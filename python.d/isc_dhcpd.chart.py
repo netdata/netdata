@@ -30,7 +30,6 @@ class Service(SimpleService):
         # Will work only with 'default' db-time-format (weekday year/month/day hour:minute:second)
         # TODO: update algorithm to parse correctly 'local' db-time-format
         # (epoch <seconds-since-epoch>; # <day-name> <month-name> <day-number> <hours>:<minutes>:<seconds> <year>)
-        # TODO: use threading to iter through file
         # Also only ipv4 supported
 
     def check(self):
@@ -50,25 +49,30 @@ class Service(SimpleService):
                 self.error('Pools configurations is incorrect')
                 return False
             
-            # Creating dynamic charts
-            self.order = ['parse_time', 'leases_size', 'utilization']
+            # Creating static charts
+            self.order = ['parse_time', 'leases_size', 'utilization', 'total']
             self.definitions = {'utilization':
                                     {'options':
-                                         [None, 'Pools utilization', 'used %', 'Utulization', 'isc_dhcpd.util', 'line'],
+                                         [None, 'Pools utilization', 'used %', 'Utilization', 'isc_dhcpd.util', 'line'],
                                      'lines': []},
+                                 'total':
+                                   {'options':
+                                        [None, 'Total all pools', 'leases', 'Utilization', 'isc_dhcpd.total', 'line'],
+                                    'lines': [['total', 'leases', 'absolute']]},
                                'parse_time':
                                    {'options':
-                                        [None, 'Parse time', 'ms', 'Parse statistics', 'isc_dhcpd.parse', 'line'],
+                                        [None, 'Parse time', 'ms', 'Parse stats', 'isc_dhcpd.parse', 'line'],
                                     'lines': [['ptime', 'time', 'absolute']]},
                                'leases_size':
                                    {'options':
-                                        [None, 'dhcpd.leases file size', 'kilobytes', 'Parse statistics', 'isc_dhcpd.lsize', 'line'],
+                                        [None, 'dhcpd.leases file size', 'kilobytes', 'Parse stats', 'isc_dhcpd.lsize', 'line'],
                                     'lines': [['lsize', 'size', 'absolute']]}}
+            # Creating dynamic charts
             for pool in self.pools:
                 self.definitions['utilization']['lines'].append([''.join(['ut_', pool]), pool, 'absolute'])
                 self.order.append(''.join(['leases_', pool]))
                 self.definitions[''.join(['leases_', pool])] = \
-                    {'options': [None, 'Active leases', 'leases', 'Leases', 'isc_dhcpd.lease', 'area'], 
+                    {'options': [None, 'Active leases', 'leases', 'Pools', 'isc_dhcpd.lease', 'area'], 
                      'lines': [[''.join(['le_', pool]), pool, 'absolute']]}
 
             self.info('Plugin was started succesfully')
@@ -130,11 +134,12 @@ class Service(SimpleService):
         final_count = {''.join(['le_', k]): v for k, v in pools_count.items()}
         final_util = {''.join(['ut_', k]): v for k, v in pools_util.items()}
         
-        to_netdata = {'lsize': int(stat(self.leases_path)[6] / 1024)}
+        to_netdata = {'total': len(active_leases)}
+        to_netdata.update({'lsize': int(stat(self.leases_path)[6] / 1024)})
         to_netdata.update({'ptime': int(raw_leases[1])})
         to_netdata.update(final_util)
         to_netdata.update(final_count)
- 
+
         return to_netdata
 
 
