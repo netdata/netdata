@@ -112,7 +112,7 @@ class Service(SimpleService):
         all_leases = {k[6:len(k)-3]:v[7:len(v)-2] for k, v in raw_leases[0].items()}
 
         # Result: [active binding, active binding....]. (Expire time (ends date;) - current time > 0)
-        active_leases = [k for k, v in all_leases.items() if is_bind_active(all_leases[k])]
+        active_leases = [k for k, v in all_leases.items() if is_binding_active(all_leases[k])]
 
         # Result: {pool: number of active bindings in pool, ...}
         pools_count = {pool: len([lease for lease in active_leases if is_address_in(lease, pool)])
@@ -138,7 +138,7 @@ class Service(SimpleService):
         return to_netdata
 
 
-def is_bind_active(binding):
+def is_binding_active(binding):
     return mktime(strptime(binding, '%w %Y/%m/%d %H:%M:%S')) - mktime(gmtime()) > 0
 
 
