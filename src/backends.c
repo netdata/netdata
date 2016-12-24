@@ -95,13 +95,35 @@ static inline int format_dimension_stored_opentsdb_telnet(BUFFER *b, const char 
 }
 
 static inline int process_graphite_response(BUFFER *b) {
-    info("Received %zu bytes from graphite backend. Ignoring them.", buffer_strlen(b));
+    char sample[1024];
+    const char *s = buffer_tostring(b);
+    char *d = sample, *e = &sample[sizeof(sample) - 1];
+
+    for(; *s && d < e ;s++) {
+        char c = *s;
+        if(unlikely(!isprint(c))) c = ' ';
+        *d++ = c;
+    }
+    *d = '\0';
+
+    info("Received %zu bytes from graphite backend. Ignoring them. Sample: '%s'", buffer_strlen(b), sample);
     buffer_flush(b);
     return 0;
 }
 
 static inline int process_opentsdb_response(BUFFER *b) {
-    info("Received %zu bytes from opentsdb backend. Ignoring them.", buffer_strlen(b));
+    char sample[1024];
+    const char *s = buffer_tostring(b);
+    char *d = sample, *e = &sample[sizeof(sample) - 1];
+
+    for(; *s && d < e ;s++) {
+        char c = *s;
+        if(unlikely(!isprint(c))) c = ' ';
+        *d++ = c;
+    }
+    *d = '\0';
+
+    info("Received %zu bytes from opentsdb backend. Ignoring them. Sample: '%s'", buffer_strlen(b), sample);
     buffer_flush(b);
     return 0;
 }
