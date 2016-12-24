@@ -3,7 +3,6 @@
 # Author: l2isbad
 
 from base import SimpleService
-from re import compile
 from time import mktime, strptime, gmtime, time
 from os import stat
 try:
@@ -12,6 +11,11 @@ try:
     have_ipaddress = True
 except ImportError:
     have_ipaddress = False
+try:
+    from itertools import filterfalse as filterfalse
+except ImportError:
+    from itertools import ifilterfalse as filterfalse
+
 
 priority = 60000
 retries = 60
@@ -26,8 +30,8 @@ class Service(SimpleService):
         # Will work only with 'default' db-time-format (weekday year/month/day hour:minute:second)
         # TODO: update algorithm to parse correctly 'local' db-time-format
         # (epoch <seconds-since-epoch>; # <day-name> <month-name> <day-number> <hours>:<minutes>:<seconds> <year>)
+        # TODO: use threading to iter through file
         # Also only ipv4 supported
-        self.regex = compile(r'\d+(?:\.\d+){3}')
 
     def check(self):
         if not self._get_raw_data():
@@ -75,31 +79,24 @@ class Service(SimpleService):
         Parses log file
         :return: tuple(
                        [ipaddress, lease end time, ...],
-                       length of list,
                        time to parse leases file
                       )
         """
         try:
             with open(self.leases_path, 'rt') as dhcp_leases:
-                raw_result = []
-
                 time_start = time()
-                for line in dhcp_leases:
-                    if line[0:3] == 'lea':
-                        raw_result.append(self.regex.search(line).group())
-                    elif line[2:6] == 'ends':
-                        raw_result.append(line[7:28])
-                    else:
-                        continue
+                part1 = filterfalse(find_lease, dhcp_leases)
+                part2 = filterfalse(find_ends, dhcp_leases)
+                raw_result = dict(zip(part1, part2))
                 time_end = time()
+
                 file_parse_time = round((time_end - time_start) * 1000)
 
         except Exception:
             return None
 
         else:
-            raw_result_length = len(raw_result)
-            result = (raw_result, raw_result_length, file_parse_time)
+            result = (raw_result, file_parse_time)
             return result
 
     def _get_data(self):
@@ -112,11 +109,10 @@ class Service(SimpleService):
             return None
 
         # Result: {ipaddress: end lease time, ...}
-        all_leases = dict(zip([raw_leases[0][_] for _ in range(0, raw_leases[1], 2)],
-                              [raw_leases[0][_] for _ in range(1, raw_leases[1], 2)]))
+        all_leases = {k[6:len(k)-3]:v[7:len(v)-2] for k, v in raw_leases[0].items()}
 
         # Result: [active binding, active binding....]. (Expire time (ends date;) - current time > 0)
-        active_leases = [k for k, v in all_leases.items() if is_binding_active(all_leases[k])]
+        active_leases = [k for k, v in all_leases.items() if is_bind_active(all_leases[k])]
 
         # Result: {pool: number of active bindings in pool, ...}
         pools_count = {pool: len([lease for lease in active_leases if is_address_in(lease, pool)])
@@ -135,14 +131,24 @@ class Service(SimpleService):
         final_util = {''.join(['ut_', k]): v for k, v in pools_util.items()}
         
         to_netdata = {'lsize': int(stat(self.leases_path)[6] / 1024)}
-        to_netdata.update({'ptime': int(raw_leases[2])})
+        to_netdata.update({'ptime': int(raw_leases[1])})
         to_netdata.update(final_util)
         to_netdata.update(final_count)
  
         return to_netdata
-    
-def is_binding_active(binding):
+
+
+def is_bind_active(binding):
     return mktime(strptime(binding, '%w %Y/%m/%d %H:%M:%S')) - mktime(gmtime()) > 0
+
 
 def is_address_in(address, pool):
     return ipaddress(address) in ip_network(pool)
+
+
+def find_lease(value):
+    return value[0:3] != 'lea'
+
+
+def find_ends(value):
+    return value[2:6] != 'ends'
