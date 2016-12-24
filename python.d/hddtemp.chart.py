@@ -82,7 +82,7 @@ class Service(SocketService):
                 val = 0
             data[raw[i*5+1].replace("/dev/", "")] = val
 
-        if not data:
+        if len(data) == 0:
             self.error("received data doesn't have needed records")
             return None
         else:
