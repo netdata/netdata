@@ -54,7 +54,7 @@ disrupting their core function._
    
  - **Highly efficient**<br/>
    collects thousands of metrics per server per second,
-   with just 1% CPU utilization of a single core, a few MB or RAM and no disk I/O at all
+   with just 1% CPU utilization of a single core, a few MB of RAM and no disk I/O at all
    
  - **Sophisticated alarming**<br/>
    supports dynamic thresholds, hysteresis, alarm templates,
