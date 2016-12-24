@@ -22,16 +22,18 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
     snprintfz(default_service, 10, "%d", default_port);
 
     char *host = buffer, *service = default_service, *interface = "";
-    int protocol = 0;
+    int protocol = IPPROTO_TCP, socktype = SOCK_STREAM;
     uint32_t scope_id = 0;
 
     if(strncmp(host, "tcp:", 4) == 0) {
         host += 4;
         protocol = IPPROTO_TCP;
+        socktype = SOCK_STREAM;
     }
     else if(strncmp(host, "udp:", 4) == 0) {
         host += 4;
         protocol = IPPROTO_UDP;
+        socktype = SOCK_DGRAM;
     }
 
     char *e = host;
@@ -76,10 +78,10 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
     if(!*service)
         service = default_service;
 
-    memset(&hints, 0, sizeof(struct addrinfo));
+    memset(&hints, 0, sizeof(hints));
     hints.ai_family   = PF_UNSPEC;   /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_DGRAM;  /* Datagram socket */
-    hints.ai_protocol = protocol;    /* The required protocol */
+    hints.ai_socktype = socktype;
+    hints.ai_protocol = protocol;
 
     int ai_err = getaddrinfo(host, service, &hints, &ai_head);
     if (ai_err != 0) {
