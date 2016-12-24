@@ -85,7 +85,7 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
 
     int ai_err = getaddrinfo(host, service, &hints, &ai_head);
     if (ai_err != 0) {
-        error("Cannot resolve host '%s', port '%s': %s\n", host, service, gai_strerror(ai_err));
+        error("Cannot resolve host '%s', port '%s': %s", host, service, gai_strerror(ai_err));
         return -1;
     }
 
