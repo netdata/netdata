@@ -228,7 +228,9 @@ void *backends_main(void *ptr) {
             chart_lost_metrics = 0,
             chart_sent_metrics = 0,
             chart_buffered_bytes = 0,
+            chart_received_bytes = 0,
             chart_sent_bytes = 0,
+            chart_receptions = 0,
             chart_transmission_successes = 0,
             chart_transmission_failures = 0,
             chart_data_lost_events = 0,
@@ -239,26 +241,28 @@ void *backends_main(void *ptr) {
     RRDSET *chart_metrics = rrdset_find("netdata.backend_metrics");
     if(!chart_metrics) {
         chart_metrics = rrdset_create("netdata", "backend_metrics", NULL, "backend", NULL, "Netdata Buffered Metrics", "metrics", 130600, frequency, RRDSET_TYPE_LINE);
-        rrddim_add(chart_metrics, "buffered", NULL,   1, 1, RRDDIM_ABSOLUTE);
-        rrddim_add(chart_metrics, "lost",     NULL,   1, 1, RRDDIM_ABSOLUTE);
-        rrddim_add(chart_metrics, "sent",     NULL,   1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_metrics, "buffered", NULL,  1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_metrics, "lost",     NULL,  1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_metrics, "sent",     NULL,  1, 1, RRDDIM_ABSOLUTE);
     }
 
     RRDSET *chart_bytes = rrdset_find("netdata.backend_bytes");
     if(!chart_bytes) {
         chart_bytes = rrdset_create("netdata", "backend_bytes", NULL, "backend", NULL, "Netdata Backend Data Size", "KB", 130610, frequency, RRDSET_TYPE_AREA);
-        rrddim_add(chart_bytes, "buffered", NULL,  1, 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(chart_bytes, "lost",     NULL,  1, 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(chart_bytes, "sent",     NULL,  1, 1024, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_bytes, "buffered", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_bytes, "lost",     NULL, 1, 1024, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_bytes, "sent",     NULL, 1, 1024, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_bytes, "received", NULL, 1, 1024, RRDDIM_ABSOLUTE);
     }
 
     RRDSET *chart_ops = rrdset_find("netdata.backend_ops");
     if(!chart_ops) {
         chart_ops = rrdset_create("netdata", "backend_ops", NULL, "backend", NULL, "Netdata Backend Operations", "operations", 130630, frequency, RRDSET_TYPE_LINE);
-        rrddim_add(chart_ops, "write",     NULL,  1, 1, RRDDIM_ABSOLUTE);
-        rrddim_add(chart_ops, "discard",   NULL,  1, 1, RRDDIM_ABSOLUTE);
-        rrddim_add(chart_ops, "reconnect", NULL,  1, 1, RRDDIM_ABSOLUTE);
-        rrddim_add(chart_ops, "failure",   NULL,  1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_ops, "write",     NULL, 1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_ops, "discard",   NULL, 1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_ops, "reconnect", NULL, 1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_ops, "failure",   NULL, 1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(chart_ops, "read",      NULL, 1, 1, RRDDIM_ABSOLUTE);
     }
 
     RRDSET *chart_latency = rrdset_find("netdata.backend_latency");
@@ -332,6 +336,7 @@ void *backends_main(void *ptr) {
         chart_buffered_bytes = (collected_number)buffer_strlen(b);
 
         // reset the monitoring chart counters
+        chart_received_bytes =
         chart_sent_bytes =
         chart_sent_metrics =
         chart_lost_metrics =
@@ -358,11 +363,12 @@ void *backends_main(void *ptr) {
                 while(sock != -1 && errno != EWOULDBLOCK) {
                     buffer_need_bytes(response, 4096);
 
-                    ssize_t r = recv(sock, &response->buffer[response->len], response->size - response->len
-                                     , O_NONBLOCK);
+                    ssize_t r = recv(sock, &response->buffer[response->len], response->size - response->len, O_NONBLOCK);
                     if(likely(r > 0)) {
                         // we received some data
                         response->len += r;
+                        chart_received_bytes += r;
+                        chart_receptions++;
                     }
                     else if(r == 0) {
                         error("Backend '%s' closed the socket", destination);
@@ -371,8 +377,9 @@ void *backends_main(void *ptr) {
                     }
                     else {
                         // failed to receive data
-                        if(errno != EAGAIN && errno != EWOULDBLOCK)
+                        if(errno != EAGAIN && errno != EWOULDBLOCK) {
                             error("Cannot receive data from backend '%s'.", destination);
+                        }
                     }
                 }
 
@@ -499,6 +506,7 @@ void *backends_main(void *ptr) {
         // update the monitoring charts
 
         if(chart_ops->counter_done) rrdset_next(chart_ops);
+        rrddim_set(chart_ops, "read",         chart_receptions);
         rrddim_set(chart_ops, "write",        chart_transmission_successes);
         rrddim_set(chart_ops, "discard",      chart_data_lost_events);
         rrddim_set(chart_ops, "failure",      chart_transmission_failures);
@@ -515,6 +523,7 @@ void *backends_main(void *ptr) {
         rrddim_set(chart_bytes, "buffered",   chart_buffered_bytes);
         rrddim_set(chart_bytes, "lost",       chart_lost_bytes);
         rrddim_set(chart_bytes, "sent",       chart_sent_bytes);
+        rrddim_set(chart_bytes, "received",   chart_received_bytes);
         rrdset_done(chart_bytes);
 
         if(chart_latency->counter_done) rrdset_next(chart_latency);
