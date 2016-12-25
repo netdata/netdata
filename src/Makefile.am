@@ -45,6 +45,7 @@ netdata_SOURCES = \
 	plugin_tc.c plugin_tc.h \
 	plugins_d.c plugins_d.h \
 	popen.c popen.h \
+	socket.c socket.h \
 	sys_fs_cgroup.c \
 	procfile.c procfile.h \
 	proc_self_mountinfo.c proc_self_mountinfo.h \

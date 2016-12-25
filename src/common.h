@@ -60,6 +60,8 @@
 #include <netdb.h>
 #endif
 
+#include <net/if.h>
+
 #include <poll.h>
 #include <signal.h>
 #include <syslog.h>
@@ -141,6 +143,8 @@
 #endif /* __FreeBSD__ || __APPLE__*/
 #include "plugin_tc.h"
 #include "plugins_d.h"
+
+#include "socket.h"
 
 #include "eval.h"
 #include "health.h"
