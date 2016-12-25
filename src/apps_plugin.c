@@ -189,10 +189,11 @@ struct target *get_groups_target(gid_t gid)
 
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
-struct target *get_apps_groups_target(const char *id, struct target *target) {
-    int tdebug = 0, thidden = 0, ends_with = 0;
+struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
+    int tdebug = 0, thidden = target?target->hidden:0, ends_with = 0;
     const char *nid = id;
 
+    // extract the options
     while(nid[0] == '-' || nid[0] == '+' || nid[0] == '*') {
         if(nid[0] == '-') thidden = 1;
         if(nid[0] == '+') tdebug = 1;
@@ -201,6 +202,7 @@ struct target *get_apps_groups_target(const char *id, struct target *target) {
     }
     uint32_t hash = simple_hash(id);
 
+    // find if it already exists
     struct target *w, *last = apps_groups_root_target;
     for(w = apps_groups_root_target ; w ; w = w->next) {
         if(w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
@@ -209,11 +211,37 @@ struct target *get_apps_groups_target(const char *id, struct target *target) {
         last = w;
     }
 
+    // find an existing target
+    if(unlikely(!target)) {
+        while(*name == '-') {
+            if(*name == '-') thidden = 1;
+            name++;
+        }
+        for(target = apps_groups_root_target ; target ; target = target->next) {
+            if(!target->target && strcmp(name, target->name) == 0)
+                break;
+        }
+        if(unlikely(debug)) {
+            if(unlikely(target))
+                fprintf(stderr, "apps.plugin: REUSING TARGET NAME '%s' on ID '%s'\n", target->name, target->id);
+            else
+                fprintf(stderr, "apps.plugin: NEW TARGET NAME '%s' on ID '%s'\n", name, id);
+        }
+    }
+
+    if(target && target->target)
+        fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id, target->id, target->target->id);
+
     w = callocz(sizeof(struct target), 1);
     strncpyz(w->id, nid, MAX_NAME);
     w->idhash = simple_hash(w->id);
 
-    strncpyz(w->name, nid, MAX_NAME);
+    if(unlikely(!target))
+        // copy the name
+        strncpyz(w->name, name, MAX_NAME);
+    else
+        // copy the id
+        strncpyz(w->name, nid, MAX_NAME);
 
     strncpyz(w->compare, nid, MAX_COMPARE_NAME);
     size_t len = strlen(w->compare);
@@ -241,7 +269,7 @@ struct target *get_apps_groups_target(const char *id, struct target *target) {
         fprintf(stderr, "apps.plugin: ADDING TARGET ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s\n"
                 , w->id
                 , w->compare, (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
-                , w->target?w->target->id:w->id
+                , w->target?w->target->name:w->name
                 , (w->hidden)?"hidden":"-"
                 , (w->debug)?"debug":"-"
         );
@@ -250,11 +278,11 @@ struct target *get_apps_groups_target(const char *id, struct target *target) {
 }
 
 // read the apps_groups.conf file
-int read_apps_groups_conf(const char *name)
+int read_apps_groups_conf(const char *file)
 {
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", config_dir, name);
+    snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", config_dir, file);
 
     if(unlikely(debug))
         fprintf(stderr, "apps.plugin: process groups file: '%s'\n", filename);
@@ -274,59 +302,45 @@ int read_apps_groups_conf(const char *name)
 
     for(line = 0; line < lines ;line++) {
         unsigned long word, words = procfile_linewords(ff, line);
+        if(!words) continue;
+
+        char *name = procfile_lineword(ff, line, 0);
+        if(!name || !*name) continue;
+
+        // find a possibly existing target
         struct target *w = NULL;
 
-        char *t = procfile_lineword(ff, line, 0);
-        if(!t || !*t) continue;
-
+        // loop through all words, skipping the first one (the name)
         for(word = 0; word < words ;word++) {
             char *s = procfile_lineword(ff, line, word);
             if(!s || !*s) continue;
             if(*s == '#') break;
 
-            if(t == s) continue;
+            // is this the first word? skip it
+            if(s == name) continue;
 
-            struct target *n = get_apps_groups_target(s, w);
+            // add this target
+            struct target *n = get_apps_groups_target(s, w, name);
             if(!n) {
                 error("Cannot create target '%s' (line %lu, word %lu)", s, line, word);
                 continue;
             }
 
-            if(!w) w = n;
-        }
-
-        if(w) {
-            int tdebug = 0, thidden = 0;
-
-            while(t[0] == '-' || t[0] == '+') {
-                if(t[0] == '-') thidden = 1;
-                if(t[0] == '+') tdebug = 1;
-                t++;
-            }
-
-            strncpyz(w->name, t, MAX_NAME);
-            w->hidden = thidden;
-            w->debug = tdebug;
-
-            if(unlikely(debug))
-                fprintf(stderr, "apps.plugin: AGGREGATION TARGET NAME '%s' on ID '%s', process name '%s' (%s), aggregated on target '%s', options: %s %s\n"
-                        , w->name
-                        , w->id
-                        , w->compare, (w->starts_with && w->ends_with)?"substring":((w->starts_with)?"prefix":((w->ends_with)?"suffix":"exact"))
-                        , w->target?w->target->id:w->id
-                        , (w->hidden)?"hidden":"-"
-                        , (w->debug)?"debug":"-"
-                );
+            // just some optimization
+            // to avoid searching for a target for each process
+            if(!w) w = n->target?n->target:n;
         }
     }
 
     procfile_close(ff);
 
-    apps_groups_default_target = get_apps_groups_target("p+!o@w#e$i^r&7*5(-i)l-o_", NULL); // match nothing
+    apps_groups_default_target = get_apps_groups_target("p+!o@w#e$i^r&7*5(-i)l-o_", NULL, "other"); // match nothing
     if(!apps_groups_default_target)
-        error("Cannot create default target");
-    else
-        strncpyz(apps_groups_default_target->name, "other", MAX_NAME);
+        fatal("Cannot create default target");
+
+    // allow the user to override group 'other'
+    if(apps_groups_default_target->target)
+        apps_groups_default_target = apps_groups_default_target->target;
 
     return 0;
 }
