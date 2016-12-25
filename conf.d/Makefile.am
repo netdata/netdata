@@ -32,6 +32,7 @@ dist_pythonconfig_DATA = \
     python.d/freeradius.conf \
     python.d/hddtemp.conf \
     python.d/ipfs.conf \
+    python.d/isc_dhcpd.conf \
     python.d/memcached.conf \
     python.d/mysql.conf \
     python.d/nginx.conf \
