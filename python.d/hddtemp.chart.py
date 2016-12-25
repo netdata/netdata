@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: hddtemp netdata python.d module
 # Author: Pawel Krupa (paulfantom)
+# Modified by l2isbad
 
 import os
 from base import SocketService
@@ -21,15 +22,6 @@ retries = 60
 
 ORDER = ['temperatures']
 
-CHARTS = {
-    'temperatures': {
-        'options': ['disks_temp', 'Disks Temperatures', 'Celsius', 'temperatures', 'hddtemp.temperatures', 'line'],
-        'lines': [
-            # lines are created dynamically in `check()` method
-        ]}
-}
-
-
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
@@ -38,7 +30,10 @@ class Service(SocketService):
         self.host = "127.0.0.1"
         self.port = 7634
         self.order = ORDER
-        self.definitions = CHARTS
+        self.fahrenheit = ('Fahrenheit', lambda x: x * 9 / 5 + 32)  if self.configuration.get('fahrenheit') else False
+        self.whatever = ('Whatever', lambda x: x * 33 / 22 + 11) if self.configuration.get('whatever') else False
+        self.choice = (choice for choice in [self.fahrenheit, self.whatever] if choice)
+        self.calc = lambda x: x
         self.disks = []
 
     def _get_disks(self):
@@ -82,7 +77,7 @@ class Service(SocketService):
             if not raw[i*5+1] in self.disks:
                 continue
             try:
-                val = int(raw[i*5+3])
+                val = self.calc(int(raw[i*5+3]))
             except ValueError:
                 val = 0
             data[raw[i*5+1].replace("/dev/", "")] = val
@@ -105,9 +100,21 @@ class Service(SocketService):
         if data is None:
             return False
 
+        self.definitions = {
+            'temperatures': {
+            'options': ['disks_temp', 'Disks Temperatures', 'temperatures', 'hddtemp.temperatures', 'line'],
+            'lines': [
+                # lines are created dynamically in `check()` method
+                          ]}
+                      }
+        try:
+            self.choice = next(self.choice)
+        except StopIteration:
+            self.definitions[ORDER[0]]['options'].insert(2, 'Celsius')
+        else:
+            self.calc = self.choice[1]
+            self.definitions[ORDER[0]]['options'].insert(2, self.choice[0])
+
         for name in data:
             self.definitions[ORDER[0]]['lines'].append([name])
-
         return True
-
-
