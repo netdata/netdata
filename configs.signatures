@@ -114,6 +114,7 @@ declare -A configs_signatures=(
   ['5379cdc26d7725e2b0d688d785816cef']='python.d/mysql.conf'
   ['54614490a14e1a4b7b3d9fecb6b4cfa5']='python.d/exim.conf'
   ['55608bdd908a3806df1468f6ee318b2b']='health.d/qos.conf'
+  ['5598b83e915e31f68027afe324a427cd']='apps_groups.conf'
   ['565f11c38ae6bd5cc9d3c2adb542bc1b']='health.d/softnet.conf'
   ['5664a814f9351b55da76edd472169a73']='health_alarm_notify.conf'
   ['573398335c0c71c075fa57f702bce287']='health.d/disks.conf'
