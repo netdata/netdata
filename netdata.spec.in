@@ -35,12 +35,24 @@ Group:		Applications/System
 Source0:	http://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
 URL:		http://my-netdata.io/
 %distro_buildrequires
+BuildRequires:	/usr/bin/autoconf
+BuildRequires:	/usr/bin/automake
 BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
 BuildRequires:	libuuid-devel
-Requires: zlib
-Requires: libuuid
+Requires:	zlib
+Requires:	libuuid
+Requires(post): libcap
+Recommends:	curl
+Recommends:	iproute-tc
+Recommends:	lm_sensors
+Recommends:	nmap-ncat
+Recommends:	nodejs
+Recommends:	python
+Recommends:	PyYAML
+Recommends:	python2-PyMySQL
+Recommends:	python2-psycopg2
 
 # Packages can be found in the EPEL repo
 %if %{with nfacct}
@@ -79,6 +91,7 @@ happened, on your systems and applications.
 %setup -q
 
 %build
+./autogen.sh
 %configure \
 	--with-zlib \
 	--with-math \
@@ -115,6 +128,7 @@ install -m755 system/netdata-init-d \
 
 %post
 %distro_post
+setcap cap_dac_read,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/apps.plugin || chmod 1755 /usr/libexec/netdata/plugins.d/apps.plugin
 
 %preun
 %distro_preun
@@ -125,12 +139,14 @@ install -m755 system/netdata-init-d \
 %pre
 # Add the "netdata" user
 getent group netdata >/dev/null || groupadd -r netdata
+getent group docker >/dev/null || groupadd -r docker
 getent passwd netdata >/dev/null || \
-  useradd -r -g netdata -s /sbin/nologin \
+  useradd -r -g netdata -G docker -s /sbin/nologin \
     -d %{contentdir} -c "netdata" netdata
 exit 0
 
 %post
+setcap cap_dac_read,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/apps.plugin || chmod 1755 /usr/libexec/netdata/plugins.d/apps.plugin
 # Register the netdata service
 /sbin/chkconfig --add netdata
 # Only gets run on initial install (not upgrades or uninstalls)
@@ -160,16 +176,22 @@ exit 0
 rm -rf $RPM_BUILD_ROOT
 
 %files
+%doc README.md
 %defattr(-,root,root)
 
 %dir %{_sysconfdir}/%{name}
 
 %config(noreplace) %{_sysconfdir}/%{name}/*.conf
-#%config(noreplace) %{_sysconfdir}/%{name}/charts.d/*.conf
+%config(noreplace) %{_sysconfdir}/%{name}/charts.d/*.conf
 %config(noreplace) %{_sysconfdir}/%{name}/health.d/*.conf
-#%config(noreplace) %{_sysconfdir}/%{name}/node.d/*.conf
+#%%config(noreplace) %{_sysconfdir}/%{name}/node.d/*.conf
 %config(noreplace) %{_sysconfdir}/%{name}/python.d/*.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
+
+# To be eventually moved to %%_defaultdocdir
+%{_sysconfdir}/%{name}/node.d/*.md
+
+%caps(cap_dac_read_search,cap_sys_ptrace=ep) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
