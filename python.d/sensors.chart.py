@@ -77,6 +77,9 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = []
         self.definitions = {}
+        self.celsius = ('Celsius', lambda x: x)
+        self.fahrenheit = ('Fahrenheit', lambda x: x * 9 / 5 + 32)  if self.configuration.get('fahrenheit') else False
+        self.choice = (choice for choice in [self.fahrenheit, self.celsius] if choice)
         self.chips = []
 
     def _get_data(self):
@@ -94,7 +97,10 @@ class Service(SimpleService):
                         limit = LIMITS[typeName];
                         if val < limit[0] or val > limit[1]:
                             continue
-                    data[prefix + "_" + str(feature.name.decode())] = int(val * 1000)
+                    if 'temp' in str(feature.name.decode()):
+                        data[prefix + "_" + str(feature.name.decode())] = int(self.calc(val) * 1000)
+                    else:
+                        data[prefix + "_" + str(feature.name.decode())] = int(val * 1000)
         except Exception as e:
             self.error(e)
             return None
@@ -121,6 +127,8 @@ class Service(SimpleService):
                             self.order.append(name)
                             chart_def = list(CHARTS[type]['options'])
                             chart_def[1] = chip_name + chart_def[1]
+                            if chart_def[2] == 'Celsius':
+                                chart_def[2] = self.choice[0]
                             self.definitions[name] = {'options': chart_def}
                             self.definitions[name]['lines'] = []
                         line = list(CHARTS[type]['lines'][0])
@@ -134,10 +142,20 @@ class Service(SimpleService):
         except Exception as e:
             self.error(e)
             return False
+        
+        try:
+            self.choice = next(self.choice)
+        except StopIteration:
+            # That can not happen but..
+            self.choice = ('Celsius', lambda x: x)
+            self.calc = self.choice[1]
+        else:
+            self.calc = self.choice[1]
 
         try:
             self._create_definitions()
         except Exception as e:
             self.error(e)
             return False
+
         return True
