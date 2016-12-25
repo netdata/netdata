@@ -265,11 +265,19 @@ void *backends_main(void *ptr) {
         rrddim_add(chart_ops, "read",      NULL, 1, 1, RRDDIM_ABSOLUTE);
     }
 
+    /*
+     * this is misleading - we can only measure the time we need to send data
+     * this time is not related to the time required for the data to travel to
+     * the backend database and the time that server needed to process them
+     *
+     * issue #1432 and https://www.softlab.ntua.gr/facilities/documentation/unix/unix-socket-faq/unix-socket-faq-2.html
+     *
     RRDSET *chart_latency = rrdset_find("netdata.backend_latency");
     if(!chart_latency) {
         chart_latency = rrdset_create("netdata", "backend_latency", NULL, "backend", NULL, "Netdata Backend Latency", "ms", 130620, frequency, RRDSET_TYPE_AREA);
         rrddim_add(chart_latency, "latency",   NULL,  1, 1000, RRDDIM_ABSOLUTE);
     }
+    */
 
     RRDSET *chart_rusage = rrdset_find("netdata.backend_thread_cpu");
     if(!chart_rusage) {
@@ -356,53 +364,35 @@ void *backends_main(void *ptr) {
         // if we are connected, receive a response, without blocking
 
         if(likely(sock != -1)) {
-            if(likely(fcntl(sock, F_SETFL, O_NONBLOCK) >= 0)) {
-                errno = 0;
+            errno = 0;
 
-                // loop through to collect all data
-                while(sock != -1 && errno != EWOULDBLOCK) {
-                    buffer_need_bytes(response, 4096);
+            // loop through to collect all data
+            while(sock != -1 && errno != EWOULDBLOCK) {
+                buffer_need_bytes(response, 4096);
 
-                    ssize_t r = recv(sock, &response->buffer[response->len], response->size - response->len, O_NONBLOCK);
-                    if(likely(r > 0)) {
-                        // we received some data
-                        response->len += r;
-                        chart_received_bytes += r;
-                        chart_receptions++;
-                    }
-                    else if(r == 0) {
-                        error("Backend '%s' closed the socket", destination);
-                        close(sock);
-                        sock = -1;
-                    }
-                    else {
-                        // failed to receive data
-                        if(errno != EAGAIN && errno != EWOULDBLOCK) {
-                            error("Cannot receive data from backend '%s'.", destination);
-                        }
+                ssize_t r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+                if(likely(r > 0)) {
+                    // we received some data
+                    response->len += r;
+                    chart_received_bytes += r;
+                    chart_receptions++;
+                }
+                else if(r == 0) {
+                    error("Backend '%s' closed the socket", destination);
+                    close(sock);
+                    sock = -1;
+                }
+                else {
+                    // failed to receive data
+                    if(errno != EAGAIN && errno != EWOULDBLOCK) {
+                        error("Cannot receive data from backend '%s'.", destination);
                     }
                 }
-
-                if(sock != -1) {
-                    // unset O_NONBLOCK
-                    int val = fcntl(sock, F_GETFL, 0);
-                    if(likely(val >= 0)) {
-                        int flags = O_NONBLOCK;
-                        val &= ~flags;
-                        if(unlikely(fcntl(sock, F_SETFL, val) < 0))
-                            error("Cannot unset O_NONBLOCK from backend's '%s' socket.", destination);
-                    }
-                    else
-                        error("Cannot get active flags from backend's '%s' socket.", destination);
-                }
-
-                // if we received data, process them
-                if(buffer_strlen(response))
-                    backend_response_checker(response);
             }
-            else {
-                error("Cannot set O_NONBLOCK from backend's '%s' socket. Receiving data from backend skipped.", destination);
-            }
+
+            // if we received data, process them
+            if(buffer_strlen(response))
+                backend_response_checker(response);
         }
 
         // ------------------------------------------------------------------------
@@ -526,9 +516,11 @@ void *backends_main(void *ptr) {
         rrddim_set(chart_bytes, "received",   chart_received_bytes);
         rrdset_done(chart_bytes);
 
+        /*
         if(chart_latency->counter_done) rrdset_next(chart_latency);
         rrddim_set(chart_latency, "latency",  chart_backend_latency);
         rrdset_done(chart_latency);
+        */
 
         getrusage(RUSAGE_THREAD, &thread);
         if(chart_rusage->counter_done) rrdset_next(chart_rusage);

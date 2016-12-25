@@ -7,7 +7,7 @@
 //    [PROTOCOL:]IP[%INTERFACE][:PORT]
 //
 // PROTOCOL  = tcp or udp
-// IP        = IPv4 or IPv6 IP or hostname, optionaly enclosed in [] (required for IPv6)
+// IP        = IPv4 or IPv6 IP or hostname, optionally enclosed in [] (required for IPv6)
 // INTERFACE = for IPv6 only, the network interface to use
 // PORT      = port number or service name
 
