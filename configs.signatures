@@ -79,6 +79,7 @@ declare -A configs_signatures=(
   ['3cc6255457d4cba881ae0554ae5d9190']='health.d/squid.conf'
   ['3f170e3343cd784983b019163393f5af']='health.d/nginx.conf'
   ['3fc45cc18e884c22482524dff6d27833']='python.d/hddtemp.conf'
+  ['3fcc3c449ce8e0388f9c23ca07cab608']='health.d/backend.conf'
   ['4063a01bffb43b0423425d1ba3004967']='health.d/tcp_resets.conf'
   ['421d5dc6c2fce22d0816b6e6363bea57']='python.d/hddtemp.conf'
   ['42ad0e70b1365b6e7244cc305dbaa529']='health_alarm_notify.conf'

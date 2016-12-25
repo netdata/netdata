@@ -68,7 +68,7 @@ DIMENSION output_voltage_nominal nominal absolute 1 100
 CHART apcupsd.load '' "UPS Load" "percentage" ups apcupsd.load area $((apcupsd_priority)) $apcupsd_update_every
 DIMENSION load load absolute 1 100
 
-CHART apcupsd.temp '' "UPS Temperature" "Celcius" ups apcupsd.temperature line $((apcupsd_priority + 7)) $apcupsd_update_every
+CHART apcupsd.temp '' "UPS Temperature" "Celsius" ups apcupsd.temperature line $((apcupsd_priority + 7)) $apcupsd_update_every
 DIMENSION temp temp absolute 1 100
 
 CHART apcupsd.time '' "UPS Time Remaining" "Minutes" ups apcupsd.time area $((apcupsd_priority + 2)) $apcupsd_update_every
