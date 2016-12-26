@@ -67,6 +67,13 @@ netdata_SOURCES += \
 	freebsd_sysctl.c \
 	$(NULL)
 else
+if MACOS
+netdata_SOURCES += \
+	plugin_macos.c plugin_macos.h \
+	macos_sysctl.c \
+	macos_mach_smi.c \
+	$(NULL)
+else
 netdata_SOURCES += \
 	plugin_proc.c plugin_proc.h \
 	proc_diskstats.c \
@@ -90,6 +97,7 @@ netdata_SOURCES += \
 	ipc.c ipc.h \
 	sys_kernel_mm_ksm.c \
 	$(NULL)
+endif
 endif
 
 netdata_LDADD = \

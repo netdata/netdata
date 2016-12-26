@@ -45,13 +45,14 @@ freebsd*)
 	build_target=freebsd
 	;;
 darwin*)
-	build_target=freebsd
+	build_target=macos
 	;;
 *)
 	;;
 esac
 
 AM_CONDITIONAL([FREEBSD], [test x$build_target = xfreebsd])
+AM_CONDITIONAL([MACOS], [test x$build_target = xmacos])
 
 AC_ARG_ENABLE(
 	[plugin-nfacct],
