@@ -126,7 +126,7 @@
     NETDATA.themes = {
         white: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20161002-1',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20161226-1',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#F0F0F0',
@@ -143,7 +143,7 @@
         },
         slate: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161218-2',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161218-1',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161226-1',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
@@ -2197,6 +2197,10 @@
             if(typeof series === 'undefined') return;
             if(series.value === null && series.user === null) return;
 
+            /*
+            // this slows down firefox and edge significantly
+            // since it requires to use innerHTML(), instead of innerText()
+
             // if the value has not changed, skip DOM update
             //if(series.last === value) return;
 
@@ -2211,15 +2215,48 @@
                     else s += '<i class="fa fa-angle-left" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
                 }
                 else s += '<i class="fa fa-angle-right" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+
                 series.last = v;
             }
             else {
-                s = r = value;
+                if(value === null)
+                    s = r = '';
+                else
+                    s = r = value;
+
                 series.last = value;
             }
+            */
 
-            if(series.value !== null) series.value.innerHTML = s;
-            if(series.user !== null) series.user.innerHTML = r;
+            var s = this.legendFormatValue(value);
+
+            // caching: do not update the update to show the same value again
+            if(s === series.last_shown_value) return;
+            series.last_shown_value = s;
+
+            if(series.value !== null) series.value.innerText = s;
+            if(series.user !== null) series.user.innerText = s;
+        };
+
+        this.__legendSetDateString = function(date) {
+            if(date !== this.__last_shown_legend_date) {
+                this.element_legend_childs.title_date.innerText = date;
+                this.__last_shown_legend_date = date;
+            }
+        };
+
+        this.__legendSetTimeString = function(time) {
+            if(time !== this.__last_shown_legend_time) {
+                this.element_legend_childs.title_time.innerText = time;
+                this.__last_shown_legend_time = time;
+            }
+        };
+
+        this.__legendSetUnitsString = function(units) {
+            if(units !== this.__last_shown_legend_units) {
+                this.element_legend_childs.title_units.innerText = units;
+                this.__last_shown_legend_units = units;
+            }
         };
 
         this.legendSetDate = function(ms) {
@@ -2231,24 +2268,24 @@
             var d = new Date(ms);
 
             if(this.element_legend_childs.title_date)
-                this.element_legend_childs.title_date.innerHTML = d.toLocaleDateString();
+                this.__legendSetDateString(d.toLocaleDateString());
 
             if(this.element_legend_childs.title_time)
-                this.element_legend_childs.title_time.innerHTML = d.toLocaleTimeString();
+                this.__legendSetTimeString(d.toLocaleTimeString());
 
             if(this.element_legend_childs.title_units)
-                this.element_legend_childs.title_units.innerHTML = this.units;
+                this.__legendSetUnitsString(this.units)
         };
 
         this.legendShowUndefined = function() {
             if(this.element_legend_childs.title_date)
-                this.element_legend_childs.title_date.innerHTML = '&nbsp;';
+                this.__legendSetDateString(' ');
 
             if(this.element_legend_childs.title_time)
-                this.element_legend_childs.title_time.innerHTML = this.chart.name;
+                this.__legendSetTimeString(this.chart.name);
 
             if(this.element_legend_childs.title_units)
-                this.element_legend_childs.title_units.innerHTML = '&nbsp;';
+                this.__legendSetUnitsString(' ')
 
             if(this.data && this.element_legend_childs.series !== null) {
                 var labels = this.data.dimension_names;
@@ -2439,7 +2476,8 @@
                     name: document.createElement('span'),
                     value: document.createElement('span'),
                     user: user_element,
-                    last: null
+                    last: null,
+                    last_shown_value: null
                 };
 
                 var label = state.element_legend_childs.series[name];
@@ -3009,7 +3047,7 @@
             NETDATA.options.auto_refresher_fast_weight += this.refresh_dt_ms;
 
             if(this.refresh_dt_element !== null)
-                this.refresh_dt_element.innerHTML = this.refresh_dt_ms.toString();
+                this.refresh_dt_element.innerText = this.refresh_dt_ms.toString();
         };
 
         this.updateChart = function(callback) {
@@ -4207,9 +4245,12 @@
                         return NETDATA.zeropad(d.getHours()) + ":" + NETDATA.zeropad(d.getMinutes()) + ":" + NETDATA.zeropad(d.getSeconds());
                     },
                     valueFormatter: function (ms) {
-                        var d = new Date(ms);
-                        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
-                        // return NETDATA.zeropad(d.getHours()) + ":" + NETDATA.zeropad(d.getMinutes()) + ":" + NETDATA.zeropad(d.getSeconds());
+                        //var d = new Date(ms);
+                        //return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+
+                        // no need to return anything here
+                        return ' ';
+
                     }
                 },
                 y: {
@@ -4235,8 +4276,8 @@
                     var i = data.series.length;
                     while(i--) {
                         var series = data.series[i];
-                        if(!series.isVisible) continue;
-                        state.legendSetLabelValue(series.label, series.y);
+                        if(series.isVisible === true)
+                            state.legendSetLabelValue(series.label, series.y);
                     }
                 }
 
@@ -5085,7 +5126,7 @@
             NETDATA.easypiechartChartUpdate(state, state.data);
         }
         else {
-            state.easyPieChartLabel.innerHTML = state.legendFormatValue(null);
+            state.easyPieChartLabel.innerText = state.legendFormatValue(null);
             state.easyPieChart_instance.update(0);
         }
         state.easyPieChart_instance.enableAnimation();
@@ -5116,7 +5157,7 @@
 
         state.easyPieChartEvent.value = value;
         state.easyPieChartEvent.pcent = pcent;
-        state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
+        state.easyPieChartLabel.innerText = state.legendFormatValue(value);
 
         if(state.easyPieChartEvent.timer === null) {
             state.easyPieChart_instance.disableAnimation();
@@ -5144,7 +5185,7 @@
             pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
         }
 
-        state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
+        state.easyPieChartLabel.innerText = state.legendFormatValue(value);
         state.easyPieChart_instance.update(pcent);
         return true;
     };
@@ -5194,7 +5235,7 @@
         var valuetop = Math.round((size - valuefontsize - (size / 40)) / 2);
         state.easyPieChartLabel = document.createElement('span');
         state.easyPieChartLabel.className = 'easyPieChartLabel';
-        state.easyPieChartLabel.innerHTML = state.legendFormatValue(value);
+        state.easyPieChartLabel.innerText = state.legendFormatValue(value);
         state.easyPieChartLabel.style.fontSize = valuefontsize + 'px';
         state.easyPieChartLabel.style.top = valuetop.toString() + 'px';
         state.element_chart.appendChild(state.easyPieChartLabel);
@@ -5203,7 +5244,7 @@
         var titletop = Math.round(valuetop - (titlefontsize * 2) - (size / 40));
         state.easyPieChartTitle = document.createElement('span');
         state.easyPieChartTitle.className = 'easyPieChartTitle';
-        state.easyPieChartTitle.innerHTML = state.title;
+        state.easyPieChartTitle.innerText = state.title;
         state.easyPieChartTitle.style.fontSize = titlefontsize + 'px';
         state.easyPieChartTitle.style.lineHeight = titlefontsize + 'px';
         state.easyPieChartTitle.style.top = titletop.toString() + 'px';
@@ -5213,7 +5254,7 @@
         var unittop = Math.round(valuetop + (valuefontsize + unitfontsize) + (size / 40));
         state.easyPieChartUnits = document.createElement('span');
         state.easyPieChartUnits.className = 'easyPieChartUnits';
-        state.easyPieChartUnits.innerHTML = state.units;
+        state.easyPieChartUnits.innerText = state.units;
         state.easyPieChartUnits.style.fontSize = unitfontsize + 'px';
         state.easyPieChartUnits.style.top = unittop.toString() + 'px';
         state.element_chart.appendChild(state.easyPieChartUnits);
@@ -5337,15 +5378,15 @@
     NETDATA.gaugeSetLabels = function(state, value, min, max) {
         if(state.___gaugeOld__.valueLabel !== value) {
             state.___gaugeOld__.valueLabel = value;
-            state.gaugeChartLabel.innerHTML = state.legendFormatValue(value);
+            state.gaugeChartLabel.innerText = state.legendFormatValue(value);
         }
         if(state.___gaugeOld__.minLabel !== min) {
             state.___gaugeOld__.minLabel = min;
-            state.gaugeChartMin.innerHTML = state.legendFormatValue(min);
+            state.gaugeChartMin.innerText = state.legendFormatValue(min);
         }
         if(state.___gaugeOld__.maxLabel !== max) {
             state.___gaugeOld__.maxLabel = max;
-            state.gaugeChartMax.innerHTML = state.legendFormatValue(max);
+            state.gaugeChartMax.innerText = state.legendFormatValue(max);
         }
     };
 
@@ -5555,7 +5596,7 @@
         var titletop = 0;
         state.gaugeChartTitle = document.createElement('span');
         state.gaugeChartTitle.className = 'gaugeChartTitle';
-        state.gaugeChartTitle.innerHTML = state.title;
+        state.gaugeChartTitle.innerText = state.title;
         state.gaugeChartTitle.style.fontSize = titlefontsize + 'px';
         state.gaugeChartTitle.style.lineHeight = titlefontsize + 'px';
         state.gaugeChartTitle.style.top = titletop.toString() + 'px';
@@ -5564,7 +5605,7 @@
         var unitfontsize = Math.round(titlefontsize * 0.9);
         state.gaugeChartUnits = document.createElement('span');
         state.gaugeChartUnits.className = 'gaugeChartUnits';
-        state.gaugeChartUnits.innerHTML = state.units;
+        state.gaugeChartUnits.innerText = state.units;
         state.gaugeChartUnits.style.fontSize = unitfontsize + 'px';
         state.element_chart.appendChild(state.gaugeChartUnits);
 
