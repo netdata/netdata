@@ -42,11 +42,11 @@ class Service(SimpleService):
         else:
             try:
                 self.pools = self.pools.split()
-                if not [ip_network(pool) for pool in self.pools]:
+                if not [ip_network(return_utf(pool)) for pool in self.pools]:
                     self.error('Pools list is empty')
                     return False
-            except (ValueError, IndexError, AttributeError, SyntaxError):
-                self.error('Pools configurations is incorrect')
+            except (ValueError, IndexError, AttributeError, SyntaxError) as e:
+                self.error('Pools configurations is incorrect', str(e))
                 return False
             
             # Creating static charts
@@ -96,7 +96,8 @@ class Service(SimpleService):
 
                 file_parse_time = round((time_end - time_start) * 1000)
 
-        except Exception:
+        except Exception as e:
+            self.error("Failed to parse leases file:", str(e))
             return None
 
         else:
@@ -148,7 +149,7 @@ def is_binding_active(binding):
 
 
 def is_address_in(address, pool):
-    return ipaddress(address) in ip_network(pool)
+    return ipaddress(return_utf(address)) in ip_network(return_utf(pool))
 
 
 def find_lease(value):
@@ -157,3 +158,10 @@ def find_lease(value):
 
 def find_ends(value):
     return value[2:6] != 'ends'
+
+def return_utf(s):
+    # python2 returns "<type 'str'>" for simple strings
+    # python3 returns "<class 'str'>" for unicode strings
+    if str(type(s)) == "<type 'str'>":
+        return unicode(s, 'utf-8')
+    return s
