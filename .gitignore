@@ -38,6 +38,7 @@ netdata-coverity-analysis.tgz
 .cproject
 .idea/
 .project
+.settings
 README
 TODO.md
 asan_symbolize.py
