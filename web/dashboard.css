@@ -176,20 +176,20 @@ body {
 }
 .netdata-legend-title-units {
 	position: absolute;
-	right: 5px;
+	right: 7px;
 	float: right;
-	font-size: 10px;
+	font-size: 11px;
 	vertical-align: top;
 	font-weight: normal;
 	margin-top: 0px;
 }
 .netdata-legend-series {
 	position: absolute;
-	width: 140px;				/* --legend-width */
+	width: 140px;				/* legend-width */
 	height: calc(100% - 50px);
 	overflow: hidden;
 	text-overflow: ellipsis;
-	line-height: 14px;
+	line-height: 14.5px;       /* line spacing at the legend */
 	display: block;
 	font-size: 10px;
 	margin-top: 0px;
@@ -279,7 +279,7 @@ body {
 }
 .netdata-legend-name {
 	text-align: left;
-	font-size: 10px;
+	font-size: 11px;            /* legend: dimension name size */
 	font-weight: bold;
 	vertical-align: bottom;
 	margin-top: 0px;
@@ -297,10 +297,10 @@ body {
 .netdata-legend-value {
 	/*margin-left: 14px;*/
 	position: absolute;
-	right: 5px;
+	right: 7px;
 	float: right;
 	text-align: right;
-	font-size: 10px;
+	font-size: 11px;              /* legend: dimension value size */
 	font-weight: bold;
 	vertical-align: bottom;
 	background-color: White;
