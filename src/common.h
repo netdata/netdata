@@ -136,11 +136,13 @@
 #include "plugin_checks.h"
 #include "plugin_idlejitter.h"
 #include "plugin_nfacct.h"
-#if !(defined(__FreeBSD__) || defined(__APPLE__))
-#include "plugin_proc.h"
-#else
+#if defined(__FreeBSD__)
 #include "plugin_freebsd.h"
-#endif /* __FreeBSD__ || __APPLE__*/
+#elif defined(__APPLE__)
+#include "plugin_macos.h"
+#else
+#include "plugin_proc.h"
+#endif /* __FreeBSD__, __APPLE__*/
 #include "plugin_tc.h"
 #include "plugins_d.h"
 
