@@ -45,11 +45,13 @@ struct netdata_static_thread {
 
     {"tc",                 "plugins",   "tc",         1, NULL, NULL, tc_main},
     {"idlejitter",         "plugins",   "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
-#if !(defined(__FreeBSD__) || defined(__APPLE__))
-    {"proc",               "plugins",   "proc",       1, NULL, NULL, proc_main},
-#else
+#if defined(__FreeBSD__)
     {"freebsd",            "plugins",   "freebsd",    1, NULL, NULL, freebsd_main},
-#endif /* __FreeBSD__ || __APPLE__*/
+#elif defined(__APPLE__)
+    {"macos",              "plugins",   "macos",      1, NULL, NULL, macos_main},
+#else
+    {"proc",               "plugins",   "proc",       1, NULL, NULL, proc_main},
+#endif /* __FreeBSD__, __APPLE__*/
     {"cgroups",            "plugins",   "cgroups",    1, NULL, NULL, cgroups_main},
     {"check",              "plugins",   "checks",     0, NULL, NULL, checks_main},
     {"backends",            NULL,       NULL,         1, NULL, NULL, backends_main},

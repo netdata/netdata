@@ -1,6 +1,5 @@
 #include "common.h"
 
-#ifndef __APPLE__
 // NEEDED BY: struct vmtotal, struct vmmeter
 #include <sys/vmmeter.h>
 // NEEDED BY: struct devstat
@@ -19,7 +18,6 @@
 #define _IFI_OQDROPS // It is for FreeNAS only. Most probably in future releases of FreeNAS it will be removed
 #include <net/if.h>
 #include <ifaddrs.h>
-#endif /* __APPLE__ */
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
 
@@ -73,7 +71,6 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     static usec_t last_loadavg_usec = 0;
     struct loadavg sysload;
 
-#ifndef __APPLE__
     // NEEDED BY: do_cpu, do_cpu_cores
     long cp_time[CPUSTATES];
 
@@ -180,7 +177,6 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-#endif /* __APPLE__ */
     if (last_loadavg_usec <= dt) {
         if (likely(do_loadavg)) {
             if (unlikely(GETSYSCTL("vm.loadavg", sysload))) {
@@ -207,7 +203,6 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         last_loadavg_usec = st->update_every * USEC_PER_SEC;
     }
     else last_loadavg_usec -= dt;
-#ifndef __APPLE__
 
     // --------------------------------------------------------------------
 
@@ -1193,7 +1188,6 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             freeifaddrs(ifap);
         }
     }
-#endif /* __APPLE__ */
 
     return 0;
 }
