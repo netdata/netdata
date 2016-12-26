@@ -206,6 +206,7 @@ declare -A configs_signatures=(
   ['9c0185ceff15415bc59b2ce2c1f04367']='apps_groups.conf'
   ['9c981c75bdf4b1637f7113e7e45eb2bf']='health.d/memcached.conf'
   ['9e0553ebdc21b64295873fc104cfa79d']='python.d.conf'
+  ['9eb3326ae2ee9badeaad31d8dd2eaa2b']='python.d/isc_dhcpd.conf'
   ['a02d14124b19c635c1426cee2e98bac5']='charts.d.conf'
   ['a09714b5942cf25a89ec3da1dbc18063']='health.d/ram.conf'
   ['a0ee8f351f213c0e8af9eb7a4a09cb95']='apps_groups.conf'
