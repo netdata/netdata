@@ -673,7 +673,6 @@ struct cgroup *cgroup_add(const char *id) {
 
         // disable by default the root cgroup
         def = 0;
-        debug(D_CGROUP, "cgroup '%s' is the root container (by default %s)", id, (def)?"enabled":"disabled");
     }
     else {
         if(*chart_id == '/') chart_id++;
@@ -694,7 +693,7 @@ struct cgroup *cgroup_add(const char *id) {
                 !strcmp(chart_id, "system") ||
                 !strcmp(chart_id, "machine") ||
                 // starts with them
-                (len >  6 && !strncmp(chart_id, "user/", 6)) ||
+                (len >  5 && !strncmp(chart_id, "user/", 5)) ||
                 (len > 11 && !strncmp(chart_id, "user.slice/", 11)) ||
                 // ends with them
                 (len >  5 && !strncmp(&chart_id[len -  5], ".user", 5)) ||
@@ -708,9 +707,9 @@ struct cgroup *cgroup_add(const char *id) {
                 (len > 7 && !strncmp(chart_id, "lxc/", 4) && !strncmp(&chart_id[len - 3], "/ns", 3)) // #1397
                 ) {
             def = 0;
-            debug(D_CGROUP, "cgroup '%s' is %s (by default)", id, (def)?"enabled":"disabled");
         }
     }
+    debug(D_CGROUP, "cgroup '%s' (chart_id '%s') is (by default) %s", id, chart_id, (def)?"enabled":"disabled");
 
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
