@@ -3855,7 +3855,7 @@
         var self = $(state.element);
         var type = self.data('sparkline-type') || 'line';
         var lineColor = self.data('sparkline-linecolor') || state.chartColors()[0];
-        var fillColor = self.data('sparkline-fillcolor') || (state.chart.chart_type === 'line')?NETDATA.themes.current.background:NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance);
+        var fillColor = self.data('sparkline-fillcolor') || ((state.chart.chart_type === 'line')?NETDATA.themes.current.background:NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance));
         var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
         var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
         var composite = self.data('sparkline-composite') || undefined;
@@ -3902,6 +3902,8 @@
         if(spotColor === 'disable') spotColor='';
         if(minSpotColor === 'disable') minSpotColor='';
         if(maxSpotColor === 'disable') maxSpotColor='';
+
+        // state.log('sparkline type ' + type + ', lineColor: ' + lineColor + ', fillColor: ' + fillColor);
 
         state.sparkline_options = {
             type: type,
@@ -4211,9 +4213,9 @@
             strokeBorderColor: self.data('dygraph-strokebordercolor') || NETDATA.themes.current.background,
             strokeBorderWidth: self.data('dygraph-strokeborderwidth') || (chart_type === 'stacked')?0.0:0.0,
 
-            fillGraph: self.data('dygraph-fillgraph') || (chart_type === 'area' || chart_type === 'stacked')?true:false,
-            fillAlpha: self.data('dygraph-fillalpha') || (chart_type === 'stacked')?NETDATA.options.current.color_fill_opacity_stacked:NETDATA.options.current.color_fill_opacity_area,
-            stackedGraph: self.data('dygraph-stackedgraph') || (chart_type === 'stacked')?true:false,
+            fillGraph: self.data('dygraph-fillgraph') || ((chart_type === 'area' || chart_type === 'stacked')?true:false),
+            fillAlpha: self.data('dygraph-fillalpha') || ((chart_type === 'stacked')?NETDATA.options.current.color_fill_opacity_stacked:NETDATA.options.current.color_fill_opacity_area),
+            stackedGraph: self.data('dygraph-stackedgraph') || ((chart_type === 'stacked')?true:false),
             stackedGraphNaNFill: self.data('dygraph-stackedgraphnanfill') || 'none',
 
             drawAxis: self.data('dygraph-drawaxis') || true,

@@ -539,6 +539,12 @@ p {
         display: inline-block;
     }
 
+    .mygauge-combo25 {
+        display: inline-block;
+        min-width: 200px;
+        max-width: 25%;
+    }
+
     .mygauge {
         position: relative;
         display: block;
@@ -878,16 +884,16 @@ p {
             </div>
         </div>
         <div class="container" style="padding-top: 40px; text-align: center;">
-            Charts are coming from 8 servers, in parallel.
+            Charts are coming from all servers, <b>in parallel</b>.
             <br/>
-            The servers are not aware of this multi-server dashboard.
+            The servers are <b>not aware</b> of this multi-server dashboard.
             <br/>
-            Each server is not aware of the other servers.
+            Each server is <b>not aware</b> of the other servers.
             <br/>
             But on this dashboard <b>they are one</b>! (hover on the chart below)
         </div>
 
-        <div class="container" style="padding-top: 40px; text-align: center;">
+        <div class="container" style="padding-top: 40px; padding-bottom: 40px; text-align: center;">
             <div class="mysparkline">
                 <div class="mysparkline-overchart-label">
                     <b>EU - London</b> connected clients
@@ -910,13 +916,68 @@ p {
                 ></div>
             </div>
         </div>
+
+        <h3>Want more demos?</h3>
+
+        <div class="mygauge-combo25" style="padding-top: 40px; text-align: center;">
+            <div style="padding-bottom: 20px;">
+                <b>on Amazon EC2</b>
+            </div>
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    connected clients
+                </div>
+                <div class="mysparkline-overchart-value" id="aws-fra-nginx_local.connections.netdata" >
+                </div>
+                <div data-netdata="nginx_local.connections"
+                     data-dimensions="active"
+                     data-host="//aws-fra.my-netdata.io"
+                     data-decimal-digits="0"
+                     data-chart-library="dygraph"
+                     data-dygraph-theme="sparkline"
+                     data-dygraph-type="area"
+                     data-width="100%"
+                     data-height="100%"
+                     data-after="-300"
+                     data-colors="#004B91"
+                     data-show-value-of-active-at="aws-fra-nginx_local.connections.netdata"
+                ></div>
+            </div>
+            <a class="btn btn-alt mygauge-legend-button" href=//aws-fra.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoAwsFra><strong>Enter Amazon!</strong></a>
+        </div>
+        <div class="mygauge-combo25" style="padding-top: 40px; text-align: center;">
+            <div style="padding-bottom: 20px;">
+                <b>on Azure</b>
+            </div>
+            <div class="mysparkline">
+                <div class="mysparkline-overchart-label">
+                    connected clients
+                </div>
+                <div class="mysparkline-overchart-value" id="azure-west-eu-nginx_local.connections.netdata" >
+                </div>
+                <div data-netdata="nginx_local.connections"
+                     data-dimensions="active"
+                     data-host="//azure-west-eu.my-netdata.io"
+                     data-decimal-digits="0"
+                     data-chart-library="dygraph"
+                     data-dygraph-theme="sparkline"
+                     data-dygraph-type="area"
+                     data-width="100%"
+                     data-height="100%"
+                     data-after="-300"
+                     data-colors="#007FFF"
+                     data-show-value-of-active-at="azure-west-eu-nginx_local.connections.netdata"
+                ></div>
+            </div>
+            <a class="btn btn-alt mygauge-legend-button" href=//azure-west-eu.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoAzureWestEu><strong>Enter Azure!</strong></a>
+        </div>
     </div>
 </div>
 
 <div class=site-section><h2>Who uses netdata?</h2>
     <div class="content">
         <div class="container" style="text-align: center;">
-            <small>Figures come from users using the <a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=GlobalRegistry>netdata public global registry</a>.<br/>Counting since May 16th 2016. Actual figures might be a lot higher.<br/></small>
+            <small>Figures come from users using the <a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=GlobalRegistry>netdata public global registry</a>.<br/>Counting since May 16th 2016. Actual figures may be a lot higher.<br/></small>
             <div class="container" style="padding-top: 40px; text-align: center; width: 30%; min-width: 230px; display: inline-block;">
                 <div class="mysparkline">
                     <div class="mysparkline-overchart-label">
