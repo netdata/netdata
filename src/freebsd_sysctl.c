@@ -702,19 +702,19 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                      GETSYSCTL("vm.stats.vm.v_cache_count",     vmmeter_data.v_cache_count) ||
                      GETSYSCTL("vfs.bufspace",                  vfs_bufspace_count) ||
                      GETSYSCTL("vm.stats.vm.v_free_count",      vmmeter_data.v_free_count))) {
-            do_swapio = 0;
-            error("DISABLED: system.swapio");
+            do_ram = 0;
+            error("DISABLED: system.ram");
         } else {
             st = rrdset_find("system.ram");
             if (unlikely(!st)) {
                 st = rrdset_create("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
 
-                rrddim_add(st, "active",    NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "inactive",  NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "wired",     NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "cache",     NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "buffers",   NULL, 1, 1024, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "free",      NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "active",    NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "inactive",  NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "wired",     NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "cache",     NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "buffers",   NULL, 1, 1048576, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "free",      NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
             }
             else rrdset_next(st);
 
