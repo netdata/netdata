@@ -693,7 +693,7 @@ struct cgroup *cgroup_add(const char *id) {
                 !strcmp(chart_id, "system") ||
                 !strcmp(chart_id, "machine") ||
                 // starts with them
-                (len >  6 && !strncmp(chart_id, "user/", 6)) ||
+                (len >  5 && !strncmp(chart_id, "user/", 5)) ||
                 (len > 11 && !strncmp(chart_id, "user.slice/", 11)) ||
                 // ends with them
                 (len >  5 && !strncmp(&chart_id[len -  5], ".user", 5)) ||
