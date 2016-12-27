@@ -29,8 +29,10 @@
 // netdata server already.
 // var netdataServer = "http://yourhost:19999"; // set your NetData server
 
-//(function(window, document, undefined) {
+// global namespace
+var NETDATA = window.NETDATA || {};
 
+(function(window, document, undefined) {
     // ------------------------------------------------------------------------
     // compatibility fixes
 
@@ -52,9 +54,6 @@
             return this.slice(s.length) === s;
         };
     }
-
-    // global namespace
-    var NETDATA = window.NETDATA || {};
 
     NETDATA.name2id = function(s) {
         return s
@@ -6577,6 +6576,4 @@
             }
         });
     });
-
-    // window.NETDATA = NETDATA;
-// })(window, document);
+})(window, document);
