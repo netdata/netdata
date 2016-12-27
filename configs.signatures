@@ -71,6 +71,7 @@ declare -A configs_signatures=(
   ['39304b2570611c3acb35b72762b46778']='charts.d/sensors.conf'
   ['39571e9fad9b759200c5d5b2ee13feb4']='python.d/redis.conf'
   ['39f9422b0f0c3eec11a31aff79d89514']='health.d/retroshare.conf'
+  ['3a04a3bc66c49d0c24f65a44fd9caa80']='python.d/postgres.conf'
   ['3af522d65b50a5e447607ffb28c81ff5']='apps_groups.conf'
   ['3b1bfa40a4ff6a200bb2fc00bc51a664']='apps_groups.conf'
   ['3bc2776623889744a98178bad6fb3b79']='health.d/disks.conf'

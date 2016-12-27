@@ -657,7 +657,7 @@ portable_add_user_to_group() {
     fi
 }
 
-run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf  -a \! -name \*.service -exec chmod 755 {} \;
+run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.logrotate -exec chmod 755 {} \;
 
 NETDATA_ADDED_TO_DOCKER=0
 NETDATA_ADDED_TO_NGINX=0
@@ -672,6 +672,12 @@ if [ ${UID} -eq 0 ]
         then
         echo >&2 "Adding netdata logrotate configuration ..."
         run cp system/netdata.logrotate /etc/logrotate.d/netdata
+    fi
+    
+    if [ -f /etc/logrotate.d/netdata ]
+        then
+        echo >&2 "Fixing netdata logrotate permissions ..."
+        run chmod 644 /etc/logrotate.d/netdata
     fi
 fi
 
