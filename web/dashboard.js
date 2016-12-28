@@ -1196,6 +1196,7 @@ var NETDATA = window.NETDATA || {};
         // the user given dimensions of the element
         this.width = self.data('width') || NETDATA.chartDefaults.width;
         this.height = self.data('height') || NETDATA.chartDefaults.height;
+        this.height_original = this.height;
 
         if(this.settings_id !== null) {
             this.height = NETDATA.localStorageGet('chart_heights.' + this.settings_id, this.height, function(height) {
@@ -1256,8 +1257,7 @@ var NETDATA = window.NETDATA || {};
             title_date: null,
             title_time: null,
             title_units: null,
-            nano: null,
-            nano_options: null,
+            perfect_scroller: null, // the container to apply perfect scroller to
             series: null
         };
 
@@ -1671,8 +1671,8 @@ var NETDATA = window.NETDATA || {};
                 else if(typeof that.library.resize === 'function') {
                     that.library.resize(that);
 
-                    if(that.element_legend_childs.nano !== null && that.element_legend_childs.nano_options !== null)
-                        $(that.element_legend_childs.nano).nanoScroller();
+                    if(that.element_legend_childs.perfect_scroller !== null)
+                        Ps.update(that.element_legend_childs.perfect_scroller);
 
                     maxMessageFontSize();
                 }
@@ -1730,23 +1730,53 @@ var NETDATA = window.NETDATA || {};
             this.event_resize.chart_last_h = this.element.clientHeight;
 
             var now = Date.now();
-            if(now - this.event_resize.last <= NETDATA.options.current.double_click_speed) {
+            if(now - this.event_resize.last <= NETDATA.options.current.double_click_speed && this.element_legend_childs.perfect_scroller != null) {
                 // double click / double tap event
+
+                // console.dir(this.element_legend_childs.content);
+                // console.dir(this.element_legend_childs.perfect_scroller);
 
                 // the optimal height of the chart
                 // showing the entire legend
                 var optimal = this.event_resize.chart_last_h
-                        + this.element_legend_childs.content.scrollHeight
-                        - this.element_legend_childs.content.clientHeight;
+                        + this.element_legend_childs.perfect_scroller.scrollHeight
+                        - this.element_legend_childs.perfect_scroller.clientHeight;
 
                 // if we are not optimal, be optimal
-                if(this.event_resize.chart_last_h != optimal)
+                if(this.event_resize.chart_last_h != optimal) {
+                    // this.log('resize to optimal, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString());
                     resizeChartToHeight(optimal.toString() + 'px');
+                }
 
-                // else if we do not have the original height
-                // reset to the original height
-                else if(this.event_resize.chart_last_h != this.event_resize.chart_original_h)
+                // else if the current height is not the original/saved height
+                // reset to the original/saved height
+                else if(this.event_resize.chart_last_h != this.event_resize.chart_original_h) {
+                    // this.log('resize to original, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString());
                     resizeChartToHeight(this.event_resize.chart_original_h.toString() + 'px');
+                }
+
+                // else if the current height is not the internal default height
+                // reset to the internal default height
+                else if((this.event_resize.chart_last_h.toString() + 'px') != this.height_original) {
+                    // this.log('resize to internal default, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString());
+                    resizeChartToHeight(this.height_original.toString());
+                }
+
+                // else if the current height is not the firstchild's clientheight
+                // resize to it
+                else if(typeof this.element_legend_childs.perfect_scroller.firstChild !== 'undefined') {
+                    var parent_rect = this.element.getBoundingClientRect();
+                    var content_rect = this.element_legend_childs.perfect_scroller.firstElementChild.getBoundingClientRect();
+                    var wanted = content_rect.top - parent_rect.top + this.element_legend_childs.perfect_scroller.firstChild.clientHeight + 18; // 15 = toolbox + 3 space
+
+                    // console.log(parent_rect);
+                    // console.log(content_rect);
+                    // console.log(wanted);
+
+                    // this.log('resize to firstChild, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString() + 'px, firstChild = ' + wanted.toString() + 'px' );
+                    if(this.event_resize.chart_last_h != wanted)
+                        resizeChartToHeight(wanted.toString() + 'px');
+                }
             }
             else {
                 this.event_resize.last = now;
@@ -2517,18 +2547,7 @@ var NETDATA = window.NETDATA || {};
                     title_date: document.createElement('span'),
                     title_time: document.createElement('span'),
                     title_units: document.createElement('span'),
-                    nano: document.createElement('div'),
-                    nano_options: {
-                        paneClass: 'netdata-legend-series-pane',
-                        sliderClass: 'netdata-legend-series-slider',
-                        contentClass: 'netdata-legend-series-content',
-                        enabledClass: '__enabled',
-                        flashedClass: '__flashed',
-                        activeClass: '__active',
-                        tabIndex: -1,
-                        alwaysVisible: true,
-                        sliderMinHeight: 10
-                    },
+                    perfect_scroller: document.createElement('div'),
                     series: {}
                 };
 
@@ -2726,11 +2745,11 @@ var NETDATA = window.NETDATA || {};
 
                 this.element_legend.appendChild(document.createElement('br'));
 
-                this.element_legend_childs.nano.className = 'netdata-legend-series';
-                this.element_legend.appendChild(this.element_legend_childs.nano);
+                this.element_legend_childs.perfect_scroller.className = 'netdata-legend-series';
+                this.element_legend.appendChild(this.element_legend_childs.perfect_scroller);
 
                 content.className = 'netdata-legend-series-content';
-                this.element_legend_childs.nano.appendChild(content);
+                this.element_legend_childs.perfect_scroller.appendChild(content);
 
                 if(NETDATA.options.current.show_help === true)
                     $(content).popover({
@@ -2758,8 +2777,7 @@ var NETDATA = window.NETDATA || {};
                     title_date: null,
                     title_time: null,
                     title_units: null,
-                    nano: null,
-                    nano_options: null,
+                    perfect_scroller: null,
                     series: {}
                 };
             }
@@ -2794,8 +2812,22 @@ var NETDATA = window.NETDATA || {};
             this.element_legend_childs.hidden = document.createElement('div');
             el.appendChild(this.element_legend_childs.hidden);
 
-            if(this.element_legend_childs.nano !== null && this.element_legend_childs.nano_options !== null)
-                $(this.element_legend_childs.nano).nanoScroller(this.element_legend_childs.nano_options);
+            if(this.element_legend_childs.perfect_scroller !== null) {
+                Ps.initialize(this.element_legend_childs.perfect_scroller, {
+                    wheelSpeed: 0.2,
+                    wheelPropagation: true,
+                    swipePropagation: true,
+                    minScrollbarLength: null,
+                    maxScrollbarLength: null,
+                    useBothWheelAxes: false,
+                    suppressScrollX: true,
+                    suppressScrollY: false,
+                    scrollXMarginOffset: 0,
+                    scrollYMarginOffset: 0,
+                    theme: 'default'
+                });
+                Ps.update(this.element_legend_childs.perfect_scroller);
+            }
 
             this.legendShowLatestValues();
         };
@@ -5889,7 +5921,7 @@ var NETDATA = window.NETDATA || {};
             }
         },
         {
-            url: NETDATA.serverDefault + 'lib/jquery.nanoscroller-0.8.7.min.js',
+            url: NETDATA.serverDefault + 'lib/perfect-scrollbar-0.6.15.min.js',
             isAlreadyLoaded: function() { return false; }
         }
     ];
