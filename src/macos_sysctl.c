@@ -11,10 +11,11 @@ int getsysctl(const char *name, void *ptr, size_t len);
 int do_macos_sysctl(int update_every, usec_t dt) {
     (void)dt;
 
-    static int do_loadavg = -1;
+    static int do_loadavg = -1, do_swap = -1;
 
     if (unlikely(do_loadavg == -1)) {
         do_loadavg              = config_get_boolean("plugin:macos:sysctl", "enable load average", 1);
+        do_swap                 = config_get_boolean("plugin:macos:sysctl", "system swap", 1);
     }
 
     RRDSET *st;
@@ -27,6 +28,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     // NEEDED BY: do_loadavg
     static usec_t last_loadavg_usec = 0;
     struct loadavg sysload;
+
+    // NEEDED BY: do_swap
+    struct xsw_usage swap_usage;
 
     if (last_loadavg_usec <= dt) {
         if (likely(do_loadavg)) {
@@ -54,6 +58,27 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         last_loadavg_usec = st->update_every * USEC_PER_SEC;
     }
     else last_loadavg_usec -= dt;
+
+    if (likely(do_swap)) {
+        if (unlikely(GETSYSCTL("vm.swapusage", swap_usage))) {
+            do_swap = 0;
+            error("DISABLED: system.swap");
+        } else {
+            st = rrdset_find("system.swap");
+            if (unlikely(!st)) {
+                st = rrdset_create("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
+                st->isdetail = 1;
+
+                rrddim_add(st, "free",    NULL, 1, 1048576, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "used",    NULL, 1, 1048576, RRDDIM_ABSOLUTE);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "free", swap_usage.xsu_avail);
+            rrddim_set(st, "used", swap_usage.xsu_used);
+            rrdset_done(st);
+        }
+    }
 
     return 0;
 }

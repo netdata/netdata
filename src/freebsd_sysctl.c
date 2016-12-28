@@ -653,7 +653,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         if (unlikely(sysctlnametomib("vm.swap_info", mib, &mibsize) == -1)) {
             error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
             do_swap = 0;
-            error("DISABLED: disk.io");
+            error("DISABLED: system.swap");
         } else {
             for (i = 0; ; i++) {
                 mib[mibsize] = i;
@@ -662,12 +662,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                     if (unlikely(errno != ENOENT)) {
                         error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
                         do_swap = 0;
-                        error("DISABLED: disk.io");
+                        error("DISABLED: system.swap");
                     } else {
                         if (unlikely(size != sizeof(xsw))) {
                             error("FREEBSD: sysctl(%s...) expected %lu, got %lu", "vm.swap_info", (unsigned long)sizeof(xsw), (unsigned long)size);
                             do_swap = 0;
-                            error("DISABLED: disk.io");
+                            error("DISABLED: system.swap");
                         } else break;
                     }
                 }
