@@ -93,8 +93,8 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                     rrddim_add(st, "throttled", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
                     rrddim_add(st, "compressor", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
                     rrddim_add(st, "inactive",  NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "speculative", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
                     rrddim_add(st, "purgeable", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "speculative", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
                     rrddim_add(st, "free",      NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
                 }
                 else rrdset_next(st);
@@ -104,9 +104,9 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 rrddim_set(st, "throttled", vm_statistics.throttled_count);
                 rrddim_set(st, "compressor", vm_statistics.compressor_page_count);
                 rrddim_set(st, "inactive",  vm_statistics.inactive_count);
-                rrddim_set(st, "speculative", vm_statistics.speculative_count);
                 rrddim_set(st, "purgeable", vm_statistics.purgeable_count);
-                rrddim_set(st, "free",      vm_statistics.free_count);
+                rrddim_set(st, "speculative", vm_statistics.speculative_count);
+                rrddim_set(st, "free",      (vm_statistics.free_count - vm_statistics.speculative_count));
                 rrdset_done(st);
             }
 
