@@ -29,6 +29,7 @@ dist_pythonconfig_DATA = \
     python.d/dovecot.conf \
     python.d/example.conf \
     python.d/exim.conf \
+    python.d/fail2ban.conf \
     python.d/freeradius.conf \
     python.d/hddtemp.conf \
     python.d/ipfs.conf \
