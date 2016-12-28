@@ -22,10 +22,12 @@ void *macos_main(void *ptr)
     int vdo_cpu_netdata             = !config_get_boolean("plugin:macos", "netdata server resources", 1);
     int vdo_macos_sysctl            = !config_get_boolean("plugin:macos", "sysctl", 1);
     int vdo_macos_mach_smi          = !config_get_boolean("plugin:macos", "mach system management interface", 1);
+    int vdo_macos_iokit             = !config_get_boolean("plugin:macos", "iokit", 1);
 
     // keep track of the time each module was called
     unsigned long long sutime_macos_sysctl = 0ULL;
     unsigned long long sutime_macos_mach_smi = 0ULL;
+    unsigned long long sutime_macos_iokit = 0ULL;
 
     usec_t step = rrd_update_every * USEC_PER_SEC;
     for(;;) {
@@ -54,6 +56,14 @@ void *macos_main(void *ptr)
             now = now_realtime_usec();
             vdo_macos_mach_smi = do_macos_mach_smi(rrd_update_every, (sutime_macos_mach_smi > 0)?now - sutime_macos_mach_smi:0ULL);
             sutime_macos_mach_smi = now;
+        }
+        if(unlikely(netdata_exit)) break;
+
+        if(!vdo_macos_iokit) {
+            debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_iokit().");
+            now = now_realtime_usec();
+            vdo_macos_iokit = do_macos_iokit(rrd_update_every, (sutime_macos_iokit > 0)?now - sutime_macos_iokit:0ULL);
+            sutime_macos_iokit = now;
         }
         if(unlikely(netdata_exit)) break;
 
