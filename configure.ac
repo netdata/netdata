@@ -46,6 +46,7 @@ freebsd*)
 	;;
 darwin*)
 	build_target=macos
+	LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
 	;;
 *)
 	;;
