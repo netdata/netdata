@@ -72,6 +72,7 @@ netdata_SOURCES += \
 	plugin_macos.c plugin_macos.h \
 	macos_sysctl.c \
 	macos_mach_smi.c \
+	macos_fw.c \
 	$(NULL)
 else
 netdata_SOURCES += \

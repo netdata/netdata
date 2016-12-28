@@ -36,7 +36,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
     if (likely(do_cpu)) {
         if (unlikely(HOST_CPU_LOAD_INFO_COUNT != 4)) {
-            error("FREEBSD: There are %d CPU states (4 was expected)", HOST_CPU_LOAD_INFO_COUNT);
+            error("MACOS: There are %d CPU states (4 was expected)", HOST_CPU_LOAD_INFO_COUNT);
             do_cpu = 0;
             error("DISABLED: system.cpu");
         } else {
