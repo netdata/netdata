@@ -790,6 +790,9 @@ do
     #run find "${x}" -type d -exec chmod 0770 {} \;
 done
 
+run chown "${NETDATA_USER}:root" "${NETDATA_LOG_DIR}"
+run chmod 755 "${NETDATA_LOG_DIR}"
+
 # --- plugins ----
 
 if [ ${UID} -eq 0 ]
