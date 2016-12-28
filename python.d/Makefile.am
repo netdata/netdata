@@ -14,6 +14,7 @@ dist_python_SCRIPTS = \
     dovecot.chart.py \
     example.chart.py \
     exim.chart.py \
+    fail2ban.chart.py \
     freeradius.chart.py \
     hddtemp.chart.py \
     ipfs.chart.py \
