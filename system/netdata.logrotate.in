@@ -1,4 +1,5 @@
 @localstatedir_POST@/log/netdata/*.log {
+	su netdata netdata
 	daily
 	missingok
 	rotate 14
