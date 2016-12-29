@@ -501,9 +501,13 @@ var NETDATA = window.NETDATA || {};
     if(NETDATA.options.debug.main_loop === true)
         console.log('welcome to NETDATA');
 
+    NETDATA.onresizeCallback = null;
     NETDATA.onresize = function() {
         NETDATA.options.last_resized = Date.now();
         NETDATA.onscroll();
+
+        if(typeof NETDATA.onresizeCallback === 'function')
+            NETDATA.onresizeCallback();
     };
 
     NETDATA.onscroll_updater_count = 0;
