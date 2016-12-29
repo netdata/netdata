@@ -398,10 +398,26 @@ class Service(SimpleService):
             return None
 
         if slave_raw_data is not None:
-            slave_data = {'slave_behind': 0, 'slave_sql': 0, 'slave_io': 0 }
-            slave_data['slave_behind'] = int(slave_raw_data.setdefault('Seconds_Behind_Master', -1))
-            slave_data['slave_sql'] = 1 if slave_raw_data.get('Slave_SQL_Running') == 'Yes' else -1
-            slave_data['slave_io'] = 1 if slave_raw_data.get('Slave_IO_Running') == 'Yes' else -1
+            slave_data = {
+                'slave_behind': None,
+                'slave_sql': None,
+                'slave_io': None
+            }
+
+            try:
+                slave_data['slave_behind'] = int(slave_raw_data.setdefault('Seconds_Behind_Master', -1))
+            except:
+                slave_data['slave_behind'] = None
+
+            try:
+                slave_data['slave_sql'] = 1 if slave_raw_data.get('Slave_SQL_Running') == 'Yes' else -1
+            except:
+                slave_data['slave_sql'] = None
+
+            try:
+                slave_data['slave_io'] = 1 if slave_raw_data.get('Slave_IO_Running') == 'Yes' else -1
+            except:
+                slave_data['slave_io'] = None
 
         return slave_data
 
@@ -442,11 +458,14 @@ class Service(SimpleService):
         data = dict(raw_data)
 
         # check for slave data
+        # the first time is -1 (so we do it)
+        # then it is set to 1 or 0 and we keep it like that
         if self.do_slave != 0:
             slave_data = self._get_data_slave()
             if slave_data is not None:
                 data.update(slave_data)
-                self.do_slave = 1
+                if self.do_slave == -1:
+                    self.do_slave = 1
             else:
                 if self.do_slave == -1:
                     self.error("replication metrics will be disabled - please allow netdata to collect them.")
@@ -456,8 +475,8 @@ class Service(SimpleService):
         try:
             data["Thread_cache_misses"] = int(data["Threads_created"] * 10000 / float(data["Connections"]))
         except:
-            data["Thread_cache_misses"] = 0
-       
+            data["Thread_cache_misses"] = None
+
         return data
 
     def check(self):
