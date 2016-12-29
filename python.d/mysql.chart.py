@@ -40,6 +40,7 @@ retries = 60
 
 # query executed on MySQL server
 QUERY = "SHOW GLOBAL STATUS;"
+QUERY_SLAVE = "SHOW SLAVE STATUS;"
 
 ORDER = ['net',
          'queries',
@@ -55,7 +56,7 @@ ORDER = ['net',
          'innodb_buffer_pool_read_ahead', 'innodb_buffer_pool_reqs', 'innodb_buffer_pool_ops',
          'qcache_ops', 'qcache', 'qcache_freemem', 'qcache_memblocks',
          'key_blocks', 'key_requests', 'key_disk_ops',
-         'files', 'files_rate']
+         'files', 'files_rate', 'slave_behind', 'slave_status']
 
 CHARTS = {
     'net': {
@@ -298,8 +299,18 @@ CHARTS = {
             ["Connection_errors_peer_address", "peer_addr", "incremental"],
             ["Connection_errors_select", "select", "incremental"],
             ["Connection_errors_tcpwrap", "tcpwrap", "incremental"]
+        ]},
+    'slave_behind': {
+        'options': [None, 'Slave Behind Seconds', 'seconds', 'slave', 'mysql.slave_behind', 'line'],
+        'lines': [
+            ["slave_behind", "seconds", "absolute"]
+        ]},
+    'slave_status': {
+        'options': [None, 'Slave Status', 'status', 'slave', 'mysql.slave_status', 'line'],
+        'lines': [
+            ["slave_sql", "sql_running", "absolute"],
+            ["slave_io", "io_running", "absolute"]
         ]}
-
 }
 
 
@@ -362,12 +373,28 @@ class Service(SimpleService):
             cursor = self.connection.cursor()
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
+            slave_data = {}
+            if cursor.execute(QUERY_SLAVE):
+                slave_data = {'slave_behind': 0, 'slave_sql': 0, 'slave_io': 0 }
+                slave_raw_data = dict(list(zip([elem[0] for elem in cursor.description], cursor.fetchone())))
+                slave_data['slave_behind'] = int(slave_raw_data.setdefault('Seconds_Behind_Master', -1))
+                slave_data['slave_sql'] = 1 if slave_raw_data.get('Slave_SQL_Running') == 'Yes' else -1
+                slave_data['slave_io'] = 1 if slave_raw_data.get('Slave_IO_Running') == 'Yes' else -1
+
         except MySQLdb.OperationalError as e:
             self.debug("Reconnecting due to", str(e))
             self._connect()
             cursor = self.connection.cursor()
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
+            slave_data = {}
+            if cursor.execute(QUERY_SLAVE):
+                slave_data = {'slave_behind': 0, 'slave_sql': 0, 'slave_io': 0 }
+                slave_raw_data = dict(list(zip([elem[0] for elem in cursor.description], cursor.fetchone())))
+                slave_data['slave_behind'] = int(slave_raw_data.setdefault('Seconds_Behind_Master', -1))
+                slave_data['slave_sql'] = 1 if slave_raw_data.get('Slave_SQL_Running') == 'Yes' else -1
+                slave_data['slave_io'] = 1 if slave_raw_data.get('Slave_IO_Running') == 'Yes' else -1
+
         except Exception as e:
             self.error("cannot execute query.", e)
             self.connection.close()
@@ -379,7 +406,8 @@ class Service(SimpleService):
             data["Thread_cache_misses"] = int(data["Threads_created"] * 10000 / float(data["Connections"]))
         except:
             data["Thread_cache_misses"] = 0
-
+       
+        data.update(slave_data)
         return data
 
     def check(self):
