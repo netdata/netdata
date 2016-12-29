@@ -3013,7 +3013,7 @@ select[multiple].input-lg {
       touch-action: manipulation;
   cursor: pointer;
   background-image: none;
-  border: 1px solid transparent;
+  border: 0px solid transparent;
   white-space: nowrap;
   padding: 8px 12px;
   font-size: 14px;

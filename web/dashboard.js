@@ -141,7 +141,7 @@ var NETDATA = window.NETDATA || {};
             gauge_gradient: false
         },
         slate: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161218-2',
+            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
             dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161226-1',
             background: '#272b30',
             foreground: '#C8C8C8',
