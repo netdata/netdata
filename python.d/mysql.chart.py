@@ -321,6 +321,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.connection = None
+        self.do_slave = -1
 
     def _parse_config(self, configuration):
         """
@@ -359,6 +360,51 @@ class Service(SimpleService):
             self.error("problem connecting to server:", e)
             raise RuntimeError
 
+    def _get_data_slave(self):
+        """
+        Get slave raw data from MySQL server
+        :return: dict
+        """
+        if self.connection is None:
+            try:
+                self._connect()
+            except RuntimeError:
+                return None
+
+        slave_data = None
+        slave_raw_data = None
+        try:
+            cursor = self.connection.cursor()
+            if cursor.execute(QUERY_SLAVE):
+                slave_raw_data = dict(list(zip([elem[0] for elem in cursor.description], cursor.fetchone())))
+
+        except MySQLdb.OperationalError as e:
+            self.debug("Reconnecting for query", QUERY_SLAVE, ":", str(e))
+            try:
+                self._connect()
+                cursor = self.connection.cursor()
+                if cursor.execute(QUERY_SLAVE):
+                    slave_raw_data = dict(list(zip([elem[0] for elem in cursor.description], cursor.fetchone())))
+            except Exception as e:
+                self.error("retried, but cannot execute query", QUERY_SLAVE, ":", str(e))
+                self.connection.close()
+                self.connection = None
+                return None
+
+        except Exception as e:
+            self.error("cannot execute query", QUERY_SLAVE, ":", str(e))
+            self.connection.close()
+            self.connection = None
+            return None
+
+        if slave_raw_data is not None:
+            slave_data = {'slave_behind': 0, 'slave_sql': 0, 'slave_io': 0 }
+            slave_data['slave_behind'] = int(slave_raw_data.setdefault('Seconds_Behind_Master', -1))
+            slave_data['slave_sql'] = 1 if slave_raw_data.get('Slave_SQL_Running') == 'Yes' else -1
+            slave_data['slave_io'] = 1 if slave_raw_data.get('Slave_IO_Running') == 'Yes' else -1
+
+        return slave_data
+
     def _get_data(self):
         """
         Get raw data from MySQL server
@@ -373,41 +419,45 @@ class Service(SimpleService):
             cursor = self.connection.cursor()
             cursor.execute(QUERY)
             raw_data = cursor.fetchall()
-            slave_data = {}
-            if cursor.execute(QUERY_SLAVE):
-                slave_data = {'slave_behind': 0, 'slave_sql': 0, 'slave_io': 0 }
-                slave_raw_data = dict(list(zip([elem[0] for elem in cursor.description], cursor.fetchone())))
-                slave_data['slave_behind'] = int(slave_raw_data.setdefault('Seconds_Behind_Master', -1))
-                slave_data['slave_sql'] = 1 if slave_raw_data.get('Slave_SQL_Running') == 'Yes' else -1
-                slave_data['slave_io'] = 1 if slave_raw_data.get('Slave_IO_Running') == 'Yes' else -1
 
         except MySQLdb.OperationalError as e:
-            self.debug("Reconnecting due to", str(e))
-            self._connect()
-            cursor = self.connection.cursor()
-            cursor.execute(QUERY)
-            raw_data = cursor.fetchall()
-            slave_data = {}
-            if cursor.execute(QUERY_SLAVE):
-                slave_data = {'slave_behind': 0, 'slave_sql': 0, 'slave_io': 0 }
-                slave_raw_data = dict(list(zip([elem[0] for elem in cursor.description], cursor.fetchone())))
-                slave_data['slave_behind'] = int(slave_raw_data.setdefault('Seconds_Behind_Master', -1))
-                slave_data['slave_sql'] = 1 if slave_raw_data.get('Slave_SQL_Running') == 'Yes' else -1
-                slave_data['slave_io'] = 1 if slave_raw_data.get('Slave_IO_Running') == 'Yes' else -1
+            self.debug("Reconnecting for query", QUERY, ":", str(e))
+            try:
+                self._connect()
+                cursor = self.connection.cursor()
+                cursor.execute(QUERY)
+                raw_data = cursor.fetchall()
+            except Exception as e:
+                self.error("retried, but cannot execute query", QUERY, ":", str(e))
+                self.connection.close()
+                self.connection = None
+                return None
 
         except Exception as e:
-            self.error("cannot execute query.", e)
+            self.error("cannot execute query", QUERY, ":", str(e))
             self.connection.close()
             self.connection = None
             return None
 
         data = dict(raw_data)
+
+        # check for slave data
+        if self.do_slave != 0:
+            slave_data = self._get_data_slave()
+            if slave_data is not None:
+                data.update(slave_data)
+                self.do_slave = 1
+            else:
+                if self.do_slave == -1:
+                    self.error("replication metrics will be disabled - please allow netdata to collect them.")
+                    self.do_slave = 0
+
+        # do calculations
         try:
             data["Thread_cache_misses"] = int(data["Threads_created"] * 10000 / float(data["Connections"]))
         except:
             data["Thread_cache_misses"] = 0
        
-        data.update(slave_data)
         return data
 
     def check(self):
