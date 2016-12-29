@@ -141,7 +141,7 @@ var NETDATA = window.NETDATA || {};
             gauge_gradient: false
         },
         slate: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161218-2',
+            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
             dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161226-1',
             background: '#272b30',
             foreground: '#C8C8C8',
@@ -501,9 +501,13 @@ var NETDATA = window.NETDATA || {};
     if(NETDATA.options.debug.main_loop === true)
         console.log('welcome to NETDATA');
 
+    NETDATA.onresizeCallback = null;
     NETDATA.onresize = function() {
         NETDATA.options.last_resized = Date.now();
         NETDATA.onscroll();
+
+        if(typeof NETDATA.onresizeCallback === 'function')
+            NETDATA.onresizeCallback();
     };
 
     NETDATA.onscroll_updater_count = 0;
