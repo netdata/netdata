@@ -202,6 +202,7 @@ declare -A configs_signatures=(
   ['919911d13901d60a7580f5dfd7fc87bb']='health.d/ram.conf'
   ['91c757ef6be3abdb86906d9dbb9c217a']='fping.conf'
   ['91cf3b3d42cac969b8b3fd4f531ecfb3']='python.d/squid.conf'
+  ['9542f80def48ba105190f6cdaa18248e']='health.d/mysql.conf'
   ['97eee7a30e6419df4537242e9d4a719d']='health.d/mysql.conf'
   ['97f337eb96213f3ede05e522e3743a6c']='python.d/memcached.conf'
   ['99a3de85d1e7826ed64a5f8576712e5d']='python.d.conf'
