@@ -106,6 +106,14 @@ debug() {
 
 # -----------------------------------------------------------------------------
 
+# store in ${plugin} the name we run under
+# this allows us to copy/link fping.plugin under a different name
+# to have multiple fping plugins running with different settings
+plugin="${PROGRAM_NAME/.plugin/}"
+
+
+# -----------------------------------------------------------------------------
+
 # the frequency to send info to netdata
 # passed by netdata as the first parameter
 update_every="${1-1}"
@@ -137,21 +145,21 @@ fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 # -----------------------------------------------------------------------------
 # load the configuration file
 
-if [ ! -f "${NETDATA_CONFIG_DIR}/fping.conf" ]
+if [ ! -f "${NETDATA_CONFIG_DIR}/${plugin}.conf" ]
 then
-	fatal "configuration file '${NETDATA_CONFIG_DIR}/fping.conf' not found - nothing to do."
+	fatal "configuration file '${NETDATA_CONFIG_DIR}/${plugin}.conf' not found - nothing to do."
 fi
 
-source "${NETDATA_CONFIG_DIR}/fping.conf"
+source "${NETDATA_CONFIG_DIR}/${plugin}.conf"
 
 if [ -z "${hosts}" ]
 then
-	fatal "no hosts configued in '${NETDATA_CONFIG_DIR}/fping.conf' - nothing to do."
+	fatal "no hosts configued in '${NETDATA_CONFIG_DIR}/${plugin}.conf' - nothing to do."
 fi
 
 if [ -z "${fping}" -o ! -x "${fping}" ]
 then
-	fatal "command '${fping}' is not executable - cannot proceed."
+	fatal "command '${fping}' is not found or is not executable - cannot proceed."
 fi
 
 if [ ${ping_every} -lt 20 ]
