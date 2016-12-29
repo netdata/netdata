@@ -149,6 +149,7 @@ declare -A configs_signatures=(
   ['6bf0de6e3b251b765b10a71d8c5c319d']='python.d/apache.conf'
   ['6cba40e32a7e98a98c31a209913839cc']='python.d/nginx_log.conf'
   ['6d02c2dd0863e09ad9dbba53e3b58116']='health.d/mysql.conf'
+  ['6ea958ca521e0514af57c08b518d8c5c']='health.d/backend.conf'
   ['70105b1744a8e13f49083d7f1981aea2']='python.d/ipfs.conf'
   ['707a63f53f4b32e01d134ae90ba94aad']='health_alarm_notify.conf'
   ['707a63f53f4b32e01d134ae90ba94aad']='health_email_recipients.conf'
