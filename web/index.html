@@ -2552,9 +2552,9 @@
             });
             Ps.update(sidebar);
 
-            var registry = document.getElementById('registry-dropdown');
+            var registry = document.getElementById('myNetdataDropdownUL');
             Ps.initialize(registry, {
-                wheelSpeed: 0.5,
+                wheelSpeed: 1,
                 wheelPropagation: false,
                 swipePropagation: false,
                 minScrollbarLength: null,
@@ -2572,6 +2572,17 @@
                 Ps.update(sidebar);
                 Ps.update(registry);
             };
+
+            $('#myNetdataDropdownParent')
+                .on('show.bs.dropdown', function () {
+                    NETDATA.pause(function() {});
+                })
+                .on('shown.bs.dropdown', function () {
+                    Ps.update(registry);
+                })
+                .on('hidden.bs.dropdown', function () {
+                    NETDATA.unpause();
+                });
         }
 
         function resetDashboardOptions() {
@@ -2630,9 +2641,9 @@
         <div class="container">
             <nav id="mynetdata_nav" class="collapse navbar-collapse navbar-left hidden-sm hidden-xs" role="navigation" style="padding-right: 20px;">
                 <ul class="nav navbar-nav">
-                    <li class="dropdown">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">my-netdata <strong class="caret"></strong></a>
-                        <ul class="dropdown-menu scrollable-menu inpagemenu multi-column columns-2" role="menu" id="registry-dropdown">
+                    <li class="dropdown" id="myNetdataDropdownParent">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
+                        <ul class="dropdown-menu scrollable-menu inpagemenu multi-column columns-2" role="menu" id="myNetdataDropdownUL">
                             <div class="row">
                                 <div class="col-sm-6" style="width: 85%; padding-right: 0;">
                                     <ul id="mynetdata_servers" class="multi-column-dropdown">
@@ -2663,21 +2674,10 @@
                     <li><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i>&nbsp;<span class="hidden-sm">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
                     <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-sliders"></i>&nbsp;<span class="hidden-sm">Settings</span></a></li>
                     <li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata community"><i class="fa fa-github"></i>&nbsp;<span class="hidden-sm hidden-md">Community</span></a></li>
-                    <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal" title="check for update"><i class="fa fa-cloud-download"></i><span id="update_badge" class="badge"></span>&nbsp;<span class="hidden-sm hidden-md">Update</span></a></li>
+                    <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal" title="check for update"><i class="fa fa-cloud-download"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
                     <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal" title="dashboard help"><i class="fa fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
-                    <!--
-                    <li class="dropdown hidden-md hidden-lg hidden-xs">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">Menu <strong class="caret"></strong></a>
-                        <ul class="dropdown-menu scrollable-menu inpagemenu" role="menu">
-                            <li><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fa fa-bell"></i> alarms</a></li>
-                            <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-sliders"></i> settings</a></li>
-                            <li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i> community</a></li>
-                            <li><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i> help</a></li>
-                        </ul>
-                    </li>
-                    -->
                     <li class="dropdown hidden-sm hidden-md hidden-lg">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="current_view">my-netdata <strong class="caret"></strong></a>
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
                         <ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
                             <li><a href="#" onclick="return false;" style="color: #999;">loading...</a></li>
                         </ul>
@@ -3223,4 +3223,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20161229-3"></script>
+<script type="text/javascript" src="dashboard.js?v20161229-4"></script>
