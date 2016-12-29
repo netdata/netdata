@@ -9,6 +9,7 @@ import os
 import sys
 import time
 import threading
+from re import sub
 
 # -----------------------------------------------------------------------------
 # globals & environment setup
@@ -340,7 +341,7 @@ class PythonCharts(object):
                     i += 1
                     try:
                         if job.override_name is not None:
-                            new_name = job.__module__ + '_' + job.override_name
+                            new_name = job.__module__ + '_' + sub(r'\s+', '_', job.override_name)
                             if new_name in overridden:
                                 msg.info("DROPPED:", job.name, ", job '" + job.override_name + "' is already served by another job.")
                                 self._stop(job)
