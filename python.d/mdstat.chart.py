@@ -18,7 +18,7 @@ class Service(SimpleService):
                                      [None, 'Faulty devices in MD', 'failed disks', 'health', 'md.health', 'line'],
                                  'lines': []}}
         self.proc_mdstat = '/proc/mdstat'
-        self.regex_disks = compile(r'((?<= )[md_]+[0-9]+(?= : active)).*?((?<= \[)[0-9]+)/([0-9]+(?=\] ))')
+        self.regex_disks = compile(r'((?<=\ )[a-zA-Z_0-9]+(?= : active)).*?((?<= \[)[0-9]+)/([0-9]+(?=\] ))')
 
     def check(self):
         raw_data = self._get_raw_data()
