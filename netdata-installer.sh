@@ -839,6 +839,15 @@ if [ ${UID} -eq 0 ]
         then
         run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
         setcap_ret=$?
+
+        if [ ${setcap_ret} -eq 0 ]
+            then
+            # if we managed to setcap
+            # but we fail to execute apps.plugin
+            # trigger setuid to root
+            "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -v >/dev/null 2>&1
+            setcap_ret=$?
+        fi
     fi
 
     if [ ${setcap_ret} -ne 0 ]
