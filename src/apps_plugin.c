@@ -1721,23 +1721,19 @@ static int collect_data_for_all_processes_from_proc(void) {
 
     struct dirent *file = NULL;
 
-    size_t found = 0;
     while((file = readdir(dir))) {
         char *endptr = file->d_name;
         pid_t pid = (pid_t) strtoul(file->d_name, &endptr, 10);
 
         // make sure we read a valid number
-        if(unlikely(endptr == file->d_name || *endptr != '\0')) {
-            found++;
+        if(unlikely(endptr == file->d_name || *endptr != '\0'))
             continue;
-        }
 
-        if(collect_data_for_pid(pid))
-            found++;
+        collect_data_for_pid(pid);
     }
     closedir(dir);
 
-    if(!found)
+    if(!all_pids_count)
         return 0;
 
     // normally this is done
