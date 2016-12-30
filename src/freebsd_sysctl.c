@@ -61,9 +61,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     }
 
     RRDSET *st;
+    RRDDIM *rd;
 
     int system_pagesize = getpagesize(); // wouldn't it be better to get value directly from hw.pagesize?
     int i, n;
+    void *p;
     int common_error = 0;
     size_t size;
 
@@ -91,6 +93,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     size_t intrcnt_size;
     unsigned long nintr = 0;
     static unsigned long *intrcnt = NULL;
+    static char *intrnames = NULL;
     unsigned long long totalintr = 0;
 
     // NEEDED BY: do_disk_io
@@ -380,6 +383,33 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 rrddim_set(st, "interrupts", totalintr);
                 rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                size = nintr * (MAXCOMLEN +1);
+                intrnames = reallocz(intrnames, size);
+                if (unlikely(getsysctl("hw.intrnames", intrnames, size))) {
+                    do_interrupts = 0;
+                    error("DISABLED: system.intr");
+                } else {
+                    st = rrdset_find_bytype("system", "interrupts");
+                    if (unlikely(!st))
+                        st = rrdset_create("system", "interrupts", NULL, "interrupts", NULL, "System interrupts", "interrupts/s",
+                                           1000, update_every, RRDSET_TYPE_STACKED);
+                    else
+                        rrdset_next(st);
+
+                    for (i = 0; i < nintr; i++) {
+                        p = intrnames + i * (MAXCOMLEN + 1);
+                        if (unlikely((intrcnt[i] != 0) && (*(char*)p != 0))) {
+                            rd = rrddim_find(st, p);
+                            if (unlikely(!rd))
+                                rd = rrddim_add(st, p, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                            rrddim_set_by_pointer(st, rd, intrcnt[i]);
+                        }
+                    }
+                    rrdset_done(st);
+                }
             }
         }
     }
