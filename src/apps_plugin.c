@@ -2680,6 +2680,11 @@ static void parse_args(int argc, char **argv)
             }
         }
 
+        if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0) {
+            printf("apps.plugin %s\n", VERSION);
+            exit(0);
+        }
+
         if(strcmp("debug", argv[i]) == 0) {
             debug = 1;
             // debug_flags = 0xffffffff;
@@ -2728,7 +2733,7 @@ static void parse_args(int argc, char **argv)
 
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
-                    "apps.plugin\n"
+                    "apps.plugin %s\n"
                     "(C) 2016 Costa Tsaousis"
                     "GPL v3+\n"
                     "This program is a data collector plugin for netdata.\n"
@@ -2755,6 +2760,10 @@ static void parse_args(int argc, char **argv)
                     "NAME              read apps_NAME.conf instead of\n"
                     "                  apps_groups.conf\n"
                     "                  (default NAME=groups)\n"
+                    "\n"
+                    "version           print program version and exit\n"
+                    "\n"
+                    , VERSION
             );
             exit(1);
         }
