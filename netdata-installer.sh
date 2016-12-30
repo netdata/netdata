@@ -657,6 +657,37 @@ portable_add_user_to_group() {
     fi
 }
 
+iscontainer() {
+    # man systemd-detect-virt
+    local cmd=$(which systemd-detect-virt 2>/dev/null || command -v systemd-detect-virt 2>/dev/null)
+    if [ ! -z "${cmd}" -a -x "${cmd}" ]
+        then
+        "${cmd}" --container >/dev/null 2>&1 && return 0
+    fi
+
+    # /proc/1/sched exposes the host's pid of our init !
+    # http://stackoverflow.com/a/37016302
+    local pid=$( cat /proc/1/sched | head -n 1 | { IFS='(),#:' read name pid th threads; echo $pid; } )
+    local p=$(( pid + 0 ))
+    [ ${pid} -ne 1 ] && return 0
+
+    # lxc sets environment variable 'container'
+    [ ! -z "${container}" ] && return 0
+
+    # docker creates /.dockerenv
+    # http://stackoverflow.com/a/25518345
+    [ -f "/.dockerenv" ] && return 0
+
+    # ubuntu and debian supply /bin/running-in-container
+    # https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
+    if [ -x "/bin/running-in-container" ]
+        then
+        "/bin/running-in-container" >/dev/null 2>&1 && return 0
+    fi
+
+    return 1
+}
+
 run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.logrotate -exec chmod 755 {} \;
 
 NETDATA_ADDED_TO_DOCKER=0
@@ -790,27 +821,34 @@ do
     #run find "${x}" -type d -exec chmod 0770 {} \;
 done
 
-run chown "${NETDATA_USER}:root" "${NETDATA_LOG_DIR}"
 run chmod 755 "${NETDATA_LOG_DIR}"
 
 # --- plugins ----
 
 if [ ${UID} -eq 0 ]
     then
+    run chown "${NETDATA_USER}:root" "${NETDATA_LOG_DIR}"
     run chown -R root "${NETDATA_PREFIX}/usr/libexec/netdata"
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
 
-    run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-    if [ $? -ne 0 ]
+    setcap_ret=1
+    if ! iscontainer
+        then
+        run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+        setcap_ret=$?
+    fi
+
+    if [ ${setcap_ret} -ne 0 ]
         then
         # fix apps.plugin to be setuid to root
         run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
         run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
     fi
 else
+    run chown "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_LOG_DIR}"
     run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_PREFIX}/usr/libexec/netdata"
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
