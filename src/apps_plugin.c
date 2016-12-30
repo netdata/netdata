@@ -121,7 +121,7 @@ long apps_groups_targets = 0;
 struct target *users_root_target = NULL;
 struct target *groups_root_target = NULL;
 
-struct target *get_users_target(uid_t uid)
+static struct target *get_users_target(uid_t uid)
 {
     struct target *w;
     for(w = users_root_target ; w ; w = w->next)
@@ -189,7 +189,7 @@ struct target *get_groups_target(gid_t gid)
 
 // find or create a new target
 // there are targets that are just aggregated to other target (the second argument)
-struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
+static struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
     int tdebug = 0, thidden = target?target->hidden:0, ends_with = 0;
     const char *nid = id;
 
@@ -278,7 +278,7 @@ struct target *get_apps_groups_target(const char *id, struct target *target, con
 }
 
 // read the apps_groups.conf file
-int read_apps_groups_conf(const char *file)
+static int read_apps_groups_conf(const char *file)
 {
     char filename[FILENAME_MAX + 1];
 
@@ -483,7 +483,7 @@ struct pid_stat {
 
 long all_pids_count = 0;
 
-struct pid_stat *get_pid_entry(pid_t pid) {
+static inline struct pid_stat *get_pid_entry(pid_t pid) {
     if(all_pids[pid]) {
         all_pids[pid]->new_entry = 0;
         return all_pids[pid];
@@ -505,7 +505,7 @@ struct pid_stat *get_pid_entry(pid_t pid) {
     return all_pids[pid];
 }
 
-void del_pid_entry(pid_t pid) {
+static inline void del_pid_entry(pid_t pid) {
     if(!all_pids[pid]) {
         error("attempted to free pid %d that is not allocated.", pid);
         return;
@@ -533,7 +533,7 @@ void del_pid_entry(pid_t pid) {
 // ----------------------------------------------------------------------------
 // update pids from proc
 
-int read_proc_pid_cmdline(struct pid_stat *p) {
+static inline int read_proc_pid_cmdline(struct pid_stat *p) {
 
     if(unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX + 1];
@@ -564,7 +564,7 @@ cleanup:
     return 0;
 }
 
-int read_proc_pid_ownership(struct pid_stat *p) {
+static inline int read_proc_pid_ownership(struct pid_stat *p) {
     if(unlikely(!p->stat_filename)) {
         error("pid %d does not have a stat_filename", p->pid);
         return 0;
@@ -585,7 +585,7 @@ int read_proc_pid_ownership(struct pid_stat *p) {
     return 1;
 }
 
-int read_proc_pid_stat(struct pid_stat *p) {
+static inline int read_proc_pid_stat(struct pid_stat *p) {
     static procfile *ff = NULL;
 
     if(unlikely(!p->stat_filename)) {
@@ -731,7 +731,7 @@ cleanup:
     return 0;
 }
 
-int read_proc_pid_statm(struct pid_stat *p) {
+static inline int read_proc_pid_statm(struct pid_stat *p) {
     static procfile *ff = NULL;
 
     if(unlikely(!p->statm_filename)) {
@@ -769,7 +769,7 @@ cleanup:
     return 0;
 }
 
-int read_proc_pid_io(struct pid_stat *p) {
+static inline int read_proc_pid_io(struct pid_stat *p) {
     static procfile *ff = NULL;
 
     if(unlikely(!p->io_filename)) {
@@ -847,7 +847,7 @@ unsigned long long global_utime = 0;
 unsigned long long global_stime = 0;
 unsigned long long global_gtime = 0;
 
-int read_proc_stat() {
+static inline int read_proc_stat() {
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
     static unsigned long long utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
@@ -983,7 +983,7 @@ static struct file_descriptor *file_descriptor_find(const char *name, uint32_t h
 #define FILETYPE_TIMERFD 7
 #define FILETYPE_SIGNALFD 8
 
-void file_descriptor_not_used(int id)
+static inline void file_descriptor_not_used(int id)
 {
     if(id > 0 && id < all_files_size) {
 
@@ -1017,7 +1017,7 @@ void file_descriptor_not_used(int id)
     else    error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)", id, all_files_size);
 }
 
-int file_descriptor_find_or_add(const char *name)
+static inline int file_descriptor_find_or_add(const char *name)
 {
     static int last_pos = 0;
     uint32_t hash = simple_hash(name);
@@ -1153,7 +1153,7 @@ int file_descriptor_find_or_add(const char *name)
     return c;
 }
 
-int read_pid_file_descriptors(struct pid_stat *p) {
+static inline int read_pid_file_descriptors(struct pid_stat *p) {
     char dirname[FILENAME_MAX+1];
 
     snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", global_host_prefix, p->pid);
@@ -1231,7 +1231,7 @@ int read_pid_file_descriptors(struct pid_stat *p) {
 
 // ----------------------------------------------------------------------------
 
-int print_process_and_parents(struct pid_stat *p, unsigned long long time) {
+static inline int print_process_and_parents(struct pid_stat *p, unsigned long long time) {
     char *prefix = "\\_ ";
     int indent = 0;
 
@@ -1270,13 +1270,13 @@ int print_process_and_parents(struct pid_stat *p, unsigned long long time) {
     return indent + 1;
 }
 
-void print_process_tree(struct pid_stat *p, char *msg) {
+static inline void print_process_tree(struct pid_stat *p, char *msg) {
     log_date(stderr);
     fprintf(stderr, "%s: process %s (%d, %s) with parents:\n", msg, p->comm, p->pid, p->updated?"running":"exited");
     print_process_and_parents(p, p->stat_collected_usec);
 }
 
-void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int type) {
+static inline void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int type) {
     int found = 0;
     struct pid_stat *p = NULL;
 
@@ -1346,7 +1346,7 @@ void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int typ
     }
 }
 
-unsigned long long remove_exited_child_from_parent(unsigned long long *field, unsigned long long *pfield) {
+static inline unsigned long long remove_exited_child_from_parent(unsigned long long *field, unsigned long long *pfield) {
     unsigned long long absorbed = 0;
 
     if(*field > *pfield) {
@@ -1363,7 +1363,7 @@ unsigned long long remove_exited_child_from_parent(unsigned long long *field, un
     return absorbed;
 }
 
-void process_exited_processes() {
+static inline void process_exited_processes() {
     struct pid_stat *p;
 
     for(p = root_of_pids; p ; p = p->next) {
@@ -1476,7 +1476,7 @@ void process_exited_processes() {
     }
 }
 
-void link_all_processes_to_their_parents(void) {
+static inline void link_all_processes_to_their_parents(void) {
     struct pid_stat *p, *pp;
 
     // link all children to their parents
@@ -1579,15 +1579,15 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
     return status;
 }
 
-void collect_data_for_pid(pid_t pid) {
+static inline int collect_data_for_pid(pid_t pid) {
     if(unlikely(pid <= 0 || pid > pid_max)) {
         error("Invalid pid %d read (expected 1 to %d). Ignoring process.", pid, pid_max);
-        return;
+        return 0;
     }
 
     struct pid_stat *p = get_pid_entry(pid);
-    if(unlikely(!p || p->read)) return;
-    p->read             = 1;
+    if(unlikely(!p || p->read)) return 0;
+    p->read = 1;
 
     // fprintf(stderr, "Reading process %d (%s), sortlist %d\n", p->pid, p->comm, p->sortlist);
 
@@ -1596,7 +1596,7 @@ void collect_data_for_pid(pid_t pid) {
 
     if(unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p))))
         // there is no reason to proceed if we cannot get its status
-        return;
+        return 0;
 
     read_proc_pid_ownership(p);
 
@@ -1616,7 +1616,7 @@ void collect_data_for_pid(pid_t pid) {
 
     if(unlikely(!managed_log(p, PID_LOG_STATM, read_proc_pid_statm(p))))
         // there is no reason to proceed if we cannot get its memory status
-        return;
+        return 0;
 
     // --------------------------------------------------------------------
     // link it
@@ -1675,9 +1675,11 @@ void collect_data_for_pid(pid_t pid) {
     p->updated = 1;
     p->keep = 0;
     p->keeploops = 0;
+
+    return 1;
 }
 
-int collect_data_for_all_processes_from_proc(void) {
+static int collect_data_for_all_processes_from_proc(void) {
     struct pid_stat *p = NULL;
 
     if(all_pids_count) {
@@ -1731,6 +1733,9 @@ int collect_data_for_all_processes_from_proc(void) {
     }
     closedir(dir);
 
+    if(!all_pids_count)
+        return 0;
+
     // normally this is done
     // however we may have processes exited while we collected values
     // so let's find the exited ones
@@ -1760,7 +1765,7 @@ int collect_data_for_all_processes_from_proc(void) {
 // 9. find the unique file count for each target
 // check: update_apps_groups_statistics()
 
-void cleanup_exited_pids(void) {
+static void cleanup_exited_pids(void) {
     int c;
     struct pid_stat *p = NULL;
 
@@ -1788,7 +1793,7 @@ void cleanup_exited_pids(void) {
     }
 }
 
-void apply_apps_groups_targets_inheritance(void) {
+static void apply_apps_groups_targets_inheritance(void) {
     struct pid_stat *p = NULL;
 
     // children that do not have a target
@@ -1898,7 +1903,7 @@ void apply_apps_groups_targets_inheritance(void) {
         fprintf(stderr, "apps.plugin: apply_apps_groups_targets_inheritance() made %d loops on the process tree\n", loops);
 }
 
-long zero_all_targets(struct target *root) {
+static long zero_all_targets(struct target *root) {
     struct target *w;
     long count = 0;
 
@@ -1942,7 +1947,7 @@ long zero_all_targets(struct target *root) {
     return count;
 }
 
-void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
+static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
     (void)o;
 
     if(unlikely(!w->fds))
@@ -2000,7 +2005,7 @@ void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target
     }
 }
 
-void count_targets_fds(struct target *root) {
+static inline void count_targets_fds(struct target *root) {
     int c;
     struct target *w;
 
@@ -2062,7 +2067,7 @@ void count_targets_fds(struct target *root) {
     }
 }
 
-void calculate_netdata_statistics(void) {
+static void calculate_netdata_statistics(void) {
     apply_apps_groups_targets_inheritance();
 
     zero_all_targets(users_root_target);
@@ -2162,7 +2167,7 @@ static inline void send_END(void) {
 double utime_fix_ratio = 1.0, stime_fix_ratio = 1.0, gtime_fix_ratio = 1.0, cutime_fix_ratio = 1.0, cstime_fix_ratio = 1.0, cgtime_fix_ratio = 1.0;
 double minflt_fix_ratio = 1.0, majflt_fix_ratio = 1.0, cminflt_fix_ratio = 1.0, cmajflt_fix_ratio = 1.0;
 
-usec_t send_resource_usage_to_netdata() {
+static usec_t send_resource_usage_to_netdata() {
     static struct timeval last = { 0, 0 };
     static struct rusage me_last;
 
@@ -2250,7 +2255,7 @@ usec_t send_resource_usage_to_netdata() {
     return usec;
 }
 
-void normalize_data(struct target *root) {
+static void normalize_data(struct target *root) {
     struct target *w;
 
     // childs processing introduces spikes
@@ -2396,7 +2401,7 @@ void normalize_data(struct target *root) {
     }
 }
 
-void send_collected_data_to_netdata(struct target *root, const char *type, usec_t usec) {
+static void send_collected_data_to_netdata(struct target *root, const char *type, usec_t usec) {
     struct target *w;
 
     send_BEGIN(type, "cpu", usec);
@@ -2527,7 +2532,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
 // ----------------------------------------------------------------------------
 // generate the charts
 
-void send_charts_updates_to_netdata(struct target *root, const char *type, const char *title)
+static void send_charts_updates_to_netdata(struct target *root, const char *type, const char *title)
 {
     struct target *w;
     int newly_added = 0;
@@ -2661,7 +2666,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 // ----------------------------------------------------------------------------
 // parse command line arguments
 
-void parse_args(int argc, char **argv)
+static void parse_args(int argc, char **argv)
 {
     int i, freq = 0;
     char *name = NULL;
@@ -2767,7 +2772,7 @@ void parse_args(int argc, char **argv)
     if(!name) name = "groups";
 
     if(read_apps_groups_conf(name)) {
-        error("Cannot read process groups %s", name);
+        error("Cannot read process groups '%s/apps_%s.conf'. There are no internal defaults. Failing.", config_dir, name);
         exit(1);
     }
 }
