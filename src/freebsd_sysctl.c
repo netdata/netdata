@@ -516,7 +516,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 collected_number total_disk_writes = 0;
 
                 for (i = 0; i < numdevs; i++) {
-                    if ((dstat[i].device_type == (DEVSTAT_TYPE_IF_SCSI | DEVSTAT_TYPE_DIRECT)) || (dstat[i].device_type == (DEVSTAT_TYPE_IF_IDE | DEVSTAT_TYPE_DIRECT))) {
+                    if (((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_DIRECT) || ((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_STORARRAY)) {
 
                         // --------------------------------------------------------------------
 
