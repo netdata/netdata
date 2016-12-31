@@ -50,6 +50,13 @@ netdata_SOURCES = \
 	procfile.c procfile.h \
 	proc_self_mountinfo.c proc_self_mountinfo.h \
 	registry.c registry.h \
+	registry_internals.c registry_internals.h \
+	registry_url.c registry_url.h \
+	registry_person.c registry_person.h \
+	registry_machine.c registry_machine.h \
+	registry_init.c \
+	registry_db.c \
+	registry_log.c \
 	rrd.c rrd.h \
 	rrd2json.c rrd2json.h \
 	storage_number.c storage_number.h \

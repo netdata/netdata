@@ -170,6 +170,8 @@
 #endif
 #define abs(x) ((x < 0)? -x : x)
 
+#define GUID_LEN 36
+
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);
 
@@ -198,10 +200,10 @@ extern void *mallocz_int(const char *file, const char *function, const unsigned 
 extern void *reallocz_int(const char *file, const char *function, const unsigned long line, void *ptr, size_t size);
 extern void freez_int(const char *file, const char *function, const unsigned long line, void *ptr);
 #else
-extern char *strdupz(const char *s);
-extern void *callocz(size_t nmemb, size_t size);
-extern void *mallocz(size_t size);
-extern void *reallocz(void *ptr, size_t size);
+extern char *strdupz(const char *s) __attribute__((returns_nonnull));
+extern void *callocz(size_t nmemb, size_t size) __attribute__((returns_nonnull));
+extern void *mallocz(size_t size) __attribute__((returns_nonnull));
+extern void *reallocz(void *ptr, size_t size) __attribute__((returns_nonnull));
 extern void freez(void *ptr);
 #endif
 
