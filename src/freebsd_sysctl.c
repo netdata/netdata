@@ -701,8 +701,8 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                         } else break;
                     }
                 }
-                total_xsw.bytes_used += xsw.xsw_used * system_pagesize;
-                total_xsw.bytes_total += xsw.xsw_nblks * system_pagesize;
+                total_xsw.bytes_used += xsw.xsw_used;
+                total_xsw.bytes_total += xsw.xsw_nblks;
             }
 
             if (likely(do_swap)) {
@@ -711,8 +711,8 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "free",    NULL, 1, 1048576, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "used",    NULL, 1, 1048576, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "free",    NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "used",    NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
