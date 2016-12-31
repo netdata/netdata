@@ -124,9 +124,9 @@ typedef struct registry_url REGISTRY_URL;
 // For each MACHINE-URL pair we keep this
 struct registry_machine_url {
     REGISTRY_URL *url;          // de-duplicated URL
-//  DICTIONARY *persons;        // dictionary of PERSON *
 
     uint8_t flags;
+
     uint32_t first_t;           // the first time we saw this
     uint32_t last_t;            // the last time we saw this
     uint32_t usages;            // how many times this has been accessed
@@ -137,9 +137,9 @@ typedef struct registry_machine_url REGISTRY_MACHINE_URL;
 struct registry_machine {
     char guid[GUID_LEN + 1];    // the GUID
 
-    uint32_t links;             // the number of PERSON_URLs linked to this machine
+    uint32_t links;             // the number of REGISTRY_PERSON_URL linked to this machine
 
-    DICTIONARY *urls;           // MACHINE_URL *
+    DICTIONARY *machine_urls;   // MACHINE_URL *
 
     uint32_t first_t;           // the first time we saw this
     uint32_t last_t;            // the last time we saw this
@@ -152,25 +152,26 @@ typedef struct registry_machine REGISTRY_MACHINE;
 // PERSON structures
 
 // for each PERSON-URL pair we keep this
-struct person_url {
+struct registry_person_url {
     REGISTRY_URL *url;          // de-duplicated URL
     REGISTRY_MACHINE *machine;  // link the MACHINE of this URL
 
     uint8_t flags;
+
     uint32_t first_t;           // the first time we saw this
     uint32_t last_t;            // the last time we saw this
     uint32_t usages;            // how many times this has been accessed
 
-    char name[1];               // the name of the URL, as known by the user
+    char machine_name[1];       // the name of the machine, as known by the user
                                 // dynamically allocated to fit properly
 };
-typedef struct person_url REGISTRY_PERSON_URL;
+typedef struct registry_person_url REGISTRY_PERSON_URL;
 
 // A person
 struct registry_person {
     char guid[GUID_LEN + 1];    // the person GUID
 
-    DICTIONARY *urls;           // dictionary of PERSON_URL *
+    DICTIONARY *person_urls;    // dictionary of PERSON_URL *
 
     uint32_t first_t;           // the first time we saw this
     uint32_t last_t;            // the last time we saw this
@@ -401,7 +402,7 @@ static inline REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHI
     registry.machines_urls_memory += sizeof(REGISTRY_MACHINE_URL);
 
     debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): indexing URL in machine", m->guid, u->url);
-    dictionary_set(m->urls, u->url, mu, sizeof(REGISTRY_MACHINE_URL));
+    dictionary_set(m->machine_urls, u->url, mu, sizeof(REGISTRY_MACHINE_URL));
     registry_url_link_nolock(u);
 
     return mu;
@@ -415,7 +416,7 @@ static inline REGISTRY_MACHINE *registry_machine_allocate(const char *machine_gu
     strncpyz(m->guid, machine_guid, GUID_LEN);
 
     debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating dictionary of urls", machine_guid);
-    m->urls = dictionary_create(DICTIONARY_FLAGS);
+    m->machine_urls = dictionary_create(DICTIONARY_FLAGS);
 
     m->first_t = m->last_t = (uint32_t)when;
     m->usages = 0;
@@ -474,7 +475,7 @@ static inline REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON 
 
     // a simple strcpy() should do the job
     // but I prefer to be safe, since the caller specified urllen
-    strncpyz(pu->name, name, namelen);
+    strncpyz(pu->machine_name, name, namelen);
 
     pu->machine = m;
     pu->first_t = pu->last_t = when;
@@ -486,7 +487,7 @@ static inline REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON 
     registry.persons_urls_memory += sizeof(REGISTRY_PERSON_URL) + namelen;
 
     debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): indexing URL in person", p->guid, m->guid, u->url);
-    dictionary_set(p->urls, u->url, pu, sizeof(REGISTRY_PERSON_URL));
+    dictionary_set(p->person_urls, u->url, pu, sizeof(REGISTRY_PERSON_URL));
     registry_url_link_nolock(u);
 
     return pu;
@@ -506,7 +507,7 @@ static inline REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSO
     // ok, these are a hack - since the registry_person_url_allocate() is
     // adding these, we have to subtract them
     tpu->machine->links--;
-    registry.persons_urls_memory -= sizeof(REGISTRY_PERSON_URL) + strlen(pu->name);
+    registry.persons_urls_memory -= sizeof(REGISTRY_PERSON_URL) + strlen(pu->machine_name);
     registry_url_unlink_nolock(u);
 
     freez(pu);
@@ -540,7 +541,7 @@ static inline REGISTRY_PERSON *registry_person_allocate(const char *person_guid,
         strncpyz(p->guid, person_guid, GUID_LEN);
 
     debug(D_REGISTRY, "Registry: registry_person_allocate('%s'): creating dictionary of urls", p->guid);
-    p->urls = dictionary_create(DICTIONARY_FLAGS);
+    p->person_urls = dictionary_create(DICTIONARY_FLAGS);
 
     p->first_t = p->last_t = when;
     p->usages = 0;
@@ -589,7 +590,7 @@ static inline REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *
 
     registry_person_urls_lock(p);
 
-    REGISTRY_PERSON_URL *pu = dictionary_get(p->urls, u->url);
+    REGISTRY_PERSON_URL *pu = dictionary_get(p->person_urls, u->url);
     if(!pu) {
         debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): not found", p->guid, m->guid, u->url);
         pu = registry_person_url_allocate(p, m, u, name, namelen, when);
@@ -601,7 +602,7 @@ static inline REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *
         if(likely(pu->last_t < (uint32_t)when)) pu->last_t = when;
 
         if(pu->machine != m) {
-            REGISTRY_MACHINE_URL *mu = dictionary_get(pu->machine->urls, u->url);
+            REGISTRY_MACHINE_URL *mu = dictionary_get(pu->machine->machine_urls, u->url);
             if(mu) {
                 info("registry_person_link_to_url('%s', '%s', '%s'): URL switched machines (old was '%s') - expiring it from previous machine.",
                      p->guid, m->guid, u->url, pu->machine->guid);
@@ -616,7 +617,7 @@ static inline REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *
             pu->machine = m;
         }
 
-        if(strcmp(pu->name, name)) {
+        if(strcmp(pu->machine_name, name)) {
             // the name of the PERSON_URL has changed !
             pu = registry_person_url_reallocate(p, m, u, name, namelen, when, pu);
         }
@@ -640,7 +641,7 @@ static inline REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_PERSON
 
     registry_machine_urls_lock(m);
 
-    REGISTRY_MACHINE_URL *mu = dictionary_get(m->urls, u->url);
+    REGISTRY_MACHINE_URL *mu = dictionary_get(m->machine_urls, u->url);
     if(!mu) {
         debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s', '%s'): not found", p->guid, m->guid, u->url);
         mu = registry_machine_url_allocate(m, u, when);
@@ -887,7 +888,7 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
     }
     if(pp) *pp = p;
 
-    REGISTRY_PERSON_URL *pu = dictionary_get(p->urls, url);
+    REGISTRY_PERSON_URL *pu = dictionary_get(p->person_urls, url);
     if(!pu) {
         info("Registry Request Verification: URL not found for person, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
@@ -914,7 +915,7 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
 
     registry_person_urls_lock(p);
 
-    REGISTRY_PERSON_URL *dpu = dictionary_get(p->urls, delete_url);
+    REGISTRY_PERSON_URL *dpu = dictionary_get(p->person_urls, delete_url);
     if(!dpu) {
         info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid, m->guid, pu->url->url, delete_url);
         registry_person_urls_unlock(p);
@@ -923,7 +924,7 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
 
     registry_log('D', p, m, pu->url, dpu->url->url);
 
-    dictionary_del(p->urls, dpu->url->url);
+    dictionary_del(p->person_urls, dpu->url->url);
     registry_url_unlink_nolock(dpu->url);
     freez(dpu);
 
@@ -985,7 +986,7 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
 
     // request a walk through on the dictionary
     // no need for locking here, the underlying dictionary has its own
-    dictionary_get_all(p->urls, machine_request_callback, &rdata);
+    dictionary_get_all(p->person_urls, machine_request_callback, &rdata);
 
     if(rdata.result)
         return m;
@@ -1074,7 +1075,7 @@ static inline int registry_json_person_url_callback(void *entry, void *data) {
         buffer_strcat(w->response.data, ",");
 
     buffer_sprintf(w->response.data, "\n\t\t[ \"%s\", \"%s\", %u000, %u, \"%s\" ]",
-                   pu->machine->guid, pu->url->url, pu->last_t, pu->usages, pu->name);
+                   pu->machine->guid, pu->url->url, pu->last_t, pu->usages, pu->machine_name);
 
     return 1;
 }
@@ -1116,7 +1117,7 @@ int registry_request_access_json(struct web_client *w, char *person_guid, char *
 
     buffer_sprintf(w->response.data, ",\n\t\"person_guid\": \"%s\",\n\t\"urls\": [", p->guid);
     struct registry_json_walk_person_urls_callback c = { p, NULL, w, 0 };
-    dictionary_get_all(p->urls, registry_json_person_url_callback, &c);
+    dictionary_get_all(p->person_urls, registry_json_person_url_callback, &c);
     buffer_strcat(w->response.data, "\n\t]\n");
 
     registry_json_footer(w);
@@ -1157,7 +1158,7 @@ int registry_request_search_json(struct web_client *w, char *person_guid, char *
 
     buffer_strcat(w->response.data, ",\n\t\"urls\": [");
     struct registry_json_walk_person_urls_callback c = { NULL, m, w, 0 };
-    dictionary_get_all(m->urls, registry_json_machine_url_callback, &c);
+    dictionary_get_all(m->machine_urls, registry_json_machine_url_callback, &c);
     buffer_strcat(w->response.data, "\n\t]\n");
 
     registry_json_footer(w);
@@ -1213,7 +1214,7 @@ int registry_request_switch_json(struct web_client *w, char *person_guid, char *
     struct registry_person_url_callback_verify_machine_exists_data data = { m, 0 };
 
     // verify the old person has access to this machine
-    dictionary_get_all(op->urls, registry_person_url_callback_verify_machine_exists, &data);
+    dictionary_get_all(op->person_urls, registry_person_url_callback_verify_machine_exists, &data);
     if(!data.count) {
         registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -1222,7 +1223,7 @@ int registry_request_switch_json(struct web_client *w, char *person_guid, char *
 
     // verify the new person has access to this machine
     data.count = 0;
-    dictionary_get_all(np->urls, registry_person_url_callback_verify_machine_exists, &data);
+    dictionary_get_all(np->person_urls, registry_person_url_callback_verify_machine_exists, &data);
     if(!data.count) {
         registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -1344,7 +1345,7 @@ int registry_machine_save(void *entry, void *file) {
     );
 
     if(ret >= 0) {
-        int ret2 = dictionary_get_all(m->urls, registry_machine_save_url, fp);
+        int ret2 = dictionary_get_all(m->machine_urls, registry_machine_save_url, fp);
         if(ret2 < 0) return ret2;
         ret += ret2;
     }
@@ -1366,7 +1367,7 @@ static inline int registry_person_save_url(void *entry, void *file) {
             pu->usages,
             pu->flags,
             pu->machine->guid,
-            pu->name,
+            pu->machine_name,
             pu->url->url
     );
 
@@ -1389,7 +1390,7 @@ static inline int registry_person_save(void *entry, void *file) {
     );
 
     if(ret >= 0) {
-        int ret2 = dictionary_get_all(p->urls, registry_person_save_url, fp);
+        int ret2 = dictionary_get_all(p->person_urls, registry_person_save_url, fp);
         if (ret2 < 0) return ret2;
         ret += ret2;
     }
@@ -1610,7 +1611,7 @@ static inline size_t registry_load(void) {
                 pu->last_t = strtoul(&s[11], NULL, 16);
                 pu->usages = strtoul(&s[20], NULL, 16);
                 pu->flags = strtoul(&s[29], NULL, 16);
-                debug(D_REGISTRY, "Registry loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x", u->url, pu->name, m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
+                debug(D_REGISTRY, "Registry loaded person URL '%s' with name '%s' of machine '%s', first: %u, last: %u, usages: %u, flags: %02x", u->url, pu->machine_name, m->guid, pu->first_t, pu->last_t, pu->usages, pu->flags);
                 break;
 
             case 'V': // machine URL
@@ -1745,13 +1746,13 @@ void registry_free(void) {
 
         // fprintf(stderr, "\nPERSON: '%s', first: %u, last: %u, usages: %u\n", p->guid, p->first_t, p->last_t, p->usages);
 
-        while(p->urls->values_index.root) {
-            REGISTRY_PERSON_URL *pu = ((NAME_VALUE *)p->urls->values_index.root)->value;
+        while(p->person_urls->values_index.root) {
+            REGISTRY_PERSON_URL *pu = ((NAME_VALUE *)p->person_urls->values_index.root)->value;
 
             // fprintf(stderr, "\tURL: '%s', first: %u, last: %u, usages: %u, flags: 0x%02x\n", pu->url->url, pu->first_t, pu->last_t, pu->usages, pu->flags);
 
             debug(D_REGISTRY, "Registry: deleting url '%s' from person '%s'", pu->url->url, p->guid);
-            dictionary_del(p->urls, pu->url->url);
+            dictionary_del(p->person_urls, pu->url->url);
 
             debug(D_REGISTRY, "Registry: unlinking url '%s' from person", pu->url->url);
             registry_url_unlink_nolock(pu->url);
@@ -1764,7 +1765,7 @@ void registry_free(void) {
         dictionary_del(registry.persons, p->guid);
 
         debug(D_REGISTRY, "Registry: destroying URL dictionary of person '%s'", p->guid);
-        dictionary_destroy(p->urls);
+        dictionary_destroy(p->person_urls);
 
         debug(D_REGISTRY, "Registry: freeing person '%s'", p->guid);
         freez(p);
@@ -1775,8 +1776,8 @@ void registry_free(void) {
 
         // fprintf(stderr, "\nMACHINE: '%s', first: %u, last: %u, usages: %u\n", m->guid, m->first_t, m->last_t, m->usages);
 
-        while(m->urls->values_index.root) {
-            REGISTRY_MACHINE_URL *mu = ((NAME_VALUE *)m->urls->values_index.root)->value;
+        while(m->machine_urls->values_index.root) {
+            REGISTRY_MACHINE_URL *mu = ((NAME_VALUE *)m->machine_urls->values_index.root)->value;
 
             // fprintf(stderr, "\tURL: '%s', first: %u, last: %u, usages: %u, flags: 0x%02x\n", mu->url->url, mu->first_t, mu->last_t, mu->usages, mu->flags);
 
@@ -1784,7 +1785,7 @@ void registry_free(void) {
             //dictionary_destroy(mu->persons);
 
             debug(D_REGISTRY, "Registry: deleting url '%s' from person '%s'", mu->url->url, m->guid);
-            dictionary_del(m->urls, mu->url->url);
+            dictionary_del(m->machine_urls, mu->url->url);
 
             debug(D_REGISTRY, "Registry: unlinking url '%s' from machine", mu->url->url);
             registry_url_unlink_nolock(mu->url);
@@ -1797,7 +1798,7 @@ void registry_free(void) {
         dictionary_del(registry.machines, m->guid);
 
         debug(D_REGISTRY, "Registry: destroying URL dictionary of machine '%s'", m->guid);
-        dictionary_destroy(m->urls);
+        dictionary_destroy(m->machine_urls);
 
         debug(D_REGISTRY, "Registry: freeing machine '%s'", m->guid);
         freez(m);
