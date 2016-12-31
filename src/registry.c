@@ -32,7 +32,6 @@
 //
 //    - embed avl structures directly into registry objects, instead of DICTIONARY
 //    - store GUIDs in memory as UUID instead of char *
-//      (this will also remove the index hash, since UUIDs can be compared directly)
 //    - do not track persons using the demo machines only
 //      (i.e. start tracking them only when they access a non-demo machine)
 //    - [DONE] do not track custom dashboards by default
@@ -42,13 +41,15 @@
 
 #define DICTIONARY_FLAGS DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE | DICTIONARY_FLAG_NAME_LINK_DONT_CLONE
 
+#define GUID_LEN 36
+
 // ----------------------------------------------------------------------------
 // COMMON structures
 
 struct registry {
     int enabled;
 
-    char machine_guid[36 + 1];
+    char machine_guid[GUID_LEN + 1];
 
     // entries counters / statistics
     unsigned long long persons_count;
@@ -109,20 +110,20 @@ struct registry {
 // so instead of storing URLs all over the place
 // we store them here and we keep pointers elsewhere
 
-struct url {
+struct registry_url {
     uint32_t links; // the number of links to this URL - when none is left, we free it
     uint16_t len;   // the length of the URL in bytes
     char url[1];    // the URL - dynamically allocated to more size
 };
-typedef struct url ND_URL;
+typedef struct registry_url REGISTRY_URL;
 
 
 // ----------------------------------------------------------------------------
 // MACHINE structures
 
 // For each MACHINE-URL pair we keep this
-struct machine_url {
-    ND_URL *url;                   // de-duplicated URL
+struct registry_machine_url {
+    REGISTRY_URL *url;          // de-duplicated URL
 //  DICTIONARY *persons;        // dictionary of PERSON *
 
     uint8_t flags;
@@ -130,11 +131,11 @@ struct machine_url {
     uint32_t last_t;            // the last time we saw this
     uint32_t usages;            // how many times this has been accessed
 };
-typedef struct machine_url ND_MACHINE_URL;
+typedef struct registry_machine_url REGISTRY_MACHINE_URL;
 
 // A machine
-struct machine {
-    char guid[36 + 1];          // the GUID
+struct registry_machine {
+    char guid[GUID_LEN + 1];    // the GUID
 
     uint32_t links;             // the number of PERSON_URLs linked to this machine
 
@@ -144,7 +145,7 @@ struct machine {
     uint32_t last_t;            // the last time we saw this
     uint32_t usages;            // how many times this has been accessed
 };
-typedef struct machine ND_MACHINE;
+typedef struct registry_machine REGISTRY_MACHINE;
 
 
 // ----------------------------------------------------------------------------
@@ -152,8 +153,8 @@ typedef struct machine ND_MACHINE;
 
 // for each PERSON-URL pair we keep this
 struct person_url {
-    ND_URL *url;                   // de-duplicated URL
-    ND_MACHINE *machine;           // link the MACHINE of this URL
+    REGISTRY_URL *url;          // de-duplicated URL
+    REGISTRY_MACHINE *machine;  // link the MACHINE of this URL
 
     uint8_t flags;
     uint32_t first_t;           // the first time we saw this
@@ -163,11 +164,11 @@ struct person_url {
     char name[1];               // the name of the URL, as known by the user
                                 // dynamically allocated to fit properly
 };
-typedef struct person_url ND_PERSON_URL;
+typedef struct person_url REGISTRY_PERSON_URL;
 
 // A person
-struct person {
-    char guid[36 + 1];          // the person GUID
+struct registry_person {
+    char guid[GUID_LEN + 1];    // the person GUID
 
     DICTIONARY *urls;           // dictionary of PERSON_URL *
 
@@ -175,7 +176,7 @@ struct person {
     uint32_t last_t;            // the last time we saw this
     uint32_t usages;            // how many times this has been accessed
 };
-typedef struct person ND_PERSON;
+typedef struct registry_person REGISTRY_PERSON;
 
 
 // ----------------------------------------------------------------------------
@@ -209,12 +210,12 @@ static inline void registry_urls_unlock(void) {
 // updating a person's urls.
 // however, to save the memory required for keeping a
 // mutex (40 bytes) per person, we do...
-static inline void registry_person_urls_lock(ND_PERSON *p) {
+static inline void registry_person_urls_lock(REGISTRY_PERSON *p) {
     (void)p;
     pthread_mutex_lock(&registry.person_urls_lock);
 }
 
-static inline void registry_person_urls_unlock(ND_PERSON *p) {
+static inline void registry_person_urls_unlock(REGISTRY_PERSON *p) {
     (void)p;
     pthread_mutex_unlock(&registry.person_urls_lock);
 }
@@ -223,12 +224,12 @@ static inline void registry_person_urls_unlock(ND_PERSON *p) {
 // updating a machine's urls.
 // however, to save the memory required for keeping a
 // mutex (40 bytes) per machine, we do...
-static inline void registry_machine_urls_lock(ND_MACHINE *m) {
+static inline void registry_machine_urls_lock(REGISTRY_MACHINE *m) {
     (void)m;
     pthread_mutex_lock(&registry.machine_urls_lock);
 }
 
-static inline void registry_machine_urls_unlock(ND_MACHINE *m) {
+static inline void registry_machine_urls_unlock(REGISTRY_MACHINE *m) {
     (void)m;
     pthread_mutex_unlock(&registry.machine_urls_lock);
 }
@@ -306,20 +307,20 @@ static inline char *registry_fix_url(char *url, size_t *len) {
 // ----------------------------------------------------------------------------
 // forward definition of functions
 
-extern ND_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when);
-extern ND_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
+extern REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when);
+extern REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
 
 
 // ----------------------------------------------------------------------------
 // URL
 
-static inline ND_URL *registry_url_allocate_nolock(const char *url, size_t urllen) {
+static inline REGISTRY_URL *registry_url_allocate_nolock(const char *url, size_t urllen) {
     // protection from too big URLs
     if(urllen > registry.max_url_length)
         urllen = registry.max_url_length;
 
-    debug(D_REGISTRY, "Registry: registry_url_allocate_nolock('%s'): allocating %zu bytes", url, sizeof(ND_URL) + urllen);
-    ND_URL *u = mallocz(sizeof(ND_URL) + urllen);
+    debug(D_REGISTRY, "Registry: registry_url_allocate_nolock('%s'): allocating %zu bytes", url, sizeof(REGISTRY_URL) + urllen);
+    REGISTRY_URL *u = mallocz(sizeof(REGISTRY_URL) + urllen);
 
     // a simple strcpy() should do the job
     // but I prefer to be safe, since the caller specified urllen
@@ -327,18 +328,18 @@ static inline ND_URL *registry_url_allocate_nolock(const char *url, size_t urlle
     strncpyz(u->url, url, u->len);
     u->links = 0;
 
-    registry.urls_memory += sizeof(ND_URL) + urllen;
+    registry.urls_memory += sizeof(REGISTRY_URL) + urllen;
 
     debug(D_REGISTRY, "Registry: registry_url_allocate_nolock('%s'): indexing it", url);
-    dictionary_set(registry.urls, u->url, u, sizeof(ND_URL));
+    dictionary_set(registry.urls, u->url, u, sizeof(REGISTRY_URL));
 
     return u;
 }
 
-static inline ND_URL *registry_url_get_nolock(const char *url, size_t urllen) {
+static inline REGISTRY_URL *registry_url_get_nolock(const char *url, size_t urllen) {
     debug(D_REGISTRY, "Registry: registry_url_get_nolock('%s')", url);
 
-    ND_URL *u = dictionary_get(registry.urls, url);
+    REGISTRY_URL *u = dictionary_get(registry.urls, url);
     if(!u) {
         u = registry_url_allocate_nolock(url, urllen);
         registry.urls_count++;
@@ -347,24 +348,24 @@ static inline ND_URL *registry_url_get_nolock(const char *url, size_t urllen) {
     return u;
 }
 
-static inline ND_URL *registry_url_get(const char *url, size_t urllen) {
+static inline REGISTRY_URL *registry_url_get(const char *url, size_t urllen) {
     debug(D_REGISTRY, "Registry: registry_url_get('%s')", url);
 
     registry_urls_lock();
 
-    ND_URL *u = registry_url_get_nolock(url, urllen);
+    REGISTRY_URL *u = registry_url_get_nolock(url, urllen);
 
     registry_urls_unlock();
 
     return u;
 }
 
-static inline void registry_url_link_nolock(ND_URL *u) {
+static inline void registry_url_link_nolock(REGISTRY_URL *u) {
     u->links++;
     debug(D_REGISTRY, "Registry: registry_url_link_nolock('%s'): URL has now %u links", u->url, u->links);
 }
 
-static inline void registry_url_unlink_nolock(ND_URL *u) {
+static inline void registry_url_unlink_nolock(REGISTRY_URL *u) {
     u->links--;
     if(!u->links) {
         debug(D_REGISTRY, "Registry: registry_url_unlink_nolock('%s'): No more links for this URL", u->url);
@@ -379,15 +380,15 @@ static inline void registry_url_unlink_nolock(ND_URL *u) {
 // ----------------------------------------------------------------------------
 // MACHINE
 
-static inline ND_MACHINE *registry_machine_find(const char *machine_guid) {
+static inline REGISTRY_MACHINE *registry_machine_find(const char *machine_guid) {
     debug(D_REGISTRY, "Registry: registry_machine_find('%s')", machine_guid);
     return dictionary_get(registry.machines, machine_guid);
 }
 
-static inline ND_MACHINE_URL *registry_machine_url_allocate(ND_MACHINE *m, ND_URL *u, time_t when) {
-    debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): allocating %zu bytes", m->guid, u->url, sizeof(ND_MACHINE_URL));
+static inline REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, REGISTRY_URL *u, time_t when) {
+    debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): allocating %zu bytes", m->guid, u->url, sizeof(REGISTRY_MACHINE_URL));
 
-    ND_MACHINE_URL *mu = mallocz(sizeof(ND_MACHINE_URL));
+    REGISTRY_MACHINE_URL *mu = mallocz(sizeof(REGISTRY_MACHINE_URL));
 
     // mu->persons = dictionary_create(DICTIONARY_FLAGS);
     // dictionary_set(mu->persons, p->guid, p, sizeof(PERSON));
@@ -397,21 +398,21 @@ static inline ND_MACHINE_URL *registry_machine_url_allocate(ND_MACHINE *m, ND_UR
     mu->url = u;
     mu->flags = REGISTRY_URL_FLAGS_DEFAULT;
 
-    registry.machines_urls_memory += sizeof(ND_MACHINE_URL);
+    registry.machines_urls_memory += sizeof(REGISTRY_MACHINE_URL);
 
     debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): indexing URL in machine", m->guid, u->url);
-    dictionary_set(m->urls, u->url, mu, sizeof(ND_MACHINE_URL));
+    dictionary_set(m->urls, u->url, mu, sizeof(REGISTRY_MACHINE_URL));
     registry_url_link_nolock(u);
 
     return mu;
 }
 
-static inline ND_MACHINE *registry_machine_allocate(const char *machine_guid, time_t when) {
-    debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating new machine, sizeof(MACHINE)=%zu", machine_guid, sizeof(ND_MACHINE));
+static inline REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t when) {
+    debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating new machine, sizeof(MACHINE)=%zu", machine_guid, sizeof(REGISTRY_MACHINE));
 
-    ND_MACHINE *m = mallocz(sizeof(ND_MACHINE));
+    REGISTRY_MACHINE *m = mallocz(sizeof(REGISTRY_MACHINE));
 
-    strncpyz(m->guid, machine_guid, 36);
+    strncpyz(m->guid, machine_guid, GUID_LEN);
 
     debug(D_REGISTRY, "Registry: registry_machine_allocate('%s'): creating dictionary of urls", machine_guid);
     m->urls = dictionary_create(DICTIONARY_FLAGS);
@@ -419,10 +420,10 @@ static inline ND_MACHINE *registry_machine_allocate(const char *machine_guid, ti
     m->first_t = m->last_t = (uint32_t)when;
     m->usages = 0;
 
-    registry.machines_memory += sizeof(ND_MACHINE);
+    registry.machines_memory += sizeof(REGISTRY_MACHINE);
 
     registry.machines_count++;
-    dictionary_set(registry.machines, m->guid, m, sizeof(ND_MACHINE));
+    dictionary_set(registry.machines, m->guid, m, sizeof(REGISTRY_MACHINE));
 
     return m;
 }
@@ -430,14 +431,14 @@ static inline ND_MACHINE *registry_machine_allocate(const char *machine_guid, ti
 // 1. validate machine GUID
 // 2. if it is valid, find it or create it and return it
 // 3. if it is not valid, return NULL
-static inline ND_MACHINE *registry_machine_get(const char *machine_guid, time_t when) {
-    ND_MACHINE *m = NULL;
+static inline REGISTRY_MACHINE *registry_machine_get(const char *machine_guid, time_t when) {
+    REGISTRY_MACHINE *m = NULL;
 
     registry_machines_lock();
 
     if(likely(machine_guid && *machine_guid)) {
         // validate it is a GUID
-        char buf[36 + 1];
+        char buf[GUID_LEN + 1];
         if(unlikely(registry_regenerate_guid(machine_guid, buf) == -1))
             info("Registry: machine guid '%s' is not a valid guid. Ignoring it.", machine_guid);
         else {
@@ -456,20 +457,20 @@ static inline ND_MACHINE *registry_machine_get(const char *machine_guid, time_t 
 // ----------------------------------------------------------------------------
 // PERSON
 
-static inline ND_PERSON *registry_person_find(const char *person_guid) {
+static inline REGISTRY_PERSON *registry_person_find(const char *person_guid) {
     debug(D_REGISTRY, "Registry: registry_person_find('%s')", person_guid);
     return dictionary_get(registry.persons, person_guid);
 }
 
-static inline ND_PERSON_URL *registry_person_url_allocate(ND_PERSON *p, ND_MACHINE *m, ND_URL *u, char *name, size_t namelen, time_t when) {
+static inline REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when) {
     // protection from too big names
     if(namelen > registry.max_name_length)
         namelen = registry.max_name_length;
 
     debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, u->url,
-          sizeof(ND_PERSON_URL) + namelen);
+          sizeof(REGISTRY_PERSON_URL) + namelen);
 
-    ND_PERSON_URL *pu = mallocz(sizeof(ND_PERSON_URL) + namelen);
+    REGISTRY_PERSON_URL *pu = mallocz(sizeof(REGISTRY_PERSON_URL) + namelen);
 
     // a simple strcpy() should do the job
     // but I prefer to be safe, since the caller specified urllen
@@ -482,22 +483,22 @@ static inline ND_PERSON_URL *registry_person_url_allocate(ND_PERSON *p, ND_MACHI
     pu->flags = REGISTRY_URL_FLAGS_DEFAULT;
     m->links++;
 
-    registry.persons_urls_memory += sizeof(ND_PERSON_URL) + namelen;
+    registry.persons_urls_memory += sizeof(REGISTRY_PERSON_URL) + namelen;
 
     debug(D_REGISTRY, "registry_person_url_allocate('%s', '%s', '%s'): indexing URL in person", p->guid, m->guid, u->url);
-    dictionary_set(p->urls, u->url, pu, sizeof(ND_PERSON_URL));
+    dictionary_set(p->urls, u->url, pu, sizeof(REGISTRY_PERSON_URL));
     registry_url_link_nolock(u);
 
     return pu;
 }
 
-static inline ND_PERSON_URL *registry_person_url_reallocate(ND_PERSON *p, ND_MACHINE *m, ND_URL *u, char *name, size_t namelen, time_t when, ND_PERSON_URL *pu) {
+static inline REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when, REGISTRY_PERSON_URL *pu) {
     // this function is needed to change the name of a PERSON_URL
 
     debug(D_REGISTRY, "registry_person_url_reallocate('%s', '%s', '%s'): allocating %zu bytes", p->guid, m->guid, u->url,
-          sizeof(ND_PERSON_URL) + namelen);
+          sizeof(REGISTRY_PERSON_URL) + namelen);
 
-    ND_PERSON_URL *tpu = registry_person_url_allocate(p, m, u, name, namelen, when);
+    REGISTRY_PERSON_URL *tpu = registry_person_url_allocate(p, m, u, name, namelen, when);
     tpu->first_t = pu->first_t;
     tpu->last_t = pu->last_t;
     tpu->usages = pu->usages;
@@ -505,7 +506,7 @@ static inline ND_PERSON_URL *registry_person_url_reallocate(ND_PERSON *p, ND_MAC
     // ok, these are a hack - since the registry_person_url_allocate() is
     // adding these, we have to subtract them
     tpu->machine->links--;
-    registry.persons_urls_memory -= sizeof(ND_PERSON_URL) + strlen(pu->name);
+    registry.persons_urls_memory -= sizeof(REGISTRY_PERSON_URL) + strlen(pu->name);
     registry_url_unlink_nolock(u);
 
     freez(pu);
@@ -513,12 +514,12 @@ static inline ND_PERSON_URL *registry_person_url_reallocate(ND_PERSON *p, ND_MAC
     return tpu;
 }
 
-static inline ND_PERSON *registry_person_allocate(const char *person_guid, time_t when) {
-    ND_PERSON *p = NULL;
+static inline REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when) {
+    REGISTRY_PERSON *p = NULL;
 
-    debug(D_REGISTRY, "Registry: registry_person_allocate('%s'): allocating new person, sizeof(PERSON)=%zu", (person_guid)?person_guid:"", sizeof(ND_PERSON));
+    debug(D_REGISTRY, "Registry: registry_person_allocate('%s'): allocating new person, sizeof(PERSON)=%zu", (person_guid)?person_guid:"", sizeof(REGISTRY_PERSON));
 
-    p = mallocz(sizeof(ND_PERSON));
+    p = mallocz(sizeof(REGISTRY_PERSON));
 
     if(!person_guid) {
         for (; ;) {
@@ -536,7 +537,7 @@ static inline ND_PERSON *registry_person_allocate(const char *person_guid, time_
         }
     }
     else
-        strncpyz(p->guid, person_guid, 36);
+        strncpyz(p->guid, person_guid, GUID_LEN);
 
     debug(D_REGISTRY, "Registry: registry_person_allocate('%s'): creating dictionary of urls", p->guid);
     p->urls = dictionary_create(DICTIONARY_FLAGS);
@@ -544,10 +545,10 @@ static inline ND_PERSON *registry_person_allocate(const char *person_guid, time_
     p->first_t = p->last_t = when;
     p->usages = 0;
 
-    registry.persons_memory += sizeof(ND_PERSON);
+    registry.persons_memory += sizeof(REGISTRY_PERSON);
 
     registry.persons_count++;
-    dictionary_set(registry.persons, p->guid, p, sizeof(ND_PERSON));
+    dictionary_set(registry.persons, p->guid, p, sizeof(REGISTRY_PERSON));
 
     return p;
 }
@@ -557,13 +558,13 @@ static inline ND_PERSON *registry_person_allocate(const char *person_guid, time_
 // 2. if it is valid, find it
 // 3. if it is not valid, create a new one
 // 4. return it
-static inline ND_PERSON *registry_person_get(const char *person_guid, time_t when) {
-    ND_PERSON *p = NULL;
+static inline REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when) {
+    REGISTRY_PERSON *p = NULL;
 
     registry_persons_lock();
 
     if(person_guid && *person_guid) {
-        char buf[36 + 1];
+        char buf[GUID_LEN + 1];
         // validate it is a GUID
         if(unlikely(registry_regenerate_guid(person_guid, buf) == -1))
             info("Registry: person guid '%s' is not a valid guid. Ignoring it.", person_guid);
@@ -583,12 +584,12 @@ static inline ND_PERSON *registry_person_get(const char *person_guid, time_t whe
 // ----------------------------------------------------------------------------
 // LINKING OF OBJECTS
 
-static inline ND_PERSON_URL *registry_person_link_to_url(ND_PERSON *p, ND_MACHINE *m, ND_URL *u, char *name, size_t namelen, time_t when) {
+static inline REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when) {
     debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): searching for URL in person", p->guid, m->guid, u->url);
 
     registry_person_urls_lock(p);
 
-    ND_PERSON_URL *pu = dictionary_get(p->urls, u->url);
+    REGISTRY_PERSON_URL *pu = dictionary_get(p->urls, u->url);
     if(!pu) {
         debug(D_REGISTRY, "registry_person_link_to_url('%s', '%s', '%s'): not found", p->guid, m->guid, u->url);
         pu = registry_person_url_allocate(p, m, u, name, namelen, when);
@@ -600,7 +601,7 @@ static inline ND_PERSON_URL *registry_person_link_to_url(ND_PERSON *p, ND_MACHIN
         if(likely(pu->last_t < (uint32_t)when)) pu->last_t = when;
 
         if(pu->machine != m) {
-            ND_MACHINE_URL *mu = dictionary_get(pu->machine->urls, u->url);
+            REGISTRY_MACHINE_URL *mu = dictionary_get(pu->machine->urls, u->url);
             if(mu) {
                 info("registry_person_link_to_url('%s', '%s', '%s'): URL switched machines (old was '%s') - expiring it from previous machine.",
                      p->guid, m->guid, u->url, pu->machine->guid);
@@ -634,12 +635,12 @@ static inline ND_PERSON_URL *registry_person_link_to_url(ND_PERSON *p, ND_MACHIN
     return pu;
 }
 
-static inline ND_MACHINE_URL *registry_machine_link_to_url(ND_PERSON *p, ND_MACHINE *m, ND_URL *u, time_t when) {
+static inline REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, time_t when) {
     debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s', '%s'): searching for URL in machine", p->guid, m->guid, u->url);
 
     registry_machine_urls_lock(m);
 
-    ND_MACHINE_URL *mu = dictionary_get(m->urls, u->url);
+    REGISTRY_MACHINE_URL *mu = dictionary_get(m->urls, u->url);
     if(!mu) {
         debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s', '%s'): not found", p->guid, m->guid, u->url);
         mu = registry_machine_url_allocate(m, u, when);
@@ -675,7 +676,7 @@ static inline int registry_should_save_db(void) {
     return registry.log_count > registry.save_registry_every_entries;
 }
 
-static inline void registry_log(const char action, ND_PERSON *p, ND_MACHINE *m, ND_URL *u, char *name) {
+static inline void registry_log(const char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name) {
     if(likely(registry.log_fp)) {
         // we lock only if the file is open
         // to allow replaying the log at registry_log_load()
@@ -789,7 +790,7 @@ int registry_log_load(void) {
 
                     // make sure the person exists
                     // without this, a new person guid will be created
-                    ND_PERSON *p = registry_person_find(person_guid);
+                    REGISTRY_PERSON *p = registry_person_find(person_guid);
                     if(!p) p = registry_person_allocate(person_guid, when);
 
                     if(s[0] == 'A')
@@ -819,10 +820,10 @@ int registry_log_load(void) {
 // ----------------------------------------------------------------------------
 // REGISTRY REQUESTS
 
-ND_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
+REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when) {
     debug(D_REGISTRY, "registry_request_access('%s', '%s', '%s'): NEW REQUEST", (person_guid)?person_guid:"", machine_guid, url);
 
-    ND_MACHINE *m = registry_machine_get(machine_guid, when);
+    REGISTRY_MACHINE *m = registry_machine_get(machine_guid, when);
     if(!m) return NULL;
 
     // make sure the name is valid
@@ -832,8 +833,8 @@ ND_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *
     size_t urllen;
     url = registry_fix_url(url, &urllen);
 
-    ND_URL *u = registry_url_get(url, urllen);
-    ND_PERSON *p = registry_person_get(person_guid, when);
+    REGISTRY_URL *u = registry_url_get(url, urllen);
+    REGISTRY_PERSON *p = registry_person_get(person_guid, when);
 
     registry_person_link_to_url(p, m, u, name, namelen, when);
     registry_machine_link_to_url(p, m, u, when);
@@ -845,8 +846,8 @@ ND_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *
 }
 
 // verify the person, the machine and the URL exist in our DB
-ND_PERSON_URL *registry_verify_request(char *person_guid, char *machine_guid, char *url, ND_PERSON **pp, ND_MACHINE **mm) {
-    char pbuf[36 + 1], mbuf[36 + 1];
+REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_guid, char *url, REGISTRY_PERSON **pp, REGISTRY_MACHINE **mm) {
+    char pbuf[GUID_LEN + 1], mbuf[GUID_LEN + 1];
 
     if(!person_guid || !*person_guid || !machine_guid || !*machine_guid || !url || !*url) {
         info("Registry Request Verification: invalid request! person: '%s', machine '%s', url '%s'", person_guid?person_guid:"UNSET", machine_guid?machine_guid:"UNSET", url?url:"UNSET");
@@ -871,7 +872,7 @@ ND_PERSON_URL *registry_verify_request(char *person_guid, char *machine_guid, ch
     machine_guid = mbuf;
 
     // make sure the machine exists
-    ND_MACHINE *m = registry_machine_find(machine_guid);
+    REGISTRY_MACHINE *m = registry_machine_find(machine_guid);
     if(!m) {
         info("Registry Request Verification: machine not found, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
@@ -879,14 +880,14 @@ ND_PERSON_URL *registry_verify_request(char *person_guid, char *machine_guid, ch
     if(mm) *mm = m;
 
     // make sure the person exist
-    ND_PERSON *p = registry_person_find(person_guid);
+    REGISTRY_PERSON *p = registry_person_find(person_guid);
     if(!p) {
         info("Registry Request Verification: person not found, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
     }
     if(pp) *pp = p;
 
-    ND_PERSON_URL *pu = dictionary_get(p->urls, url);
+    REGISTRY_PERSON_URL *pu = dictionary_get(p->urls, url);
     if(!pu) {
         info("Registry Request Verification: URL not found for person, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
@@ -894,12 +895,12 @@ ND_PERSON_URL *registry_verify_request(char *person_guid, char *machine_guid, ch
     return pu;
 }
 
-ND_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
+REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
     (void)when;
 
-    ND_PERSON *p = NULL;
-    ND_MACHINE *m = NULL;
-    ND_PERSON_URL *pu = registry_verify_request(person_guid, machine_guid, url, &p, &m);
+    REGISTRY_PERSON *p = NULL;
+    REGISTRY_MACHINE *m = NULL;
+    REGISTRY_PERSON_URL *pu = registry_verify_request(person_guid, machine_guid, url, &p, &m);
     if(!pu || !p || !m) return NULL;
 
     // normalize the url
@@ -913,7 +914,7 @@ ND_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *
 
     registry_person_urls_lock(p);
 
-    ND_PERSON_URL *dpu = dictionary_get(p->urls, delete_url);
+    REGISTRY_PERSON_URL *dpu = dictionary_get(p->urls, delete_url);
     if(!dpu) {
         info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid, m->guid, pu->url->url, delete_url);
         registry_person_urls_unlock(p);
@@ -933,14 +934,14 @@ ND_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *
 
 // a structure to pass to the dictionary_get_all() callback handler
 struct machine_request_callback_data {
-    ND_MACHINE *find_this_machine;
-    ND_PERSON_URL *result;
+    REGISTRY_MACHINE *find_this_machine;
+    REGISTRY_PERSON_URL *result;
 };
 
 // the callback function
 // this will be run for every PERSON_URL of this PERSON
 int machine_request_callback(void *entry, void *data) {
-    ND_PERSON_URL *mypu = (ND_PERSON_URL *)entry;
+    REGISTRY_PERSON_URL *mypu = (REGISTRY_PERSON_URL *)entry;
     struct machine_request_callback_data *myrdata = (struct machine_request_callback_data *)data;
 
     if(mypu->machine == myrdata->find_this_machine) {
@@ -951,14 +952,14 @@ int machine_request_callback(void *entry, void *data) {
     return 0; // continue
 }
 
-ND_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
+REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when) {
     (void)when;
 
-    char mbuf[36 + 1];
+    char mbuf[GUID_LEN + 1];
 
-    ND_PERSON *p = NULL;
-    ND_MACHINE *m = NULL;
-    ND_PERSON_URL *pu = registry_verify_request(person_guid, machine_guid, url, &p, &m);
+    REGISTRY_PERSON *p = NULL;
+    REGISTRY_MACHINE *m = NULL;
+    REGISTRY_PERSON_URL *pu = registry_verify_request(person_guid, machine_guid, url, &p, &m);
     if(!pu || !p || !m) return NULL;
 
     // make sure the machine GUID is valid
@@ -1020,7 +1021,7 @@ void registry_set_cookie(struct web_client *w, const char *guid) {
         snprintfz(w->cookie2, COOKIE_MAX, NETDATA_REGISTRY_COOKIE_NAME "=%s; Domain=%s; Expires=%s", guid, registry.registry_domain, edate);
 }
 
-static inline void registry_set_person_cookie(struct web_client *w, ND_PERSON *p) {
+static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PERSON *p) {
     registry_set_cookie(w, p->guid);
 }
 
@@ -1057,15 +1058,15 @@ static inline int registry_json_disabled(struct web_client *w, const char *actio
 
 // structure used be the callbacks below
 struct registry_json_walk_person_urls_callback {
-    ND_PERSON *p;
-    ND_MACHINE *m;
+    REGISTRY_PERSON *p;
+    REGISTRY_MACHINE *m;
     struct web_client *w;
     int count;
 };
 
 // callback for rendering PERSON_URLs
 static inline int registry_json_person_url_callback(void *entry, void *data) {
-    ND_PERSON_URL *pu = (ND_PERSON_URL *)entry;
+    REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
 
@@ -1080,10 +1081,10 @@ static inline int registry_json_person_url_callback(void *entry, void *data) {
 
 // callback for rendering MACHINE_URLs
 static inline int registry_json_machine_url_callback(void *entry, void *data) {
-    ND_MACHINE_URL *mu = (ND_MACHINE_URL *)entry;
+    REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
-    ND_MACHINE *m = c->m;
+    REGISTRY_MACHINE *m = c->m;
 
     if(unlikely(c->count++))
         buffer_strcat(w->response.data, ",");
@@ -1100,7 +1101,7 @@ int registry_request_access_json(struct web_client *w, char *person_guid, char *
     if(!registry.enabled)
         return registry_json_disabled(w, "access");
 
-    ND_PERSON *p = registry_request_access(person_guid, machine_guid, url, name, when);
+    REGISTRY_PERSON *p = registry_request_access(person_guid, machine_guid, url, name, when);
     if(!p) {
         registry_json_header(w, "access", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -1127,7 +1128,7 @@ int registry_request_delete_json(struct web_client *w, char *person_guid, char *
     if(!registry.enabled)
         return registry_json_disabled(w, "delete");
 
-    ND_PERSON *p = registry_request_delete(person_guid, machine_guid, url, delete_url, when);
+    REGISTRY_PERSON *p = registry_request_delete(person_guid, machine_guid, url, delete_url, when);
     if(!p) {
         registry_json_header(w, "delete", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -1145,7 +1146,7 @@ int registry_request_search_json(struct web_client *w, char *person_guid, char *
     if(!registry.enabled)
         return registry_json_disabled(w, "search");
 
-    ND_MACHINE *m = registry_request_machine(person_guid, machine_guid, url, request_machine, when);
+    REGISTRY_MACHINE *m = registry_request_machine(person_guid, machine_guid, url, request_machine, when);
     if(!m) {
         registry_json_header(w, "search", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -1165,14 +1166,14 @@ int registry_request_search_json(struct web_client *w, char *person_guid, char *
 
 // structure used be the callbacks below
 struct registry_person_url_callback_verify_machine_exists_data {
-    ND_MACHINE *m;
+    REGISTRY_MACHINE *m;
     int count;
 };
 
 int registry_person_url_callback_verify_machine_exists(void *entry, void *data) {
     struct registry_person_url_callback_verify_machine_exists_data *d = (struct registry_person_url_callback_verify_machine_exists_data *)data;
-    ND_PERSON_URL *pu = (ND_PERSON_URL *)entry;
-    ND_MACHINE *m = d->m;
+    REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)entry;
+    REGISTRY_MACHINE *m = d->m;
 
     if(pu->machine == m)
         d->count++;
@@ -1188,21 +1189,21 @@ int registry_request_switch_json(struct web_client *w, char *person_guid, char *
     if(!registry.enabled)
         return registry_json_disabled(w, "switch");
 
-    ND_PERSON *op = registry_person_find(person_guid);
+    REGISTRY_PERSON *op = registry_person_find(person_guid);
     if(!op) {
         registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
         return 430;
     }
 
-    ND_PERSON *np = registry_person_find(new_person_guid);
+    REGISTRY_PERSON *np = registry_person_find(new_person_guid);
     if(!np) {
         registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
         return 431;
     }
 
-    ND_MACHINE *m = registry_machine_find(machine_guid);
+    REGISTRY_MACHINE *m = registry_machine_find(machine_guid);
     if(!m) {
         registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -1265,11 +1266,11 @@ char *registry_get_this_machine_guid(void) {
     // read it from disk
     int fd = open(registry.machine_guid_filename, O_RDONLY);
     if(fd != -1) {
-        char buf[36 + 1];
-        if(read(fd, buf, 36) != 36)
+        char buf[GUID_LEN + 1];
+        if(read(fd, buf, GUID_LEN) != GUID_LEN)
             error("Failed to read machine GUID from '%s'", registry.machine_guid_filename);
         else {
-            buf[36] = '\0';
+            buf[GUID_LEN] = '\0';
             if(registry_regenerate_guid(buf, registry.machine_guid) == -1) {
                 error("Failed to validate machine GUID '%s' from '%s'. Ignoring it - this might mean this netdata will appear as duplicate in the registry.",
                       buf, registry.machine_guid_filename);
@@ -1288,14 +1289,14 @@ char *registry_get_this_machine_guid(void) {
 
         uuid_generate_time(uuid);
         uuid_unparse_lower(uuid, registry.machine_guid);
-        registry.machine_guid[36] = '\0';
+        registry.machine_guid[GUID_LEN] = '\0';
 
         // save it
         fd = open(registry.machine_guid_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
         if(fd == -1)
             fatal("Cannot create unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
 
-        if(write(fd, registry.machine_guid, 36) != 36)
+        if(write(fd, registry.machine_guid, GUID_LEN) != GUID_LEN)
             fatal("Cannot write the unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
 
         close(fd);
@@ -1311,7 +1312,7 @@ char *registry_get_this_machine_guid(void) {
 // REGISTRY LOAD/SAVE
 
 int registry_machine_save_url(void *entry, void *file) {
-    ND_MACHINE_URL *mu = entry;
+    REGISTRY_MACHINE_URL *mu = entry;
     FILE *fp = file;
 
     debug(D_REGISTRY, "Registry: registry_machine_save_url('%s')", mu->url->url);
@@ -1330,7 +1331,7 @@ int registry_machine_save_url(void *entry, void *file) {
 }
 
 int registry_machine_save(void *entry, void *file) {
-    ND_MACHINE *m = entry;
+    REGISTRY_MACHINE *m = entry;
     FILE *fp = file;
 
     debug(D_REGISTRY, "Registry: registry_machine_save('%s')", m->guid);
@@ -1354,7 +1355,7 @@ int registry_machine_save(void *entry, void *file) {
 }
 
 static inline int registry_person_save_url(void *entry, void *file) {
-    ND_PERSON_URL *pu = entry;
+    REGISTRY_PERSON_URL *pu = entry;
     FILE *fp = file;
 
     debug(D_REGISTRY, "Registry: registry_person_save_url('%s')", pu->url->url);
@@ -1375,7 +1376,7 @@ static inline int registry_person_save_url(void *entry, void *file) {
 }
 
 static inline int registry_person_save(void *entry, void *file) {
-    ND_PERSON *p = entry;
+    REGISTRY_PERSON *p = entry;
     FILE *fp = file;
 
     debug(D_REGISTRY, "Registry: registry_person_save('%s')", p->guid);
@@ -1512,9 +1513,9 @@ int registry_save(void) {
 
 static inline size_t registry_load(void) {
     char *s, buf[4096 + 1];
-    ND_PERSON *p = NULL;
-    ND_MACHINE *m = NULL;
-    ND_URL *u = NULL;
+    REGISTRY_PERSON *p = NULL;
+    REGISTRY_MACHINE *m = NULL;
+    REGISTRY_URL *u = NULL;
     size_t line = 0;
 
     debug(D_REGISTRY, "Registry: loading active db from: '%s'", registry.db_filename);
@@ -1605,7 +1606,7 @@ static inline size_t registry_load(void) {
                 m = registry_machine_find(&s[32]);
                 if(!m) m = registry_machine_allocate(&s[32], first_t);
 
-                ND_PERSON_URL *pu = registry_person_url_allocate(p, m, u, &s[69], strlen(&s[69]), first_t);
+                REGISTRY_PERSON_URL *pu = registry_person_url_allocate(p, m, u, &s[69], strlen(&s[69]), first_t);
                 pu->last_t = strtoul(&s[11], NULL, 16);
                 pu->usages = strtoul(&s[20], NULL, 16);
                 pu->flags = strtoul(&s[29], NULL, 16);
@@ -1628,7 +1629,7 @@ static inline size_t registry_load(void) {
                 // u = registry_url_allocate_nolock(&s[32], strlen(&s[32]));
                 u = registry_url_get_nolock(&s[32], strlen(&s[32]));
 
-                ND_MACHINE_URL *mu = registry_machine_url_allocate(m, u, strtoul(&s[2], NULL, 16));
+                REGISTRY_MACHINE_URL *mu = registry_machine_url_allocate(m, u, strtoul(&s[2], NULL, 16));
                 mu->last_t = strtoul(&s[11], NULL, 16);
                 mu->usages = strtoul(&s[20], NULL, 16);
                 mu->flags = strtoul(&s[29], NULL, 16);
@@ -1740,12 +1741,12 @@ void registry_free(void) {
     // since the dictionaries use memory we allocated
 
     while(registry.persons->values_index.root) {
-        ND_PERSON *p = ((NAME_VALUE *)registry.persons->values_index.root)->value;
+        REGISTRY_PERSON *p = ((NAME_VALUE *)registry.persons->values_index.root)->value;
 
         // fprintf(stderr, "\nPERSON: '%s', first: %u, last: %u, usages: %u\n", p->guid, p->first_t, p->last_t, p->usages);
 
         while(p->urls->values_index.root) {
-            ND_PERSON_URL *pu = ((NAME_VALUE *)p->urls->values_index.root)->value;
+            REGISTRY_PERSON_URL *pu = ((NAME_VALUE *)p->urls->values_index.root)->value;
 
             // fprintf(stderr, "\tURL: '%s', first: %u, last: %u, usages: %u, flags: 0x%02x\n", pu->url->url, pu->first_t, pu->last_t, pu->usages, pu->flags);
 
@@ -1770,12 +1771,12 @@ void registry_free(void) {
     }
 
     while(registry.machines->values_index.root) {
-        ND_MACHINE *m = ((NAME_VALUE *)registry.machines->values_index.root)->value;
+        REGISTRY_MACHINE *m = ((NAME_VALUE *)registry.machines->values_index.root)->value;
 
         // fprintf(stderr, "\nMACHINE: '%s', first: %u, last: %u, usages: %u\n", m->guid, m->first_t, m->last_t, m->usages);
 
         while(m->urls->values_index.root) {
-            ND_MACHINE_URL *mu = ((NAME_VALUE *)m->urls->values_index.root)->value;
+            REGISTRY_MACHINE_URL *mu = ((NAME_VALUE *)m->urls->values_index.root)->value;
 
             // fprintf(stderr, "\tURL: '%s', first: %u, last: %u, usages: %u, flags: 0x%02x\n", mu->url->url, mu->first_t, mu->last_t, mu->usages, mu->flags);
 
