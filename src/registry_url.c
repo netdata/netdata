@@ -9,8 +9,13 @@ int registry_url_compare(void *a, void *b) {
     else return strcmp(((REGISTRY_URL *)a)->url, ((REGISTRY_URL *)b)->url);
 }
 
-#define registry_url_index_add(rc) (REGISTRY_URL *)avl_insert(&(registry.registry_urls_root_index), (avl *)(rc))
-#define registry_url_index_del(rc) (REGISTRY_URL *)avl_remove(&(registry.registry_urls_root_index), (avl *)(rc))
+inline REGISTRY_URL *registry_url_index_add(REGISTRY_URL *u) {
+    return (REGISTRY_URL *)avl_insert(&(registry.registry_urls_root_index), (avl *)(u));
+}
+
+inline REGISTRY_URL *registry_url_index_del(REGISTRY_URL *u) {
+    return (REGISTRY_URL *)avl_remove(&(registry.registry_urls_root_index), (avl *)(u));
+}
 
 REGISTRY_URL *registry_url_get(const char *url, size_t urllen) {
     // protection from too big URLs
@@ -63,11 +68,17 @@ void registry_url_unlink(REGISTRY_URL *u) {
     if(!u->links) {
         debug(D_REGISTRY, "Registry: registry_url_unlink('%s'): No more links for this URL", u->url);
         REGISTRY_URL *n = registry_url_index_del(u);
-        if(n != u)
-            error("INTERNAL ERROR: registry_url_unlink(): request to delete url '%s', deleted url '%s'", u->url, n->url);
+        if(!n) {
+            error("INTERNAL ERROR: registry_url_unlink('%s'): cannot find url in index", u->url);
+        }
+        else {
+            if(n != u) {
+                error("INTERNAL ERROR: registry_url_unlink('%s'): deleted different url '%s'", u->url, n->url);
+            }
 
-        registry.urls_memory -= sizeof(REGISTRY_URL) + n->len; // no need for +1, 1 is already in REGISTRY_URL
-        freez(n);
+            registry.urls_memory -= sizeof(REGISTRY_URL) + n->len; // no need for +1, 1 is already in REGISTRY_URL
+            freez(n);
+        }
     }
     else
         debug(D_REGISTRY, "Registry: registry_url_unlink('%s'): URL has %u links left", u->url, u->links);

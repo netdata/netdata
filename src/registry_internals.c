@@ -59,7 +59,17 @@ static inline char *registry_fix_machine_name(char *name, size_t *len) {
 }
 
 static inline char *registry_fix_url(char *url, size_t *len) {
-    return registry_fix_machine_name(url, len);
+    size_t l = 0;
+    char *s = registry_fix_machine_name(url, &l);
+
+    // protection from too big URLs
+    if(l > registry.max_url_length) {
+        l = registry.max_url_length;
+        s[l] = '\0';
+    }
+
+    if(len) *len = l;
+    return s;
 }
 
 
@@ -115,7 +125,7 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
     }
     if(pp) *pp = p;
 
-    REGISTRY_PERSON_URL *pu = registry_person_url_find(p, url);
+    REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, url);
     if(!pu) {
         info("Registry Request Verification: URL not found for person, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
@@ -154,7 +164,7 @@ REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, 
 }
 
 REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when) {
-    (void)when;
+    (void) when;
 
     REGISTRY_PERSON *p = NULL;
     REGISTRY_MACHINE *m = NULL;
@@ -166,23 +176,20 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
 
     // make sure the user is not deleting the url it uses
     if(!strcmp(delete_url, pu->url->url)) {
-        info("Registry Delete Request: delete URL is the one currently accessed, person: '%s', machine '%s', url '%s', delete url '%s'", p->guid, m->guid, pu->url->url, delete_url);
+        info("Registry Delete Request: delete URL is the one currently accessed, person: '%s', machine '%s', url '%s', delete url '%s'"
+             , p->guid, m->guid, pu->url->url, delete_url);
         return NULL;
     }
 
-    REGISTRY_PERSON_URL *dpu = registry_person_url_find(p, delete_url);
+    REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, delete_url);
     if(!dpu) {
-        info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid, m->guid, pu->url->url, delete_url);
+        info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid
+             , m->guid, pu->url->url, delete_url);
         return NULL;
     }
 
     registry_log('D', p, m, pu->url, dpu->url->url);
-
-    registry_person_url_del(p, dpu);
-
-    registry_url_unlink(dpu->url);
-
-    freez(dpu);
+    registry_person_unlink_from_url(p, dpu);
 
     return p;
 }

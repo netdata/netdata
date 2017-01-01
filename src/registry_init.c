@@ -80,7 +80,7 @@ int registry_init(void) {
 
     return 0;
 }
-/*
+
 void registry_free(void) {
     if(!registry.enabled) return;
 
@@ -89,32 +89,7 @@ void registry_free(void) {
 
     while(registry.persons->values_index.root) {
         REGISTRY_PERSON *p = ((NAME_VALUE *)registry.persons->values_index.root)->value;
-
-        // fprintf(stderr, "\nPERSON: '%s', first: %u, last: %u, usages: %u\n", p->guid, p->first_t, p->last_t, p->usages);
-
-        while(p->person_urls->values_index.root) {
-            REGISTRY_PERSON_URL *pu = ((NAME_VALUE *)p->person_urls->values_index.root)->value;
-
-            // fprintf(stderr, "\tURL: '%s', first: %u, last: %u, usages: %u, flags: 0x%02x\n", pu->url->url, pu->first_t, pu->last_t, pu->usages, pu->flags);
-
-            debug(D_REGISTRY, "Registry: deleting url '%s' from person '%s'", pu->url->url, p->guid);
-            dictionary_del(p->person_urls, pu->url->url);
-
-            debug(D_REGISTRY, "Registry: unlinking url '%s' from person", pu->url->url);
-            registry_url_unlink(pu->url);
-
-            debug(D_REGISTRY, "Registry: freeing person url");
-            freez(pu);
-        }
-
-        debug(D_REGISTRY, "Registry: deleting person '%s' from persons registry", p->guid);
-        dictionary_del(registry.persons, p->guid);
-
-        debug(D_REGISTRY, "Registry: destroying URL dictionary of person '%s'", p->guid);
-        dictionary_destroy(p->person_urls);
-
-        debug(D_REGISTRY, "Registry: freeing person '%s'", p->guid);
-        freez(p);
+        registry_person_del(p);
     }
 
     while(registry.machines->values_index.root) {
@@ -158,4 +133,4 @@ void registry_free(void) {
     debug(D_REGISTRY, "Registry: destroying machines dictionary");
     dictionary_destroy(registry.machines);
 }
-*/
+
