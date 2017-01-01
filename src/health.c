@@ -663,7 +663,7 @@ struct variable2json_helper {
     size_t counter;
 };
 
-static void single_variable2json(void *entry, void *data) {
+static int single_variable2json(void *entry, void *data) {
     struct variable2json_helper *helper = (struct variable2json_helper *)data;
     RRDVAR *rv = (RRDVAR *)entry;
     calculated_number value = rrdvar2number(rv);
@@ -674,6 +674,8 @@ static void single_variable2json(void *entry, void *data) {
         buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5Lf", helper->counter?",":"", rv->name, (long double)value);
 
     helper->counter++;
+
+    return 0;
 }
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {

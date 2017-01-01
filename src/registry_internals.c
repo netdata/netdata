@@ -115,7 +115,7 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
     }
     if(pp) *pp = p;
 
-    REGISTRY_PERSON_URL *pu = dictionary_get(p->person_urls, url);
+    REGISTRY_PERSON_URL *pu = registry_person_url_find(p, url);
     if(!pu) {
         info("Registry Request Verification: URL not found for person, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
@@ -170,7 +170,7 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
         return NULL;
     }
 
-    REGISTRY_PERSON_URL *dpu = dictionary_get(p->person_urls, delete_url);
+    REGISTRY_PERSON_URL *dpu = registry_person_url_find(p, delete_url);
     if(!dpu) {
         info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid, m->guid, pu->url->url, delete_url);
         return NULL;
@@ -178,7 +178,7 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
 
     registry_log('D', p, m, pu->url, dpu->url->url);
 
-    dictionary_del(p->person_urls, dpu->url->url);
+    registry_person_url_del(p, dpu);
 
     registry_url_unlink(dpu->url);
 
@@ -240,8 +240,7 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
     struct machine_request_callback_data rdata = { m, NULL };
 
     // request a walk through on the dictionary
-    // no need for locking here, the underlying dictionary has its own
-    dictionary_get_all(p->person_urls, machine_request_callback, &rdata);
+    avl_traverse(&p->person_urls, machine_request_callback, &rdata);
 
     if(rdata.result)
         return m;
