@@ -33,15 +33,16 @@ class Service(SimpleService):
                 self.order.append(''.join([md, '_status']))
                 self.definitions['agr_health']['lines'].append([''.join([md, '_health']), md, 'absolute'])
                 self.definitions[md] = {'options':
-                                            [None, 'MD disks stats', 'disks', md, 'md.stats', 'stacked'],
+                                            [None, 'MD disks stats', 'disks', md, 'md.disks', 'stacked'],
                                         'lines': [[''.join([md, '_total']), 'total', 'absolute'],
                                                   [''.join([md, '_inuse']), 'inuse', 'absolute']]}
                 self.definitions[''.join([md, '_status'])] = {'options':
                                             [None, 'MD current status', 'percent', md, 'md.status', 'line'],
-                                        'lines': [[''.join([md, '_resync']), 'resync', 'absolute'],
-                                                  [''.join([md, '_recovery']), 'recovery', 'absolute'],
-                                                  [''.join([md, '_check']), 'check', 'absolute']]}
+                                        'lines': [[''.join([md, '_resync']), 'resync', 'absolute', 1, 100],
+                                                  [''.join([md, '_recovery']), 'recovery', 'absolute', 1, 100],
+                                                  [''.join([md, '_check']), 'check', 'absolute', 1, 100]]}
             self.info('Plugin was started successfully. MDs to monitor %s' % (md_list))
+            to_netdata = {}
 
             return True
 
@@ -78,6 +79,6 @@ class Service(SimpleService):
             to_netdata[''.join([md[0], '_recovery'])] = 0
         
         for md in mdstat_status:
-            to_netdata[''.join([md[0], '_' + md[2]])] = round(float(md[3]))
+            to_netdata[''.join([md[0], '_' + md[2]])] = round(float(md[3]) * 100)
 
         return to_netdata
