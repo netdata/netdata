@@ -86,7 +86,8 @@ static inline int registry_person_save(void *entry, void *file) {
     );
 
     if(ret >= 0) {
-        int ret2 = dictionary_get_all(p->person_urls, registry_person_save_url, fp);
+        //int ret2 = dictionary_get_all(p->person_urls, registry_person_save_url, fp);
+        int ret2 = avl_traverse(&p->person_urls, registry_person_save_url, fp);
         if (ret2 < 0) return ret2;
         ret += ret2;
     }

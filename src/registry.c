@@ -75,7 +75,7 @@ struct registry_json_walk_person_urls_callback {
 };
 
 // callback for rendering PERSON_URLs
-static inline int registry_json_person_url_callback(void *entry, void *data) {
+static int registry_json_person_url_callback(void *entry, void *data) {
     REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
@@ -86,11 +86,11 @@ static inline int registry_json_person_url_callback(void *entry, void *data) {
     buffer_sprintf(w->response.data, "\n\t\t[ \"%s\", \"%s\", %u000, %u, \"%s\" ]",
             pu->machine->guid, pu->url->url, pu->last_t, pu->usages, pu->machine_name);
 
-    return 1;
+    return 0;
 }
 
 // callback for rendering MACHINE_URLs
-static inline int registry_json_machine_url_callback(void *entry, void *data) {
+static int registry_json_machine_url_callback(void *entry, void *data) {
     REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
@@ -113,7 +113,7 @@ struct registry_person_url_callback_verify_machine_exists_data {
     int count;
 };
 
-int registry_person_url_callback_verify_machine_exists(void *entry, void *data) {
+static inline int registry_person_url_callback_verify_machine_exists(void *entry, void *data) {
     struct registry_person_url_callback_verify_machine_exists_data *d = (struct registry_person_url_callback_verify_machine_exists_data *)data;
     REGISTRY_PERSON_URL *pu = (REGISTRY_PERSON_URL *)entry;
     REGISTRY_MACHINE *m = d->m;
@@ -181,7 +181,7 @@ int registry_request_access_json(struct web_client *w, char *person_guid, char *
 
     buffer_sprintf(w->response.data, ",\n\t\"person_guid\": \"%s\",\n\t\"urls\": [", p->guid);
     struct registry_json_walk_person_urls_callback c = { p, NULL, w, 0 };
-    dictionary_get_all(p->person_urls, registry_json_person_url_callback, &c);
+    avl_traverse(&p->person_urls, registry_json_person_url_callback, &c);
     buffer_strcat(w->response.data, "\n\t]\n");
 
     registry_json_footer(w);
@@ -284,7 +284,7 @@ int registry_request_switch_json(struct web_client *w, char *person_guid, char *
     struct registry_person_url_callback_verify_machine_exists_data data = { m, 0 };
 
     // verify the old person has access to this machine
-    dictionary_get_all(op->person_urls, registry_person_url_callback_verify_machine_exists, &data);
+    avl_traverse(&op->person_urls, registry_person_url_callback_verify_machine_exists, &data);
     if(!data.count) {
         registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -294,7 +294,7 @@ int registry_request_switch_json(struct web_client *w, char *person_guid, char *
 
     // verify the new person has access to this machine
     data.count = 0;
-    dictionary_get_all(np->person_urls, registry_person_url_callback_verify_machine_exists, &data);
+    avl_traverse(&np->person_urls, registry_person_url_callback_verify_machine_exists, &data);
     if(!data.count) {
         registry_json_header(w, "switch", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
@@ -372,7 +372,7 @@ void registry_statistics(void) {
     rrddim_set(stm, "persons",       registry.persons_memory + registry.persons_count * sizeof(NAME_VALUE) + sizeof(DICTIONARY));
     rrddim_set(stm, "machines",      registry.machines_memory + registry.machines_count * sizeof(NAME_VALUE) + sizeof(DICTIONARY));
     rrddim_set(stm, "urls",          registry.urls_memory);
-    rrddim_set(stm, "persons_urls",  registry.persons_urls_memory + registry.persons_count * sizeof(DICTIONARY) + registry.persons_urls_count * sizeof(NAME_VALUE));
+    rrddim_set(stm, "persons_urls",  registry.persons_urls_memory);
     rrddim_set(stm, "machines_urls", registry.machines_urls_memory + registry.machines_count * sizeof(DICTIONARY) + registry.machines_urls_count * sizeof(NAME_VALUE));
     rrdset_done(stm);
 }

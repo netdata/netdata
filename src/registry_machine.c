@@ -93,7 +93,7 @@ REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, REGISTRY
     if(likely(m->last_t < (uint32_t)when)) m->last_t = (uint32_t)when;
 
     if(mu->flags & REGISTRY_URL_FLAGS_EXPIRED) {
-        info("registry_machine_link_to_url('%s', '%s'): accessing an expired URL.", m->guid, u->url);
+        debug(D_REGISTRY, "registry_machine_link_to_url('%s', '%s'): accessing an expired URL.", m->guid, u->url);
         mu->flags &= ~REGISTRY_URL_FLAGS_EXPIRED;
     }
 

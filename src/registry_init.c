@@ -80,7 +80,7 @@ int registry_init(void) {
 
     return 0;
 }
-
+/*
 void registry_free(void) {
     if(!registry.enabled) return;
 
@@ -158,3 +158,4 @@ void registry_free(void) {
     debug(D_REGISTRY, "Registry: destroying machines dictionary");
     dictionary_destroy(registry.machines);
 }
+*/
