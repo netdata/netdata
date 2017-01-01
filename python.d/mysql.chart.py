@@ -142,7 +142,7 @@ CHARTS = {
     'thread_cache_misses': {
         'options': [None, 'mysql Threads Cache Misses', 'misses', 'threads', 'mysql.thread_cache_misses', 'area'],
         'lines': [
-            ["Thread_cache_misses", "misses", "absolute", 1, 10000]
+            ["Thread_cache_misses", "misses", "absolute", 1, 100]
         ]},
     'innodb_io': {
         'options': [None, 'mysql InnoDB I/O Bandwidth', 'kilobytes/s', 'innodb', 'mysql.innodb_io', 'area'],
@@ -473,7 +473,7 @@ class Service(SimpleService):
 
         # do calculations
         try:
-            data["Thread_cache_misses"] = round(float(data["Threads_created"]) * 10000 / float(data["Connections"]) * 10000)
+            data["Thread_cache_misses"] = round(float(data["Threads_created"]) / float(data["Connections"]) * 10000)
         except:
             data["Thread_cache_misses"] = None
 
