@@ -473,7 +473,7 @@ class Service(SimpleService):
 
         # do calculations
         try:
-            data["Thread_cache_misses"] = int(data["Threads_created"] * 10000 / float(data["Connections"]))
+            data["Thread_cache_misses"] = round(float(data["Threads_created"]) / float(data["Connections"]) * 10000)
         except:
             data["Thread_cache_misses"] = None
 
