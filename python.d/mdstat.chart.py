@@ -19,7 +19,7 @@ class Service(SimpleService):
                                  'lines': []}}
         self.proc_mdstat = '/proc/mdstat'
         self.regex_disks = compile(r'((?<=\ )[a-zA-Z_0-9]+(?= : active)).*?((?<= \[)[0-9]+)/([0-9]+(?=\] ))')
-        self.regex_status = compile(r'([a-zA-Z_0-9]+)( : active)[^:]*?([a-z]+) = ([0-9.]+(?=%))')
+        self.regex_status = compile(r'([a-zA-Z_0-9]+)( : active)[^:]*?([a-z]+) = ([0-9.]+(?=%)).*?((?<=finish=)[0-9.]+)min speed=([0-9]+)')
 
     def check(self):
         raw_data = self._get_raw_data()
@@ -31,6 +31,7 @@ class Service(SimpleService):
             for md in md_list:
                 self.order.append(md)
                 self.order.append(''.join([md, '_status']))
+                self.order.append(''.join([md, '_rate']))
                 self.definitions['agr_health']['lines'].append([''.join([md, '_health']), md, 'absolute'])
                 self.definitions[md] = {'options':
                                             [None, 'MD disks stats', 'disks', md, 'md.disks', 'stacked'],
@@ -41,6 +42,10 @@ class Service(SimpleService):
                                         'lines': [[''.join([md, '_resync']), 'resync', 'absolute', 1, 100],
                                                   [''.join([md, '_recovery']), 'recovery', 'absolute', 1, 100],
                                                   [''.join([md, '_check']), 'check', 'absolute', 1, 100]]}
+                self.definitions[''.join([md, '_rate'])] = {'options':
+                                            [None, 'MD operation status', 'rate', md, 'md.rate', 'line'],
+                                        'lines': [[''.join([md, '_finishin']), 'finish min', 'absolute', 1, 100],
+                                                  [''.join([md, '_rate']), 'megabyte/s', 'absolute', -1, 100]]}
             self.info('Plugin was started successfully. MDs to monitor %s' % (md_list))
             to_netdata = {}
 
@@ -77,8 +82,12 @@ class Service(SimpleService):
             to_netdata[''.join([md[0], '_check'])] = 0
             to_netdata[''.join([md[0], '_resync'])] = 0
             to_netdata[''.join([md[0], '_recovery'])] = 0
+            to_netdata[''.join([md[0], '_finishin'])] = 0
+            to_netdata[''.join([md[0], '_rate'])] = 0
         
         for md in mdstat_status:
             to_netdata[''.join([md[0], '_' + md[2]])] = round(float(md[3]) * 100)
+            to_netdata[''.join([md[0], '_finishin'])] = round(float(md[4]) * 100)
+            to_netdata[''.join([md[0], '_rate'])] = round(float(md[5]) / 1000 * 100)
 
         return to_netdata

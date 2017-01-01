@@ -34,6 +34,7 @@ dist_pythonconfig_DATA = \
     python.d/hddtemp.conf \
     python.d/ipfs.conf \
     python.d/isc_dhcpd.conf \
+    python.d/mdstat.conf \
     python.d/memcached.conf \
     python.d/mysql.conf \
     python.d/nginx.conf \
@@ -57,6 +58,7 @@ dist_healthconfig_DATA = \
     health.d/disks.conf \
     health.d/entropy.conf \
     health.d/ipc.conf \
+    health.d/mdstat.conf \
     health.d/memcached.conf \
     health.d/mysql.conf \
     health.d/named.conf \
