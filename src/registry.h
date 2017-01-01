@@ -55,11 +55,9 @@
 // should only happen when netdata starts
 extern int registry_init(void);
 
-/*
 // free all data held by the registry
 // should only happen when netdata exits
 extern void registry_free(void);
-*/
 
 // HTTP requests handled by the registry
 extern int registry_request_access_json(struct web_client *w, char *person_guid, char *machine_guid, char *url, char *name, time_t when);
