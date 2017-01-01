@@ -59,9 +59,6 @@ static int name_value_compare(void* a, void* b) {
     else return strcmp(((NAME_VALUE *)a)->name, ((NAME_VALUE *)b)->name);
 }
 
-#define dictionary_name_value_index_add_nolock(dict, nv) do { NETDATA_DICTIONARY_STATS_INSERTS_PLUS1(dict); avl_insert(&((dict)->values_index), (avl *)(nv)); } while(0)
-#define dictionary_name_value_index_del_nolock(dict, nv) do { NETDATA_DICTIONARY_STATS_DELETES_PLUS1(dict); avl_remove(&(dict->values_index), (avl *)(nv)); } while(0)
-
 static inline NAME_VALUE *dictionary_name_value_index_find_nolock(DICTIONARY *dict, const char *name, uint32_t hash) {
     NAME_VALUE tmp;
     tmp.hash = (hash)?hash:simple_hash(name);
@@ -95,7 +92,10 @@ static NAME_VALUE *dictionary_name_value_create_nolock(DICTIONARY *dict, const c
     }
 
     // index it
-    dictionary_name_value_index_add_nolock(dict, nv);
+    NETDATA_DICTIONARY_STATS_INSERTS_PLUS1(dict);
+    if(unlikely(avl_insert(&((dict)->values_index), (avl *)(nv)) != (avl *)nv))
+        error("dictionary: INTERNAL ERROR: duplicate insertion to dictionary.");
+
     NETDATA_DICTIONARY_STATS_ENTRIES_PLUS1(dict);
 
     return nv;
@@ -104,7 +104,9 @@ static NAME_VALUE *dictionary_name_value_create_nolock(DICTIONARY *dict, const c
 static void dictionary_name_value_destroy_nolock(DICTIONARY *dict, NAME_VALUE *nv) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", nv->name);
 
-    dictionary_name_value_index_del_nolock(dict, nv);
+    NETDATA_DICTIONARY_STATS_DELETES_PLUS1(dict);
+    if(unlikely(avl_remove(&(dict->values_index), (avl *)(nv)) != (avl *)nv))
+        error("dictionary: INTERNAL ERROR: dictionary invalid removal of node.");
 
     NETDATA_DICTIONARY_STATS_ENTRIES_MINUS1(dict);
 
