@@ -56,8 +56,8 @@ typedef struct avl_tree_lock {
  * a is linked directly to the tree, so it has to
  * be properly allocated by the caller.
  */
-avl *avl_insert_lock(avl_tree_lock *t, avl *a);
-avl *avl_insert(avl_tree *t, avl *a);
+avl *avl_insert_lock(avl_tree_lock *t, avl *a) __attribute__((returns_nonnull));
+avl *avl_insert(avl_tree *t, avl *a) __attribute__((returns_nonnull));
 
 /* Remove an element a from the AVL tree t
  * returns a pointer to the removed element

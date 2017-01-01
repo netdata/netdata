@@ -39,6 +39,7 @@
 // 3. lower memory requirements
 //
 //    - embed avl structures directly into registry objects, instead of DICTIONARY
+//      [DONE for PERSON_URLs, PENDING for MACHINE_URLs]
 //    - store GUIDs in memory as UUID instead of char *
 //    - do not track persons using the demo machines only
 //      (i.e. start tracking them only when they access a non-demo machine)

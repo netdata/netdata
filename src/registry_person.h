@@ -39,14 +39,22 @@ struct registry_person {
 };
 typedef struct registry_person REGISTRY_PERSON;
 
-extern REGISTRY_PERSON *registry_person_find(const char *person_guid);
+// PERSON_URL
+extern REGISTRY_PERSON_URL *registry_person_url_index_find(REGISTRY_PERSON *p, const char *url);
+extern REGISTRY_PERSON_URL *registry_person_url_index_add(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) __attribute__((warn_unused_result));
+extern REGISTRY_PERSON_URL *registry_person_url_index_del(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu) __attribute__((warn_unused_result));
+
 extern REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when);
 extern REGISTRY_PERSON_URL *registry_person_url_reallocate(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when, REGISTRY_PERSON_URL *pu);
+
+// PERSON
+extern REGISTRY_PERSON *registry_person_find(const char *person_guid);
 extern REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when);
 extern REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when);
-extern REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when);
+extern void registry_person_del(REGISTRY_PERSON *p);
 
-extern REGISTRY_PERSON_URL *registry_person_url_find(REGISTRY_PERSON *p, const char *url);
-extern void registry_person_url_del(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu);
+// LINKING PERSON -> PERSON_URL
+extern REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name, size_t namelen, time_t when);
+extern void registry_person_unlink_from_url(REGISTRY_PERSON *p, REGISTRY_PERSON_URL *pu);
 
 #endif //NETDATA_REGISTRY_PERSON_H
