@@ -20,6 +20,7 @@ dist_web_DATA = \
 	netdata-swagger.json \
 	robots.txt \
 	registry.html \
+	sitemap.xml \
 	tv.html \
 	version.txt \
 	$(NULL)
