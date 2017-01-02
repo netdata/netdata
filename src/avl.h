@@ -56,16 +56,16 @@ typedef struct avl_tree_lock {
  * a is linked directly to the tree, so it has to
  * be properly allocated by the caller.
  */
-avl *avl_insert_lock(avl_tree_lock *t, avl *a);
-avl *avl_insert(avl_tree *t, avl *a);
+avl *avl_insert_lock(avl_tree_lock *t, avl *a) __attribute__((returns_nonnull, warn_unused_result));
+avl *avl_insert(avl_tree *t, avl *a) __attribute__((returns_nonnull, warn_unused_result));
 
 /* Remove an element a from the AVL tree t
  * returns a pointer to the removed element
  * or NULL if an element equal to a is not found
  * (equal as returned by t->compar())
  */
-avl *avl_remove_lock(avl_tree_lock *t, avl *a);
-avl *avl_remove(avl_tree *t, avl *a);
+avl *avl_remove_lock(avl_tree_lock *t, avl *a) __attribute__((warn_unused_result));
+avl *avl_remove(avl_tree *t, avl *a) __attribute__((warn_unused_result));
 
 /* Find the element into the tree that equal to a
  * (equal as returned by t->compar())
@@ -80,7 +80,7 @@ void avl_init_lock(avl_tree_lock *t, int (*compar)(void *a, void *b));
 void avl_init(avl_tree *t, int (*compar)(void *a, void *b));
 
 
-void avl_traverse_lock(avl_tree_lock *t, void (*callback)(void *entry, void *data), void *data);
-void avl_traverse(avl_tree *t, void (*callback)(void *entry, void *data), void *data);
+int avl_traverse_lock(avl_tree_lock *t, int (*callback)(void *entry, void *data), void *data);
+int avl_traverse(avl_tree *t, int (*callback)(void *entry, void *data), void *data);
 
 #endif /* avl.h */

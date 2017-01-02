@@ -94,7 +94,14 @@ set(NETDATA_SOURCE_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        src/socket.c src/socket.h)
+        src/socket.c src/socket.h
+        src/registry_url.c
+        src/registry_url.h
+        src/registry_internals.h
+        src/registry_person.c
+        src/registry_person.h
+        src/registry_machine.c
+        src/registry_machine.h src/registry_internals.c src/registry_init.c src/registry_db.c src/registry_log.c)
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c

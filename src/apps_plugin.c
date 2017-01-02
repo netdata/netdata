@@ -1004,7 +1004,9 @@ static inline void file_descriptor_not_used(int id)
                 if(unlikely(debug))
                     fprintf(stderr, "apps.plugin:   >> slot %d is empty.\n", id);
 
-                file_descriptor_remove(&all_files[id]);
+                if(unlikely(file_descriptor_remove(&all_files[id]) != (void *)&all_files[id]))
+                    error("INTERNAL ERROR: removal of unused fd from index, removed a different fd");
+
 #ifdef NETDATA_INTERNAL_CHECKS
                 all_files[id].magic = 0x00000000;
 #endif /* NETDATA_INTERNAL_CHECKS */
@@ -1056,7 +1058,8 @@ static inline int file_descriptor_find_or_add(const char *name)
             all_files_index.root = NULL;
             for(i = 0; i < all_files_size; i++) {
                 if(!all_files[i].count) continue;
-                file_descriptor_add(&all_files[i]);
+                if(unlikely(file_descriptor_add(&all_files[i]) != (void *)&all_files[i]))
+                    error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
             }
 
             if(unlikely(debug))
@@ -1145,7 +1148,8 @@ static inline int file_descriptor_find_or_add(const char *name)
 #ifdef NETDATA_INTERNAL_CHECKS
     all_files[c].magic = 0x0BADCAFE;
 #endif /* NETDATA_INTERNAL_CHECKS */
-    file_descriptor_add(&all_files[c]);
+    if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
+        error("INTERNAL ERROR: duplicate indexing of fd.");
 
     if(unlikely(debug))
         fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);

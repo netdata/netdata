@@ -100,8 +100,8 @@ avl_tree tc_device_root_index = {
         tc_device_compare
 };
 
-#define tc_device_index_add(st) avl_insert(&tc_device_root_index, (avl *)(st))
-#define tc_device_index_del(st) avl_remove(&tc_device_root_index, (avl *)(st))
+#define tc_device_index_add(st) (struct tc_device *)avl_insert(&tc_device_root_index, (avl *)(st))
+#define tc_device_index_del(st) (struct tc_device *)avl_remove(&tc_device_root_index, (avl *)(st))
 
 static inline struct tc_device *tc_device_index_find(const char *id, uint32_t hash) {
     struct tc_device tmp;
@@ -121,8 +121,8 @@ static int tc_class_compare(void* a, void* b) {
     else return strcmp(((struct tc_class *)a)->id, ((struct tc_class *)b)->id);
 }
 
-#define tc_class_index_add(st, rd) avl_insert(&((st)->classes_index), (avl *)(rd))
-#define tc_class_index_del(st, rd) avl_remove(&((st)->classes_index), (avl *)(rd))
+#define tc_class_index_add(st, rd) (struct tc_class *)avl_insert(&((st)->classes_index), (avl *)(rd))
+#define tc_class_index_del(st, rd) (struct tc_class *)avl_remove(&((st)->classes_index), (avl *)(rd))
 
 static inline struct tc_class *tc_class_index_find(struct tc_device *st, const char *id, uint32_t hash) {
     struct tc_class tmp;
@@ -146,7 +146,8 @@ static inline void tc_class_free(struct tc_device *n, struct tc_class *c) {
 
     debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', seen=%d", n->id, c->id, c->parentid?c->parentid:"", c->leafid?c->leafid:"", c->seen);
 
-    tc_class_index_del(n, c);
+    if(unlikely(tc_class_index_del(n, c) != c))
+        error("plugin_tc: INTERNAL ERROR: attempt remove class '%s' from device '%s': removed a different calls", c->id, n->id);
 
     freez(c->id);
     freez(c->name);
@@ -619,7 +620,8 @@ static inline struct tc_device *tc_device_create(char *id)
         d->enabled = (char)-1;
 
         avl_init(&d->classes_index, tc_class_compare);
-        tc_device_index_add(d);
+        if(unlikely(tc_device_index_add(d) != d))
+            error("plugin_tc: INTERNAL ERROR: removing device '%s' removed a different device.", d->id);
 
         if(!tc_device_root) {
             tc_device_root = d;
@@ -660,7 +662,8 @@ static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, char 
             c->leaf_hash = simple_hash(c->leafid);
         }
 
-        tc_class_index_add(n, c);
+        if(unlikely(tc_class_index_add(n, c) != c))
+            error("plugin_tc: INTERNAL ERROR: attempt index class '%s' on device '%s': already exists", c->id, n->id);
     }
 
     c->seen = 1;
@@ -677,7 +680,8 @@ static inline void tc_device_free(struct tc_device *n)
         else tc_device_root = n->prev;
     }
 
-    tc_device_index_del(n);
+    if(unlikely(tc_device_index_del(n) != n))
+        error("plugin_tc: INTERNAL ERROR: removing device '%s' removed a different device.", n->id);
 
     while(n->classes) tc_class_free(n, n->classes);
 
