@@ -1,2 +1,6 @@
 User-agent: *
+Allow: /$
+Allow: /index.html
+Allow: /default.html
+Allow: /demosites.html
 Disallow: /
