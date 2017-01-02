@@ -430,7 +430,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int  global_enable_new_disks_detected_at_runtime = CONFIG_ONDEMAND_YES,
                 global_enable_performance_for_physical_disks = CONFIG_ONDEMAND_ONDEMAND,
-                global_enable_performance_for_virtual_disks = CONFIG_ONDEMAND_NO,
+                global_enable_performance_for_virtual_disks = CONFIG_ONDEMAND_ONDEMAND,
                 global_enable_performance_for_partitions = CONFIG_ONDEMAND_NO,
                 global_do_io = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_ops = CONFIG_ONDEMAND_ONDEMAND,
