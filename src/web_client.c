@@ -1213,8 +1213,6 @@ cleanup:
 }
 
 
-#define REGISTRY_VERIFY_COOKIES_GUID "give-me-back-this-cookie-now--please"
-
 int web_client_api_request_v1_registry(struct web_client *w, char *url)
 {
     static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
@@ -1239,7 +1237,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 */
     }
 
-    char person_guid[36 + 1] = "";
+    char person_guid[GUID_LEN + 1] = "";
 
     debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
 
@@ -1354,60 +1352,6 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
     switch(action) {
         case 'A':
             w->tracking_required = 1;
-            if(registry_verify_cookies_redirects() > 0 && (!cookie || !person_guid[0])) {
-                buffer_flush(w->response.data);
-                registry_set_cookie(w, REGISTRY_VERIFY_COOKIES_GUID);
-                w->response.data->contenttype = CT_APPLICATION_JSON;
-                buffer_sprintf(w->response.data, "{ \"status\": \"redirect\", \"registry\": \"%s\" }", registry_to_announce());
-                return 200;
-
-/*
- * it seems that web browsers are ignoring 307 (Moved Temporarily)
- * under certain conditions, when using CORS
- * so this is commented and we use application level redirects instead
- *
-                redirects++;
-
-                if(redirects > registry_verify_cookies_redirects()) {
-                    buffer_flush(w->response.data);
-                    buffer_sprintf(w->response.data, "Your browser does not support cookies");
-                    return 400;
-                }
-
-                char *encoded_url = url_encode(machine_url);
-                if(!encoded_url) {
-                    error("%llu: Cannot URL encode string '%s'", w->id, machine_url);
-                    return 500;
-                }
-
-                char *encoded_name = url_encode(url_name);
-                if(!encoded_name) {
-                    free(encoded_url);
-                    error("%llu: Cannot URL encode string '%s'", w->id, url_name);
-                    return 500;
-                }
-
-                char *encoded_guid = url_encode(machine_guid);
-                if(!encoded_guid) {
-                    free(encoded_url);
-                    free(encoded_name);
-                    error("%llu: Cannot URL encode string '%s'", w->id, machine_guid);
-                    return 500;
-                }
-
-                buffer_sprintf(w->response.header, "Location: %s/api/v1/registry?action=access&machine=%s&name=%s&url=%s&redirects=%d\r\n",
-                               registry_to_announce(), encoded_guid, encoded_name, encoded_url, redirects);
-
-                free(encoded_guid);
-                free(encoded_name);
-                free(encoded_url);
-                return 307
-*/
-            }
-
-            if(unlikely(cookie && person_guid[0] && !strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
-                person_guid[0] = '\0';
-
             return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
 
         case 'D':

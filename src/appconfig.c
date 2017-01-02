@@ -72,8 +72,8 @@ static int config_value_compare(void* a, void* b) {
     else return strcmp(((struct config_value *)a)->name, ((struct config_value *)b)->name);
 }
 
-#define config_value_index_add(co, cv) avl_insert_lock(&((co)->values_index), (avl *)(cv))
-#define config_value_index_del(co, cv) avl_remove_lock(&((co)->values_index), (avl *)(cv))
+#define config_value_index_add(co, cv) (struct config_value *)avl_insert_lock(&((co)->values_index), (avl *)(cv))
+#define config_value_index_del(co, cv) (struct config_value *)avl_remove_lock(&((co)->values_index), (avl *)(cv))
 
 static struct config_value *config_value_index_find(struct config *co, const char *name, uint32_t hash) {
     struct config_value tmp;
@@ -98,8 +98,8 @@ avl_tree_lock config_root_index = {
         AVL_LOCK_INITIALIZER
 };
 
-#define config_index_add(cfg) avl_insert_lock(&config_root_index, (avl *)(cfg))
-#define config_index_del(cfg) avl_remove_lock(&config_root_index, (avl *)(cfg))
+#define config_index_add(cfg) (struct config *)avl_insert_lock(&config_root_index, (avl *)(cfg))
+#define config_index_del(cfg) (struct config *)avl_remove_lock(&config_root_index, (avl *)(cfg))
 
 static struct config *config_index_find(const char *name, uint32_t hash) {
     struct config tmp;
@@ -127,7 +127,8 @@ static inline struct config *config_section_create(const char *section)
 
     avl_init_lock(&co->values_index, config_value_compare);
 
-    config_index_add(co);
+    if(unlikely(config_index_add(co) != co))
+        error("INTERNAL ERROR: indexing of section '%s', already exists.", co->name);
 
     config_global_write_lock();
     struct config *co2 = config_root;
@@ -154,7 +155,8 @@ static inline struct config_value *config_value_create(struct config *co, const 
     cv->hash = simple_hash(cv->name);
     cv->value = strdupz(value);
 
-    config_value_index_add(co, cv);
+    if(unlikely(config_value_index_add(co, cv) != cv))
+        error("INTERNAL ERROR: indexing of config '%s' in section '%s': already exists.", cv->name, co->name);
 
     config_section_write_lock(co);
     struct config_value *cv2 = co->values;
@@ -198,14 +200,15 @@ int config_rename(const char *section, const char *old, const char *new) {
     cv2 = config_value_index_find(co, new, 0);
     if(cv2) goto cleanup;
 
-    config_value_index_del(co, cv);
+    if(unlikely(config_value_index_del(co, cv) != cv))
+        error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted tge wrong config entry.", cv->name, co->name);
 
     freez(cv->name);
     cv->name = strdupz(new);
-
     cv->hash = simple_hash(cv->name);
+    if(unlikely(config_value_index_add(co, cv) != cv))
+        error("INTERNAL ERROR: indexing of config '%s' in section '%s', already exists.", cv->name, co->name);
 
-    config_value_index_add(co, cv);
     config_section_unlock(co);
 
     return 0;
