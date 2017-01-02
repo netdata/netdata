@@ -18,7 +18,6 @@ static struct disk {
     int type;
 
     char *mount_point;
-    uint32_t mount_point_hash;
 
     // disk options caching
     int configured;
@@ -29,8 +28,6 @@ static struct disk {
     int do_qops;
     int do_util;
     int do_backlog;
-    int do_space;
-    int do_inodes;
 
     struct disk *next;
 } *disk_root = NULL;
@@ -339,21 +336,10 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     // mountinfo_find() can be called with NULL disk_mountinfo_root
     struct mountinfo *mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
-/*    if(unlikely(!mi)) {
-        mountinfo_reload(1);
-
-        // search again for this disk
-        mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
-    }
-*/
-    if(unlikely(mi)) {
+    if(unlikely(mi))
         d->mount_point = strdupz(mi->mount_point);
-        d->mount_point_hash = mi->mount_point_hash;
-    }
-    else {
+    else
         d->mount_point = NULL;
-        d->mount_point_hash = 0;
-    }
 
     // ------------------------------------------------------------------------
     // find the disk sector size
@@ -411,6 +397,33 @@ static inline int select_positive_option(int option1, int option2) {
     return CONFIG_ONDEMAND_NO;
 }
 
+static inline int is_major_enabled(int major) {
+    static char *major_configs = NULL;
+    static size_t major_size = 0;
+
+    if(major < 0) return 1;
+
+    size_t wanted_size = (size_t)major + 1;
+
+    if(major_size < wanted_size) {
+        major_configs = reallocz(major_configs, wanted_size);
+
+        size_t i;
+        for(i = major_size; i < wanted_size ; i++)
+            major_configs[i] = -1;
+
+        major_size = wanted_size;
+    }
+
+    if(major_configs[major] == -1) {
+        char buffer[CONFIG_MAX_NAME + 1];
+        snprintfz(buffer, CONFIG_MAX_NAME, "performance metrics for disks with major %d", major);
+        major_configs[major] = (char)config_get_boolean("plugin:proc:/proc/diskstats", buffer, 1);
+    }
+
+    return major_configs[major];
+}
+
 int do_proc_diskstats(int update_every, usec_t dt) {
     (void)dt;
 
@@ -419,8 +432,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 global_enable_performance_for_physical_disks = CONFIG_ONDEMAND_ONDEMAND,
                 global_enable_performance_for_virtual_disks = CONFIG_ONDEMAND_NO,
                 global_enable_performance_for_partitions = CONFIG_ONDEMAND_NO,
-                global_enable_performance_for_mountpoints = CONFIG_ONDEMAND_NO,
-                global_enable_performance_for_virtual_mountpoints = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_io = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_ops = CONFIG_ONDEMAND_ONDEMAND,
                 global_do_mops = CONFIG_ONDEMAND_ONDEMAND,
@@ -436,8 +447,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_enable_performance_for_physical_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for physical disks", global_enable_performance_for_physical_disks);
         global_enable_performance_for_virtual_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for virtual disks", global_enable_performance_for_virtual_disks);
         global_enable_performance_for_partitions = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for partitions", global_enable_performance_for_partitions);
-        global_enable_performance_for_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for mounted filesystems", global_enable_performance_for_mountpoints);
-        global_enable_performance_for_virtual_mountpoints = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for mounted virtual disks", global_enable_performance_for_virtual_mountpoints);
 
         global_do_io      = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "bandwidth for all disks", global_do_io);
         global_do_ops     = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "operations for all disks", global_do_ops);
@@ -579,15 +588,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 d->do_qops = CONFIG_ONDEMAND_NO;
                 d->do_util = CONFIG_ONDEMAND_NO;
                 d->do_backlog = CONFIG_ONDEMAND_NO;
-                d->do_space = CONFIG_ONDEMAND_NO;
-                d->do_inodes = CONFIG_ONDEMAND_NO;
             }
             else {
                 // this disk is enabled
                 // check its direct settings
 
                 int def_performance = CONFIG_ONDEMAND_ONDEMAND;
-                int def_space = (d->mount_point)?CONFIG_ONDEMAND_ONDEMAND:CONFIG_ONDEMAND_NO;
 
                 // since this is 'on demand' we can figure the performance settings
                 // based on the type of disk
@@ -603,14 +609,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     case DISK_TYPE_CONTAINER:
                         def_performance = global_enable_performance_for_virtual_disks;
-
-                        if(d->mount_point)
-                            def_performance = select_positive_option(def_performance, global_enable_performance_for_virtual_mountpoints);
                         break;
                 }
 
-                if(d->mount_point)
-                    def_performance = select_positive_option(def_performance, global_enable_performance_for_mountpoints);
+                // check if we have to disable performance for this disk
+                if(def_performance)
+                    def_performance = is_major_enabled((int)major);
 
                 // ------------------------------------------------------------
                 // now we have def_performance and def_space
@@ -646,23 +650,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 d->do_qops    = config_get_boolean_ondemand(var_name, "queued operations", ddo_qops);
                 d->do_util    = config_get_boolean_ondemand(var_name, "utilization percentage", ddo_util);
                 d->do_backlog = config_get_boolean_ondemand(var_name, "backlog", ddo_backlog);
-
-                // def_space
-                if(unlikely(d->mount_point)) {
-                    // check the user configuration (this will also show our 'on demand' decision)
-                    def_space = config_get_boolean_ondemand(var_name, "enable space metrics", def_space);
-
-                    int ddo_space = def_space,
-                        ddo_inodes = def_space;
-
-                    d->do_space = config_get_boolean_ondemand(var_name, "space usage", ddo_space);
-                    d->do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", ddo_inodes);
-                }
-                else {
-                    // don't show settings for this disk
-                    d->do_space = CONFIG_ONDEMAND_NO;
-                    d->do_inodes = CONFIG_ONDEMAND_NO;
-                }
             }
 
             d->configured = 1;
