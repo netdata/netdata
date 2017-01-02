@@ -209,8 +209,8 @@ int do_ipc(int update_every, usec_t dt) {
             error("Unable to fetch semaphore limits.");
         }
         else {
-            rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
-            rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
+            if(arrays_max)     rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
+            if(semaphores_max) rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
 
             arrays->red = limits.semmni;
             semaphores->red = limits.semmns;
