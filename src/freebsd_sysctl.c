@@ -20,6 +20,10 @@
 #include <ifaddrs.h>
 // NEEDED BY do_tcp...
 #include <netinet/tcp_var.h>
+// NEEDED BY do_udp...
+#include <netinet/ip_var.h>
+#include <netinet/udp.h>
+#include <netinet/udp_var.h>
 
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
@@ -38,7 +42,8 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
-        do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1;
+        do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
+        do_udp_packets = -1, do_udp_errors = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -71,6 +76,8 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_tcpext_syscookies    = config_get_boolean_ondemand("plugin:freebsd:sysctl", "TCP SYN cookies", CONFIG_ONDEMAND_ONDEMAND);
         do_tcpext_ofo           = config_get_boolean_ondemand("plugin:freebsd:sysctl", "TCP out-of-order queue", CONFIG_ONDEMAND_ONDEMAND);
         do_tcpext_connaborts    = config_get_boolean_ondemand("plugin:freebsd:sysctl", "TCP connection aborts", CONFIG_ONDEMAND_ONDEMAND);
+        do_udp_packets          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 UDP packets", 1);
+        do_udp_errors           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 UDP errors", 1);
     }
 
     RRDSET *st;
@@ -194,6 +201,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     // NEEDED BY: do_tcp...
     struct tcpstat tcpstat;
     uint64_t tcps_states[TCP_NSTATES];
+
+    // NEEDED BY: do_udp...
+    struct udpstat udpstat;
 
     // --------------------------------------------------------------------
 
@@ -1427,6 +1437,59 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
+    if (likely(do_udp_packets || do_udp_errors)) {
+        if (unlikely(GETSYSCTL("net.inet.udp.stats", udpstat))) {
+            do_udp_packets = 0;
+            error("DISABLED: ipv4.udppackets");
+            do_udp_errors = 0;
+            error("DISABLED: ipv4.udperrors");
+        } else {
+            if (likely(do_udp_packets)) {
+                st = rrdset_find("ipv4.udppackets");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "udppackets", NULL, "udp", NULL, "IPv4 UDP Packets",
+                                       "packets/s", 2601, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InDatagrams", "received", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutDatagrams", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InDatagrams", udpstat.udps_ipackets);
+                rrddim_set(st, "OutDatagrams", udpstat.udps_opackets);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_udp_errors)) {
+                st = rrdset_find("ipv4.udperrors");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "udperrors", NULL, "udp", NULL, "IPv4 UDP Errors", "events/s",
+                                       2701, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "NoPorts", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InErrors", udpstat.udps_hdrops + udpstat.udps_badlen);
+                rrddim_set(st, "NoPorts", udpstat.udps_noport);
+                rrddim_set(st, "RcvbufErrors", udpstat.udps_fullsock);
+                rrddim_set(st, "InCsumErrors", udpstat.udps_badsum + udpstat.udps_nosum);
+                rrddim_set(st, "IgnoredMulti", udpstat.udps_filtermcast);
+                rrdset_done(st);
+            }
         }
     }
 
