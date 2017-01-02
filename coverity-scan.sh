@@ -34,6 +34,6 @@ tar czvf netdata-coverity-analysis.tgz cov-int || exit 1
 curl --form token="${token}" \
   --form email=costa@tsaousis.gr \
   --form file=@netdata-coverity-analysis.tgz \
-  --form version="1.3.0rc1" \
+  --form version="1.5.0rc1" \
   --form description="Description" \
   https://scan.coverity.com/builds?project=firehol%2Fnetdata
