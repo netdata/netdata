@@ -25,6 +25,7 @@ pythonconfigdir=$(configdir)/python.d
 dist_pythonconfig_DATA = \
     python.d/apache.conf \
     python.d/apache_cache.conf \
+    python.d/bind_rndc.conf \
     python.d/cpufreq.conf \
     python.d/dovecot.conf \
     python.d/example.conf \
@@ -54,6 +55,7 @@ healthconfigdir=$(configdir)/health.d
 dist_healthconfig_DATA = \
     health.d/apache.conf \
     health.d/backend.conf \
+    health.d/bind_rndc.conf \
     health.d/cpu.conf \
     health.d/disks.conf \
     health.d/entropy.conf \
