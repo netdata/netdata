@@ -31,11 +31,11 @@
 #define DATASOURCE_FORMAT_SSV_COMMA "ssvcomma"
 #define DATASOURCE_FORMAT_CSV_JSON_ARRAY "csvjsonarray"
 
-#define RAWMETRICS_FORMAT_BASH "bash"
-#define RAWMETRICS_FORMAT_PROMETHEUS "prometheus"
+#define ALLMETRICS_FORMAT_SHELL "shell"
+#define ALLMETRICS_FORMAT_PROMETHEUS "prometheus"
 
-#define RAWMETRICS_BASH 1
-#define RAWMETRICS_PROMETHEUS 2
+#define ALLMETRICS_SHELL 1
+#define ALLMETRICS_PROMETHEUS 2
 
 #define GROUP_UNDEFINED         0
 #define GROUP_AVERAGE           1
@@ -61,7 +61,7 @@
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrd_stats_api_v1_charts(BUFFER *wb);
 
-// extern void rrd_stats_api_v1_charts_allmetrics_bash(BUFFER *wb);
+extern void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb);
 extern void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb);
 
 extern unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb);
