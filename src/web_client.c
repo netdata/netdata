@@ -776,7 +776,7 @@ int web_client_api_request_v1_charts(struct web_client *w, char *url)
 
 int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
 {
-    int format = 0;
+    int format = ALLMETRICS_SHELL;
 
     while(url) {
         char *value = mystrsep(&url, "?&");
@@ -787,10 +787,10 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
         if(!value || !*value) continue;
 
         if(!strcmp(name, "format")) {
-            if(!strcmp(value, RAWMETRICS_FORMAT_BASH))
-                format = RAWMETRICS_BASH;
-            else if(!strcmp(value, RAWMETRICS_FORMAT_PROMETHEUS))
-                format = RAWMETRICS_PROMETHEUS;
+            if(!strcmp(value, ALLMETRICS_FORMAT_SHELL))
+                format = ALLMETRICS_SHELL;
+            else if(!strcmp(value, ALLMETRICS_FORMAT_PROMETHEUS))
+                format = ALLMETRICS_PROMETHEUS;
         }
     }
 
@@ -798,18 +798,19 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
     buffer_no_cacheable(w->response.data);
 
     switch(format) {
-        //case RAWMETRICS_BASH:
-        //    rrd_stats_api_v1_charts_allmetrics_bash(w->response.data);
-        //    return 200;
+        case ALLMETRICS_SHELL:
+            w->response.data->contenttype = CT_TEXT_PLAIN;
+            rrd_stats_api_v1_charts_allmetrics_shell(w->response.data);
+            return 200;
 
-        case RAWMETRICS_PROMETHEUS:
+        case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
             rrd_stats_api_v1_charts_allmetrics_prometheus(w->response.data);
             return 200;
 
         default:
             w->response.data->contenttype = CT_TEXT_PLAIN;
-            buffer_strcat(w->response.data, "Which format? Only '" RAWMETRICS_FORMAT_PROMETHEUS "' is currently supported.");
+            buffer_strcat(w->response.data, "Which format? Only '" ALLMETRICS_FORMAT_PROMETHEUS "' is currently supported.");
             return 400;
     }
 }

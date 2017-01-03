@@ -124,6 +124,10 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
     );
 }
 
+// ----------------------------------------------------------------------------
+// PROMETHEUS
+// /api/v1/allmetrics?format=prometheus
+
 static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable) {
     size_t n;
 
@@ -155,11 +159,12 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
 
         buffer_strcat(wb, "\n");
         if(st->enabled && st->dimensions) {
+            pthread_rwlock_rdlock(&st->rwlock);
+
             // for each dimension
             RRDDIM *rd;
             for(rd = st->dimensions; rd ; rd = rd->next) {
                 if(rd->counter) {
-
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     prometheus_name_copy(dimension, rd->id, PROMETHEUS_ELEMENT_MAX);
 
@@ -183,13 +188,82 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
                     buffer_sprintf(wb, "%s_%s{instance=\"%s\"} " COLLECTED_NUMBER_FORMAT " %llu\n",
                             chart, dimension, host, rd->last_collected_value,
                             (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
+
                 }
             }
+
+            pthread_rwlock_unlock(&st->rwlock);
         }
     }
 
     pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 }
+
+// ----------------------------------------------------------------------------
+// BASH
+// /api/v1/allmetrics?format=bash
+
+static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
+    size_t n;
+
+    for(n = 0; *s && n < usable ; d++, s++, n++) {
+        register char c = *s;
+
+        if(unlikely(!isalnum(c))) *d = '_';
+        else *d = (char)toupper(c);
+    }
+    *d = '\0';
+
+    return n;
+}
+
+#define BASH_ELEMENT_MAX 100
+
+void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
+{
+    pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
+
+    char host[BASH_ELEMENT_MAX + 1];
+    shell_name_copy(host, config_get("global", "hostname", "localhost"), BASH_ELEMENT_MAX);
+
+    // for each chart
+    RRDSET *st;
+    for(st = localhost.rrdset_root; st ; st = st->next) {
+        char chart[BASH_ELEMENT_MAX + 1];
+        shell_name_copy(chart, st->id, BASH_ELEMENT_MAX);
+
+        buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, st->name);
+        if(st->enabled && st->dimensions) {
+            pthread_rwlock_rdlock(&st->rwlock);
+
+            // for each dimension
+            RRDDIM *rd;
+            for(rd = st->dimensions; rd ; rd = rd->next) {
+                if(rd->counter) {
+                    char dimension[BASH_ELEMENT_MAX + 1];
+                    shell_name_copy(dimension, rd->id, BASH_ELEMENT_MAX);
+
+                    calculated_number n = rd->last_stored_value;
+                    if(rd->multiplier < 0 || rd->divisor < 0)
+                        n = -n;
+
+                    if(isnan(n) || isinf(n))
+                        buffer_sprintf(wb, "NETDATA_%s_%s=\"\"      # %s\n", chart, dimension, st->units);
+                    else {
+                        n = roundl(n);
+                        buffer_sprintf(wb, "NETDATA_%s_%s=\"%0.0Lf\"      # %s\n", chart, dimension, n, st->units);
+                    }
+                }
+            }
+
+            pthread_rwlock_unlock(&st->rwlock);
+        }
+    }
+
+    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+}
+
+// ----------------------------------------------------------------------------
 
 unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
 {
