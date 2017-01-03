@@ -1023,7 +1023,7 @@ void rrdsetvar_free(RRDSETVAR *rs) {
 // ----------------------------------------------------------------------------
 // RRDCALC management
 
-static inline const char *rrdcalc_status2string(int status) {
+inline const char *rrdcalc_status2string(int status) {
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
             return "REMOVED";
