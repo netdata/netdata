@@ -791,6 +791,8 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
                 format = ALLMETRICS_SHELL;
             else if(!strcmp(value, ALLMETRICS_FORMAT_PROMETHEUS))
                 format = ALLMETRICS_PROMETHEUS;
+            else
+                format = 0;
         }
     }
 
@@ -810,7 +812,7 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
 
         default:
             w->response.data->contenttype = CT_TEXT_PLAIN;
-            buffer_strcat(w->response.data, "Which format? Only '" ALLMETRICS_FORMAT_PROMETHEUS "' is currently supported.");
+            buffer_strcat(w->response.data, "Which format? Only '" ALLMETRICS_FORMAT_SHELL "' and '" ALLMETRICS_FORMAT_PROMETHEUS "' is currently supported.");
             return 400;
     }
 }
