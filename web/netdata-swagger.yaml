@@ -259,6 +259,23 @@ paths:
           description: 'No chart with the given id is found.'
         '500':
           description: 'Internal server error. This usually means the server is out of memory.'
+  /allmetrics:
+    get:
+      summary: 'Get a value of all the metrics maintained by netdata'
+      description: 'The charts endpoint returns the latest value of all charts and dimensions stored in the netdata server.'
+      parameters:
+        - name: format
+          in: query
+          description: 'The format of the response to be returned'
+          required: true
+          type: string
+          enum: [ 'shell', 'prometheus' ]
+          default: 'shell'
+      responses:
+        '200':
+          description: 'All the metrics returned in the format requested'
+        '400':
+          description: 'The format requested is not supported'
 definitions:
   chart_summary:
     type: object
