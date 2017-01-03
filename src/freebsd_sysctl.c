@@ -295,7 +295,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("mem", "committed", NULL, "system", NULL, "Committed (Allocated) Memory", "MB", 5000, update_every, RRDSET_TYPE_AREA);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "Committed_AS", NULL, system_pagesize, 1024, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "Committed_AS", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
