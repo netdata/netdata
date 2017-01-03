@@ -124,20 +124,42 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
     );
 }
 
+static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable) {
+    size_t n;
+
+    for(n = 0; *s && n < usable ; d++, s++, n++) {
+        register char c = *s;
+
+        if(unlikely(!isalpha(c) && !isdigit(c))) *d = '_';
+        else *d = c;
+    }
+    *d = '\0';
+
+    return n;
+}
+
+#define PROMETHEUS_ELEMENT_MAX 256
+
 void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
 {
     pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
 
+    char host[PROMETHEUS_ELEMENT_MAX + 1];
+    prometheus_name_copy(host, config_get("global", "hostname", "localhost"), PROMETHEUS_ELEMENT_MAX);
+
     // for each chart
     RRDSET *st;
     for(st = localhost.rrdset_root; st ; st = st->next) {
+        char chart[PROMETHEUS_ELEMENT_MAX + 1];
+        prometheus_name_copy(chart, st->id, PROMETHEUS_ELEMENT_MAX);
+
         buffer_strcat(wb, "\n");
         if(st->enabled && st->dimensions) {
             // for each dimension
             RRDDIM *rd;
             for(rd = st->dimensions; rd ; rd = rd->next) {
                 if(rd->counter) {
-                    buffer_sprintf(wb, "# HELP %s.%s %s\n", st->id, rd->id, st->units);
+                    // buffer_sprintf(wb, "# HELP %s.%s %s\n", st->id, rd->id, st->units);
 
                     switch(rd->algorithm) {
                         case RRDDIM_INCREMENTAL:
@@ -150,9 +172,15 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
                             break;
                     }
 
-                    calculated_number n = (calculated_number)rd->last_collected_value * (calculated_number)(abs(rd->multiplier)) / (calculated_number)(abs(rd->divisor));
+                    // calculated_number n = (calculated_number)rd->last_collected_value * (calculated_number)(abs(rd->multiplier)) / (calculated_number)(abs(rd->divisor));
+                    // buffer_sprintf(wb, "%s.%s " CALCULATED_NUMBER_FORMAT " %llu\n", st->id, rd->id, n,
+                    //        (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
 
-                    buffer_sprintf(wb, "%s.%s " CALCULATED_NUMBER_FORMAT " %llu\n", st->id, rd->id, n,
+                    char dimension[PROMETHEUS_ELEMENT_MAX + 1];
+                    prometheus_name_copy(dimension, rd->id, PROMETHEUS_ELEMENT_MAX);
+
+                    buffer_sprintf(wb, "%s.%s{instance=\"%s\"} " COLLECTED_NUMBER_FORMAT " %llu\n",
+                            chart, dimension, host, rd->last_collected_value,
                             (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
                 }
             }

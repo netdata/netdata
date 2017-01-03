@@ -2,7 +2,6 @@
 #define NETDATA_RRD2JSON_H 1
 
 #define HOSTNAME_MAX 1024
-extern char *hostname;
 
 #define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 

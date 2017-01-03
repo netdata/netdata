@@ -796,7 +796,6 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
 
     buffer_flush(w->response.data);
     buffer_no_cacheable(w->response.data);
-    w->response.data->contenttype = CT_TEXT_PLAIN;
 
     switch(format) {
         //case RAWMETRICS_BASH:
@@ -804,10 +803,12 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
         //    return 200;
 
         case RAWMETRICS_PROMETHEUS:
+            w->response.data->contenttype = CT_PROMETHEUS;
             rrd_stats_api_v1_charts_allmetrics_prometheus(w->response.data);
             return 200;
 
         default:
+            w->response.data->contenttype = CT_TEXT_PLAIN;
             buffer_strcat(w->response.data, "Which format? Only '" RAWMETRICS_FORMAT_PROMETHEUS "' is currently supported.");
             return 400;
     }
@@ -1733,6 +1734,9 @@ const char *web_content_type_to_string(uint8_t contenttype) {
 
         case CT_IMAGE_ICNS:
             return "image/icns";
+
+        case CT_PROMETHEUS:
+            return "text/plain; version=0.0.4";
 
         default:
         case CT_TEXT_PLAIN:
