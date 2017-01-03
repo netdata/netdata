@@ -29,6 +29,8 @@
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp_var.h>
+// NEEDED BY do_ip6...
+#include <netinet6/ip6_var.h>
 
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
@@ -49,7 +51,8 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
         do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
         do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1,
-        do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1;
+        do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
+        do_ip6_packets = -1, do_ip6_fragsout = -1, do_ip6_fragsin = -1, do_ip6_errors = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -88,6 +91,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_ip_fragsout          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments sent", 1);
         do_ip_fragsin           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments assembly", 1);
         do_ip_errors            = config_get_boolean("plugin:freebsd:sysctl", "ipv4 errors", 1);
+        do_ip6_packets          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "ipv6 packets", CONFIG_ONDEMAND_ONDEMAND);
+        do_ip6_fragsout         = config_get_boolean_ondemand("plugin:freebsd:sysctl", "ipv6 fragments sent", CONFIG_ONDEMAND_ONDEMAND);
+        do_ip6_fragsin          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "ipv6 fragments assembly", CONFIG_ONDEMAND_ONDEMAND);
+        do_ip6_errors           = config_get_boolean_ondemand("plugin:freebsd:sysctl", "ipv6 errors", CONFIG_ONDEMAND_ONDEMAND);
     }
 
     RRDSET *st;
@@ -224,6 +231,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     // NEEDED BY: do_ip...
     struct ipstat ipstat;
+
+    // NEEDED BY: do_ip6...
+    struct ip6stat ip6stat;
 
     // --------------------------------------------------------------------
 
@@ -1698,6 +1708,138 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "InAddrErrors", ipstat.ips_badaddr);
                 rrddim_set(st, "InUnknownProtos", ipstat.ips_noproto);
                 rrddim_set(st, "OutNoRoutes", ipstat.ips_noroute);
+                rrdset_done(st);
+            }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_ip6_packets || do_ip6_fragsout || do_ip6_fragsin || do_ip6_errors)) {
+        if (unlikely(GETSYSCTL("net.inet6.ip6.stats", ip6stat))) {
+            do_ip6_packets = 0;
+            error("DISABLED: ipv6.packets");
+            do_ip6_fragsout = 0;
+            error("DISABLED: ipv6.fragsout");
+            do_ip6_fragsin = 0;
+            error("DISABLED: ipv6.fragsin");
+            do_ip6_errors = 0;
+            error("DISABLED: ipv6.errors");
+        } else {
+            if (do_ip6_packets == CONFIG_ONDEMAND_YES || (do_ip6_packets == CONFIG_ONDEMAND_ONDEMAND &&
+                                                          (ip6stat.ip6s_localout || ip6stat.ip6s_total ||
+                                                           ip6stat.ip6s_forward || ip6stat.ip6s_delivered))) {
+                do_ip6_packets = CONFIG_ONDEMAND_YES;
+                st = rrdset_find("ipv6.packets");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv6", "packets", NULL, "packets", NULL, "IPv6 Packets", "packets/s", 3000,
+                                       update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "forwarded", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "delivers", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "sent", ip6stat.ip6s_localout);
+                rrddim_set(st, "received", ip6stat.ip6s_total);
+                rrddim_set(st, "forwarded", ip6stat.ip6s_forward);
+                rrddim_set(st, "delivers", ip6stat.ip6s_delivered);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (do_ip6_fragsout == CONFIG_ONDEMAND_YES || (do_ip6_fragsout == CONFIG_ONDEMAND_ONDEMAND &&
+                                                           (ip6stat.ip6s_fragmented || ip6stat.ip6s_cantfrag ||
+                                                            ip6stat.ip6s_ofragments))) {
+                do_ip6_fragsout = CONFIG_ONDEMAND_YES;
+                st = rrdset_find("ipv6.fragsout");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv6", "fragsout", NULL, "fragments", NULL, "IPv6 Fragments Sent",
+                                       "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "failed", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "all", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "ok", ip6stat.ip6s_fragmented);
+                rrddim_set(st, "failed", ip6stat.ip6s_cantfrag);
+                rrddim_set(st, "all", ip6stat.ip6s_ofragments);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (do_ip6_fragsin == CONFIG_ONDEMAND_YES || (do_ip6_fragsin == CONFIG_ONDEMAND_ONDEMAND &&
+                                                          (ip6stat.ip6s_reassembled || ip6stat.ip6s_fragdropped ||
+                                                           ip6stat.ip6s_fragtimeout || ip6stat.ip6s_fragments))) {
+                do_ip6_fragsin = CONFIG_ONDEMAND_YES;
+                st = rrdset_find("ipv6.fragsin");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv6", "fragsin", NULL, "fragments", NULL, "IPv6 Fragments Reassembly",
+                                       "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "failed", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "timeout", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "all", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "ok", ip6stat.ip6s_reassembled);
+                rrddim_set(st, "failed", ip6stat.ip6s_fragdropped);
+                rrddim_set(st, "timeout", ip6stat.ip6s_fragtimeout);
+                rrddim_set(st, "all", ip6stat.ip6s_fragments);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (do_ip6_errors == CONFIG_ONDEMAND_YES || (do_ip6_errors == CONFIG_ONDEMAND_ONDEMAND && (
+                    ip6stat.ip6s_toosmall ||
+                    ip6stat.ip6s_odropped ||
+                    ip6stat.ip6s_badoptions ||
+                    ip6stat.ip6s_badvers ||
+                    ip6stat.ip6s_exthdrtoolong ||
+                    ip6stat.ip6s_sources_none ||
+                    ip6stat.ip6s_tooshort ||
+                    ip6stat.ip6s_cantforward ||
+                    ip6stat.ip6s_noroute))) {
+                do_ip6_errors = CONFIG_ONDEMAND_YES;
+                st = rrdset_find("ipv6.errors");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv6", "errors", NULL, "errors", NULL, "IPv6 Errors", "packets/s", 3002,
+                                       update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRDDIM_INCREMENTAL);
+
+                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InTruncatedPkts", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InNoRoutes", NULL, 1, 1, RRDDIM_INCREMENTAL);
+
+                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InDiscards", ip6stat.ip6s_toosmall);
+                rrddim_set(st, "OutDiscards", ip6stat.ip6s_odropped);
+
+                rrddim_set(st, "InHdrErrors",
+                           ip6stat.ip6s_badoptions + ip6stat.ip6s_badvers + ip6stat.ip6s_exthdrtoolong);
+                rrddim_set(st, "InAddrErrors", ip6stat.ip6s_sources_none);
+                rrddim_set(st, "InTruncatedPkts", ip6stat.ip6s_tooshort);
+                rrddim_set(st, "InNoRoutes", ip6stat.ip6s_cantforward);
+
+                rrddim_set(st, "OutNoRoutes", ip6stat.ip6s_noroute);
                 rrdset_done(st);
             }
         }
