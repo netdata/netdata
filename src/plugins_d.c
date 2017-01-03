@@ -325,7 +325,7 @@ void *pluginsd_worker_thread(void *arg)
                 else if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
             }
             else if(unlikely(hash == DISABLE_HASH && !strcmp(s, "DISABLE"))) {
-                error("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
+                info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
                 cd->enabled = 0;
                 killpid(cd->pid, SIGTERM);
                 break;
