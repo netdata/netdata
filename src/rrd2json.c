@@ -229,6 +229,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
     // for each chart
     RRDSET *st;
     for(st = localhost.rrdset_root; st ; st = st->next) {
+        calculated_number total = 0.0;
         char chart[BASH_ELEMENT_MAX + 1];
         shell_name_copy(chart, st->id, BASH_ELEMENT_MAX);
 
@@ -244,18 +245,20 @@ void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
                     shell_name_copy(dimension, rd->id, BASH_ELEMENT_MAX);
 
                     calculated_number n = rd->last_stored_value;
-                    if(rd->multiplier < 0 || rd->divisor < 0)
-                        n = -n;
 
                     if(isnan(n) || isinf(n))
                         buffer_sprintf(wb, "NETDATA_%s_%s=\"\"      # %s\n", chart, dimension, st->units);
                     else {
+                        if(rd->multiplier < 0 || rd->divisor < 0) n = -n;
                         n = roundl(n);
+                        if(!(rd->flags & RRDDIM_FLAG_HIDDEN)) total += n;
                         buffer_sprintf(wb, "NETDATA_%s_%s=\"%0.0Lf\"      # %s\n", chart, dimension, n, st->units);
                     }
                 }
             }
 
+            total = roundl(total);
+            buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"%0.0Lf\"      # %s\n", chart, total, st->units);
             pthread_rwlock_unlock(&st->rwlock);
         }
     }
