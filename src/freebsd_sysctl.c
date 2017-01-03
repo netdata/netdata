@@ -18,6 +18,17 @@
 #define _IFI_OQDROPS // It is for FreeNAS only. Most probably in future releases of FreeNAS it will be removed
 #include <net/if.h>
 #include <ifaddrs.h>
+// NEEDED BY do_tcp...
+#include <netinet/tcp_var.h>
+// NEEDED BY do_udp...
+#include <netinet/ip_var.h>
+#include <netinet/udp.h>
+#include <netinet/udp_var.h>
+// NEEDED BY do_icmp...
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp_var.h>
+
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
 
@@ -33,7 +44,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
         do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
-        do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1;
+        do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
+        do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
+        do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
+        do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -58,6 +72,16 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_netisr               = config_get_boolean("plugin:freebsd:sysctl", "netisr", 1);
         do_netisr_per_core      = config_get_boolean("plugin:freebsd:sysctl", "netisr per core", 1);
         do_bandwidth            = config_get_boolean("plugin:freebsd:sysctl", "bandwidth", 1);
+        do_tcp_sockets          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 TCP connections", 1);
+        do_tcp_packets          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 TCP packets", 1);
+        do_tcp_errors           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 TCP errors", 1);
+        do_tcp_handshake        = config_get_boolean("plugin:freebsd:sysctl", "ipv4 TCP handshake issues", 1);
+        do_ecn                  = config_get_boolean_ondemand("plugin:freebsd:sysctl", "ECN packets", CONFIG_ONDEMAND_ONDEMAND);
+        do_tcpext_syscookies    = config_get_boolean_ondemand("plugin:freebsd:sysctl", "TCP SYN cookies", CONFIG_ONDEMAND_ONDEMAND);
+        do_tcpext_ofo           = config_get_boolean_ondemand("plugin:freebsd:sysctl", "TCP out-of-order queue", CONFIG_ONDEMAND_ONDEMAND);
+        do_tcpext_connaborts    = config_get_boolean_ondemand("plugin:freebsd:sysctl", "TCP connection aborts", CONFIG_ONDEMAND_ONDEMAND);
+        do_udp_packets          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 UDP packets", 1);
+        do_udp_errors           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 UDP errors", 1);
     }
 
     RRDSET *st;
@@ -177,6 +201,20 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         u_long  ift_ibytes;
         u_long  ift_obytes;
     } iftot = {0, 0};
+
+    // NEEDED BY: do_tcp...
+    struct tcpstat tcpstat;
+    uint64_t tcps_states[TCP_NSTATES];
+
+    // NEEDED BY: do_udp...
+    struct udpstat udpstat;
+
+    // NEEDED BY: do_icmp...
+    struct icmpstat icmpstat;
+    struct icmp_total {
+        u_long  msgs_in;
+        u_long  msgs_out;
+    } icmp_total = {0, 0};
 
     // --------------------------------------------------------------------
 
@@ -616,7 +654,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                             }
                             else rrdset_next(st);
 
-                            rrddim_set(st, "reads", (dstat[i].operations[DEVSTAT_READ] - prev_dstat.operations_read) ? 
+                            rrddim_set(st, "reads", (dstat[i].operations[DEVSTAT_READ] - prev_dstat.operations_read) ?
                                 (cur_dstat.duration_read_ms - prev_dstat.duration_read_ms) / (dstat[i].operations[DEVSTAT_READ] - prev_dstat.operations_read) : 0);
                             rrddim_set(st, "writes", (dstat[i].operations[DEVSTAT_WRITE] - prev_dstat.operations_write) ?
                                 (cur_dstat.duration_write_ms - prev_dstat.duration_write_ms) / (dstat[i].operations[DEVSTAT_WRITE] - prev_dstat.operations_write) : 0);
@@ -1216,6 +1254,334 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             }
 
             freeifaddrs(ifap);
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
+    if (likely(do_tcp_sockets)) {
+        if (unlikely(GETSYSCTL("net.inet.tcp.states", tcps_states))) {
+            do_tcp_sockets = 0;
+            error("DISABLED: ipv4.tcpsock");
+        } else {
+            if (likely(do_tcp_sockets)) {
+                st = rrdset_find("ipv4.tcpsock");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "tcpsock", NULL, "tcp", NULL, "IPv4 TCP Connections",
+                                       "active connections", 2500, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "CurrEstab", "connections", 1, 1, RRDDIM_ABSOLUTE);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "CurrEstab", tcps_states[TCPS_ESTABLISHED]);
+                rrdset_done(st);
+            }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
+    if (likely(do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo || do_tcpext_syscookies || do_ecn)) {
+        if (unlikely(GETSYSCTL("net.inet.tcp.stats", tcpstat))){
+            do_tcp_packets = 0;
+            error("DISABLED: ipv4.tcppackets");
+            do_tcp_errors = 0;
+            error("DISABLED: ipv4.tcperrors");
+            do_tcp_handshake = 0;
+            error("DISABLED: ipv4.tcphandshake");
+            do_tcpext_connaborts = 0;
+            error("DISABLED: ipv4.tcpconnaborts");
+            do_tcpext_ofo = 0;
+            error("DISABLED: ipv4.tcpofo");
+            do_tcpext_syscookies = 0;
+            error("DISABLED: ipv4.tcpsyncookies");
+            do_ecn = 0;
+            error("DISABLED: ipv4.ecnpkts");
+        } else {
+            if (likely(do_tcp_packets)) {
+                st = rrdset_find("ipv4.tcppackets");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "tcppackets", NULL, "tcp", NULL, "IPv4 TCP Packets",
+                                       "packets/s",
+                                       2600, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InSegs", "received", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutSegs", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InSegs", tcpstat.tcps_rcvtotal);
+                rrddim_set(st, "OutSegs", tcpstat.tcps_sndtotal);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_tcp_errors)) {
+                st = rrdset_find("ipv4.tcperrors");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "tcperrors", NULL, "tcp", NULL, "IPv4 TCP Errors",
+                                       "packets/s",
+                                       2700, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "InErrs", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "RetransSegs", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InErrs", tcpstat.tcps_rcvbadoff + tcpstat.tcps_rcvreassfull + tcpstat.tcps_rcvshort);
+                rrddim_set(st, "InCsumErrors", tcpstat.tcps_rcvbadsum);
+                rrddim_set(st, "RetransSegs", tcpstat.tcps_sndrexmitpack);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_tcp_handshake)) {
+                st = rrdset_find("ipv4.tcphandshake");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "tcphandshake", NULL, "tcp", NULL,
+                                       "IPv4 TCP Handshake Issues",
+                                       "events/s", 2900, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "EstabResets", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ActiveOpens", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "PassiveOpens", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "AttemptFails", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "EstabResets", tcpstat.tcps_drops);
+                rrddim_set(st, "ActiveOpens", tcpstat.tcps_connattempt);
+                rrddim_set(st, "PassiveOpens", tcpstat.tcps_accepts);
+                rrddim_set(st, "AttemptFails", tcpstat.tcps_conndrops);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (do_tcpext_connaborts == CONFIG_ONDEMAND_YES || (do_tcpext_connaborts == CONFIG_ONDEMAND_ONDEMAND && (tcpstat.tcps_rcvpackafterwin || tcpstat.tcps_rcvafterclose || tcpstat.tcps_rcvmemdrop || tcpstat.tcps_persistdrop || tcpstat.tcps_finwait2_drops))) {
+                do_tcpext_connaborts = CONFIG_ONDEMAND_YES;
+                st = rrdset_find("ipv4.tcpconnaborts");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts", "connections/s", 3010, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnClose",   "userclosed",  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnMemory",  "nomemory",    1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnLinger",  "linger",      1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "TCPAbortOnData",    tcpstat.tcps_rcvpackafterwin);
+                rrddim_set(st, "TCPAbortOnClose",   tcpstat.tcps_rcvafterclose);
+                rrddim_set(st, "TCPAbortOnMemory",  tcpstat.tcps_rcvmemdrop);
+                rrddim_set(st, "TCPAbortOnTimeout", tcpstat.tcps_persistdrop);
+                rrddim_set(st, "TCPAbortOnLinger",  tcpstat.tcps_finwait2_drops);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (do_tcpext_ofo == CONFIG_ONDEMAND_YES || (do_tcpext_ofo == CONFIG_ONDEMAND_ONDEMAND && tcpstat.tcps_rcvoopack)) {
+                do_tcpext_ofo = CONFIG_ONDEMAND_YES;
+                st = rrdset_find("ipv4.tcpofo");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "tcpofo", NULL, "tcp", NULL, "TCP Out-Of-Order Queue", "packets/s", 3050, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "TCPOFOQueue",   tcpstat.tcps_rcvoopack);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (do_tcpext_syscookies == CONFIG_ONDEMAND_YES || (do_tcpext_syscookies == CONFIG_ONDEMAND_ONDEMAND && (tcpstat.tcps_sc_sendcookie || tcpstat.tcps_sc_recvcookie || tcpstat.tcps_sc_zonefail))) {
+                do_tcpext_syscookies = CONFIG_ONDEMAND_YES;
+
+                st = rrdset_find("ipv4.tcpsyncookies");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "tcpsyncookies", NULL, "tcp", NULL, "TCP SYN Cookies", "packets/s", 3100, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "SyncookiesRecv",   tcpstat.tcps_sc_recvcookie);
+                rrddim_set(st, "SyncookiesSent",   tcpstat.tcps_sc_sendcookie);
+                rrddim_set(st, "SyncookiesFailed", tcpstat.tcps_sc_zonefail);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (do_ecn == CONFIG_ONDEMAND_YES || (do_ecn == CONFIG_ONDEMAND_ONDEMAND && (tcpstat.tcps_ecn_ce || tcpstat.tcps_ecn_ect0 || tcpstat.tcps_ecn_ect1))) {
+                do_ecn = CONFIG_ONDEMAND_YES;
+                st = rrdset_find("ipv4.ecnpkts");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics", "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InECT0Pkts", "ECTP0", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InECT1Pkts", "ECTP1", 1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "InCEPkts", tcpstat.tcps_ecn_ce);
+                rrddim_set(st, "InNoECTPkts", tcpstat.tcps_ecn_ce - (tcpstat.tcps_ecn_ect0 + tcpstat.tcps_ecn_ect1));
+                rrddim_set(st, "InECT0Pkts", tcpstat.tcps_ecn_ect0);
+                rrddim_set(st, "InECT1Pkts", tcpstat.tcps_ecn_ect1);
+                rrdset_done(st);
+            }
+
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
+    if (likely(do_udp_packets || do_udp_errors)) {
+        if (unlikely(GETSYSCTL("net.inet.udp.stats", udpstat))) {
+            do_udp_packets = 0;
+            error("DISABLED: ipv4.udppackets");
+            do_udp_errors = 0;
+            error("DISABLED: ipv4.udperrors");
+        } else {
+            if (likely(do_udp_packets)) {
+                st = rrdset_find("ipv4.udppackets");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "udppackets", NULL, "udp", NULL, "IPv4 UDP Packets",
+                                       "packets/s", 2601, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InDatagrams", "received", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutDatagrams", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InDatagrams", udpstat.udps_ipackets);
+                rrddim_set(st, "OutDatagrams", udpstat.udps_opackets);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_udp_errors)) {
+                st = rrdset_find("ipv4.udperrors");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "udperrors", NULL, "udp", NULL, "IPv4 UDP Errors", "events/s",
+                                       2701, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "NoPorts", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InErrors", udpstat.udps_hdrops + udpstat.udps_badlen);
+                rrddim_set(st, "NoPorts", udpstat.udps_noport);
+                rrddim_set(st, "RcvbufErrors", udpstat.udps_fullsock);
+                rrddim_set(st, "InCsumErrors", udpstat.udps_badsum + udpstat.udps_nosum);
+                rrddim_set(st, "IgnoredMulti", udpstat.udps_filtermcast);
+                rrdset_done(st);
+            }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_icmp_packets || do_icmpmsg)) {
+        if (unlikely(GETSYSCTL("net.inet.icmp.stats", icmpstat))) {
+            do_icmp_packets = 0;
+            error("DISABLED: ipv4.icmp");
+            error("DISABLED: ipv4.icmp_errors");
+            do_icmpmsg = 0;
+            error("DISABLED: ipv4.icmpmsg");
+        } else {
+            for (i = 0; i <= ICMP_MAXTYPE; i++) {
+                icmp_total.msgs_in += icmpstat.icps_inhist[i];
+                icmp_total.msgs_out += icmpstat.icps_outhist[i];
+            }
+            icmp_total.msgs_in += icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort;
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_icmp_packets)) {
+                st = rrdset_find("ipv4.icmp");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "icmp", NULL, "icmp", NULL, "IPv4 ICMP Packets", "packets/s",
+                                       2602,
+                                       update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InMsgs", "received", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutMsgs", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InMsgs", icmp_total.msgs_in);
+                rrddim_set(st, "OutMsgs", icmp_total.msgs_out);
+
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("ipv4.icmp_errors");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors",
+                                       "packets/s",
+                                       2603, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InErrors", icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort);
+                rrddim_set(st, "OutErrors", icmpstat.icps_error);
+                rrddim_set(st, "InCsumErrors", icmpstat.icps_checksum);
+
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_icmpmsg)) {
+                st = rrdset_find("ipv4.icmpmsg");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages",
+                                       "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InEchoReps", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InEchos", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                    rrddim_set(st, "InEchoReps", icmpstat.icps_inhist[ICMP_ECHOREPLY]);
+                    rrddim_set(st, "OutEchoReps", icmpstat.icps_outhist[ICMP_ECHOREPLY]);
+                    rrddim_set(st, "InEchos", icmpstat.icps_inhist[ICMP_ECHO]);
+                    rrddim_set(st, "OutEchos", icmpstat.icps_outhist[ICMP_ECHO]);
+
+                rrdset_done(st);
+            }
         }
     }
 
