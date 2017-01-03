@@ -774,6 +774,45 @@ int web_client_api_request_v1_charts(struct web_client *w, char *url)
     return 200;
 }
 
+int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
+{
+    int format = 0;
+
+    while(url) {
+        char *value = mystrsep(&url, "?&");
+        if (!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        if(!strcmp(name, "format")) {
+            if(!strcmp(value, RAWMETRICS_FORMAT_BASH))
+                format = RAWMETRICS_BASH;
+            else if(!strcmp(value, RAWMETRICS_FORMAT_PROMETHEUS))
+                format = RAWMETRICS_PROMETHEUS;
+        }
+    }
+
+    buffer_flush(w->response.data);
+    buffer_no_cacheable(w->response.data);
+    w->response.data->contenttype = CT_TEXT_PLAIN;
+
+    switch(format) {
+        //case RAWMETRICS_BASH:
+        //    rrd_stats_api_v1_charts_allmetrics_bash(w->response.data);
+        //    return 200;
+
+        case RAWMETRICS_PROMETHEUS:
+            rrd_stats_api_v1_charts_allmetrics_prometheus(w->response.data);
+            return 200;
+
+        default:
+            buffer_strcat(w->response.data, "Which format? Only '" RAWMETRICS_FORMAT_PROMETHEUS "' is currently supported.");
+            return 400;
+    }
+}
+
 int web_client_api_request_v1_chart(struct web_client *w, char *url)
 {
     return web_client_api_request_single_chart(w, url, rrd_stats_api_v1_chart);
@@ -1377,7 +1416,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 }
 
 int web_client_api_request_v1(struct web_client *w, char *url) {
-    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0, hash_alarm_log = 0, hash_alarm_variables = 0;
+    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0, hash_alarm_log = 0, hash_alarm_variables = 0, hash_raw = 0;
 
     if(unlikely(hash_data == 0)) {
         hash_data = simple_hash("data");
@@ -1388,6 +1427,7 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
         hash_alarms = simple_hash("alarms");
         hash_alarm_log = simple_hash("alarm_log");
         hash_alarm_variables = simple_hash("alarm_variables");
+        hash_raw = simple_hash("allmetrics");
     }
 
     // get the command
@@ -1419,6 +1459,9 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
 
         else if(hash == hash_alarm_variables && !strcmp(tok, "alarm_variables"))
             return web_client_api_request_v1_alarm_variables(w, url);
+
+        else if(hash == hash_raw && !strcmp(tok, "allmetrics"))
+            return web_client_api_request_v1_allmetrics(w, url);
 
         else {
             buffer_flush(w->response.data);

@@ -124,6 +124,43 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
     );
 }
 
+void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
+{
+    pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
+
+    // for each chart
+    RRDSET *st;
+    for(st = localhost.rrdset_root; st ; st = st->next) {
+        buffer_strcat(wb, "\n");
+        if(st->enabled && st->dimensions) {
+            // for each dimension
+            RRDDIM *rd;
+            for(rd = st->dimensions; rd ; rd = rd->next) {
+                if(rd->counter) {
+                    buffer_sprintf(wb, "# HELP %s.%s %s\n", st->id, rd->id, st->units);
+
+                    switch(rd->algorithm) {
+                        case RRDDIM_INCREMENTAL:
+                        case RRDDIM_PCENT_OVER_DIFF_TOTAL:
+                            buffer_sprintf(wb, "# TYPE %s.%s counter\n", st->id, rd->id);
+                            break;
+
+                        default:
+                            buffer_sprintf(wb, "# TYPE %s.%s gauge\n", st->id, rd->id);
+                            break;
+                    }
+
+                    calculated_number n = (calculated_number)rd->last_collected_value * (calculated_number)(abs(rd->multiplier)) / (calculated_number)(abs(rd->divisor));
+
+                    buffer_sprintf(wb, "%s.%s " CALCULATED_NUMBER_FORMAT " %llu\n", st->id, rd->id, n,
+                            (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
+                }
+            }
+        }
+    }
+
+    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+}
 
 unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
 {
