@@ -107,7 +107,8 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
 
     RRDCALC *rc;
     for(rc = localhost.alarms; rc ; rc = rc->next) {
-        alarms++;
+        if(rc->rrdset)
+            alarms++;
     }
     pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
@@ -217,21 +218,21 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
     return n;
 }
 
-#define BASH_ELEMENT_MAX 100
+#define SHELL_ELEMENT_MAX 100
 
 void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
 {
     pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
 
-    char host[BASH_ELEMENT_MAX + 1];
-    shell_name_copy(host, config_get("global", "hostname", "localhost"), BASH_ELEMENT_MAX);
+    char host[SHELL_ELEMENT_MAX + 1];
+    shell_name_copy(host, config_get("global", "hostname", "localhost"), SHELL_ELEMENT_MAX);
 
     // for each chart
     RRDSET *st;
     for(st = localhost.rrdset_root; st ; st = st->next) {
         calculated_number total = 0.0;
-        char chart[BASH_ELEMENT_MAX + 1];
-        shell_name_copy(chart, st->id, BASH_ELEMENT_MAX);
+        char chart[SHELL_ELEMENT_MAX + 1];
+        shell_name_copy(chart, st->id, SHELL_ELEMENT_MAX);
 
         buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, st->name);
         if(st->enabled && st->dimensions) {
@@ -241,8 +242,8 @@ void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
             RRDDIM *rd;
             for(rd = st->dimensions; rd ; rd = rd->next) {
                 if(rd->counter) {
-                    char dimension[BASH_ELEMENT_MAX + 1];
-                    shell_name_copy(dimension, rd->id, BASH_ELEMENT_MAX);
+                    char dimension[SHELL_ELEMENT_MAX + 1];
+                    shell_name_copy(dimension, rd->id, SHELL_ELEMENT_MAX);
 
                     calculated_number n = rd->last_stored_value;
 
@@ -261,6 +262,30 @@ void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
             buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"%0.0Lf\"      # %s\n", chart, total, st->units);
             pthread_rwlock_unlock(&st->rwlock);
         }
+    }
+
+    buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
+
+    RRDCALC *rc;
+    for(rc = localhost.alarms; rc ;rc = rc->next) {
+        if(!rc->rrdset) continue;
+
+        char chart[SHELL_ELEMENT_MAX + 1];
+        shell_name_copy(chart, rc->rrdset->id, SHELL_ELEMENT_MAX);
+
+        char alarm[SHELL_ELEMENT_MAX + 1];
+        shell_name_copy(alarm, rc->name, SHELL_ELEMENT_MAX);
+
+        calculated_number n = rc->value;
+
+        if(isnan(n) || isinf(n))
+            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"\"      # %s\n", chart, alarm, rc->units);
+        else {
+            n = roundl(n);
+            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"%0.0Lf\"      # %s\n", chart, alarm, n, rc->units);
+        }
+
+        buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));
     }
 
     pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);

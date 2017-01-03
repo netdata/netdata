@@ -358,4 +358,6 @@ extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *nam
 extern void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name);
 extern void rrdvar_custom_host_variable_set(RRDVAR *rv, calculated_number value);
 
+extern const char *rrdcalc_status2string(int status);
+
 #endif //NETDATA_HEALTH_H
