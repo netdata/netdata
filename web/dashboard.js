@@ -1161,6 +1161,35 @@ var NETDATA = window.NETDATA || {};
     };
 
     // ----------------------------------------------------------------------------------------------------------------
+    // http://wilsonpage.co.uk/preventing-layout-thrashing/
+
+    NETDATA.noLayoutTrashing = {
+        set: false,
+        callbacks: [],
+
+        add: function(callback) {
+            // console.log('adding...');
+            this.callbacks.push(callback);
+
+            if(this.set === false) {
+                this.set = true;
+                var that = this;
+
+                window.requestAnimationFrame(function() {
+                    var len = that.callbacks.length;
+                    // console.log('running... ' + len.toString());
+                    while(len--) {
+                        that.callbacks[len]();
+                    }
+
+                    that.callbacks = new Array();
+                    that.set = false;
+                });
+            }
+        }
+    };
+
+    // ----------------------------------------------------------------------------------------------------------------
     // Our state object, where all per-chart values are stored
 
     chartState = function(element) {
@@ -1469,8 +1498,11 @@ var NETDATA = window.NETDATA || {};
         };
 
         var maxMessageFontSize = function() {
+            var screenHeight = screen.height;
+            var el = that.element_message;
+
             // normally we want a font size, as tall as the element
-            var h = that.element_message.clientHeight;
+            var h = el.clientHeight;
 
             // but give it some air, 20% let's say, or 5 pixels min
             var lost = Math.max(h * 0.2, 5);
@@ -1481,7 +1513,7 @@ var NETDATA = window.NETDATA || {};
 
             // but check the width too
             // it should fit 10 characters in it
-            var w = that.element_message.clientWidth / 10;
+            var w = el.clientWidth / 10;
             if(h > w) {
                 paddingTop += (h - w) / 2;
                 h = w;
@@ -1489,14 +1521,14 @@ var NETDATA = window.NETDATA || {};
 
             // and don't make it too huge
             // 5% of the screen size is good
-            if(h > screen.height / 20) {
-                paddingTop += (h - (screen.height / 20)) / 2;
-                h = screen.height / 20;
+            if(h > screenHeight / 20) {
+                paddingTop += (h - (screenHeight / 20)) / 2;
+                h = screenHeight / 20;
             }
 
             // set it
-            that.element_message.style.fontSize = h.toString() + 'px';
-            that.element_message.style.paddingTop = paddingTop.toString() + 'px';
+            el.style.fontSize = h.toString() + 'px';
+            el.style.paddingTop = paddingTop.toString() + 'px';
         };
 
         var showMessage = function(msg) {
@@ -1508,10 +1540,12 @@ var NETDATA = window.NETDATA || {};
         };
 
         var showMessageIcon = function(icon) {
-            that.element_message.innerHTML = icon;
-            that.element_message.className = 'netdata-message icon';
-            maxMessageFontSize();
-            that.___messageHidden___ = undefined;
+            NETDATA.noLayoutTrashing.add(function() {
+                that.element_message.innerHTML = icon;
+                that.element_message.className = 'netdata-message icon';
+                maxMessageFontSize();
+                that.___messageHidden___ = undefined;
+            });
         };
 
         var hideMessage = function() {

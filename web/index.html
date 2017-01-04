@@ -2600,6 +2600,9 @@
                 .on('hidden.bs.dropdown', function () {
                     NETDATA.unpause();
                 });
+
+            // var netdataEnded = performance.now();
+            // console.log('start up time: ' + (netdataEnded - netdataStarted).toString() + ' ms');
         }
 
         function resetDashboardOptions() {
@@ -2642,6 +2645,7 @@
         };
 
         // our entry point
+        // var netdataStarted = performance.now();
         var netdataCallback = initializeDynamicDashboard;
     </script>
 </head>
@@ -3253,4 +3257,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20161229-4"></script>
+<script type="text/javascript" src="dashboard.js?v20170104-25"></script>
