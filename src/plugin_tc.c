@@ -248,7 +248,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     for(c = d->classes ; c ; c = c->next) {
         // debug(D_TC_LOOP, "TC: Device '%s', class '%s', isLeaf=%d, HasParent=%d, Seen=%d", d->name?d->name:d->id, c->name?c->name:c->id, c->isleaf, c->hasparent, c->seen);
         debug(D_TC_LOOP, "TC: Device '%s', class '%s', isleaf=%s, isqdisc=%s, hasparent=%s bytes=%d, packtes=%d, dropped=%d, tokens=%d, ctokens=%d", d->name?d->name:d->id, c->name?c->name:c->id, c->isleaf?"true":"false", c->isqdisc?"true":"false", c->hasparent?"true":"false", c->bytes, c->packets, c->dropped, c->tokens, c->ctokens);
-        if(unlikely(c->updated && c->isqdisc && !c->hasparent)) {
+        if(unlikely(c->updated && c->isqdisc && !c->parentid)) {
             active_qos = 1;
             bytes_sum = c->bytes;
             packets_sum = c->packets;
