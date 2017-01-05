@@ -1161,35 +1161,6 @@ var NETDATA = window.NETDATA || {};
     };
 
     // ----------------------------------------------------------------------------------------------------------------
-    // http://wilsonpage.co.uk/preventing-layout-thrashing/
-
-    NETDATA.noLayoutTrashing = {
-        set: false,
-        callbacks: [],
-
-        add: function(callback) {
-            // console.log('adding...');
-            this.callbacks.unshift(callback);
-
-            if(this.set === false) {
-                this.set = true;
-                var that = this;
-
-                window.requestAnimationFrame(function() {
-                    var len = that.callbacks.length;
-                    // console.log('running... ' + len.toString());
-                    while(len--) {
-                        that.callbacks[len]();
-                    }
-
-                    that.callbacks = new Array();
-                    that.set = false;
-                });
-            }
-        }
-    };
-
-    // ----------------------------------------------------------------------------------------------------------------
     // Our state object, where all per-chart values are stored
 
     chartState = function(element) {
@@ -1421,29 +1392,27 @@ var NETDATA = window.NETDATA || {};
             }
             that.element_legend_childs.series = null;
 
-            NETDATA.noLayoutTrashing.add(function() {
-                if(typeof(that.width) === 'string')
-                    $(that.element).css('width', that.width);
-                else if(typeof(that.width) === 'number')
-                    $(that.element).css('width', that.width + 'px');
+            if(typeof(that.width) === 'string')
+                $(that.element).css('width', that.width);
+            else if(typeof(that.width) === 'number')
+                $(that.element).css('width', that.width + 'px');
 
-                if(typeof(that.library.aspect_ratio) === 'undefined') {
-                    if(typeof(that.height) === 'string')
-                        that.element.style.height = that.height;
-                    else if(typeof(that.height) === 'number')
-                        that.element.style.height = that.height.toString() + 'px';
+            if(typeof(that.library.aspect_ratio) === 'undefined') {
+                if(typeof(that.height) === 'string')
+                    that.element.style.height = that.height;
+                else if(typeof(that.height) === 'number')
+                    that.element.style.height = that.height.toString() + 'px';
+            }
+            else {
+                var w = that.element.offsetWidth;
+                if(w === null || w === 0) {
+                    // the div is hidden
+                    // this will resize the chart when next viewed
+                    that.tm.last_resized = 0;
                 }
-                else {
-                    var w = that.element.offsetWidth;
-                    if(w === null || w === 0) {
-                        // the div is hidden
-                        // this will resize the chart when next viewed
-                        that.tm.last_resized = 0;
-                    }
-                    else
-                        that.element.style.height = (w * that.library.aspect_ratio / 100).toString() + 'px';
-                }
-            });
+                else
+                    that.element.style.height = (w * that.library.aspect_ratio / 100).toString() + 'px';
+            }
 
             if(NETDATA.chartDefaults.min_width !== null)
                 $(that.element).css('min-width', NETDATA.chartDefaults.min_width);
@@ -1534,12 +1503,10 @@ var NETDATA = window.NETDATA || {};
         };
 
         var showMessageIcon = function(icon) {
-            NETDATA.noLayoutTrashing.add(function() {
-                that.element_message.innerHTML = icon;
-                maxMessageFontSize();
-                $(that.element_message).removeClass('hidden');
-                that.___messageHidden___ = undefined;
-            });
+            that.element_message.innerHTML = icon;
+            maxMessageFontSize();
+            $(that.element_message).removeClass('hidden');
+            that.___messageHidden___ = undefined;
         };
 
         var hideMessage = function() {
@@ -1706,7 +1673,7 @@ var NETDATA = window.NETDATA || {};
                     if(that.element_legend_childs.perfect_scroller !== null)
                         Ps.update(that.element_legend_childs.perfect_scroller);
 
-                    NETDATA.noLayoutTrashing.add(maxMessageFontSize);
+                    maxMessageFontSize();
                 }
 
                 that.tm.last_resized = Date.now();
