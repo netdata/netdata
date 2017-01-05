@@ -10,6 +10,7 @@ SUFFIXES = .in
 dist_python_SCRIPTS = \
     apache.chart.py \
     apache_cache.chart.py \
+    bind_rndc.chart.py \
     cpufreq.chart.py \
     dovecot.chart.py \
     example.chart.py \
