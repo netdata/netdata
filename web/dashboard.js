@@ -1369,7 +1369,7 @@ var NETDATA = window.NETDATA || {};
             that.element.innerHTML = '';
 
             that.element_message = document.createElement('div');
-            that.element_message.className = ' netdata-message hidden';
+            that.element_message.className = 'netdata-message icon hidden';
             that.element.appendChild(that.element_message);
 
             that.element_chart = document.createElement('div');
@@ -1399,9 +1399,9 @@ var NETDATA = window.NETDATA || {};
 
             if(typeof(that.library.aspect_ratio) === 'undefined') {
                 if(typeof(that.height) === 'string')
-                    $(that.element).css('height', that.height);
+                    that.element.style.height = that.height;
                 else if(typeof(that.height) === 'number')
-                    $(that.element).css('height', that.height + 'px');
+                    that.element.style.height = that.height.toString() + 'px';
             }
             else {
                 var w = that.element.offsetWidth;
@@ -1411,7 +1411,7 @@ var NETDATA = window.NETDATA || {};
                     that.tm.last_resized = 0;
                 }
                 else
-                    $(that.element).css('height', (that.element.offsetWidth * that.library.aspect_ratio / 100).toString() + 'px');
+                    that.element.style.height = (w * that.library.aspect_ratio / 100).toString() + 'px';
             }
 
             if(NETDATA.chartDefaults.min_width !== null)
@@ -1469,8 +1469,11 @@ var NETDATA = window.NETDATA || {};
         };
 
         var maxMessageFontSize = function() {
+            var screenHeight = screen.height;
+            var el = that.element;
+
             // normally we want a font size, as tall as the element
-            var h = that.element_message.clientHeight;
+            var h = el.clientHeight;
 
             // but give it some air, 20% let's say, or 5 pixels min
             var lost = Math.max(h * 0.2, 5);
@@ -1481,7 +1484,7 @@ var NETDATA = window.NETDATA || {};
 
             // but check the width too
             // it should fit 10 characters in it
-            var w = that.element_message.clientWidth / 10;
+            var w = el.clientWidth / 10;
             if(h > w) {
                 paddingTop += (h - w) / 2;
                 h = w;
@@ -1489,9 +1492,9 @@ var NETDATA = window.NETDATA || {};
 
             // and don't make it too huge
             // 5% of the screen size is good
-            if(h > screen.height / 20) {
-                paddingTop += (h - (screen.height / 20)) / 2;
-                h = screen.height / 20;
+            if(h > screenHeight / 20) {
+                paddingTop += (h - (screenHeight / 20)) / 2;
+                h = screenHeight / 20;
             }
 
             // set it
@@ -1499,25 +1502,17 @@ var NETDATA = window.NETDATA || {};
             that.element_message.style.paddingTop = paddingTop.toString() + 'px';
         };
 
-        var showMessage = function(msg) {
-            that.element_message.className = 'netdata-message';
-            that.element_message.innerHTML = msg;
-            that.element_message.style.fontSize = 'x-small';
-            that.element_message.style.paddingTop = '0px';
-            that.___messageHidden___ = undefined;
-        };
-
         var showMessageIcon = function(icon) {
             that.element_message.innerHTML = icon;
-            that.element_message.className = 'netdata-message icon';
             maxMessageFontSize();
+            $(that.element_message).removeClass('hidden');
             that.___messageHidden___ = undefined;
         };
 
         var hideMessage = function() {
             if(typeof that.___messageHidden___ === 'undefined') {
                 that.___messageHidden___ = true;
-                that.element_message.className = 'netdata-message hidden';
+                $(that.element_message).addClass('hidden');
             }
         };
 

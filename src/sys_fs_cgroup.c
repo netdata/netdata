@@ -1005,7 +1005,7 @@ void find_all_cgroups() {
         // check for newly added cgroups
         // and update the filenames they read
         char filename[FILENAME_MAX + 1];
-        if(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename) {
+        if(unlikely(cgroup_enable_cpuacct_stat && !cg->cpuacct_stat.filename)) {
             snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.stat", cgroup_cpuacct_base, cg->id);
             if(stat(filename, &buf) != -1) {
                 cg->cpuacct_stat.filename = strdupz(filename);
@@ -1013,7 +1013,8 @@ void find_all_cgroups() {
             }
             else debug(D_CGROUP, "cpuacct.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
         }
-        if(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename) {
+
+        if(unlikely(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename)) {
             snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.usage_percpu", cgroup_cpuacct_base, cg->id);
             if(stat(filename, &buf) != -1) {
                 cg->cpuacct_usage.filename = strdupz(filename);
@@ -1021,37 +1022,48 @@ void find_all_cgroups() {
             }
             else debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
         }
-        if(cgroup_enable_memory && !cg->memory.filename) {
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
-            if(stat(filename, &buf) != -1) {
-                cg->memory.filename = strdupz(filename);
-                debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename);
-            }
-            else debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
 
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.usage_in_bytes", cgroup_memory_base, cg->id);
-            if(stat(filename, &buf) != -1) {
-                cg->memory.filename_usage_in_bytes = strdupz(filename);
-                debug(D_CGROUP, "memory.usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
+        if(unlikely(cgroup_enable_memory)) {
+            if(unlikely(!cg->memory.filename)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
+                if(stat(filename, &buf) != -1) {
+                    cg->memory.filename = strdupz(filename);
+                    debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename);
+                }
+                else
+                    debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else debug(D_CGROUP, "memory.usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.msw_usage_in_bytes", cgroup_memory_base, cg->id);
-            if(stat(filename, &buf) != -1) {
-                cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
-                debug(D_CGROUP, "memory.msw_usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
+            if(unlikely(!cg->memory.filename_usage_in_bytes)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.usage_in_bytes", cgroup_memory_base, cg->id);
+                if(stat(filename, &buf) != -1) {
+                    cg->memory.filename_usage_in_bytes = strdupz(filename);
+                    debug(D_CGROUP, "memory.usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
+                }
+                else
+                    debug(D_CGROUP, "memory.usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else debug(D_CGROUP, "memory.msw_usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
-
-            snprintfz(filename, FILENAME_MAX, "%s%s/memory.failcnt", cgroup_memory_base, cg->id);
-            if(stat(filename, &buf) != -1) {
-                cg->memory.filename_failcnt = strdupz(filename);
-                debug(D_CGROUP, "memory.failcnt filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_failcnt);
+            if(unlikely(!cg->memory.filename_msw_usage_in_bytes)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.msw_usage_in_bytes", cgroup_memory_base, cg->id);
+                if(stat(filename, &buf) != -1) {
+                    cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
+                    debug(D_CGROUP, "memory.msw_usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
+                }
+                else
+                    debug(D_CGROUP, "memory.msw_usage_in_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            else debug(D_CGROUP, "memory.failcnt file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+            if(unlikely(!cg->memory.filename_failcnt)) {
+                snprintfz(filename, FILENAME_MAX, "%s%s/memory.failcnt", cgroup_memory_base, cg->id);
+                if(stat(filename, &buf) != -1) {
+                    cg->memory.filename_failcnt = strdupz(filename);
+                    debug(D_CGROUP, "memory.failcnt filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_failcnt);
+                }
+                else
+                    debug(D_CGROUP, "memory.failcnt file for cgroup '%s': '%s' does not exist.", cg->id, filename);
+            }
         }
-        if(cgroup_enable_blkio) {
-            if(!cg->io_service_bytes.filename) {
+
+        if(unlikely(cgroup_enable_blkio)) {
+            if(unlikely(!cg->io_service_bytes.filename)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_service_bytes", cgroup_blkio_base, cg->id);
                 if(stat(filename, &buf) != -1) {
                     cg->io_service_bytes.filename = strdupz(filename);
@@ -1059,7 +1071,7 @@ void find_all_cgroups() {
                 }
                 else debug(D_CGROUP, "io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if(!cg->io_serviced.filename) {
+            if(unlikely(!cg->io_serviced.filename)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_serviced", cgroup_blkio_base, cg->id);
                 if(stat(filename, &buf) != -1) {
                     cg->io_serviced.filename = strdupz(filename);
@@ -1067,7 +1079,7 @@ void find_all_cgroups() {
                 }
                 else debug(D_CGROUP, "io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if(!cg->throttle_io_service_bytes.filename) {
+            if(unlikely(!cg->throttle_io_service_bytes.filename)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_service_bytes", cgroup_blkio_base, cg->id);
                 if(stat(filename, &buf) != -1) {
                     cg->throttle_io_service_bytes.filename = strdupz(filename);
@@ -1075,7 +1087,7 @@ void find_all_cgroups() {
                 }
                 else debug(D_CGROUP, "throttle_io_service_bytes file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if(!cg->throttle_io_serviced.filename) {
+            if(unlikely(!cg->throttle_io_serviced.filename)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.throttle.io_serviced", cgroup_blkio_base, cg->id);
                 if(stat(filename, &buf) != -1) {
                     cg->throttle_io_serviced.filename = strdupz(filename);
@@ -1083,7 +1095,7 @@ void find_all_cgroups() {
                 }
                 else debug(D_CGROUP, "throttle_io_serviced file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if(!cg->io_merged.filename) {
+            if(unlikely(!cg->io_merged.filename)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_merged", cgroup_blkio_base, cg->id);
                 if(stat(filename, &buf) != -1) {
                     cg->io_merged.filename = strdupz(filename);
@@ -1091,7 +1103,7 @@ void find_all_cgroups() {
                 }
                 else debug(D_CGROUP, "io_merged file for cgroup '%s': '%s' does not exist.", cg->id, filename);
             }
-            if(!cg->io_queued.filename) {
+            if(unlikely(!cg->io_queued.filename)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/blkio.io_queued", cgroup_blkio_base, cg->id);
                 if(stat(filename, &buf) != -1) {
                     cg->io_queued.filename = strdupz(filename);
