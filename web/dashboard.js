@@ -1169,7 +1169,7 @@ var NETDATA = window.NETDATA || {};
 
         add: function(callback) {
             // console.log('adding...');
-            this.callbacks.push(callback);
+            this.callbacks.unshift(callback);
 
             if(this.set === false) {
                 this.set = true;
@@ -1398,7 +1398,7 @@ var NETDATA = window.NETDATA || {};
             that.element.innerHTML = '';
 
             that.element_message = document.createElement('div');
-            that.element_message.className = ' netdata-message hidden';
+            that.element_message.className = 'netdata-message icon hidden';
             that.element.appendChild(that.element_message);
 
             that.element_chart = document.createElement('div');
@@ -1421,27 +1421,29 @@ var NETDATA = window.NETDATA || {};
             }
             that.element_legend_childs.series = null;
 
-            if(typeof(that.width) === 'string')
-                $(that.element).css('width', that.width);
-            else if(typeof(that.width) === 'number')
-                $(that.element).css('width', that.width + 'px');
+            NETDATA.noLayoutTrashing.add(function() {
+                if(typeof(that.width) === 'string')
+                    $(that.element).css('width', that.width);
+                else if(typeof(that.width) === 'number')
+                    $(that.element).css('width', that.width + 'px');
 
-            if(typeof(that.library.aspect_ratio) === 'undefined') {
-                if(typeof(that.height) === 'string')
-                    $(that.element).css('height', that.height);
-                else if(typeof(that.height) === 'number')
-                    $(that.element).css('height', that.height + 'px');
-            }
-            else {
-                var w = that.element.offsetWidth;
-                if(w === null || w === 0) {
-                    // the div is hidden
-                    // this will resize the chart when next viewed
-                    that.tm.last_resized = 0;
+                if(typeof(that.library.aspect_ratio) === 'undefined') {
+                    if(typeof(that.height) === 'string')
+                        that.element.style.height = that.height;
+                    else if(typeof(that.height) === 'number')
+                        that.element.style.height = that.height.toString() + 'px';
                 }
-                else
-                    $(that.element).css('height', (that.element.offsetWidth * that.library.aspect_ratio / 100).toString() + 'px');
-            }
+                else {
+                    var w = that.element.offsetWidth;
+                    if(w === null || w === 0) {
+                        // the div is hidden
+                        // this will resize the chart when next viewed
+                        that.tm.last_resized = 0;
+                    }
+                    else
+                        that.element.style.height = (w * that.library.aspect_ratio / 100).toString() + 'px';
+                }
+            });
 
             if(NETDATA.chartDefaults.min_width !== null)
                 $(that.element).css('min-width', NETDATA.chartDefaults.min_width);
@@ -1499,7 +1501,7 @@ var NETDATA = window.NETDATA || {};
 
         var maxMessageFontSize = function() {
             var screenHeight = screen.height;
-            var el = that.element_message;
+            var el = that.element;
 
             // normally we want a font size, as tall as the element
             var h = el.clientHeight;
@@ -1527,23 +1529,15 @@ var NETDATA = window.NETDATA || {};
             }
 
             // set it
-            el.style.fontSize = h.toString() + 'px';
-            el.style.paddingTop = paddingTop.toString() + 'px';
-        };
-
-        var showMessage = function(msg) {
-            that.element_message.className = 'netdata-message';
-            that.element_message.innerHTML = msg;
-            that.element_message.style.fontSize = 'x-small';
-            that.element_message.style.paddingTop = '0px';
-            that.___messageHidden___ = undefined;
+            that.element_message.style.fontSize = h.toString() + 'px';
+            that.element_message.style.paddingTop = paddingTop.toString() + 'px';
         };
 
         var showMessageIcon = function(icon) {
             NETDATA.noLayoutTrashing.add(function() {
                 that.element_message.innerHTML = icon;
-                that.element_message.className = 'netdata-message icon';
                 maxMessageFontSize();
+                $(that.element_message).removeClass('hidden');
                 that.___messageHidden___ = undefined;
             });
         };
@@ -1551,7 +1545,7 @@ var NETDATA = window.NETDATA || {};
         var hideMessage = function() {
             if(typeof that.___messageHidden___ === 'undefined') {
                 that.___messageHidden___ = true;
-                that.element_message.className = 'netdata-message hidden';
+                $(that.element_message).addClass('hidden');
             }
         };
 
@@ -1712,7 +1706,7 @@ var NETDATA = window.NETDATA || {};
                     if(that.element_legend_childs.perfect_scroller !== null)
                         Ps.update(that.element_legend_childs.perfect_scroller);
 
-                    maxMessageFontSize();
+                    NETDATA.noLayoutTrashing.add(maxMessageFontSize);
                 }
 
                 that.tm.last_resized = Date.now();
