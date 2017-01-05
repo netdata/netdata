@@ -34,16 +34,17 @@ class Service(SimpleService):
                 self.order.append(''.join([md, '_rate']))
                 self.definitions['agr_health']['lines'].append([''.join([md, '_health']), md, 'absolute'])
                 self.definitions[md] = {'options':
-                                            [None, 'MD disks stats', 'disks', md, 'md.disks', 'stacked'],
+                                            [None, '%s disks stats' % md, 'disks', md, 'md.disks', 'stacked'],
                                         'lines': [[''.join([md, '_total']), 'total', 'absolute'],
                                                   [''.join([md, '_inuse']), 'inuse', 'absolute']]}
                 self.definitions[''.join([md, '_status'])] = {'options':
-                                            [None, 'MD current status', 'percent', md, 'md.status', 'line'],
+                                            [None, '%s current status' % md, 'percent', md, 'md.status', 'line'],
                                         'lines': [[''.join([md, '_resync']), 'resync', 'absolute', 1, 100],
                                                   [''.join([md, '_recovery']), 'recovery', 'absolute', 1, 100],
+                                                  [''.join([md, '_reshape']), 'reshape', 'absolute', 1, 100],
                                                   [''.join([md, '_check']), 'check', 'absolute', 1, 100]]}
                 self.definitions[''.join([md, '_rate'])] = {'options':
-                                            [None, 'MD operation status', 'rate', md, 'md.rate', 'line'],
+                                            [None, '%s operation status' % md, 'rate', md, 'md.rate', 'line'],
                                         'lines': [[''.join([md, '_finishin']), 'finish min', 'absolute', 1, 100],
                                                   [''.join([md, '_rate']), 'megabyte/s', 'absolute', -1, 100]]}
             self.info('Plugin was started successfully. MDs to monitor %s' % (md_list))
@@ -81,6 +82,7 @@ class Service(SimpleService):
             to_netdata[''.join([md[0], '_health'])] = int(md[1]) - int(md[2])
             to_netdata[''.join([md[0], '_check'])] = 0
             to_netdata[''.join([md[0], '_resync'])] = 0
+            to_netdata[''.join([md[0], '_reshape'])] = 0
             to_netdata[''.join([md[0], '_recovery'])] = 0
             to_netdata[''.join([md[0], '_finishin'])] = 0
             to_netdata[''.join([md[0], '_rate'])] = 0
