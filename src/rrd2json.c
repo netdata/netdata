@@ -107,7 +107,8 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
 
     RRDCALC *rc;
     for(rc = localhost.alarms; rc ; rc = rc->next) {
-        alarms++;
+        if(rc->rrdset)
+            alarms++;
     }
     pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
 
@@ -124,6 +125,173 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
     );
 }
 
+// ----------------------------------------------------------------------------
+// PROMETHEUS
+// /api/v1/allmetrics?format=prometheus
+
+static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable) {
+    size_t n;
+
+    for(n = 0; *s && n < usable ; d++, s++, n++) {
+        register char c = *s;
+
+        if(unlikely(!isalnum(c))) *d = '_';
+        else *d = c;
+    }
+    *d = '\0';
+
+    return n;
+}
+
+#define PROMETHEUS_ELEMENT_MAX 256
+
+void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
+{
+    pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
+
+    char host[PROMETHEUS_ELEMENT_MAX + 1];
+    prometheus_name_copy(host, config_get("global", "hostname", "localhost"), PROMETHEUS_ELEMENT_MAX);
+
+    // for each chart
+    RRDSET *st;
+    for(st = localhost.rrdset_root; st ; st = st->next) {
+        char chart[PROMETHEUS_ELEMENT_MAX + 1];
+        prometheus_name_copy(chart, st->id, PROMETHEUS_ELEMENT_MAX);
+
+        buffer_strcat(wb, "\n");
+        if(st->enabled && st->dimensions) {
+            pthread_rwlock_rdlock(&st->rwlock);
+
+            // for each dimension
+            RRDDIM *rd;
+            for(rd = st->dimensions; rd ; rd = rd->next) {
+                if(rd->counter) {
+                    char dimension[PROMETHEUS_ELEMENT_MAX + 1];
+                    prometheus_name_copy(dimension, rd->id, PROMETHEUS_ELEMENT_MAX);
+
+                    // buffer_sprintf(wb, "# HELP %s.%s %s\n", st->id, rd->id, st->units);
+
+                    switch(rd->algorithm) {
+                        case RRDDIM_INCREMENTAL:
+                        case RRDDIM_PCENT_OVER_DIFF_TOTAL:
+                            buffer_sprintf(wb, "# TYPE %s_%s counter\n", chart, dimension);
+                            break;
+
+                        default:
+                            buffer_sprintf(wb, "# TYPE %s_%s gauge\n", chart, dimension);
+                            break;
+                    }
+
+                    // calculated_number n = (calculated_number)rd->last_collected_value * (calculated_number)(abs(rd->multiplier)) / (calculated_number)(abs(rd->divisor));
+                    // buffer_sprintf(wb, "%s.%s " CALCULATED_NUMBER_FORMAT " %llu\n", st->id, rd->id, n,
+                    //        (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
+
+                    buffer_sprintf(wb, "%s_%s{instance=\"%s\"} " COLLECTED_NUMBER_FORMAT " %llu\n",
+                            chart, dimension, host, rd->last_collected_value,
+                            (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
+
+                }
+            }
+
+            pthread_rwlock_unlock(&st->rwlock);
+        }
+    }
+
+    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+}
+
+// ----------------------------------------------------------------------------
+// BASH
+// /api/v1/allmetrics?format=bash
+
+static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
+    size_t n;
+
+    for(n = 0; *s && n < usable ; d++, s++, n++) {
+        register char c = *s;
+
+        if(unlikely(!isalnum(c))) *d = '_';
+        else *d = (char)toupper(c);
+    }
+    *d = '\0';
+
+    return n;
+}
+
+#define SHELL_ELEMENT_MAX 100
+
+void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
+{
+    pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
+
+    char host[SHELL_ELEMENT_MAX + 1];
+    shell_name_copy(host, config_get("global", "hostname", "localhost"), SHELL_ELEMENT_MAX);
+
+    // for each chart
+    RRDSET *st;
+    for(st = localhost.rrdset_root; st ; st = st->next) {
+        calculated_number total = 0.0;
+        char chart[SHELL_ELEMENT_MAX + 1];
+        shell_name_copy(chart, st->id, SHELL_ELEMENT_MAX);
+
+        buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, st->name);
+        if(st->enabled && st->dimensions) {
+            pthread_rwlock_rdlock(&st->rwlock);
+
+            // for each dimension
+            RRDDIM *rd;
+            for(rd = st->dimensions; rd ; rd = rd->next) {
+                if(rd->counter) {
+                    char dimension[SHELL_ELEMENT_MAX + 1];
+                    shell_name_copy(dimension, rd->id, SHELL_ELEMENT_MAX);
+
+                    calculated_number n = rd->last_stored_value;
+
+                    if(isnan(n) || isinf(n))
+                        buffer_sprintf(wb, "NETDATA_%s_%s=\"\"      # %s\n", chart, dimension, st->units);
+                    else {
+                        if(rd->multiplier < 0 || rd->divisor < 0) n = -n;
+                        n = roundl(n);
+                        if(!(rd->flags & RRDDIM_FLAG_HIDDEN)) total += n;
+                        buffer_sprintf(wb, "NETDATA_%s_%s=\"%0.0Lf\"      # %s\n", chart, dimension, n, st->units);
+                    }
+                }
+            }
+
+            total = roundl(total);
+            buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"%0.0Lf\"      # %s\n", chart, total, st->units);
+            pthread_rwlock_unlock(&st->rwlock);
+        }
+    }
+
+    buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
+
+    RRDCALC *rc;
+    for(rc = localhost.alarms; rc ;rc = rc->next) {
+        if(!rc->rrdset) continue;
+
+        char chart[SHELL_ELEMENT_MAX + 1];
+        shell_name_copy(chart, rc->rrdset->id, SHELL_ELEMENT_MAX);
+
+        char alarm[SHELL_ELEMENT_MAX + 1];
+        shell_name_copy(alarm, rc->name, SHELL_ELEMENT_MAX);
+
+        calculated_number n = rc->value;
+
+        if(isnan(n) || isinf(n))
+            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"\"      # %s\n", chart, alarm, rc->units);
+        else {
+            n = roundl(n);
+            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"%0.0Lf\"      # %s\n", chart, alarm, n, rc->units);
+        }
+
+        buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));
+    }
+
+    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+}
+
+// ----------------------------------------------------------------------------
 
 unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
 {
