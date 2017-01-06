@@ -384,19 +384,19 @@ Module monitor /proc/mdstat
 
 It produces:
 
-**Health:** Number of failed disks in every array (aggregate chart).
+1. **Health:** Number of failed disks in every array (aggregate chart).
  
-**Disks stats** 
+2. **Disks stats** 
  * total (number of devices array ideally would have)
  * inuse (number of devices currently are in use)
 
-**Current status**
+3. **Current status**
  * resync in percent
  * recovery in percent
  * reshape in percent
  * check in percent
  
-**Operation status** (if resync/recovery/reshape/check is active)
+4. **Operation status** (if resync/recovery/reshape/check is active)
  * finish in minutes
  * speed in megabytes/s
   
@@ -654,10 +654,10 @@ Module monitor openvpn-status log file.
  
 It produces:
 
-**Users** OpenVPN active users
+1. **Users** OpenVPN active users
  * users
  
-**Traffic** OpenVPN overall bandwidth usage in kilobit/s
+2. **Traffic** OpenVPN overall bandwidth usage in kilobit/s
  * in
  * out
  
