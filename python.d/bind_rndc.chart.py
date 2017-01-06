@@ -13,6 +13,10 @@ retries = 60
 update_every = 30
 
 DIRECTORIES = ['/bin/', '/usr/bin/', '/sbin/', '/usr/sbin/']
+NMS = ['requests', 'responses', 'success', 'auth_answer', 'nonauth_answer', 'nxrrset', 'failure',
+       'nxdomain', 'recursion', 'duplicate', 'rejections']
+QUERIES = ['RESERVED0', 'A', 'NS', 'CNAME', 'SOA', 'PTR', 'MX', 'TXT', 'X25', 'AAAA', 'SRV', 'NAPTR',
+           'A6', 'DS', 'RRSIG', 'DNSKEY', 'SPF', 'ANY', 'DLV']
 
 
 class Service(SimpleService):
@@ -23,7 +27,7 @@ class Service(SimpleService):
         # self.options = ['Incoming Requests', 'Incoming Queries', 'Outgoing Queries',
         # 'Name Server Statistics', 'Zone Maintenance Statistics', 'Resolver Statistics',
         # 'Cache DB RRsets', 'Socket I/O Statistics']
-        self.options = ['Name Server Statistics']
+        self.options = ['Name Server Statistics', 'Incoming Queries', 'Outgoing Queries']
         self.regex_options = [r'(%s(?= \+\+)) \+\+([^\+]+)' % option for option in self.options]
         try:
             self.rndc = [''.join([directory, 'rndc']) for directory in DIRECTORIES
@@ -32,13 +36,12 @@ class Service(SimpleService):
             self.rndc = False
 
     def check(self):
-
-        # We cant start without 'rndc' command 
+        # We cant start without 'rndc' command
         if not self.rndc:
             self.error('Command "rndc" not found')
             return False
 
-        # We cant if stats file is not exist or not readable by netdata user
+        # We cant start if stats file is not exist or not readable by netdata user
         if not is_accessible(self.named_stats_path, R_OK):
             self.error('Cannot access file %s' % self.named_stats_path)
             return False
@@ -72,7 +75,6 @@ class Service(SimpleService):
             return False
 
     def _get_raw_data(self):
-
         """
         Run 'rndc stats' and read last dump from named.stats
         :return: tuple(
@@ -102,7 +104,6 @@ class Service(SimpleService):
             return result, current_size
 
     def _get_data(self):
-
         """
         Parse data from _get_raw_data()
         :return: dict
@@ -115,14 +116,23 @@ class Service(SimpleService):
 
         rndc_stats = dict()
         
+        # Result: dict.
+        # topic = Cache DB RRsets; body = A 178303 NS 86790 ... ; desc = A; value = 178303
+        # {'Cache DB RRsets': [('A', 178303), ('NS', 286790), ...],
+        # {Incoming Queries': [('RESERVED0', 8), ('A', 4557317680), ...],
+        # ......
         for regex in self.regex_options:
-            rndc_stats.update({k: [(y, int(x)) for x, y in self.regex_values.findall(v)]
-                               for k, v in findall(regex, raw_data)})
+            rndc_stats.update({topic: [(desc, int(value)) for value, desc in self.regex_values.findall(body)]
+                               for topic, body in findall(regex, raw_data)})
         
         nms = dict(rndc_stats.get('Name Server Statistics', []))
 
+        inc_queries = {'i' + k: 0 for k in QUERIES}
+        inc_queries.update({'i' + k: v for k, v in rndc_stats.get('Incoming Queries', [])})
+        out_queries = {'o' + k: 0 for k in QUERIES}
+        out_queries.update({'o' + k: v for k, v in rndc_stats.get('Outgoing Queries', [])})
+        
         to_netdata = dict()
-
         to_netdata['requests'] = sum([v for k, v in nms.items() if 'request' in k and 'received' in k])
         to_netdata['responses'] = sum([v for k, v in nms.items() if 'responses' in k and 'sent' in k])
         to_netdata['success'] = nms.get('queries resulted in successful answer', 0)
@@ -136,26 +146,35 @@ class Service(SimpleService):
         to_netdata['rejections'] = nms.get('recursive queries rejected', 0)
         to_netdata['stats_size'] = size
         
+        to_netdata.update(inc_queries)
+        to_netdata.update(out_queries)
         return to_netdata
 
     def create_charts(self):
-
-        self.order = ['stats_size', 'bind_stats']
+        self.order = ['stats_size', 'bind_stats', 'incoming_q', 'outgoing_q']
         self.definitions = {
             'bind_stats': {
-                'options': [None, 'Name Server Statistics', 'stats', 'NS Statistics', 'bind_rndc.stats', 'line'],
+                'options': [None, 'Name Server Statistics', 'stats', 'Name Server Statistics', 'bind_rndc.stats', 'line'],
                 'lines': [
-                         ["requests", None, "incremental"], ["responses", None, "incremental"],
-                         ["success", None, "incremental"], ["auth_answer", None, "incremental"],
-                         ["nonauth_answer", None, "incremental"], ["nxrrset", None, "incremental"],
-                         ["failure", None, "incremental"], ["nxdomain", None, "incremental"],
-                         ["recursion", None, "incremental"], ["duplicate", None, "incremental"],
-                         ["rejections", None, "incremental"]
                          ]},
-                'stats_size': {
-                'options': [None, '%s file size' % split(self.named_stats_path)[1].capitalize(), 'megabyte',
+            'incoming_q': {
+                'options': [None, 'Incoming queries', 'queries','Incoming queries', 'bind_rndc.incq', 'line'],
+                'lines': [
+                        ]},
+            'outgoing_q': {
+                'options': [None, 'Outgoing queries', 'queries','Outgoing queries', 'bind_rndc.outq', 'line'],
+                'lines': [
+                        ]},
+            'stats_size': {
+                'options': [None, '%s file size' % split(self.named_stats_path)[1].capitalize(), 'megabytes',
                             '%s size' % split(self.named_stats_path)[1].capitalize(), 'bind_rndc.size', 'line'],
                 'lines': [
                          ["stats_size", None, "absolute", 1, 1048576]
                         ]}
                      }
+        for elem in QUERIES:
+            self.definitions['incoming_q']['lines'].append(['i' + elem, elem, 'incremental'])
+            self.definitions['outgoing_q']['lines'].append(['o' + elem, elem, 'incremental'])
+
+        for elem in NMS:
+            self.definitions['bind_stats']['lines'].append([elem, None, 'incremental'])
