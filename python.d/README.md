@@ -125,6 +125,68 @@ If no configuration is given, module will attempt to read log file at `/var/log/
 
 ---
 
+# bind_rndc
+
+Module parses bind dump file to collect real-time performance metrics
+
+**Requirements:**
+ * Version of bind must be 9.6 +
+ * Netdata must have permissions to run `rndc status`
+
+It produces:
+
+1. **Name server statistics**
+ * requests
+ * responses
+ * success
+ * auth_answer
+ * nonauth_answer
+ * nxrrset
+ * failure
+ * nxdomain
+ * recursion
+ * duplicate
+ * rejections
+ 
+2. **Incoming queries**
+ * RESERVED0
+ * A
+ * NS
+ * CNAME
+ * SOA
+ * PTR
+ * MX
+ * TXT
+ * X25
+ * AAAA
+ * SRV
+ * NAPTR
+ * A6
+ * DS
+ * RSIG
+ * DNSKEY
+ * SPF
+ * ANY
+ * DLV
+ 
+3. **Outgoing queries**
+ * Same as Incoming queries
+
+
+### configuration
+
+Sample:
+
+```yaml
+local:
+  named_stats_path       : '/var/log/bind/named.stats'
+```
+
+If no configuration is given, module will attempt to read named.stats file  at `/var/log/bind/named.stats`
+
+---
+
+
 # cpufreq
 
 Module shows current cpu frequency by looking at appropriate files in /sys/devices
@@ -232,6 +294,30 @@ It produces only one chart:
  * emails
 
 Configuration is not needed.
+
+---
+
+# fail2ban
+
+Module monitor fail2ban log file to show all bans for all active jails 
+
+**Requirements:**
+ * fail2ban.log file MUST BE readable by netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at logrotate.d)
+ 
+It produces one chart with multiple lines (one line per jail)
+ 
+### configuration
+
+Sample:
+
+```yaml
+local:
+ log_path: '/var/log/fail2ban.log'
+ conf_path: '/etc/fail2ban/jail.local'
+ exclude: 'dropbear apache'
+```
+If no configuration is given, module will attempt to read log file at `/var/log/fail2ban.log` and conf file at `/etc/fail2ban/jail.local`.
+If conf file is not found default jail is `ssh`.
 
 ---
 
@@ -351,6 +437,69 @@ localhost:
   name : 'local'
   url  : 'http://localhost:5001'
 ```
+
+---
+
+# isc_dhcpd
+
+Module monitor leases database to show all active leases for given pools.
+
+**Requirements:**
+ * dhcpd leases file MUST BE readable by netdata
+ * pools MUST BE in CIDR format
+
+It produces:
+
+1. **Pools utilization** Aggregate chart for all pools.
+ * utilization in percent
+
+2. **Total leases**
+ * leases (overall number of leases for all pools)
+ 
+3. **Active leases** for every pools
+  * leases (number of active leases in pool)
+
+  
+### configuration
+
+Sample:
+
+```yaml
+local:
+  leases_path       : '/var/lib/dhcp/dhcpd.leases'
+  pools       : '192.168.3.0/24 192.168.4.0/24 192.168.5.0/24'
+```
+
+In case of python2 you need to  install `py2-ipaddress` to make plugin work.
+The module will not work If no configuration is given.
+
+---
+
+
+# mdstat
+
+Module monitor /proc/mdstat
+
+It produces:
+
+1. **Health** Number of failed disks in every array (aggregate chart).
+ 
+2. **Disks stats** 
+ * total (number of devices array ideally would have)
+ * inuse (number of devices currently are in use)
+
+3. **Current status**
+ * resync in percent
+ * recovery in percent
+ * reshape in percent
+ * check in percent
+ 
+4. **Operation status** (if resync/recovery/reshape/check is active)
+ * finish in minutes
+ * speed in megabytes/s
+  
+### configuration
+No configuration is needed.
 
 ---
 
@@ -585,6 +734,39 @@ site_B:
 ```
 
 When no configuration file is found, module tries to parse `/var/log/nginx/access.log` file.
+
+---
+
+# ovpn_status_log
+
+Module monitor openvpn-status log file. 
+
+**Requirements:**
+
+ * If you are running multiple OpenVPN instances out of the same directory, MAKE SURE TO EDIT DIRECTIVES which create output files
+ so that multiple instances do not overwrite each other's output files.
+
+ * Make sure NETDATA USER CAN READ openvpn-status.log
+
+ * Update_every interval MUST MATCH interval on which OpenVPN writes operational status to log file.
+ 
+It produces:
+
+1. **Users** OpenVPN active users
+ * users
+ 
+2. **Traffic** OpenVPN overall bandwidth usage in kilobit/s
+ * in
+ * out
+ 
+### configuration
+
+Sample:
+
+```yaml
+default
+ log_path     : '/var/log/openvpn-status.log'
+```
 
 ---
 
