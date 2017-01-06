@@ -29,7 +29,11 @@ ratings:
   - "**.py"
   - "**.rb"
 exclude_paths:
+- .gitignore
+- conf.d/
+- hooks/
 - tests/
+- m4/
 - web/css/
 - web/lib/
 - web/fonts/
