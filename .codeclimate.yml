@@ -10,14 +10,25 @@ engines:
       - javascript
       - python
       - php
+    checks:
+      Similar code:
+        enabled: false
   eslint:
     enabled: true
+    checks:
+      max-statements:
+        enabled: false
+      complexity:
+        enabled: false
   fixme:
-    enabled: true
+    enabled: false
   phpmd:
     enabled: true
   radon:
     enabled: true
+    checks:
+      Complexity:
+        enabled: false
 ratings:
   paths:
   - "**.css"

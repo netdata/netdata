@@ -41,7 +41,7 @@ var http = require('http');
 var XML = require('pixl-xml');
 var netdata = require('netdata');
 
-if(netdata.options.DEBUG === true) netdata.debug('loaded ' + __filename + ' plugin');
+if(netdata.options.DEBUG === true) netdata.debug('loaded', __filename, 'plugin');
 
 var named = {
     name: __filename,
@@ -62,10 +62,14 @@ var named = {
             priority: priority,                             // the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
             dimensions: {}
-        }
+        };
 
         var found = 0;
-        for(var x in obj) {
+        var dims = Object.keys(obj);
+        var len = dims.length;
+        for(var i = 0; i < len ;i++) {
+            var x = dims[i];
+
             if(typeof(obj[x]) !== 'undefined' && obj[x] !== 0) {
                 found++;
                 chart.dimensions[x] = {
@@ -90,6 +94,7 @@ var named = {
     chartFromMembers: function(service, obj, id_suffix, title_suffix, units, family, context, type, priority, algorithm, multiplier, divisor) {
         var id = 'named_' + service.name + '.' + id_suffix;
         var chart = this.charts[id];
+        var dims, len, x, i;
 
         if(typeof chart === 'undefined') {
             chart = this.chartFromMembersCreate(service, obj, id, title_suffix, units, family, context, type, priority, algorithm, multiplier, divisor);
@@ -97,7 +102,10 @@ var named = {
         }
         else {
             // check if we need to re-generate the chart
-            for(var x in obj) {
+            dims = Object.keys(obj);
+            len = dims.length;
+            for(i = 0; i < len ;i++) {
+                x = dims[i];
                 if(typeof(chart.dimensions[x]) === 'undefined') {
                     chart = this.chartFromMembersCreate(service, obj, id, title_suffix, units, family, context, type, priority, algorithm, multiplier, divisor);
                     if(chart === null) return false;
@@ -106,18 +114,22 @@ var named = {
             }
         }
 
-        var found = 0;
         service.begin(chart);
-        for(var x in obj) {
+
+        var found = 0;
+        dims = Object.keys(obj);
+        len = dims.length;
+        for(i = 0; i < len ;i++) {
+            x = dims[i];
             if(typeof(chart.dimensions[x]) !== 'undefined') {
                 found++;
                 service.set(x, obj[x]);
             }
         }
+
         service.end();
 
-        if(found > 0) return true;
-        return false;
+        return (found > 0);
     },
 
     // an index to map values to different charts
@@ -133,19 +145,21 @@ var named = {
         var d = XML.parse(data_xml);
         if(d === null) return null;
 
+        var a, aa, alen, alen2;
+
         var data = {};
         var len = d.server.counters.length;
         while(len--) {
-            var a = d.server.counters[len];
+            a = d.server.counters[len];
             if(typeof a.counter === 'undefined') continue;
             if(a.type === 'opcode') a.type = 'opcodes';
             else if(a.type === 'qtype') a.type = 'qtypes';
             else if(a.type === 'nsstat') a.type = 'nsstats';
-            var aa = data[a.type] = {};
-            var alen = 0
-            var alen2 = a.counter.length;
+            aa = data[a.type] = {};
+            alen = 0;
+            alen2 = a.counter.length;
             while(alen < alen2) {
-                aa[a.counter[alen].name] = parseInt(a.counter[alen]._Data);
+                aa[a.counter[alen].name] = parseInt(a.counter[alen]._Data, 10);
                 alen++;
             }
         }
@@ -155,18 +169,18 @@ var named = {
         while(vlen--) {
             var vname = d.views.view[vlen].name;
             data.views[vname] = { resolver: {} };
-            var len = d.views.view[vlen].counters.length;
+            len = d.views.view[vlen].counters.length;
             while(len--) {
-                var a = d.views.view[vlen].counters[len];
+                a = d.views.view[vlen].counters[len];
                 if(typeof a.counter === 'undefined') continue;
                 if(a.type === 'resstats') a.type = 'stats';
                 else if(a.type === 'resqtype') a.type = 'qtypes';
                 else if(a.type === 'adbstat') a.type = 'adb';
-                var aa = data.views[vname].resolver[a.type] = {};
-                var alen = 0;
-                var alen2 = a.counter.length;
+                aa = data.views[vname].resolver[a.type] = {};
+                alen = 0;
+                alen2 = a.counter.length;
                 while(alen < alen2) {
-                    aa[a.counter[alen].name] = parseInt(a.counter[alen]._Data);
+                    aa[a.counter[alen].name] = parseInt(a.counter[alen]._Data, 10);
                     alen++;
                 }
             }
@@ -177,7 +191,7 @@ var named = {
 
     processResponse: function(service, data) {
         if(data !== null) {
-            var r;
+            var r, x, look, id, chart, keys, len;
 
             // parse XML or JSON
             // pepending on the URL given
@@ -212,11 +226,15 @@ var named = {
                     delete r.nsstats['RecursClients'];
                 }
 
-                for( var x in r.nsstats ) {
+                keys = Object.keys(r.nsstats);
+                len = keys.length;
+                while(len--) {
+                    x = keys[len];
+
                     // we maintain an index of the values found
                     // mapping them to objects splitted
 
-                    var look = named.lookups.nsstats[x];
+                    look = named.lookups.nsstats[x];
                     if(typeof look === 'undefined') {
                         // a new value, not found in the index
                         // index it:
@@ -299,66 +317,64 @@ var named = {
                     }
                 }
 
-                if(global_requests_enable == true)
+                if(global_requests_enable === true)
                     service.module.chartFromMembers(service, global_requests, 'received_requests', 'Bind, Global Received Requests by IP version', 'requests/s', 'requests', 'named.requests', netdata.chartTypes.stacked, named.base_priority + 1, netdata.chartAlgorithms.incremental, 1, 1);
 
-                if(global_queries_success_enable == true)
+                if(global_queries_success_enable === true)
                     service.module.chartFromMembers(service, global_queries_success, 'global_queries_success', 'Bind, Global Successful Queries', 'queries/s', 'queries', 'named.queries_succcess', netdata.chartTypes.line, named.base_priority + 2, netdata.chartAlgorithms.incremental, 1, 1);
 
-                if(protocol_queries_enable == true)
+                if(protocol_queries_enable === true)
                     service.module.chartFromMembers(service, protocol_queries, 'protocols_queries', 'Bind, Global Queries by IP Protocol', 'queries/s', 'queries', 'named.protocol_queries', netdata.chartTypes.stacked, named.base_priority + 3, netdata.chartAlgorithms.incremental, 1, 1);
 
-                if(global_queries_enable == true)
+                if(global_queries_enable === true)
                     service.module.chartFromMembers(service, global_queries, 'global_queries', 'Bind, Global Queries Analysis', 'queries/s', 'queries', 'named.global_queries', netdata.chartTypes.stacked, named.base_priority + 4, netdata.chartAlgorithms.incremental, 1, 1);
 
-                if(global_updates_enable == true)
+                if(global_updates_enable === true)
                     service.module.chartFromMembers(service, global_updates, 'received_updates', 'Bind, Global Received Updates', 'updates/s', 'updates', 'named.global_updates', netdata.chartTypes.stacked, named.base_priority + 5, netdata.chartAlgorithms.incremental, 1, 1);
 
-                if(global_failures_enable == true)
+                if(global_failures_enable === true)
                     service.module.chartFromMembers(service, global_failures, 'query_failures', 'Bind, Global Query Failures', 'failures/s', 'failures', 'named.global_failures', netdata.chartTypes.line, named.base_priority + 6, netdata.chartAlgorithms.incremental, 1, 1);
 
-                if(global_failures_detail_enable == true)
+                if(global_failures_detail_enable === true)
                     service.module.chartFromMembers(service, global_failures_detail, 'query_failures_detail', 'Bind, Global Query Failures Analysis', 'failures/s', 'failures', 'named.global_failures_detail', netdata.chartTypes.stacked, named.base_priority + 7, netdata.chartAlgorithms.incremental, 1, 1);
 
                 if(default_enable === true)
                     service.module.chartFromMembers(service, r.nsstats, 'nsstats', 'Bind, Other Global Server Statistics', 'operations/s', 'other', 'named.nsstats', netdata.chartTypes.line, named.base_priority + 8, netdata.chartAlgorithms.incremental, 1, 1);
 
                 // RecursClients chart
-                {
-                    var id = 'named_' + service.name + '.recursive_clients';
-                    var chart = named.charts[id];
+                id = 'named_' + service.name + '.recursive_clients';
+                chart = named.charts[id];
 
-                    if(typeof chart === 'undefined') {
-                        chart = {
-                            id: id,                                         // the unique id of the chart
-                            name: '',                                       // the unique name of the chart
-                            title: service.name + ' Bind, Current Recursive Clients',       // the title of the chart
-                            units: 'clients',                               // the units of the chart dimensions
-                            family: 'clients',                              // the family of the chart
-                            context: 'named.recursive_clients',             // the context of the chart
-                            type: netdata.chartTypes.line,                  // the type of the chart
-                            priority: named.base_priority + 1,              // the priority relative to others in the same family
-                            update_every: service.update_every,             // the expected update frequency of the chart
-                            dimensions: {
-                                'clients': {
-                                    id: 'clients',                              // the unique id of the dimension
-                                    name: '',                                   // the name of the dimension
-                                    algorithm: netdata.chartAlgorithms.absolute,// the id of the netdata algorithm
-                                    multiplier: 1,                              // the multiplier
-                                    divisor: 1,                                 // the divisor
-                                    hidden: false                               // is hidden (boolean)
-                                }
+                if(typeof chart === 'undefined') {
+                    chart = {
+                        id: id,                                         // the unique id of the chart
+                        name: '',                                       // the unique name of the chart
+                        title: service.name + ' Bind, Current Recursive Clients',       // the title of the chart
+                        units: 'clients',                               // the units of the chart dimensions
+                        family: 'clients',                              // the family of the chart
+                        context: 'named.recursive_clients',             // the context of the chart
+                        type: netdata.chartTypes.line,                  // the type of the chart
+                        priority: named.base_priority + 1,              // the priority relative to others in the same family
+                        update_every: service.update_every,             // the expected update frequency of the chart
+                        dimensions: {
+                            'clients': {
+                                id: 'clients',                              // the unique id of the dimension
+                                name: '',                                   // the name of the dimension
+                                algorithm: netdata.chartAlgorithms.absolute,// the id of the netdata algorithm
+                                multiplier: 1,                              // the multiplier
+                                divisor: 1,                                 // the divisor
+                                hidden: false                               // is hidden (boolean)
                             }
-                        };
+                        }
+                    };
 
-                        chart = service.chart(id, chart);
-                        named.charts[id] = chart;
-                    }
-
-                    service.begin(chart);
-                    service.set('clients', RecursClients);
-                    service.end();
+                    chart = service.chart(id, chart);
+                    named.charts[id] = chart;
                 }
+
+                service.begin(chart);
+                service.set('clients', RecursClients);
+                service.end();
             }
 
             if(typeof r.opcodes !== 'undefined')
@@ -371,15 +387,18 @@ var named = {
                 service.module.chartFromMembers(service, r.sockstats, 'in_sockstats', 'Bind, Global Socket Statistics', 'operations/s', 'sockets', 'named.in_sockstats', netdata.chartTypes.line, named.base_priority + 11, netdata.chartAlgorithms.incremental, 1, 1);
 
             if(typeof r.views !== 'undefined') {
-                for( var x in r.views ) {
+                keys = Object.keys(r.views);
+                len = keys.length;
+                while(len--) {
+                    x = keys[len];
                     var resolver = r.views[x].resolver;
 
                     if(typeof resolver !== 'undefined') {
                         if(typeof resolver.stats !== 'undefined') {
                             var NumFetch = 0;
                             var key = service.name + '.' + x;
-                            var default_enable = false;
                             var rtt = {}, rtt_enable = false;
+                            default_enable = false;
 
                             // NumFetch is an absolute value
                             if(typeof resolver.stats['NumFetch'] !== 'undefined') {
@@ -392,11 +411,15 @@ var named = {
                             }
 
                             // split the QryRTT* from the main chart
-                            for( var y in resolver.stats ) {
+                            var ykeys = Object.keys(resolver.stats);
+                            var ylen = ykeys.length;
+                            while(ylen--) {
+                                var y = ykeys[ylen];
+
                                 // we maintain an index of the values found
                                 // mapping them to objects splitted
 
-                                var look = named.lookups.resolver_stats[y];
+                                look = named.lookups.resolver_stats[y];
                                 if(typeof look === 'undefined') {
                                     if(y.match(/^QryRTT/) !== null) {
                                         named.lookups.resolver_stats[y] = {
@@ -429,8 +452,8 @@ var named = {
 
                             // NumFetch chart
                             if(typeof named.lookups.numfetch[key] !== 'undefined') {
-                                var id = 'named_' + service.name + '.view_resolver_numfetch_' + x;
-                                var chart = named.charts[id];
+                                id = 'named_' + service.name + '.view_resolver_numfetch_' + x;
+                                chart = named.charts[id];
 
                                 if(typeof chart === 'undefined') {
                                     chart = {
@@ -473,8 +496,8 @@ var named = {
                     //  service.module.chartFromMembers(service, resolver.cache, 'view_resolver_cache_' + x, 'Bind, ' + x + ' View, Cache Entries', 'entries', 'view_' + x, 'named.resolver_cache', netdata.chartTypes.stacked, named.base_priority + 15, netdata.chartAlgorithms.absolute, 1, 1);
 
                     if(typeof resolver.cachestats['CacheHits'] !== 'undefined' && resolver.cachestats['CacheHits'] > 0) {
-                        var id = 'named_' + service.name + '.view_resolver_cachehits_' + x;
-                        var chart = named.charts[id];
+                        id = 'named_' + service.name + '.view_resolver_cachehits_' + x;
+                        chart = named.charts[id];
 
                         if(typeof chart === 'undefined') {
                             chart = {
@@ -580,7 +603,7 @@ var named = {
             service.module.processResponse(serv, data);
             callback();
         });
-    },
+    }
 };
 
 module.exports = named;
