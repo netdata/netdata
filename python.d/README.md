@@ -378,6 +378,33 @@ localhost:
 
 ---
 
+# mdstat
+
+Module monitor /proc/mdstat
+
+It produces:
+
+**Health:** Number of failed disks in every array (aggregate chart).
+ 
+**Disks stats** 
+ * total (number of devices array ideally would have)
+ * inuse (number of devices currently are in use)
+
+**Current status**
+ * resync in percent
+ * recovery in percent
+ * reshape in percent
+ * check in percent
+ 
+**Operation status** (if resync/recovery/reshape/check is active)
+ * finish in minutes
+ * speed in megabytes/s
+  
+### configuration
+No configuration is needed.
+
+---
+
 # memcached
 
 Memcached monitoring module. Data grabbed from [stats interface](https://github.com/memcached/memcached/wiki/Commands#stats).
