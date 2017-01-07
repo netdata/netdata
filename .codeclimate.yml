@@ -20,6 +20,14 @@ engines:
         enabled: false
       complexity:
         enabled: false
+      no-eval:
+        enabled: false
+      no-extend-native:
+        enabled: false
+      no-void:
+        enabled: false
+      no-alert:
+        enabled: false
   fixme:
     enabled: false
   phpmd:
