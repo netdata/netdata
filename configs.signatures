@@ -341,6 +341,7 @@ declare -A configs_signatures=(
   ['f82924563e41d99cdae5431f0af69155']='python.d.conf'
   ['f8c30f22df92765e2c0fab3c8174e2fc']='health.d/memcached.conf'
   ['f8dade4484f1b6a48655388502df7d5a']='health_alarm_notify.conf'
+  ['f9be549a849d023595d19d5d74263e0f']='health.d/tcp_resets.conf'
   ['fa4396513b358d6ec6a7f5bfb08439b8']='health.d/net.conf'
   ['fd3164e6e8cb6726706267eae49aa082']='health_alarm_notify.conf'
   ['fdd11640ba626cc2064c2fe3ea3eee4c']='health.d/cpu.conf'
