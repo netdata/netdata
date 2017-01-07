@@ -22,11 +22,11 @@ typedef struct registry_url REGISTRY_URL;
 
 // REGISTRY_URL INDEX
 extern int registry_url_compare(void *a, void *b);
-extern REGISTRY_URL *registry_url_index_del(REGISTRY_URL *u) __attribute__((warn_unused_result));
-extern REGISTRY_URL *registry_url_index_add(REGISTRY_URL *u) __attribute__((returns_nonnull, warn_unused_result));
+extern REGISTRY_URL *registry_url_index_del(REGISTRY_URL *u) WARNUNUSED;
+extern REGISTRY_URL *registry_url_index_add(REGISTRY_URL *u) NEVERNULL WARNUNUSED;
 
 // REGISTRY_URL MANAGEMENT
-extern REGISTRY_URL *registry_url_get(const char *url, size_t urllen) __attribute__((returns_nonnull));
+extern REGISTRY_URL *registry_url_get(const char *url, size_t urllen) NEVERNULL;
 extern void registry_url_link(REGISTRY_URL *u);
 extern void registry_url_unlink(REGISTRY_URL *u);
 
