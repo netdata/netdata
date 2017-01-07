@@ -32,7 +32,7 @@
 // global namespace
 var NETDATA = window.NETDATA || {};
 
-(function(window, document, undefined) {
+(function(window, document) {
     // ------------------------------------------------------------------------
     // compatibility fixes
 
@@ -194,10 +194,7 @@ var NETDATA = window.NETDATA || {};
 
     if(typeof netdataRegistry === 'undefined') {
         // backward compatibility
-        if(typeof netdataNoRegistry !== 'undefined' && netdataNoRegistry === false)
-            netdataRegistry = true;
-        else
-            netdataRegistry = false;
+        netdataRegistry = (typeof netdataNoRegistry !== 'undefined' && netdataNoRegistry === false);
     }
     if(netdataRegistry === false && typeof netdataRegistryCallback === 'function')
         netdataRegistry = true;
@@ -333,7 +330,7 @@ var NETDATA = window.NETDATA || {};
 
             retries_on_data_failures: 3, // how many retries to make if we can't fetch chart data from the server
 
-            setOptionCallback: function() { ; }
+            setOptionCallback: function() { }
         },
 
         debug: {
@@ -342,7 +339,7 @@ var NETDATA = window.NETDATA || {};
             focus:              false,
             visibility:         false,
             chart_data_url:     false,
-            chart_errors:       false, // FIXME
+            chart_errors:       false, // FIXME: remember to set it to false before merging
             chart_timing:       false,
             chart_calls:        false,
             libraries:          false,
@@ -431,7 +428,11 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.localStorageGetRecursive = function(obj, prefix, callback) {
-        for(var i in obj) {
+        var keys = Object.keys(obj);
+        var len = keys.length;
+        while(len--) {
+            var i = keys[len];
+
             if(typeof obj[i] === 'object') {
                 //console.log('object ' + prefix + '.' + i.toString());
                 NETDATA.localStorageGetRecursive(obj[i], prefix + '.' + i.toString(), callback);
@@ -478,7 +479,10 @@ var NETDATA = window.NETDATA || {};
     NETDATA.setOption('stop_updates_when_focus_is_lost', true);
 
     NETDATA.resetOptions = function() {
-        for(var i in NETDATA.localStorage.default) {
+        var keys = Object.keys(NETDATA.localStorage.default);
+        var len = keys.length;
+        while(len--) {
+            var i = keys[len];
             var a = i.split('.');
 
             if(a[0] === 'options') {
@@ -494,7 +498,7 @@ var NETDATA = window.NETDATA || {};
                 }
             }
         }
-    }
+    };
 
     // ----------------------------------------------------------------------------------------------------------------
 
@@ -788,6 +792,13 @@ var NETDATA = window.NETDATA || {};
     // Every time we download a chart definition, we save it here with .add()
     // Then we try to get it back with .get(). If that fails, we download it.
 
+    NETDATA.fixHost = function(host) {
+        while(host.slice(-1) === '/')
+            host = host.substring(0, host.length - 1);
+
+        return host;
+    };
+
     NETDATA.chartRegistry = {
         charts: {},
 
@@ -821,8 +832,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         downloadAll: function(host, callback) {
-            while(host.slice(-1) === '/')
-                host = host.substring(0, host.length - 1);
+            host = NETDATA.fixHost(host);
 
             var self = this;
 
@@ -840,13 +850,13 @@ var NETDATA = window.NETDATA || {};
                 else NETDATA.error(406, host + '/api/v1/charts');
 
                 if(typeof callback === 'function')
-                    callback(data);
+                    return callback(data);
             })
             .fail(function() {
                 NETDATA.error(405, host + '/api/v1/charts');
 
                 if(typeof callback === 'function')
-                    callback(null);
+                    return callback(null);
             });
         }
     };
@@ -971,7 +981,7 @@ var NETDATA = window.NETDATA || {};
     dimensionStatus.prototype.setOptions = function(name_div, value_div, color) {
         this.color = color;
 
-        if(this.name_div != name_div) {
+        if(this.name_div !== name_div) {
             this.name_div = name_div;
             this.name_div.title = this.label;
             this.name_div.style.color = this.color;
@@ -981,7 +991,7 @@ var NETDATA = window.NETDATA || {};
                 this.name_div.className = 'netdata-legend-name selected';
         }
 
-        if(this.value_div != value_div) {
+        if(this.value_div !== value_div) {
             this.value_div = value_div;
             this.value_div.title = this.label;
             this.value_div.style.color = this.color;
@@ -1086,26 +1096,34 @@ var NETDATA = window.NETDATA || {};
     };
 
     dimensionsVisibility.prototype.invalidateAll = function() {
-        for(var d in this.dimensions)
-            this.dimensions[d].invalidate();
+        var keys = Object.keys(this.dimensions);
+        var len = keys.length;
+        while(len--)
+            this.dimensions[keys[len]].invalidate();
     };
 
     dimensionsVisibility.prototype.selectAll = function() {
-        for(var d in this.dimensions)
-            this.dimensions[d].select();
+        var keys = Object.keys(this.dimensions);
+        var len = keys.length;
+        while(len--)
+            this.dimensions[keys[len]].select();
     };
 
     dimensionsVisibility.prototype.countSelected = function() {
-        var i = 0;
-        for(var d in this.dimensions)
-            if(this.dimensions[d].isSelected()) i++;
+        var selected = 0;
+        var keys = Object.keys(this.dimensions);
+        var len = keys.length;
+        while(len--)
+            if(this.dimensions[keys[len]].isSelected()) selected++;
 
-        return i;
+        return selected;
     };
 
     dimensionsVisibility.prototype.selectNone = function() {
-        for(var d in this.dimensions)
-            this.dimensions[d].unselect();
+        var keys = Object.keys(this.dimensions);
+        var len = keys.length;
+        while(len--)
+            this.dimensions[keys[len]].unselect();
     };
 
     dimensionsVisibility.prototype.selected2BooleanArray = function(array) {
@@ -1289,13 +1307,11 @@ var NETDATA = window.NETDATA || {};
         this.view_before = 0;
 
         this.value_decimal_detail = -1;
-        {
-            var d = self.data('decimal-digits');
-            if(typeof d === 'number') {
-                this.value_decimal_detail = 1;
-                while(d-- > 0)
-                    this.value_decimal_detail *= 10;
-            }
+        var d = self.data('decimal-digits');
+        if(typeof d === 'number') {
+            this.value_decimal_detail = 1;
+            while(d-- > 0)
+                this.value_decimal_detail *= 10;
         }
 
         this.auto = {
@@ -1729,7 +1745,7 @@ var NETDATA = window.NETDATA || {};
             this.event_resize.chart_last_h = this.element.clientHeight;
 
             var now = Date.now();
-            if(now - this.event_resize.last <= NETDATA.options.current.double_click_speed && this.element_legend_childs.perfect_scroller != null) {
+            if(now - this.event_resize.last <= NETDATA.options.current.double_click_speed && this.element_legend_childs.perfect_scroller !== null) {
                 // double click / double tap event
 
                 // console.dir(this.element_legend_childs.content);
@@ -1742,21 +1758,21 @@ var NETDATA = window.NETDATA || {};
                         - this.element_legend_childs.perfect_scroller.clientHeight;
 
                 // if we are not optimal, be optimal
-                if(this.event_resize.chart_last_h != optimal) {
+                if(this.event_resize.chart_last_h !== optimal) {
                     // this.log('resize to optimal, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString());
                     resizeChartToHeight(optimal.toString() + 'px');
                 }
 
                 // else if the current height is not the original/saved height
                 // reset to the original/saved height
-                else if(this.event_resize.chart_last_h != this.event_resize.chart_original_h) {
+                else if(this.event_resize.chart_last_h !== this.event_resize.chart_original_h) {
                     // this.log('resize to original, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString());
                     resizeChartToHeight(this.event_resize.chart_original_h.toString() + 'px');
                 }
 
                 // else if the current height is not the internal default height
                 // reset to the internal default height
-                else if((this.event_resize.chart_last_h.toString() + 'px') != this.height_original) {
+                else if((this.event_resize.chart_last_h.toString() + 'px') !== this.height_original) {
                     // this.log('resize to internal default, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString());
                     resizeChartToHeight(this.height_original.toString());
                 }
@@ -1773,7 +1789,7 @@ var NETDATA = window.NETDATA || {};
                     // console.log(wanted);
 
                     // this.log('resize to firstChild, current = ' + this.event_resize.chart_last_h.toString() + 'px, original = ' + this.event_resize.chart_original_h.toString() + 'px, optimal = ' + optimal.toString() + 'px, internal = ' + this.height_original.toString() + 'px, firstChild = ' + wanted.toString() + 'px' );
-                    if(this.event_resize.chart_last_h != wanted)
+                    if(this.event_resize.chart_last_h !== wanted)
                         resizeChartToHeight(wanted.toString() + 'px');
                 }
             }
@@ -1890,10 +1906,7 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.globalSelectionSyncIsMaster = function() {
-            if(NETDATA.globalSelectionSync.state === this)
-                return true;
-            else
-                return false;
+            return (NETDATA.globalSelectionSync.state === this);
         };
 
         // this chart is the master of the global selection sync
@@ -1962,12 +1975,8 @@ var NETDATA = window.NETDATA || {};
         // sync all the visible charts to the given time
         // this is to be called from the chart libraries
         this.globalSelectionSync = function(t) {
-            if(this.globalSelectionSyncAbility() === false) {
-                if(this.debug === true)
-                    this.log('sync: cannot sync (yet?).');
-
+            if(this.globalSelectionSyncAbility() === false)
                 return;
-            }
 
             if(this.globalSelectionSyncIsMaster() === false) {
                 if(this.debug === true)
@@ -1975,12 +1984,8 @@ var NETDATA = window.NETDATA || {};
 
                 this.globalSelectionSyncBeMaster();
 
-                if(this.globalSelectionSyncAbility() === false) {
-                    if(this.debug === true)
-                        this.log('sync: cannot sync (yet?).');
-
+                if(this.globalSelectionSyncAbility() === false)
                     return;
-                }
             }
 
             NETDATA.globalSelectionSync.last_t = t;
@@ -2429,7 +2434,7 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.legendUpdateDOM = function() {
-            var needed = false;
+            var needed = false, dim, keys, len, i;
 
             // check that the legend DOM is up to date for the downloaded dimensions
             if(typeof this.element_legend_childs.series !== 'object' || this.element_legend_childs.series === null) {
@@ -2473,9 +2478,12 @@ var NETDATA = window.NETDATA || {};
             if(this.colors === null) {
                 // this is the first time we update the chart
                 // let's assign colors to all dimensions
-                if(this.library.track_colors() === true)
-                    for(var dim in this.chart.dimensions)
-                        this._chartDimensionColor(this.chart.dimensions[dim].name);
+                if(this.library.track_colors() === true) {
+                    keys = Object.keys(this.chart.dimensions);
+                    len = keys.length;
+                    for(i = 0; i < len ;i++)
+                        this._chartDimensionColor(this.chart.dimensions[keys[i]].name);
+                }
             }
             // we will re-generate the colors for the chart
             // based on the selected dimensions
@@ -2554,7 +2562,7 @@ var NETDATA = window.NETDATA || {};
 
                 if(this.library.toolboxPanAndZoom !== null) {
 
-                    function get_pan_and_zoom_step(event) {
+                    var get_pan_and_zoom_step = function(event) {
                         if (event.ctrlKey)
                             return NETDATA.options.current.pan_and_zoom_factor * NETDATA.options.current.pan_and_zoom_factor_multiplier_control;
 
@@ -2566,7 +2574,7 @@ var NETDATA = window.NETDATA || {};
 
                         else
                             return NETDATA.options.current.pan_and_zoom_factor;
-                    }
+                    };
 
                     this.element_legend_childs.toolbox.className += ' netdata-legend-toolbox';
                     this.element.appendChild(this.element_legend_childs.toolbox);
@@ -2786,13 +2794,15 @@ var NETDATA = window.NETDATA || {};
                 if(this.debug === true)
                     this.log('labels from data: "' + this.element_legend_childs.series.labels_key + '"');
 
-                for(var i = 0, len = this.data.dimension_names.length; i < len ;i++) {
+                for(i = 0, len = this.data.dimension_names.length; i < len ;i++) {
                     genLabel(this, content, this.data.dimension_ids[i], this.data.dimension_names[i], i);
                 }
             }
             else {
                 var tmp = new Array();
-                for(var dim in this.chart.dimensions) {
+                keys = Object.keys(this.chart.dimensions);
+                for(i = 0, len = keys.length; i < len ;i++) {
+                    dim = keys[i];
                     tmp.push(this.chart.dimensions[dim].name);
                     genLabel(this, content, dim, this.chart.dimensions[dim].name, i);
                 }
@@ -3088,8 +3098,10 @@ var NETDATA = window.NETDATA || {};
                 if(this.debug === true)
                     this.log('I am already updating...');
 
-                if(typeof callback === 'function') callback();
-                return false;
+                if(typeof callback === 'function')
+                    return callback();
+
+                return;
             }
 
             // due to late initialization of charts and libraries
@@ -3098,29 +3110,37 @@ var NETDATA = window.NETDATA || {};
                 if(this.debug === true)
                     this.log('I am not enabled');
 
-                if(typeof callback === 'function') callback();
-                return false;
+                if(typeof callback === 'function')
+                    return callback();
+
+                return;
             }
 
             if(canBeRendered() === false) {
-                if(typeof callback === 'function') callback();
-                return false;
+                if(typeof callback === 'function')
+                    return callback();
+
+                return;
             }
 
-            if(this.chart === null) {
-                this.getChart(function() { that.updateChart(callback); });
-                return false;
-            }
+            if(this.chart === null)
+                return this.getChart(function() {
+                    return that.updateChart(callback);
+                });
 
             if(this.library.initialized === false) {
                 if(this.library.enabled === true) {
-                    this.library.initialize(function() { that.updateChart(callback); });
-                    return false;
+                    return this.library.initialize(function () {
+                        return that.updateChart(callback);
+                    });
                 }
                 else {
                     error('chart library "' + this.library_name + '" is not available.');
-                    if(typeof callback === 'function') callback();
-                    return false;
+
+                    if(typeof callback === 'function')
+                        return callback();
+
+                    return;
                 }
             }
 
@@ -3178,10 +3198,10 @@ var NETDATA = window.NETDATA || {};
 
                 NETDATA.statistics.refreshes_active--;
                 that._updating = false;
-                if(typeof callback === 'function') callback();
-            });
 
-            return true;
+                if(typeof callback === 'function')
+                    return callback();
+            });
         };
 
         this.isVisible = function(nocache) {
@@ -3345,12 +3365,12 @@ var NETDATA = window.NETDATA || {};
                     state.running = false;
 
                     if(typeof callback !== 'undefined')
-                        callback();
+                        return callback();
                 });
             }
             else {
                 if(typeof callback !== 'undefined')
-                    callback();
+                    return callback();
             }
         };
 
@@ -3373,7 +3393,9 @@ var NETDATA = window.NETDATA || {};
             this.chart = NETDATA.chartRegistry.get(this.host, this.id);
             if(this.chart) {
                 this._defaultsFromDownloadedChart(this.chart);
-                if(typeof callback === 'function') callback();
+
+                if(typeof callback === 'function')
+                    return callback();
             }
             else {
                 this.chart_url = "/api/v1/chart?chart=" + this.id;
@@ -3397,7 +3419,8 @@ var NETDATA = window.NETDATA || {};
                     error('chart not found on url "' + that.chart_url + '"');
                 })
                 .always(function() {
-                    if(typeof callback === 'function') callback();
+                    if(typeof callback === 'function')
+                        return callback();
                 });
             }
         };
@@ -3458,7 +3481,7 @@ var NETDATA = window.NETDATA || {};
             script.src = NETDATA.jQuery;
 
             // script.onabort = onError;
-            script.onerror = function(err, t) { NETDATA.error(101, NETDATA.jQuery); };
+            script.onerror = function() { NETDATA.error(101, NETDATA.jQuery); };
             if(typeof callback === "function")
                 script.onload = callback;
 
@@ -3466,7 +3489,7 @@ var NETDATA = window.NETDATA || {};
             s.parentNode.insertBefore(script, s);
         }
         else if(typeof callback === "function")
-            callback();
+            return callback();
     };
 
     NETDATA._loadCSS = function(filename) {
@@ -3543,10 +3566,12 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.pause = function(callback) {
-        if(NETDATA.options.pause === true)
-            callback();
-        else
-            NETDATA.options.pauseCallback = callback;
+        if(typeof callback === 'function') {
+            if (NETDATA.options.pause === true)
+                return callback();
+            else
+                NETDATA.options.pauseCallback = callback;
+        }
     };
 
     NETDATA.unpause = function() {
@@ -3725,7 +3750,8 @@ var NETDATA = window.NETDATA || {};
             NETDATA.options.targets.push(NETDATA.chartState(targets[len]));
         }
 
-        if(typeof callback === 'function') callback();
+        if(typeof callback === 'function')
+            return callback();
     };
 
     // this is the main function - where everything starts
@@ -3801,13 +3827,13 @@ var NETDATA = window.NETDATA || {};
             })
             .always(function() {
                 if(typeof callback === "function")
-                    callback();
+                    return callback();
             });
         }
         else {
             NETDATA.chartLibraries.peity.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -3863,13 +3889,13 @@ var NETDATA = window.NETDATA || {};
             })
             .always(function() {
                 if(typeof callback === "function")
-                    callback();
+                    return callback();
             });
         }
         else {
             NETDATA.chartLibraries.sparkline.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -4050,7 +4076,7 @@ var NETDATA = window.NETDATA || {};
         })
         .always(function() {
             if(typeof callback === "function")
-                callback();
+                return callback();
         });
     };
 
@@ -4073,13 +4099,13 @@ var NETDATA = window.NETDATA || {};
                 if(NETDATA.chartLibraries.dygraph.enabled === true && NETDATA.options.current.smooth_plot === true)
                     NETDATA.dygraphSmoothInitialize(callback);
                 else if(typeof callback === "function")
-                    callback();
+                    return callback();
             });
         }
         else {
             NETDATA.chartLibraries.dygraph.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -4527,7 +4553,7 @@ var NETDATA = window.NETDATA || {};
 
                         // http://dygraphs.com/gallery/interaction-api.js
                         var normal_def;
-                        if(typeof event.wheelDelta === 'number' && event.wheelDelta != NaN)
+                        if(typeof event.wheelDelta === 'number' && !isNaN(event.wheelDelta))
                             // chrome
                             normal_def = event.wheelDelta / 40;
                         else
@@ -4688,7 +4714,7 @@ var NETDATA = window.NETDATA || {};
                 else {
                     NETDATA.chartLibraries.morris.enabled = false;
                     if(typeof callback === "function")
-                        callback();
+                        return callback();
                 }
             }
             else {
@@ -4709,14 +4735,14 @@ var NETDATA = window.NETDATA || {};
                 })
                 .always(function() {
                     if(typeof callback === "function")
-                        callback();
+                        return callback();
                 });
             }
         }
         else {
             NETDATA.chartLibraries.morris.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -4775,13 +4801,13 @@ var NETDATA = window.NETDATA || {};
             })
             .always(function() {
                 if(typeof callback === "function")
-                    callback();
+                    return callback();
             });
         }
         else {
             NETDATA.chartLibraries.raphael.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -4819,7 +4845,7 @@ var NETDATA = window.NETDATA || {};
                 else {
                     NETDATA.chartLibraries.c3.enabled = false;
                     if(typeof callback === "function")
-                        callback();
+                        return callback();
                 }
             }
             else {
@@ -4840,14 +4866,14 @@ var NETDATA = window.NETDATA || {};
                 })
                 .always(function() {
                     if(typeof callback === "function")
-                        callback();
+                        return callback();
                 });
             }
         }
         else {
             NETDATA.chartLibraries.c3.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -4939,13 +4965,13 @@ var NETDATA = window.NETDATA || {};
             })
             .always(function() {
                 if(typeof callback === "function")
-                    callback();
+                    return callback();
             });
         }
         else {
             NETDATA.chartLibraries.d3.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -4979,13 +5005,13 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.chartLibraries.google.enabled = false;
                 NETDATA.error(100, NETDATA.google_js);
                 if(typeof callback === "function")
-                    callback();
+                    return callback();
             });
         }
         else {
             NETDATA.chartLibraries.google.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -5136,13 +5162,13 @@ var NETDATA = window.NETDATA || {};
                 })
                 .always(function() {
                     if(typeof callback === "function")
-                        callback();
+                        return callback();
                 })
         }
         else {
             NETDATA.chartLibraries.easypiechart.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -5348,13 +5374,13 @@ var NETDATA = window.NETDATA || {};
                 })
                 .always(function() {
                     if(typeof callback === "function")
-                        callback();
+                        return callback();
                 })
         }
         else {
             NETDATA.chartLibraries.gauge.enabled = false;
             if(typeof callback === "function")
-                callback();
+                return callback();
         }
     };
 
@@ -5382,7 +5408,7 @@ var NETDATA = window.NETDATA || {};
             min = max;
             max = t;
         }
-        else if(min == max)
+        else if(min === max)
             max = min + 1;
 
         // gauge.js has an issue if the needle
@@ -5909,7 +5935,7 @@ var NETDATA = window.NETDATA || {};
             async: false,
             isAlreadyLoaded: function() {
                 // check if bootstrap is loaded
-                if(typeof $().emulateTransitionEnd == 'function')
+                if(typeof $().emulateTransitionEnd === 'function')
                     return true;
                 else {
                     if(typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap)
@@ -5949,7 +5975,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.loadRequiredJs = function(index, callback) {
         if(index >= NETDATA.requiredJs.length) {
             if(typeof callback === 'function')
-                callback();
+                return callback();
             return;
         }
 
@@ -6041,7 +6067,7 @@ var NETDATA = window.NETDATA || {};
             var value = entry.value;
             if(NETDATA.alarms.current !== null) {
                 var t = NETDATA.alarms.current.alarms[entry.chart + '.' + entry.name];
-                if(typeof t !== 'undefined' && entry.status == t.status)
+                if(typeof t !== 'undefined' && entry.status === t.status)
                     value = t.value;
             }
 
@@ -6253,13 +6279,13 @@ var NETDATA = window.NETDATA || {};
                         NETDATA.alarms.first_notification_id = data.latest_alarm_log_unique_id;
 
                     if(typeof callback === 'function')
-                        callback(data);
+                        return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(415, NETDATA.alarms.server);
 
                     if(typeof callback === 'function')
-                        callback(null);
+                        return callback(null);
                 });
         },
 
@@ -6298,23 +6324,21 @@ var NETDATA = window.NETDATA || {};
             })
                 .done(function(data) {
                     if(typeof callback === 'function')
-                        callback(data);
+                        return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(416, NETDATA.alarms.server);
 
                     if(typeof callback === 'function')
-                        callback(null);
+                        return callback(null);
                 });
         },
 
         init: function() {
-            var host = NETDATA.serverDefault;
-            while(host.slice(-1) === '/')
-                host = host.substring(0, host.length - 1);
-            NETDATA.alarms.server = host;
+            NETDATA.alarms.server = NETDATA.fixHost(NETDATA.serverDefault);
 
-            NETDATA.alarms.last_notification_id = NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
+            NETDATA.alarms.last_notification_id =
+                NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
 
             if(NETDATA.alarms.onclick === null)
                 NETDATA.alarms.onclick = NETDATA.alarms.scrollToAlarm;
@@ -6410,8 +6434,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         hello: function(host, callback) {
-            while(host.slice(-1) === '/')
-                host = host.substring(0, host.length - 1);
+            host = NETDATA.fixHost(host);
 
             // send HELLO to a netdata server:
             // 1. verifies the server is reachable
@@ -6433,13 +6456,13 @@ var NETDATA = window.NETDATA || {};
                     }
 
                     if(typeof callback === 'function')
-                        callback(data);
+                        return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(407, host);
 
                     if(typeof callback === 'function')
-                        callback(null);
+                        return callback(null);
                 });
         },
 
@@ -6476,7 +6499,7 @@ var NETDATA = window.NETDATA || {};
                         }
                         else {
                             if(typeof callback === 'function')
-                                callback(null);
+                                return callback(null);
                         }
                     }
                     else {
@@ -6484,14 +6507,14 @@ var NETDATA = window.NETDATA || {};
                             NETDATA.registry.person_guid = data.person_guid;
 
                         if(typeof callback === 'function')
-                            callback(data.urls);
+                            return callback(data.urls);
                     }
                 })
                 .fail(function() {
                     NETDATA.error(410, NETDATA.registry.server);
 
                     if(typeof callback === 'function')
-                        callback(null);
+                        return callback(null);
                 });
         },
 
@@ -6514,13 +6537,13 @@ var NETDATA = window.NETDATA || {};
                     }
 
                     if(typeof callback === 'function')
-                        callback(data);
+                        return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(412, NETDATA.registry.server);
 
                     if(typeof callback === 'function')
-                        callback(null);
+                        return callback(null);
                 });
         },
 
@@ -6543,13 +6566,13 @@ var NETDATA = window.NETDATA || {};
                     }
 
                     if(typeof callback === 'function')
-                        callback(data);
+                        return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(418, NETDATA.registry.server);
 
                     if(typeof callback === 'function')
-                        callback(null);
+                        return callback(null);
                 });
         },
 
@@ -6572,13 +6595,13 @@ var NETDATA = window.NETDATA || {};
                     }
 
                     if(typeof callback === 'function')
-                        callback(data);
+                        return callback(data);
                 })
                 .fail(function() {
                     NETDATA.error(414, NETDATA.registry.server);
 
                     if(typeof callback === 'function')
-                        callback(null);
+                        return callback(null);
                 });
         }
     };
