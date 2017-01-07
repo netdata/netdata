@@ -64,10 +64,10 @@ extern void reopen_all_log_files();
 #define fatal(args...)   fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 
 extern void log_date(FILE *out);
-extern void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) __attribute__ (( format (printf, 4, 5)));
-extern void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) __attribute__ (( format (printf, 4, 5)));
-extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) __attribute__ (( format (printf, 5, 6)));
-extern void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) __attribute__ ((noreturn, format (printf, 4, 5)));
-extern void log_access( const char *fmt, ... ) __attribute__ (( format (printf, 1, 2)));
+extern void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
+extern void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
+extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
+extern void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
+extern void log_access( const char *fmt, ... ) PRINTFLIKE(1, 2);
 
 #endif /* NETDATA_LOG_H */
