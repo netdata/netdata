@@ -109,7 +109,7 @@ var net_snmp = require('net-snmp');
 var extend = require('extend');
 var netdata = require('netdata');
 
-if(netdata.options.DEBUG === true) netdata.debug('loaded ' + __filename + ' plugin');
+if(netdata.options.DEBUG === true) netdata.debug('loaded', __filename, ' plugin');
 
 netdata.processors.snmp = {
     name: 'snmp',
@@ -125,62 +125,72 @@ netdata.processors.snmp = {
     },
 
     prepare: function(service) {
+        var __DEBUG = netdata.options.DEBUG;
+
         if(typeof service.snmp_oids === 'undefined' || service.snmp_oids === null || service.snmp_oids.length === 0) {
             // this is the first time we see this service
 
-            if(netdata.options.DEBUG === true)
+            if(__DEBUG === true)
                 netdata.debug(service.module.name + ': ' + service.name + ': preparing ' + this.name + ' OIDs');
 
             // build an index of all OIDs
             service.snmp_oids_index = {};
-            for(var c in service.request.charts) {
+            var chart_keys = Object.keys(service.request.charts);
+            var chart_keys_len = chart_keys.length;
+            while(chart_keys_len--) {
+                var c = chart_keys[chart_keys_len];
+                var chart = service.request.charts[c];
+
                 // for each chart
 
-                if(netdata.options.DEBUG === true)
+                if(__DEBUG === true)
                     netdata.debug(service.module.name + ': ' + service.name + ': indexing ' + this.name + ' chart: ' + c);
 
-                if(typeof service.request.charts[c].titleoid !== 'undefined') {
-                        service.snmp_oids_index[this.fixoid(service.request.charts[c].titleoid)] = {
+                if(typeof chart.titleoid !== 'undefined') {
+                        service.snmp_oids_index[this.fixoid(chart.titleoid)] = {
                             type: 'title',
-                            link: service.request.charts[c]
+                            link: chart
                         };
                     }
 
-                for(var d in service.request.charts[c].dimensions) {
+                var dim_keys = Object.keys(chart.dimensions);
+                var dim_keys_len = dim_keys.length;
+                while(dim_keys_len--) {
+                    var d = dim_keys[dim_keys_len];
+                    var dim = chart.dimensions[d];
+
                     // for each dimension in the chart
 
-                    var oid = this.fixoid(service.request.charts[c].dimensions[d].oid);
-                    var oidname = this.fixoid(service.request.charts[c].dimensions[d].oidname);
+                    var oid = this.fixoid(dim.oid);
+                    var oidname = this.fixoid(dim.oidname);
                     
-                    if(netdata.options.DEBUG === true)
+                    if(__DEBUG === true)
                         netdata.debug(service.module.name + ': ' + service.name + ': indexing ' + this.name + ' chart: ' + c + ', dimension: ' + d + ', OID: ' + oid + ", OID name: " + oidname);
 
                     // link it to the point we need to set the value to
                     service.snmp_oids_index[oid] = {
                         type: 'value',
-                        link: service.request.charts[c].dimensions[d]
+                        link: dim
                     };
 
                     if(typeof oidname !== 'undefined')
                         service.snmp_oids_index[oidname] = {
                             type: 'name',
-                            link: service.request.charts[c].dimensions[d]
+                            link: dim
                         };
 
                     // and set the value to null
-                    service.request.charts[c].dimensions[d].value = null;
+                    dim.value = null;
                 }
             }
 
-            if(netdata.options.DEBUG === true)
+            if(__DEBUG === true)
                 netdata.debug(service.module.name + ': ' + service.name + ': indexed ' + this.name + ' OIDs: ' + netdata.stringify(service.snmp_oids_index));
 
             // now create the array of OIDs needed by net-snmp
-            service.snmp_oids = new Array();
-            for(var o in service.snmp_oids_index)
-                service.snmp_oids.push(o);
+            service.snmp_oids = Object.keys(service.snmp_oids_index);
 
-            if(netdata.options.DEBUG === true)
+            if(__DEBUG === true)
                 netdata.debug(service.module.name + ': ' + service.name + ': final list of ' + this.name + ' OIDs: ' + netdata.stringify(service.snmp_oids));
 
             service.snmp_oids_cleaned = 0;
@@ -189,14 +199,19 @@ netdata.processors.snmp = {
             service.snmp_oids_cleaned = 1;
 
             // the second time, keep only values
+
             service.snmp_oids = new Array();
-            for(var o in service.snmp_oids_index)
-                if(service.snmp_oids_index[o].type === 'value')
-                    service.snmp_oids.push(o);
+            var oid_keys = Object.keys(service.snmp_oids_index);
+            var oid_keys_len = oid_keys.length;
+            while(oid_keys_len--) {
+                if (service.snmp_oids_index[oid_keys[oid_keys_len]].type === 'value')
+                    service.snmp_oids.push(oid_keys[oid_keys_len]);
+            }
         }
     },
 
     getdata: function(service, index, ok, failed, callback) {
+        var __DEBUG = netdata.options.DEBUG;
         var that = this;
 
         if(index >= service.snmp_oids.length) {
@@ -218,7 +233,7 @@ netdata.processors.snmp = {
             index += service.request.max_request_size;
         }
 
-        if(netdata.options.DEBUG === true)
+        if(__DEBUG === true)
             netdata.debug(service.module.name + ': ' + service.name + ': making ' + slice.length + ' entries request, max is: ' + service.request.max_request_size);
 
         service.snmp_session.get(slice, function(error, varbinds) {
@@ -231,14 +246,15 @@ netdata.processors.snmp = {
                     service.snmp_oids_index[slice[len]].value = null;
             }
             else {
-                if(netdata.options.DEBUG === true)
+                if(__DEBUG === true)
                     netdata.debug(service.module.name + ': ' + service.name + ': got valid ' + service.module.name + ' response: ' + netdata.stringify(varbinds));
 
-                for(var i = 0; i < varbinds.length; i++) {
+                var varbinds_len = varbinds.length;
+                for(var i = 0; i < varbinds_len ; i++) {
                     var value = null;
 
                     if(net_snmp.isVarbindError(varbinds[i])) {
-                        if(netdata.options.DEBUG === true)
+                        if(__DEBUG === true)
                             netdata.debug(service.module.name + ': ' + service.name + ': failed ' + service.module.name + ' get for OIDs ' + varbinds[i].oid);
 
                         service.error('OID ' + varbinds[i].oid + ' gave error: ' + snmp.varbindError(varbinds[i]));
@@ -246,7 +262,7 @@ netdata.processors.snmp = {
                         failed++;
                     }
                     else {
-                        if(netdata.options.DEBUG === true)
+                        if(__DEBUG === true)
                             netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + " = " + varbinds[i].value);
 
                         if(varbinds[i].type === net_snmp.ObjectType.OctetString)
@@ -266,7 +282,7 @@ netdata.processors.snmp = {
                     }
                 }
 
-                if(netdata.options.DEBUG === true)
+                if(__DEBUG === true)
                     netdata.debug(service.module.name + ': ' + service.name + ': finished ' + service.module.name + ' with ' + ok + ' successful and ' + failed + ' failed values');
             }
             that.getdata(service, index, ok, failed, callback);
@@ -274,12 +290,14 @@ netdata.processors.snmp = {
     },
 
     process: function(service, callback) {
+        var __DEBUG = netdata.options.DEBUG;
+
         this.prepare(service);
 
         if(service.snmp_oids.length === 0) {
             // no OIDs found for this service
 
-            if(netdata.options.DEBUG === true)
+            if(__DEBUG === true)
                 service.error('no OIDs to process.');
 
             callback(null);
@@ -290,13 +308,13 @@ netdata.processors.snmp = {
             // no SNMP session has been created for this service
             // the SNMP session is just the initialization of NET-SNMP
 
-            if(netdata.options.DEBUG === true)
+            if(__DEBUG === true)
                 netdata.debug(service.module.name + ': ' + service.name + ': opening ' + this.name + ' session on ' + service.request.hostname + ' community ' + service.request.community + ' options ' + netdata.stringify(service.request.options));
 
             // create the SNMP session
             service.snmp_session = net_snmp.createSession (service.request.hostname, service.request.community, service.request.options);
 
-            if(netdata.options.DEBUG === true)
+            if(__DEBUG === true)
                 netdata.debug(service.module.name + ': ' + service.name + ': got ' + this.name + ' session: ' + netdata.stringify(service.snmp_session));
 
             // if we later need traps, this is how to do it:
@@ -323,19 +341,28 @@ var snmp = {
             if(service.added !== true)
                 service.commit();
 
-            for(var c in service.request.charts) {
-                var chart = snmp.charts[c];
+            var chart_keys = Object.keys(service.request.charts);
+            var chart_keys_len = chart_keys.length;
+            for(var i = 0; i < chart_keys_len; i++) {
+                var c = chart_keys[i];
 
+                var chart = snmp.charts[c];
                 if(typeof chart === 'undefined') {
                     chart = service.chart(c, service.request.charts[c]);
                     snmp.charts[c] = chart;
                 }
 
                 service.begin(chart);
-                
-                for( var d in service.request.charts[c].dimensions )
-                    if(service.request.charts[c].dimensions[d].value !== null)
-                        service.set(d, service.request.charts[c].dimensions[d].value);
+
+                var dimensions = service.request.charts[c].dimensions;
+                var dim_keys = Object.keys(dimensions);
+                var dim_keys_len = dim_keys.length;
+                for(var j = 0; j < dim_keys_len ; j++) {
+                    var d = dim_keys[j];
+
+                    if (dimensions[d].value !== null)
+                        service.set(d, dimensions[d].value);
+                }
 
                 service.end();
             }
@@ -347,7 +374,9 @@ var snmp = {
     // its purpose is to prepare the request and call
     // netdata.serviceExecute()
     serviceExecute: function(conf) {
-        if(netdata.options.DEBUG === true)
+        var __DEBUG = netdata.options.DEBUG;
+
+        if(__DEBUG === true)
             netdata.debug(this.name + ': snmp hostname: ' + conf.hostname + ', update_every: ' + conf.update_every);
 
         var service = netdata.service({
@@ -359,30 +388,40 @@ var snmp = {
         });
 
         // multiply the charts, if required
-        for(var c in service.request.charts) {
-            if(netdata.options.DEBUG === true)
+        var chart_keys = Object.keys(service.request.charts);
+        var chart_keys_len = chart_keys.length;
+        for( var i = 0; i < chart_keys_len ; i++ ) {
+            var c = chart_keys[i];
+            var service_request_chart = service.request.charts[c];
+
+            if(__DEBUG === true)
                 netdata.debug(this.name + ': snmp hostname: ' + conf.hostname + ', examining chart: ' + c);
 
-            if(typeof service.request.charts[c].update_every === 'undefined')
-                service.request.charts[c].update_every = service.update_every;
+            if(typeof service_request_chart.update_every === 'undefined')
+                service_request_chart.update_every = service.update_every;
 
-            if(typeof service.request.charts[c].multiply_range !== 'undefined') {
-                var from = service.request.charts[c].multiply_range[0];
-                var to = service.request.charts[c].multiply_range[1];
-                var prio = service.request.charts[c].priority || 1;
+            if(typeof service_request_chart.multiply_range !== 'undefined') {
+                var from = service_request_chart.multiply_range[0];
+                var to = service_request_chart.multiply_range[1];
+                var prio = service_request_chart.priority || 1;
 
                 if(prio < snmp.base_priority) prio += snmp.base_priority;
 
                 while(from <= to) {
                     var id = c + from.toString();
-                    var chart = extend(true, {}, service.request.charts[c]);
+                    var chart = extend(true, {}, service_request_chart);
                     chart.title += from.toString();
                     
                     if(typeof chart.titleoid !== 'undefined')
                         chart.titleoid += from.toString();
 
                     chart.priority = prio++;
-                    for(var d in chart.dimensions) {
+
+                    var dim_keys = Object.keys(chart.dimensions);
+                    var dim_keys_len = dim_keys.length;
+                    for(var j = 0; j < dim_keys_len ; j++) {
+                        var d = dim_keys[j];
+
                         chart.dimensions[d].oid += from.toString();
 
                         if(typeof chart.dimensions[d].oidname !== 'undefined')
@@ -434,7 +473,7 @@ var snmp = {
             service.module.processResponse(serv, data);
             callback();
         });
-    },
+    }
 };
 
 module.exports = snmp;

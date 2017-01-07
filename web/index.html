@@ -1564,7 +1564,9 @@
                     var chart = options.data.charts[alarm.chart];
                     var has_alarm = ((typeof alarm.warn !== 'undefined' || typeof alarm.crit !== 'undefined')?true:false);
 
-                    var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20"/><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span><br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fa fa-line-chart" aria-hidden="true"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="NETDATA.alarms.scrollToChart(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small></td>'
+                    var role_href = ((has_alarm === true)?('<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fa fa-line-chart" aria-hidden="true"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="NETDATA.alarms.scrollToChart(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small>'):('&nbsp;'));
+
+                    var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20"/><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span>' + role_href + '</td>'
                         + '<td><table class="table">'
                         + ((typeof alarm.warn !== 'undefined')?('<tr><td width="10%" style="text-align:right">warning&nbsp;when</td><td><span style="font-family: monospace; color:#fe7d37; font-weight: bold;">' + alarm.warn + '</span></td></tr>'):'')
                         + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><span style="font-family: monospace; color: #e05d44; font-weight: bold;">' + alarm.crit + '</span></td></tr>'):'');
@@ -3257,4 +3259,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170105-7"></script>
+<script type="text/javascript" src="dashboard.js?v20170107-5"></script>

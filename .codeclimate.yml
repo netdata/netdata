@@ -1,0 +1,66 @@
+---
+engines:
+  csslint:
+    enabled: true
+  duplication:
+    enabled: true
+    config:
+      languages:
+      - ruby
+      - javascript
+      - python
+      - php
+    checks:
+      Similar code:
+        enabled: false
+  eslint:
+    enabled: true
+    checks:
+      max-statements:
+        enabled: false
+      complexity:
+        enabled: false
+      no-eval:
+        enabled: false
+      no-extend-native:
+        enabled: false
+      no-void:
+        enabled: false
+      no-alert:
+        enabled: false
+  fixme:
+    enabled: false
+  phpmd:
+    enabled: true
+  radon:
+    enabled: true
+    checks:
+      Complexity:
+        enabled: false
+ratings:
+  paths:
+  - "**.css"
+  - "**.inc"
+  - "**.js"
+  - "**.jsx"
+  - "**.module"
+  - "**.php"
+  - "**.py"
+  - "**.rb"
+exclude_paths:
+- .gitignore
+- conf.d/
+- hooks/
+- tests/
+- m4/
+- web/css/
+- web/lib/
+- web/fonts/
+- web/old/
+- python.d/python_modules/pyyaml2/
+- python.d/python_modules/pyyaml3/
+- node.d/node_modules/ber/
+- node.d/node_modules/asn1.js
+- node.d/node_modules/extend.js
+- node.d/node_modules/pixl-xml.js
+- node.d/node_modules/net-snmp.js
