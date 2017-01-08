@@ -624,17 +624,21 @@ void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)
 
 uint32_t rrdr_check_options(RRDR *r, uint32_t options, const char *dims)
 {
+    (void)dims;
+
     if(options & RRDR_OPTION_NONZERO) {
         long i;
 
-        if(dims && *dims) {
+        // commented due to #1514
+
+        //if(dims && *dims) {
             // the caller wants specific dimensions
             // disable NONZERO option
             // to make sure we don't accidentally prevent
             // the specific dimensions from being returned
-            i = 0;
-        }
-        else {
+            // i = 0;
+        //}
+        //else {
             // find how many dimensions are not zero
             long c;
             RRDDIM *rd;
@@ -643,7 +647,7 @@ uint32_t rrdr_check_options(RRDR *r, uint32_t options, const char *dims)
                 if(unlikely(!(r->od[c] & RRDR_NONZERO))) continue;
                 i++;
             }
-        }
+        //}
 
         // if with nonzero we get i = 0 (no dimensions will be returned)
         // disable nonzero to show all dimensions
