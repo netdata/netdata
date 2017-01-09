@@ -20,6 +20,7 @@
 #include <ifaddrs.h>
 // NEEDED BY do_tcp...
 #include <netinet/tcp_var.h>
+#include <netinet/tcp_fsm.h>
 // NEEDED BY do_udp..., do_ip...
 #include <netinet/ip_var.h>
 // NEEDED BY do_udp...
@@ -1279,12 +1280,16 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                     st->isdetail = 1;
 
                     rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+#ifdef __IFI_OQDROPS
                     rrddim_add(st, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
+#endif
                 }
                 else rrdset_next(st);
 
                 rrddim_set(st, "inbound", IFA_DATA(iqdrops));
+#ifdef __IFI_OQDROPS
                 rrddim_set(st, "outbound", IFA_DATA(oqdrops));
+#endif
                 rrdset_done(st);
 
                 // --------------------------------------------------------------------
@@ -1385,7 +1390,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 } else
                     rrdset_next(st);
 
+#if __FreeBSD__ >= 11
                 rrddim_set(st, "InErrs", tcpstat.tcps_rcvbadoff + tcpstat.tcps_rcvreassfull + tcpstat.tcps_rcvshort);
+#else
+                rrddim_set(st, "InErrs", tcpstat.tcps_rcvbadoff + tcpstat.tcps_rcvshort);
+#endif
                 rrddim_set(st, "InCsumErrors", tcpstat.tcps_rcvbadsum);
                 rrddim_set(st, "RetransSegs", tcpstat.tcps_sndrexmitpack);
                 rrdset_done(st);
