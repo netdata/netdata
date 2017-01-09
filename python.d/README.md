@@ -186,13 +186,21 @@ If no configuration is given, module will attempt to read named.stats file  at `
 
 ---
 
-
 # cpufreq
 
-Module shows current cpu frequency by looking at appropriate files in /sys/devices
+This module shows the current CPU frequency as set by the cpufreq kernel
+module.
 
 **Requirement:**
-Processor which presents data scaling frequency data
+You need to have `CONFIG_CPU_FREQ` and (optionally) `CONFIG_CPU_FREQ_STAT`
+enabled in your kernel.
+
+This module tries to read from one of two possible locations. On
+initialization, it tries to read the `time_in_state` files provided by
+cpufreq\_stats. If this file does not exist, or doesn't contain valid data, it
+falls back to using the more inaccurate `scaling_cur_freq` file (which only
+represents the **current** CPU frequency, and doesn't account for any state
+changes which happen between updates).
 
 It produces one chart with multiple lines (one line per core).
 
@@ -204,7 +212,7 @@ Sample:
 sys_dir: "/sys/devices"
 ```
 
-If no configuration is given, module will search for `scaling_cur_freq` files in `/sys/devices` directory.
+If no configuration is given, module will search for cpufreq files in `/sys/devices` directory.
 Directory is also prefixed with `NETDATA_HOST_PREFIX` if specified.
 
 ---
