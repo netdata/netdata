@@ -53,21 +53,21 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         do_udp_errors           = config_get_boolean("plugin:macos:sysctl", "ipv4 UDP errors", 1);
         do_icmp_packets         = config_get_boolean("plugin:macos:sysctl", "ipv4 ICMP packets", 1);
         do_icmpmsg              = config_get_boolean("plugin:macos:sysctl", "ipv4 ICMP messages", 1);
-        do_ip_packets           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 packets", 1);
-        do_ip_fragsout          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments sent", 1);
-        do_ip_fragsin           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments assembly", 1);
-        do_ip_errors            = config_get_boolean("plugin:freebsd:sysctl", "ipv4 errors", 1);
-        do_ip6_packets          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "ipv6 packets", CONFIG_ONDEMAND_ONDEMAND);
-        do_ip6_fragsout         = config_get_boolean_ondemand("plugin:freebsd:sysctl", "ipv6 fragments sent", CONFIG_ONDEMAND_ONDEMAND);
-        do_ip6_fragsin          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "ipv6 fragments assembly", CONFIG_ONDEMAND_ONDEMAND);
-        do_ip6_errors           = config_get_boolean_ondemand("plugin:freebsd:sysctl", "ipv6 errors", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp6                = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp6_redir          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp redirects", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp6_errors         = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp errors", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp6_echos          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp echos", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp6_router         = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp router", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp6_neighbor       = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp neighbor", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp6_types          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp types", CONFIG_ONDEMAND_ONDEMAND);
+        do_ip_packets           = config_get_boolean("plugin:macos:sysctl", "ipv4 packets", 1);
+        do_ip_fragsout          = config_get_boolean("plugin:macos:sysctl", "ipv4 fragments sent", 1);
+        do_ip_fragsin           = config_get_boolean("plugin:macos:sysctl", "ipv4 fragments assembly", 1);
+        do_ip_errors            = config_get_boolean("plugin:macos:sysctl", "ipv4 errors", 1);
+        do_ip6_packets          = config_get_boolean_ondemand("plugin:macos:sysctl", "ipv6 packets", CONFIG_ONDEMAND_ONDEMAND);
+        do_ip6_fragsout         = config_get_boolean_ondemand("plugin:macos:sysctl", "ipv6 fragments sent", CONFIG_ONDEMAND_ONDEMAND);
+        do_ip6_fragsin          = config_get_boolean_ondemand("plugin:macos:sysctl", "ipv6 fragments assembly", CONFIG_ONDEMAND_ONDEMAND);
+        do_ip6_errors           = config_get_boolean_ondemand("plugin:macos:sysctl", "ipv6 errors", CONFIG_ONDEMAND_ONDEMAND);
+        do_icmp6                = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp", CONFIG_ONDEMAND_ONDEMAND);
+        do_icmp6_redir          = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp redirects", CONFIG_ONDEMAND_ONDEMAND);
+        do_icmp6_errors         = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp errors", CONFIG_ONDEMAND_ONDEMAND);
+        do_icmp6_echos          = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp echos", CONFIG_ONDEMAND_ONDEMAND);
+        do_icmp6_router         = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp router", CONFIG_ONDEMAND_ONDEMAND);
+        do_icmp6_neighbor       = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp neighbor", CONFIG_ONDEMAND_ONDEMAND);
+        do_icmp6_types          = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp types", CONFIG_ONDEMAND_ONDEMAND);
     }
 
     RRDSET *st;
@@ -113,7 +113,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
     // NEEDED BY: do_ip6...
     /*
-     * Dirty workaround for /usr/include/netinet6/ip6_var.h absense.
+     * Dirty workaround for /usr/include/netinet6/ip6_var.h absence.
      * Struct ip6stat was copied from bsd/netinet6/ip6_var.h from xnu sources.
      */
 #define	IP6S_SRCRULE_COUNT 16
