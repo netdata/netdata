@@ -26,8 +26,13 @@ class Service(SimpleService):
         if not raw_data:
             self.error('Cant read mdstat data from %s' % (self.proc_mdstat))
             return False
+        
+        md_list = [md[0] for md in self.regex_disks.findall(raw_data)]
+
+        if not md_list:
+            self.error('No active arrays in %s' % (self.proc_mdstat))
+            return False
         else:
-            md_list = [md[0] for md in self.regex_disks.findall(raw_data)]
             for md in md_list:
                 self.order.append(md)
                 self.order.append(''.join([md, '_status']))
@@ -48,7 +53,6 @@ class Service(SimpleService):
                                         'lines': [[''.join([md, '_finishin']), 'finish min', 'absolute', 1, 100],
                                                   [''.join([md, '_rate']), 'megabyte/s', 'absolute', -1, 100]]}
             self.info('Plugin was started successfully. MDs to monitor %s' % (md_list))
-            to_netdata = {}
 
             return True
 
