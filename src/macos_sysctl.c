@@ -29,7 +29,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     static int do_loadavg = -1, do_swap = -1, do_bandwidth = -1,
                do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_ecn = -1,
                do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
-               do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1;
+               do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1,
+               do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1;
 
 
     if (unlikely(do_loadavg == -1)) {
@@ -47,6 +48,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         do_udp_errors           = config_get_boolean("plugin:macos:sysctl", "ipv4 UDP errors", 1);
         do_icmp_packets         = config_get_boolean("plugin:macos:sysctl", "ipv4 ICMP packets", 1);
         do_icmpmsg              = config_get_boolean("plugin:macos:sysctl", "ipv4 ICMP messages", 1);
+        do_ip_packets           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 packets", 1);
+        do_ip_fragsout          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments sent", 1);
+        do_ip_fragsin           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments assembly", 1);
+        do_ip_errors            = config_get_boolean("plugin:freebsd:sysctl", "ipv4 errors", 1);
     }
 
     RRDSET *st;
@@ -86,6 +91,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         u_long  msgs_in;
         u_long  msgs_out;
     } icmp_total = {0, 0};
+
+    // NEEDED BY: do_ip...
+    struct ipstat ipstat;
 
     // --------------------------------------------------------------------
 
@@ -486,6 +494,115 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         }
     }
 
+    // --------------------------------------------------------------------
+
+    // see also http://net-snmp.sourceforge.net/docs/mibs/ip.html
+    if (likely(do_ip_packets || do_ip_fragsout || do_ip_fragsin || do_ip_errors)) {
+        if (unlikely(GETSYSCTL("net.inet.ip.stats", ipstat))) {
+            do_ip_packets = 0;
+            error("DISABLED: ipv4.packets");
+            do_ip_fragsout = 0;
+            error("DISABLED: ipv4.fragsout");
+            do_ip_fragsin = 0;
+            error("DISABLED: ipv4.fragsin");
+            do_ip_errors = 0;
+            error("DISABLED: ipv4.errors");
+        } else {
+            if (likely(do_ip_packets)) {
+                st = rrdset_find("ipv4.packets");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "packets", NULL, "packets", NULL, "IPv4 Packets", "packets/s",
+                                       3000, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InReceives", "received", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutRequests", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDelivers", "delivered", 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "OutRequests", ipstat.ips_localout);
+                rrddim_set(st, "InReceives", ipstat.ips_total);
+                rrddim_set(st, "ForwDatagrams", ipstat.ips_forward);
+                rrddim_set(st, "InDelivers", ipstat.ips_delivered);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_ip_fragsout)) {
+                st = rrdset_find("ipv4.fragsout");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "fragsout", NULL, "fragments", NULL, "IPv4 Fragments Sent",
+                                       "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "FragOKs", "ok", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "FragFails", "failed", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "FragCreates", "created", 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "FragOKs", ipstat.ips_fragmented);
+                rrddim_set(st, "FragFails", ipstat.ips_cantfrag);
+                rrddim_set(st, "FragCreates", ipstat.ips_ofragments);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_ip_fragsin)) {
+                st = rrdset_find("ipv4.fragsin");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "fragsin", NULL, "fragments", NULL,
+                                       "IPv4 Fragments Reassembly",
+                                       "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "ReasmOKs", "ok", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ReasmFails", "failed", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ReasmReqds", "all", 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "ReasmOKs", ipstat.ips_fragments);
+                rrddim_set(st, "ReasmFails", ipstat.ips_fragdropped);
+                rrddim_set(st, "ReasmReqds", ipstat.ips_reassembled);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_ip_errors)) {
+                st = rrdset_find("ipv4.errors");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "errors", NULL, "errors", NULL, "IPv4 Errors", "packets/s",
+                                       3002,
+                                       update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRDDIM_INCREMENTAL);
+
+                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+
+                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InUnknownProtos", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InDiscards", ipstat.ips_badsum + ipstat.ips_tooshort + ipstat.ips_toosmall + ipstat.ips_toolong);
+                rrddim_set(st, "OutDiscards", ipstat.ips_odropped);
+                rrddim_set(st, "InHdrErrors", ipstat.ips_badhlen + ipstat.ips_badlen + ipstat.ips_badoptions + ipstat.ips_badvers);
+                rrddim_set(st, "InAddrErrors", ipstat.ips_badaddr);
+                rrddim_set(st, "InUnknownProtos", ipstat.ips_noproto);
+                rrddim_set(st, "OutNoRoutes", ipstat.ips_noroute);
+                rrdset_done(st);
+            }
+        }
+    }
+ 
     return 0;
 }
 
