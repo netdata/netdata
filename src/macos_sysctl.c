@@ -11,6 +11,10 @@
 // NEEDED BY do_udp...
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+// NEEDED BY do_icmp...
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp_var.h>
 
 #define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
 
@@ -25,7 +29,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     static int do_loadavg = -1, do_swap = -1, do_bandwidth = -1,
                do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_ecn = -1,
                do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
-               do_udp_packets = -1, do_udp_errors = -1;
+               do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1;
 
 
     if (unlikely(do_loadavg == -1)) {
@@ -41,6 +45,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         do_tcpext_connaborts    = config_get_boolean_ondemand("plugin:macos:sysctl", "TCP connection aborts", CONFIG_ONDEMAND_ONDEMAND);
         do_udp_packets          = config_get_boolean("plugin:macos:sysctl", "ipv4 UDP packets", 1);
         do_udp_errors           = config_get_boolean("plugin:macos:sysctl", "ipv4 UDP errors", 1);
+        do_icmp_packets         = config_get_boolean("plugin:macos:sysctl", "ipv4 ICMP packets", 1);
+        do_icmpmsg              = config_get_boolean("plugin:macos:sysctl", "ipv4 ICMP messages", 1);
     }
 
     RRDSET *st;
@@ -74,6 +80,15 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     // NEEDED BY: do_udp...
     struct udpstat udpstat;
 
+    // NEEDED BY: do_icmp...
+    struct icmpstat icmpstat;
+    struct icmp_total {
+        u_long  msgs_in;
+        u_long  msgs_out;
+    } icmp_total = {0, 0};
+
+    // --------------------------------------------------------------------
+
     if (last_loadavg_usec <= dt) {
         if (likely(do_loadavg)) {
             if (unlikely(GETSYSCTL("vm.loadavg", sysload))) {
@@ -100,6 +115,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         last_loadavg_usec = st->update_every * USEC_PER_SEC;
     }
     else last_loadavg_usec -= dt;
+
+    // --------------------------------------------------------------------
 
     if (likely(do_swap)) {
         if (unlikely(GETSYSCTL("vm.swapusage", swap_usage))) {
@@ -383,6 +400,87 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "RcvbufErrors", udpstat.udps_fullsock);
                 rrddim_set(st, "InCsumErrors", udpstat.udps_badsum + udpstat.udps_nosum);
                 rrddim_set(st, "IgnoredMulti", udpstat.udps_filtermcast);
+                rrdset_done(st);
+            }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_icmp_packets || do_icmpmsg)) {
+        if (unlikely(GETSYSCTL("net.inet.icmp.stats", icmpstat))) {
+            do_icmp_packets = 0;
+            error("DISABLED: ipv4.icmp");
+            error("DISABLED: ipv4.icmp_errors");
+            do_icmpmsg = 0;
+            error("DISABLED: ipv4.icmpmsg");
+        } else {
+            for (i = 0; i <= ICMP_MAXTYPE; i++) {
+                icmp_total.msgs_in += icmpstat.icps_inhist[i];
+                icmp_total.msgs_out += icmpstat.icps_outhist[i];
+            }
+            icmp_total.msgs_in += icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort;
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_icmp_packets)) {
+                st = rrdset_find("ipv4.icmp");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "icmp", NULL, "icmp", NULL, "IPv4 ICMP Packets", "packets/s",
+                                       2602,
+                                       update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InMsgs", "received", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutMsgs", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InMsgs", icmp_total.msgs_in);
+                rrddim_set(st, "OutMsgs", icmp_total.msgs_out);
+
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find("ipv4.icmp_errors");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors",
+                                       "packets/s",
+                                       2603, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set(st, "InErrors", icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort);
+                rrddim_set(st, "OutErrors", icmpstat.icps_error);
+                rrddim_set(st, "InCsumErrors", icmpstat.icps_checksum);
+
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_icmpmsg)) {
+                st = rrdset_find("ipv4.icmpmsg");
+                if (unlikely(!st)) {
+                    st = rrdset_create("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages",
+                                       "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
+
+                    rrddim_add(st, "InEchoReps", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InEchos", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                    rrddim_set(st, "InEchoReps", icmpstat.icps_inhist[ICMP_ECHOREPLY]);
+                    rrddim_set(st, "OutEchoReps", icmpstat.icps_outhist[ICMP_ECHOREPLY]);
+                    rrddim_set(st, "InEchos", icmpstat.icps_inhist[ICMP_ECHO]);
+                    rrddim_set(st, "OutEchos", icmpstat.icps_outhist[ICMP_ECHO]);
+
                 rrdset_done(st);
             }
         }
