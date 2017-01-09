@@ -15,7 +15,6 @@
 // NEEDED BY: struct sysctl_netisr_workstream, struct sysctl_netisr_work
 #include <net/netisr.h>
 // NEEDED BY: struct ifaddrs, getifaddrs()
-#define _IFI_OQDROPS // It is for FreeNAS only. Most probably in future releases of FreeNAS it will be removed
 #include <net/if.h>
 #include <ifaddrs.h>
 // NEEDED BY do_tcp...
@@ -1280,14 +1279,14 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                     st->isdetail = 1;
 
                     rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
-#ifdef __IFI_OQDROPS
+#if __FreeBSD__ >= 11
                     rrddim_add(st, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
 #endif
                 }
                 else rrdset_next(st);
 
                 rrddim_set(st, "inbound", IFA_DATA(iqdrops));
-#ifdef __IFI_OQDROPS
+#if __FreeBSD__ >= 11
                 rrddim_set(st, "outbound", IFA_DATA(oqdrops));
 #endif
                 rrdset_done(st);
