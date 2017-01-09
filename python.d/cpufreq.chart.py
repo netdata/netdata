@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # Description: cpufreq netdata python.d module
-# Author: Pawel Krupa (paulfantom)
+# Author: Pawel Krupa (paulfantom) and Steven Noonan (tycho)
 
+import glob
 import os
 from base import SimpleService
 
@@ -18,29 +19,31 @@ CHARTS = {
         ]}
 }
 
-
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         prefix = os.getenv('NETDATA_HOST_PREFIX', "")
         if prefix.endswith('/'):
             prefix = prefix[:-1]
         self.sys_dir = prefix + "/sys/devices"
-        self.filename = "scaling_cur_freq"
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
         self._orig_name = ""
         self.assignment = {}
-        self.paths = []
+        self.accurate = True
 
     def _get_data(self):
-        raw = {}
-        for path in self.paths:
-            with open(path, 'r') as f:
-                raw[path] = f.read()
         data = {}
-        for path in self.paths:
-            data[self.assignment[path]] = raw[path]
+        if self.accurate:
+            for name, path in self.assignment.items():
+                total = 0
+                for line in open(path, 'r'):
+                    line = list(map(int, line.split()))
+                    total += (line[0] * line[1]) / 100
+                data[name] = total
+        else:
+            for name, path in self.assignment.items():
+                data[name] = open(path, 'r').read()
         return data
 
     def check(self):
@@ -51,23 +54,35 @@ class Service(SimpleService):
 
         self._orig_name = self.chart_name
 
-        for dirpath, _, filenames in os.walk(self.sys_dir):
-            if self.filename in filenames:
-                self.paths.append(dirpath + "/" + self.filename)
+        for path in glob.glob(self.sys_dir + '/system/cpu/cpu*/cpufreq/stats/time_in_state'):
+            if len(open(path, 'rb').read().rstrip()) == 0:
+                self.alert("time_in_state is empty, broken cpufreq_stats data")
+                self.assignment = {}
+                break
+            path_elem = path.split('/')
+            cpu = path_elem[-4]
+            self.assignment[cpu] = path
 
-        if len(self.paths) == 0:
-            self.error("cannot find", self.filename)
+        if len(self.assignment) == 0:
+            self.alert("trying less accurate scaling_cur_freq method")
+            self.accurate = False
+
+            for path in glob.glob(self.sys_dir + '/system/cpu/cpu*/cpufreq/scaling_cur_freq'):
+                path_elem = path.split('/')
+                cpu = path_elem[-3]
+                self.assignment[cpu] = path
+
+        if len(self.assignment) == 0:
+            self.error("couldn't find a method to read cpufreq statistics")
             return False
 
-        self.paths.sort()
-        i = 0
-        for path in self.paths:
-            self.assignment[path] = "cpu" + str(i)
-            i += 1
+        if self.accurate:
+            algo = 'incremental'
+        else:
+            algo = 'absolute'
 
-        for name in self.assignment:
-            dim = self.assignment[name]
-            self.definitions[ORDER[0]]['lines'].append([dim, dim, 'absolute', 1, 1000])
+        for name in self.assignment.keys():
+            self.definitions[ORDER[0]]['lines'].append([name, name, algo, 1, 1000])
 
         return True
 
