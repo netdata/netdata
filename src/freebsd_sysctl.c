@@ -97,6 +97,8 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_tcpext_connaborts    = config_get_boolean_ondemand("plugin:freebsd:sysctl", "TCP connection aborts", CONFIG_ONDEMAND_ONDEMAND);
         do_udp_packets          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 UDP packets", 1);
         do_udp_errors           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 UDP errors", 1);
+        do_icmp_packets         = config_get_boolean("plugin:freebsd:sysctl", "ipv4 ICMP packets", 1);
+        do_icmpmsg              = config_get_boolean("plugin:freebsd:sysctl", "ipv4 ICMP messages", 1);
         do_ip_packets           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 packets", 1);
         do_ip_fragsout          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments sent", 1);
         do_ip_fragsin           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments assembly", 1);
