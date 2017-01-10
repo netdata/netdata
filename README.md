@@ -59,7 +59,7 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
  - **Sophisticated alarming**<br/>
    supports dynamic thresholds, hysteresis, alarm templates,
    multiple role-based notification methods (such as email, slack.com,
-   pushover.net, pushbullet.com telegram.org, twilio.com)
+   pushover.net, pushbullet.com telegram.org, twilio.com, messagebird.com)
    
  - **Extensible**<br/>
    you can monitor anything you can get a metric for,
