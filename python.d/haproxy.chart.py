@@ -112,7 +112,7 @@ class Service(UrlService):
 
         for _ in range(len(back_ends)):
             to_netdata.update({'_'.join(['hdown', back_ends[_]['# pxname']]):
-                           len([server for server in servers if is_server_up(server, back_ends, _)])})
+                           len([server for server in servers if is_server_down(server, back_ends, _)])})
 
         return to_netdata
 
@@ -125,5 +125,5 @@ def is_frontend(frontend):
 def is_server(server):
     return not server['svname'].startswith(('FRONTEND', 'BACKEND'))
 
-def is_server_up(server, back_ends, _):
+def is_server_down(server, back_ends, _):
     return server['# pxname'] == back_ends[_]['# pxname'] and server['status'] != 'UP'
