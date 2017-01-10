@@ -10,7 +10,7 @@ priority = 60000
 retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['fbin', 'fbout', 'fscur', 'fqcur', 'bbin', 'bbout', 'bscur', 'bqcur']
+ORDER = ['fbin', 'fbout', 'fscur', 'fqcur', 'bbin', 'bbout', 'bscur', 'bqcur', 'health_down']
 CHARTS = {
     'fbin': {
         'options': [None, "Kilobytes in", "kilobytes in/s", 'Frontend', 'f.bin', 'line'],
@@ -43,6 +43,10 @@ CHARTS = {
     'bqcur': {
         'options': [None, "Sessions in queue", "sessions", 'Backend', 'b.qcur', 'line'],
         'lines': [
+        ]},
+    'health_down': {
+        'options': [None, "Servers in DOWN state", "servers", 'Health', 'h.down', 'line'],
+        'lines': [
         ]}
 }
 
@@ -69,6 +73,7 @@ class Service(UrlService):
             self.definitions['bbout']['lines'].append(['_'.join(['bbout', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'incremental', 1, 1024])
             self.definitions['bscur']['lines'].append(['_'.join(['bscur', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
             self.definitions['bqcur']['lines'].append(['_'.join(['bqcur', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
+            self.definitions['health_down']['lines'].append(['_'.join(['hdown', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
                 
     def _get_data(self):
         """
@@ -89,6 +94,7 @@ class Service(UrlService):
 
         back_ends = list(filter(is_backend, all_instances))
         front_ends = list(filter(is_frontend, all_instances))
+        servers = list(filter(is_server, all_instances))
 
         if self.charts:
             self.create_charts(front_ends, back_ends)
@@ -104,6 +110,10 @@ class Service(UrlService):
             for _ in self.order_back:
                 to_netdata.update({'_'.join([_, backend['# pxname']]): int(backend[_[1:]]) if backend.get(_[1:]) else 0})
 
+        for _ in range(len(back_ends)):
+            to_netdata.update({'_'.join(['hdown', back_ends[_]['# pxname']]):
+                           len([server for server in servers if is_server_up(server, back_ends, _)])})
+
         return to_netdata
 
 def is_backend(backend):
@@ -111,3 +121,9 @@ def is_backend(backend):
 
 def is_frontend(frontend):
     return frontend['svname'] == 'FRONTEND' and frontend['# pxname'] != 'stats'
+
+def is_server(server):
+    return not server['svname'].startswith(('FRONTEND', 'BACKEND'))
+
+def is_server_up(server, back_ends, _):
+    return server['# pxname'] == back_ends[_]['# pxname'] and server['status'] != 'UP'
