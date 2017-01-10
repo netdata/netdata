@@ -13,11 +13,11 @@ retries = 60
 ORDER = ['fbin', 'fbout', 'fscur', 'fqcur', 'bbin', 'bbout', 'bscur', 'bqcur']
 CHARTS = {
     'fbin': {
-        'options': [None, "Bytes in", "bytes/s", 'Frontend', 'f.bin', 'line'],
+        'options': [None, "Kilobytes in", "kilobytes in/s", 'Frontend', 'f.bin', 'line'],
         'lines': [
         ]},
     'fbout': {
-        'options': [None, "Bytes out", "bytes/s", 'Frontend', 'f.bout', 'line'],
+        'options': [None, "Kilobytes out", "kilobytes out/s", 'Frontend', 'f.bout', 'line'],
         'lines': [
         ]},
     'fscur': {
@@ -29,11 +29,11 @@ CHARTS = {
         'lines': [
         ]},
     'bbin': {
-        'options': [None, "Bytes in", "bytes/s", 'Backend', 'b.bin', 'line'],
+        'options': [None, "Kilobytes in", "kilobytes in/s", 'Backend', 'b.bin', 'line'],
         'lines': [
         ]},
     'bbout': {
-        'options': [None, "Bytes out", "bytes/s", 'Backend', 'b.bout', 'line'],
+        'options': [None, "Kilobytes out", "kilobytes out/s", 'Backend', 'b.bout', 'line'],
         'lines': [
         ]},
     'bscur': {
@@ -58,19 +58,18 @@ class Service(UrlService):
         self.charts = True
 
     def create_charts(self, front_ends, back_ends):
-        for chart in self.order_front:
-            for _ in range(len(front_ends)):
-                self.definitions[chart]['lines'].append(['_'.join([chart, front_ends[_]['# pxname']]),
-                                                         front_ends[_]['# pxname'],
-                                                         'incremental' if chart.startswith(
-                                                             ('fb', 'bb')) else 'absolute'])
-        for chart in self.order_back:
-            for _ in range(len(back_ends)):
-                self.definitions[chart]['lines'].append(['_'.join([chart, back_ends[_]['# pxname']]),
-                                                         back_ends[_]['# pxname'],
-                                                         'incremental' if chart.startswith(
-                                                             ('fb', 'bb')) else 'absolute'])
-
+        for _ in range(len(front_ends)):
+            self.definitions['fbin']['lines'].append(['_'.join(['fbin', front_ends[_]['# pxname']]), front_ends[_]['# pxname'], 'incremental', 1, 1024])
+            self.definitions['fbout']['lines'].append(['_'.join(['fbout', front_ends[_]['# pxname']]), front_ends[_]['# pxname'], 'incremental', 1, 1024])
+            self.definitions['fscur']['lines'].append(['_'.join(['fscur', front_ends[_]['# pxname']]), front_ends[_]['# pxname'], 'absolute'])
+            self.definitions['fqcur']['lines'].append(['_'.join(['fqcur', front_ends[_]['# pxname']]), front_ends[_]['# pxname'], 'absolute'])
+        
+        for _ in range(len(back_ends)):
+            self.definitions['bbin']['lines'].append(['_'.join(['bbin', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'incremental', 1, 1024])
+            self.definitions['bbout']['lines'].append(['_'.join(['bbout', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'incremental', 1, 1024])
+            self.definitions['bscur']['lines'].append(['_'.join(['bscur', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
+            self.definitions['bqcur']['lines'].append(['_'.join(['bqcur', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
+                
     def _get_data(self):
         """
         Format data received from http request
