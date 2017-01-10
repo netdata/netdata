@@ -12,6 +12,7 @@ dist_python_SCRIPTS = \
     apache_cache.chart.py \
     bind_rndc.chart.py \
     cpufreq.chart.py \
+    cpuidle.chart.py \
     dovecot.chart.py \
     example.chart.py \
     exim.chart.py \
