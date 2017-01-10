@@ -87,10 +87,8 @@ class Service(UrlService):
 
         all_instances = [dict(zip(raw_data[0].split(','), raw_data[_].split(','))) for _ in range(1, len(raw_data))]
 
-        back_ends = [backend for backend in all_instances
-                     if backend['svname'] == 'BACKEND' and backend['# pxname'] != 'stats']
-        front_ends = [frontend for frontend in all_instances
-                      if frontend['svname'] == 'FRONTEND' and frontend['# pxname'] != 'stats']
+        back_ends = list(filter(is_backend, all_instances))
+        front_ends = list(filter(is_frontend, all_instances))
 
         if self.charts:
             self.create_charts(front_ends, back_ends)
@@ -107,3 +105,9 @@ class Service(UrlService):
                 to_netdata.update({'_'.join([_, backend['# pxname']]): int(backend[_[1:]]) if backend.get(_[1:]) else 0})
 
         return to_netdata
+
+def is_backend(backend):
+    return backend['svname'] == 'BACKEND' and backend['# pxname'] != 'stats'
+
+def is_frontend(frontend):
+    return frontend['svname'] == 'FRONTEND' and frontend['# pxname'] != 'stats'
