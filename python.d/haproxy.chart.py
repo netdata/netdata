@@ -45,7 +45,7 @@ CHARTS = {
         'lines': [
         ]},
     'health_down': {
-        'options': [None, "Servers in DOWN state", "servers", 'Health', 'h.down', 'line'],
+        'options': [None, "Servers in DOWN state", "failed servers", 'Health', 'h.down', 'line'],
         'lines': [
         ]}
 }
