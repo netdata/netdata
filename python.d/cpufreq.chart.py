@@ -4,6 +4,7 @@
 
 import glob
 import os
+import time
 from base import SimpleService
 
 # default module values (can be overridden per job in `config`)
@@ -30,20 +31,42 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self._orig_name = ""
         self.assignment = {}
-        self.accurate = True
+        self.accurate_exists = True
+        self.accurate_last = {}
 
     def _get_data(self):
         data = {}
-        if self.accurate:
-            for name, path in self.assignment.items():
-                total = 0
-                for line in open(path, 'r'):
+
+        if self.accurate_exists:
+            elapsed = time.time() - self.timetable['last']
+
+            accurate_ok = True
+
+            for name, paths in self.assignment.items():
+                last = self.accurate_last[name]
+                current = 0
+                for line in open(paths['accurate'], 'r'):
                     line = list(map(int, line.split()))
-                    total += (line[0] * line[1]) / 100
-                data[name] = total
-        else:
-            for name, path in self.assignment.items():
-                data[name] = open(path, 'r').read()
+                    current += (line[0] * line[1]) / 100
+                delta = current - last
+                data[name] = delta
+                self.accurate_last[name] = current
+                if delta == 0 or abs(delta) > 1e7:
+                    # Delta is either too large or nonexistent, fall back to
+                    # less accurate reading. This can happen if we switch
+                    # to/from the 'schedutil' governor, which doesn't report
+                    # stats.
+                    accurate_ok = False
+
+            if accurate_ok:
+                return data
+            else:
+                self.alert("accurate method failed, falling back")
+
+
+        for name, paths in self.assignment.items():
+            data[name] = open(paths['inaccurate'], 'r').read()
+
         return data
 
     def check(self):
@@ -55,34 +78,29 @@ class Service(SimpleService):
         self._orig_name = self.chart_name
 
         for path in glob.glob(self.sys_dir + '/system/cpu/cpu*/cpufreq/stats/time_in_state'):
-            if len(open(path, 'rb').read().rstrip()) == 0:
-                self.alert("time_in_state is empty, broken cpufreq_stats data")
-                self.assignment = {}
-                break
             path_elem = path.split('/')
             cpu = path_elem[-4]
-            self.assignment[cpu] = path
+            if cpu not in self.assignment:
+                self.assignment[cpu] = {}
+            self.assignment[cpu]['accurate'] = path
+            self.accurate_last[cpu] = 0
 
         if len(self.assignment) == 0:
-            self.alert("trying less accurate scaling_cur_freq method")
-            self.accurate = False
+            self.accurate_exists = False
 
-            for path in glob.glob(self.sys_dir + '/system/cpu/cpu*/cpufreq/scaling_cur_freq'):
-                path_elem = path.split('/')
-                cpu = path_elem[-3]
-                self.assignment[cpu] = path
+        for path in glob.glob(self.sys_dir + '/system/cpu/cpu*/cpufreq/scaling_cur_freq'):
+            path_elem = path.split('/')
+            cpu = path_elem[-3]
+            if cpu not in self.assignment:
+                self.assignment[cpu] = {}
+            self.assignment[cpu]['inaccurate'] = path
 
         if len(self.assignment) == 0:
             self.error("couldn't find a method to read cpufreq statistics")
             return False
 
-        if self.accurate:
-            algo = 'incremental'
-        else:
-            algo = 'absolute'
-
         for name in self.assignment.keys():
-            self.definitions[ORDER[0]]['lines'].append([name, name, algo, 1, 1000])
+            self.definitions[ORDER[0]]['lines'].append([name, name, 'absolute', 1, 1000])
 
         return True
 
