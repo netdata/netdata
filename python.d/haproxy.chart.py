@@ -132,6 +132,14 @@ class Service(UrlService, SocketService):
 
         return to_netdata
 
+    def _check_raw_data(self, data):
+        """
+        Check if all data has been gathered from socket
+        :param data: str
+        :return: boolean
+        """
+        return not bool(data)
+
 def is_backend(backend):
     try:
         return backend['svname'] == 'BACKEND' and backend['# pxname'] != 'stats'
