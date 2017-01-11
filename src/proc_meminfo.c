@@ -267,7 +267,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
         st = rrdset_find("mem.hwcorrupt");
         if(!st) {
-            st = rrdset_create("mem", "hwcorrupt", NULL, "errors", NULL, "Hardware Corrupted ECC", "MB", 9000, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create("mem", "hwcorrupt", NULL, "ecc", NULL, "Hardware Corrupted ECC", "MB", 9000, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
             rrddim_add(st, "HardwareCorrupted", NULL, 1, 1024, RRDDIM_ABSOLUTE);
