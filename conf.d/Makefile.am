@@ -60,6 +60,7 @@ dist_healthconfig_DATA = \
     health.d/cpu.conf \
     health.d/disks.conf \
     health.d/entropy.conf \
+    health.d/haproxy.conf \
     health.d/ipc.conf \
     health.d/mdstat.conf \
     health.d/memcached.conf \
