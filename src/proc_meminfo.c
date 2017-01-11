@@ -262,12 +262,12 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(hwcorrupted && do_hwcorrupt && HardwareCorrupted > 0) {
+    if(hwcorrupted && (do_hwcorrupt == CONFIG_ONDEMAND_YES || (do_hwcorrupt == CONFIG_ONDEMAND_ONDEMAND && HardwareCorrupted > 0))) {
         do_hwcorrupt = CONFIG_ONDEMAND_YES;
 
         st = rrdset_find("mem.hwcorrupt");
         if(!st) {
-            st = rrdset_create("mem", "hwcorrupt", NULL, "errors", NULL, "Hardware Corrupted ECC", "MB", 9000, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create("mem", "hwcorrupt", NULL, "ecc", NULL, "Hardware Corrupted ECC", "MB", 9000, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
             rrddim_add(st, "HardwareCorrupted", NULL, 1, 1024, RRDDIM_ABSOLUTE);

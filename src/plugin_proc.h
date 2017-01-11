@@ -23,5 +23,6 @@ extern int do_proc_loadavg(int update_every, usec_t dt);
 extern int do_proc_net_stat_synproxy(int update_every, usec_t dt);
 extern int do_proc_net_softnet_stat(int update_every, usec_t dt);
 extern int do_proc_uptime(int update_every, usec_t dt);
+extern int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt);
 
 #endif /* NETDATA_PLUGIN_PROC_H */
