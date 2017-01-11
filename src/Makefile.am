@@ -83,6 +83,7 @@ netdata_SOURCES += \
 	$(NULL)
 else
 netdata_SOURCES += \
+	ipc.c ipc.h \
 	plugin_proc.c plugin_proc.h \
 	proc_diskstats.c \
 	proc_interrupts.c \
@@ -102,7 +103,7 @@ netdata_SOURCES += \
 	proc_stat.c \
 	proc_sys_kernel_random_entropy_avail.c \
 	proc_vmstat.c \
-	ipc.c ipc.h \
+	proc_uptime.c \
 	sys_kernel_mm_ksm.c \
 	$(NULL)
 endif
