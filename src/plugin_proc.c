@@ -35,6 +35,7 @@ void *proc_main(void *ptr)
     int vdo_proc_softirqs           = !config_get_boolean("plugin:proc", "/proc/softirqs", 1);
     int vdo_proc_net_softnet_stat   = !config_get_boolean("plugin:proc", "/proc/net/softnet_stat", 1);
     int vdo_proc_loadavg            = !config_get_boolean("plugin:proc", "/proc/loadavg", 1);
+    int vdo_proc_uptime             = !config_get_boolean("plugin:proc", "/proc/uptime", 1);
     int vdo_ipc                     = !config_get_boolean("plugin:proc", "ipc", 1);
     int vdo_sys_kernel_mm_ksm       = !config_get_boolean("plugin:proc", "/sys/kernel/mm/ksm", 1);
     int vdo_cpu_netdata             = !config_get_boolean("plugin:proc", "netdata server resources", 1);
@@ -58,6 +59,7 @@ void *proc_main(void *ptr)
     usec_t sutime_proc_softirqs = 0ULL;
     usec_t sutime_proc_net_softnet_stat = 0ULL;
     usec_t sutime_proc_loadavg = 0ULL;
+    usec_t sutime_proc_uptime = 0ULL;
     usec_t sutime_ipc = 0ULL;
     usec_t sutime_sys_kernel_mm_ksm = 0ULL;
 
@@ -89,6 +91,14 @@ void *proc_main(void *ptr)
             now = now_realtime_usec();
             vdo_proc_loadavg = do_proc_loadavg(rrd_update_every, (sutime_proc_loadavg > 0)?now - sutime_proc_loadavg:0ULL);
             sutime_proc_loadavg = now;
+        }
+        if(unlikely(netdata_exit)) break;
+
+        if(!vdo_proc_uptime) {
+            debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_uptime().");
+            now = now_realtime_usec();
+            vdo_proc_uptime = do_proc_uptime(rrd_update_every, (sutime_proc_uptime > 0)?now - sutime_proc_uptime:0ULL);
+            sutime_proc_uptime = now;
         }
         if(unlikely(netdata_exit)) break;
 
