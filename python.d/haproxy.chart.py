@@ -2,7 +2,7 @@
 # Description: haproxy netdata python.d module
 # Author: l2isbad
 
-from base import UrlService
+from base import UrlService, SocketService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -51,15 +51,35 @@ CHARTS = {
 }
 
 
-class Service(UrlService):
+class Service(UrlService, SocketService):
     def __init__(self, configuration=None, name=None):
-        UrlService.__init__(self, configuration=configuration, name=name)
-        self.url = "http://127.0.0.1:7000/haproxy_stats;csv"
+        SocketService.__init__(self, configuration=configuration, name=name)
+        self.user = self.configuration.get('user')
+        self.password = self.configuration.get('pass')
+        self.request = 'show stat\n'
+        self.poll_method = (UrlService, SocketService)
         self.order = ORDER
         self.order_front = [_ for _ in ORDER if _.startswith('f')]
         self.order_back = [_ for _ in ORDER if _.startswith('b')]
         self.definitions = CHARTS
         self.charts = True
+
+    def check(self):
+        if self.configuration.get('url'):
+            self.poll_method = self.poll_method[0]
+            url = self.configuration.get('url')
+            if not url.endswith(';csv'):
+                self.error('Bad url(%s). Must be http://<ip.address>:<port>/<url>;csv' % url)
+                return False
+        elif self.configuration.get('socket'):
+            self.poll_method = self.poll_method[1]
+        else:
+            self.error('No configuration is specified')
+            return False
+
+        if self.poll_method.check(self):
+            self.info('Plugin was started succesfully. We are using %s.' % self.poll_method.__name__)
+            return True
 
     def create_charts(self, front_ends, back_ends):
         for _ in range(len(front_ends)):
@@ -80,12 +100,8 @@ class Service(UrlService):
         Format data received from http request
         :return: dict
         """
-        if self.url[-4:] != ';csv':
-            self.url += ';csv'
-            self.info('Url rewritten to %s' % self.url)
-
         try:
-            raw_data = self._get_raw_data().splitlines()
+            raw_data = self.poll_method._get_raw_data(self).splitlines()
         except Exception as e:
             self.error(str(e))
             return None
@@ -117,13 +133,25 @@ class Service(UrlService):
         return to_netdata
 
 def is_backend(backend):
-    return backend['svname'] == 'BACKEND' and backend['# pxname'] != 'stats'
+    try:
+        return backend['svname'] == 'BACKEND' and backend['# pxname'] != 'stats'
+    except Exception:
+        return False
 
 def is_frontend(frontend):
-    return frontend['svname'] == 'FRONTEND' and frontend['# pxname'] != 'stats'
+    try:
+        return frontend['svname'] == 'FRONTEND' and frontend['# pxname'] != 'stats'
+    except Exception:
+        return False
 
 def is_server(server):
-    return not server['svname'].startswith(('FRONTEND', 'BACKEND'))
+    try:
+        return not server['svname'].startswith(('FRONTEND', 'BACKEND'))
+    except Exception:
+        return False
 
 def is_server_down(server, back_ends, _):
-    return server['# pxname'] == back_ends[_]['# pxname'] and server['status'] != 'UP'
+    try:
+        return server['# pxname'] == back_ends[_]['# pxname'] and server['status'] != 'UP'
+    except Exception:
+        return False
