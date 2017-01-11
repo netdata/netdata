@@ -68,8 +68,8 @@ class Service(UrlService, SocketService):
         if self.configuration.get('url'):
             self.poll_method = self.poll_method[0]
             url = self.configuration.get('url')
-            if not url.endswith(';csv'):
-                self.error('Bad url(%s). Must be http://<ip.address>:<port>/<url>;csv' % url)
+            if not url.endswith(';csv;norefresh'):
+                self.error('Bad url(%s). Must be http://<ip.address>:<port>/<url>;csv;norefresh' % url)
                 return False
         elif self.configuration.get('socket'):
             self.poll_method = self.poll_method[1]
