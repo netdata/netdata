@@ -30,7 +30,8 @@ void *proc_main(void *ptr)
     int vdo_proc_vmstat             = !config_get_boolean("plugin:proc", "/proc/vmstat", 1);
     int vdo_proc_net_rpc_nfs        = !config_get_boolean("plugin:proc", "/proc/net/rpc/nfs", 1);
     int vdo_proc_net_rpc_nfsd       = !config_get_boolean("plugin:proc", "/proc/net/rpc/nfsd", 1);
-    int vdo_proc_sys_kernel_random_entropy_avail    = !config_get_boolean("plugin:proc", "/proc/sys/kernel/random/entropy_avail", 1);
+    int vdo_proc_sys_kernel_random_entropy_avail = !config_get_boolean("plugin:proc", "/proc/sys/kernel/random/entropy_avail", 1);
+    int vdo_proc_sys_devices_system_edac_mc      = !config_get_boolean("plugin:proc", "/sys/devices/system/edac/mc", 1);
     int vdo_proc_interrupts         = !config_get_boolean("plugin:proc", "/proc/interrupts", 1);
     int vdo_proc_softirqs           = !config_get_boolean("plugin:proc", "/proc/softirqs", 1);
     int vdo_proc_net_softnet_stat   = !config_get_boolean("plugin:proc", "/proc/net/softnet_stat", 1);
@@ -55,6 +56,7 @@ void *proc_main(void *ptr)
     usec_t sutime_proc_net_rpc_nfs = 0ULL;
     usec_t sutime_proc_net_rpc_nfsd = 0ULL;
     usec_t sutime_proc_sys_kernel_random_entropy_avail = 0ULL;
+    usec_t sutime_proc_sys_devices_system_edac_mc = 0ULL;
     usec_t sutime_proc_interrupts = 0ULL;
     usec_t sutime_proc_softirqs = 0ULL;
     usec_t sutime_proc_net_softnet_stat = 0ULL;
@@ -139,6 +141,14 @@ void *proc_main(void *ptr)
             now = now_realtime_usec();
             vdo_proc_sys_kernel_random_entropy_avail = do_proc_sys_kernel_random_entropy_avail(rrd_update_every, (sutime_proc_sys_kernel_random_entropy_avail > 0)?now - sutime_proc_sys_kernel_random_entropy_avail:0ULL);
             sutime_proc_sys_kernel_random_entropy_avail = now;
+        }
+        if(unlikely(netdata_exit)) break;
+
+        if(!vdo_proc_sys_devices_system_edac_mc) {
+            debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_proc_sys_devices_system_edac_mc().");
+            now = now_realtime_usec();
+            vdo_proc_sys_devices_system_edac_mc = do_proc_sys_devices_system_edac_mc(rrd_update_every, (sutime_proc_sys_devices_system_edac_mc > 0)?now - sutime_proc_sys_devices_system_edac_mc:0ULL);
+            sutime_proc_sys_devices_system_edac_mc = now;
         }
         if(unlikely(netdata_exit)) break;
 

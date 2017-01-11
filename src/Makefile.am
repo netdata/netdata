@@ -47,6 +47,7 @@ netdata_SOURCES = \
 	popen.c popen.h \
 	socket.c socket.h \
 	sys_fs_cgroup.c \
+	sys_devices_system_edac_mc.c \
 	procfile.c procfile.h \
 	proc_self_mountinfo.c proc_self_mountinfo.h \
 	registry.c registry.h \
