@@ -13,39 +13,39 @@ retries = 60
 ORDER = ['fbin', 'fbout', 'fscur', 'fqcur', 'bbin', 'bbout', 'bscur', 'bqcur', 'health_down']
 CHARTS = {
     'fbin': {
-        'options': [None, "Kilobytes in", "kilobytes in/s", 'Frontend', 'f.bin', 'line'],
+        'options': [None, "Kilobytes in", "kilobytes in/s", 'Frontend', 'haproxy_f.bin', 'line'],
         'lines': [
         ]},
     'fbout': {
-        'options': [None, "Kilobytes out", "kilobytes out/s", 'Frontend', 'f.bout', 'line'],
+        'options': [None, "Kilobytes out", "kilobytes out/s", 'Frontend', 'haproxy_f.bout', 'line'],
         'lines': [
         ]},
     'fscur': {
-        'options': [None, "Sessions active", "sessions", 'Frontend', 'f.scur', 'line'],
+        'options': [None, "Sessions active", "sessions", 'Frontend', 'haproxy_f.scur', 'line'],
         'lines': [
         ]},
     'fqcur': {
-        'options': [None, "Session in queue", "sessions", 'Frontend', 'f.qcur', 'line'],
+        'options': [None, "Session in queue", "sessions", 'Frontend', 'haproxy_f.qcur', 'line'],
         'lines': [
         ]},
     'bbin': {
-        'options': [None, "Kilobytes in", "kilobytes in/s", 'Backend', 'b.bin', 'line'],
+        'options': [None, "Kilobytes in", "kilobytes in/s", 'Backend', 'haproxy_b.bin', 'line'],
         'lines': [
         ]},
     'bbout': {
-        'options': [None, "Kilobytes out", "kilobytes out/s", 'Backend', 'b.bout', 'line'],
+        'options': [None, "Kilobytes out", "kilobytes out/s", 'Backend', 'haproxy_b.bout', 'line'],
         'lines': [
         ]},
     'bscur': {
-        'options': [None, "Sessions active", "sessions", 'Backend', 'b.scur', 'line'],
+        'options': [None, "Sessions active", "sessions", 'Backend', 'haproxy_b.scur', 'line'],
         'lines': [
         ]},
     'bqcur': {
-        'options': [None, "Sessions in queue", "sessions", 'Backend', 'b.qcur', 'line'],
+        'options': [None, "Sessions in queue", "sessions", 'Backend', 'haproxy_b.qcur', 'line'],
         'lines': [
         ]},
     'health_down': {
-        'options': [None, "Servers in DOWN state", "failed servers", 'Health', 'h.down', 'line'],
+        'options': [None, "Servers in DOWN state", "failed servers", 'Health', 'haproxy_h.down', 'line'],
         'lines': [
         ]}
 }
