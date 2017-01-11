@@ -262,7 +262,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(hwcorrupted && do_hwcorrupt && HardwareCorrupted > 0) {
+    if(hwcorrupted && (do_hwcorrupt == CONFIG_ONDEMAND_YES || (do_hwcorrupt == CONFIG_ONDEMAND_ONDEMAND && HardwareCorrupted > 0))) {
         do_hwcorrupt = CONFIG_ONDEMAND_YES;
 
         st = rrdset_find("mem.hwcorrupt");
