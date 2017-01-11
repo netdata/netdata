@@ -29,6 +29,10 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts);
 #ifndef CLOCK_BOOTTIME
 /* fallback to CLOCK_MONOTONIC if not available */
 #define CLOCK_BOOTTIME  CLOCK_MONOTONIC
+#else
+#ifdef HAVE_CLOCK_GETTIME
+#define CLOCK_BOOTTIME_IS_AVAILABLE 1 // required for /proc/uptime
+#endif
 #endif
 
 typedef unsigned long long usec_t;

@@ -4,8 +4,6 @@
 #define MIN_LOADAVG_UPDATE_EVERY 5
 
 int do_proc_loadavg(int update_every, usec_t dt) {
-    (void)dt;
-
     static procfile *ff = NULL;
     static int do_loadavg = -1, do_all_processes = -1;
     static usec_t last_loadavg_usec = 0;
@@ -14,10 +12,11 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/loadavg");
+
         ff = procfile_open(config_get("plugin:proc:/proc/loadavg", "filename to monitor", filename), " \t,:|/", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff))
+            return 1;
     }
-    if(unlikely(!ff))
-        return 1;
 
     ff = procfile_readall(ff);
     if(unlikely(!ff))
