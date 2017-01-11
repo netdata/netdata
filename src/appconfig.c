@@ -246,45 +246,45 @@ char *config_get(const char *section, const char *name, const char *default_valu
     return(cv->value);
 }
 
-long long config_get_number(const char *section, const char *name, long long value)
+long long config_get_number(const char *section, const char *name, long long default_value)
 {
     char buffer[100], *s;
-    sprintf(buffer, "%lld", value);
+    sprintf(buffer, "%lld", default_value);
 
     s = config_get(section, name, buffer);
-    if(!s) return value;
+    if(!s) return default_value;
 
     return strtoll(s, NULL, 0);
 }
 
-int config_get_boolean(const char *section, const char *name, int value)
+int config_get_boolean(const char *section, const char *name, int default_value)
 {
     char *s;
-    if(value) s = "yes";
+    if(default_value) s = "yes";
     else s = "no";
 
     s = config_get(section, name, s);
-    if(!s) return value;
+    if(!s) return default_value;
 
     if(!strcmp(s, "yes") || !strcmp(s, "auto") || !strcmp(s, "on demand")) return 1;
     return 0;
 }
 
-int config_get_boolean_ondemand(const char *section, const char *name, int value)
+int config_get_boolean_ondemand(const char *section, const char *name, int default_value)
 {
     char *s;
 
-    if(value == CONFIG_ONDEMAND_ONDEMAND)
+    if(default_value == CONFIG_ONDEMAND_ONDEMAND)
         s = "auto";
 
-    else if(value == CONFIG_ONDEMAND_NO)
+    else if(default_value == CONFIG_ONDEMAND_NO)
         s = "no";
 
     else
         s = "yes";
 
     s = config_get(section, name, s);
-    if(!s) return value;
+    if(!s) return default_value;
 
     if(!strcmp(s, "yes"))
         return CONFIG_ONDEMAND_YES;
@@ -293,7 +293,7 @@ int config_get_boolean_ondemand(const char *section, const char *name, int value
     else if(!strcmp(s, "auto") || !strcmp(s, "on demand"))
         return CONFIG_ONDEMAND_ONDEMAND;
 
-    return value;
+    return default_value;
 }
 
 const char *config_set_default(const char *section, const char *name, const char *value)
