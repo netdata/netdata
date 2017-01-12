@@ -10,7 +10,7 @@ priority = 60000
 retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['fbin', 'fbout', 'fscur', 'fqcur', 'bbin', 'bbout', 'bscur', 'bqcur', 'health_down']
+ORDER = ['fbin', 'fbout', 'fscur', 'fqcur', 'bbin', 'bbout', 'bscur', 'bqcur', 'health_sdown', 'health_bdown']
 CHARTS = {
     'fbin': {
         'options': [None, "Kilobytes in", "kilobytes in/s", 'Frontend', 'haproxy_f.bin', 'line'],
@@ -44,8 +44,12 @@ CHARTS = {
         'options': [None, "Sessions in queue", "sessions", 'Backend', 'haproxy_b.qcur', 'line'],
         'lines': [
         ]},
-    'health_down': {
-        'options': [None, "Servers in DOWN state", "failed servers", 'Health', 'haproxy_h.down', 'line'],
+    'health_sdown': {
+        'options': [None, "Number of servers in backend in DOWN state", "failed servers", 'Health', 'haproxy_hs.down', 'line'],
+        'lines': [
+        ]},
+    'health_bdown': {
+        'options': [None, "Is backend alive? 1 = DOWN", "failed backend", 'Health', 'haproxy_hb.down', 'line'],
         'lines': [
         ]}
 }
@@ -93,7 +97,8 @@ class Service(UrlService, SocketService):
             self.definitions['bbout']['lines'].append(['_'.join(['bbout', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'incremental', 1, 1024])
             self.definitions['bscur']['lines'].append(['_'.join(['bscur', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
             self.definitions['bqcur']['lines'].append(['_'.join(['bqcur', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
-            self.definitions['health_down']['lines'].append(['_'.join(['hdown', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
+            self.definitions['health_sdown']['lines'].append(['_'.join(['hsdown', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
+            self.definitions['health_bdown']['lines'].append(['_'.join(['hbdown', back_ends[_]['# pxname']]), back_ends[_]['# pxname'], 'absolute'])
                 
     def _get_data(self):
         """
@@ -127,8 +132,9 @@ class Service(UrlService, SocketService):
                 to_netdata.update({'_'.join([_, backend['# pxname']]): int(backend[_[1:]]) if backend.get(_[1:]) else 0})
 
         for _ in range(len(back_ends)):
-            to_netdata.update({'_'.join(['hdown', back_ends[_]['# pxname']]):
+            to_netdata.update({'_'.join(['hsdown', back_ends[_]['# pxname']]):
                            len([server for server in servers if is_server_down(server, back_ends, _)])})
+            to_netdata.update({'_'.join(['hbdown', back_ends[_]['# pxname']]): 1 if is_backend_down(back_ends, _) else 0})
 
         return to_netdata
 
@@ -160,6 +166,12 @@ def is_server(server):
 
 def is_server_down(server, back_ends, _):
     try:
-        return server['# pxname'] == back_ends[_]['# pxname'] and server['status'] != 'UP' and server['status'] != 'no check'
+        return server['# pxname'] == back_ends[_]['# pxname'] and server['status'] == 'DOWN'
+    except Exception:
+        return False
+
+def is_backend_down(back_ends, _):
+    try:
+        return back_ends[_]['status'] == 'DOWN'
     except Exception:
         return False
