@@ -414,7 +414,7 @@ and restart/reload your FREERADIUS server.
 
 # haproxy
 
-Module monitors frontend and backend metrics such as bytes in, bytes out, session current, session in queue current.
+Module monitors frontend and backend metrics such as bytes in, bytes out, sessions current, sessions in queue current.
 And health metrics such as backend servers status (server check should be used).
 
 Plugin can obtain data from url **OR** unix socket.
@@ -425,16 +425,16 @@ Socket MUST be readable AND writable by netdata user.
 It produces:
 
 1. **Frontend** family charts
-* Kilobytes in/s 
-* Kilobytes out/s
-* Sessions current
-* Sessions in queue current
+ * Kilobytes in/s 
+ * Kilobytes out/s
+ * Sessions current
+ * Sessions in queue current
 
 2. **Backend** family charts
-* Kilobytes in/s 
-* Kilobytes out/s
-* Sessions current
-* Sessions in queue current
+ * Kilobytes in/s 
+ * Kilobytes out/s
+ * Sessions current
+ * Sessions in queue current
 
 3. **Health** chart
  * number of failed servers for every backend (in DOWN state)
