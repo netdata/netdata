@@ -22,6 +22,7 @@
 #  - twilio.com notifications by Levi Blaney @shadycuz PR #1211
 #  - kafka notifications
 #  - pagerduty.com notifications by Jim Cooley @jimcooley PR #1373
+#  - messagebird.com notifications by @tech_no_logical
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -172,6 +173,7 @@ sendmail=
 SEND_SLACK="YES"
 SEND_PUSHOVER="YES"
 SEND_TWILIO="YES"
+SEND_MESSAGEBIRD="YES"
 SEND_TELEGRAM="YES"
 SEND_EMAIL="YES"
 SEND_PUSHBULLET="YES"
@@ -199,6 +201,12 @@ TWILIO_ACCOUNT_TOKEN=
 TWILIO_NUMBER=
 DEFAULT_RECIPIENT_TWILIO=
 declare -A role_recipients_twilio=()
+
+# messagebird configs
+MESSAGEBIRD_ACCESS_KEY=
+MESSAGEBIRD_NUMBER=
+DEFAULT_RECIPIENT_MESSAGEBIRD=
+declare -A role_recipients_messagebird=()
 
 # telegram configs
 TELEGRAM_BOT_TOKEN=
@@ -315,6 +323,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality twilio "${r}" && arr_twilio[${r/|*/}]="1"
     done
 
+    # messagebird
+    a="${role_recipients_messagebird[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_MESSAGEBIRD}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality messagebird "${r}" && arr_messagebird[${r/|*/}]="1"
+    done
+
     # telegram
     a="${role_recipients_telegram[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_TELEGRAM}"
@@ -356,6 +372,10 @@ to_pushbullet="${!arr_pushbullet[*]}"
 to_twilio="${!arr_twilio[*]}"
 [ -z "${to_twilio}" ] && SEND_TWILIO="NO"
 
+# build the list of messagebird recipients (phone numbers)
+to_messagebird="${!arr_messagebird[*]}"
+[ -z "${to_messagebird}" ] && SEND_MESSAGEBIRD="NO"
+
 # check array of telegram recipients (chat ids)
 to_telegram="${!arr_telegram[*]}"
 [ -z "${to_telegram}" ] && SEND_TELEGRAM="NO"
@@ -389,6 +409,9 @@ done
 # check twilio
 [ -z "${TWILIO_ACCOUNT_TOKEN}" -o -z "${TWILIO_ACCOUNT_SID}" -o -z "${TWILIO_NUMBER}" ] && SEND_TWILIO="NO"
 
+# check messagebird
+[ -z "${MESSAGEBIRD_ACCESS_KEY}" -o -z "${MESSAGEBIRD_NUMBER}" ] && SEND_MESSAGEBIRD="NO"
+
 # check telegram
 [ -z "${TELEGRAM_BOT_TOKEN}" ] && SEND_TELEGRAM="NO"
 
@@ -410,7 +433,7 @@ if [ "${SEND_PD}" = "YES" ]
 fi
 
 # if we need curl, check for the curl command
-if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" -o "${SEND_KAFKA}" = "YES" \) -a -z "${curl}" ]
+if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}" = "YES" -o "${SEND_MESSAGEBIRD}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" -o "${SEND_KAFKA}" = "YES" \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
@@ -422,6 +445,7 @@ if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
         SEND_TWILIO="NO"
+        SEND_MESSAGEBIRD="NO"
         SEND_KAFKA="NO"
     fi
 fi
@@ -434,14 +458,15 @@ if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
 fi
 
 # check that we have at least a method enabled
-if [   "${SEND_EMAIL}"      != "YES" \
-    -a "${SEND_PUSHOVER}"   != "YES" \
-    -a "${SEND_TELEGRAM}"   != "YES" \
-    -a "${SEND_SLACK}"      != "YES" \
-    -a "${SEND_TWILIO}"     != "YES" \
-    -a "${SEND_PUSHBULLET}" != "YES" \
-    -a "${SEND_KAFKA}"      != "YES" \
-    -a "${SEND_PD}"         != "YES" \
+if [   "${SEND_EMAIL}"          != "YES" \
+    -a "${SEND_PUSHOVER}"       != "YES" \
+    -a "${SEND_TELEGRAM}"       != "YES" \
+    -a "${SEND_SLACK}"          != "YES" \
+    -a "${SEND_TWILIO}"         != "YES" \
+    -a "${SEND_MESSAGEBIRD}"    != "YES" \
+    -a "${SEND_PUSHBULLET}"     != "YES" \
+    -a "${SEND_KAFKA}"          != "YES" \
+    -a "${SEND_PD}"             != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification to '${roles}' for '${name}' = '${value}' of chart '${chart}' for status '${status}'."
@@ -761,6 +786,39 @@ send_twilio() {
 }
 
 # -----------------------------------------------------------------------------
+# messagebird sender
+
+send_messagebird() {
+    local accesskey="${1}" messagebirdnumber="${2}" recipients="${3}"  title="${4}" message="${5}" httpcode sent=0 user
+    if [ "${SEND_MESSAGEBIRD}" = "YES" -a ! -z "${accesskey}" -a ! -z "${messagebirdnumber}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
+        then
+        #https://developers.messagebird.com/docs/messaging
+        for user in ${recipients}
+        do
+            httpcode=$(${curl} -X POST --write-out %{http_code} --silent --output /dev/null \
+                --data-urlencode "originator=${messagebirdnumber}" \
+                --data-urlencode "recipients=${user}" \
+                --data-urlencode "body=${title} ${message}" \
+		        --data-urlencode "datacoding=auto" \
+                -H "Authorization: AccessKey ${accesskey}" \
+                "https://rest.messagebird.com/messages")
+
+            if [ "${httpcode}" == "201" ]
+            then
+                info "sent Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+                sent=$((sent + 1))
+            else
+                error "failed to send Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # telegram sender
 
 send_telegram() {
@@ -1000,6 +1058,18 @@ ${info}"
 SENT_TWILIO=$?
 
 # -----------------------------------------------------------------------------
+# send the messagebird SMS
+
+send_messagebird "${MESSAGEBIRD_ACCESS_KEY}" "${MESSAGEBIRD_NUMBER}" "${to_messagebird}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm} 
+Severity: ${severity}
+Chart: ${chart}
+Family: ${family}
+${info}"
+
+SENT_MESSAGEBIRD=$?
+
+
+# -----------------------------------------------------------------------------
 # send the telegram.org message
 
 # https://core.telegram.org/bots/api#formatting-options
@@ -1123,14 +1193,15 @@ SENT_EMAIL=$?
 # -----------------------------------------------------------------------------
 # let netdata know
 
-if [   ${SENT_EMAIL}      -eq 0 \
-    -o ${SENT_PUSHOVER}   -eq 0 \
-    -o ${SENT_TELEGRAM}   -eq 0 \
-    -o ${SENT_SLACK}      -eq 0 \
-    -o ${SENT_TWILIO}     -eq 0 \
-    -o ${SENT_PUSHBULLET} -eq 0 \
-    -o ${SENT_KAFKA}      -eq 0 \
-    -o ${SENT_PD}         -eq 0 \
+if [   ${SENT_EMAIL}        -eq 0 \
+    -o ${SENT_PUSHOVER}     -eq 0 \
+    -o ${SENT_TELEGRAM}     -eq 0 \
+    -o ${SENT_SLACK}        -eq 0 \
+    -o ${SENT_TWILIO}       -eq 0 \
+    -o ${SENT_MESSAGEBIRD}  -eq 0 \
+    -o ${SENT_PUSHBULLET}   -eq 0 \
+    -o ${SENT_KAFKA}        -eq 0 \
+    -o ${SENT_PD}           -eq 0 \
     ]
     then
     # we did send something
