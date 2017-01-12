@@ -4,7 +4,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;
-    static int do_swapio = -1, do_io = -1, do_pgfaults = -1;
+    static int do_swapio = -1, do_io = -1, do_pgfaults = -1, do_numa = -1;
+    static int has_numa = -1;
 
     // static uint32_t hash_allocstall_dma = 0;
     // static uint32_t hash_allocstall_dma32 = 0;
@@ -67,17 +68,17 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     // static uint32_t hash_nr_zone_unevictable = 0;
     // static uint32_t hash_nr_zone_write_pending = 0;
     // static uint32_t hash_nr_zspages = 0;
-    // static uint32_t hash_numa_foreign = 0;
-    // static uint32_t hash_numa_hint_faults = 0;
-    // static uint32_t hash_numa_hint_faults_local = 0;
-    // static uint32_t hash_numa_hit = 0;
-    // static uint32_t hash_numa_huge_pte_updates = 0;
-    // static uint32_t hash_numa_interleave = 0;
-    // static uint32_t hash_numa_local = 0;
-    // static uint32_t hash_numa_miss = 0;
-    // static uint32_t hash_numa_other = 0;
-    // static uint32_t hash_numa_pages_migrated = 0;
-    // static uint32_t hash_numa_pte_updates = 0;
+    static uint32_t hash_numa_foreign = 0;
+    static uint32_t hash_numa_hint_faults = 0;
+    static uint32_t hash_numa_hint_faults_local = 0;
+    //static uint32_t hash_numa_hit = 0;
+    static uint32_t hash_numa_huge_pte_updates = 0;
+    static uint32_t hash_numa_interleave = 0;
+    static uint32_t hash_numa_local = 0;
+    //static uint32_t hash_numa_miss = 0;
+    static uint32_t hash_numa_other = 0;
+    static uint32_t hash_numa_pages_migrated = 0;
+    static uint32_t hash_numa_pte_updates = 0;
     // static uint32_t hash_pageoutrun = 0;
     // static uint32_t hash_pgactivate = 0;
     // static uint32_t hash_pgalloc_dma = 0;
@@ -136,6 +137,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_ONDEMAND_ONDEMAND);
         do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", 1);
         do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", 1);
+        do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_ONDEMAND_ONDEMAND);
 
         // hash_allocstall_dma32 = simple_hash("allocstall_dma32");
         // hash_allocstall_dma = simple_hash("allocstall_dma");
@@ -198,17 +200,17 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         // hash_nr_zone_unevictable = simple_hash("nr_zone_unevictable");
         // hash_nr_zone_write_pending = simple_hash("nr_zone_write_pending");
         // hash_nr_zspages = simple_hash("nr_zspages");
-        // hash_numa_foreign = simple_hash("numa_foreign");
-        // hash_numa_hint_faults_local = simple_hash("numa_hint_faults_local");
-        // hash_numa_hint_faults = simple_hash("numa_hint_faults");
-        // hash_numa_hit = simple_hash("numa_hit");
-        // hash_numa_huge_pte_updates = simple_hash("numa_huge_pte_updates");
-        // hash_numa_interleave = simple_hash("numa_interleave");
-        // hash_numa_local = simple_hash("numa_local");
-        // hash_numa_miss = simple_hash("numa_miss");
-        // hash_numa_other = simple_hash("numa_other");
-        // hash_numa_pages_migrated = simple_hash("numa_pages_migrated");
-        // hash_numa_pte_updates = simple_hash("numa_pte_updates");
+        hash_numa_foreign = simple_hash("numa_foreign");
+        hash_numa_hint_faults_local = simple_hash("numa_hint_faults_local");
+        hash_numa_hint_faults = simple_hash("numa_hint_faults");
+        //hash_numa_hit = simple_hash("numa_hit");
+        hash_numa_huge_pte_updates = simple_hash("numa_huge_pte_updates");
+        hash_numa_interleave = simple_hash("numa_interleave");
+        hash_numa_local = simple_hash("numa_local");
+        //hash_numa_miss = simple_hash("numa_miss");
+        hash_numa_other = simple_hash("numa_other");
+        hash_numa_pages_migrated = simple_hash("numa_pages_migrated");
+        hash_numa_pte_updates = simple_hash("numa_pte_updates");
         // hash_pageoutrun = simple_hash("pageoutrun");
         // hash_pgactivate = simple_hash("pgactivate");
         // hash_pgalloc_dma32 = simple_hash("pgalloc_dma32");
@@ -337,17 +339,17 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     // unsigned long long nr_zone_unevictable = 0ULL;
     // unsigned long long nr_zone_write_pending = 0ULL;
     // unsigned long long nr_zspages = 0ULL;
-    // unsigned long long numa_foreign = 0ULL;
-    // unsigned long long numa_hint_faults = 0ULL;
-    // unsigned long long numa_hint_faults_local = 0ULL;
-    // unsigned long long numa_hit = 0ULL;
-    // unsigned long long numa_huge_pte_updates = 0ULL;
-    // unsigned long long numa_interleave = 0ULL;
-    // unsigned long long numa_local = 0ULL;
-    // unsigned long long numa_miss = 0ULL;
-    // unsigned long long numa_other = 0ULL;
-    // unsigned long long numa_pages_migrated = 0ULL;
-    // unsigned long long numa_pte_updates = 0ULL;
+    unsigned long long numa_foreign = 0ULL;
+    unsigned long long numa_hint_faults = 0ULL;
+    unsigned long long numa_hint_faults_local = 0ULL;
+    //unsigned long long numa_hit = 0ULL;
+    unsigned long long numa_huge_pte_updates = 0ULL;
+    unsigned long long numa_interleave = 0ULL;
+    unsigned long long numa_local = 0ULL;
+    //unsigned long long numa_miss = 0ULL;
+    unsigned long long numa_other = 0ULL;
+    unsigned long long numa_pages_migrated = 0ULL;
+    unsigned long long numa_pte_updates = 0ULL;
     // unsigned long long pageoutrun = 0ULL;
     // unsigned long long pgactivate = 0ULL;
     // unsigned long long pgalloc_dma = 0ULL;
@@ -477,17 +479,17 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         // else if(unlikely(hash == hash_nr_zone_unevictable && strcmp(name, "nr_zone_unevictable") == 0)) nr_zone_unevictable = strtoull(value, NULL, 10);
         // else if(unlikely(hash == hash_nr_zone_write_pending && strcmp(name, "nr_zone_write_pending") == 0)) nr_zone_write_pending = strtoull(value, NULL, 10);
         // else if(unlikely(hash == hash_nr_zspages && strcmp(name, "nr_zspages") == 0)) nr_zspages = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_foreign && strcmp(name, "numa_foreign") == 0)) numa_foreign = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_hint_faults_local && strcmp(name, "numa_hint_faults_local") == 0)) numa_hint_faults_local = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_hint_faults && strcmp(name, "numa_hint_faults") == 0)) numa_hint_faults = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_hit && strcmp(name, "numa_hit") == 0)) numa_hit = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_huge_pte_updates && strcmp(name, "numa_huge_pte_updates") == 0)) numa_huge_pte_updates = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_interleave && strcmp(name, "numa_interleave") == 0)) numa_interleave = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_local && strcmp(name, "numa_local") == 0)) numa_local = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_miss && strcmp(name, "numa_miss") == 0)) numa_miss = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_other && strcmp(name, "numa_other") == 0)) numa_other = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_pages_migrated && strcmp(name, "numa_pages_migrated") == 0)) numa_pages_migrated = strtoull(value, NULL, 10);
-        // else if(unlikely(hash == hash_numa_pte_updates && strcmp(name, "numa_pte_updates") == 0)) numa_pte_updates = strtoull(value, NULL, 10);
+        else if(unlikely(hash == hash_numa_foreign && strcmp(name, "numa_foreign") == 0)) numa_foreign = strtoull(value, NULL, 10);
+        else if(unlikely(hash == hash_numa_hint_faults_local && strcmp(name, "numa_hint_faults_local") == 0)) numa_hint_faults_local = strtoull(value, NULL, 10);
+        else if(unlikely(hash == hash_numa_hint_faults && strcmp(name, "numa_hint_faults") == 0)) numa_hint_faults = strtoull(value, NULL, 10);
+        //else if(unlikely(hash == hash_numa_hit && strcmp(name, "numa_hit") == 0)) numa_hit = strtoull(value, NULL, 10);
+        else if(unlikely(hash == hash_numa_huge_pte_updates && strcmp(name, "numa_huge_pte_updates") == 0)) numa_huge_pte_updates = strtoull(value, NULL, 10);
+        else if(unlikely(hash == hash_numa_interleave && strcmp(name, "numa_interleave") == 0)) numa_interleave = strtoull(value, NULL, 10);
+        else if(unlikely(hash == hash_numa_local && strcmp(name, "numa_local") == 0)) numa_local = strtoull(value, NULL, 10);
+        //else if(unlikely(hash == hash_numa_miss && strcmp(name, "numa_miss") == 0)) numa_miss = strtoull(value, NULL, 10);
+        else if(unlikely(hash == hash_numa_other && strcmp(name, "numa_other") == 0)) numa_other = strtoull(value, NULL, 10);
+        else if(unlikely(hash == hash_numa_pages_migrated && strcmp(name, "numa_pages_migrated") == 0)) numa_pages_migrated = strtoull(value, NULL, 10);
+        else if(unlikely(hash == hash_numa_pte_updates && strcmp(name, "numa_pte_updates") == 0)) numa_pte_updates = strtoull(value, NULL, 10);
         // else if(unlikely(hash == hash_pageoutrun && strcmp(name, "pageoutrun") == 0)) pageoutrun = strtoull(value, NULL, 10);
         // else if(unlikely(hash == hash_pgactivate && strcmp(name, "pgactivate") == 0)) pgactivate = strtoull(value, NULL, 10);
         // else if(unlikely(hash == hash_pgalloc_dma32 && strcmp(name, "pgalloc_dma32") == 0)) pgalloc_dma32 = strtoull(value, NULL, 10);
@@ -595,6 +597,54 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         rrddim_set(st_pgfaults, "minor", pgfault);
         rrddim_set(st_pgfaults, "major", pgmajfault);
         rrdset_done(st_pgfaults);
+    }
+
+    // --------------------------------------------------------------------
+
+    // Ondemand criteria for NUMA. Since this won't change at run time, we
+    // check it only once. We check whether the node count is >= 2 because
+    // single-node systems have uninteresting statistics (since all accesses
+    // are local).
+    if(unlikely(has_numa == -1)) {
+        has_numa = (get_numa_node_count() >= 2 &&
+                    (numa_local || numa_foreign || numa_interleave || numa_other || numa_pte_updates ||
+                     numa_huge_pte_updates || numa_hint_faults || numa_hint_faults_local || numa_pages_migrated)) ? 1 : 0;
+    }
+
+    if(do_numa == CONFIG_ONDEMAND_YES || (do_numa == CONFIG_ONDEMAND_ONDEMAND && has_numa)) {
+        static RRDSET *st_numa = NULL;
+        if(unlikely(!st_numa)) {
+            st_numa = rrdset_create("mem", "numa", NULL, "numa", NULL, "NUMA events", "events/s", 800, update_every, RRDSET_TYPE_LINE);
+            st_numa->isdetail = 1;
+
+            // These depend on CONFIG_NUMA in the kernel.
+            rrddim_add(st_numa, "local", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_numa, "foreign", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_numa, "interleave", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_numa, "other", NULL, 1, 1, RRDDIM_INCREMENTAL);
+
+            // The following stats depend on CONFIG_NUMA_BALANCING in the
+            // kernel.
+            rrddim_add(st_numa, "pte updates", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_numa, "huge pte updates", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_numa, "hint faults", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_numa, "hint faults local", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_numa, "pages migrated", NULL, 1, 1, RRDDIM_INCREMENTAL);
+        }
+        else rrdset_next(st_numa);
+
+        rrddim_set(st_numa, "local", numa_local);
+        rrddim_set(st_numa, "foreign", numa_foreign);
+        rrddim_set(st_numa, "interleave", numa_interleave);
+        rrddim_set(st_numa, "other", numa_other);
+
+        rrddim_set(st_numa, "pte updates", numa_pte_updates);
+        rrddim_set(st_numa, "huge pte updates", numa_huge_pte_updates);
+        rrddim_set(st_numa, "hint faults", numa_hint_faults);
+        rrddim_set(st_numa, "hint faults local", numa_hint_faults_local);
+        rrddim_set(st_numa, "pages migrated", numa_pages_migrated);
+
+        rrdset_done(st_numa);
     }
 
     return 0;
