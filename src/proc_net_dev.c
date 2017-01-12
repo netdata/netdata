@@ -138,21 +138,23 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     }
 
     ff = procfile_readall(ff);
-    if(!ff) return 0; // we return 0, so that we will retry to open it next time
+    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
     uint32_t lines = procfile_lines(ff), l;
-
     for(l = 2; l < lines ;l++) {
-        uint32_t words = procfile_linewords(ff, l);
-        if(words < 17) continue;
+        // require 17 words on each line
+        if(unlikely(procfile_linewords(ff, l) < 17)) continue;
 
         struct netdev *d = get_netdev(procfile_lineword(ff, l, 0));
 
         if(unlikely(!d->configured)) {
+            // this is the first time we see this interface
+
+            // remember we configured it
             d->configured = 1;
 
+            // start with the default enabled flag
             d->enabled = enable_new_interfaces;
-
             if(d->enabled) {
                 if(unlikely(!strcmp(d->name, "lo")))
                     d->enabled = CONFIG_ONDEMAND_NO;
