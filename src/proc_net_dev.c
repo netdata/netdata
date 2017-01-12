@@ -162,13 +162,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->enabled = enable_ifb_interfaces;
             }
 
-            if(d->enabled == CONFIG_ONDEMAND_NO)
-                continue;
-
             char var_name[512 + 1];
             snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", d->name);
             d->enabled = config_get_boolean_ondemand(var_name, "enabled", d->enabled);
-            if(d->enabled == CONFIG_ONDEMAND_NO) continue;
+
+            if(d->enabled == CONFIG_ONDEMAND_NO)
+                continue;
 
             d->do_bandwidth = config_get_boolean_ondemand(var_name, "bandwidth", do_bandwidth);
             d->do_packets = config_get_boolean_ondemand(var_name, "packets", do_packets);
