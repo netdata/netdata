@@ -23,7 +23,7 @@
 #  - kafka notifications by @ktsaou #1342
 #  - pagerduty.com notifications by Jim Cooley @jimcooley PR #1373
 #  - messagebird.com notifications by @tech_no_logical #1453
-#  - hipchart notifications by @ktsaou
+#  - hipchart notifications by @ktsaou #1561
 
 # -----------------------------------------------------------------------------
 # testing notifications
