@@ -160,6 +160,6 @@ def is_server(server):
 
 def is_server_down(server, back_ends, _):
     try:
-        return server['# pxname'] == back_ends[_]['# pxname'] and server['status'] != 'UP' and server['status'] != 'no check'
+        return server['# pxname'] == back_ends[_]['# pxname'] and server['status'] == 'DOWN'
     except Exception:
         return False
