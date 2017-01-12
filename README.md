@@ -107,7 +107,7 @@ This is a list of what it currently monitors:
   usage, interrupts, softirqs, frequency, total and per core
 
 - **Memory**<br/>
-  RAM, swap and kernel memory usage, including KSM the kernel memory deduper
+  RAM, swap and kernel memory usage, KSM (Kernel Samepage Merging), NUMA
 
 - **Disks**<br/>
   per disk: I/O, operations, backlog, utilization, space
