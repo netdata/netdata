@@ -35,6 +35,8 @@
 #include <netinet/icmp6.h>
 // NEEDED BY do_space, do_inodes
 #include <sys/mount.h>
+// NEEDED BY do_uptime
+#include <time.h>
 
 #define KILO_FACTOR 1024
 #define MEGA_FACTOR 1048576     // 1024 * 1024
@@ -62,7 +64,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
         do_ip6_packets = -1, do_ip6_fragsout = -1, do_ip6_fragsin = -1, do_ip6_errors = -1,
         do_icmp6 = -1, do_icmp6_redir = -1, do_icmp6_errors = -1, do_icmp6_echos = -1, do_icmp6_router = -1,
-        do_icmp6_neighbor = -1, do_icmp6_types = -1, do_space = -1, do_inodes = -1;
+        do_icmp6_neighbor = -1, do_icmp6_types = -1, do_space = -1, do_inodes = -1, do_uptime = -1;
 
     if (unlikely(do_cpu == -1)) {
         do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
@@ -116,6 +118,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_icmp6_types          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp types", CONFIG_ONDEMAND_ONDEMAND);
         do_space                = config_get_boolean("plugin:freebsd:sysctl", "space usage for all disks", 1);
         do_inodes               = config_get_boolean("plugin:freebsd:sysctl", "inodes usage for all disks", 1);
+        do_uptime               = config_get_boolean("plugin:macos:sysctl", "system uptime", 1);
     }
 
     RRDSET *st;
@@ -268,6 +271,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     struct statfs *mntbuf;
     int mntsize;
     char mntonname[MNAMELEN + 1];
+
+    // NEEDED BY: do_uptime
+    struct timespec boot_time, cur_time;
 
     // --------------------------------------------------------------------
 
@@ -2171,6 +2177,27 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                     rrdset_done(st);
                 }
             }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_uptime)) {
+        if (unlikely(GETSYSCTL("kern.boottime", boot_time))) {
+            do_uptime = 0;
+            error("DISABLED: system.uptime");
+        } else {
+            clock_gettime(CLOCK_REALTIME, &cur_time);
+            st = rrdset_find("system.uptime");
+
+            if(unlikely(!st)) {
+                st = rrdset_create("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000, update_every, RRDSET_TYPE_LINE);
+                rrddim_add(st, "uptime", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "uptime", cur_time.tv_sec - boot_time.tv_sec);
+            rrdset_done(st);
         }
     }
 
