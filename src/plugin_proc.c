@@ -122,7 +122,7 @@ void *proc_main(void *ptr)
                 st = rrdset_find_bytype("netdata", "plugin_proc_modules");
 
                 if(!st) {
-                    st = rrdset_create("netdata", "plugin_proc_modules", NULL, "proc.internal", NULL, "NetData Proc Plugin Modules Durations", "milliseconds/s", 132001, rrd_update_every, RRDSET_TYPE_STACKED);
+                    st = rrdset_create("netdata", "plugin_proc_modules", NULL, "proc.internal", NULL, "NetData Proc Plugin Modules Durations", "milliseconds/run", 132001, rrd_update_every, RRDSET_TYPE_STACKED);
 
                     for(i = 0 ; proc_modules[i].name ;i++) {
                         if(unlikely(!proc_modules[i].enabled)) continue;
