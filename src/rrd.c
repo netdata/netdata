@@ -864,6 +864,8 @@ void rrdset_free_all(void)
         if(unlikely(rrdset_index_del(&localhost, st) != st))
             error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", st->id);
 
+        rrdset_index_del_name(&localhost, st);
+
         st->rrdfamily->use_count--;
         if(!st->rrdfamily->use_count)
             rrdfamily_free(st->rrdfamily);
