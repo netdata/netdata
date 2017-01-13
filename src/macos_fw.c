@@ -3,16 +3,24 @@
 #include <IOKit/IOKitLib.h>
 #include <IOKit/storage/IOBlockStorageDriver.h>
 #include <IOKit/IOBSD.h>
+// NEEDED BY do_space, do_inodes
+#include <sys/mount.h>
 
 #define MAXDRIVENAME 31
+
+#define KILO_FACTOR 1024
+#define MEGA_FACTOR 1048576     // 1024 * 1024
+#define GIGA_FACTOR 1073741824  // 1024 * 1024 * 1024
 
 int do_macos_iokit(int update_every, usec_t dt) {
     (void)dt;
 
-    static int do_io = -1;
+    static int do_io = -1, do_space = -1, do_inodes = -1;
 
     if (unlikely(do_io == -1)) {
         do_io                  = config_get_boolean("plugin:macos:iokit", "disk i/o", 1);
+        do_space                = config_get_boolean("plugin:macos:sysctl", "space usage for all disks", 1);
+        do_inodes               = config_get_boolean("plugin:macos:sysctl", "inodes usage for all disks", 1);
     }
 
     RRDSET *st;
@@ -51,6 +59,12 @@ int do_macos_iokit(int update_every, usec_t dt) {
         collected_number duration_write_ns;
         collected_number busy_time_ns;
     } prev_diskstat;
+
+    // NEEDED BY: do_space, do_inodes
+    struct statfs *mntbuf;
+    int mntsize, i;
+    char mntonname[MNAMELEN + 1];
+    char title[4096 + 1];
 
     /* Get ports and services for drive statistics. */
     if (unlikely(IOMasterPort(bootstrap_port, &master_port))) {
@@ -288,6 +302,74 @@ int do_macos_iokit(int update_every, usec_t dt) {
         rrddim_set(st, "in", total_disk_reads);
         rrddim_set(st, "out", total_disk_writes);
         rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------------
+
+    if (likely(do_space || do_inodes)) {
+        // there is no mount info in sysctl MIBs
+        if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
+            error("FREEBSD: getmntinfo() failed");
+            do_space = 0;
+            error("DISABLED: disk_space.X");
+            do_inodes = 0;
+            error("DISABLED: disk_inodes.X");
+        } else {
+            for (i = 0; i < mntsize; i++) {
+                if (mntbuf[i].f_flags == MNT_RDONLY ||
+                        mntbuf[i].f_blocks == 0 ||
+                        // taken from gnulib/mountlist.c and shortened to FreeBSD related fstypes
+                        strcmp(mntbuf[i].f_fstypename, "autofs") == 0 ||
+                        strcmp(mntbuf[i].f_fstypename, "procfs") == 0 ||
+                        strcmp(mntbuf[i].f_fstypename, "subfs") == 0 ||
+                        strcmp(mntbuf[i].f_fstypename, "devfs") == 0 ||
+                        strcmp(mntbuf[i].f_fstypename, "none") == 0)
+                    continue;
+
+                // --------------------------------------------------------------------------
+
+                if (likely(do_space)) {
+                    st = rrdset_find_bytype("disk_space", mntbuf[i].f_mntonname);
+                    if (unlikely(!st)) {
+                        snprintfz(title, 4096, "Disk Space Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
+                        st = rrdset_create("disk_space", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.space", title, "GB", 2023,
+                                           update_every,
+                                           RRDSET_TYPE_STACKED);
+
+                        rrddim_add(st, "avail", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRDDIM_ABSOLUTE);
+                        rrddim_add(st, "used", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRDDIM_ABSOLUTE);
+                        rrddim_add(st, "reserved_for_root", "reserved for root", mntbuf[i].f_bsize, GIGA_FACTOR,
+                                   RRDDIM_ABSOLUTE);
+                    } else
+                        rrdset_next(st);
+
+                    rrddim_set(st, "avail", (collected_number) mntbuf[i].f_bavail);
+                    rrddim_set(st, "used", (collected_number) (mntbuf[i].f_blocks - mntbuf[i].f_bfree));
+                    rrddim_set(st, "reserved_for_root", (collected_number) (mntbuf[i].f_bfree - mntbuf[i].f_bavail));
+                    rrdset_done(st);
+                }
+
+                // --------------------------------------------------------------------------
+
+                if (likely(do_inodes)) {
+                    st = rrdset_find_bytype("disk_inodes", mntbuf[i].f_mntonname);
+                    if (unlikely(!st)) {
+                        snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
+                        st = rrdset_create("disk_inodes", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.inodes", title, "Inodes", 2024,
+                                           update_every, RRDSET_TYPE_STACKED);
+
+                        rrddim_add(st, "avail", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                        rrddim_add(st, "used", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                        rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRDDIM_ABSOLUTE);
+                    } else
+                        rrdset_next(st);
+
+                    rrddim_set(st, "avail", (collected_number) mntbuf[i].f_ffree);
+                    rrddim_set(st, "used", (collected_number) (mntbuf[i].f_files - mntbuf[i].f_ffree));
+                    rrdset_done(st);
+                }
+            }
+        }
     }
 
     return 0;
