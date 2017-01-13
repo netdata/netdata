@@ -17,6 +17,8 @@
 #include <netinet/icmp_var.h>
 // NEEDED BY do_icmp6...
 #include <netinet/icmp6.h>
+// NEEDED BY do_uptime
+#include <time.h>
 
 #define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
 
@@ -35,7 +37,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
                do_ip6_packets = -1, do_ip6_fragsout = -1, do_ip6_fragsin = -1, do_ip6_errors = -1,
                do_icmp6 = -1, do_icmp6_redir = -1, do_icmp6_errors = -1, do_icmp6_echos = -1,
-               do_icmp6_router = -1, do_icmp6_neighbor = -1, do_icmp6_types = -1;
+               do_icmp6_router = -1, do_icmp6_neighbor = -1, do_icmp6_types = -1, do_uptime = -1;
 
 
     if (unlikely(do_loadavg == -1)) {
@@ -68,6 +70,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         do_icmp6_router         = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp router", CONFIG_ONDEMAND_ONDEMAND);
         do_icmp6_neighbor       = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp neighbor", CONFIG_ONDEMAND_ONDEMAND);
         do_icmp6_types          = config_get_boolean_ondemand("plugin:macos:sysctl", "icmp types", CONFIG_ONDEMAND_ONDEMAND);
+        do_uptime               = config_get_boolean("plugin:macos:sysctl", "system uptime", 1);
     }
 
     RRDSET *st;
@@ -205,6 +208,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         u_long  msgs_in;
         u_long  msgs_out;
     } icmp6_total = {0, 0};
+
+    // NEEDED BY: do_uptime
+    struct timespec boot_time, cur_time;
 
     // --------------------------------------------------------------------
 
@@ -1062,6 +1068,27 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "OutType143", icmp6stat.icp6s_outhist[143]);
                 rrdset_done(st);
             }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_uptime)) {
+        if (unlikely(GETSYSCTL("kern.boottime", boot_time))) {
+            do_uptime = 0;
+            error("DISABLED: system.uptime");
+        } else {
+            clock_gettime(CLOCK_REALTIME, &cur_time);
+            st = rrdset_find("system.uptime");
+
+            if(unlikely(!st)) {
+                st = rrdset_create("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000, update_every, RRDSET_TYPE_LINE);
+                rrddim_add(st, "uptime", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            }
+            else rrdset_next(st);
+
+            rrddim_set(st, "uptime", cur_time.tv_sec - boot_time.tv_sec);
+            rrdset_done(st);
         }
     }
 
