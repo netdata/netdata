@@ -5,6 +5,12 @@
 #include <IOKit/IOBSD.h>
 // NEEDED BY do_space, do_inodes
 #include <sys/mount.h>
+// NEEDED BY: struct ifaddrs, getifaddrs()
+#include <net/if.h>
+#include <ifaddrs.h>
+
+// NEEDED BY: do_bandwidth
+#define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 #define MAXDRIVENAME 31
 
@@ -15,12 +21,13 @@
 int do_macos_iokit(int update_every, usec_t dt) {
     (void)dt;
 
-    static int do_io = -1, do_space = -1, do_inodes = -1;
+    static int do_io = -1, do_space = -1, do_inodes = -1, do_bandwidth = -1;
 
     if (unlikely(do_io == -1)) {
-        do_io                  = config_get_boolean("plugin:macos:iokit", "disk i/o", 1);
+        do_io                   = config_get_boolean("plugin:macos:iokit", "disk i/o", 1);
         do_space                = config_get_boolean("plugin:macos:sysctl", "space usage for all disks", 1);
         do_inodes               = config_get_boolean("plugin:macos:sysctl", "inodes usage for all disks", 1);
+        do_bandwidth            = config_get_boolean("plugin:macos:sysctl", "bandwidth", 1);
     }
 
     RRDSET *st;
@@ -65,6 +72,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
     int mntsize, i;
     char mntonname[MNAMELEN + 1];
     char title[4096 + 1];
+
+    // NEEDED BY: do_bandwidth
+    struct ifaddrs *ifa, *ifap;
 
     /* Get ports and services for drive statistics. */
     if (unlikely(IOMasterPort(bootstrap_port, &master_port))) {
@@ -304,12 +314,13 @@ int do_macos_iokit(int update_every, usec_t dt) {
         rrdset_done(st);
     }
 
+    // Can be merged with FreeBSD plugin
     // --------------------------------------------------------------------------
 
     if (likely(do_space || do_inodes)) {
         // there is no mount info in sysctl MIBs
         if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
-            error("FREEBSD: getmntinfo() failed");
+            error("MACOS: getmntinfo() failed");
             do_space = 0;
             error("DISABLED: disk_space.X");
             do_inodes = 0;
@@ -371,6 +382,106 @@ int do_macos_iokit(int update_every, usec_t dt) {
             }
         }
     }
+
+    // Can be merged with FreeBSD plugin
+    // --------------------------------------------------------------------
+
+    if (likely(do_bandwidth)) {
+        if (unlikely(getifaddrs(&ifap))) {
+            error("MACOS: getifaddrs()");
+            do_bandwidth = 0;
+            error("DISABLED: system.ipv4");
+        } else {
+            for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+                if (ifa->ifa_addr->sa_family != AF_LINK)
+                        continue;
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net", ifa->ifa_name, NULL, ifa->ifa_name, "net.net", "Bandwidth", "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
+
+                    rrddim_add(st, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -8, 1024, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "received", IFA_DATA(ibytes));
+                rrddim_set(st, "sent", IFA_DATA(obytes));
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net_packets", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net_packets", ifa->ifa_name, NULL, ifa->ifa_name, "net.packets", "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "multicast_received", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "multicast_sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "received", IFA_DATA(ipackets));
+                rrddim_set(st, "sent", IFA_DATA(opackets));
+                rrddim_set(st, "multicast_received", IFA_DATA(imcasts));
+                rrddim_set(st, "multicast_sent", IFA_DATA(omcasts));
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net_errors", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net_errors", ifa->ifa_name, NULL, ifa->ifa_name, "net.errors", "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "inbound", IFA_DATA(ierrors));
+                rrddim_set(st, "outbound", IFA_DATA(oerrors));
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net_drops", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net_drops", ifa->ifa_name, NULL, ifa->ifa_name, "net.drops", "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "inbound", IFA_DATA(iqdrops));
+                rrdset_done(st);
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("net_events", ifa->ifa_name);
+                if (unlikely(!st)) {
+                    st = rrdset_create("net_events", ifa->ifa_name, NULL, ifa->ifa_name, "net.events", "Network Interface Events", "events/s", 7006, update_every, RRDSET_TYPE_LINE);
+                    st->isdetail = 1;
+
+                    rrddim_add(st, "frames", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "collisions", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "carrier", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "collisions", IFA_DATA(collisions));
+                rrdset_done(st);
+            }
+
+            freeifaddrs(ifap);
+        }
+    }
+
 
     return 0;
 }
