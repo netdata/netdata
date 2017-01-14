@@ -19,8 +19,11 @@ static int cgroup_root_count = 0;
 static int cgroup_root_max = 500;
 static int cgroup_max_depth = 0;
 
+static NETDATA_SIMPLE_PATTERN *disabled_cgroups_patterns = NULL;
+static NETDATA_SIMPLE_PATTERN *disabled_cgroup_paths = NULL;
+
 void read_cgroup_plugin_configuration() {
-    cgroup_check_for_new_every = config_get_number("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
+    cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
 
     cgroup_enable_cpuacct_stat = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct stat", cgroup_enable_cpuacct_stat);
     cgroup_enable_cpuacct_usage = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct usage", cgroup_enable_cpuacct_usage);
@@ -70,10 +73,37 @@ void read_cgroup_plugin_configuration() {
     snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
     cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
 
-    cgroup_root_max = config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
-    cgroup_max_depth = config_get_number("plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
+    cgroup_root_max = (int)config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
+    cgroup_max_depth = (int)config_get_number("plugin:cgroups", "max cgroups depth to monitor", cgroup_max_depth);
 
     cgroup_enable_new_cgroups_detected_at_runtime = config_get_boolean("plugin:cgroups", "enable new cgroups detected at run time", cgroup_enable_new_cgroups_detected_at_runtime);
+
+    disabled_cgroups_patterns = netdata_simple_pattern_list_create(
+            config_get("plugin:cgroups", "disable by default cgroups matching",
+                    " lxc docker libvirt qemu systemd "
+                    " system system.slice "
+                    " machine machine.slice "
+                    " user user.slice "
+                    " init.scope "
+                    " *.swap "
+                    " *.slice "
+                    " *.user "
+                    " *.mount "
+                    " *.service "
+                    " *.partition "
+                    " */ns "                               //   lxc/*/ns    #1397
+            ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
+
+    disabled_cgroup_paths = netdata_simple_pattern_list_create(
+            config_get("plugin:cgroups", "disable by default cgroup paths matching",
+                    " system.slice "
+                    " system "
+                    " systemd "
+                    " user.slice "
+                    " user "
+                    " init.scope "
+                    " *-qemu "
+            ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
     mountinfo_free(root);
 }
@@ -173,6 +203,7 @@ struct cpuacct_usage {
 };
 
 #define CGROUP_OPTIONS_DISABLED_DUPLICATE 0x00000001
+#define CGROUP_OPTIONS_PART_OF_GROUP      0x00000002
 
 struct cgroup {
     uint32_t options;
@@ -659,7 +690,7 @@ void cgroup_get_chart_id(struct cgroup *cg) {
 }
 
 struct cgroup *cgroup_add(const char *id) {
-    debug(D_CGROUP, "adding cgroup '%s'", id);
+    debug(D_CGROUP, "adding cgroup with id '%s'", id);
 
     if(cgroup_root_count >= cgroup_root_max) {
         info("Maximum number of cgroups reached (%d). Not adding cgroup '%s'", cgroup_root_count, id);
@@ -676,40 +707,11 @@ struct cgroup *cgroup_add(const char *id) {
     }
     else {
         if(*chart_id == '/') chart_id++;
-
-        size_t len = strlen(chart_id);
-
-        // disable by default the parent cgroup
-        // for known cgroup managers
-        if(!strcmp(chart_id, "lxc") ||
-                !strcmp(chart_id, "docker") ||
-                !strcmp(chart_id, "libvirt") ||
-                !strcmp(chart_id, "qemu") ||
-                !strcmp(chart_id, "systemd") ||
-                !strcmp(chart_id, "system.slice") ||
-                !strcmp(chart_id, "machine.slice") ||
-                !strcmp(chart_id, "init.scope") ||
-                !strcmp(chart_id, "user") ||
-                !strcmp(chart_id, "system") ||
-                !strcmp(chart_id, "machine") ||
-                // starts with them
-                (len >  5 && !strncmp(chart_id, "user/", 5)) ||
-                (len > 11 && !strncmp(chart_id, "user.slice/", 11)) ||
-                // ends with them
-                (len >  5 && !strncmp(&chart_id[len -  5], ".user", 5)) ||
-                (len >  5 && !strncmp(&chart_id[len -  5], ".swap", 5)) ||
-                (len >  6 && !strncmp(&chart_id[len -  6], ".slice", 6)) ||
-                (len >  6 && !strncmp(&chart_id[len -  6], ".mount", 6)) ||
-                (len >  8 && !strncmp(&chart_id[len -  8], ".session", 8)) ||
-                (len >  8 && !strncmp(&chart_id[len -  8], ".service", 8)) ||
-                (len > 10 && !strncmp(&chart_id[len - 10], ".partition", 10)) ||
-                // starts and ends with them
-                (len > 7 && !strncmp(chart_id, "lxc/", 4) && !strncmp(&chart_id[len - 3], "/ns", 3)) // #1397
-                ) {
+        if(netdata_simple_pattern_list_matches(disabled_cgroups_patterns, chart_id))
             def = 0;
-        }
     }
-    debug(D_CGROUP, "cgroup '%s' (chart_id '%s') is (by default) %s", id, chart_id, (def)?"enabled":"disabled");
+
+    debug(D_CGROUP, "cgroup with id '%s' (chart_id '%s') is (by default) %s", id, chart_id, (def)?"enabled":"disabled");
 
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
@@ -736,11 +738,11 @@ struct cgroup *cgroup_add(const char *id) {
     // fix the name by calling the external script
     cgroup_get_chart_id(cg);
 
-    debug(D_CGROUP, "adding cgroup '%s' with chart id '%s'", id, chart_id);
+    debug(D_CGROUP, "adding cgroup '%s' ('%s') with chart id '%s' ('%s')", cg->id, id, cg->chart_id, chart_id);
 
     char option[FILENAME_MAX + 1];
     snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
-    cg->enabled = config_get_boolean("plugin:cgroups", option, def);
+    cg->enabled = (char)config_get_boolean("plugin:cgroups", option, def);
 
     if(cg->enabled) {
         struct cgroup *t;
@@ -780,17 +782,25 @@ void cgroup_free(struct cgroup *cg) {
 
     freez(cg->cpuacct_stat.filename);
     freez(cg->cpuacct_usage.filename);
+
     freez(cg->memory.filename);
+    freez(cg->memory.filename_failcnt);
+    freez(cg->memory.filename_usage_in_bytes);
+    freez(cg->memory.filename_msw_usage_in_bytes);
+
     freez(cg->io_service_bytes.filename);
     freez(cg->io_serviced.filename);
+
     freez(cg->throttle_io_service_bytes.filename);
     freez(cg->throttle_io_serviced.filename);
+
     freez(cg->io_merged.filename);
     freez(cg->io_queued.filename);
 
     freez(cg->id);
     freez(cg->chart_id);
     freez(cg->chart_title);
+
     freez(cg);
 
     cgroup_root_count--;
@@ -879,8 +889,7 @@ int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(con
                 // do not decent in directories we are not interested
                 // https://github.com/firehol/netdata/issues/345
                 int def = 1;
-                size_t len = strlen(r);
-                if(len >  5 && !strncmp(&r[len -  5], "-qemu", 5))
+                if(netdata_simple_pattern_list_matches(disabled_cgroup_paths, r))
                     def = 0;
 
                 // we check for this option here
@@ -1133,13 +1142,13 @@ void update_cgroup_charts(int update_every) {
     RRDSET *st;
 
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(!cg->available || !cg->enabled)
+        if(!cg->available || !cg->enabled || cg->options & CGROUP_OPTIONS_PART_OF_GROUP)
             continue;
 
         if(cg->id[0] == '\0')
             strcpy(type, "cgroup_root");
-        else if(cg->id[0] == '/')
-            snprintfz(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->chart_id);
+        //else if(cg->id[0] == '/')
+        //    snprintfz(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->chart_id);
         else
             snprintfz(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->chart_id);
 

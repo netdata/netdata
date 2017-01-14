@@ -20,9 +20,9 @@ void netdata_cleanup_and_exit(int ret) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // kill all childs
-    kill_childs();
+    //kill_childs();
 
-    // free all memory
+    // free database
     rrdset_free_all();
 #endif
 
