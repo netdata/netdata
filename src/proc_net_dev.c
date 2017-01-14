@@ -112,14 +112,13 @@ static struct netdev *get_netdev(const char *name) {
 int do_proc_net_dev(int update_every, usec_t dt) {
     (void)dt;
 
+    static NETDATA_SIMPLE_PATTERN *disabled_list = NULL;
     static procfile *ff = NULL;
-    static int enable_new_interfaces = -1, enable_ifb_interfaces = -1, enable_veth_interfaces = -1;
+    static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
 
     if(unlikely(enable_new_interfaces == -1)) {
         enable_new_interfaces = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", CONFIG_ONDEMAND_ONDEMAND);
-        enable_ifb_interfaces = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "enable ifb interfaces", CONFIG_ONDEMAND_NO);
-        enable_veth_interfaces = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "enable veth interfaces", enable_new_interfaces);
 
         do_bandwidth    = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
         do_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "packets for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
@@ -128,6 +127,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         do_fifo         = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "fifo for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
         do_compressed   = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
         do_events       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+
+        disabled_list = netdata_simple_pattern_list_create(config_get("plugin:proc:/proc/net/dev", "disable by default interfaces matching", "lo fireqos* *-ifb"), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
     }
 
     if(unlikely(!ff)) {
@@ -153,16 +154,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             // remember we configured it
             d->configured = 1;
 
-            // start with the default enabled flag
             d->enabled = enable_new_interfaces;
-            if(d->enabled) {
-                if(unlikely(!strcmp(d->name, "lo")))
-                    d->enabled = CONFIG_ONDEMAND_NO;
-                else if(unlikely(!strncmp(d->name, "veth", 4)))
-                    d->enabled = enable_veth_interfaces;
-                else if(unlikely(d->len >= 4 && strcmp(&d->name[d->len - 4], "-ifb") == 0))
-                    d->enabled = enable_ifb_interfaces;
-            }
+
+            if(d->enabled)
+                d->enabled = !netdata_simple_pattern_list_matches(disabled_list, d->name);
 
             char var_name[512 + 1];
             snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", d->name);

@@ -14,15 +14,16 @@
 #  - severity filtering per recipient
 #
 # Supported notification methods:
-#  - emails
-#  - slack.com notifications
-#  - pushover.net notifications
+#  - emails by @ktsaou
+#  - slack.com notifications by @ktsaou
+#  - pushover.net notifications by @ktsaou
 #  - pushbullet.com push notifications by Tiago Peralta @tperalta82 PR #1070
 #  - telegram.org notifications by @hashworks PR #1002
 #  - twilio.com notifications by Levi Blaney @shadycuz PR #1211
-#  - kafka notifications
+#  - kafka notifications by @ktsaou #1342
 #  - pagerduty.com notifications by Jim Cooley @jimcooley PR #1373
-#  - messagebird.com notifications by @tech_no_logical
+#  - messagebird.com notifications by @tech_no_logical #1453
+#  - hipchart notifications by @ktsaou #1561
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -173,6 +174,7 @@ sendmail=
 SEND_SLACK="YES"
 SEND_PUSHOVER="YES"
 SEND_TWILIO="YES"
+SEND_HIPCHAT="YES"
 SEND_MESSAGEBIRD="YES"
 SEND_TELEGRAM="YES"
 SEND_EMAIL="YES"
@@ -201,6 +203,11 @@ TWILIO_ACCOUNT_TOKEN=
 TWILIO_NUMBER=
 DEFAULT_RECIPIENT_TWILIO=
 declare -A role_recipients_twilio=()
+
+# hipchat configs
+HIPCHAT_AUTH_TOKEN=
+DEFAULT_RECIPIENT_HIPCHAT=
+declare -A role_recipients_hipchat=()
 
 # messagebird configs
 MESSAGEBIRD_ACCESS_KEY=
@@ -279,6 +286,7 @@ declare -A arr_slack=()
 declare -A arr_pushover=()
 declare -A arr_pushbullet=()
 declare -A arr_twilio=()
+declare -A arr_hipchat=()
 declare -A arr_telegram=()
 declare -A arr_pd=()
 declare -A arr_email=()
@@ -321,6 +329,14 @@ do
     for r in ${a//,/ }
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality twilio "${r}" && arr_twilio[${r/|*/}]="1"
+    done
+
+    # hipchat
+    a="${role_recipients_hipchat[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_HIPCHAT}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality hipchat "${r}" && arr_hipchat[${r/|*/}]="1"
     done
 
     # messagebird
@@ -372,6 +388,10 @@ to_pushbullet="${!arr_pushbullet[*]}"
 to_twilio="${!arr_twilio[*]}"
 [ -z "${to_twilio}" ] && SEND_TWILIO="NO"
 
+# build the list of hipchat recipients (rooms)
+to_hipchat="${!arr_hipchat[*]}"
+[ -z "${to_hipchat}" ] && SEND_HIPCHAT="NO"
+
 # build the list of messagebird recipients (phone numbers)
 to_messagebird="${!arr_messagebird[*]}"
 [ -z "${to_messagebird}" ] && SEND_MESSAGEBIRD="NO"
@@ -409,6 +429,9 @@ done
 # check twilio
 [ -z "${TWILIO_ACCOUNT_TOKEN}" -o -z "${TWILIO_ACCOUNT_SID}" -o -z "${TWILIO_NUMBER}" ] && SEND_TWILIO="NO"
 
+# check hipchat
+[ -z "${HIPCHAT_AUTH_TOKEN}" ] && SEND_HIPCHAT="NO"
+
 # check messagebird
 [ -z "${MESSAGEBIRD_ACCESS_KEY}" -o -z "${MESSAGEBIRD_NUMBER}" ] && SEND_MESSAGEBIRD="NO"
 
@@ -433,7 +456,16 @@ if [ "${SEND_PD}" = "YES" ]
 fi
 
 # if we need curl, check for the curl command
-if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}" = "YES" -o "${SEND_MESSAGEBIRD}" = "YES" -o "${SEND_TELEGRAM}" = "YES" -o "${SEND_PUSHBULLET}" = "YES" -o "${SEND_KAFKA}" = "YES" \) -a -z "${curl}" ]
+if [ \( \
+           "${SEND_PUSHOVER}"    = "YES" \
+        -o "${SEND_SLACK}"       = "YES" \
+        -o "${SEND_HIPCHAT}"     = "YES" \
+        -o "${SEND_TWILIO}"      = "YES" \
+        -o "${SEND_MESSAGEBIRD}" = "YES" \
+        -o "${SEND_TELEGRAM}"    = "YES" \
+        -o "${SEND_PUSHBULLET}"  = "YES" \
+        -o "${SEND_KAFKA}"       = "YES" \
+    \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
@@ -445,6 +477,7 @@ if [ \( "${SEND_PUSHOVER}" = "YES" -o "${SEND_SLACK}" = "YES" -o "${SEND_TWILIO}
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
         SEND_TWILIO="NO"
+        SEND_HIPCHAT="NO"
         SEND_MESSAGEBIRD="NO"
         SEND_KAFKA="NO"
     fi
@@ -463,6 +496,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_TELEGRAM}"       != "YES" \
     -a "${SEND_SLACK}"          != "YES" \
     -a "${SEND_TWILIO}"         != "YES" \
+    -a "${SEND_HIPCHAT}"        != "YES" \
     -a "${SEND_MESSAGEBIRD}"    != "YES" \
     -a "${SEND_PUSHBULLET}"     != "YES" \
     -a "${SEND_KAFKA}"          != "YES" \
@@ -785,6 +819,61 @@ send_twilio() {
     return 1
 }
 
+
+# -----------------------------------------------------------------------------
+# hipchat sender
+
+send_hipchat() {
+    local authtoken="${1}" recipients="${2}" message="${3}" httpcode sent=0 room color sender msg_format notify
+
+    if [ "${SEND_HIPCHAT}" = "YES" -a ! -z "${authtoken}" -a ! -z "${recipients}" -a ! -z "${message}" ]
+        then
+
+        # A label to be shown in addition to the sender's name
+        # Valid length range: 0 - 64. 
+        sender="netdata"
+
+        # Valid values: html, text.
+        # Defaults to 'html'.
+        msg_format="text"
+
+        # Background color for message. Valid values: yellow, green, red, purple, gray, random. Defaults to 'yellow'.
+        case "${status}" in
+            WARNING)  color="yellow" ;;
+            CRITICAL) color="red" ;;
+            CLEAR)    color="green" ;;
+            *)        color="gray" ;;
+        esac
+
+        # Whether this message should trigger a user notification (change the tab color, play a sound, notify mobile phones, etc).
+        # Each recipient's notification preferences are taken into account.
+        # Defaults to false.
+        notify="true"
+
+        for room in ${recipients}
+        do
+            httpcode=$(${curl} -X POST --write-out %{http_code} --silent --output /dev/null \
+                    -H "Content-type: application/json" \
+                    -H "Authorization: Bearer ${authtoken}" \
+                    -d "{\"color\": \"${color}\", \"from\": \"${netdata}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
+                    "https://api.hipchat.com/v2/room/${room}/notification")
+
+            if [ "${httpcode}" == "200" ]
+            then
+                info "sent HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
+                sent=$((sent + 1))
+            else
+                error "failed to send HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}' with HTTP error code ${httpcode}."
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+
 # -----------------------------------------------------------------------------
 # messagebird sender
 
@@ -1096,6 +1185,21 @@ SENT_PD=$?
 
 
 # -----------------------------------------------------------------------------
+# send hipchat message
+
+send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" "
+<b>${alarm}</b> ${info_html}<br/>&nbsp;
+<small><b>${chart}</b><br/>Chart<br/>&nbsp;</small>
+<small><b>${family}</b><br/>Family<br/>&nbsp;</small>
+<small><b>${severity}</b><br/>Severity<br/>&nbsp;</small>
+<small><b>${date}${raised_for_html}</b><br/>Time<br/>&nbsp;</small>
+<a href=\"${goto_url}\">View Netdata</a><br/>&nbsp;
+<small><small>The source of this alarm is line ${src}</small></small>
+"
+
+SENT_HIPCHAT=$?
+
+# -----------------------------------------------------------------------------
 # send the email
 
 send_email <<EOF
@@ -1198,6 +1302,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
     -o ${SENT_TWILIO}       -eq 0 \
+    -o ${SENT_HIPCHAT}      -eq 0 \
     -o ${SENT_MESSAGEBIRD}  -eq 0 \
     -o ${SENT_PUSHBULLET}   -eq 0 \
     -o ${SENT_KAFKA}        -eq 0 \
