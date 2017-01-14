@@ -21,6 +21,10 @@ static int cgroup_max_depth = 0;
 
 static NETDATA_SIMPLE_PATTERN *disabled_cgroups_patterns = NULL;
 static NETDATA_SIMPLE_PATTERN *disabled_cgroup_paths = NULL;
+static NETDATA_SIMPLE_PATTERN *disabled_cgroup_renames = NULL;
+static NETDATA_SIMPLE_PATTERN *systemd_services_cgroups = NULL;
+
+static char *cgroups_rename_script = PLUGINS_DIR "/cgroup-name.sh";
 
 void read_cgroup_plugin_configuration() {
     cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
@@ -80,27 +84,46 @@ void read_cgroup_plugin_configuration() {
 
     disabled_cgroups_patterns = netdata_simple_pattern_list_create(
             config_get("plugin:cgroups", "disable by default cgroups matching",
-                    " lxc docker libvirt qemu systemd "
-                    " system system.slice "
-                    " machine machine.slice "
-                    " user user.slice "
-                    " init.scope "
+                    " / /lxc /docker /libvirt /qemu /systemd "
+                    " /system /system.slice "
+                    " /machine /machine.slice "
+                    " /user /user.slice "
+                    " /init.scope "
                     " *.swap "
                     " *.slice "
                     " *.user "
                     " *.mount "
                     " *.partition "
-                    " */ns "                               //   lxc/*/ns    #1397
+                    " */ns "                               //   /lxc/*/ns    #1397
             ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
     disabled_cgroup_paths = netdata_simple_pattern_list_create(
-            config_get("plugin:cgroups", "disable by default cgroup paths matching",
-                    " system "
-                    " systemd "
-                    " user.slice "
-                    " user "
-                    " init.scope "
-                    " *-qemu "
+            config_get("plugin:cgroups", "do not search for cgroups in paths matching",
+                    " /system "
+                    " /systemd "
+                    " /user.slice "
+                    " /user "
+                    " /init.scope "
+                    " *-qemu "                             //  #345
+            ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
+
+    cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", cgroups_rename_script);
+
+    disabled_cgroup_renames = netdata_simple_pattern_list_create(
+            config_get("plugin:cgroups", "do not run script to rename cgroups matching",
+                    " / "
+                    " *.service "
+                    " *.slice "
+                    " *.scope "
+                    " *.swap "
+                    " *.mount "
+                    " *.partition "
+                    " *.user "
+            ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
+
+    systemd_services_cgroups = netdata_simple_pattern_list_create(
+            config_get("plugin:cgroups", "cgroups to match as systemd services",
+                    " *.service "
             ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
     mountinfo_free(root);
@@ -200,8 +223,8 @@ struct cpuacct_usage {
     unsigned long long *cpu_percpu;
 };
 
-#define CGROUP_OPTIONS_DISABLED_DUPLICATE 0x00000001
-#define CGROUP_OPTIONS_PART_OF_GROUP      0x00000002
+#define CGROUP_OPTIONS_DISABLED_DUPLICATE   0x00000001
+#define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE 0x00000002
 
 struct cgroup {
     uint32_t options;
@@ -230,6 +253,21 @@ struct cgroup {
 
     struct blkio io_merged;                     // operations
     struct blkio io_queued;                     // operations
+
+    RRDSET *st_cpu;
+    RRDSET *st_cpu_per_core;
+    RRDSET *st_mem;
+    RRDSET *st_writeback;
+    RRDSET *st_mem_activity;
+    RRDSET *st_pgfaults;
+    RRDSET *st_mem_usage;
+    RRDSET *st_mem_failcnt;
+    RRDSET *st_io;
+    RRDSET *st_serviced_ops;
+    RRDSET *st_throttle_io;
+    RRDSET *st_throttle_serviced_ops;
+    RRDSET *st_queued_ops;
+    RRDSET *st_merged_ops;
 
     struct cgroup *next;
 
@@ -647,80 +685,122 @@ void read_all_cgroups(struct cgroup *root) {
 
 #define CGROUP_CHARTID_LINE_MAX 1024
 
-void cgroup_get_chart_id(struct cgroup *cg) {
-    debug(D_CGROUP, "getting the name of cgroup '%s'", cg->id);
+static char *cgroup_title_strdupz(const char *s) {
+    if(!s || !*s) s = "/";
 
-    pid_t cgroup_pid;
-    char buffer[CGROUP_CHARTID_LINE_MAX + 1];
+    if(*s == '/' && s[1] != '\0') s++;
 
-    snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'",
-             config_get("plugin:cgroups", "script to get cgroup names", PLUGINS_DIR "/cgroup-name.sh"), cg->chart_id);
+    char *r = strdupz(s);
+    netdata_fix_chart_name(r);
 
-    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", buffer, cg->id);
-    FILE *fp = mypopen(buffer, &cgroup_pid);
-    if(!fp) {
-        error("CGROUP: Cannot popen(\"%s\", \"r\").", buffer);
-        return;
+    return r;
+}
+
+static char *cgroup_chart_id_strdupz(const char *s) {
+    if(!s || !*s) s = "/";
+
+    if(*s == '/' && s[1] != '\0') s++;
+
+    char *r = strdupz(s);
+    netdata_fix_chart_id(r);
+
+    return r;
+}
+
+void cgroup_get_chart_name(struct cgroup *cg) {
+    debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
+
+    if(!netdata_simple_pattern_list_matches(disabled_cgroup_renames, cg->id) &&
+            !netdata_simple_pattern_list_matches(disabled_cgroup_renames, cg->chart_id)) {
+
+        pid_t cgroup_pid;
+        char buffer[CGROUP_CHARTID_LINE_MAX + 1];
+
+        snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->chart_id);
+
+        debug(D_CGROUP, "executing command '%s' for cgroup '%s'", buffer, cg->id);
+        FILE *fp = mypopen(buffer, &cgroup_pid);
+        if(fp) {
+            // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", buffer, cg->id);
+            char *s = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp);
+            // debug(D_CGROUP, "closing command for cgroup '%s'", cg->id);
+            mypclose(fp, cgroup_pid);
+            // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
+
+            if(s && *s && *s != '\n') {
+                debug(D_CGROUP, "cgroup '%s' should be renamed to '%s'", cg->id, s);
+
+                trim(s);
+
+                freez(cg->chart_title);
+                cg->chart_title = cgroup_title_strdupz(s);
+
+                freez(cg->chart_id);
+                cg->chart_id = cgroup_chart_id_strdupz(s);
+                cg->hash_chart = simple_hash(cg->chart_id);
+            }
+        }
+        else
+            error("CGROUP: Cannot popen(\"%s\", \"r\").", buffer);
+
+        debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
     }
-    debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", buffer, cg->id);
-    char *s = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp);
-    debug(D_CGROUP, "closing command for cgroup '%s'", cg->id);
-    mypclose(fp, cgroup_pid);
-    debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
+    else
+        debug(D_CGROUP, "cgroup '%s' will not be renamed - it matches the list of disabled cgroup renames (will be shown as '%s')", cg->id, cg->chart_id);
 
-    if(s && *s && *s != '\n') {
-        debug(D_CGROUP, "cgroup '%s' should be renamed to '%s'", cg->id, s);
 
-        trim(s);
+    if(netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->id) ||
+            netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->chart_id)) {
+        debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') matches systemd services cgroups", cg->id, cg->chart_id, cg->chart_title);
+
+        char buffer[CGROUP_CHARTID_LINE_MAX + 1];
+        cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
+
+        strncpy(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
+        char *s = buffer;
+
+        // skip to the last slash
+        size_t len = strlen(s);
+        while(len--) if(unlikely(s[len] == '/')) break;
+        if(len) s = &s[len+1];
+
+        // remove extension
+        //len = strlen(s);
+        //while(len--) if(unlikely(s[len] == '.')) break;
+        //if(len) s[len] = '\0';
 
         freez(cg->chart_title);
-        cg->chart_title = strdupz(s);
-        netdata_fix_chart_name(cg->chart_title);
+        cg->chart_title = cgroup_title_strdupz(s);
 
         freez(cg->chart_id);
-        cg->chart_id = strdupz(s);
-        netdata_fix_chart_id(cg->chart_id);
+        cg->chart_id = cgroup_chart_id_strdupz(s);
         cg->hash_chart = simple_hash(cg->chart_id);
 
         debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
     }
-    else debug(D_CGROUP, "cgroup '%s' is not to be renamed (will be shown as '%s')", cg->id, cg->chart_id);
+    else
+        debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') does not match systemd services groups", cg->id, cg->chart_id, cg->chart_title);
 }
 
 struct cgroup *cgroup_add(const char *id) {
-    debug(D_CGROUP, "adding cgroup with id '%s'", id);
+    if(!id || !*id) id = "/";
+    debug(D_CGROUP, "adding to list, cgroup with id '%s'", id);
 
     if(cgroup_root_count >= cgroup_root_max) {
         info("Maximum number of cgroups reached (%d). Not adding cgroup '%s'", cgroup_root_count, id);
         return NULL;
     }
 
-    int def = cgroup_enable_new_cgroups_detected_at_runtime;
-    const char *chart_id = id;
-    if(!*chart_id) {
-        chart_id = "/";
-
-        // disable by default the root cgroup
-        def = 0;
-    }
-    else {
-        if(*chart_id == '/') chart_id++;
-        if(netdata_simple_pattern_list_matches(disabled_cgroups_patterns, chart_id))
-            def = 0;
-    }
-
-    debug(D_CGROUP, "cgroup with id '%s' (chart_id '%s') is (by default) %s", id, chart_id, (def)?"enabled":"disabled");
-
+    int def = netdata_simple_pattern_list_matches(disabled_cgroups_patterns, id)?0:cgroup_enable_new_cgroups_detected_at_runtime;
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
     cg->id = strdupz(id);
     cg->hash = simple_hash(cg->id);
 
-    cg->chart_id = strdupz(chart_id);
-    netdata_fix_chart_id(cg->chart_id);
-    cg->hash_chart = simple_hash(cg->chart_id);
+    cg->chart_title = cgroup_title_strdupz(id);
 
-    cg->chart_title = strdupz(chart_id);
+    cg->chart_id = cgroup_chart_id_strdupz(id);
+    cg->hash_chart = simple_hash(cg->chart_id);
 
     if(!cgroup_root)
         cgroup_root = cg;
@@ -734,9 +814,7 @@ struct cgroup *cgroup_add(const char *id) {
     cgroup_root_count++;
 
     // fix the name by calling the external script
-    cgroup_get_chart_id(cg);
-
-    debug(D_CGROUP, "adding cgroup '%s' ('%s') with chart id '%s' ('%s')", cg->id, id, cg->chart_id, chart_id);
+    cgroup_get_chart_name(cg);
 
     char option[FILENAME_MAX + 1];
     snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
@@ -768,7 +846,7 @@ struct cgroup *cgroup_add(const char *id) {
         }
     }
 
-    debug(D_CGROUP, "Added cgroup '%s' with chart id '%s' and title '%s' as %s (default was %s)", cg->id, cg->chart_id, cg->chart_title, (cg->enabled)?"enabled":"disabled", (def)?"enabled":"disabled");
+    debug(D_CGROUP, "ADDED CGROUP: '%s' with chart id '%s' and title '%s' as %s (default was %s)", cg->id, cg->chart_id, cg->chart_title, (cg->enabled)?"enabled":"disabled", (def)?"enabled":"disabled");
 
     return cg;
 }
@@ -816,7 +894,7 @@ struct cgroup *cgroup_find(const char *id) {
             break;
     }
 
-    debug(D_CGROUP, "cgroup_find('%s') %s", id, (cg)?"found":"not found");
+    debug(D_CGROUP, "cgroup '%s' %s in memory", id, (cg)?"found":"not found");
     return cg;
 }
 
@@ -842,7 +920,7 @@ void found_subdir_in_dir(const char *dir) {
                 return;
             }
         }
-        debug(D_CGROUP, "will add dir '%s' as cgroup", dir);
+        // debug(D_CGROUP, "will add dir '%s' as cgroup", dir);
         cg = cgroup_add(dir);
     }
 
@@ -850,13 +928,16 @@ void found_subdir_in_dir(const char *dir) {
 }
 
 int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
-    debug(D_CGROUP, "searching for directories in '%s'", base);
+    if(!this) this = base;
+    debug(D_CGROUP, "searching for directories in '%s' (base '%s')", this?this:"", base);
+
+    size_t dirlen = strlen(this), baselen = strlen(base);
 
     int ret = -1;
     int enabled = -1;
-    if(!this) this = base;
-    size_t dirlen = strlen(this), baselen = strlen(base);
+
     const char *relative_path = &this[baselen];
+    if(!*relative_path) relative_path = "/";
 
     DIR *dir = opendir(this);
     if(!dir) {
@@ -876,16 +957,12 @@ int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(con
                 ))
             continue;
 
-        debug(D_CGROUP, "examining '%s/%s'", this, de->d_name);
-
         if(de->d_type == DT_DIR) {
             if(enabled == -1) {
                 const char *r = relative_path;
                 if(*r == '\0') r = "/";
-                else if (*r == '/') r++;
 
                 // do not decent in directories we are not interested
-                // https://github.com/firehol/netdata/issues/345
                 int def = 1;
                 if(netdata_simple_pattern_list_matches(disabled_cgroup_paths, r))
                     def = 0;
@@ -1130,6 +1207,18 @@ void find_all_cgroups() {
 
 #define CHART_TITLE_MAX 300
 
+static inline char *cgroup_chart_type(char *buffer, const char *id, size_t len) {
+    if(buffer[0]) return buffer;
+
+    if(id[0] == '\0' || (id[0] == '/' && id[1] == '\0'))
+        strncpy(buffer, "cgroup_root", len);
+    else
+        snprintfz(buffer, len, "cgroup_%s", id);
+
+    netdata_fix_chart_id(buffer);
+    return buffer;
+}
+
 void update_cgroup_charts(int update_every) {
     debug(D_CGROUP, "updating cgroups charts");
 
@@ -1137,271 +1226,280 @@ void update_cgroup_charts(int update_every) {
     char title[CHART_TITLE_MAX + 1];
 
     struct cgroup *cg;
-    RRDSET *st;
 
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(!cg->available || !cg->enabled || cg->options & CGROUP_OPTIONS_PART_OF_GROUP)
+        if(!cg->available || !cg->enabled || cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)
             continue;
 
-        if(cg->id[0] == '\0')
-            strcpy(type, "cgroup_root");
-        //else if(cg->id[0] == '/')
-        //    snprintfz(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->chart_id);
-        else
-            snprintfz(type, RRD_ID_LENGTH_MAX, "cgroup_%s", cg->chart_id);
-
-        netdata_fix_chart_id(type);
+        type[0] = '\0';
 
         if(cg->cpuacct_stat.updated) {
-            st = rrdset_find_bytype(type, "cpu");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) for cgroup %s", (processors * 100), processors, (processors>1)?"s":"", cg->chart_title);
-                st = rrdset_create(type, "cpu", NULL, "cpu", "cgroup.cpu", title, "%", 40000, update_every, RRDSET_TYPE_STACKED);
+            if(unlikely(!cg->st_cpu)) {
+                cg->st_cpu = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "cpu");
+                if(!cg->st_cpu) {
+                    snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
+                    cg->st_cpu = rrdset_create(type, "cpu", NULL, "cpu", "cgroup.cpu", title, "%", 40000, update_every, RRDSET_TYPE_STACKED);
 
-                rrddim_add(st, "user", NULL, 100, hz, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "system", NULL, 100, hz, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_cpu, "user", NULL, 100, hz, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_cpu, "system", NULL, 100, hz, RRDDIM_INCREMENTAL);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_cpu);
 
-            rrddim_set(st, "user", cg->cpuacct_stat.user);
-            rrddim_set(st, "system", cg->cpuacct_stat.system);
-            rrdset_done(st);
+            rrddim_set(cg->st_cpu, "user", cg->cpuacct_stat.user);
+            rrddim_set(cg->st_cpu, "system", cg->cpuacct_stat.system);
+            rrdset_done(cg->st_cpu);
         }
 
         if(cg->cpuacct_usage.updated) {
             char id[RRD_ID_LENGTH_MAX + 1];
             unsigned int i;
 
-            st = rrdset_find_bytype(type, "cpu_per_core");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) Per Core for cgroup %s", (processors * 100), processors, (processors>1)?"s":"", cg->chart_title);
-                st = rrdset_create(type, "cpu_per_core", NULL, "cpu", "cgroup.cpu_per_core", title, "%", 40100, update_every, RRDSET_TYPE_STACKED);
+            if(unlikely(!cg->st_cpu_per_core)) {
+                cg->st_cpu_per_core = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "cpu_per_core");
+                if(!cg->st_cpu_per_core) {
+                    snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) Per Core for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
+                    cg->st_cpu_per_core = rrdset_create(type, "cpu_per_core", NULL, "cpu", "cgroup.cpu_per_core", title, "%", 40100, update_every, RRDSET_TYPE_STACKED);
 
-                for(i = 0; i < cg->cpuacct_usage.cpus ;i++) {
-                    snprintfz(id, CHART_TITLE_MAX, "cpu%u", i);
-                    rrddim_add(st, id, NULL, 100, 1000000000, RRDDIM_INCREMENTAL);
+                    for(i = 0; i < cg->cpuacct_usage.cpus; i++) {
+                        snprintfz(id, CHART_TITLE_MAX, "cpu%u", i);
+                        rrddim_add(cg->st_cpu_per_core, id, NULL, 100, 1000000000, RRDDIM_INCREMENTAL);
+                    }
                 }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_cpu_per_core);
 
             for(i = 0; i < cg->cpuacct_usage.cpus ;i++) {
                 snprintfz(id, CHART_TITLE_MAX, "cpu%u", i);
-                rrddim_set(st, id, cg->cpuacct_usage.cpu_percpu[i]);
+                rrddim_set(cg->st_cpu_per_core, id, cg->cpuacct_usage.cpu_percpu[i]);
             }
-            rrdset_done(st);
+            rrdset_done(cg->st_cpu_per_core);
         }
 
         if(cg->memory.updated) {
             if(cg->memory.cache + cg->memory.rss + cg->memory.rss_huge + cg->memory.mapped_file > 0) {
-                st = rrdset_find_bytype(type, "mem");
-                if(!st) {
-                    snprintfz(title, CHART_TITLE_MAX, "Memory Usage for cgroup %s", cg->chart_title);
-                    st = rrdset_create(type, "mem", NULL, "mem", "cgroup.mem", title, "MB", 40210, update_every,
-                                       RRDSET_TYPE_STACKED);
+                if(unlikely(!cg->st_mem)) {
+                    cg->st_mem = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "mem");
+                    if(!cg->st_mem) {
+                        snprintfz(title, CHART_TITLE_MAX, "Memory Usage for cgroup %s", cg->chart_title);
+                        cg->st_mem = rrdset_create(type, "mem", NULL, "mem", "cgroup.mem", title, "MB", 40210, update_every, RRDSET_TYPE_STACKED);
 
-                    rrddim_add(st, "cache", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "rss", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-                    if(cg->memory.has_dirty_swap)
-                        rrddim_add(st, "swap", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "rss_huge", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "mapped_file", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                        rrddim_add(cg->st_mem, "cache", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                        rrddim_add(cg->st_mem, "rss", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                        if(cg->memory.has_dirty_swap)
+                            rrddim_add(cg->st_mem, "swap", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                        rrddim_add(cg->st_mem, "rss_huge", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                        rrddim_add(cg->st_mem, "mapped_file", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                    }
                 }
-                else rrdset_next(st);
+                else rrdset_next(cg->st_mem);
 
-                rrddim_set(st, "cache", cg->memory.cache);
-                rrddim_set(st, "rss", cg->memory.rss);
+                rrddim_set(cg->st_mem, "cache", cg->memory.cache);
+                rrddim_set(cg->st_mem, "rss", cg->memory.rss);
                 if(cg->memory.has_dirty_swap)
-                    rrddim_set(st, "swap", cg->memory.swap);
-                rrddim_set(st, "rss_huge", cg->memory.rss_huge);
-                rrddim_set(st, "mapped_file", cg->memory.mapped_file);
-                rrdset_done(st);
+                    rrddim_set(cg->st_mem, "swap", cg->memory.swap);
+                rrddim_set(cg->st_mem, "rss_huge", cg->memory.rss_huge);
+                rrddim_set(cg->st_mem, "mapped_file", cg->memory.mapped_file);
+                rrdset_done(cg->st_mem);
             }
 
-            st = rrdset_find_bytype(type, "writeback");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "Writeback Memory for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "writeback", NULL, "mem", "cgroup.writeback", title, "MB", 40300,
-                                   update_every, RRDSET_TYPE_AREA);
+            if(unlikely(!cg->st_writeback)) {
+                cg->st_writeback = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "writeback");
+                if(!cg->st_writeback) {
+                    snprintfz(title, CHART_TITLE_MAX, "Writeback Memory for cgroup %s", cg->chart_title);
+                    cg->st_writeback = rrdset_create(type, "writeback", NULL, "mem", "cgroup.writeback", title, "MB", 40300, update_every, RRDSET_TYPE_AREA);
 
-                if(cg->memory.has_dirty_swap)
-                    rrddim_add(st, "dirty", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "writeback", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                    if(cg->memory.has_dirty_swap)
+                        rrddim_add(cg->st_writeback, "dirty", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                    rrddim_add(cg->st_writeback, "writeback", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_writeback);
 
             if(cg->memory.has_dirty_swap)
-                rrddim_set(st, "dirty", cg->memory.dirty);
-            rrddim_set(st, "writeback", cg->memory.writeback);
-            rrdset_done(st);
+                rrddim_set(cg->st_writeback, "dirty", cg->memory.dirty);
+            rrddim_set(cg->st_writeback, "writeback", cg->memory.writeback);
+            rrdset_done(cg->st_writeback);
 
             if(cg->memory.pgpgin + cg->memory.pgpgout > 0) {
-                st = rrdset_find_bytype(type, "mem_activity");
-                if(!st) {
-                    snprintfz(title, CHART_TITLE_MAX, "Memory Activity for cgroup %s", cg->chart_title);
-                    st = rrdset_create(type, "mem_activity", NULL, "mem", "cgroup.mem_activity", title, "MB/s",
-                                       40400, update_every, RRDSET_TYPE_LINE);
+                if(unlikely(!cg->st_mem_activity)) {
+                    cg->st_mem_activity = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "mem_activity");
+                    if(!cg->st_mem_activity) {
+                        snprintfz(title, CHART_TITLE_MAX, "Memory Activity for cgroup %s", cg->chart_title);
+                        cg->st_mem_activity = rrdset_create(type, "mem_activity", NULL, "mem", "cgroup.mem_activity", title, "MB/s", 40400, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "pgpgin", "in", sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "pgpgout", "out", -sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
+                        rrddim_add(cg->st_mem_activity, "pgpgin", "in", sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
+                        rrddim_add(cg->st_mem_activity, "pgpgout", "out", -sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
+                    }
                 }
-                else rrdset_next(st);
+                else rrdset_next(cg->st_mem_activity);
 
-                rrddim_set(st, "pgpgin", cg->memory.pgpgin);
-                rrddim_set(st, "pgpgout", cg->memory.pgpgout);
-                rrdset_done(st);
+                rrddim_set(cg->st_mem_activity, "pgpgin", cg->memory.pgpgin);
+                rrddim_set(cg->st_mem_activity, "pgpgout", cg->memory.pgpgout);
+                rrdset_done(cg->st_mem_activity);
             }
 
             if(cg->memory.pgfault + cg->memory.pgmajfault > 0) {
-                st = rrdset_find_bytype(type, "pgfaults");
-                if(!st) {
-                    snprintfz(title, CHART_TITLE_MAX, "Memory Page Faults for cgroup %s", cg->chart_title);
-                    st = rrdset_create(type, "pgfaults", NULL, "mem", "cgroup.pgfaults", title, "MB/s", 40500,
-                                       update_every, RRDSET_TYPE_LINE);
+                if(unlikely(!cg->st_pgfaults)) {
+                    cg->st_pgfaults = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "pgfaults");
+                    if(!cg->st_pgfaults) {
+                        snprintfz(title, CHART_TITLE_MAX, "Memory Page Faults for cgroup %s", cg->chart_title);
+                        cg->st_pgfaults = rrdset_create(type, "pgfaults", NULL, "mem", "cgroup.pgfaults", title, "MB/s", 40500, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "pgfault", NULL, sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "pgmajfault", "swap", -sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
+                        rrddim_add(cg->st_pgfaults, "pgfault", NULL, sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
+                        rrddim_add(cg->st_pgfaults, "pgmajfault", "swap", -sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
+                    }
                 }
-                else rrdset_next(st);
+                else rrdset_next(cg->st_pgfaults);
 
-                rrddim_set(st, "pgfault", cg->memory.pgfault);
-                rrddim_set(st, "pgmajfault", cg->memory.pgmajfault);
-                rrdset_done(st);
+                rrddim_set(cg->st_pgfaults, "pgfault", cg->memory.pgfault);
+                rrddim_set(cg->st_pgfaults, "pgmajfault", cg->memory.pgmajfault);
+                rrdset_done(cg->st_pgfaults);
             }
         }
 
         if(cg->memory.usage_in_bytes_updated) {
-            st = rrdset_find_bytype(type, "mem_usage");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "Total Memory for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "mem_usage", NULL, "mem", "cgroup.mem_usage", title, "MB", 40200,
-                                   update_every, RRDSET_TYPE_STACKED);
+            if(unlikely(!cg->st_mem_usage)) {
+                cg->st_mem_usage = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "mem_usage");
+                if(!cg->st_mem_usage) {
+                    snprintfz(title, CHART_TITLE_MAX, "Total Memory for cgroup %s", cg->chart_title);
+                    cg->st_mem_usage = rrdset_create(type, "mem_usage", NULL, "mem", "cgroup.mem_usage", title, "MB", 40200, update_every, RRDSET_TYPE_STACKED);
 
-                rrddim_add(st, "ram", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "swap", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                    rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                    rrddim_add(cg->st_mem_usage, "swap", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_mem_usage);
 
-            rrddim_set(st, "ram", cg->memory.usage_in_bytes);
-            rrddim_set(st, "swap", (cg->memory.msw_usage_in_bytes > cg->memory.usage_in_bytes)?cg->memory.msw_usage_in_bytes - cg->memory.usage_in_bytes:0);
-            rrdset_done(st);
+            rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes);
+            rrddim_set(cg->st_mem_usage, "swap", (cg->memory.msw_usage_in_bytes > cg->memory.usage_in_bytes)?cg->memory.msw_usage_in_bytes - cg->memory.usage_in_bytes:0);
+            rrdset_done(cg->st_mem_usage);
         }
 
         if(cg->memory.failcnt_updated && cg->memory.failcnt > 0) {
-            st = rrdset_find_bytype(type, "mem_failcnt");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "Memory Limit Failures for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "mem_failcnt", NULL, "mem", "cgroup.mem_failcnt", title, "MB", 40250,
-                                   update_every, RRDSET_TYPE_LINE);
+            if(unlikely(!cg->st_mem_failcnt)) {
+                cg->st_mem_failcnt = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "mem_failcnt");
+                if(!cg->st_mem_failcnt) {
+                    snprintfz(title, CHART_TITLE_MAX, "Memory Limit Failures for cgroup %s", cg->chart_title);
+                    cg->st_mem_failcnt = rrdset_create(type, "mem_failcnt", NULL, "mem", "cgroup.mem_failcnt", title, "MB", 40250, update_every, RRDSET_TYPE_LINE);
 
-                rrddim_add(st, "failures", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_mem_failcnt, "failures", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_mem_failcnt);
 
-            rrddim_set(st, "failures", cg->memory.failcnt);
-            rrdset_done(st);
+            rrddim_set(cg->st_mem_failcnt, "failures", cg->memory.failcnt);
+            rrdset_done(cg->st_mem_failcnt);
         }
 
         if(cg->io_service_bytes.updated && cg->io_service_bytes.Read + cg->io_service_bytes.Write > 0) {
-            st = rrdset_find_bytype(type, "io");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_AREA);
+            if(unlikely(!cg->st_io)) {
+                cg->st_io = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "io");
+                if(!cg->st_io) {
+                    snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
+                    cg->st_io = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200, update_every, RRDSET_TYPE_AREA);
 
-                rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_io, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_io, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_io);
 
-            rrddim_set(st, "read", cg->io_service_bytes.Read);
-            rrddim_set(st, "write", cg->io_service_bytes.Write);
-            rrdset_done(st);
+            rrddim_set(cg->st_io, "read", cg->io_service_bytes.Read);
+            rrddim_set(cg->st_io, "write", cg->io_service_bytes.Write);
+            rrdset_done(cg->st_io);
         }
 
         if(cg->io_serviced.updated && cg->io_serviced.Read + cg->io_serviced.Write > 0) {
-            st = rrdset_find_bytype(type, "serviced_ops");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "Serviced I/O Operations (all disks) for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "serviced_ops", NULL, "disk", "cgroup.serviced_ops", title, "operations/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+            if(unlikely(!cg->st_serviced_ops)) {
+                cg->st_serviced_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "serviced_ops");
+                if(!cg->st_serviced_ops) {
+                    snprintfz(title, CHART_TITLE_MAX, "Serviced I/O Operations (all disks) for cgroup %s"
+                              , cg->chart_title);
+                    cg->st_serviced_ops = rrdset_create(type, "serviced_ops", NULL, "disk", "cgroup.serviced_ops", title, "operations/s", 41200, update_every, RRDSET_TYPE_LINE);
 
-                rrddim_add(st, "read", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "write", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_serviced_ops, "read", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_serviced_ops, "write", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_serviced_ops);
 
-            rrddim_set(st, "read", cg->io_serviced.Read);
-            rrddim_set(st, "write", cg->io_serviced.Write);
-            rrdset_done(st);
+            rrddim_set(cg->st_serviced_ops, "read", cg->io_serviced.Read);
+            rrddim_set(cg->st_serviced_ops, "write", cg->io_serviced.Write);
+            rrdset_done(cg->st_serviced_ops);
         }
 
         if(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.Read + cg->throttle_io_service_bytes.Write > 0) {
-            st = rrdset_find_bytype(type, "throttle_io");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "throttle_io", NULL, "disk", "cgroup.throttle_io", title, "KB/s", 41200,
-                                   update_every, RRDSET_TYPE_AREA);
+            if(unlikely(!cg->st_throttle_io)) {
+                cg->st_throttle_io = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "throttle_io");
+                if(!cg->st_throttle_io) {
+                    snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
+                    cg->st_throttle_io = rrdset_create(type, "throttle_io", NULL, "disk", "cgroup.throttle_io", title, "KB/s", 41200, update_every, RRDSET_TYPE_AREA);
 
-                rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_throttle_io, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_throttle_io, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_throttle_io);
 
-            rrddim_set(st, "read", cg->throttle_io_service_bytes.Read);
-            rrddim_set(st, "write", cg->throttle_io_service_bytes.Write);
-            rrdset_done(st);
+            rrddim_set(cg->st_throttle_io, "read", cg->throttle_io_service_bytes.Read);
+            rrddim_set(cg->st_throttle_io, "write", cg->throttle_io_service_bytes.Write);
+            rrdset_done(cg->st_throttle_io);
         }
 
 
         if(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.Read + cg->throttle_io_serviced.Write > 0) {
-            st = rrdset_find_bytype(type, "throttle_serviced_ops");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "Throttle Serviced I/O Operations (all disks) for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "throttle_serviced_ops", NULL, "disk", "cgroup.throttle_serviced_ops", title, "operations/s", 41200,
-                                   update_every, RRDSET_TYPE_LINE);
+            if(unlikely(!cg->st_throttle_serviced_ops)) {
+                cg->st_throttle_serviced_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "throttle_serviced_ops");
+                if(!cg->st_throttle_serviced_ops) {
+                    snprintfz(title, CHART_TITLE_MAX, "Throttle Serviced I/O Operations (all disks) for cgroup %s", cg->chart_title);
+                    cg->st_throttle_serviced_ops = rrdset_create(type, "throttle_serviced_ops", NULL, "disk", "cgroup.throttle_serviced_ops", title, "operations/s", 41200, update_every, RRDSET_TYPE_LINE);
 
-                rrddim_add(st, "read", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "write", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_throttle_serviced_ops, "read", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_throttle_serviced_ops, "write", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_throttle_serviced_ops);
 
-            rrddim_set(st, "read", cg->throttle_io_serviced.Read);
-            rrddim_set(st, "write", cg->throttle_io_serviced.Write);
-            rrdset_done(st);
+            rrddim_set(cg->st_throttle_serviced_ops, "read", cg->throttle_io_serviced.Read);
+            rrddim_set(cg->st_throttle_serviced_ops, "write", cg->throttle_io_serviced.Write);
+            rrdset_done(cg->st_throttle_serviced_ops);
         }
 
         if(cg->io_queued.updated) {
-            st = rrdset_find_bytype(type, "queued_ops");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "Queued I/O Operations (all disks) for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "queued_ops", NULL, "disk", "cgroup.queued_ops", title, "operations", 42000,
-                                   update_every, RRDSET_TYPE_LINE);
+            if(unlikely(!cg->st_queued_ops)) {
+                cg->st_queued_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "queued_ops");
+                if(!cg->st_queued_ops) {
+                    snprintfz(title, CHART_TITLE_MAX, "Queued I/O Operations (all disks) for cgroup %s", cg->chart_title);
+                    cg->st_queued_ops = rrdset_create(type, "queued_ops", NULL, "disk", "cgroup.queued_ops", title, "operations", 42000, update_every, RRDSET_TYPE_LINE);
 
-                rrddim_add(st, "read", NULL, 1, 1, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "write", NULL, -1, 1, RRDDIM_ABSOLUTE);
+                    rrddim_add(cg->st_queued_ops, "read", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                    rrddim_add(cg->st_queued_ops, "write", NULL, -1, 1, RRDDIM_ABSOLUTE);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_queued_ops);
 
-            rrddim_set(st, "read", cg->io_queued.Read);
-            rrddim_set(st, "write", cg->io_queued.Write);
-            rrdset_done(st);
+            rrddim_set(cg->st_queued_ops, "read", cg->io_queued.Read);
+            rrddim_set(cg->st_queued_ops, "write", cg->io_queued.Write);
+            rrdset_done(cg->st_queued_ops);
         }
 
         if(cg->io_merged.updated && cg->io_merged.Read + cg->io_merged.Write > 0) {
-            st = rrdset_find_bytype(type, "merged_ops");
-            if(!st) {
-                snprintfz(title, CHART_TITLE_MAX, "Merged I/O Operations (all disks) for cgroup %s", cg->chart_title);
-                st = rrdset_create(type, "merged_ops", NULL, "disk", "cgroup.merged_ops", title, "operations/s", 42100,
-                                   update_every, RRDSET_TYPE_LINE);
+            if(unlikely(!cg->st_merged_ops)) {
+                cg->st_merged_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->id, RRD_ID_LENGTH_MAX), "merged_ops");
+                if(!cg->st_merged_ops) {
+                    snprintfz(title, CHART_TITLE_MAX, "Merged I/O Operations (all disks) for cgroup %s", cg->chart_title);
+                    cg->st_merged_ops = rrdset_create(type, "merged_ops", NULL, "disk", "cgroup.merged_ops", title, "operations/s", 42100, update_every, RRDSET_TYPE_LINE);
 
-                rrddim_add(st, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_merged_ops, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(cg->st_merged_ops, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
+                }
             }
-            else rrdset_next(st);
+            else rrdset_next(cg->st_merged_ops);
 
-            rrddim_set(st, "read", cg->io_merged.Read);
-            rrddim_set(st, "write", cg->io_merged.Write);
-            rrdset_done(st);
+            rrddim_set(cg->st_merged_ops, "read", cg->io_merged.Read);
+            rrddim_set(cg->st_merged_ops, "write", cg->io_merged.Write);
+            rrdset_done(cg->st_merged_ops);
         }
     }
 

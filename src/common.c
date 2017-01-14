@@ -1199,7 +1199,7 @@ struct simple_pattern {
 };
 
 NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NETDATA_SIMPLE_PREFIX_MODE default_mode) {
-    struct simple_pattern *root = NULL;
+    struct simple_pattern *root = NULL, *last = NULL;
 
     if(unlikely(!list || !*list)) return root;
 
@@ -1237,36 +1237,37 @@ NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NET
             if(len >= 2 && *s == '*' && s[len - 1] == '*') {
                 s[len - 1] = '\0';
                 s++;
-                len -= 2;
                 mode = NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING;
             }
             else if(len >= 1 && *s == '*') {
                 s++;
-                len--;
                 mode = NETDATA_SIMPLE_PATTERN_MODE_SUFFIX;
             }
             else if(len >= 1 && s[len - 1] == '*') {
                 s[len - 1] = '\0';
-                len--;
                 mode = NETDATA_SIMPLE_PATTERN_MODE_PREFIX;
             }
             else
                 mode = default_mode;
 
-            if(len) {
-                if(*s == '*')
-                    error("simple pattern '%s' includes '%s' that is invalid", a, s);
-
-                // allocate the structure
-                struct simple_pattern *m = mallocz(sizeof(struct simple_pattern));
+            // allocate the structure
+            struct simple_pattern *m = callocz(1, sizeof(struct simple_pattern));
+            if(*s) {
                 m->match = strdup(s);
                 m->len = strlen(m->match);
                 m->mode = mode;
-                m->next = root;
-                root = m;
             }
-            else
-                error("simple pattern '%s' includes invalid matches", a);
+            else {
+                m->mode = NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING;
+            }
+
+            // link it at the end
+            if(unlikely(!root))
+                root = last = m;
+            else {
+                last->next = m;
+                last = m;
+            }
 
             // prepare for next loop
             s = n;
@@ -1287,7 +1288,7 @@ int netdata_simple_pattern_list_matches(NETDATA_SIMPLE_PATTERN *list, const char
         if(m->len <= len) {
             switch(m->mode) {
                 case NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING:
-                    if(unlikely(strstr(str, m->match)))
+                    if(unlikely(!m->len || strstr(str, m->match)))
                         return 1;
                     break;
 
