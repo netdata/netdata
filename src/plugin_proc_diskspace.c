@@ -14,7 +14,7 @@ static inline void mountinfo_reload(int force) {
         mountinfo_free(disk_mountinfo_root);
 
         // re-read mountinfo in case something changed
-        disk_mountinfo_root = mountinfo_read();
+        disk_mountinfo_root = mountinfo_read(1);
 
         last_loaded = now;
     }
