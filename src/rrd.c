@@ -902,7 +902,10 @@ void rrdset_save_all(void) {
     RRDSET *st;
     RRDDIM *rd;
 
-    rrdhost_rdlock(&localhost);
+    // we get an write lock
+    // to ensure only one thread is saving the database
+    rrdhost_rwlock(&localhost);
+
     for(st = localhost.rrdset_root; st ; st = st->next) {
         pthread_rwlock_rdlock(&st->rwlock);
 
@@ -920,6 +923,7 @@ void rrdset_save_all(void) {
 
         pthread_rwlock_unlock(&st->rwlock);
     }
+
     rrdhost_unlock(&localhost);
 }
 
