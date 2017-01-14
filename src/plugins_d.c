@@ -428,12 +428,13 @@ void *pluginsd_worker_thread(void *arg)
     info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
 
     cd->obsolete = 1;
+    cd->thread = 0;
     pthread_exit(NULL);
     return NULL;
 }
 
 void *pluginsd_main(void *ptr) {
-    (void)ptr;
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("PLUGINS.D thread created with task id %d", gettid());
 
@@ -461,8 +462,7 @@ void *pluginsd_main(void *ptr) {
         dir = opendir(dir_name);
         if(unlikely(!dir)) {
             error("Cannot open directory '%s'.", dir_name);
-            pthread_exit(NULL);
-            return NULL;
+            goto cleanup;
         }
 
         while(likely((file = readdir(dir)))) {
@@ -520,7 +520,10 @@ void *pluginsd_main(void *ptr) {
             }
             cd->obsolete = 0;
 
-            if(unlikely(!cd->enabled)) continue;
+            if(unlikely(!cd->enabled)) {
+                cd->obsolete = 1;
+                continue;
+            }
 
             // spawn a new thread for it
             if(unlikely(pthread_create(&cd->thread, NULL, pluginsd_worker_thread, cd) != 0)) {
@@ -529,14 +532,18 @@ void *pluginsd_main(void *ptr) {
             }
             else if(unlikely(pthread_detach(cd->thread) != 0))
                 error("PLUGINSD: Cannot request detach of newly created thread for plugin '%s'.", cd->filename);
+
         }
 
         closedir(dir);
         sleep((unsigned int) scan_frequency);
     }
 
+cleanup:
     info("PLUGINS.D thread exiting");
 
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

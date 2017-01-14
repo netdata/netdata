@@ -56,9 +56,8 @@ static struct proc_module {
         { .name = NULL, .dim = NULL, .func = NULL }
 };
 
-void *proc_main(void *ptr)
-{
-    (void)ptr;
+void *proc_main(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("PROC Plugin thread created with task id %d", gettid());
 
@@ -140,6 +139,8 @@ void *proc_main(void *ptr)
 
     info("PROC thread exiting");
 
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

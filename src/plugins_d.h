@@ -23,7 +23,7 @@ struct plugind {
                                         // without collecting values
 
     int update_every;                   // the plugin default data collection frequency
-    int obsolete;                       // do not touch this structure after setting this to 1
+    volatile int obsolete;              // do not touch this structure after setting this to 1
     int enabled;                        // if this is enabled or not
 
     time_t started_t;

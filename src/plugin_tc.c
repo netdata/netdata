@@ -749,7 +749,7 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
 
 pid_t tc_child_pid = 0;
 void *tc_main(void *ptr) {
-    (void)ptr;
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("TC thread created with task id %d", gettid());
 
@@ -796,8 +796,7 @@ void *tc_main(void *ptr) {
         fp = mypopen(buffer, &tc_child_pid);
         if(unlikely(!fp)) {
             error("TC: Cannot popen(\"%s\", \"r\").", buffer);
-            pthread_exit(NULL);
-            return NULL;
+            goto cleanup;
         }
 
         while(fgets(buffer, TC_LINE_MAX, fp) != NULL) {
@@ -998,8 +997,7 @@ void *tc_main(void *ptr) {
 
         if(unlikely(netdata_exit)) {
             tc_device_free_all();
-            pthread_exit(NULL);
-            return NULL;
+            goto cleanup;
         }
 
         if(code == 1 || code == 127) {
@@ -1008,13 +1006,17 @@ void *tc_main(void *ptr) {
             error("TC: tc-qos-helper.sh exited with code %d. Disabling it.", code);
 
             tc_device_free_all();
-            pthread_exit(NULL);
-            return NULL;
+            goto cleanup;
         }
 
         sleep((unsigned int) rrd_update_every);
     }
 
+cleanup:
+    info("TC thread exiting");
+
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

@@ -1,8 +1,7 @@
 #include "common.h"
 
-void *macos_main(void *ptr)
-{
-    (void)ptr;
+void *macos_main(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("MACOS Plugin thread created with task id %d", gettid());
 
@@ -79,6 +78,8 @@ void *macos_main(void *ptr)
 
     info("MACOS thread exiting");
 
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

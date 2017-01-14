@@ -2,11 +2,10 @@
 
 #define CPU_IDLEJITTER_SLEEP_TIME_MS 20
 
-void *cpuidlejitter_main(void *ptr)
-{
-    if(ptr) { ; }
+void *cpuidlejitter_main(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
-    info("CPU Idle Jitter thread created with task id %d", gettid());
+    info("IDLEJITTER thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
         error("Cannot set pthread cancel type to DEFERRED.");
@@ -48,6 +47,10 @@ void *cpuidlejitter_main(void *ptr)
         rrdset_done(st);
     }
 
+    info("IDLEJITTER thread exiting");
+
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }
