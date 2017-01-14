@@ -54,71 +54,6 @@ static inline void mountinfo_reload(int force) {
 }
 
 
-// linked list of mount points that are by default disabled
-static struct excluded_mount_point {
-    const char *prefix;
-    size_t len;
-    struct excluded_mount_point *next;
-} *excluded_mount_points = NULL;
-
-static inline int is_mount_point_excluded(const char *mount_point) {
-    static int initialized = 0;
-
-    if(unlikely(!initialized)) {
-        initialized = 1;
-
-        char *a = config_get("plugin:proc:/proc/diskstats", "exclude space metrics on paths", "/proc/ /sys/ /var/run/user/ /run/user/");
-        if(a && *a) {
-            char *s = a;
-
-            while(s && *s) {
-                // skip all spaces
-                while(isspace(*s)) s++;
-
-                // empty string
-                if(unlikely(!*s)) break;
-
-                // find the next space
-                char *c = s;
-                while(*c && !isspace(*c)) c++;
-
-                char *n;
-                if(likely(*c)) n = c + 1;
-                else n = NULL;
-
-                // terminate our string
-                *c = '\0';
-
-                // allocate the structure
-                struct excluded_mount_point *m = mallocz(sizeof(struct excluded_mount_point));
-                m->prefix = strdup(s);
-                m->len = strlen(m->prefix);
-                m->next = excluded_mount_points;
-                excluded_mount_points = m;
-
-                // prepare for next loop
-                s = n;
-                if(likely(n)) *c = ' ';
-            }
-        }
-    }
-
-    size_t len = strlen(mount_point);
-    struct excluded_mount_point *m;
-    for(m = excluded_mount_points; m ; m = m->next) {
-        if(m->len <= len) {
-            // fprintf(stderr, "SPACE: comparing '%s' with '%s'\n", mount_point, m->prefix);
-            if(unlikely(strncmp(m->prefix, mount_point, m->len) == 0)) {
-                // fprintf(stderr, "SPACE: excluded '%s'\n", mount_point);
-                return 1;
-            }
-        }
-    }
-
-    // fprintf(stderr, "SPACE: included '%s'\n", mount_point);
-    return 0;
-}
-
 // Data to be stored in DICTIONARY mount_points used by do_disk_space_stats().
 // This DICTIONARY is used to lookup the settings of the mount point on each iteration.
 struct mount_point_metadata {
@@ -133,10 +68,12 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every, u
     const char *disk = mi->persistent_id;
 
     static DICTIONARY *mount_points = NULL;
+    static NETDATA_SIMPLE_PATTERN *excluded_mountpoints = NULL;
     int do_space, do_inodes;
 
     if(unlikely(!mount_points)) {
         mount_points = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        excluded_mountpoints = netdata_simple_pattern_list_create(config_get("plugin:proc:/proc/diskstats", "exclude space metrics on paths", "/proc/ /sys/ /var/run/user/ /run/user/"), NETDATA_SIMPLE_PATTERN_MODE_PREFIX);
     }
 
     struct mount_point_metadata *m = dictionary_get(mount_points, mi->mount_point);
@@ -147,7 +84,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every, u
         int def_space = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
         int def_inodes = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "inodes usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
 
-        if(unlikely(is_mount_point_excluded(mi->mount_point))) {
+        if(unlikely(netdata_simple_pattern_list_matches(excluded_mountpoints, mi->mount_point))) {
             def_space = CONFIG_ONDEMAND_NO;
             def_inodes = CONFIG_ONDEMAND_NO;
         }

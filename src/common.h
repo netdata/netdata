@@ -277,4 +277,14 @@ extern void get_system_HZ(void);
 
 extern int read_single_number_file(const char *filename, unsigned long long *result);
 
+typedef enum {
+    NETDATA_SIMPLE_PATTERN_MODE_EXACT,
+    NETDATA_SIMPLE_PATTERN_MODE_PREFIX,
+    NETDATA_SIMPLE_PATTERN_MODE_SUFFIX,
+    NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING
+} NETDATA_SIMPLE_PREFIX_MODE;
+typedef void NETDATA_SIMPLE_PATTERN;
+extern NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NETDATA_SIMPLE_PREFIX_MODE default_mode);
+extern int netdata_simple_pattern_list_matches(NETDATA_SIMPLE_PATTERN *list, const char *str);
+
 #endif /* NETDATA_COMMON_H */
