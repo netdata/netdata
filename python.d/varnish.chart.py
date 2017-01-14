@@ -235,7 +235,7 @@ class Service(SimpleService):
         except OSError:
             return None
 
-        raw_data = reply.stdout.read()
+        raw_data = reply.communicate()[0]
 
         if not raw_data:
             return None
