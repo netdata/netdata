@@ -25,7 +25,6 @@ static inline void mountinfo_reload(int force) {
 struct mount_point_metadata {
     int do_space;
     int do_inodes;
-    int update_every;
 };
 
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
@@ -71,8 +70,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         struct mount_point_metadata mp = {
                 .do_space = do_space,
-                .do_inodes = do_inodes,
-                .update_every = rrd_update_every
+                .do_inodes = do_inodes
         };
 
         dictionary_set(mount_points, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
@@ -80,7 +78,6 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     else {
         do_space = m->do_space;
         do_inodes = m->do_inodes;
-        update_every = m->update_every;
     }
 
     if(unlikely(do_space == CONFIG_ONDEMAND_NO && do_inodes == CONFIG_ONDEMAND_NO))
