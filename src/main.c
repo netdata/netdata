@@ -178,12 +178,13 @@ void kill_childs()
 
     struct plugind *cd;
     for(cd = pluginsd_root ; cd ; cd = cd->next) {
-        if(!cd->obsolete) {
-            if(cd->thread) {
+        if(cd->enabled && !cd->obsolete) {
+            if(cd->thread != (pthread_t)NULL) {
                 info("Stopping %s plugin thread", cd->id);
                 pthread_cancel(cd->thread);
                 // they are detached
                 // pthread_join(cd->thread, NULL);
+                cd->thread = (pthread_t)NULL;
             }
 
             if(cd->pid) {
