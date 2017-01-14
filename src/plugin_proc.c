@@ -68,12 +68,7 @@ void *proc_main(void *ptr)
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    // disable (by default) various interface that are not needed
-    config_get_boolean("plugin:proc:/proc/net/dev:lo", "enabled", 0);
-    config_get_boolean("plugin:proc:/proc/net/dev:fireqos_monitor", "enabled", 0);
-
-    // when ZERO, attempt to do it
-    int vdo_cpu_netdata             = !config_get_boolean("plugin:proc", "netdata server resources", 1);
+    int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
 
     // check the enabled status for each module
     int i;
@@ -116,7 +111,7 @@ void *proc_main(void *ptr)
 
         // --------------------------------------------------------------------
 
-        if(!vdo_cpu_netdata) {
+        if(vdo_cpu_netdata) {
             static RRDSET *st = NULL;
             if(unlikely(!st)) {
                 st = rrdset_find_bytype("netdata", "plugin_proc_modules");

@@ -1187,3 +1187,128 @@ int read_single_number_file(const char *filename, unsigned long long *result) {
     *result = strtoull(buffer, NULL, 0);
     return 0;
 }
+
+// ----------------------------------------------------------------------------
+// simple_pattern_match
+
+struct simple_pattern {
+    const char *match;
+    size_t len;
+    NETDATA_SIMPLE_PREFIX_MODE mode;
+    struct simple_pattern *next;
+};
+
+NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NETDATA_SIMPLE_PREFIX_MODE default_mode) {
+    struct simple_pattern *root = NULL;
+
+    if(unlikely(!list || !*list)) return root;
+
+    char *a = strdupz(list);
+    if(a && *a) {
+        char *s = a;
+
+        while(s && *s) {
+            // skip all spaces
+            while(isspace(*s)) s++;
+
+            // empty string
+            if(unlikely(!*s)) break;
+
+            // find the next space
+            char *c = s;
+            while(*c && !isspace(*c)) c++;
+
+            // find the next word
+            char *n;
+            if(likely(*c)) n = c + 1;
+            else n = NULL;
+
+            // terminate our string
+            *c = '\0';
+
+            char buf[100 + 1];
+            strncpy(buf, s, 100);
+            buf[100] = '\0';
+            if(likely(n)) *c = ' ';
+            s = buf;
+
+            NETDATA_SIMPLE_PREFIX_MODE mode;
+            size_t len = strlen(s);
+            if(len >= 2 && *s == '*' && s[len - 1] == '*') {
+                s[len - 1] = '\0';
+                s++;
+                len -= 2;
+                mode = NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING;
+            }
+            else if(len >= 1 && *s == '*') {
+                s++;
+                len--;
+                mode = NETDATA_SIMPLE_PATTERN_MODE_SUFFIX;
+            }
+            else if(len >= 1 && s[len - 1] == '*') {
+                s[len - 1] = '\0';
+                len--;
+                mode = NETDATA_SIMPLE_PATTERN_MODE_PREFIX;
+            }
+            else
+                mode = default_mode;
+
+            if(len) {
+                if(*s == '*')
+                    error("simple pattern '%s' includes '%s' that is invalid", a, s);
+
+                // allocate the structure
+                struct simple_pattern *m = mallocz(sizeof(struct simple_pattern));
+                m->match = strdup(s);
+                m->len = strlen(m->match);
+                m->mode = mode;
+                m->next = root;
+                root = m;
+            }
+            else
+                error("simple pattern '%s' includes invalid matches", a);
+
+            // prepare for next loop
+            s = n;
+        }
+    }
+
+    free(a);
+    return (NETDATA_SIMPLE_PATTERN *)root;
+}
+
+int netdata_simple_pattern_list_matches(NETDATA_SIMPLE_PATTERN *list, const char *str) {
+    struct simple_pattern *m, *root = (struct simple_pattern *)list;
+
+    if(unlikely(!root)) return 0;
+
+    size_t len = strlen(str);
+    for(m = root; m ; m = m->next) {
+        if(m->len <= len) {
+            switch(m->mode) {
+                case NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING:
+                    if(unlikely(strstr(str, m->match)))
+                        return 1;
+                    break;
+
+                case NETDATA_SIMPLE_PATTERN_MODE_PREFIX:
+                    if(unlikely(strncmp(str, m->match, m->len) == 0))
+                        return 1;
+                    break;
+
+                case NETDATA_SIMPLE_PATTERN_MODE_SUFFIX:
+                    if(unlikely(strcmp(&str[len - m->len], m->match) == 0))
+                        return 1;
+                    break;
+
+                case NETDATA_SIMPLE_PATTERN_MODE_EXACT:
+                default:
+                    if(unlikely(strcmp(str, m->match) == 0))
+                        return 1;
+                    break;
+            }
+        }
+    }
+
+    return 0;
+}
