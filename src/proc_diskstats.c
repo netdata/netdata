@@ -6,8 +6,6 @@
 #define DISK_TYPE_PARTITION 2
 #define DISK_TYPE_CONTAINER 3
 
-static int check_for_new_mountpoints_every = 15;
-
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc)
     unsigned long major;
@@ -30,27 +28,12 @@ static struct disk {
     struct disk *next;
 } *disk_root = NULL;
 
-static struct mountinfo *disk_mountinfo_root = NULL;
-
-static inline void mountinfo_reload(int force) {
-    static time_t last_loaded = 0;
-    time_t now = now_realtime_sec();
-
-    if(force || now - last_loaded >= check_for_new_mountpoints_every) {
-        // mountinfo_free() can be called with NULL disk_mountinfo_root
-        mountinfo_free(disk_mountinfo_root);
-
-        // re-read mountinfo in case something changed
-        disk_mountinfo_root = mountinfo_read(0);
-
-        last_loaded = now;
-    }
-}
-
 static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk) {
     static char path_to_get_hw_sector_size[FILENAME_MAX + 1] = "";
     static char path_to_get_hw_sector_size_partitions[FILENAME_MAX + 1] = "";
     static char path_find_block_device[FILENAME_MAX + 1] = "";
+    static struct mountinfo *disk_mountinfo_root = NULL;
+
     struct disk *d;
 
     // search for it in our RAM list.
@@ -59,11 +42,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // should not be that many, it should be acceptable
     for(d = disk_root; d ; d = d->next)
         if(unlikely(d->major == major && d->minor == minor))
-            break;
-
-    // if we found it, return it
-    if(likely(d))
-        return d;
+            return d;
 
     // not found
     // create a new disk structure
@@ -131,6 +110,13 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     // mountinfo_find() can be called with NULL disk_mountinfo_root
     struct mountinfo *mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
+    if(unlikely(!mi)) {
+        // mountinfo_free can be called with NULL
+        mountinfo_free(disk_mountinfo_root);
+        disk_mountinfo_root = mountinfo_read(0);
+        mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
+    }
+
     if(unlikely(mi))
         d->mount_point = strdupz(mi->mount_point);
     else
@@ -242,17 +228,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_do_util    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "utilization percentage for all disks", global_do_util);
         global_do_backlog = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "backlog for all disks", global_do_backlog);
 
-        check_for_new_mountpoints_every = (int)config_get_number("plugin:proc:/proc/diskstats", "check for new mount points every", check_for_new_mountpoints_every);
-        if(check_for_new_mountpoints_every < update_every)
-            check_for_new_mountpoints_every = update_every;
-
         globals_initialized = 1;
     }
-
-    // --------------------------------------------------------------------------
-    // this is smart enough not to reload it every time
-
-    mountinfo_reload(0);
 
     // --------------------------------------------------------------------------
 
