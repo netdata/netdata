@@ -89,14 +89,12 @@ void read_cgroup_plugin_configuration() {
                     " *.slice "
                     " *.user "
                     " *.mount "
-                    " *.service "
                     " *.partition "
                     " */ns "                               //   lxc/*/ns    #1397
             ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
     disabled_cgroup_paths = netdata_simple_pattern_list_create(
             config_get("plugin:cgroups", "disable by default cgroup paths matching",
-                    " system.slice "
                     " system "
                     " systemd "
                     " user.slice "
@@ -1510,7 +1508,6 @@ void *cgroups_main(void *ptr) {
     info("CGROUP thread exiting");
 
     static_thread->enabled = 0;
-    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

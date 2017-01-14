@@ -280,7 +280,6 @@ void *proc_diskspace_main(void *ptr) {
     info("DISKSPACE thread exiting");
 
     static_thread->enabled = 0;
-    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }
