@@ -470,6 +470,8 @@ void *socket_listen_main_multi_threaded(void *ptr) {
     debug(D_WEB_CLIENT, "LISTENER: exit!");
     close_listen_sockets();
 
+    freez(fds);
+
     static_thread->enabled = 0;
     static_thread->thread = NULL;
     pthread_exit(NULL);

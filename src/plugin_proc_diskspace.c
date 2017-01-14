@@ -1,6 +1,6 @@
 #include "common.h"
 
-#define DELAULT_EXLUDED_PATHS "/proc/ /sys/ /var/run/user/ /run/user/"
+#define DELAULT_EXLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/*"
 
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
@@ -37,19 +37,18 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     if(unlikely(!mount_points)) {
         const char *s;
+        NETDATA_SIMPLE_PREFIX_MODE mode = NETDATA_SIMPLE_PATTERN_MODE_EXACT;
 
         if(config_exists("plugin:proc:/proc/diskstats", "exclude space metrics on paths") && !config_exists("plugin:proc:diskspace", "exclude space metrics on paths")) {
             // the config exists in the old section
             s = config_get("plugin:proc:/proc/diskstats", "exclude space metrics on paths", DELAULT_EXLUDED_PATHS);
-
-            // set it to the new section
-            config_set("plugin:proc:diskspace", "exclude space metrics on paths", s);
+            mode = NETDATA_SIMPLE_PATTERN_MODE_PREFIX;
         }
         else
             s = config_get("plugin:proc:diskspace", "exclude space metrics on paths", DELAULT_EXLUDED_PATHS);
 
         mount_points = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
-        excluded_mountpoints = netdata_simple_pattern_list_create(s, NETDATA_SIMPLE_PATTERN_MODE_PREFIX);
+        excluded_mountpoints = netdata_simple_pattern_list_create(s, mode);
     }
 
     struct mount_point_metadata *m = dictionary_get(mount_points, mi->mount_point);
