@@ -28,7 +28,7 @@ void read_cgroup_plugin_configuration() {
     cgroup_enable_blkio = config_get_boolean_ondemand("plugin:cgroups", "enable blkio", cgroup_enable_blkio);
 
     char filename[FILENAME_MAX + 1], *s;
-    struct mountinfo *mi, *root = mountinfo_read();
+    struct mountinfo *mi, *root = mountinfo_read(0);
 
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
     if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
