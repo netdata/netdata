@@ -87,6 +87,8 @@ static int pluginsd_split_words(char *str, char **words, int max_words) {
 void *pluginsd_worker_thread(void *arg)
 {
     struct plugind *cd = (struct plugind *)arg;
+    cd->obsolete = 0;
+
     char line[PLUGINSD_LINE_MAX + 1];
 
 #ifdef DETACH_PLUGINS_FROM_NETDATA
@@ -428,7 +430,7 @@ void *pluginsd_worker_thread(void *arg)
     info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
 
     cd->obsolete = 1;
-    cd->thread = 0;
+    cd->thread = (pthread_t)NULL;
     pthread_exit(NULL);
     return NULL;
 }
@@ -489,9 +491,9 @@ void *pluginsd_main(void *ptr) {
             }
 
             // check if it runs already
-            for(cd = pluginsd_root ; likely(cd) ; cd = cd->next) {
+            for(cd = pluginsd_root ; cd ; cd = cd->next)
                 if(unlikely(strcmp(cd->filename, file->d_name) == 0)) break;
-            }
+
             if(likely(cd && !cd->obsolete)) {
                 debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is already running", cd->filename);
                 continue;
@@ -517,22 +519,19 @@ void *pluginsd_main(void *ptr) {
                 // link it
                 if(likely(pluginsd_root)) cd->next = pluginsd_root;
                 pluginsd_root = cd;
-            }
-            cd->obsolete = 0;
 
-            if(unlikely(!cd->enabled)) {
+                // it is not currently running
                 cd->obsolete = 1;
-                continue;
-            }
 
-            // spawn a new thread for it
-            if(unlikely(pthread_create(&cd->thread, NULL, pluginsd_worker_thread, cd) != 0)) {
-                error("PLUGINSD: failed to create new thread for plugin '%s'.", cd->filename);
-                cd->obsolete = 1;
-            }
-            else if(unlikely(pthread_detach(cd->thread) != 0))
-                error("PLUGINSD: Cannot request detach of newly created thread for plugin '%s'.", cd->filename);
+                if(cd->enabled) {
+                    // spawn a new thread for it
+                    if(unlikely(pthread_create(&cd->thread, NULL, pluginsd_worker_thread, cd) != 0))
+                        error("PLUGINSD: failed to create new thread for plugin '%s'.", cd->filename);
 
+                    else if(unlikely(pthread_detach(cd->thread) != 0))
+                        error("PLUGINSD: Cannot request detach of newly created thread for plugin '%s'.", cd->filename);
+                }
+            }
         }
 
         closedir(dir);

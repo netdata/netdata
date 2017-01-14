@@ -747,7 +747,7 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
     while(i < max_words) words[i++] = NULL;
 }
 
-pid_t tc_child_pid = 0;
+volatile pid_t tc_child_pid = 0;
 void *tc_main(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
@@ -793,7 +793,7 @@ void *tc_main(void *ptr) {
         snprintfz(buffer, TC_LINE_MAX, "exec %s %d", tc_script, rrd_update_every);
         debug(D_TC_LOOP, "executing '%s'", buffer);
 
-        fp = mypopen(buffer, &tc_child_pid);
+        fp = mypopen(buffer, (pid_t *)&tc_child_pid);
         if(unlikely(!fp)) {
             error("TC: Cannot popen(\"%s\", \"r\").", buffer);
             goto cleanup;
@@ -986,7 +986,7 @@ void *tc_main(void *ptr) {
         }
 
         // fgets() failed or loop broke
-        int code = mypclose(fp, tc_child_pid);
+        int code = mypclose(fp, (pid_t)tc_child_pid);
         tc_child_pid = 0;
 
         if(unlikely(device)) {
