@@ -79,6 +79,7 @@ dist_healthconfig_DATA = \
     health.d/squid.conf \
     health.d/swap.conf \
     health.d/tcp_resets.conf \
+    health.d/udp_errors.conf \
     $(NULL)
 
 chartsconfigdir=$(configdir)/charts.d
