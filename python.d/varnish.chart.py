@@ -179,36 +179,50 @@ class Service(SimpleService):
                          if is_executable(''.join([directory, 'varnishstat']), X_OK)][0]
         except IndexError:
             self.varnish = False
-        self.regex = compile(r'([A-Z]+\.)([\d\w_.]+)\s+([0-9]+)')
+        self.rgx_all = compile(r'([A-Z]+\.)([\d\w_.]+)\s+(\d+)')
+        # Could be
+        # VBE.boot.super_backend.pipe_hdrbyte (new)
+        # or
+        # VBE.default2(127.0.0.2,,81).bereq_bodybytes (old)
+        # Regex result: [('super_backend', 'beresp_hdrbytes', '0'), ('super_backend', 'beresp_bodybytes', '0')]
+        self.rgx_bck = (compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)'),
+                        compile(r'VBE.boot.([\w\d_]+).(beresp[\w_]+)\s+(\d+)'))
         self.extra_charts = self.configuration.get('extra_charts', [])
 
     def check(self):
-        # Cant start without varnishstat command
+        # Cant start without 'varnishstat' command
         if not self.varnish:
-            self.error('varnishstat command was not found in %s or not executable by netdata' % DIRECTORIES)
+            self.error('\'varnishstat\' command was not found in %s or not executable by netdata' % DIRECTORIES)
             return False
 
         # If command is present and we can execute it we need to make sure..
         # 1. STDOUT is not empty
         reply = self._get_raw_data()
         if not reply:
-            self.error('No output from varnishstat (not enough privileges?)')
+            self.error('No output from \'varnishstat\' (not enough privileges?)')
             return False
 
         # 2. Output is parsable (list is not empty after regex findall)
-        is_parsable = self.regex.findall(reply)
+        is_parsable = self.rgx_all.findall(reply)
         if not is_parsable:
             self.error('Cant parse output (only varnish version 4+ supported)')
             return False
-        
+
+        # We need to find the right regex for backend parse
+        self.backend_list = self.rgx_bck[0].findall(reply)[::2]
+        if self.backend_list:
+            self.rgx_bck = self.rgx_bck[0]
+        else:
+            self.backend_list = self.rgx_bck[1].findall(reply)[::2]
+            self.rgx_bck = self.rgx_back[1]
+
         # We are about to start!
         self.create_charts()
 
         self.info('Active charts: %s' % self.order)
-        self.info('Plugin was started succesfully')
+        self.info('Plugin was started successfully')
         return True
      
-
     def _get_raw_data(self):
         try:
             reply = Popen([self.varnish, '-1'], stdout=PIPE, stderr=PIPE, shell=False)
@@ -228,45 +242,72 @@ class Service(SimpleService):
         :return: dict
         """
         raw_data = self._get_raw_data()
-        data = self.regex.findall(raw_data)
+        data_all = self.rgx_all.findall(raw_data)
+        data_backend = self.rgx_bck.findall(raw_data)
 
-        if not data:
+        if not data_all:
             return None
 
-        # ALL data from 'varnishstat -1'. t - type(MAIN, MEMPOOL etc)
-        to_netdata = {k: int(v) for t, k, v in data}
+        # 1. ALL data from 'varnishstat -1'. t - type(MAIN, MEMPOOL etc)
+        to_netdata = {k: int(v) for t, k, v in data_all}
+        
+        # 2. ADD backend statistics
+        to_netdata.update({'_'.join([n, k]): int(v) for n, k, v in data_backend})
 
-        # ADD additional keys to dict
-        cache_summary = sum([to_netdata.get('cache_hit', 0), to_netdata.get('cache_miss', 0), to_netdata.get('cache_hitpass', 0)])
+        # 3. ADD additional keys to dict
+        # 3.1 Cache hit/miss/hitpass overall in percent
+        cache_summary = sum([to_netdata.get('cache_hit', 0), to_netdata.get('cache_miss', 0),
+                             to_netdata.get('cache_hitpass', 0)])
         to_netdata['cache_hit_perc'] = find_percent(to_netdata.get('cache_hit', 0), cache_summary, 10000)
         to_netdata['cache_miss_perc'] = find_percent(to_netdata.get('cache_miss', 0), cache_summary, 10000)
         to_netdata['cache_hitpass_perc'] = find_percent(to_netdata.get('cache_hitpass', 0), cache_summary, 10000)
-        to_netdata['obj_per_objhead'] = find_percent(to_netdata.get('n_object', 0), to_netdata.get('n_objecthead', 0), 100)
+
+        # 3.2 Copy random stuff to new keys (do we need this?)
+        to_netdata['obj_per_objhead'] = find_percent(to_netdata.get('n_object', 0),
+                                                     to_netdata.get('n_objecthead', 0), 100)
         to_netdata['backend_conn_bt'] = to_netdata.get('backend_conn', 0)
         to_netdata['sess_conn_rr'] = to_netdata.get('sess_conn', 0)
         to_netdata['n_lru_nuked_e'] = to_netdata.get('n_lru_nuked', 0)
 
-        for elem in ['backend_busy', 'backend_unhealthy', 'esi_errors', 'esi_warnings', 'losthdr', 'sess_drop', 'sess_fail', 'sess_pipe_overflow',
-                     'threads_destroyed', 'threads_failed', 'threads_limited']:
+        for elem in ['backend_busy', 'backend_unhealthy', 'esi_errors', 'esi_warnings', 'losthdr', 'sess_drop',
+                     'sess_fail', 'sess_pipe_overflow', 'threads_destroyed', 'threads_failed', 'threads_limited']:
             to_netdata[''.join([elem, '_b'])] = to_netdata.get(elem, 0)
 
+        # Ready steady go!
         return to_netdata
 
     def create_charts(self):
+        # If 'all_charts' is true...ALL charts are displayed. If no only default + 'extra_charts'
         if self.configuration.get('all_charts'):
-            self.order = EXTRA_CHARTS
+            self.order = EXTRA_ORDER
         else:
             try:
                 extra_charts = list(filter(lambda chart: chart in EXTRA_ORDER, self.extra_charts.split()))
-            except Exception:
+            except (AttributeError, NameError, ValueError):
                 self.error('Extra charts disabled.')
                 extra_charts = []
     
             self.order = ORDER[:]
             self.order.extend(extra_charts)
-            self.order = self.order
 
-        self.definitions = {k: v for k, v in CHARTS.items() if k in self.order}
+        # Create static charts
+        self.definitions = {chart: values for chart, values in CHARTS.items() if chart in self.order}
+ 
+        # Create dynamic backend charts
+        if self.backend_list:
+            for backend in self.backend_list:
+                self.order.insert(0, ''.join([backend[0], '_resp_stats']))
+                self.definitions.update({''.join([backend[0], '_resp_stats']): {
+                    'options': [None,
+                                '%s response statistics' % backend[0].capitalize(),
+                                "bits/s",
+                                'Backend response',
+                                'varnish.backend',
+                                'area'],
+                    'lines': [[''.join([backend[0], '_beresp_hdrbytes']),
+                               'header', 'incremental', 8, 1],
+                              [''.join([backend[0], '_beresp_bodybytes']),
+                               'body', 'incremental', -8, 1]]}})
 
 
 def find_percent(value1, value2, multiply):
