@@ -72,10 +72,12 @@ void *proc_main(void *ptr) {
     // check the enabled status for each module
     int i;
     for(i = 0 ; proc_modules[i].name ;i++) {
-        proc_modules[i].enabled = config_get_boolean("plugin:proc", proc_modules[i].name, 1);
-        proc_modules[i].last_run_usec = 0ULL;
-        proc_modules[i].duration = 0ULL;
-        proc_modules[i].rd = NULL;
+        struct proc_module *pm = &proc_modules[i];
+
+        pm->enabled = config_get_boolean("plugin:proc", pm->name, 1);
+        pm->last_run_usec = 0ULL;
+        pm->duration = 0ULL;
+        pm->rd = NULL;
     }
 
     usec_t step = rrd_update_every * USEC_PER_SEC;
@@ -93,15 +95,16 @@ void *proc_main(void *ptr) {
         // BEGIN -- the job to be done
 
         for(i = 0 ; proc_modules[i].name ;i++) {
-            if(unlikely(!proc_modules[i].enabled)) continue;
+            struct proc_module *pm = &proc_modules[i];
+            if(unlikely(!pm->enabled)) continue;
 
-            debug(D_PROCNETDEV_LOOP, "PROC calling %s.", proc_modules[i].name);
+            debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
 
-            proc_modules[i].enabled = !proc_modules[i].func(rrd_update_every, (proc_modules[i].last_run_usec > 0)?now - proc_modules[i].last_run_usec:0ULL);
-            proc_modules[i].last_run_usec = now;
+            pm->enabled = !pm->func(rrd_update_every, (pm->last_run_usec > 0)?now - pm->last_run_usec:0ULL);
+            pm->last_run_usec = now;
 
             now = now_monotonic_usec();
-            proc_modules[i].duration = now - proc_modules[i].last_run_usec;
+            pm->duration = now - pm->last_run_usec;
 
             if(unlikely(netdata_exit)) break;
         }
@@ -112,6 +115,7 @@ void *proc_main(void *ptr) {
 
         if(vdo_cpu_netdata) {
             static RRDSET *st = NULL;
+
             if(unlikely(!st)) {
                 st = rrdset_find_bytype("netdata", "plugin_proc_modules");
 
@@ -119,16 +123,20 @@ void *proc_main(void *ptr) {
                     st = rrdset_create("netdata", "plugin_proc_modules", NULL, "proc", NULL, "NetData Proc Plugin Modules Durations", "milliseconds/run", 132001, rrd_update_every, RRDSET_TYPE_STACKED);
 
                     for(i = 0 ; proc_modules[i].name ;i++) {
-                        if(unlikely(!proc_modules[i].enabled)) continue;
-                        proc_modules[i].rd = rrddim_add(st, proc_modules[i].dim, NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                        struct proc_module *pm = &proc_modules[i];
+                        if(unlikely(!pm->enabled)) continue;
+
+                        pm->rd = rrddim_add(st, pm->dim, NULL, 1, 1000, RRDDIM_ABSOLUTE);
                     }
                 }
             }
             else rrdset_next(st);
 
             for(i = 0 ; proc_modules[i].name ;i++) {
-                if(unlikely(!proc_modules[i].enabled)) continue;
-                rrddim_set_by_pointer(st, proc_modules[i].rd, proc_modules[i].duration);
+                struct proc_module *pm = &proc_modules[i];
+                if(unlikely(!pm->enabled)) continue;
+
+                rrddim_set_by_pointer(st, pm->rd, pm->duration);
             }
             rrdset_done(st);
 
