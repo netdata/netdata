@@ -13,7 +13,7 @@ from subprocess import Popen, PIPE
 priority = 60000
 retries = 60
 
-ORDER = ['request_rate', 'hit_rate', 'transfer_rates', 'session', 'backend_traffic', 'bad', 'uptime']
+ORDER = ['hit_rate', 'chit_rate', 'request_rate', 'transfer_rates', 'session', 'backend_traffic', 'bad', 'uptime']
 EXTRA_ORDER = ['request_rate', 'hit_rate', 'backend_traffic', 'objects', 'transfer_rates', 'threads', 'memory_usage',
          'objects_per_objhead', 'losthdr', 'hcb', 'esi', 'session', 'session_herd', 'shm_writes', 
          'shm', 'allocations', 'vcl', 'bans', 'bans_lurker', 'expunge', 'lru', 'bad', 'gzip', 'uptime']
@@ -91,7 +91,12 @@ CHARTS = {'allocations':
              {'lines': [['cache_hit_perc', 'hit', 'absolute', 1, 100],
                        ['cache_miss_perc', 'miss', 'absolute', 1, 100],
                        ['cache_hitpass_perc', 'hitpass', 'absolute', 1, 100]],
-              'options': [None, 'Hit rates','percent', 'hit_rate', 'varnish.hit_rate', 'line']},
+              'options': [None, 'All history hit rate','percent', 'Cache hit rate', 'varnish.hit_rate', 'line']},
+          'chit_rate': 
+             {'lines': [['cache_hit_cperc', 'hit', 'absolute', 1, 100],
+                       ['cache_miss_cperc', 'miss', 'absolute', 1, 100],
+                       ['cache_hitpass_cperc', 'hitpass', 'absolute', 1, 100]],
+              'options': [None, 'Current poll hit rate (prev / current * 100)','percent', 'Cache hit rate', 'varnish.hit_rate', 'line']},
           'losthdr': 
              {'lines': [['losthdr', None, 'incremental', 1, 1]],
               'options': [None, 'HTTP Header overflows', 'units', 'losthdr', 'varnish.losthdr', 'line']},
@@ -188,6 +193,7 @@ class Service(SimpleService):
         self.rgx_bck = (compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)'),
                         compile(r'VBE.boot.([\w\d_]+).(beresp[\w_]+)\s+(\d+)'))
         self.extra_charts = self.configuration.get('extra_charts', [])
+        self.cache_prev = list()
 
     def check(self):
         # Cant start without 'varnishstat' command
@@ -255,14 +261,28 @@ class Service(SimpleService):
         to_netdata.update({'_'.join([n, k]): int(v) for n, k, v in data_backend})
 
         # 3. ADD additional keys to dict
-        # 3.1 Cache hit/miss/hitpass overall in percent
+        # 3.1 Cache hit/miss/hitpass OVERALL in percent
         cache_summary = sum([to_netdata.get('cache_hit', 0), to_netdata.get('cache_miss', 0),
                              to_netdata.get('cache_hitpass', 0)])
         to_netdata['cache_hit_perc'] = find_percent(to_netdata.get('cache_hit', 0), cache_summary, 10000)
         to_netdata['cache_miss_perc'] = find_percent(to_netdata.get('cache_miss', 0), cache_summary, 10000)
         to_netdata['cache_hitpass_perc'] = find_percent(to_netdata.get('cache_hitpass', 0), cache_summary, 10000)
 
-        # 3.2 Copy random stuff to new keys (do we need this?)
+        # 3.2 Cache hit/miss/hitpass CURRENT in percent
+        if self.cache_prev:
+            cache_summary = sum([to_netdata.get('cache_hit', 0) - self.cache_prev[0], to_netdata.get('cache_miss', 0) - self.cache_prev[1],
+                                 to_netdata.get('cache_hitpass', 0) - self.cache_prev[2]])
+            to_netdata['cache_hit_cperc'] = find_percent(to_netdata.get('cache_hit', 0) - self.cache_prev[0], cache_summary, 10000)
+            to_netdata['cache_miss_cperc'] = find_percent(to_netdata.get('cache_miss', 0) - self.cache_prev[1], cache_summary, 10000)
+            to_netdata['cache_hitpass_cperc'] = find_percent(to_netdata.get('cache_hitpass', 0) - self.cache_prev[2], cache_summary, 10000)
+        else:
+            to_netdata['cache_hit_cperc'] = 0
+            to_netdata['cache_miss_cperc'] = 0
+            to_netdata['cache_hitpass_cperc'] = 0
+
+        self.cache_prev = [to_netdata.get('cache_hit', 0), to_netdata.get('cache_miss', 0), to_netdata.get('cache_hitpass', 0)]
+
+        # 3.3 Copy random stuff to new keys (do we need this?)
         to_netdata['obj_per_objhead'] = find_percent(to_netdata.get('n_object', 0),
                                                      to_netdata.get('n_objecthead', 0), 100)
         to_netdata['backend_conn_bt'] = to_netdata.get('backend_conn', 0)
