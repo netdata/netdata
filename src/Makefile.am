@@ -86,6 +86,7 @@ else
 netdata_SOURCES += \
 	ipc.c ipc.h \
 	plugin_proc.c plugin_proc.h \
+	plugin_proc_diskspace.c plugin_proc_diskspace.h \
 	proc_diskstats.c \
 	proc_interrupts.c \
 	proc_softirqs.c \

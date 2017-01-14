@@ -390,7 +390,7 @@ static inline void cleanup_web_clients(void) {
 #define CLEANUP_EVERY_EVENTS 100
 
 void *socket_listen_main_multi_threaded(void *ptr) {
-    (void)ptr;
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
     info("Multi-threaded WEB SERVER thread created with task id %d", gettid());
@@ -470,6 +470,9 @@ void *socket_listen_main_multi_threaded(void *ptr) {
     debug(D_WEB_CLIENT, "LISTENER: exit!");
     close_listen_sockets();
 
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
+    pthread_exit(NULL);
     return NULL;
 }
 
@@ -518,7 +521,7 @@ static inline int single_threaded_unlink_client(struct web_client *w, fd_set *if
 }
 
 void *socket_listen_main_single_threaded(void *ptr) {
-    (void)ptr;
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     web_server_mode = WEB_SERVER_MODE_SINGLE_THREADED;
 
@@ -637,5 +640,9 @@ void *socket_listen_main_single_threaded(void *ptr) {
 
     debug(D_WEB_CLIENT, "LISTENER: exit!");
     close_listen_sockets();
+
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
+    pthread_exit(NULL);
     return NULL;
 }

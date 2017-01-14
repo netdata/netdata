@@ -173,7 +173,7 @@ static inline int is_read_only(const char *s) {
 }
 
 // read the whole mountinfo into a linked list
-struct mountinfo *mountinfo_read() {
+struct mountinfo *mountinfo_read(int do_statvfs) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", global_host_prefix);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
@@ -282,7 +282,7 @@ struct mountinfo *mountinfo_read() {
                 mi->flags |= MOUNTINFO_IS_REMOTE;
 
             // mark as BIND the duplicates (i.e. same filesystem + same source)
-            {
+            if(do_statvfs) {
                 struct stat buf;
                 if(unlikely(stat(mi->mount_point, &buf) == -1)) {
                     mi->st_dev = 0;
@@ -302,6 +302,9 @@ struct mountinfo *mountinfo_read() {
                     }
                 }
             }
+            else {
+                mi->st_dev = 0;
+            }
         }
         else {
             mi->filesystem = NULL;
@@ -316,7 +319,7 @@ struct mountinfo *mountinfo_read() {
         }
 
         // check if it has size
-        {
+        if(do_statvfs) {
             struct statvfs buff_statvfs;
             if(unlikely(statvfs(mi->mount_point, &buff_statvfs) < 0)) {
                 mi->flags |= MOUNTINFO_NO_STAT;

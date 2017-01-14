@@ -24,6 +24,21 @@ struct option_def {
  */
 extern struct option_def options[];
 
+
+struct netdata_static_thread {
+    char *name;
+
+    char *config_section;
+    char *config_name;
+
+    volatile int enabled;
+
+    pthread_t *thread;
+
+    void (*init_routine) (void);
+    void *(*start_routine) (void *);
+};
+
 extern void kill_childs(void);
 extern int killpid(pid_t pid, int signal);
 extern void netdata_cleanup_and_exit(int ret) NORETURN;

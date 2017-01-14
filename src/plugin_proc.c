@@ -56,9 +56,8 @@ static struct proc_module {
         { .name = NULL, .dim = NULL, .func = NULL }
 };
 
-void *proc_main(void *ptr)
-{
-    (void)ptr;
+void *proc_main(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("PROC Plugin thread created with task id %d", gettid());
 
@@ -117,7 +116,7 @@ void *proc_main(void *ptr)
                 st = rrdset_find_bytype("netdata", "plugin_proc_modules");
 
                 if(!st) {
-                    st = rrdset_create("netdata", "plugin_proc_modules", NULL, "proc.internal", NULL, "NetData Proc Plugin Modules Durations", "milliseconds/run", 132001, rrd_update_every, RRDSET_TYPE_STACKED);
+                    st = rrdset_create("netdata", "plugin_proc_modules", NULL, "proc", NULL, "NetData Proc Plugin Modules Durations", "milliseconds/run", 132001, rrd_update_every, RRDSET_TYPE_STACKED);
 
                     for(i = 0 ; proc_modules[i].name ;i++) {
                         if(unlikely(!proc_modules[i].enabled)) continue;
@@ -140,6 +139,8 @@ void *proc_main(void *ptr)
 
     info("PROC thread exiting");
 
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

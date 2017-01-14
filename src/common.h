@@ -188,6 +188,7 @@
 #include "plugin_macos.h"
 #else
 #include "plugin_proc.h"
+#include "plugin_proc_diskspace.h"
 #endif /* __FreeBSD__, __APPLE__*/
 
 #include "plugin_tc.h"
