@@ -880,14 +880,7 @@ void rrdset_free_all(void)
 
         pthread_rwlock_unlock(&st->rwlock);
 
-        if(st->mapped == RRD_MEMORY_MODE_SAVE) {
-            debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
-            savememory(st->cache_filename, st, st->memsize);
-
-            debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
-            munmap(st, st->memsize);
-        }
-        else if(st->mapped == RRD_MEMORY_MODE_MAP) {
+        if(st->mapped == RRD_MEMORY_MODE_SAVE || st->mapped == RRD_MEMORY_MODE_MAP) {
             debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
             munmap(st, st->memsize);
         }

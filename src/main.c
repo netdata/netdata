@@ -8,20 +8,25 @@ void netdata_cleanup_and_exit(int ret) {
     error_log_limit_unlimited();
 
     debug(D_EXIT, "Called: netdata_cleanup_and_exit()");
-#ifdef NETDATA_INTERNAL_CHECKS
-    kill_childs();
-    rrdset_free_all();
-#else
-    rrdset_save_all();
-#endif
-    // kill_childs();
 
+    // save the database
+    rrdset_save_all();
+
+    // unlink the pid
     if(pidfile[0]) {
         if(unlink(pidfile) != 0)
             error("Cannot unlink pidfile '%s'.", pidfile);
     }
 
-    info("NetData exiting. Bye bye...");
+#ifdef NETDATA_INTERNAL_CHECKS
+    // kill all childs
+    kill_childs();
+
+    // free all memory
+    rrdset_free_all();
+#endif
+
+    info("netdata exiting. Bye bye...");
     exit(ret);
 }
 
@@ -661,8 +666,7 @@ int main(int argc, char **argv)
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
 
-    info("NetData started on pid %d", getpid());
-
+    info("netdata started on pid %d.", getpid());
 
     // ------------------------------------------------------------------------
     // get default pthread stack size
@@ -719,6 +723,8 @@ int main(int argc, char **argv)
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+
+    info("netdata initialization completed. Enjoy real-time performance monitoring!");
 
     // ------------------------------------------------------------------------
     // block signals while initializing threads.
