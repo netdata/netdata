@@ -1427,9 +1427,8 @@ int do_sys_fs_cgroup(int update_every, usec_t dt) {
     return 0;
 }
 
-void *cgroups_main(void *ptr)
-{
-    (void)ptr;
+void *cgroups_main(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("CGROUP Plugin thread created with task id %d", gettid());
 
@@ -1501,6 +1500,8 @@ void *cgroups_main(void *ptr)
 
     info("CGROUP thread exiting");
 
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

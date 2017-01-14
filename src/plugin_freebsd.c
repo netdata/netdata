@@ -1,8 +1,7 @@
 #include "common.h"
 
-void *freebsd_main(void *ptr)
-{
-    (void)ptr;
+void *freebsd_main(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("FREEBSD Plugin thread created with task id %d", gettid());
 
@@ -59,6 +58,8 @@ void *freebsd_main(void *ptr)
 
     info("FREEBSD thread exiting");
 
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

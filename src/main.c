@@ -9,6 +9,7 @@ void netdata_cleanup_and_exit(int ret) {
 
     debug(D_EXIT, "Called: netdata_cleanup_and_exit()");
 #ifdef NETDATA_INTERNAL_CHECKS
+    kill_childs();
     rrdset_free_all();
 #else
     rrdset_save_all();
@@ -24,19 +25,7 @@ void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
 
-struct netdata_static_thread {
-    char *name;
-
-    char *config_section;
-    char *config_name;
-
-    int enabled;
-
-    pthread_t *thread;
-
-    void (*init_routine) (void);
-    void *(*start_routine) (void *);
-} static_threads[] = {
+struct netdata_static_thread static_threads[] = {
 #ifdef INTERNAL_PLUGIN_NFACCT
 // nfacct requires root access
     // so, we build it as an external plugin with setuid to root
@@ -156,27 +145,32 @@ int killpid(pid_t pid, int sig)
 
 void kill_childs()
 {
+    error_log_limit_unlimited();
+
     siginfo_t info;
 
     struct web_client *w;
     for(w = web_clients; w ; w = w->next) {
-        debug(D_EXIT, "Stopping web client %s", w->client_ip);
+        info("Stopping web client %s", w->client_ip);
         pthread_cancel(w->thread);
-        pthread_join(w->thread, NULL);
+        // it is detached
+        // pthread_join(w->thread, NULL);
     }
 
     int i;
     for (i = 0; static_threads[i].name != NULL ; i++) {
-        if(static_threads[i].thread) {
-            debug(D_EXIT, "Stopping %s thread", static_threads[i].name);
+        if(static_threads[i].enabled && static_threads[i].thread) {
+            info("Stopping %s thread", static_threads[i].name);
             pthread_cancel(*static_threads[i].thread);
-            pthread_join(*static_threads[i].thread, NULL);
+            // it is detached
+            // pthread_join(*static_threads[i].thread, NULL);
+
             static_threads[i].thread = NULL;
         }
     }
 
     if(tc_child_pid) {
-        debug(D_EXIT, "Killing tc-qos-helper procees");
+        info("Killing tc-qos-helper process %d", tc_child_pid);
         if(killpid(tc_child_pid, SIGTERM) != -1)
             waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
     }
@@ -184,22 +178,32 @@ void kill_childs()
 
     struct plugind *cd;
     for(cd = pluginsd_root ; cd ; cd = cd->next) {
-        debug(D_EXIT, "Stopping %s plugin thread", cd->id);
-        pthread_cancel(cd->thread);
-        pthread_join(cd->thread, NULL);
+        if(!cd->obsolete) {
+            if(cd->thread) {
+                info("Stopping %s plugin thread", cd->id);
+                pthread_cancel(cd->thread);
+                // they are detached
+                // pthread_join(cd->thread, NULL);
+            }
 
-        if(cd->pid && !cd->obsolete) {
-            debug(D_EXIT, "killing %s plugin process", cd->id);
-            if(killpid(cd->pid, SIGTERM) != -1)
-                waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
+            if(cd->pid) {
+                info("killing %s plugin child process pid %d", cd->id, cd->pid);
+                if(killpid(cd->pid, SIGTERM) != -1)
+                    waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
+
+                cd->pid = 0;
+            }
+
+            cd->obsolete = 1;
         }
     }
 
     // if, for any reason there is any child exited
     // catch it here
+    info("Cleaning up an other children");
     waitid(P_PID, 0, &info, WEXITED|WNOHANG);
 
-    debug(D_EXIT, "All threads/childs stopped.");
+    info("All threads/childs stopped.");
 }
 
 struct option_def options[] = {
@@ -706,7 +710,7 @@ int main(int argc, char **argv)
 
             debug(D_SYSTEM, "Starting thread %s.", st->name);
 
-            if(pthread_create(st->thread, &attr, st->start_routine, NULL))
+            if(pthread_create(st->thread, &attr, st->start_routine, st))
                 error("failed to create new thread for %s.", st->name);
 
             else if(pthread_detach(*st->thread))

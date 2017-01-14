@@ -648,18 +648,26 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
 RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier, long divisor, int algorithm)
 {
+    RRDDIM *rd = rrddim_find(st, id);
+    if(rd) {
+        error("Cannot create rrd dimension '%s/%s', it already exists.", st->id, name);
+        return rd;
+    }
+
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 
     char varname[CONFIG_MAX_NAME + 1];
-    RRDDIM *rd = NULL;
     unsigned long size = sizeof(RRDDIM) + (st->entries * sizeof(storage_number));
 
     debug(D_RRD_CALLS, "Adding dimension '%s/%s'.", st->id, id);
 
     rrdset_strncpyz_name(filename, id, FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
-    if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 1);
+
+    if(rrd_memory_mode != RRD_MEMORY_MODE_RAM)
+        rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 1);
+
     if(rd) {
         struct timeval now;
         now_realtime_timeval(&now);
@@ -901,9 +909,9 @@ void rrdset_save_all(void) {
     RRDSET *st;
     RRDDIM *rd;
 
-    rrdhost_rwlock(&localhost);
+    rrdhost_rdlock(&localhost);
     for(st = localhost.rrdset_root; st ; st = st->next) {
-        pthread_rwlock_wrlock(&st->rwlock);
+        pthread_rwlock_rdlock(&st->rwlock);
 
         if(st->mapped == RRD_MEMORY_MODE_SAVE) {
             debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);

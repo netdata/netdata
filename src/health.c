@@ -2806,7 +2806,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
 }
 
 void *health_main(void *ptr) {
-    (void)ptr;
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("HEALTH thread created with task id %d", gettid());
 
@@ -3113,6 +3113,9 @@ void *health_main(void *ptr) {
     buffer_free(wb);
 
     info("HEALTH thread exiting");
+
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }
