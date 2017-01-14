@@ -282,7 +282,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
                 mi->flags |= MOUNTINFO_IS_REMOTE;
 
             // mark as BIND the duplicates (i.e. same filesystem + same source)
-            {
+            if(do_statvfs) {
                 struct stat buf;
                 if(unlikely(stat(mi->mount_point, &buf) == -1)) {
                     mi->st_dev = 0;
@@ -301,6 +301,9 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
                         }
                     }
                 }
+            }
+            else {
+                mi->st_dev = 0;
             }
         }
         else {
