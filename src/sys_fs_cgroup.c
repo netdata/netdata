@@ -28,7 +28,7 @@ void read_cgroup_plugin_configuration() {
     cgroup_enable_blkio = config_get_boolean_ondemand("plugin:cgroups", "enable blkio", cgroup_enable_blkio);
 
     char filename[FILENAME_MAX + 1], *s;
-    struct mountinfo *mi, *root = mountinfo_read();
+    struct mountinfo *mi, *root = mountinfo_read(0);
 
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
     if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
@@ -1427,9 +1427,8 @@ int do_sys_fs_cgroup(int update_every, usec_t dt) {
     return 0;
 }
 
-void *cgroups_main(void *ptr)
-{
-    (void)ptr;
+void *cgroups_main(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("CGROUP Plugin thread created with task id %d", gettid());
 
@@ -1486,7 +1485,7 @@ void *cgroups_main(void *ptr)
 
             if(!stcpu_thread) stcpu_thread = rrdset_find("netdata.plugin_cgroups_cpu");
             if(!stcpu_thread) {
-                stcpu_thread = rrdset_create("netdata", "plugin_cgroups_cpu", NULL, "proc.internal", NULL, "NetData CGroups Plugin CPU usage", "milliseconds/s", 132000, rrd_update_every, RRDSET_TYPE_STACKED);
+                stcpu_thread = rrdset_create("netdata", "plugin_cgroups_cpu", NULL, "cgroups", NULL, "NetData CGroups Plugin CPU usage", "milliseconds/s", 132000, rrd_update_every, RRDSET_TYPE_STACKED);
 
                 rrddim_add(stcpu_thread, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
                 rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
@@ -1501,6 +1500,8 @@ void *cgroups_main(void *ptr)
 
     info("CGROUP thread exiting");
 
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

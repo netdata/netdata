@@ -1,8 +1,7 @@
 #include "common.h"
 
-void *checks_main(void *ptr)
-{
-    if(ptr) { ; }
+void *checks_main(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("CHECKS thread created with task id %d", gettid());
 
@@ -78,6 +77,10 @@ void *checks_main(void *ptr)
         rrdset_done(check3);
     }
 
+    info("CHECKS thread exiting");
+
+    static_thread->enabled = 0;
+    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

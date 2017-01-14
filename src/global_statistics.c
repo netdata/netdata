@@ -131,7 +131,7 @@ void global_statistics_charts(void) {
 
     if (!stcpu_thread) stcpu_thread = rrdset_find("netdata.plugin_proc_cpu");
     if (!stcpu_thread) {
-        stcpu_thread = rrdset_create("netdata", "plugin_proc_cpu", NULL, "proc.internal", NULL,
+        stcpu_thread = rrdset_create("netdata", "plugin_proc_cpu", NULL, "proc", NULL,
                                      "NetData Proc Plugin CPU usage", "milliseconds/s", 132000, rrd_update_every,
                                      RRDSET_TYPE_STACKED);
 
