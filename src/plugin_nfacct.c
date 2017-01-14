@@ -190,7 +190,6 @@ cleanup:
     if(nl) mnl_socket_close(nl);
 
     static_thread->enabled = 0;
-    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

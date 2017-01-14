@@ -473,7 +473,6 @@ void *socket_listen_main_multi_threaded(void *ptr) {
     freez(fds);
 
     static_thread->enabled = 0;
-    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }
@@ -644,7 +643,6 @@ void *socket_listen_main_single_threaded(void *ptr) {
     close_listen_sockets();
 
     static_thread->enabled = 0;
-    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }
