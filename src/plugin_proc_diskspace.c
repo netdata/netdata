@@ -176,6 +176,8 @@ void *proc_diskspace_main(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
+    int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
+
     int update_every = (int)config_get_number("plugin:proc:diskspace", "update every", rrd_update_every);
     if(update_every < rrd_update_every)
         update_every = rrd_update_every;
@@ -184,22 +186,33 @@ void *proc_diskspace_main(void *ptr) {
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 
+    RRDSET *stcpu_thread = NULL, *st_duration = NULL;
+    RRDDIM *rd_user = NULL, *rd_system = NULL, *rd_duration = NULL;
+    struct rusage thread;
+
+    usec_t last = 0, dt = 0;
     usec_t step = update_every * USEC_PER_SEC;
     for(;;) {
         usec_t now = now_monotonic_usec();
         usec_t next = now - (now % step) + step;
+
+        dt = (last)?now - last:0;
 
         while(now < next) {
             sleep_usec(next - now);
             now = now_monotonic_usec();
         }
 
+        last = now;
+
         if(unlikely(netdata_exit)) break;
+
 
         // --------------------------------------------------------------------------
         // this is smart enough not to reload it every time
 
         mountinfo_reload(0);
+
 
         // --------------------------------------------------------------------------
         // disk space metrics
@@ -213,6 +226,55 @@ void *proc_diskspace_main(void *ptr) {
                 continue;
 
             do_disk_space_stats(mi, update_every);
+            if(unlikely(netdata_exit)) break;
+        }
+
+        if(unlikely(netdata_exit)) break;
+
+        if(vdo_cpu_netdata) {
+            // ----------------------------------------------------------------
+
+            getrusage(RUSAGE_THREAD, &thread);
+
+            if(!stcpu_thread) {
+                stcpu_thread = rrdset_find("netdata.plugin_diskspace");
+                if(!stcpu_thread) {
+                    stcpu_thread = rrdset_create("netdata", "plugin_diskspace", NULL, "diskspace", NULL
+                                                 , "NetData Disk Space Plugin CPU usage", "milliseconds/s", 132020
+                                                 , update_every, RRDSET_TYPE_STACKED);
+
+                    rd_user = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+                    rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+                }
+            }
+            else
+                rrdset_next(stcpu_thread);
+
+            rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+            rrddim_set_by_pointer(stcpu_thread, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+            rrdset_done(stcpu_thread);
+
+            // ----------------------------------------------------------------
+
+            if(!st_duration) {
+                st_duration = rrdset_find("netdata.plugin_diskspace_dt");
+                if(!st_duration) {
+                    st_duration = rrdset_create("netdata", "plugin_diskspace_dt", NULL, "diskspace", NULL
+                                                 , "NetData Disk Space Plugin Duration", "milliseconds/run", 132021
+                                                 , update_every, RRDSET_TYPE_AREA);
+
+                    rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                }
+            }
+            else
+                rrdset_next(st_duration);
+
+            rrddim_set_by_pointer(st_duration, rd_duration, dt);
+            rrdset_done(st_duration);
+
+            // ----------------------------------------------------------------
+
+            if(unlikely(netdata_exit)) break;
         }
     }
 
