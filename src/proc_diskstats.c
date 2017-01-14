@@ -6,9 +6,7 @@
 #define DISK_TYPE_PARTITION 2
 #define DISK_TYPE_CONTAINER 3
 
-#ifndef NETDATA_RELOAD_MOUNTINFO_EVERY
-#define NETDATA_RELOAD_MOUNTINFO_EVERY 60
-#endif
+static int check_for_new_mountpoints_every = 15;
 
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc)
@@ -38,7 +36,7 @@ static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
     time_t now = now_realtime_sec();
 
-    if(force || now - last_loaded >= NETDATA_RELOAD_MOUNTINFO_EVERY) {
+    if(force || now - last_loaded >= check_for_new_mountpoints_every) {
         // mountinfo_free() can be called with NULL disk_mountinfo_root
         mountinfo_free(disk_mountinfo_root);
 
@@ -243,6 +241,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_do_qops    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "queued operations for all disks", global_do_qops);
         global_do_util    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "utilization percentage for all disks", global_do_util);
         global_do_backlog = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "backlog for all disks", global_do_backlog);
+
+        check_for_new_mountpoints_every = (int)config_get_number("plugin:proc:/proc/diskstats", "check for new mount points every", check_for_new_mountpoints_every);
+        if(check_for_new_mountpoints_every < update_every)
+            check_for_new_mountpoints_every = update_every;
 
         globals_initialized = 1;
     }

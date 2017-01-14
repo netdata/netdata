@@ -1,18 +1,15 @@
 #include "common.h"
 
-#ifndef NETDATA_RELOAD_MOUNTINFO_EVERY
-#define NETDATA_RELOAD_MOUNTINFO_EVERY 60
-#endif
-
 #define DELAULT_EXLUDED_PATHS "/proc/ /sys/ /var/run/user/ /run/user/"
 
 static struct mountinfo *disk_mountinfo_root = NULL;
+static int check_for_new_mountpoints_every = 15;
 
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
     time_t now = now_realtime_sec();
 
-    if(force || now - last_loaded >= NETDATA_RELOAD_MOUNTINFO_EVERY) {
+    if(force || now - last_loaded >= check_for_new_mountpoints_every) {
         // mountinfo_free() can be called with NULL disk_mountinfo_root
         mountinfo_free(disk_mountinfo_root);
 
@@ -185,6 +182,10 @@ void *proc_diskspace_main(void *ptr) {
     int update_every = (int)config_get_number("plugin:proc:diskspace", "update every", rrd_update_every);
     if(update_every < rrd_update_every)
         update_every = rrd_update_every;
+
+    check_for_new_mountpoints_every = (int)config_get_number("plugin:proc:diskspace", "check for new mount points every", check_for_new_mountpoints_every);
+    if(check_for_new_mountpoints_every < update_every)
+        check_for_new_mountpoints_every = update_every;
 
     usec_t step = update_every * USEC_PER_SEC;
     for(;;) {
