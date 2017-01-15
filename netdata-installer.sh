@@ -692,12 +692,14 @@ run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name 
 
 NETDATA_ADDED_TO_DOCKER=0
 NETDATA_ADDED_TO_NGINX=0
+NETDATA_ADDED_TO_VARNISH=0
 if [ ${UID} -eq 0 ]
     then
     portable_add_group netdata
     portable_add_user netdata
     portable_add_user_to_group docker netdata && NETDATA_ADDED_TO_DOCKER=1
     portable_add_user_to_group nginx  netdata && NETDATA_ADDED_TO_NGINX=1
+    portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
 
     if [ -d /etc/logrotate.d -a ! -f /etc/logrotate.d/netdata ]
         then
@@ -1341,6 +1343,15 @@ if [ $? -eq 0 -a "${NETDATA_ADDED_TO_NGINX}" = "1" ]
     echo "You may also want to remove the netdata user from the nginx group"
     echo "by running:"
     echo "   gpasswd -d netdata nginx"
+fi
+
+getent group varnish > /dev/null
+if [ $? -eq 0 -a "${NETDATA_ADDED_TO_VARNISH}" = "1" ]
+    then
+    echo
+    echo "You may also want to remove the netdata user from the varnish group"
+    echo "by running:"
+    echo "   gpasswd -d netdata varnish"
 fi
 
 UNINSTALL
