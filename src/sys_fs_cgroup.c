@@ -8,8 +8,10 @@ static int cgroup_enable_cpuacct_usage = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_memory = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_devices = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_blkio = CONFIG_ONDEMAND_ONDEMAND;
+static int cgroup_enable_systemd_services = CONFIG_ONDEMAND_NO;
 static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
 static int cgroup_check_for_new_every = 10;
+static int cgroup_update_every = 1;
 static char *cgroup_cpuacct_base = NULL;
 static char *cgroup_blkio_base = NULL;
 static char *cgroup_memory_base = NULL;
@@ -27,12 +29,20 @@ static NETDATA_SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 static char *cgroups_rename_script = PLUGINS_DIR "/cgroup-name.sh";
 
 void read_cgroup_plugin_configuration() {
-    cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every);
+    cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", rrd_update_every);
+    if(cgroup_update_every < rrd_update_every)
+        cgroup_update_every = rrd_update_every;
+
+    cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every * cgroup_update_every);
+    if(cgroup_check_for_new_every < cgroup_update_every)
+        cgroup_check_for_new_every = cgroup_update_every;
 
     cgroup_enable_cpuacct_stat = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct stat", cgroup_enable_cpuacct_stat);
     cgroup_enable_cpuacct_usage = config_get_boolean_ondemand("plugin:cgroups", "enable cpuacct usage", cgroup_enable_cpuacct_usage);
     cgroup_enable_memory = config_get_boolean_ondemand("plugin:cgroups", "enable memory", cgroup_enable_memory);
     cgroup_enable_blkio = config_get_boolean_ondemand("plugin:cgroups", "enable blkio", cgroup_enable_blkio);
+
+    cgroup_enable_systemd_services = config_get_boolean_ondemand("plugin:cgroups", "enable systemd services", cgroup_enable_systemd_services);
 
     char filename[FILENAME_MAX + 1], *s;
     struct mountinfo *mi, *root = mountinfo_read(0);
@@ -94,6 +104,7 @@ void read_cgroup_plugin_configuration() {
                     " *.user "
                     " *.mount "
                     " *.partition "
+                    " *.service "
                     " */ns "                               //   /lxc/*/ns    #1397
             ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
@@ -121,10 +132,11 @@ void read_cgroup_plugin_configuration() {
                     " *.user "
             ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
-    systemd_services_cgroups = netdata_simple_pattern_list_create(
-            config_get("plugin:cgroups", "cgroups to match as systemd services",
-                    " *.service "
-            ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
+    if(cgroup_enable_systemd_services)
+        systemd_services_cgroups = netdata_simple_pattern_list_create(
+                config_get("plugin:cgroups", "cgroups to match as systemd services",
+                        " /system.slice/*.service "
+                ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
     mountinfo_free(root);
 }
@@ -749,37 +761,40 @@ void cgroup_get_chart_name(struct cgroup *cg) {
         debug(D_CGROUP, "cgroup '%s' will not be renamed - it matches the list of disabled cgroup renames (will be shown as '%s')", cg->id, cg->chart_id);
 
 
-    if(netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->id) ||
-            netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->chart_id)) {
-        debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') matches systemd services cgroups", cg->id, cg->chart_id, cg->chart_title);
+    if(cgroup_enable_systemd_services) {
+        if(netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->id) ||
+           netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->chart_id)) {
+            debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') matches systemd services cgroups", cg->id, cg->chart_id, cg->chart_title);
 
-        char buffer[CGROUP_CHARTID_LINE_MAX + 1];
-        cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
+            char buffer[CGROUP_CHARTID_LINE_MAX + 1];
+            cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
 
-        strncpy(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
-        char *s = buffer;
+            strncpy(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
+            char *s = buffer;
 
-        // skip to the last slash
-        size_t len = strlen(s);
-        while(len--) if(unlikely(s[len] == '/')) break;
-        if(len) s = &s[len+1];
+            // skip to the last slash
+            size_t len = strlen(s);
+            while(len--) if(unlikely(s[len] == '/')) break;
+            if(len) s = &s[len + 1];
 
-        // remove extension
-        //len = strlen(s);
-        //while(len--) if(unlikely(s[len] == '.')) break;
-        //if(len) s[len] = '\0';
+            // remove extension
+            //len = strlen(s);
+            //while(len--) if(unlikely(s[len] == '.')) break;
+            //if(len) s[len] = '\0';
 
-        freez(cg->chart_title);
-        cg->chart_title = cgroup_title_strdupz(s);
+            freez(cg->chart_title);
+            cg->chart_title = cgroup_title_strdupz(s);
 
-        freez(cg->chart_id);
-        cg->chart_id = cgroup_chart_id_strdupz(s);
-        cg->hash_chart = simple_hash(cg->chart_id);
+            freez(cg->chart_id);
+            cg->chart_id = cgroup_chart_id_strdupz(s);
+            cg->hash_chart = simple_hash(cg->chart_id);
+            cg->enabled = 1;
 
-        debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
+            debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
+        }
+        else
+            debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') does not match systemd services groups", cg->id, cg->chart_id, cg->chart_title);
     }
-    else
-        debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') does not match systemd services groups", cg->id, cg->chart_id, cg->chart_title);
 }
 
 struct cgroup *cgroup_add(const char *id) {
@@ -1509,29 +1524,6 @@ void update_cgroup_charts(int update_every) {
 // ----------------------------------------------------------------------------
 // cgroups main
 
-int do_sys_fs_cgroup(int update_every, usec_t dt) {
-    (void)dt;
-
-    static int cgroup_global_config_read = 0;
-    static time_t last_run = 0;
-    time_t now = now_realtime_sec();
-
-    if(unlikely(!cgroup_global_config_read)) {
-        read_cgroup_plugin_configuration();
-        cgroup_global_config_read = 1;
-    }
-
-    if(unlikely(cgroup_enable_new_cgroups_detected_at_runtime && now - last_run > cgroup_check_for_new_every)) {
-        find_all_cgroups();
-        last_run = now;
-    }
-
-    read_all_cgroups(cgroup_root);
-    update_cgroup_charts(update_every);
-
-    return 0;
-}
-
 void *cgroups_main(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
@@ -1546,51 +1538,45 @@ void *cgroups_main(void *ptr) {
     struct rusage thread;
 
     // when ZERO, attempt to do it
-    int vdo_sys_fs_cgroup           = 0;
-    int vdo_cpu_netdata             = !config_get_boolean("plugin:cgroups", "cgroups plugin resources", 1);
+    int vdo_cpu_netdata = config_get_boolean("plugin:cgroups", "cgroups plugin resources", 1);
 
-    // keep track of the time each module was called
-    usec_t sutime_sys_fs_cgroup = 0ULL;
-
-    // the next time we will run - aligned properly
-    usec_t sunext = (now_realtime_sec() - (now_realtime_sec() % rrd_update_every) + rrd_update_every) * USEC_PER_SEC;
+    read_cgroup_plugin_configuration();
 
     RRDSET *stcpu_thread = NULL;
 
+    usec_t step = cgroup_update_every * USEC_PER_SEC;
+    usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_next = 0;
     for(;;) {
-        usec_t sunow;
-        if(unlikely(netdata_exit)) break;
+        usec_t now = now_monotonic_usec();
+        usec_t next = now - (now % step) + step;
 
-        // delay until it is our time to run
-        while((sunow = now_realtime_usec()) < sunext)
-            sleep_usec(sunext - sunow);
-
-        // find the next time we need to run
-        while(now_realtime_usec() > sunext)
-            sunext += rrd_update_every * USEC_PER_SEC;
+        while(now < next) {
+            sleep_usec(next - now);
+            now = now_monotonic_usec();
+        }
 
         if(unlikely(netdata_exit)) break;
 
         // BEGIN -- the job to be done
 
-        if(!vdo_sys_fs_cgroup) {
-            debug(D_PROCNETDEV_LOOP, "PROCNETDEV: calling do_sys_fs_cgroup().");
-            sunow = now_realtime_usec();
-            vdo_sys_fs_cgroup = do_sys_fs_cgroup(rrd_update_every, (sutime_sys_fs_cgroup > 0)?sunow - sutime_sys_fs_cgroup:0ULL);
-            sutime_sys_fs_cgroup = sunow;
+        if(unlikely(now >= find_next)) {
+            find_all_cgroups();
+            find_next = now + find_every;
         }
-        if(unlikely(netdata_exit)) break;
+
+        read_all_cgroups(cgroup_root);
+        update_cgroup_charts(cgroup_update_every);
 
         // END -- the job is done
 
         // --------------------------------------------------------------------
 
-        if(!vdo_cpu_netdata) {
+        if(vdo_cpu_netdata) {
             getrusage(RUSAGE_THREAD, &thread);
 
             if(!stcpu_thread) stcpu_thread = rrdset_find("netdata.plugin_cgroups_cpu");
             if(!stcpu_thread) {
-                stcpu_thread = rrdset_create("netdata", "plugin_cgroups_cpu", NULL, "cgroups", NULL, "NetData CGroups Plugin CPU usage", "milliseconds/s", 132000, rrd_update_every, RRDSET_TYPE_STACKED);
+                stcpu_thread = rrdset_create("netdata", "plugin_cgroups_cpu", NULL, "cgroups", NULL, "NetData CGroups Plugin CPU usage", "milliseconds/s", 132000, cgroup_update_every, RRDSET_TYPE_STACKED);
 
                 rrddim_add(stcpu_thread, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
                 rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
