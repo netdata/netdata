@@ -4,7 +4,7 @@ struct simple_pattern {
     const char *match;
     size_t len;
 
-    NETDATA_SIMPLE_PREFIX_MODE mode;
+    SIMPLE_PREFIX_MODE mode;
     char negative;
 
     struct simple_pattern *child;
@@ -12,13 +12,8 @@ struct simple_pattern {
     struct simple_pattern *next;
 };
 
-static inline struct simple_pattern *parse_pattern(const char *str, NETDATA_SIMPLE_PREFIX_MODE default_mode) {
-    /*
-     * DEBUG
-    info(">>>> PARSE: '%s'", str);
-     */
-
-    NETDATA_SIMPLE_PREFIX_MODE mode;
+static inline struct simple_pattern *parse_pattern(const char *str, SIMPLE_PREFIX_MODE default_mode) {
+    SIMPLE_PREFIX_MODE mode;
     struct simple_pattern *child = NULL;
 
     char *buf = strdupz(str);
@@ -43,15 +38,15 @@ static inline struct simple_pattern *parse_pattern(const char *str, NETDATA_SIMP
     if(len >= 2 && *s == '*' && s[len - 1] == '*') {
         s[len - 1] = '\0';
         s++;
-        mode = NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING;
+        mode = SIMPLE_PATTERN_SUBSTRING;
     }
     else if(len >= 1 && *s == '*') {
         s++;
-        mode = NETDATA_SIMPLE_PATTERN_MODE_SUFFIX;
+        mode = SIMPLE_PATTERN_SUFFIX;
     }
     else if(len >= 1 && s[len - 1] == '*') {
         s[len - 1] = '\0';
-        mode = NETDATA_SIMPLE_PATTERN_MODE_PREFIX;
+        mode = SIMPLE_PATTERN_PREFIX;
     }
     else
         mode = default_mode;
@@ -64,30 +59,17 @@ static inline struct simple_pattern *parse_pattern(const char *str, NETDATA_SIMP
         m->mode = mode;
     }
     else {
-        m->mode = NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING;
+        m->mode = SIMPLE_PATTERN_SUBSTRING;
     }
 
     m->child = child;
 
     freez(buf);
 
-    /*
-     * DEBUG
-    info("PATTERN '%s' is composed by", str);
-    struct simple_pattern *p;
-    for(p = m; p ; p = p->child)
-        info(">>>> COMPONENT: '%s%s%s' (len %zu type %u)",
-            (p->mode == NETDATA_SIMPLE_PATTERN_MODE_SUFFIX || p->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
-            p->match,
-            (p->mode == NETDATA_SIMPLE_PATTERN_MODE_PREFIX || p->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
-            p->len,
-            p->mode);
-     */
-
     return m;
 }
 
-NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NETDATA_SIMPLE_PREFIX_MODE default_mode) {
+SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE default_mode) {
     struct simple_pattern *root = NULL, *last = NULL;
 
     if(unlikely(!list || !*list)) return root;
@@ -141,25 +123,15 @@ NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NET
     }
 
     freez(buf);
-    return (NETDATA_SIMPLE_PATTERN *)root;
+    return (SIMPLE_PATTERN *)root;
 }
 
 static inline int match_pattern(struct simple_pattern *m, const char *str, size_t len) {
-    /*
-     * DEBUG
-     *
-    info("CHECK string '%s' (len %zu) with pattern '%s%s%s' (len %zu type %u)", str, len,
-            (m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUFFIX || m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
-            m->match,
-            (m->mode == NETDATA_SIMPLE_PATTERN_MODE_PREFIX || m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
-            m->len, m->mode);
-    */
-
     char *s;
 
     if(m->len <= len) {
         switch(m->mode) {
-            case NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING:
+            case SIMPLE_PATTERN_SUBSTRING:
                 if(!m->len) return 1;
                 if((s = strstr(str, m->match))) {
                     if(!m->child) return 1;
@@ -167,21 +139,21 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
                 }
                 break;
 
-            case NETDATA_SIMPLE_PATTERN_MODE_PREFIX:
+            case SIMPLE_PATTERN_PREFIX:
                 if(unlikely(strncmp(str, m->match, m->len) == 0)) {
                     if(!m->child) return 1;
                     return match_pattern(m->child, &str[m->len], len - m->len);
                 }
                 break;
 
-            case NETDATA_SIMPLE_PATTERN_MODE_SUFFIX:
+            case SIMPLE_PATTERN_SUFFIX:
                 if(unlikely(strcmp(&str[len - m->len], m->match) == 0)) {
                     if(!m->child) return 1;
                     return 0;
                 }
                 break;
 
-            case NETDATA_SIMPLE_PATTERN_MODE_EXACT:
+            case SIMPLE_PATTERN_EXACT:
             default:
                 if(unlikely(strcmp(str, m->match) == 0)) {
                     if(!m->child) return 1;
@@ -194,7 +166,7 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
     return 0;
 }
 
-int netdata_simple_pattern_list_matches(NETDATA_SIMPLE_PATTERN *list, const char *str) {
+int simple_pattern_matches(SIMPLE_PATTERN *list, const char *str) {
     struct simple_pattern *m, *root = (struct simple_pattern *)list;
 
     if(unlikely(!root)) return 0;
@@ -202,25 +174,6 @@ int netdata_simple_pattern_list_matches(NETDATA_SIMPLE_PATTERN *list, const char
     size_t len = strlen(str);
     for(m = root; m ; m = m->next)
         if(match_pattern(m, str, len)) {
-            /*
-             * DEBUG
-             *
-            info("MATCHED string '%s' (len %zu) with pattern '%s%s%s' (len %zu type %u)", str, len,
-                    (m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUFFIX || m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
-                    m->match,
-                    (m->mode == NETDATA_SIMPLE_PATTERN_MODE_PREFIX || m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
-                    m->len, m->mode);
-
-            struct simple_pattern *p;
-            for(p = m; p ; p = p->child)
-                info(">>>> MATCHED COMPONENT: '%s%s%s' (len %zu type %u)",
-                        (p->mode == NETDATA_SIMPLE_PATTERN_MODE_SUFFIX || p->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
-                        p->match,
-                        (p->mode == NETDATA_SIMPLE_PATTERN_MODE_PREFIX || p->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
-                        p->len,
-                        p->mode);
-            */
-
             if(m->negative) return 0;
             return 1;
         }
@@ -237,6 +190,8 @@ static inline void free_pattern(struct simple_pattern *m) {
     freez(m);
 }
 
-void netdata_simple_pattern_free(NETDATA_SIMPLE_PATTERN *list) {
+void simple_pattern_free(SIMPLE_PATTERN *list) {
+    if(!list) return;
+
     free_pattern(((struct simple_pattern *)list)->next);
 }

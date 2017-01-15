@@ -478,9 +478,10 @@ int main(int argc, char **argv)
                             const char *heystack = argv[optind];
                             const char *needle = argv[optind + 1];
 
-                            NETDATA_SIMPLE_PATTERN *p = netdata_simple_pattern_list_create(heystack, NETDATA_SIMPLE_PATTERN_MODE_EXACT);
-                            int ret = netdata_simple_pattern_list_matches(p, needle);
-                            netdata_simple_pattern_free(p);
+                            SIMPLE_PATTERN *p = simple_pattern_create(heystack
+                                                                      , SIMPLE_PATTERN_EXACT);
+                            int ret = simple_pattern_matches(p, needle);
+                            simple_pattern_free(p);
 
                             if(ret) {
                                 fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s'\n", heystack, needle);
