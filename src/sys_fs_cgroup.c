@@ -94,28 +94,36 @@ void read_cgroup_plugin_configuration() {
 
     disabled_cgroups_patterns = netdata_simple_pattern_list_create(
             config_get("plugin:cgroups", "disable by default cgroups matching",
-                    " / /lxc /docker /libvirt /qemu /systemd "
-                    " /system /system.slice "
-                    " /machine /machine.slice "
-                    " /user /user.slice "
-                    " /init.scope "
-                    " *.swap "
-                    " *.slice "
-                    " *.user "
                     " *.mount "
                     " *.partition "
                     " *.service "
-                    " */ns "                               //   /lxc/*/ns    #1397
+                    " *.slice "
+                    " *.swap "
+                    " *.user "
+                    " / "
+                    " /docker "
+                    " /init.scope "
+                    " /libvirt "
+                    " /lxc "
+                    " /lxc/*/ns "                          //  #1397
+                    " /machine "
+                    " /machine.slice "
+                    " /qemu "
+                    " /system "
+                    " /system.slice "
+                    " /systemd "
+                    " /user "
+                    " /user.slice "
             ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
     disabled_cgroup_paths = netdata_simple_pattern_list_create(
             config_get("plugin:cgroups", "do not search for cgroups in paths matching",
+                    " *-qemu "                             //  #345
+                    " /init.scope "
                     " /system "
                     " /systemd "
-                    " /user.slice "
                     " /user "
-                    " /init.scope "
-                    " *-qemu "                             //  #345
+                    " /user.slice "
             ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", cgroups_rename_script);
@@ -123,12 +131,12 @@ void read_cgroup_plugin_configuration() {
     disabled_cgroup_renames = netdata_simple_pattern_list_create(
             config_get("plugin:cgroups", "do not run script to rename cgroups matching",
                     " / "
-                    " *.service "
-                    " *.slice "
-                    " *.scope "
-                    " *.swap "
                     " *.mount "
                     " *.partition "
+                    " *.scope "
+                    " *.service "
+                    " *.slice "
+                    " *.swap "
                     " *.user "
             ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
