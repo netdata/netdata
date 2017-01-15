@@ -1546,7 +1546,7 @@ void *cgroups_main(void *ptr) {
     struct rusage thread;
 
     // when ZERO, attempt to do it
-    int vdo_cpu_netdata = config_get_boolean("plugin:cgroups", "cgroups plugin resources", 1);
+    int vdo_cpu_netdata = config_get_boolean("plugin:cgroups", "cgroups plugin resource charts", 1);
 
     read_cgroup_plugin_configuration();
 

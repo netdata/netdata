@@ -186,7 +186,6 @@ void *proc_diskspace_main(void *ptr) {
         check_for_new_mountpoints_every = update_every;
 
     RRDSET *stcpu_thread = NULL, *st_duration = NULL;
-    RRDDIM *rd_user = NULL, *rd_system = NULL, *rd_duration = NULL;
     struct rusage thread;
 
     usec_t last = 0, dt = 0;
@@ -242,15 +241,15 @@ void *proc_diskspace_main(void *ptr) {
                                                  , "NetData Disk Space Plugin CPU usage", "milliseconds/s", 132020
                                                  , update_every, RRDSET_TYPE_STACKED);
 
-                    rd_user = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRDDIM_INCREMENTAL);
-                    rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+                    rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+                    rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
                 }
             }
             else
                 rrdset_next(stcpu_thread);
 
-            rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-            rrddim_set_by_pointer(stcpu_thread, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+            rrddim_set(stcpu_thread, "user", thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+            rrddim_set(stcpu_thread, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
             rrdset_done(stcpu_thread);
 
             // ----------------------------------------------------------------
@@ -262,13 +261,13 @@ void *proc_diskspace_main(void *ptr) {
                                                  , "NetData Disk Space Plugin Duration", "milliseconds/run", 132021
                                                  , update_every, RRDSET_TYPE_AREA);
 
-                    rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                    rrddim_add(st_duration, "duration", NULL, 1, 1000, RRDDIM_ABSOLUTE);
                 }
             }
             else
                 rrdset_next(st_duration);
 
-            rrddim_set_by_pointer(st_duration, rd_duration, dt);
+            rrddim_set(st_duration, "duration", dt);
             rrdset_done(st_duration);
 
             // ----------------------------------------------------------------
