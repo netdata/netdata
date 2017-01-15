@@ -3,7 +3,9 @@
 struct simple_pattern {
     const char *match;
     size_t len;
+
     NETDATA_SIMPLE_PREFIX_MODE mode;
+    char negative;
 
     struct simple_pattern *child;
 
@@ -26,7 +28,7 @@ static inline struct simple_pattern *parse_pattern(const char *str, NETDATA_SIMP
     while(*c == '*') c++;
 
     // find the next asterisk
-    while(*c && *c != '*') c++ ;
+    while(*c && *c != '*') c++;
 
     // do we have an asterisk in the middle?
     if(*c == '*' && c[1] != '\0') {
@@ -57,7 +59,7 @@ static inline struct simple_pattern *parse_pattern(const char *str, NETDATA_SIMP
     // allocate the structure
     struct simple_pattern *m = callocz(1, sizeof(struct simple_pattern));
     if(*s) {
-        m->match = strdup(s);
+        m->match = strdupz(s);
         m->len = strlen(m->match);
         m->mode = mode;
     }
@@ -67,7 +69,7 @@ static inline struct simple_pattern *parse_pattern(const char *str, NETDATA_SIMP
 
     m->child = child;
 
-    free(buf);
+    freez(buf);
 
     /*
      * DEBUG
@@ -95,8 +97,15 @@ NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NET
         char *s = buf;
 
         while(s && *s) {
+            char negative = 0;
+
             // skip all spaces
             while(isspace(*s)) s++;
+
+            if(*s == '!') {
+                negative = 1;
+                s++;
+            }
 
             // empty string
             if(unlikely(!*s)) break;
@@ -114,6 +123,7 @@ NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NET
             *c = '\0';
 
             struct simple_pattern *m = parse_pattern(s, default_mode);
+            m->negative = negative;
 
             if(likely(n)) *c = ' ';
 
@@ -130,7 +140,7 @@ NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NET
         }
     }
 
-    free(buf);
+    freez(buf);
     return (NETDATA_SIMPLE_PATTERN *)root;
 }
 
@@ -211,6 +221,7 @@ int netdata_simple_pattern_list_matches(NETDATA_SIMPLE_PATTERN *list, const char
                         p->mode);
             */
 
+            if(m->negative) return 0;
             return 1;
         }
 
@@ -218,6 +229,8 @@ int netdata_simple_pattern_list_matches(NETDATA_SIMPLE_PATTERN *list, const char
 }
 
 static inline void free_pattern(struct simple_pattern *m) {
+    if(!m) return;
+
     if(m->next) free_pattern(m->next);
     if(m->child) free_pattern(m->child);
     freez((void *)m->match);
