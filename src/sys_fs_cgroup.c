@@ -8,10 +8,11 @@ static int cgroup_enable_cpuacct_usage = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_memory = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_devices = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_blkio = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_systemd_services = CONFIG_ONDEMAND_NO;
+static int cgroup_enable_systemd_services = CONFIG_ONDEMAND_YES;
 static int cgroup_enable_new_cgroups_detected_at_runtime = 1;
 static int cgroup_check_for_new_every = 10;
 static int cgroup_update_every = 1;
+
 static char *cgroup_cpuacct_base = NULL;
 static char *cgroup_blkio_base = NULL;
 static char *cgroup_memory_base = NULL;
@@ -274,6 +275,7 @@ struct cgroup {
     struct blkio io_merged;                     // operations
     struct blkio io_queued;                     // operations
 
+    // per cgroup charts
     RRDSET *st_cpu;
     RRDSET *st_cpu_per_core;
     RRDSET *st_mem;
@@ -288,6 +290,10 @@ struct cgroup {
     RRDSET *st_throttle_serviced_ops;
     RRDSET *st_queued_ops;
     RRDSET *st_merged_ops;
+
+    // services
+    RRDDIM *rd_cpu;
+    RRDDIM *rd_mem_usage;
 
     struct cgroup *next;
 
@@ -730,65 +736,24 @@ static char *cgroup_chart_id_strdupz(const char *s) {
 void cgroup_get_chart_name(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
-    if(!netdata_simple_pattern_list_matches(disabled_cgroup_renames, cg->id) &&
-            !netdata_simple_pattern_list_matches(disabled_cgroup_renames, cg->chart_id)) {
+    pid_t cgroup_pid;
+    char buffer[CGROUP_CHARTID_LINE_MAX + 1];
 
-        pid_t cgroup_pid;
-        char buffer[CGROUP_CHARTID_LINE_MAX + 1];
+    snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->chart_id);
 
-        snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->chart_id);
+    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", buffer, cg->id);
+    FILE *fp = mypopen(buffer, &cgroup_pid);
+    if(fp) {
+        // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", buffer, cg->id);
+        char *s = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp);
+        // debug(D_CGROUP, "closing command for cgroup '%s'", cg->id);
+        mypclose(fp, cgroup_pid);
+        // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
 
-        debug(D_CGROUP, "executing command '%s' for cgroup '%s'", buffer, cg->id);
-        FILE *fp = mypopen(buffer, &cgroup_pid);
-        if(fp) {
-            // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", buffer, cg->id);
-            char *s = fgets(buffer, CGROUP_CHARTID_LINE_MAX, fp);
-            // debug(D_CGROUP, "closing command for cgroup '%s'", cg->id);
-            mypclose(fp, cgroup_pid);
-            // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
+        if(s && *s && *s != '\n') {
+            debug(D_CGROUP, "cgroup '%s' should be renamed to '%s'", cg->id, s);
 
-            if(s && *s && *s != '\n') {
-                debug(D_CGROUP, "cgroup '%s' should be renamed to '%s'", cg->id, s);
-
-                trim(s);
-
-                freez(cg->chart_title);
-                cg->chart_title = cgroup_title_strdupz(s);
-
-                freez(cg->chart_id);
-                cg->chart_id = cgroup_chart_id_strdupz(s);
-                cg->hash_chart = simple_hash(cg->chart_id);
-            }
-        }
-        else
-            error("CGROUP: Cannot popen(\"%s\", \"r\").", buffer);
-
-        debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
-    }
-    else
-        debug(D_CGROUP, "cgroup '%s' will not be renamed - it matches the list of disabled cgroup renames (will be shown as '%s')", cg->id, cg->chart_id);
-
-
-    if(cgroup_enable_systemd_services) {
-        if(netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->id) ||
-           netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->chart_id)) {
-            debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') matches systemd services cgroups", cg->id, cg->chart_id, cg->chart_title);
-
-            char buffer[CGROUP_CHARTID_LINE_MAX + 1];
-            cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
-
-            strncpy(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
-            char *s = buffer;
-
-            // skip to the last slash
-            size_t len = strlen(s);
-            while(len--) if(unlikely(s[len] == '/')) break;
-            if(len) s = &s[len + 1];
-
-            // remove extension
-            //len = strlen(s);
-            //while(len--) if(unlikely(s[len] == '.')) break;
-            //if(len) s[len] = '\0';
+            trim(s);
 
             freez(cg->chart_title);
             cg->chart_title = cgroup_title_strdupz(s);
@@ -796,13 +761,10 @@ void cgroup_get_chart_name(struct cgroup *cg) {
             freez(cg->chart_id);
             cg->chart_id = cgroup_chart_id_strdupz(s);
             cg->hash_chart = simple_hash(cg->chart_id);
-            cg->enabled = 1;
-
-            debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
         }
-        else
-            debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') does not match systemd services groups", cg->id, cg->chart_id, cg->chart_title);
     }
+    else
+        error("CGROUP: Cannot popen(\"%s\", \"r\").", buffer);
 }
 
 struct cgroup *cgroup_add(const char *id) {
@@ -836,13 +798,65 @@ struct cgroup *cgroup_add(const char *id) {
 
     cgroup_root_count++;
 
-    // fix the name by calling the external script
-    cgroup_get_chart_name(cg);
+    // fix the chart_id and title by calling the external script
+    if(!netdata_simple_pattern_list_matches(disabled_cgroup_renames, cg->id) &&
+       !netdata_simple_pattern_list_matches(disabled_cgroup_renames, cg->chart_id)) {
 
-    char option[FILENAME_MAX + 1];
-    snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
-    cg->enabled = (char)config_get_boolean("plugin:cgroups", option, def);
+        cgroup_get_chart_name(cg);
 
+        debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
+    }
+    else
+        debug(D_CGROUP, "cgroup '%s' will not be renamed - it matches the list of disabled cgroup renames (will be shown as '%s')", cg->id, cg->chart_id);
+
+    int user_configurable = 1;
+
+    // check if this cgroup should be a systemd service
+    if(cgroup_enable_systemd_services) {
+        if(netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->id) ||
+           netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->chart_id)) {
+            debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') matches systemd services cgroups", cg->id, cg->chart_id, cg->chart_title);
+
+            char buffer[CGROUP_CHARTID_LINE_MAX + 1];
+            cg->options |= CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
+
+            strncpy(buffer, cg->id, CGROUP_CHARTID_LINE_MAX);
+            char *s = buffer;
+
+            //freez(cg->chart_id);
+            //cg->chart_id = cgroup_chart_id_strdupz(s);
+            //cg->hash_chart = simple_hash(cg->chart_id);
+
+            // skip to the last slash
+            size_t len = strlen(s);
+            while(len--) if(unlikely(s[len] == '/')) break;
+            if(len) s = &s[len + 1];
+
+            // remove extension
+            len = strlen(s);
+            while(len--) if(unlikely(s[len] == '.')) break;
+            if(len) s[len] = '\0';
+
+            freez(cg->chart_title);
+            cg->chart_title = cgroup_title_strdupz(s);
+
+            cg->enabled = 1;
+            user_configurable = 0;
+
+            debug(D_CGROUP, "cgroup '%s' renamed to '%s' (title: '%s')", cg->id, cg->chart_id, cg->chart_title);
+        }
+        else
+            debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') does not match systemd services groups", cg->id, cg->chart_id, cg->chart_title);
+    }
+
+    if(user_configurable) {
+        // allow the user to enable/disable this individualy
+        char option[FILENAME_MAX + 1];
+        snprintfz(option, FILENAME_MAX, "enable cgroup %s", cg->chart_title);
+        cg->enabled = (char) config_get_boolean("plugin:cgroups", option, def);
+    }
+
+    // detect duplicate cgroups
     if(cg->enabled) {
         struct cgroup *t;
         for (t = cgroup_root; t; t = t->next) {
@@ -1230,6 +1244,59 @@ void find_all_cgroups() {
 
 #define CHART_TITLE_MAX 300
 
+void update_services_charts(int update_every, int do_cpu, int do_mem_usage) {
+    static RRDSET *st_cpu = NULL;
+    static RRDSET *st_mem_usage = NULL;
+
+    // create the charts
+
+    if(do_cpu) {
+        if(unlikely(!st_cpu)) {
+            char title[CHART_TITLE_MAX + 1];
+
+            st_cpu = rrdset_find_bytype("services", "cpu");
+            if(!st_cpu) {
+                snprintfz(title, CHART_TITLE_MAX, "Systemd Services CPU utilization (%d%% = %d core%s)", (processors * 100), processors, (processors > 1) ? "s" : "");
+                st_cpu = rrdset_create("services", "cpu", NULL, "cpu", "services.cpu", title, "%", 30000, update_every, RRDSET_TYPE_STACKED);
+            }
+        }
+        else rrdset_next(st_cpu);
+    }
+
+    if(do_mem_usage) {
+        if(unlikely(!st_mem_usage)) {
+            st_mem_usage = rrdset_find_bytype("services", "mem_usage");
+            if(!st_mem_usage)
+                st_mem_usage = rrdset_create("services", "mem_usage", NULL, "mem", "services.mem_usage", "Systemd Services RAM Usage", "MB", 30001, update_every, RRDSET_TYPE_STACKED);
+        }
+        else rrdset_next(st_mem_usage);
+    }
+
+    // update the values
+    struct cgroup *cg;
+    for(cg = cgroup_root; cg ; cg = cg->next) {
+        if(!cg->available || !cg->enabled || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) continue;
+
+        if(do_cpu && cg->cpuacct_stat.updated) {
+            if(unlikely(!cg->rd_cpu))
+                cg->rd_cpu = rrddim_add(st_cpu, cg->chart_id, cg->chart_title, 100, hz, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_cpu, cg->rd_cpu, cg->cpuacct_stat.user + cg->cpuacct_stat.system);
+        }
+
+        if(do_mem_usage) {
+            if(unlikely(!cg->rd_mem_usage))
+                cg->rd_mem_usage = rrddim_add(st_mem_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+
+            rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes);
+        }
+    }
+
+    // complete the iteration
+    if(do_cpu) rrdset_done(st_cpu);
+    if(do_mem_usage) rrdset_done(st_mem_usage);
+}
+
 static inline char *cgroup_chart_type(char *buffer, const char *id, size_t len) {
     if(buffer[0]) return buffer;
 
@@ -1248,11 +1315,18 @@ void update_cgroup_charts(int update_every) {
     char type[RRD_ID_LENGTH_MAX + 1];
     char title[CHART_TITLE_MAX + 1];
 
-    struct cgroup *cg;
+    int services_do_cpu = 0;
+    int services_do_mem_usage = 0;
 
+    struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(!cg->available || !cg->enabled || cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)
+        if(!cg->available || !cg->enabled) continue;
+
+        if(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE) {
+            if(cg->cpuacct_stat.updated && (cg->cpuacct_stat.user || cg->cpuacct_stat.system)) services_do_cpu++;
+            if(cg->memory.usage_in_bytes_updated) services_do_mem_usage++;
             continue;
+        }
 
         type[0] = '\0';
 
@@ -1300,7 +1374,7 @@ void update_cgroup_charts(int update_every) {
         }
 
         if(cg->memory.updated) {
-            if(cg->memory.cache + cg->memory.rss + cg->memory.rss_huge + cg->memory.mapped_file > 0) {
+            if(cg->memory.cache || cg->memory.rss || cg->memory.rss_huge || cg->memory.mapped_file) {
                 if(unlikely(!cg->st_mem)) {
                     cg->st_mem = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem");
                     if(!cg->st_mem) {
@@ -1344,7 +1418,7 @@ void update_cgroup_charts(int update_every) {
             rrddim_set(cg->st_writeback, "writeback", cg->memory.writeback);
             rrdset_done(cg->st_writeback);
 
-            if(cg->memory.pgpgin + cg->memory.pgpgout > 0) {
+            if(cg->memory.pgpgin || cg->memory.pgpgout) {
                 if(unlikely(!cg->st_mem_activity)) {
                     cg->st_mem_activity = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem_activity");
                     if(!cg->st_mem_activity) {
@@ -1362,7 +1436,7 @@ void update_cgroup_charts(int update_every) {
                 rrdset_done(cg->st_mem_activity);
             }
 
-            if(cg->memory.pgfault + cg->memory.pgmajfault > 0) {
+            if(cg->memory.pgfault || cg->memory.pgmajfault) {
                 if(unlikely(!cg->st_pgfaults)) {
                     cg->st_pgfaults = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "pgfaults");
                     if(!cg->st_pgfaults) {
@@ -1399,7 +1473,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_mem_usage);
         }
 
-        if(cg->memory.failcnt_updated && cg->memory.failcnt > 0) {
+        if(cg->memory.failcnt_updated && cg->memory.failcnt) {
             if(unlikely(!cg->st_mem_failcnt)) {
                 cg->st_mem_failcnt = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem_failcnt");
                 if(!cg->st_mem_failcnt) {
@@ -1415,7 +1489,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_mem_failcnt);
         }
 
-        if(cg->io_service_bytes.updated && cg->io_service_bytes.Read + cg->io_service_bytes.Write > 0) {
+        if(cg->io_service_bytes.updated && (cg->io_service_bytes.Read || cg->io_service_bytes.Write)) {
             if(unlikely(!cg->st_io)) {
                 cg->st_io = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "io");
                 if(!cg->st_io) {
@@ -1433,7 +1507,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_io);
         }
 
-        if(cg->io_serviced.updated && cg->io_serviced.Read + cg->io_serviced.Write > 0) {
+        if(cg->io_serviced.updated && (cg->io_serviced.Read || cg->io_serviced.Write)) {
             if(unlikely(!cg->st_serviced_ops)) {
                 cg->st_serviced_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "serviced_ops");
                 if(!cg->st_serviced_ops) {
@@ -1452,7 +1526,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_serviced_ops);
         }
 
-        if(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.Read + cg->throttle_io_service_bytes.Write > 0) {
+        if(cg->throttle_io_service_bytes.updated && (cg->throttle_io_service_bytes.Read || cg->throttle_io_service_bytes.Write)) {
             if(unlikely(!cg->st_throttle_io)) {
                 cg->st_throttle_io = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "throttle_io");
                 if(!cg->st_throttle_io) {
@@ -1470,8 +1544,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_throttle_io);
         }
 
-
-        if(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.Read + cg->throttle_io_serviced.Write > 0) {
+        if(cg->throttle_io_serviced.updated && (cg->throttle_io_serviced.Read || cg->throttle_io_serviced.Write)) {
             if(unlikely(!cg->st_throttle_serviced_ops)) {
                 cg->st_throttle_serviced_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "throttle_serviced_ops");
                 if(!cg->st_throttle_serviced_ops) {
@@ -1507,7 +1580,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_queued_ops);
         }
 
-        if(cg->io_merged.updated && cg->io_merged.Read + cg->io_merged.Write > 0) {
+        if(cg->io_merged.updated && (cg->io_merged.Read || cg->io_merged.Write)) {
             if(unlikely(!cg->st_merged_ops)) {
                 cg->st_merged_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "merged_ops");
                 if(!cg->st_merged_ops) {
@@ -1527,6 +1600,9 @@ void update_cgroup_charts(int update_every) {
     }
 
     debug(D_CGROUP, "done updating cgroups charts");
+
+    if(cgroup_enable_systemd_services && services_do_cpu)
+        update_services_charts(update_every, services_do_cpu, services_do_mem_usage);
 }
 
 // ----------------------------------------------------------------------------
