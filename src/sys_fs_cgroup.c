@@ -22,10 +22,10 @@ static int cgroup_root_count = 0;
 static int cgroup_root_max = 500;
 static int cgroup_max_depth = 0;
 
-static NETDATA_SIMPLE_PATTERN *disabled_cgroups_patterns = NULL;
-static NETDATA_SIMPLE_PATTERN *disabled_cgroup_paths = NULL;
-static NETDATA_SIMPLE_PATTERN *disabled_cgroup_renames = NULL;
-static NETDATA_SIMPLE_PATTERN *systemd_services_cgroups = NULL;
+static SIMPLE_PATTERN *disabled_cgroups_patterns = NULL;
+static SIMPLE_PATTERN *disabled_cgroup_paths = NULL;
+static SIMPLE_PATTERN *disabled_cgroup_renames = NULL;
+static SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 
 static char *cgroups_rename_script = PLUGINS_DIR "/cgroup-name.sh";
 
@@ -93,9 +93,8 @@ void read_cgroup_plugin_configuration() {
 
     cgroup_enable_new_cgroups_detected_at_runtime = config_get_boolean("plugin:cgroups", "enable new cgroups detected at run time", cgroup_enable_new_cgroups_detected_at_runtime);
 
-    disabled_cgroups_patterns = netdata_simple_pattern_list_create(
-            config_get("plugin:cgroups", "disable by default cgroups matching",
-                    " *.mount "
+    disabled_cgroups_patterns = simple_pattern_create(
+            config_get("plugin:cgroups", "disable by default cgroups matching", " *.mount "
                     " *.partition "
                     " *.service "
                     " *.slice "
@@ -115,23 +114,22 @@ void read_cgroup_plugin_configuration() {
                     " /systemd "
                     " /user "
                     " /user.slice "
-            ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
+            ), SIMPLE_PATTERN_EXACT);
 
-    disabled_cgroup_paths = netdata_simple_pattern_list_create(
-            config_get("plugin:cgroups", "do not search for cgroups in paths matching",
-                    " *-qemu "                             //  #345
-                    " /init.scope "
-                    " /system "
-                    " /systemd "
-                    " /user "
-                    " /user.slice "
-            ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
+    disabled_cgroup_paths = simple_pattern_create(
+            config_get("plugin:cgroups", "do not search for cgroups in paths matching"
+                       , " *-qemu "                             //  #345
+                            " /init.scope "
+                            " /system "
+                            " /systemd "
+                            " /user "
+                            " /user.slice "
+            ), SIMPLE_PATTERN_EXACT);
 
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", cgroups_rename_script);
 
-    disabled_cgroup_renames = netdata_simple_pattern_list_create(
-            config_get("plugin:cgroups", "do not run script to rename cgroups matching",
-                    " / "
+    disabled_cgroup_renames = simple_pattern_create(
+            config_get("plugin:cgroups", "do not run script to rename cgroups matching", " / "
                     " *.mount "
                     " *.partition "
                     " *.scope "
@@ -139,13 +137,13 @@ void read_cgroup_plugin_configuration() {
                     " *.slice "
                     " *.swap "
                     " *.user "
-            ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
+            ), SIMPLE_PATTERN_EXACT);
 
     if(cgroup_enable_systemd_services)
-        systemd_services_cgroups = netdata_simple_pattern_list_create(
-                config_get("plugin:cgroups", "cgroups to match as systemd services",
-                        " !/system.slice/*/*.service /system.slice/*.service "
-                ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
+        systemd_services_cgroups = simple_pattern_create(
+                config_get("plugin:cgroups", "cgroups to match as systemd services"
+                           , " !/system.slice/*/*.service /system.slice/*.service "
+                ), SIMPLE_PATTERN_EXACT);
 
     mountinfo_free(root);
 }
@@ -776,7 +774,7 @@ struct cgroup *cgroup_add(const char *id) {
         return NULL;
     }
 
-    int def = netdata_simple_pattern_list_matches(disabled_cgroups_patterns, id)?0:cgroup_enable_new_cgroups_detected_at_runtime;
+    int def = simple_pattern_matches(disabled_cgroups_patterns, id)?0:cgroup_enable_new_cgroups_detected_at_runtime;
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
     cg->id = strdupz(id);
@@ -799,8 +797,8 @@ struct cgroup *cgroup_add(const char *id) {
     cgroup_root_count++;
 
     // fix the chart_id and title by calling the external script
-    if(!netdata_simple_pattern_list_matches(disabled_cgroup_renames, cg->id) &&
-       !netdata_simple_pattern_list_matches(disabled_cgroup_renames, cg->chart_id)) {
+    if(!simple_pattern_matches(disabled_cgroup_renames, cg->id) &&
+       !simple_pattern_matches(disabled_cgroup_renames, cg->chart_id)) {
 
         cgroup_get_chart_name(cg);
 
@@ -813,8 +811,8 @@ struct cgroup *cgroup_add(const char *id) {
 
     // check if this cgroup should be a systemd service
     if(cgroup_enable_systemd_services) {
-        if(netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->id) ||
-           netdata_simple_pattern_list_matches(systemd_services_cgroups, cg->chart_id)) {
+        if(simple_pattern_matches(systemd_services_cgroups, cg->id) ||
+                simple_pattern_matches(systemd_services_cgroups, cg->chart_id)) {
             debug(D_CGROUP, "cgroup '%s' with chart id '%s' (title: '%s') matches systemd services cgroups", cg->id, cg->chart_id, cg->chart_title);
 
             char buffer[CGROUP_CHARTID_LINE_MAX + 1];
@@ -1001,7 +999,7 @@ int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(con
 
                 // do not decent in directories we are not interested
                 int def = 1;
-                if(netdata_simple_pattern_list_matches(disabled_cgroup_paths, r))
+                if(simple_pattern_matches(disabled_cgroup_paths, r))
                     def = 0;
 
                 // we check for this option here

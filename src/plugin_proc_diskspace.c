@@ -32,23 +32,23 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     const char *disk = mi->persistent_id;
 
     static DICTIONARY *mount_points = NULL;
-    static NETDATA_SIMPLE_PATTERN *excluded_mountpoints = NULL;
+    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
     int do_space, do_inodes;
 
     if(unlikely(!mount_points)) {
         const char *s;
-        NETDATA_SIMPLE_PREFIX_MODE mode = NETDATA_SIMPLE_PATTERN_MODE_EXACT;
+        SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
 
         if(config_exists("plugin:proc:/proc/diskstats", "exclude space metrics on paths") && !config_exists("plugin:proc:diskspace", "exclude space metrics on paths")) {
             // the config exists in the old section
             s = config_get("plugin:proc:/proc/diskstats", "exclude space metrics on paths", DELAULT_EXLUDED_PATHS);
-            mode = NETDATA_SIMPLE_PATTERN_MODE_PREFIX;
+            mode = SIMPLE_PATTERN_PREFIX;
         }
         else
             s = config_get("plugin:proc:diskspace", "exclude space metrics on paths", DELAULT_EXLUDED_PATHS);
 
         mount_points = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
-        excluded_mountpoints = netdata_simple_pattern_list_create(s, mode);
+        excluded_mountpoints = simple_pattern_create(s, mode);
     }
 
     struct mount_point_metadata *m = dictionary_get(mount_points, mi->mount_point);
@@ -59,7 +59,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         int def_space = config_get_boolean_ondemand("plugin:proc:diskspace", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
         int def_inodes = config_get_boolean_ondemand("plugin:proc:diskspace", "inodes usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
 
-        if(unlikely(netdata_simple_pattern_list_matches(excluded_mountpoints, mi->mount_point))) {
+        if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
             def_space = CONFIG_ONDEMAND_NO;
             def_inodes = CONFIG_ONDEMAND_NO;
         }
