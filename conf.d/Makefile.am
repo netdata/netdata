@@ -50,6 +50,7 @@ dist_pythonconfig_DATA = \
     python.d/sensors.conf \
     python.d/squid.conf \
     python.d/tomcat.conf \
+    python.d/varnish.conf \
     $(NULL)
 
 healthconfigdir=$(configdir)/health.d
@@ -80,6 +81,7 @@ dist_healthconfig_DATA = \
     health.d/swap.conf \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
+    health.d/varnish.conf \
     $(NULL)
 
 chartsconfigdir=$(configdir)/charts.d
