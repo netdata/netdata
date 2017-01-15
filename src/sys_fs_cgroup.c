@@ -144,7 +144,7 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_enable_systemd_services)
         systemd_services_cgroups = netdata_simple_pattern_list_create(
                 config_get("plugin:cgroups", "cgroups to match as systemd services",
-                        " /system.slice/*.service "
+                        " !/system.slice/*/*.service /system.slice/*.service "
                 ), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
 
     mountinfo_free(root);
