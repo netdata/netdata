@@ -13,16 +13,16 @@ from subprocess import Popen, PIPE
 priority = 60000
 retries = 60
 
-ORDER = ['hit_rate', 'chit_rate', 'request_rate', 'transfer_rates', 'session', 'backend_traffic', 'bad', 'uptime']
-EXTRA_ORDER = ['request_rate', 'hit_rate', 'backend_traffic', 'objects', 'transfer_rates', 'threads', 'memory_usage',
-         'objects_per_objhead', 'losthdr', 'hcb', 'esi', 'session', 'session_herd', 'shm_writes', 
-         'shm', 'allocations', 'vcl', 'bans', 'bans_lurker', 'expunge', 'lru', 'bad', 'gzip', 'uptime']
+ORDER = ['hit_rate', 'chit_rate', 'request_rate', 'transfer_rates', 'session', 'backend_traffic', 'memory_usage', 'bad', 'uptime']
+EXTRA_ORDER = ['hit_rate','chit_rate', 'request_rate', 'transfer_rates', 'session', 'backend_traffic', 'bad',
+               'objects', 'threads', 'memory_usage', 'objects_per_objhead', 'losthdr', 'hcb', 'esi', 'session_herd',
+               'shm_writes', 'shm', 'allocations', 'vcl', 'bans', 'bans_lurker', 'expunge', 'lru', 'gzip', 'uptime']
 
 CHARTS = {'allocations': 
              {'lines': [['sm_nreq', None, 'incremental', 1, 1],
                        ['sma_nreq', None, 'incremental', 1, 1],
                        ['sms_nreq', None, 'incremental', 1, 1]],
-              'options': [None, 'Memory allocation requests', 'units', 'allocations', 'varnish.alloc','line']},
+              'options': [None, 'Memory allocation requests', 'units', 'Extra charts', 'varnish.alloc','line']},
           'backend_traffic': 
              {'lines': [['backend_conn_bt', 'conn', 'incremental', 1, 1],
                        ['backend_unhealthy', 'unhealthy', 'incremental', 1, 1],
@@ -33,7 +33,7 @@ CHARTS = {'allocations':
                        ['backend_toolate', 'toolate', 'incremental', 1, 1],
                        ['backend_retry', 'retry', 'incremental', 1, 1],
                        ['backend_req', 'req', 'incremental', 1, 1]],
-              'options': [None, 'Backend traffic', 'units', 'backend_traffic', 'varnish.backend_traf', 'line']},
+              'options': [None, 'Backend health', 'units', 'Backend health', 'varnish.backend_traf', 'line']},
           'bad': 
              {'lines': [['sess_drop_b', None, 'incremental', 1, 1],
                        ['backend_unhealthy_b', None, 'incremental', 1, 1],
@@ -48,7 +48,7 @@ CHARTS = {'allocations':
                        ['esi_warnings_b', None, 'incremental', 1, 1],
                        ['sess_fail_b', None, 'incremental', 1, 1],
                        ['sess_pipe_overflow_b', None, 'incremental', 1, 1]],
-              'options': [None, 'Misbehavior', 'units', 'bad', 'varnish.bad', 'line']},
+              'options': [None, 'Misbehavior', 'units', 'Problems summary', 'varnish.bad', 'line']},
           'bans': 
              {'lines': [['bans', None, 'absolute', 1, 1],
                        ['bans_added', 'added', 'incremental', 1, 1],
@@ -62,61 +62,61 @@ CHARTS = {'allocations':
                        ['bans_dups', 'dups', 'absolute', 1, 1],
                        ['bans_persisted_bytes', 'pers_bytes', 'absolute', 1, 1],
                        ['bans_persisted_fragmentation', 'pers_fragmentation', 'absolute', 1, 1]],
-              'options': [None, 'Bans', 'units', 'bans', 'varnish.bans', 'line']},
+              'options': [None, 'Bans', 'units', 'Extra charts', 'varnish.bans', 'line']},
           'bans_lurker': 
              {'lines': [['bans_lurker_tested', 'tested', 'incremental', 1, 1],
                        ['bans_lurker_tests_tested', 'tests_tested', 'incremental', 1, 1],
                        ['bans_lurker_obj_killed', 'obj_killed', 'incremental', 1, 1],
                        ['bans_lurker_contention', 'contention', 'incremental', 1, 1]],
-              'options': [None, 'Ban Lurker', 'units', 'bans_lurker', 'varnish.bans_lurker', 'line']},
+              'options': [None, 'Ban Lurker', 'units', 'Extra charts', 'varnish.bans_lurker', 'line']},
           'esi':
              {'lines': [['esi_parse', None, 'incremental', 1, 1],
                        ['esi_errors', None, 'incremental', 1, 1],
                        ['esi_warnings', None, 'incremental', 1, 1]],
-              'options': [None, 'ESI', 'units', 'esi', 'varnish.esi', 'line']},
+              'options': [None, 'ESI', 'units', 'Extra charts', 'varnish.esi', 'line']},
           'expunge':
              {'lines': [['n_expired', None, 'incremental', 1, 1],
                        ['n_lru_nuked_e', None, 'incremental', 1, 1]],
-              'options': [None, 'Object expunging', 'units', 'expunge', 'varnish.expunge', 'line']},
+              'options': [None, 'Object expunging', 'units', 'Extra charts', 'varnish.expunge', 'line']},
           'gzip': 
              {'lines': [['n_gzip', None, 'incremental', 1, 1],
                        ['n_gunzip', None, 'incremental', 1, 1]],
-              'options': [None, 'GZIP activity', 'units', 'gzip', 'varnish.gzip', 'line']},
+              'options': [None, 'GZIP activity', 'units', 'Extra charts', 'varnish.gzip', 'line']},
           'hcb': 
              {'lines': [['hcb_nolock', 'nolock', 'incremental', 1, 1],
                        ['hcb_lock', 'lock', 'incremental', 1, 1],
                        ['hcb_insert', 'insert', 'incremental', 1, 1]],
-              'options': [None, 'Critbit data', 'units', 'hcb', 'varnish.hcb', 'line']},
+              'options': [None, 'Critbit data', 'units', 'Extra charts', 'varnish.hcb', 'line']},
           'hit_rate': 
              {'lines': [['cache_hit_perc', 'hit', 'absolute', 1, 100],
                        ['cache_miss_perc', 'miss', 'absolute', 1, 100],
                        ['cache_hitpass_perc', 'hitpass', 'absolute', 1, 100]],
-              'options': [None, 'All history hit rate','percent', 'Cache hit rate', 'varnish.hit_rate', 'line']},
+              'options': [None, 'All history hit rate ratio','percent', 'Cache perfomance', 'varnish.hit_rate', 'stacked']},
           'chit_rate': 
              {'lines': [['cache_hit_cperc', 'hit', 'absolute', 1, 100],
                        ['cache_miss_cperc', 'miss', 'absolute', 1, 100],
                        ['cache_hitpass_cperc', 'hitpass', 'absolute', 1, 100]],
-              'options': [None, 'Current poll hit rate (prev / current * 100)','percent', 'Cache hit rate', 'varnish.hit_rate', 'line']},
+              'options': [None, 'Current poll hit rate ratio','percent', 'Cache perfomance', 'varnish.chit_rate', 'stacked']},
           'losthdr': 
              {'lines': [['losthdr', None, 'incremental', 1, 1]],
-              'options': [None, 'HTTP Header overflows', 'units', 'losthdr', 'varnish.losthdr', 'line']},
+              'options': [None, 'HTTP Header overflows', 'units', 'Extra charts', 'varnish.losthdr', 'line']},
           'lru':
              {'lines': [['n_lru_nuked', 'nuked', 'incremental', 1, 1],
                        ['n_lru_moved', 'moved', 'incremental', 1, 1]],
-              'options': [None, 'LRU activity', 'units', 'lru', 'varnish.lru', 'line']},
+              'options': [None, 'LRU activity', 'units', 'Extra charts', 'varnish.lru', 'line']},
           'memory_usage': 
-             {'lines': [['sms_balloc', None, 'absolute', 1, 1],
-                       ['sms_nbytes', None, 'absolute', 1, 1]],
-              'options': [None, 'Memory usage', 'units', 'memory_usage', 'varnish.memory_usage', 'line']},
+             {'lines': [['s0.g_space', 'available', 'absolute', 1, 1048576],
+                       ['s0.g_bytes', 'allocated', 'absolute', -1, 1048576]],
+              'options': [None, 'Memory usage', 'megabytes', 'Memory usage', 'varnish.memory_usage', 'stacked']},
           'objects': 
              {'lines': [['n_object', 'object', 'absolute', 1, 1],
                        ['n_objectcore', 'objectcore', 'absolute', 1, 1],
                        ['n_vampireobject', 'vampireobject, ''absolute', 1, 1],
                        ['n_objecthead', 'objecthead', 'absolute', 1, 1]],
-              'options': [None, 'Number of objects', 'units', 'objects', 'varnish.objects', 'line']},
+              'options': [None, 'Number of objects', 'units', 'Extra charts', 'varnish.objects', 'line']},
           'objects_per_objhead': 
              {'lines': [['obj_per_objhead', 'per_objhead', 'absolute', 1, 100]],
-              'options': [None, 'Objects per objecthead', 'units', 'objects_per_objhead', 'varnish.objects_per_objhead', 'line']},
+              'options': [None, 'Objects per objecthead', 'units', 'Extra charts', 'varnish.objects_per_objhead', 'line']},
           'request_rate': 
              {'lines': [['sess_conn_rr', None, 'incremental', 1, 1],
                        ['client_req', None, 'incremental', 1, 1],
@@ -127,7 +127,7 @@ CHARTS = {'allocations':
                        ['backend_unhealthy', None, 'incremental', 1, 1],
                        ['s_pipe', None, 'incremental', 1, 1],
                        ['s_pass', None, 'incremental', 1, 1]],
-              'options': [None, 'Request rates', 'units', 'request_rate', 'varnish.request_rate', 'line']},
+              'options': [None, 'Request rates', 'units', 'Varnish statistics', 'varnish.request_rate', 'line']},
           'session': 
              {'lines': [['sess_conn', 'conn', 'incremental', 1, 1],
                        ['sess_drop', 'drop', 'incremental', 1, 1],
@@ -139,39 +139,39 @@ CHARTS = {'allocations':
                        ['sess_pipeline', 'pipeline', 'incremental', 1, 1],
                        ['sess_readahead' , 'readhead', 'incremental', 1, 1]],
 
-              'options': [None, 'Sessions', 'units', 'session', 'varnish.session', 'line']},
+              'options': [None, 'Sessions', 'units', 'Varnish statistics', 'varnish.session', 'line']},
           'session_herd': 
              {'lines': [['sess_herd', None, 'incremental', 1, 1]],
-              'options': [None, 'Session herd', 'units', 'session_herd', 'varnish.session_herd', 'line']},
+              'options': [None, 'Session herd', 'units', 'Extra charts', 'varnish.session_herd', 'line']},
           'shm': 
              {'lines': [['shm_flushes', 'flushes', 'incremental', 1, 1],
                        ['shm_cont', 'cont', 'incremental', 1, 1],
                        ['shm_cycles', 'cycles', 'incremental', 1, 1]],
-              'options': [None, 'SHM writes and records', 'units', 'shm', 'varnish.shm', 'line']},
+              'options': [None, 'SHM writes and records', 'units', 'Extra charts', 'varnish.shm', 'line']},
           'shm_writes': 
              {'lines': [['shm_records', 'records', 'incremental', 1, 1],
                        ['shm_writes', 'writes', 'incremental', 1, 1]],
-              'options': [None, 'SHM writes and records', 'units', 'shm_writes', 'varnish.shm_writes', 'line']},
+              'options': [None, 'SHM writes and records', 'units', 'Extra charts', 'varnish.shm_writes', 'line']},
           'threads': 
              {'lines': [['threads', None, 'absolute', 1, 1],
                        ['threads_created', 'created', 'incremental', 1, 1],
                        ['threads_failed', 'failed', 'incremental', 1, 1],
                        ['threads_limited', 'limited', 'incremental', 1, 1],
                        ['threads_destroyed', 'destroyed', 'incremental', 1, 1]],
-              'options': [None, 'Thread status', 'units', 'threads', 'varnish.threads', 'line']},
+              'options': [None, 'Thread status', 'units', 'Extra charts', 'varnish.threads', 'line']},
           'transfer_rates': 
-             {'lines': [['s_resp_hdrbytes', 'resp_hdrbytes', 'incremental', 8, 1],
-                       ['s_resp_bodybytes', 'resp_bodybytes', 'incremental', 8, 1]],
-              'options': [None, 'Transfer rates', 'bits/s', 'transfer_rates', 'varnish.transfer_rates', 'line']},
+             {'lines': [['s_resp_hdrbytes', 'header', 'incremental', 8, 1000],
+                       ['s_resp_bodybytes', 'body', 'incremental', -8, 1000]],
+              'options': [None, 'Transfer rates', 'kilobit/s', 'Varnish statistics', 'varnish.transfer_rates', 'area']},
           'uptime': 
              {'lines': [['uptime', None, 'absolute', 1, 1]],
-              'options': [None, 'Varnish uptime', 'seconds', 'uptime', 'varnish.uptime', 'line']},
+              'options': [None, 'Varnish uptime', 'seconds', 'Varnish statistics', 'varnish.uptime', 'line']},
           'vcl': 
              {'lines': [['n_backend', None, 'absolute', 1, 1],
                        ['n_vcl', None, 'incremental', 1, 1],
                        ['n_vcl_avail', None, 'incremental', 1, 1],
                        ['n_vcl_discard', None, 'incremental', 1, 1]],
-              'options': [None, 'VCL', 'units', 'vcl', 'varnish.vcl', 'line']}}
+              'options': [None, 'VCL', 'units', 'Extra charts', 'varnish.vcl', 'line']}}
 
 DIRECTORIES = ['/bin/', '/usr/bin/', '/sbin/', '/usr/sbin/']
 
@@ -270,8 +270,8 @@ class Service(SimpleService):
 
         # 3.2 Cache hit/miss/hitpass CURRENT in percent
         if self.cache_prev:
-            cache_summary = sum([to_netdata.get('cache_hit', 0) - self.cache_prev[0], to_netdata.get('cache_miss', 0) - self.cache_prev[1],
-                                 to_netdata.get('cache_hitpass', 0) - self.cache_prev[2]])
+            cache_summary = sum([to_netdata.get('cache_hit', 0), to_netdata.get('cache_miss', 0),
+                                 to_netdata.get('cache_hitpass', 0)]) - sum(self.cache_prev)
             to_netdata['cache_hit_cperc'] = find_percent(to_netdata.get('cache_hit', 0) - self.cache_prev[0], cache_summary, 10000)
             to_netdata['cache_miss_cperc'] = find_percent(to_netdata.get('cache_miss', 0) - self.cache_prev[1], cache_summary, 10000)
             to_netdata['cache_hitpass_cperc'] = find_percent(to_netdata.get('cache_hitpass', 0) - self.cache_prev[2], cache_summary, 10000)
@@ -282,7 +282,7 @@ class Service(SimpleService):
 
         self.cache_prev = [to_netdata.get('cache_hit', 0), to_netdata.get('cache_miss', 0), to_netdata.get('cache_hitpass', 0)]
 
-        # 3.3 Copy random stuff to new keys (do we need this?)
+        # 3.2 Copy random stuff to new keys (do we need this?)
         to_netdata['obj_per_objhead'] = find_percent(to_netdata.get('n_object', 0),
                                                      to_netdata.get('n_objecthead', 0), 100)
         to_netdata['backend_conn_bt'] = to_netdata.get('backend_conn', 0)
@@ -320,18 +320,18 @@ class Service(SimpleService):
                 self.definitions.update({''.join([backend[0], '_resp_stats']): {
                     'options': [None,
                                 '%s response statistics' % backend[0].capitalize(),
-                                "bits/s",
+                                "kilobit/s",
                                 'Backend response',
                                 'varnish.backend',
                                 'area'],
                     'lines': [[''.join([backend[0], '_beresp_hdrbytes']),
-                               'header', 'incremental', 8, 1],
+                               'header', 'incremental', 8, 1000],
                               [''.join([backend[0], '_beresp_bodybytes']),
-                               'body', 'incremental', -8, 1]]}})
+                               'body', 'incremental', -8, 1000]]}})
 
 
 def find_percent(value1, value2, multiply):
-    # If value 2 is 0 return 0
+    # If value2 is 0 return 0
     if not value2:
         return 0
     else:
