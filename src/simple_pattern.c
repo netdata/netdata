@@ -11,7 +11,10 @@ struct simple_pattern {
 };
 
 static inline struct simple_pattern *parse_pattern(const char *str, NETDATA_SIMPLE_PREFIX_MODE default_mode) {
+    /*
+     * DEBUG
     info(">>>> PARSE: '%s'", str);
+     */
 
     NETDATA_SIMPLE_PREFIX_MODE mode;
     struct simple_pattern *child = NULL;
@@ -66,6 +69,8 @@ static inline struct simple_pattern *parse_pattern(const char *str, NETDATA_SIMP
 
     free(buf);
 
+    /*
+     * DEBUG
     info("PATTERN '%s' is composed by", str);
     struct simple_pattern *p;
     for(p = m; p ; p = p->child)
@@ -75,6 +80,7 @@ static inline struct simple_pattern *parse_pattern(const char *str, NETDATA_SIMP
             (p->mode == NETDATA_SIMPLE_PATTERN_MODE_PREFIX || p->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
             p->len,
             p->mode);
+     */
 
     return m;
 }
@@ -129,11 +135,15 @@ NETDATA_SIMPLE_PATTERN *netdata_simple_pattern_list_create(const char *list, NET
 }
 
 static inline int match_pattern(struct simple_pattern *m, const char *str, size_t len) {
+    /*
+     * DEBUG
+     *
     info("CHECK string '%s' (len %zu) with pattern '%s%s%s' (len %zu type %u)", str, len,
             (m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUFFIX || m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
             m->match,
             (m->mode == NETDATA_SIMPLE_PATTERN_MODE_PREFIX || m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
             m->len, m->mode);
+    */
 
     char *s;
 
@@ -182,6 +192,9 @@ int netdata_simple_pattern_list_matches(NETDATA_SIMPLE_PATTERN *list, const char
     size_t len = strlen(str);
     for(m = root; m ; m = m->next)
         if(match_pattern(m, str, len)) {
+            /*
+             * DEBUG
+             *
             info("MATCHED string '%s' (len %zu) with pattern '%s%s%s' (len %zu type %u)", str, len,
                     (m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUFFIX || m->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
                     m->match,
@@ -196,9 +209,21 @@ int netdata_simple_pattern_list_matches(NETDATA_SIMPLE_PATTERN *list, const char
                         (p->mode == NETDATA_SIMPLE_PATTERN_MODE_PREFIX || p->mode == NETDATA_SIMPLE_PATTERN_MODE_SUBSTRING)?"*":"",
                         p->len,
                         p->mode);
+            */
 
             return 1;
         }
 
     return 0;
+}
+
+static inline void free_pattern(struct simple_pattern *m) {
+    if(m->next) free_pattern(m->next);
+    if(m->child) free_pattern(m->child);
+    freez((void *)m->match);
+    freez(m);
+}
+
+void netdata_simple_pattern_free(NETDATA_SIMPLE_PATTERN *list) {
+    free_pattern(((struct simple_pattern *)list)->next);
 }
