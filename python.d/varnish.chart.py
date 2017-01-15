@@ -91,12 +91,12 @@ CHARTS = {'allocations':
              {'lines': [['cache_hit_perc', 'hit', 'absolute', 1, 100],
                        ['cache_miss_perc', 'miss', 'absolute', 1, 100],
                        ['cache_hitpass_perc', 'hitpass', 'absolute', 1, 100]],
-              'options': [None, 'All history hit rate ratio','percent', 'Cache perfomance', 'varnish.hit_rate', 'stacked']},
+              'options': [None, 'All history hit rate ratio','percent', 'Cache performance', 'varnish.hit_rate', 'stacked']},
           'chit_rate': 
              {'lines': [['cache_hit_cperc', 'hit', 'absolute', 1, 100],
                        ['cache_miss_cperc', 'miss', 'absolute', 1, 100],
                        ['cache_hitpass_cperc', 'hitpass', 'absolute', 1, 100]],
-              'options': [None, 'Current poll hit rate ratio','percent', 'Cache perfomance', 'varnish.chit_rate', 'stacked']},
+              'options': [None, 'Current poll hit rate ratio','percent', 'Cache performance', 'varnish.chit_rate', 'stacked']},
           'losthdr': 
              {'lines': [['losthdr', None, 'incremental', 1, 1]],
               'options': [None, 'HTTP Header overflows', 'units', 'Extra charts', 'varnish.losthdr', 'line']},
