@@ -293,6 +293,20 @@ struct cgroup {
     RRDDIM *rd_cpu;
     RRDDIM *rd_mem_usage;
 
+    RRDDIM *rd_io_service_bytes_read;
+    RRDDIM *rd_io_serviced_read;
+    RRDDIM *rd_throttle_io_read;
+    RRDDIM *rd_throttle_io_serviced_read;
+    RRDDIM *rd_io_queued_read;
+    RRDDIM *rd_io_merged_read;
+
+    RRDDIM *rd_io_service_bytes_write;
+    RRDDIM *rd_io_serviced_write;
+    RRDDIM *rd_throttle_io_write;
+    RRDDIM *rd_throttle_io_serviced_write;
+    RRDDIM *rd_io_queued_write;
+    RRDDIM *rd_io_merged_write;
+
     struct cgroup *next;
 
 } *cgroup_root = NULL;
@@ -1242,9 +1256,35 @@ void find_all_cgroups() {
 
 #define CHART_TITLE_MAX 300
 
-void update_services_charts(int update_every, int do_cpu, int do_mem_usage) {
-    static RRDSET *st_cpu = NULL;
-    static RRDSET *st_mem_usage = NULL;
+void update_services_charts(int update_every,
+        int do_cpu,
+        int do_mem_usage,
+        int do_io,
+        int do_io_ops,
+        int do_throttle_io,
+        int do_throttle_ops /*,
+        int do_queued_ops,
+        int do_merged_ops */
+) {
+    static RRDSET
+            *st_cpu = NULL,
+            *st_mem_usage = NULL,
+
+            *st_io_read = NULL,
+            *st_io_serviced_read = NULL,
+            *st_throttle_io_read = NULL,
+            *st_throttle_ops_read = NULL,
+            /*
+            *st_queued_ops_read = NULL,
+            *st_merged_ops_read = NULL,
+            * */
+
+            *st_io_write = NULL,
+            *st_io_serviced_write = NULL,
+            *st_throttle_io_write = NULL,
+            *st_throttle_ops_write = NULL/*,
+            *st_queued_ops_write = NULL,
+            *st_merged_ops_write = NULL*/;
 
     // create the charts
 
@@ -1270,6 +1310,70 @@ void update_services_charts(int update_every, int do_cpu, int do_mem_usage) {
         else rrdset_next(st_mem_usage);
     }
 
+    if(do_io) {
+        if(unlikely(!st_io_read)) {
+            st_io_read = rrdset_find_bytype("services", "io_read");
+            if(!st_io_read)
+                st_io_read = rrdset_create("services", "io_read", NULL, "disk", "services.io_read", "Systemd Services Disk Read Bandwidth", "KB/s", 30012, update_every, RRDSET_TYPE_STACKED);
+        }
+        else rrdset_next(st_io_read);
+
+        if(unlikely(!st_io_write)) {
+            st_io_write = rrdset_find_bytype("services", "io_write");
+            if(!st_io_write)
+                st_io_write = rrdset_create("services", "io_write", NULL, "disk", "services.io_write", "Systemd Services Disk Write Bandwidth", "KB/s", 30013, update_every, RRDSET_TYPE_STACKED);
+        }
+        else rrdset_next(st_io_write);
+    }
+
+    if(do_io_ops) {
+        if(unlikely(!st_io_serviced_read)) {
+            st_io_serviced_read = rrdset_find_bytype("services", "io_ops_read");
+            if(!st_io_serviced_read)
+                st_io_serviced_read = rrdset_create("services", "io_ops_read", NULL, "disk", "services.io_ops_read", "Systemd Services Disk Read Operations", "operations/s", 30014, update_every, RRDSET_TYPE_STACKED);
+        }
+        else rrdset_next(st_io_serviced_read);
+
+        if(unlikely(!st_io_serviced_write)) {
+            st_io_serviced_write = rrdset_find_bytype("services", "io_ops_write");
+            if(!st_io_serviced_write)
+                st_io_serviced_write = rrdset_create("services", "io_ops_write", NULL, "disk", "services.io_ops_write", "Systemd Services Disk Write Operations", "operations/s", 30015, update_every, RRDSET_TYPE_STACKED);
+        }
+        else rrdset_next(st_io_serviced_write);
+    }
+
+    if(do_throttle_io) {
+        if(unlikely(!st_throttle_io_read)) {
+            st_throttle_io_read = rrdset_find_bytype("services", "throttle_io_read");
+            if(!st_throttle_io_read)
+                st_throttle_io_read = rrdset_create("services", "throttle_io_read", NULL, "disk", "services.throttle_io_read", "Systemd Services Throttle Disk Read Bandwidth", "KB/s", 30016, update_every, RRDSET_TYPE_STACKED);
+        }
+        else rrdset_next(st_throttle_io_read);
+
+        if(unlikely(!st_throttle_io_write)) {
+            st_throttle_io_write = rrdset_find_bytype("services", "throttle_io_write");
+            if(!st_throttle_io_write)
+                st_throttle_io_write = rrdset_create("services", "throttle_io_write", NULL, "disk", "services.throttle_io_write", "Systemd Services Throttle Disk Write Bandwidth", "KB/s", 30017, update_every, RRDSET_TYPE_STACKED);
+        }
+        else rrdset_next(st_throttle_io_write);
+    }
+
+    if(do_throttle_ops) {
+        if(unlikely(!st_throttle_ops_read)) {
+            st_throttle_ops_read = rrdset_find_bytype("services", "throttle_io_ops_read");
+            if(!st_throttle_ops_read)
+                st_throttle_ops_read = rrdset_create("services", "throttle_io_ops_read", NULL, "disk", "services.throttle_io_ops_read", "Systemd Services Throttle Disk Read Operations", "operations/s", 30018, update_every, RRDSET_TYPE_STACKED);
+        }
+        else rrdset_next(st_throttle_ops_read);
+
+        if(unlikely(!st_throttle_ops_write)) {
+            st_throttle_ops_write = rrdset_find_bytype("services", "throttle_io_ops_write");
+            if(!st_throttle_ops_write)
+                st_throttle_ops_write = rrdset_create("services", "throttle_io_ops_write", NULL, "disk", "services.throttle_io_ops_write", "Systemd Services Throttle Disk Write Operations", "operations/s", 30019, update_every, RRDSET_TYPE_STACKED);
+        }
+        else rrdset_next(st_throttle_ops_write);
+    }
+
     // update the values
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
@@ -1282,17 +1386,69 @@ void update_services_charts(int update_every, int do_cpu, int do_mem_usage) {
             rrddim_set_by_pointer(st_cpu, cg->rd_cpu, cg->cpuacct_stat.user + cg->cpuacct_stat.system);
         }
 
-        if(do_mem_usage) {
+        if(do_mem_usage && cg->memory.updated) {
             if(unlikely(!cg->rd_mem_usage))
                 cg->rd_mem_usage = rrddim_add(st_mem_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 
             rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes);
+        }
+
+        if(do_io && cg->io_service_bytes.updated) {
+            if(unlikely(!cg->rd_io_service_bytes_read))
+                cg->rd_io_service_bytes_read = rrddim_add(st_io_read, cg->chart_id, cg->chart_title, 1, 1024, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_io_read, cg->rd_io_service_bytes_read, cg->io_service_bytes.Read);
+
+            if(unlikely(!cg->rd_io_service_bytes_write))
+                cg->rd_io_service_bytes_write = rrddim_add(st_io_write, cg->chart_id, cg->chart_title, 1, 1024, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_io_write, cg->rd_io_service_bytes_write, cg->io_service_bytes.Write);
+        }
+
+        if(do_io_ops && cg->io_serviced.updated) {
+            if(unlikely(!cg->rd_io_serviced_read))
+                cg->rd_io_serviced_read = rrddim_add(st_io_serviced_read, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_io_serviced_read, cg->rd_io_serviced_read, cg->io_serviced.Read);
+
+            if(unlikely(!cg->rd_io_serviced_write))
+                cg->rd_io_serviced_write = rrddim_add(st_io_serviced_write, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_io_serviced_write, cg->rd_io_serviced_write, cg->io_serviced.Write);
+        }
+
+        if(do_throttle_io && cg->throttle_io_service_bytes.updated) {
+            if(unlikely(!cg->rd_throttle_io_read))
+                cg->rd_throttle_io_read = rrddim_add(st_throttle_io_read, cg->chart_id, cg->chart_title, 1, 1024, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_throttle_io_read, cg->rd_throttle_io_read, cg->throttle_io_service_bytes.Read);
+
+            if(unlikely(!cg->rd_throttle_io_write))
+                cg->rd_throttle_io_write = rrddim_add(st_throttle_io_write, cg->chart_id, cg->chart_title, 1, 1024, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_throttle_io_write, cg->rd_throttle_io_write, cg->throttle_io_service_bytes.Write);
+        }
+
+        if(do_throttle_ops && cg->throttle_io_serviced.updated) {
+            if(unlikely(!cg->rd_throttle_io_serviced_read))
+                cg->rd_throttle_io_serviced_read = rrddim_add(st_throttle_ops_read, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_throttle_ops_read, cg->rd_throttle_io_serviced_read, cg->throttle_io_serviced.Read);
+
+            if(unlikely(!cg->rd_throttle_io_serviced_write))
+                cg->rd_throttle_io_serviced_write = rrddim_add(st_throttle_ops_write, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_throttle_ops_write, cg->rd_throttle_io_serviced_write, cg->throttle_io_serviced.Write);
         }
     }
 
     // complete the iteration
     if(do_cpu) rrdset_done(st_cpu);
     if(do_mem_usage) rrdset_done(st_mem_usage);
+    if(do_io) { rrdset_done(st_io_read); rrdset_done(st_io_write); }
+    if(do_io_ops) { rrdset_done(st_io_serviced_read); rrdset_done(st_io_serviced_write); }
+    if(do_throttle_io) { rrdset_done(st_throttle_io_read); rrdset_done(st_throttle_io_write); }
+    if(do_throttle_ops) { rrdset_done(st_throttle_ops_read); rrdset_done(st_throttle_ops_write); }
 }
 
 static inline char *cgroup_chart_type(char *buffer, const char *id, size_t len) {
@@ -1313,8 +1469,14 @@ void update_cgroup_charts(int update_every) {
     char type[RRD_ID_LENGTH_MAX + 1];
     char title[CHART_TITLE_MAX + 1];
 
-    int services_do_cpu = 0;
-    int services_do_mem_usage = 0;
+    int services_do_cpu = 0,
+            services_do_mem_usage = 0,
+            services_do_io = 0,
+            services_do_io_ops = 0,
+            services_do_throttle_io = 0,
+            services_do_throttle_ops = 0,
+            services_do_queued_ops = 0,
+            services_do_merged_ops = 0;
 
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
@@ -1322,7 +1484,13 @@ void update_cgroup_charts(int update_every) {
 
         if(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE) {
             if(cg->cpuacct_stat.updated && (cg->cpuacct_stat.user || cg->cpuacct_stat.system)) services_do_cpu++;
-            if(cg->memory.usage_in_bytes_updated) services_do_mem_usage++;
+            if(cg->memory.usage_in_bytes_updated && (cg->memory.usage_in_bytes)) services_do_mem_usage++;
+            if(cg->io_service_bytes.updated && (cg->io_service_bytes.Read || cg->io_service_bytes.Write)) services_do_io++;
+            if(cg->io_serviced.updated && (cg->io_serviced.Read || cg->io_serviced.Write)) services_do_io_ops++;
+            if(cg->throttle_io_service_bytes.updated && (cg->throttle_io_service_bytes.Read || cg->throttle_io_service_bytes.Write)) services_do_throttle_io++;
+            if(cg->throttle_io_serviced.updated && (cg->throttle_io_serviced.Read || cg->throttle_io_serviced.Write)) services_do_throttle_ops++;
+            if(cg->io_queued.updated && (cg->io_queued.Read || cg->io_queued.Write)) services_do_queued_ops++;
+            if(cg->io_merged.updated && (cg->io_merged.Read || cg->io_merged.Write)) services_do_merged_ops++;
             continue;
         }
 
@@ -1599,8 +1767,17 @@ void update_cgroup_charts(int update_every) {
 
     debug(D_CGROUP, "done updating cgroups charts");
 
-    if(cgroup_enable_systemd_services && services_do_cpu)
-        update_services_charts(update_every, services_do_cpu, services_do_mem_usage);
+    if(cgroup_enable_systemd_services)
+        update_services_charts(update_every,
+                services_do_cpu,
+                services_do_mem_usage,
+                services_do_io,
+                services_do_io_ops,
+                services_do_throttle_io,
+                services_do_throttle_ops/*,
+                services_do_queued_ops,
+                services_do_merged_ops*/
+        );
 }
 
 // ----------------------------------------------------------------------------
