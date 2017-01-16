@@ -18,7 +18,18 @@ typedef uint64_t kernel_uint_t;
 
 // for faster execution, allow the compiler to inline
 // these functions that are called thousands of times per second
+// these functions that are called to hash strings
 
+/** 
+ * A simple Hash function.
+ *
+ * @see http://isthe.com/chongo/tech/comp/fnv/#FNV-1a
+ *
+ * For faster execution, allow the compiler to inline.
+ *
+ * @param name string to generate hash for
+ * @return hash for `name`
+ */
 static inline uint32_t simple_hash(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hval = 0x811c9dc5;
@@ -29,6 +40,16 @@ static inline uint32_t simple_hash(const char *name) {
     return hval;
 }
 
+/**
+ * A simple Hash function returning a positive value.
+ *
+ * @see http://isthe.com/chongo/tech/comp/fnv/#FNV-1a
+ *
+ * For faster execution, allow the compiler to inline.
+ *
+ * @param name string to generate hash for
+ * @return hash for `name`
+ */
 static inline uint32_t simple_uhash(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hval = 0x811c9dc5, c;
@@ -147,6 +168,17 @@ static inline char *strncpyz(char *dst, const char *src, size_t n) {
     return p;
 }
 
+/**
+ * Read `filename` containing a single number and return it.
+ *
+ * Open `filename`, read the first line, convert it to a number and store it in result.
+ *
+ * For faster execution, allow the compiler to inline.
+ *
+ * @param filename File to read.
+ * @param result Long to store the number in.
+ * @return 0 on success, -1 if could not open file, -2 if could not read from file.
+ */
 static inline int read_single_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
 
