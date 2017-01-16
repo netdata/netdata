@@ -42,8 +42,8 @@ CHARTS = {'backend_health':
                        ['sess_pipe_overflow_b', None, 'incremental', 1, 1]],
               'options': [None, 'Misbehavior', 'problems', 'Problems summary', 'varnish.bad', 'line']},
           'expunge':
-             {'lines': [['n_expired', None, 'incremental', 1, 1],
-                       ['n_lru_nuked', None, 'incremental', 1, 1]],
+             {'lines': [['n_expired', 'expired', 'incremental', 1, 1],
+                       ['n_lru_nuked', 'lru_nuked', 'incremental', 1, 1]],
               'options': [None, 'Object expunging', 'objects', 'Cache performance', 'varnish.expunge', 'line']},
           'hit_rate': 
              {'lines': [['cache_hit_perc', 'hit', 'absolute', 1, 100],
@@ -61,8 +61,8 @@ CHARTS = {'backend_health':
               'options': [None, 'Memory usage', 'megabytes', 'Memory usage', 'varnish.memory_usage', 'stacked']},
           'session': 
              {'lines': [['sess_conn', 'conn', 'incremental', 1, 1],
-                       ['client_req', 'drop', 'incremental', 1, 1],
-                       ['sess_dropped', 'fail', 'incremental', 1, 1]],
+                       ['client_req', 'requests', 'incremental', 1, 1],
+                       ['sess_dropped', 'dropped', 'incremental', 1, 1]],
               'options': [None, 'Sessions', 'units', 'Client metrics', 'varnish.session', 'line']},
           'threads': 
              {'lines': [['threads', None, 'absolute', 1, 1],
