@@ -381,6 +381,8 @@ struct cgroup {
     // services
     RRDDIM *rd_cpu;
     RRDDIM *rd_mem_usage;
+    RRDDIM *rd_mem_failcnt;
+    RRDDIM *rd_swap_usage;
 
     RRDDIM *rd_io_service_bytes_read;
     RRDDIM *rd_io_serviced_read;
@@ -1378,32 +1380,34 @@ static inline void find_all_cgroups() {
 void update_services_charts(int update_every,
         int do_cpu,
         int do_mem_usage,
+        int do_mem_failcnt,
+        int do_swap_usage,
         int do_io,
         int do_io_ops,
         int do_throttle_io,
-        int do_throttle_ops /*,
+        int do_throttle_ops,
         int do_queued_ops,
-        int do_merged_ops */
+        int do_merged_ops
 ) {
     static RRDSET
             *st_cpu = NULL,
             *st_mem_usage = NULL,
+            *st_mem_failcnt = NULL,
+            *st_swap_usage = NULL,
 
             *st_io_read = NULL,
             *st_io_serviced_read = NULL,
             *st_throttle_io_read = NULL,
             *st_throttle_ops_read = NULL,
-            /*
             *st_queued_ops_read = NULL,
             *st_merged_ops_read = NULL,
-            * */
 
             *st_io_write = NULL,
             *st_io_serviced_write = NULL,
             *st_throttle_io_write = NULL,
-            *st_throttle_ops_write = NULL/*,
+            *st_throttle_ops_write = NULL,
             *st_queued_ops_write = NULL,
-            *st_merged_ops_write = NULL*/;
+            *st_merged_ops_write = NULL;
 
     // create the charts
 
@@ -1425,10 +1429,30 @@ void update_services_charts(int update_every,
         if(unlikely(!st_mem_usage)) {
             st_mem_usage = rrdset_find_bytype("services", "mem_usage");
             if(likely(!st_mem_usage))
-                st_mem_usage = rrdset_create("services", "mem_usage", NULL, "mem", "services.mem_usage", "Systemd Services RAM Usage", "MB", 30001, update_every, RRDSET_TYPE_STACKED);
+                st_mem_usage = rrdset_create("services", "mem_usage", NULL, "mem", "services.mem_usage", "Systemd Services Used RAM with Cache", "MB", 30001, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_mem_usage);
+    }
+
+    if(likely(do_mem_failcnt)) {
+        if(unlikely(!st_mem_failcnt)) {
+            st_mem_failcnt = rrdset_find_bytype("services", "mem_failcnt");
+            if(likely(!st_mem_failcnt))
+                st_mem_failcnt = rrdset_create("services", "mem_failcnt", NULL, "mem", "services.mem_failcnt", "Systemd Services Memory Limit Failures", "MB", 30003, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_mem_failcnt);
+    }
+
+    if(likely(do_swap_usage)) {
+        if(unlikely(!st_swap_usage)) {
+            st_swap_usage = rrdset_find_bytype("services", "swap_usage");
+            if(likely(!st_swap_usage))
+                st_swap_usage = rrdset_create("services", "swap_usage", NULL, "swap", "services.swap_usage", "Systemd Services Swap Memory Used", "MB", 30002, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_swap_usage);
     }
 
     if(likely(do_io)) {
@@ -1503,6 +1527,42 @@ void update_services_charts(int update_every,
             rrdset_next(st_throttle_ops_write);
     }
 
+    if(likely(do_queued_ops)) {
+        if(unlikely(!st_queued_ops_read)) {
+            st_queued_ops_read = rrdset_find_bytype("services", "queued_io_ops_read");
+            if(likely(!st_queued_ops_read))
+                st_queued_ops_read = rrdset_create("services", "queued_io_ops_read", NULL, "disk", "services.queued_io_ops_read", "Systemd Services Queued Disk Read Operations", "operations/s", 30020, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_queued_ops_read);
+
+        if(unlikely(!st_queued_ops_write)) {
+            st_queued_ops_write = rrdset_find_bytype("services", "queued_io_ops_write");
+            if(likely(!st_queued_ops_write))
+                st_queued_ops_write = rrdset_create("services", "queued_io_ops_write", NULL, "disk", "services.queued_io_ops_write", "Systemd Services Queued Disk Write Operations", "operations/s", 30021, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_queued_ops_write);
+    }
+
+    if(likely(do_merged_ops)) {
+        if(unlikely(!st_merged_ops_read)) {
+            st_merged_ops_read = rrdset_find_bytype("services", "merged_io_ops_read");
+            if(likely(!st_merged_ops_read))
+                st_merged_ops_read = rrdset_create("services", "merged_io_ops_read", NULL, "disk", "services.merged_io_ops_read", "Systemd Services Merged Disk Read Operations", "operations/s", 30022, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_merged_ops_read);
+
+        if(unlikely(!st_merged_ops_write)) {
+            st_merged_ops_write = rrdset_find_bytype("services", "merged_io_ops_write");
+            if(likely(!st_merged_ops_write))
+                st_merged_ops_write = rrdset_create("services", "merged_io_ops_write", NULL, "disk", "services.merged_io_ops_write", "Systemd Services Merged Disk Write Operations", "operations/s", 30023, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_merged_ops_write);
+    }
+
     // update the values
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
@@ -1521,6 +1581,20 @@ void update_services_charts(int update_every,
                 cg->rd_mem_usage = rrddim_add(st_mem_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 
             rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes);
+        }
+
+        if(likely(do_mem_failcnt && cg->memory.failcnt_updated)) {
+            if(unlikely(!cg->rd_mem_failcnt))
+                cg->rd_mem_failcnt = rrddim_add(st_mem_failcnt, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_mem_failcnt, cg->rd_mem_failcnt, cg->memory.failcnt);
+        }
+
+        if(likely(do_swap_usage && cg->memory.msw_usage_in_bytes_updated)) {
+            if(unlikely(!cg->rd_swap_usage))
+                cg->rd_swap_usage = rrddim_add(st_swap_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+
+            rrddim_set_by_pointer(st_swap_usage, cg->rd_swap_usage, cg->memory.msw_usage_in_bytes);
         }
 
         if(likely(do_io && cg->io_service_bytes.updated)) {
@@ -1570,6 +1644,30 @@ void update_services_charts(int update_every,
 
             rrddim_set_by_pointer(st_throttle_ops_write, cg->rd_throttle_io_serviced_write, cg->throttle_io_serviced.Write);
         }
+
+        if(likely(do_queued_ops && cg->io_queued.updated)) {
+            if(unlikely(!cg->rd_io_queued_read))
+                cg->rd_io_queued_read = rrddim_add(st_queued_ops_read, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_queued_ops_read, cg->rd_io_queued_read, cg->io_queued.Read);
+
+            if(unlikely(!cg->rd_io_queued_write))
+                cg->rd_io_queued_write = rrddim_add(st_queued_ops_write, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_queued_ops_write, cg->rd_io_queued_write, cg->io_queued.Write);
+        }
+
+        if(likely(do_merged_ops && cg->io_merged.updated)) {
+            if(unlikely(!cg->rd_io_merged_read))
+                cg->rd_io_merged_read = rrddim_add(st_merged_ops_read, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_merged_ops_read, cg->rd_io_merged_read, cg->io_merged.Read);
+
+            if(unlikely(!cg->rd_io_merged_write))
+                cg->rd_io_merged_write = rrddim_add(st_merged_ops_write, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st_merged_ops_write, cg->rd_io_merged_write, cg->io_merged.Write);
+        }
     }
 
     // complete the iteration
@@ -1578,6 +1676,12 @@ void update_services_charts(int update_every,
 
     if(likely(do_mem_usage))
         rrdset_done(st_mem_usage);
+
+    if(likely(do_mem_failcnt))
+        rrdset_done(st_mem_failcnt);
+
+    if(likely(do_swap_usage))
+        rrdset_done(st_swap_usage);
 
     if(likely(do_io)) {
         rrdset_done(st_io_read);
@@ -1620,6 +1724,8 @@ void update_cgroup_charts(int update_every) {
 
     int services_do_cpu = 0,
             services_do_mem_usage = 0,
+            services_do_mem_failcnt = 0,
+            services_do_swap_usage = 0,
             services_do_io = 0,
             services_do_io_ops = 0,
             services_do_throttle_io = 0,
@@ -1635,6 +1741,8 @@ void update_cgroup_charts(int update_every) {
         if(likely(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) {
             if(cg->cpuacct_stat.updated && (cg->cpuacct_stat.user || cg->cpuacct_stat.system)) services_do_cpu++;
             if(cg->memory.usage_in_bytes_updated && (cg->memory.usage_in_bytes)) services_do_mem_usage++;
+            if(cg->memory.failcnt_updated && (cg->memory.failcnt)) services_do_mem_failcnt++;
+            if(cg->memory.msw_usage_in_bytes_updated && (cg->memory.msw_usage_in_bytes)) services_do_swap_usage++;
             if(cg->io_service_bytes.updated && (cg->io_service_bytes.Read || cg->io_service_bytes.Write)) services_do_io++;
             if(cg->io_serviced.updated && (cg->io_serviced.Read || cg->io_serviced.Write)) services_do_io_ops++;
             if(cg->throttle_io_service_bytes.updated && (cg->throttle_io_service_bytes.Read || cg->throttle_io_service_bytes.Write)) services_do_throttle_io++;
@@ -1796,7 +1904,7 @@ void update_cgroup_charts(int update_every) {
                 cg->st_mem_failcnt = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem_failcnt");
                 if(likely(!cg->st_mem_failcnt)) {
                     snprintfz(title, CHART_TITLE_MAX, "Memory Limit Failures for cgroup %s", cg->chart_title);
-                    cg->st_mem_failcnt = rrdset_create(type, "mem_failcnt", NULL, "mem", "cgroup.mem_failcnt", title, "MB", 40250, update_every, RRDSET_TYPE_LINE);
+                    cg->st_mem_failcnt = rrdset_create(type, "mem_failcnt", NULL, "mem", "cgroup.mem_failcnt", title, "count", 40250, update_every, RRDSET_TYPE_LINE);
                 }
                 rrddim_add(cg->st_mem_failcnt, "failures", NULL, 1, 1, RRDDIM_INCREMENTAL);
             }
@@ -1920,12 +2028,14 @@ void update_cgroup_charts(int update_every) {
         update_services_charts(update_every,
                 services_do_cpu,
                 services_do_mem_usage,
+                services_do_mem_failcnt,
+                services_do_swap_usage,
                 services_do_io,
                 services_do_io_ops,
                 services_do_throttle_io,
-                services_do_throttle_ops/*,
+                services_do_throttle_ops,
                 services_do_queued_ops,
-                services_do_merged_ops*/
+                services_do_merged_ops
         );
 
     debug(D_CGROUP, "done updating cgroups charts");
