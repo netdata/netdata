@@ -20,9 +20,9 @@ void netdata_cleanup_and_exit(int ret) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // kill all childs
-    kill_childs();
+    //kill_childs();
 
-    // free all memory
+    // free database
     rrdset_free_all();
 #endif
 
@@ -214,20 +214,19 @@ void kill_childs()
 }
 
 struct option_def options[] = {
-    // opt description                                                       arg name                     default value
-    {'c', "Load alternate configuration file",                               "config_file",                          CONFIG_DIR "/" CONFIG_FILENAME},
-    {'D', "Disable fork into background",                                    NULL,                                   NULL},
-    {'h', "Display help message",                                            NULL,                                   NULL},
-    {'P', "File to save a pid while running",                                "FILE",                                 NULL},
-    {'i', "The IP address to listen to.",                                    "address",                              "All addresses"},
-    {'k', "Check daemon configuration.",                                     NULL,                                   NULL},
-    {'p', "Port to listen. Can be from 1 to 65535.",                         "port_number",                          "19999"},
-    {'s', "Path to access host /proc and /sys when running in a container.", "PATH",                                 NULL},
-    {'t', "The frequency in seconds, for data collection. \
-Same as 'update every' config file option.",                                 "seconds",                              "1"},
-    {'u', "System username to run as.",                                      "username",                             "netdata"},
-    {'v', "Version of the program",                                          NULL,                                   NULL},
-    {'W', "vendor options.",                                                 "stacksize=N|unittest|debug_flags=N",   NULL},
+    // opt description                                    arg name       default value
+    { 'c', "Configuration file to load.",                 "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
+    { 'D', "Do not fork. Run in the foreground.",         NULL,          "run in the background"},
+    { 'h', "Display this help message.",                  NULL,          NULL},
+    { 'P', "File to save a pid while running.",           "filename",    "do not save pid to a file"},
+    { 'i', "The IP address to listen to.",                "IP",          "all IP addresses IPv4 and IPv6"},
+    { 'k', "Check health configuration and exit.",        NULL,          NULL},
+    { 'p', "API/Web port to use.",                        "port",        "19999"},
+    { 's', "Prefix for /proc and /sys (for containers).", "path",        "no prefix"},
+    { 't', "The internal clock of netdata.",              "seconds",     "1"},
+    { 'u', "Run as user.",                                "username",    "netdata"},
+    { 'v', "Print netdata version and exit.",             NULL,          NULL},
+    { 'W', "See Advanced options below.",                 "options",     NULL},
 };
 
 void help(int exitcode) {
@@ -249,19 +248,62 @@ void help(int exitcode) {
         }
     }
 
-    fprintf(stream, "SYNOPSIS: netdata [options]\n");
+    if(max_len_arg > 30) max_len_arg = 30;
+    if(max_len_arg < 20) max_len_arg = 20;
+
+    fprintf(stream, "\n"
+            " ^\n"
+            " |.-.   .-.   .-.   .-.   .  netdata                                         \n"
+            " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
+            " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
+            "\n"
+            " Copyright (C) 2017, Costa Tsaousis <costa@tsaousis.gr>\n"
+            " Released under GNU Public License v3 or later.\n"
+            " All rights reserved.\n"
+            "\n"
+            " Home Page  : https://my-netdata.io\n"
+            " Source Code: https://github.com/firehol/netdata\n"
+            " Wiki / Docs: https://github.com/firehol/netdata/wiki\n"
+            " Support    : https://github.com/firehol/netdata/issues\n"
+            " License    : https://github.com/firehol/netdata/blob/master/LICENSE.md\n"
+            "\n"
+            " Twitter    : https://twitter.com/linuxnetdata\n"
+            " Facebook   : https://www.facebook.com/linuxnetdata/\n"
+            "\n"
+            " netdata is a https://firehol.org project.\n"
+            "\n"
+            "\n"
+    );
+
+    fprintf(stream, " SYNOPSIS: netdata [options]\n");
     fprintf(stream, "\n");
-    fprintf(stream, "Options:\n");
+    fprintf(stream, " Options:\n\n");
 
     // Output options description.
     for( i = 0; i < num_opts; i++ ) {
         fprintf(stream, "  -%c %-*s  %s", options[i].val, max_len_arg, options[i].arg_name ? options[i].arg_name : "", options[i].description);
         if(options[i].default_value) {
-            fprintf(stream, " Default: %s\n", options[i].default_value);
+            fprintf(stream, "\n   %c %-*s  Default: %s\n", ' ', max_len_arg, "", options[i].default_value);
         } else {
             fprintf(stream, "\n");
         }
+        fprintf(stream, "\n");
     }
+
+    fprintf(stream, "\n Advanced options:\n\n"
+            "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
+            "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
+            "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W simple-pattern pattern string\n"
+            "                           Check if string matches pattern and exit.\n\n"
+    );
+
+    fprintf(stream, "\n Signals netdata handles:\n\n"
+            "  - HUP                    Close and reopen log files.\n"
+            "  - USR1                   Save internal DB to disk.\n"
+            "  - USR2                   Reload health configuration.\n"
+            "\n"
+    );
 
     fflush(stream);
     exit(exitcode);
@@ -347,6 +389,9 @@ int main(int argc, char **argv)
                 string_i++;
             }
         }
+        // terminate optstring
+        optstring[string_i] ='\0';
+        optstring[(num_opts *2)] ='\0';
 
         int opt;
         while( (opt = getopt(argc, argv, optstring)) != -1 ) {
@@ -404,10 +449,54 @@ int main(int argc, char **argv)
                             if(unit_test_storage()) exit(1);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             exit(0);
-                        } else if(strncmp(optarg, stacksize_string, strlen(stacksize_string)) == 0) {
+                        }
+                        else if(strcmp(optarg, "simple-pattern") == 0) {
+                            if(optind + 2 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"
+                                        " Checks if 'pattern' matches the given 'string'.\n"
+                                        " - 'pattern' can be one or more space separated words.\n"
+                                        " - each 'word' can contain one or more asterisks.\n"
+                                        " - words starting with '!' give negative matches.\n"
+                                        " - words are processed left to right\n"
+                                        "\n"
+                                        "Examples:\n"
+                                        "\n"
+                                        " > match all veth interfaces, except veth0:\n"
+                                        "\n"
+                                        "   -W simple-pattern '!veth0 veth*' 'veth12'\n"
+                                        "\n"
+                                        "\n"
+                                        " > match all *.ext files directly in /path/:\n"
+                                        "   (this will not match *.ext files in a subdir of /path/)\n"
+                                        "\n"
+                                        "   -W simple-pattern '!/path/*/*.ext /path/*.ext' '/path/test.ext'\n"
+                                        "\n"
+                                );
+                                exit(1);
+                            }
+
+                            const char *heystack = argv[optind];
+                            const char *needle = argv[optind + 1];
+
+                            SIMPLE_PATTERN *p = simple_pattern_create(heystack
+                                                                      , SIMPLE_PATTERN_EXACT);
+                            int ret = simple_pattern_matches(p, needle);
+                            simple_pattern_free(p);
+
+                            if(ret) {
+                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s'\n", heystack, needle);
+                                exit(0);
+                            }
+                            else {
+                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s'\n", heystack, needle);
+                                exit(1);
+                            }
+                        }
+                        else if(strncmp(optarg, stacksize_string, strlen(stacksize_string)) == 0) {
                             optarg += strlen(stacksize_string);
                             config_set("global", "pthread stack size", optarg);
-                        } else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
+                        }
+                        else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
                             optarg += strlen(debug_flags_string);
                             config_set("global", "debug flags",  optarg);
                             debug_flags = strtoull(optarg, NULL, 0);

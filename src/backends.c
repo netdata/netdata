@@ -544,7 +544,6 @@ cleanup:
     info("BACKEND thread exiting");
 
     static_thread->enabled = 0;
-    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

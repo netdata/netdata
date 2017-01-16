@@ -59,7 +59,6 @@ void *freebsd_main(void *ptr) {
     info("FREEBSD thread exiting");
 
     static_thread->enabled = 0;
-    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

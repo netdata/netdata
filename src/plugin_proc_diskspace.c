@@ -1,6 +1,6 @@
 #include "common.h"
 
-#define DELAULT_EXLUDED_PATHS "/proc/ /sys/ /var/run/user/ /run/user/"
+#define DELAULT_EXLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/*"
 
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
@@ -32,24 +32,23 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     const char *disk = mi->persistent_id;
 
     static DICTIONARY *mount_points = NULL;
-    static NETDATA_SIMPLE_PATTERN *excluded_mountpoints = NULL;
+    static SIMPLE_PATTERN *excluded_mountpoints = NULL;
     int do_space, do_inodes;
 
     if(unlikely(!mount_points)) {
         const char *s;
+        SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
 
         if(config_exists("plugin:proc:/proc/diskstats", "exclude space metrics on paths") && !config_exists("plugin:proc:diskspace", "exclude space metrics on paths")) {
             // the config exists in the old section
             s = config_get("plugin:proc:/proc/diskstats", "exclude space metrics on paths", DELAULT_EXLUDED_PATHS);
-
-            // set it to the new section
-            config_set("plugin:proc:diskspace", "exclude space metrics on paths", s);
+            mode = SIMPLE_PATTERN_PREFIX;
         }
         else
             s = config_get("plugin:proc:diskspace", "exclude space metrics on paths", DELAULT_EXLUDED_PATHS);
 
         mount_points = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
-        excluded_mountpoints = netdata_simple_pattern_list_create(s, NETDATA_SIMPLE_PATTERN_MODE_PREFIX);
+        excluded_mountpoints = simple_pattern_create(s, mode);
     }
 
     struct mount_point_metadata *m = dictionary_get(mount_points, mi->mount_point);
@@ -60,7 +59,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         int def_space = config_get_boolean_ondemand("plugin:proc:diskspace", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
         int def_inodes = config_get_boolean_ondemand("plugin:proc:diskspace", "inodes usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
 
-        if(unlikely(netdata_simple_pattern_list_matches(excluded_mountpoints, mi->mount_point))) {
+        if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
             def_space = CONFIG_ONDEMAND_NO;
             def_inodes = CONFIG_ONDEMAND_NO;
         }
@@ -238,14 +237,12 @@ void *proc_diskspace_main(void *ptr) {
 
             if(!stcpu_thread) {
                 stcpu_thread = rrdset_find("netdata.plugin_diskspace");
-                if(!stcpu_thread) {
-                    stcpu_thread = rrdset_create("netdata", "plugin_diskspace", NULL, "diskspace", NULL
+                if(!stcpu_thread) stcpu_thread = rrdset_create("netdata", "plugin_diskspace", NULL, "diskspace", NULL
                                                  , "NetData Disk Space Plugin CPU usage", "milliseconds/s", 132020
                                                  , update_every, RRDSET_TYPE_STACKED);
 
-                    rd_user = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRDDIM_INCREMENTAL);
-                    rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
-                }
+                rd_user = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+                rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
             }
             else
                 rrdset_next(stcpu_thread);
@@ -258,13 +255,11 @@ void *proc_diskspace_main(void *ptr) {
 
             if(!st_duration) {
                 st_duration = rrdset_find("netdata.plugin_diskspace_dt");
-                if(!st_duration) {
-                    st_duration = rrdset_create("netdata", "plugin_diskspace_dt", NULL, "diskspace", NULL
+                if(!st_duration) st_duration = rrdset_create("netdata", "plugin_diskspace_dt", NULL, "diskspace", NULL
                                                  , "NetData Disk Space Plugin Duration", "milliseconds/run", 132021
                                                  , update_every, RRDSET_TYPE_AREA);
 
-                    rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-                }
+                rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRDDIM_ABSOLUTE);
             }
             else
                 rrdset_next(st_duration);
@@ -281,7 +276,6 @@ void *proc_diskspace_main(void *ptr) {
     info("DISKSPACE thread exiting");
 
     static_thread->enabled = 0;
-    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }
