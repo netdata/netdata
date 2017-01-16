@@ -20,12 +20,8 @@
 // NEEDED BY do_uptime
 #include <time.h>
 
-#define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
-
 // MacOS calculates load averages once every 5 seconds
 #define MIN_LOADAVG_UPDATE_EVERY 5
-
-int getsysctl(const char *name, void *ptr, size_t len);
 
 int do_macos_sysctl(int update_every, usec_t dt) {
     (void)dt;

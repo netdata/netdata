@@ -1100,6 +1100,18 @@ int processors = 1;
 long get_system_cpus(void) {
     processors = 1;
 
+    #ifdef __APPLE__
+        int32_t tmp_processors;
+
+        if (unlikely(GETSYSCTL("hw.logicalcpu", tmp_processors))) {
+            error("Assuming system has %d processors.", processors);
+        } else {
+            processors = tmp_processors;
+        }
+
+        return processors;
+    #else
+
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/stat", global_host_prefix);
 
@@ -1129,10 +1141,19 @@ long get_system_cpus(void) {
 
     debug(D_SYSTEM, "System has %d processors.", processors);
     return processors;
+
+    #endif /* __APPLE__ */
 }
 
 pid_t pid_max = 32768;
 pid_t get_system_pid_max(void) {
+    #ifdef __APPLE__
+        // As we currently do not know a solution to query pid_max from the os
+        // we use the number defined in bsd/sys/proc_internal.h in XNU sources
+        pid_max = 99999;
+        return pid_max;
+    #else
+
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", global_host_prefix);
     procfile *ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
@@ -1158,6 +1179,8 @@ pid_t get_system_pid_max(void) {
     procfile_close(ff);
     debug(D_SYSTEM, "System supports %d pids.", pid_max);
     return pid_max;
+
+    #endif /* __APPLE__ */
 }
 
 unsigned int hz;
