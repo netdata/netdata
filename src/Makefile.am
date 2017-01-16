@@ -24,7 +24,9 @@ dist_cache_DATA = .keep
 dist_varlib_DATA = .keep
 dist_registry_DATA = .keep
 dist_log_DATA = .keep
+if !MACOS
 plugins_PROGRAMS = apps.plugin
+endif
 
 netdata_SOURCES = \
 	appconfig.c appconfig.h \
