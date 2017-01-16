@@ -29,7 +29,89 @@ static SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 
 static char *cgroups_rename_script = PLUGINS_DIR "/cgroup-name.sh";
 
+static uint32_t Read_hash = 0;
+static uint32_t Write_hash = 0;
+static uint32_t Sync_hash = 0;
+static uint32_t Async_hash = 0;
+static uint32_t Total_hash = 0;
+static uint32_t user_hash = 0;
+static uint32_t system_hash = 0;
+static uint32_t cache_hash = 0;
+static uint32_t rss_hash = 0;
+static uint32_t rss_huge_hash = 0;
+static uint32_t mapped_file_hash = 0;
+static uint32_t writeback_hash = 0;
+static uint32_t dirty_hash = 0;
+static uint32_t swap_hash = 0;
+static uint32_t pgpgin_hash = 0;
+static uint32_t pgpgout_hash = 0;
+static uint32_t pgfault_hash = 0;
+static uint32_t pgmajfault_hash = 0;
+static uint32_t inactive_anon_hash = 0;
+static uint32_t active_anon_hash = 0;
+static uint32_t inactive_file_hash = 0;
+static uint32_t active_file_hash = 0;
+static uint32_t unevictable_hash = 0;
+static uint32_t hierarchical_memory_limit_hash = 0;
+static uint32_t total_cache_hash = 0;
+static uint32_t total_rss_hash = 0;
+static uint32_t total_rss_huge_hash = 0;
+static uint32_t total_mapped_file_hash = 0;
+static uint32_t total_writeback_hash = 0;
+static uint32_t total_dirty_hash = 0;
+static uint32_t total_swap_hash = 0;
+static uint32_t total_pgpgin_hash = 0;
+static uint32_t total_pgpgout_hash = 0;
+static uint32_t total_pgfault_hash = 0;
+static uint32_t total_pgmajfault_hash = 0;
+static uint32_t total_inactive_anon_hash = 0;
+static uint32_t total_active_anon_hash = 0;
+static uint32_t total_inactive_file_hash = 0;
+static uint32_t total_active_file_hash = 0;
+static uint32_t total_unevictable_hash = 0;
+
 void read_cgroup_plugin_configuration() {
+    Read_hash = simple_hash("Read");
+    Write_hash = simple_hash("Write");
+    Sync_hash = simple_hash("Sync");
+    Async_hash = simple_hash("Async");
+    Total_hash = simple_hash("Total");
+    user_hash = simple_hash("user");
+    system_hash = simple_hash("system");
+    cache_hash = simple_hash("cache");
+    rss_hash = simple_hash("rss");
+    rss_huge_hash = simple_hash("rss_huge");
+    mapped_file_hash = simple_hash("mapped_file");
+    writeback_hash = simple_hash("writeback");
+    dirty_hash = simple_hash("dirty");
+    swap_hash = simple_hash("swap");
+    pgpgin_hash = simple_hash("pgpgin");
+    pgpgout_hash = simple_hash("pgpgout");
+    pgfault_hash = simple_hash("pgfault");
+    pgmajfault_hash = simple_hash("pgmajfault");
+    inactive_anon_hash = simple_hash("inactive_anon");
+    active_anon_hash = simple_hash("active_anon");
+    inactive_file_hash = simple_hash("inactive_file");
+    active_file_hash = simple_hash("active_file");
+    unevictable_hash = simple_hash("unevictable");
+    hierarchical_memory_limit_hash = simple_hash("hierarchical_memory_limit");
+    total_cache_hash = simple_hash("total_cache");
+    total_rss_hash = simple_hash("total_rss");
+    total_rss_huge_hash = simple_hash("total_rss_huge");
+    total_mapped_file_hash = simple_hash("total_mapped_file");
+    total_writeback_hash = simple_hash("total_writeback");
+    total_dirty_hash = simple_hash("total_dirty");
+    total_swap_hash = simple_hash("total_swap");
+    total_pgpgin_hash = simple_hash("total_pgpgin");
+    total_pgpgout_hash = simple_hash("total_pgpgout");
+    total_pgfault_hash = simple_hash("total_pgfault");
+    total_pgmajfault_hash = simple_hash("total_pgmajfault");
+    total_inactive_anon_hash = simple_hash("total_inactive_anon");
+    total_active_anon_hash = simple_hash("total_active_anon");
+    total_inactive_file_hash = simple_hash("total_inactive_file");
+    total_active_file_hash = simple_hash("total_active_file");
+    total_unevictable_hash = simple_hash("total_unevictable");
+
     cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", rrd_update_every);
     if(cgroup_update_every < rrd_update_every)
         cgroup_update_every = rrd_update_every;
@@ -314,16 +396,8 @@ struct cgroup {
 // ----------------------------------------------------------------------------
 // read values from /sys
 
-void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
+static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
     static procfile *ff = NULL;
-
-    static uint32_t user_hash = 0;
-    static uint32_t system_hash = 0;
-
-    if(unlikely(user_hash == 0)) {
-        user_hash = simple_hash("user");
-        system_hash = simple_hash("system");
-    }
 
     cp->updated = 0;
     if(cp->filename) {
@@ -357,7 +431,7 @@ void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
     }
 }
 
-void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
+static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
     static procfile *ff = NULL;
 
     ca->updated = 0;
@@ -398,26 +472,8 @@ void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
     }
 }
 
-void cgroup_read_blkio(struct blkio *io) {
+static inline void cgroup_read_blkio(struct blkio *io) {
     static procfile *ff = NULL;
-
-    static uint32_t Read_hash = 0;
-    static uint32_t Write_hash = 0;
-/*
-    static uint32_t Sync_hash = 0;
-    static uint32_t Async_hash = 0;
-    static uint32_t Total_hash = 0;
-*/
-
-    if(unlikely(Read_hash == 0)) {
-        Read_hash = simple_hash("Read");
-        Write_hash = simple_hash("Write");
-/*
-        Sync_hash = simple_hash("Sync");
-        Async_hash = simple_hash("Async");
-        Total_hash = simple_hash("Total");
-*/
-    }
 
     io->updated = 0;
     if(io->filename) {
@@ -469,81 +525,8 @@ void cgroup_read_blkio(struct blkio *io) {
     }
 }
 
-void cgroup_read_memory(struct memory *mem) {
+static inline void cgroup_read_memory(struct memory *mem) {
     static procfile *ff = NULL;
-
-    static uint32_t cache_hash = 0;
-    static uint32_t rss_hash = 0;
-    static uint32_t rss_huge_hash = 0;
-    static uint32_t mapped_file_hash = 0;
-    static uint32_t writeback_hash = 0;
-    static uint32_t dirty_hash = 0;
-    static uint32_t swap_hash = 0;
-    static uint32_t pgpgin_hash = 0;
-    static uint32_t pgpgout_hash = 0;
-    static uint32_t pgfault_hash = 0;
-    static uint32_t pgmajfault_hash = 0;
-/*
-    static uint32_t inactive_anon_hash = 0;
-    static uint32_t active_anon_hash = 0;
-    static uint32_t inactive_file_hash = 0;
-    static uint32_t active_file_hash = 0;
-    static uint32_t unevictable_hash = 0;
-    static uint32_t hierarchical_memory_limit_hash = 0;
-    static uint32_t total_cache_hash = 0;
-    static uint32_t total_rss_hash = 0;
-    static uint32_t total_rss_huge_hash = 0;
-    static uint32_t total_mapped_file_hash = 0;
-    static uint32_t total_writeback_hash = 0;
-    static uint32_t total_dirty_hash = 0;
-    static uint32_t total_swap_hash = 0;
-    static uint32_t total_pgpgin_hash = 0;
-    static uint32_t total_pgpgout_hash = 0;
-    static uint32_t total_pgfault_hash = 0;
-    static uint32_t total_pgmajfault_hash = 0;
-    static uint32_t total_inactive_anon_hash = 0;
-    static uint32_t total_active_anon_hash = 0;
-    static uint32_t total_inactive_file_hash = 0;
-    static uint32_t total_active_file_hash = 0;
-    static uint32_t total_unevictable_hash = 0;
-*/
-    if(unlikely(cache_hash == 0)) {
-        cache_hash = simple_hash("cache");
-        rss_hash = simple_hash("rss");
-        rss_huge_hash = simple_hash("rss_huge");
-        mapped_file_hash = simple_hash("mapped_file");
-        writeback_hash = simple_hash("writeback");
-        dirty_hash = simple_hash("dirty");
-        swap_hash = simple_hash("swap");
-        pgpgin_hash = simple_hash("pgpgin");
-        pgpgout_hash = simple_hash("pgpgout");
-        pgfault_hash = simple_hash("pgfault");
-        pgmajfault_hash = simple_hash("pgmajfault");
-/*
-        inactive_anon_hash = simple_hash("inactive_anon");
-        active_anon_hash = simple_hash("active_anon");
-        inactive_file_hash = simple_hash("inactive_file");
-        active_file_hash = simple_hash("active_file");
-        unevictable_hash = simple_hash("unevictable");
-        hierarchical_memory_limit_hash = simple_hash("hierarchical_memory_limit");
-        total_cache_hash = simple_hash("total_cache");
-        total_rss_hash = simple_hash("total_rss");
-        total_rss_huge_hash = simple_hash("total_rss_huge");
-        total_mapped_file_hash = simple_hash("total_mapped_file");
-        total_writeback_hash = simple_hash("total_writeback");
-        total_dirty_hash = simple_hash("total_dirty");
-        total_swap_hash = simple_hash("total_swap");
-        total_pgpgin_hash = simple_hash("total_pgpgin");
-        total_pgpgout_hash = simple_hash("total_pgpgout");
-        total_pgfault_hash = simple_hash("total_pgfault");
-        total_pgmajfault_hash = simple_hash("total_pgmajfault");
-        total_inactive_anon_hash = simple_hash("total_inactive_anon");
-        total_active_anon_hash = simple_hash("total_active_anon");
-        total_inactive_file_hash = simple_hash("total_inactive_file");
-        total_active_file_hash = simple_hash("total_active_file");
-        total_unevictable_hash = simple_hash("total_unevictable");
-*/
-    }
 
     mem->updated = 0;
     if(mem->filename) {
@@ -694,7 +677,7 @@ void cgroup_read_memory(struct memory *mem) {
     }
 }
 
-void cgroup_read(struct cgroup *cg) {
+static inline void cgroup_read(struct cgroup *cg) {
     debug(D_CGROUP, "reading metrics for cgroups '%s'", cg->id);
 
     cgroup_read_cpuacct_stat(&cg->cpuacct_stat);
@@ -708,7 +691,7 @@ void cgroup_read(struct cgroup *cg) {
     cgroup_read_blkio(&cg->io_queued);
 }
 
-void read_all_cgroups(struct cgroup *root) {
+static inline void read_all_cgroups(struct cgroup *root) {
     debug(D_CGROUP, "reading metrics for all cgroups");
 
     struct cgroup *cg;
@@ -723,7 +706,7 @@ void read_all_cgroups(struct cgroup *root) {
 
 #define CGROUP_CHARTID_LINE_MAX 1024
 
-static char *cgroup_title_strdupz(const char *s) {
+static inline char *cgroup_title_strdupz(const char *s) {
     if(!s || !*s) s = "/";
 
     if(*s == '/' && s[1] != '\0') s++;
@@ -734,7 +717,7 @@ static char *cgroup_title_strdupz(const char *s) {
     return r;
 }
 
-static char *cgroup_chart_id_strdupz(const char *s) {
+static inline char *cgroup_chart_id_strdupz(const char *s) {
     if(!s || !*s) s = "/";
 
     if(*s == '/' && s[1] != '\0') s++;
@@ -745,7 +728,7 @@ static char *cgroup_chart_id_strdupz(const char *s) {
     return r;
 }
 
-void cgroup_get_chart_name(struct cgroup *cg) {
+static inline void cgroup_get_chart_name(struct cgroup *cg) {
     debug(D_CGROUP, "looking for the name of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
 
     pid_t cgroup_pid;
@@ -779,7 +762,7 @@ void cgroup_get_chart_name(struct cgroup *cg) {
         error("CGROUP: Cannot popen(\"%s\", \"r\").", buffer);
 }
 
-struct cgroup *cgroup_add(const char *id) {
+static inline struct cgroup *cgroup_add(const char *id) {
     if(!id || !*id) id = "/";
     debug(D_CGROUP, "adding to list, cgroup with id '%s'", id);
 
@@ -900,7 +883,7 @@ struct cgroup *cgroup_add(const char *id) {
     return cg;
 }
 
-void cgroup_free(struct cgroup *cg) {
+static inline void cgroup_free(struct cgroup *cg) {
     debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
     freez(cg->cpuacct_usage.cpu_percpu);
@@ -932,7 +915,7 @@ void cgroup_free(struct cgroup *cg) {
 }
 
 // find if a given cgroup exists
-struct cgroup *cgroup_find(const char *id) {
+static inline struct cgroup *cgroup_find(const char *id) {
     debug(D_CGROUP, "searching for cgroup '%s'", id);
 
     uint32_t hash = simple_hash(id);
@@ -951,7 +934,7 @@ struct cgroup *cgroup_find(const char *id) {
 // detect running cgroups
 
 // callback for find_file_in_subdirs()
-void found_subdir_in_dir(const char *dir) {
+static inline void found_subdir_in_dir(const char *dir) {
     debug(D_CGROUP, "examining cgroup dir '%s'", dir);
 
     struct cgroup *cg = cgroup_find(dir);
@@ -976,7 +959,7 @@ void found_subdir_in_dir(const char *dir) {
     if(cg) cg->available = 1;
 }
 
-int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
+static inline int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(const char *)) {
     if(!this) this = base;
     debug(D_CGROUP, "searching for directories in '%s' (base '%s')", this?this:"", base);
 
@@ -1041,7 +1024,7 @@ int find_dir_in_subdirs(const char *base, const char *this, void (*callback)(con
     return ret;
 }
 
-void mark_all_cgroups_as_not_available() {
+static inline void mark_all_cgroups_as_not_available() {
     debug(D_CGROUP, "marking all cgroups as not available");
 
     struct cgroup *cg;
@@ -1052,7 +1035,7 @@ void mark_all_cgroups_as_not_available() {
     }
 }
 
-void cleanup_all_cgroups() {
+static inline void cleanup_all_cgroups() {
     struct cgroup *cg = cgroup_root, *last = NULL;
 
     for(; cg ;) {
@@ -1089,7 +1072,7 @@ void cleanup_all_cgroups() {
     }
 }
 
-void find_all_cgroups() {
+static inline void find_all_cgroups() {
     debug(D_CGROUP, "searching for cgroups");
 
     mark_all_cgroups_as_not_available();
@@ -1147,7 +1130,7 @@ void find_all_cgroups() {
             else debug(D_CGROUP, "cpuacct.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
         }
 
-        if(unlikely(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename)) {
+        if(unlikely(cgroup_enable_cpuacct_usage && !cg->cpuacct_usage.filename && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))) {
             snprintfz(filename, FILENAME_MAX, "%s%s/cpuacct.usage_percpu", cgroup_cpuacct_base, cg->id);
             if(stat(filename, &buf) != -1) {
                 cg->cpuacct_usage.filename = strdupz(filename);
@@ -1157,7 +1140,7 @@ void find_all_cgroups() {
         }
 
         if(unlikely(cgroup_enable_memory)) {
-            if(unlikely(!cg->memory.filename)) {
+            if(unlikely(!cg->memory.filename) && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) {
                 snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
                 if(stat(filename, &buf) != -1) {
                     cg->memory.filename = strdupz(filename);
@@ -1386,7 +1369,7 @@ void update_services_charts(int update_every,
             rrddim_set_by_pointer(st_cpu, cg->rd_cpu, cg->cpuacct_stat.user + cg->cpuacct_stat.system);
         }
 
-        if(do_mem_usage && cg->memory.updated) {
+        if(do_mem_usage && cg->memory.usage_in_bytes_updated) {
             if(unlikely(!cg->rd_mem_usage))
                 cg->rd_mem_usage = rrddim_add(st_mem_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 
