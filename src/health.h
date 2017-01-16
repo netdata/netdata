@@ -232,6 +232,9 @@ typedef struct rrdcalctemplate {
     char *context;
     uint32_t hash_context;
 
+    char *family_match;
+    SIMPLE_PATTERN *family_pattern;
+
     char *source;                   // the source of this alarm
     char *units;                    // the units of the alarm
     char *info;                     // a short description of the alarm

@@ -112,7 +112,7 @@ static struct netdev *get_netdev(const char *name) {
 int do_proc_net_dev(int update_every, usec_t dt) {
     (void)dt;
 
-    static NETDATA_SIMPLE_PATTERN *disabled_list = NULL;
+    static SIMPLE_PATTERN *disabled_list = NULL;
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
@@ -128,7 +128,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         do_compressed   = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
         do_events       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
 
-        disabled_list = netdata_simple_pattern_list_create(config_get("plugin:proc:/proc/net/dev", "disable by default interfaces matching", "lo fireqos* *-ifb"), NETDATA_SIMPLE_PATTERN_MODE_EXACT);
+        disabled_list = simple_pattern_create(
+                config_get("plugin:proc:/proc/net/dev", "disable by default interfaces matching", "lo fireqos* *-ifb")
+                , SIMPLE_PATTERN_EXACT);
     }
 
     if(unlikely(!ff)) {
@@ -157,7 +159,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->enabled = enable_new_interfaces;
 
             if(d->enabled)
-                d->enabled = !netdata_simple_pattern_list_matches(disabled_list, d->name);
+                d->enabled = !simple_pattern_matches(disabled_list, d->name);
 
             char var_name[512 + 1];
             snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", d->name);
@@ -205,11 +207,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_bandwidth)) {
                 d->st_bandwidth = rrdset_find_bytype("net", d->name);
 
-                if(!d->st_bandwidth) {
+                if(!d->st_bandwidth)
                     d->st_bandwidth = rrdset_create("net", d->name, NULL, d->name, "net.net", "Bandwidth", "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
-                    d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
-                    d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent", NULL, -8, 1024, RRDDIM_INCREMENTAL);
-                }
+
+                d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
+                d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent", NULL, -8, 1024, RRDDIM_INCREMENTAL);
             }
             else rrdset_next(d->st_bandwidth);
 
@@ -227,14 +229,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_packets)) {
                 d->st_packets = rrdset_find_bytype("net_packets", d->name);
 
-                if(!d->st_packets) {
+                if(!d->st_packets)
                     d->st_packets = rrdset_create("net_packets", d->name, NULL, d->name, "net.packets", "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
-                    d->st_packets->isdetail = 1;
 
-                    d->rd_rpackets = rrddim_add(d->st_packets, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    d->rd_tpackets = rrddim_add(d->st_packets, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    d->rd_rmulticast = rrddim_add(d->st_packets, "multicast", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                }
+                d->st_packets->isdetail = 1;
+
+                d->rd_rpackets = rrddim_add(d->st_packets, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                d->rd_tpackets = rrddim_add(d->st_packets, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                d->rd_rmulticast = rrddim_add(d->st_packets, "multicast", NULL, 1, 1, RRDDIM_INCREMENTAL);
             }
             else rrdset_next(d->st_packets);
 
@@ -253,13 +255,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_errors)) {
                 d->st_errors = rrdset_find_bytype("net_errors", d->name);
 
-                if(!d->st_errors) {
+                if(!d->st_errors)
                     d->st_errors = rrdset_create("net_errors", d->name, NULL, d->name, "net.errors", "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
-                    d->st_errors->isdetail = 1;
 
-                    d->rd_rerrors = rrddim_add(d->st_errors, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    d->rd_terrors = rrddim_add(d->st_errors, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                }
+                d->st_errors->isdetail = 1;
+
+                d->rd_rerrors = rrddim_add(d->st_errors, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                d->rd_terrors = rrddim_add(d->st_errors, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
             }
             else rrdset_next(d->st_errors);
 
@@ -277,13 +279,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_drops)) {
                 d->st_drops = rrdset_find_bytype("net_drops", d->name);
 
-                if(!d->st_drops) {
+                if(!d->st_drops)
                     d->st_drops = rrdset_create("net_drops", d->name, NULL, d->name, "net.drops", "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
-                    d->st_drops->isdetail = 1;
 
-                    d->rd_rdrops = rrddim_add(d->st_drops, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    d->rd_tdrops = rrddim_add(d->st_drops, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                }
+                d->st_drops->isdetail = 1;
+
+                d->rd_rdrops = rrddim_add(d->st_drops, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                d->rd_tdrops = rrddim_add(d->st_drops, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
             }
             else rrdset_next(d->st_drops);
 
@@ -301,13 +303,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_fifo)) {
                 d->st_fifo = rrdset_find_bytype("net_fifo", d->name);
 
-                if(!d->st_fifo) {
+                if(!d->st_fifo)
                     d->st_fifo = rrdset_create("net_fifo", d->name, NULL, d->name, "net.fifo", "Interface FIFO Buffer Errors", "errors", 7004, update_every, RRDSET_TYPE_LINE);
-                    d->st_fifo->isdetail = 1;
 
-                    d->rd_rfifo = rrddim_add(d->st_fifo, "receive", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    d->rd_tfifo = rrddim_add(d->st_fifo, "transmit", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                }
+                d->st_fifo->isdetail = 1;
+
+                d->rd_rfifo = rrddim_add(d->st_fifo, "receive", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                d->rd_tfifo = rrddim_add(d->st_fifo, "transmit", NULL, -1, 1, RRDDIM_INCREMENTAL);
             }
             else rrdset_next(d->st_fifo);
 
@@ -324,13 +326,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if(d->do_compressed == CONFIG_ONDEMAND_YES) {
             if(unlikely(!d->st_compressed)) {
                 d->st_compressed = rrdset_find_bytype("net_compressed", d->name);
-                if(!d->st_compressed) {
+                if(!d->st_compressed)
                     d->st_compressed = rrdset_create("net_compressed", d->name, NULL, d->name, "net.compressed", "Compressed Packets", "packets/s", 7005, update_every, RRDSET_TYPE_LINE);
-                    d->st_compressed->isdetail = 1;
 
-                    d->rd_rcompressed = rrddim_add(d->st_compressed, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    d->rd_tcompressed = rrddim_add(d->st_compressed, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                }
+                d->st_compressed->isdetail = 1;
+
+                d->rd_rcompressed = rrddim_add(d->st_compressed, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                d->rd_tcompressed = rrddim_add(d->st_compressed, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
             }
             else rrdset_next(d->st_compressed);
 
@@ -347,14 +349,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if(d->do_events == CONFIG_ONDEMAND_YES) {
             if(unlikely(!d->st_events)) {
                 d->st_events = rrdset_find_bytype("net_events", d->name);
-                if(!d->st_events) {
+                if(!d->st_events)
                     d->st_events = rrdset_create("net_events", d->name, NULL, d->name, "net.events", "Network Interface Events", "events/s", 7006, update_every, RRDSET_TYPE_LINE);
-                    d->st_events->isdetail = 1;
 
-                    d->rd_rframe      = rrddim_add(d->st_events, "frames", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    d->rd_tcollisions = rrddim_add(d->st_events, "collisions", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    d->rd_tcarrier    = rrddim_add(d->st_events, "carrier", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                }
+                d->st_events->isdetail = 1;
+
+                d->rd_rframe      = rrddim_add(d->st_events, "frames", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                d->rd_tcollisions = rrddim_add(d->st_events, "collisions", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                d->rd_tcarrier    = rrddim_add(d->st_events, "carrier", NULL, -1, 1, RRDDIM_INCREMENTAL);
             }
             else rrdset_next(d->st_events);
 

@@ -1400,7 +1400,8 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
     RRDCALCTEMPLATE *rt;
 
     for(rt = st->rrdhost->templates; rt ; rt = rt->next) {
-        if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)) {
+        if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
+                && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
             RRDCALC *rc = rrdcalc_create(st->rrdhost, rt, st->id);
             if(unlikely(!rc))
                 error("Health tried to create alarm from template '%s', but it failed", rt->name);
@@ -1436,6 +1437,9 @@ static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     expression_free(rt->warning);
     expression_free(rt->critical);
 
+    freez(rt->family_match);
+    simple_pattern_free(rt->family_pattern);
+
     freez(rt->name);
     freez(rt->exec);
     freez(rt->recipient);
@@ -1455,6 +1459,7 @@ static inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
 #define HEALTH_ALARM_KEY "alarm"
 #define HEALTH_TEMPLATE_KEY "template"
 #define HEALTH_ON_KEY "on"
+#define HEALTH_FAMILIES_KEY "families"
 #define HEALTH_LOOKUP_KEY "lookup"
 #define HEALTH_CALC_KEY "calc"
 #define HEALTH_EVERY_KEY "every"
@@ -1825,13 +1830,14 @@ static inline void strip_quotes(char *s) {
 int health_readfile(const char *path, const char *filename) {
     debug(D_HEALTH, "Health configuration reading file '%s/%s'", path, filename);
 
-    static uint32_t hash_alarm = 0, hash_template = 0, hash_on = 0, hash_calc = 0, hash_green = 0, hash_red = 0, hash_warn = 0, hash_crit = 0, hash_exec = 0, hash_every = 0, hash_lookup = 0, hash_units = 0, hash_info = 0, hash_recipient = 0, hash_delay = 0;
+    static uint32_t hash_alarm = 0, hash_template = 0, hash_on = 0, hash_families = 0, hash_calc = 0, hash_green = 0, hash_red = 0, hash_warn = 0, hash_crit = 0, hash_exec = 0, hash_every = 0, hash_lookup = 0, hash_units = 0, hash_info = 0, hash_recipient = 0, hash_delay = 0;
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
     if(unlikely(!hash_alarm)) {
         hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
         hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
         hash_on = simple_uhash(HEALTH_ON_KEY);
+        hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
         hash_calc = simple_uhash(HEALTH_CALC_KEY);
         hash_lookup = simple_uhash(HEALTH_LOOKUP_KEY);
         hash_green = simple_uhash(HEALTH_GREEN_KEY);
@@ -1951,7 +1957,7 @@ int health_readfile(const char *path, const char *filename) {
                 if(rc->chart) {
                     if(strcmp(rc->chart, value))
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                             line, path, filename, rc->name, key, rc->chart, value, value);
+                                line, path, filename, rc->name, key, rc->chart, value, value);
 
                     freez(rc->chart);
                 }
@@ -2066,17 +2072,23 @@ int health_readfile(const char *path, const char *filename) {
                 if(rt->context) {
                     if(strcmp(rt->context, value))
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
-                             line, path, filename, rt->name, key, rt->context, value, value);
+                                line, path, filename, rt->name, key, rt->context, value, value);
 
                     freez(rt->context);
                 }
                 rt->context = tabs2spaces(strdupz(value));
                 rt->hash_context = simple_hash(rt->context);
             }
+            else if(hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
+                freez(rt->family_match);
+                simple_pattern_free(rt->family_pattern);
+
+                rt->family_match = tabs2spaces(strdupz(value));
+                rt->family_pattern = simple_pattern_create(rt->family_match, SIMPLE_PATTERN_EXACT);
+            }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
                 health_parse_db_lookup(line, path, filename, value, &rt->group, &rt->after, &rt->before,
-                                       &rt->update_every,
-                                       &rt->options, &rt->dimensions);
+                                       &rt->update_every, &rt->options, &rt->dimensions);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
                 if(!health_parse_duration(value, &rt->update_every))
@@ -3115,7 +3127,6 @@ void *health_main(void *ptr) {
     info("HEALTH thread exiting");
 
     static_thread->enabled = 0;
-    static_thread->thread = NULL;
     pthread_exit(NULL);
     return NULL;
 }

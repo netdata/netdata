@@ -11,6 +11,12 @@ netdataDashboard.menu = {
         info: 'Overview of the key system metrics.'
     },
 
+    'services': {
+        title: 'Systemd Services',
+        icon: '<i class="fa fa-cogs" aria-hidden="true"></i>',
+        info: 'Resources utilization of systemd services.'
+    },
+
     'ap': {
         title: 'Access Points',
         icon: '<i class="fa fa-wifi" aria-hidden="true"></i>',

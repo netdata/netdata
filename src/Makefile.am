@@ -46,6 +46,7 @@ netdata_SOURCES = \
 	plugins_d.c plugins_d.h \
 	popen.c popen.h \
 	socket.c socket.h \
+	simple_pattern.c simple_pattern.h \
 	sys_fs_cgroup.c \
 	sys_devices_system_edac_mc.c \
 	procfile.c procfile.h \
