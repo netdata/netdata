@@ -3,6 +3,11 @@
 // ----------------------------------------------------------------------------
 // cgroup globals
 
+#define CHART_PRIORITY_SYSTEMD_SERVICES 19000
+#define CHART_PRIORITY_CONTAINERS       40000
+
+static long system_page_size = 4096; // system will be queried via sysconf() in configuration()
+
 static int cgroup_enable_cpuacct_stat = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_cpuacct_usage = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_memory = CONFIG_ONDEMAND_ONDEMAND;
@@ -16,6 +21,7 @@ static int cgroup_enable_blkio_throttle_ops = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_blkio_merged_ops = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_blkio_queued_ops = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_systemd_services = CONFIG_ONDEMAND_YES;
+static int cgroup_enable_systemd_services_detailed_memory = CONFIG_ONDEMAND_NO;
 
 static int cgroup_search_in_devices = 1;
 
@@ -36,9 +42,9 @@ static int cgroup_root_count = 0;
 static int cgroup_root_max = 500;
 static int cgroup_max_depth = 0;
 
-static SIMPLE_PATTERN *disabled_cgroups_patterns = NULL;
-static SIMPLE_PATTERN *disabled_cgroup_paths = NULL;
-static SIMPLE_PATTERN *disabled_cgroup_renames = NULL;
+static SIMPLE_PATTERN *enabled_cgroup_patterns = NULL;
+static SIMPLE_PATTERN *enabled_cgroup_paths = NULL;
+static SIMPLE_PATTERN *enabled_cgroup_renames = NULL;
 static SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 
 static char *cgroups_rename_script = PLUGINS_DIR "/cgroup-name.sh";
@@ -85,6 +91,8 @@ static uint32_t total_active_file_hash = 0;
 static uint32_t total_unevictable_hash = 0;
 
 void read_cgroup_plugin_configuration() {
+    system_page_size = sysconf(_SC_PAGESIZE);
+
     Read_hash = simple_hash("Read");
     Write_hash = simple_hash("Write");
     Sync_hash = simple_hash("Sync");
@@ -154,6 +162,7 @@ void read_cgroup_plugin_configuration() {
     cgroup_recheck_zero_mem_detailed_every_iterations = (int)config_get_number("plugin:cgroups", "recheck zero detailed memory every iterations", cgroup_recheck_zero_mem_detailed_every_iterations);
 
     cgroup_enable_systemd_services = config_get_boolean("plugin:cgroups", "enable systemd services", cgroup_enable_systemd_services);
+    cgroup_enable_systemd_services_detailed_memory = config_get_boolean("plugin:cgroups", "enable systemd services detailed memory", cgroup_enable_systemd_services_detailed_memory);
 
     char filename[FILENAME_MAX + 1], *s;
     struct mountinfo *mi, *root = mountinfo_read(0);
@@ -203,57 +212,61 @@ void read_cgroup_plugin_configuration() {
 
     cgroup_enable_new_cgroups_detected_at_runtime = config_get_boolean("plugin:cgroups", "enable new cgroups detected at run time", cgroup_enable_new_cgroups_detected_at_runtime);
 
-    disabled_cgroups_patterns = simple_pattern_create(
-            config_get("plugin:cgroups", "disable by default cgroups matching", " *.mount "
-                    " *.partition "
-                    " *.service "
-                    " *.slice "
-                    " *.swap "
-                    " *.user "
-                    " / "
-                    " /docker "
-                    " /init.scope "
-                    " /libvirt "
-                    " /lxc "
-                    " /lxc/*/ns "                          //  #1397
-                    " /machine "
-                    " /machine.slice "
-                    " /qemu "
-                    " /system "
-                    " /system.slice "
-                    " /systemd "
-                    " /user "
-                    " /user.slice "
+    enabled_cgroup_patterns = simple_pattern_create(
+            config_get("plugin:cgroups", "enable by default cgroups matching",
+                    " !*.mount "
+                    " !*.partition "
+                    " !*.scope "
+                    " !*.service "
+                    " !*.slice "
+                    " !*.swap "
+                    " !*.user "
+                    " !/ "
+                    " !/docker "
+                    " !/libvirt "
+                    " !/lxc "
+                    " !/lxc/*/ns "         //  #1397
+                    " !/machine "
+                    " !/qemu "
+                    " !/system "
+                    " !/systemd "
+                    " !/user "
+                    " * "                  // enable anything else
             ), SIMPLE_PATTERN_EXACT);
 
-    disabled_cgroup_paths = simple_pattern_create(
-            config_get("plugin:cgroups", "do not search for cgroups in paths matching"
-                       , " *-qemu "                             //  #345
-                            " /init.scope "
-                            " /system "
-                            " /systemd "
-                            " /user "
-                            " /user.slice "
+    enabled_cgroup_paths = simple_pattern_create(
+            config_get("plugin:cgroups", "search for cgroups in subpaths matching",
+                    " !*-qemu "            //  #345
+                    " !/init.scope "
+                    " !/system "
+                    " !/systemd "
+                    " !/user "
+                    " !/user.slice "
+                    " * "
             ), SIMPLE_PATTERN_EXACT);
 
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", cgroups_rename_script);
 
-    disabled_cgroup_renames = simple_pattern_create(
-            config_get("plugin:cgroups", "do not run script to rename cgroups matching", " / "
-                    " *.mount "
-                    " *.partition "
-                    " *.scope "
-                    " *.service "
-                    " *.slice "
-                    " *.swap "
-                    " *.user "
+    enabled_cgroup_renames = simple_pattern_create(
+            config_get("plugin:cgroups", "run script to rename cgroups matching",
+                    " !/ "
+                    " !*.mount "
+                    " !*.partition "
+                    " !*.scope "
+                    " !*.service "
+                    " !*.slice "
+                    " !*.swap "
+                    " !*.user "
+                    " * "
             ), SIMPLE_PATTERN_EXACT);
 
-    if(cgroup_enable_systemd_services)
+    if(cgroup_enable_systemd_services) {
         systemd_services_cgroups = simple_pattern_create(
-                config_get("plugin:cgroups", "cgroups to match as systemd services"
-                           , " !/system.slice/*/*.service /system.slice/*.service "
+                config_get("plugin:cgroups", "cgroups to match as systemd services",
+                        " !/system.slice/*/*.service "
+                        " /system.slice/*.service "
                 ), SIMPLE_PATTERN_EXACT);
+    }
 
     mountinfo_free(root);
 }
@@ -279,18 +292,27 @@ struct blkio {
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt
 struct memory {
-    int updated;
-    int enabled_usage;    // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
-    int enabled_detailed; // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
-    int enabled_swap;     // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
-    int enabled_failcnt;  // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
+    int updated_detailed;
+    int updated_usage_in_bytes;
+    int updated_msw_usage_in_bytes;
+    int updated_failcnt;
 
-    int delay_counter;
+    int enabled_detailed;           // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
+    int enabled_usage_in_bytes;     // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
+    int enabled_msw_usage_in_bytes; // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
+    int enabled_failcnt;            // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
 
-    char *filename;
+    int delay_counter_detailed;
+    int delay_counter_failcnt;
 
-    int has_dirty_swap;
+    char *filename_detailed;
+    char *filename_usage_in_bytes;
+    char *filename_msw_usage_in_bytes;
+    char *filename_failcnt;
 
+    int detailed_has_dirty_swap;
+
+    // detailed metrics
     unsigned long long cache;
     unsigned long long rss;
     unsigned long long rss_huge;
@@ -327,17 +349,9 @@ struct memory {
     unsigned long long total_unevictable;
 */
 
-    int usage_in_bytes_updated;
-    char *filename_usage_in_bytes;
+    // single file metrics
     unsigned long long usage_in_bytes;
-
-    int msw_usage_in_bytes_updated;
-    char *filename_msw_usage_in_bytes;
     unsigned long long msw_usage_in_bytes;
-
-    int failcnt_updated;
-    int failcnt_delay_counter;
-    char *filename_failcnt;
     unsigned long long failcnt;
 };
 
@@ -415,6 +429,17 @@ struct cgroup {
     RRDDIM *rd_mem_usage;
     RRDDIM *rd_mem_failcnt;
     RRDDIM *rd_swap_usage;
+
+    RRDDIM *rd_mem_detailed_cache;
+    RRDDIM *rd_mem_detailed_rss;
+    RRDDIM *rd_mem_detailed_mapped;
+    RRDDIM *rd_mem_detailed_writeback;
+    RRDDIM *rd_mem_detailed_dirty;
+    RRDDIM *rd_mem_detailed_swap;
+    RRDDIM *rd_mem_detailed_pgpgin;
+    RRDDIM *rd_mem_detailed_pgpgout;
+    RRDDIM *rd_mem_detailed_pgfault;
+    RRDDIM *rd_mem_detailed_pgmajfault;
 
     RRDDIM *rd_io_service_bytes_read;
     RRDDIM *rd_io_serviced_read;
@@ -622,29 +647,29 @@ static inline void cgroup_read_memory(struct memory *mem) {
     static procfile *ff = NULL;
 
     // read detailed ram usage
-    if(likely(mem->filename)) {
-        if(unlikely(mem->enabled_detailed == CONFIG_ONDEMAND_ONDEMAND && mem->delay_counter > 0)) {
-            mem->delay_counter--;
+    if(likely(mem->filename_detailed)) {
+        if(unlikely(mem->enabled_detailed == CONFIG_ONDEMAND_ONDEMAND && mem->delay_counter_detailed > 0)) {
+            mem->delay_counter_detailed--;
             goto memory_next;
         }
 
-        ff = procfile_reopen(ff, mem->filename, NULL, PROCFILE_FLAG_DEFAULT);
+        ff = procfile_reopen(ff, mem->filename_detailed, NULL, PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) {
-            mem->updated = 0;
+            mem->updated_detailed = 0;
             goto memory_next;
         }
 
         ff = procfile_readall(ff);
         if(unlikely(!ff)) {
-            mem->updated = 0;
+            mem->updated_detailed = 0;
             goto memory_next;
         }
 
         unsigned long i, lines = procfile_lines(ff);
 
         if(unlikely(lines < 1)) {
-            error("File '%s' should have 1+ lines.", mem->filename);
-            mem->updated = 0;
+            error("File '%s' should have 1+ lines.", mem->filename_detailed);
+            mem->updated_detailed = 0;
             goto memory_next;
         }
 
@@ -679,13 +704,13 @@ static inline void cgroup_read_memory(struct memory *mem) {
 
             if(unlikely(hash == dirty_hash && !strcmp(s, "dirty"))) {
                 mem->dirty = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                mem->has_dirty_swap = 1;
+                mem->detailed_has_dirty_swap = 1;
                 continue;
             }
 
             if(unlikely(hash == swap_hash && !strcmp(s, "swap"))) {
                 mem->swap = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                mem->has_dirty_swap = 1;
+                mem->detailed_has_dirty_swap = 1;
                 continue;
             }
 
@@ -824,13 +849,13 @@ static inline void cgroup_read_memory(struct memory *mem) {
 
         // fprintf(stderr, "READ: '%s', cache: %llu, rss: %llu, rss_huge: %llu, mapped_file: %llu, writeback: %llu, dirty: %llu, swap: %llu, pgpgin: %llu, pgpgout: %llu, pgfault: %llu, pgmajfault: %llu, inactive_anon: %llu, active_anon: %llu, inactive_file: %llu, active_file: %llu, unevictable: %llu, hierarchical_memory_limit: %llu, total_cache: %llu, total_rss: %llu, total_rss_huge: %llu, total_mapped_file: %llu, total_writeback: %llu, total_dirty: %llu, total_swap: %llu, total_pgpgin: %llu, total_pgpgout: %llu, total_pgfault: %llu, total_pgmajfault: %llu, total_inactive_anon: %llu, total_active_anon: %llu, total_inactive_file: %llu, total_active_file: %llu, total_unevictable: %llu\n", mem->filename, mem->cache, mem->rss, mem->rss_huge, mem->mapped_file, mem->writeback, mem->dirty, mem->swap, mem->pgpgin, mem->pgpgout, mem->pgfault, mem->pgmajfault, mem->inactive_anon, mem->active_anon, mem->inactive_file, mem->active_file, mem->unevictable, mem->hierarchical_memory_limit, mem->total_cache, mem->total_rss, mem->total_rss_huge, mem->total_mapped_file, mem->total_writeback, mem->total_dirty, mem->total_swap, mem->total_pgpgin, mem->total_pgpgout, mem->total_pgfault, mem->total_pgmajfault, mem->total_inactive_anon, mem->total_active_anon, mem->total_inactive_file, mem->total_active_file, mem->total_unevictable);
 
-        mem->updated = 1;
+        mem->updated_detailed = 1;
 
         if(unlikely(mem->enabled_detailed == CONFIG_ONDEMAND_ONDEMAND)) {
             if(mem->cache || mem->dirty || mem->rss || mem->rss_huge || mem->mapped_file || mem->writeback || mem->swap || mem->pgpgin || mem->pgpgout || mem->pgfault || mem->pgmajfault)
                 mem->enabled_detailed = CONFIG_ONDEMAND_YES;
             else
-                mem->delay_counter = cgroup_recheck_zero_mem_detailed_every_iterations;
+                mem->delay_counter_detailed = cgroup_recheck_zero_mem_detailed_every_iterations;
         }
     }
 
@@ -839,39 +864,39 @@ memory_next:
     // read usage_in_bytes
     if(likely(mem->filename_usage_in_bytes)) {
         if(likely(!read_single_number_file(mem->filename_usage_in_bytes, &mem->usage_in_bytes))) {
-            mem->usage_in_bytes_updated = 1;
+            mem->updated_usage_in_bytes = 1;
 
-            if(unlikely(mem->enabled_usage == CONFIG_ONDEMAND_ONDEMAND && mem->usage_in_bytes))
-                mem->enabled_usage = CONFIG_ONDEMAND_YES;
+            if(unlikely(mem->enabled_usage_in_bytes == CONFIG_ONDEMAND_ONDEMAND && mem->usage_in_bytes))
+                mem->enabled_usage_in_bytes = CONFIG_ONDEMAND_YES;
         }
         else
-            mem->usage_in_bytes_updated = 0;
+            mem->updated_usage_in_bytes = 0;
     }
 
     // read msw_usage_in_bytes
     if(likely(mem->filename_msw_usage_in_bytes)) {
         if(likely(!read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes))) {
-            mem->msw_usage_in_bytes_updated = 1;
+            mem->updated_msw_usage_in_bytes = 1;
 
-            if(unlikely(mem->enabled_swap == CONFIG_ONDEMAND_ONDEMAND && mem->msw_usage_in_bytes))
-                mem->enabled_swap = CONFIG_ONDEMAND_YES;
+            if(unlikely(mem->enabled_msw_usage_in_bytes == CONFIG_ONDEMAND_ONDEMAND && mem->msw_usage_in_bytes))
+                mem->enabled_msw_usage_in_bytes = CONFIG_ONDEMAND_YES;
         }
         else
-            mem->msw_usage_in_bytes_updated = 0;
+            mem->updated_msw_usage_in_bytes = 0;
     }
 
     // read failcnt
     if(likely(mem->filename_failcnt)) {
-        if(unlikely(mem->enabled_failcnt == CONFIG_ONDEMAND_ONDEMAND && mem->failcnt_delay_counter > 0)) {
-            mem->failcnt_updated = 0;
-            mem->failcnt_delay_counter--;
+        if(unlikely(mem->enabled_failcnt == CONFIG_ONDEMAND_ONDEMAND && mem->delay_counter_failcnt > 0)) {
+            mem->updated_failcnt = 0;
+            mem->delay_counter_failcnt--;
         }
         else if(likely(!read_single_number_file(mem->filename_failcnt, &mem->failcnt))) {
-            mem->failcnt_updated = 1;
+            mem->updated_failcnt = 1;
 
             if(unlikely(mem->enabled_failcnt == CONFIG_ONDEMAND_ONDEMAND)) {
                 if(unlikely(!mem->failcnt))
-                    mem->failcnt_delay_counter = cgroup_recheck_zero_mem_failcnt_every_iterations;
+                    mem->delay_counter_failcnt = cgroup_recheck_zero_mem_failcnt_every_iterations;
                 else
                     mem->enabled_failcnt = CONFIG_ONDEMAND_YES;
             }
@@ -973,7 +998,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
         return NULL;
     }
 
-    int def = simple_pattern_matches(disabled_cgroups_patterns, id)?0:cgroup_enable_new_cgroups_detected_at_runtime;
+    int def = simple_pattern_matches(enabled_cgroup_patterns, id)?cgroup_enable_new_cgroups_detected_at_runtime:0;
     struct cgroup *cg = callocz(1, sizeof(struct cgroup));
 
     cg->id = strdupz(id);
@@ -996,8 +1021,8 @@ static inline struct cgroup *cgroup_add(const char *id) {
     cgroup_root_count++;
 
     // fix the chart_id and title by calling the external script
-    if(!simple_pattern_matches(disabled_cgroup_renames, cg->id) &&
-       !simple_pattern_matches(disabled_cgroup_renames, cg->chart_id)) {
+    if(simple_pattern_matches(enabled_cgroup_renames, cg->id) ||
+       simple_pattern_matches(enabled_cgroup_renames, cg->chart_id)) {
 
         cgroup_get_chart_name(cg);
 
@@ -1093,7 +1118,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     freez(cg->cpuacct_stat.filename);
     freez(cg->cpuacct_usage.filename);
 
-    freez(cg->memory.filename);
+    freez(cg->memory.filename_detailed);
     freez(cg->memory.filename_failcnt);
     freez(cg->memory.filename_usage_in_bytes);
     freez(cg->memory.filename_msw_usage_in_bytes);
@@ -1197,9 +1222,7 @@ static inline int find_dir_in_subdirs(const char *base, const char *this, void (
                 if(*r == '\0') r = "/";
 
                 // do not decent in directories we are not interested
-                int def = 1;
-                if(simple_pattern_matches(disabled_cgroup_paths, r))
-                    def = 0;
+                int def = simple_pattern_matches(enabled_cgroup_paths, r);
 
                 // we check for this option here
                 // so that the config will not have settings
@@ -1354,12 +1377,12 @@ static inline void find_all_cgroups() {
                 debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
         }
 
-        if(unlikely(cgroup_enable_detailed_memory && !cg->memory.filename && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))) {
+        if(unlikely(cgroup_enable_detailed_memory && !cg->memory.filename_detailed && (cgroup_enable_systemd_services_detailed_memory || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))) {
             snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
             if(likely(stat(filename, &buf) != -1)) {
-                cg->memory.filename = strdupz(filename);
+                cg->memory.filename_detailed = strdupz(filename);
                 cg->memory.enabled_detailed = cgroup_enable_detailed_memory;
-                debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename);
+                debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
             }
             else
                 debug(D_CGROUP, "memory.stat file for cgroup '%s': '%s' does not exist.", cg->id, filename);
@@ -1369,7 +1392,7 @@ static inline void find_all_cgroups() {
             snprintfz(filename, FILENAME_MAX, "%s%s/memory.usage_in_bytes", cgroup_memory_base, cg->id);
             if(likely(stat(filename, &buf) != -1)) {
                 cg->memory.filename_usage_in_bytes = strdupz(filename);
-                cg->memory.enabled_usage = cgroup_enable_memory;
+                cg->memory.enabled_usage_in_bytes = cgroup_enable_memory;
                 debug(D_CGROUP, "memory.usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_usage_in_bytes);
             }
             else
@@ -1380,7 +1403,7 @@ static inline void find_all_cgroups() {
             snprintfz(filename, FILENAME_MAX, "%s%s/memory.msw_usage_in_bytes", cgroup_memory_base, cg->id);
             if(likely(stat(filename, &buf) != -1)) {
                 cg->memory.filename_msw_usage_in_bytes = strdupz(filename);
-                cg->memory.enabled_swap = cgroup_enable_swap;
+                cg->memory.enabled_msw_usage_in_bytes = cgroup_enable_swap;
                 debug(D_CGROUP, "memory.msw_usage_in_bytes filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_msw_usage_in_bytes);
             }
             else
@@ -1477,6 +1500,7 @@ static inline void find_all_cgroups() {
 void update_services_charts(int update_every,
         int do_cpu,
         int do_mem_usage,
+        int do_mem_detailed,
         int do_mem_failcnt,
         int do_swap_usage,
         int do_io,
@@ -1487,24 +1511,33 @@ void update_services_charts(int update_every,
         int do_merged_ops
 ) {
     static RRDSET
-            *st_cpu = NULL,
-            *st_mem_usage = NULL,
-            *st_mem_failcnt = NULL,
-            *st_swap_usage = NULL,
+        *st_cpu = NULL,
+        *st_mem_usage = NULL,
+        *st_mem_failcnt = NULL,
+        *st_swap_usage = NULL,
 
-            *st_io_read = NULL,
-            *st_io_serviced_read = NULL,
-            *st_throttle_io_read = NULL,
-            *st_throttle_ops_read = NULL,
-            *st_queued_ops_read = NULL,
-            *st_merged_ops_read = NULL,
+        *st_mem_detailed_cache = NULL,
+        *st_mem_detailed_rss = NULL,
+        *st_mem_detailed_mapped = NULL,
+        *st_mem_detailed_writeback = NULL,
+        *st_mem_detailed_pgfault = NULL,
+        *st_mem_detailed_pgmajfault = NULL,
+        *st_mem_detailed_pgpgin = NULL,
+        *st_mem_detailed_pgpgout = NULL,
 
-            *st_io_write = NULL,
-            *st_io_serviced_write = NULL,
-            *st_throttle_io_write = NULL,
-            *st_throttle_ops_write = NULL,
-            *st_queued_ops_write = NULL,
-            *st_merged_ops_write = NULL;
+        *st_io_read = NULL,
+        *st_io_serviced_read = NULL,
+        *st_throttle_io_read = NULL,
+        *st_throttle_ops_read = NULL,
+        *st_queued_ops_read = NULL,
+        *st_merged_ops_read = NULL,
+
+        *st_io_write = NULL,
+        *st_io_serviced_write = NULL,
+        *st_throttle_io_write = NULL,
+        *st_throttle_ops_write = NULL,
+        *st_queued_ops_write = NULL,
+        *st_merged_ops_write = NULL;
 
     // create the charts
 
@@ -1515,7 +1548,7 @@ void update_services_charts(int update_every,
             st_cpu = rrdset_find_bytype("services", "cpu");
             if(likely(!st_cpu)) {
                 snprintfz(title, CHART_TITLE_MAX, "Systemd Services CPU utilization (%d%% = %d core%s)", (processors * 100), processors, (processors > 1) ? "s" : "");
-                st_cpu = rrdset_create("services", "cpu", NULL, "cpu", "services.cpu", title, "%", 30000, update_every, RRDSET_TYPE_STACKED);
+                st_cpu = rrdset_create("services", "cpu", NULL, "cpu", "services.cpu", title, "%", CHART_PRIORITY_SYSTEMD_SERVICES, update_every, RRDSET_TYPE_STACKED);
             }
         }
         else
@@ -1526,17 +1559,83 @@ void update_services_charts(int update_every,
         if(unlikely(!st_mem_usage)) {
             st_mem_usage = rrdset_find_bytype("services", "mem_usage");
             if(likely(!st_mem_usage))
-                st_mem_usage = rrdset_create("services", "mem_usage", NULL, "mem", "services.mem_usage", "Systemd Services Used RAM with Cache", "MB", 30001, update_every, RRDSET_TYPE_STACKED);
+                st_mem_usage = rrdset_create("services", "mem_usage", NULL, "mem", "services.mem_usage", "Systemd Services Used Memory", "MB", CHART_PRIORITY_SYSTEMD_SERVICES + 10, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_mem_usage);
+    }
+
+    if(likely(do_mem_detailed)) {
+        if(unlikely(!st_mem_detailed_rss)) {
+            st_mem_detailed_rss = rrdset_find_bytype("services", "mem_rss");
+            if(likely(!st_mem_detailed_rss))
+                st_mem_detailed_rss = rrdset_create("services", "mem_rss", NULL, "mem", "services.mem_rss", "Systemd Services RSS Memory", "MB", CHART_PRIORITY_SYSTEMD_SERVICES + 20, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_mem_detailed_rss);
+
+        if(unlikely(!st_mem_detailed_mapped)) {
+            st_mem_detailed_mapped = rrdset_find_bytype("services", "mem_mapped");
+            if(likely(!st_mem_detailed_mapped))
+                st_mem_detailed_mapped = rrdset_create("services", "mem_mapped", NULL, "mem", "services.mem_mapped", "Systemd Services Mapped Memory", "MB", CHART_PRIORITY_SYSTEMD_SERVICES + 30, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_mem_detailed_mapped);
+
+        if(unlikely(!st_mem_detailed_cache)) {
+            st_mem_detailed_cache = rrdset_find_bytype("services", "mem_cache");
+            if(likely(!st_mem_detailed_cache))
+                st_mem_detailed_cache = rrdset_create("services", "mem_cache", NULL, "mem", "services.mem_cache", "Systemd Services Cache Memory", "MB", CHART_PRIORITY_SYSTEMD_SERVICES + 40, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_mem_detailed_cache);
+
+        if(unlikely(!st_mem_detailed_writeback)) {
+            st_mem_detailed_writeback = rrdset_find_bytype("services", "mem_writeback");
+            if(likely(!st_mem_detailed_writeback))
+                st_mem_detailed_writeback = rrdset_create("services", "mem_writeback", NULL, "mem", "services.mem_writeback", "Systemd Services Writeback Memory", "MB", CHART_PRIORITY_SYSTEMD_SERVICES + 50, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_mem_detailed_writeback);
+
+        if(unlikely(!st_mem_detailed_pgfault)) {
+            st_mem_detailed_pgfault = rrdset_find_bytype("services", "mem_pgfault");
+            if(likely(!st_mem_detailed_pgfault))
+                st_mem_detailed_pgfault = rrdset_create("services", "mem_pgfault", NULL, "mem", "services.mem_pgfault", "Systemd Services Memory Minor Page Faults", "MB/s", CHART_PRIORITY_SYSTEMD_SERVICES + 60, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_mem_detailed_pgfault);
+
+        if(unlikely(!st_mem_detailed_pgmajfault)) {
+            st_mem_detailed_pgmajfault = rrdset_find_bytype("services", "mem_pgmajfault");
+            if(likely(!st_mem_detailed_pgmajfault))
+                st_mem_detailed_pgmajfault = rrdset_create("services", "mem_pgmajfault", NULL, "mem", "services.mem_pgmajfault", "Systemd Services Memory Major Page Faults", "MB/s", CHART_PRIORITY_SYSTEMD_SERVICES + 70, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_mem_detailed_pgmajfault);
+
+        if(unlikely(!st_mem_detailed_pgpgin)) {
+            st_mem_detailed_pgpgin = rrdset_find_bytype("services", "mem_pgpgin");
+            if(likely(!st_mem_detailed_pgpgin))
+                st_mem_detailed_pgpgin = rrdset_create("services", "mem_pgpgin", NULL, "mem", "services.mem_pgpgin", "Systemd Services Memory Charging Activity", "MB/s", CHART_PRIORITY_SYSTEMD_SERVICES + 80, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_mem_detailed_pgpgin);
+
+        if(unlikely(!st_mem_detailed_pgpgout)) {
+            st_mem_detailed_pgpgout = rrdset_find_bytype("services", "mem_pgpgout");
+            if(likely(!st_mem_detailed_pgpgout))
+                st_mem_detailed_pgpgout = rrdset_create("services", "mem_pgpgout", NULL, "mem", "services.mem_pgpgout", "Systemd Services Memory Uncharging Activity", "MB/s", CHART_PRIORITY_SYSTEMD_SERVICES + 90, update_every, RRDSET_TYPE_STACKED);
+        }
+        else
+            rrdset_next(st_mem_detailed_pgpgout);
     }
 
     if(likely(do_mem_failcnt)) {
         if(unlikely(!st_mem_failcnt)) {
             st_mem_failcnt = rrdset_find_bytype("services", "mem_failcnt");
             if(likely(!st_mem_failcnt))
-                st_mem_failcnt = rrdset_create("services", "mem_failcnt", NULL, "mem", "services.mem_failcnt", "Systemd Services Memory Limit Failures", "MB", 30003, update_every, RRDSET_TYPE_STACKED);
+                st_mem_failcnt = rrdset_create("services", "mem_failcnt", NULL, "mem", "services.mem_failcnt", "Systemd Services Memory Limit Failures", "MB", CHART_PRIORITY_SYSTEMD_SERVICES + 110, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_mem_failcnt);
@@ -1546,7 +1645,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_swap_usage)) {
             st_swap_usage = rrdset_find_bytype("services", "swap_usage");
             if(likely(!st_swap_usage))
-                st_swap_usage = rrdset_create("services", "swap_usage", NULL, "swap", "services.swap_usage", "Systemd Services Swap Memory Used", "MB", 30002, update_every, RRDSET_TYPE_STACKED);
+                st_swap_usage = rrdset_create("services", "swap_usage", NULL, "swap", "services.swap_usage", "Systemd Services Swap Memory Used", "MB", CHART_PRIORITY_SYSTEMD_SERVICES + 100, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_swap_usage);
@@ -1556,7 +1655,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_io_read)) {
             st_io_read = rrdset_find_bytype("services", "io_read");
             if(likely(!st_io_read))
-                st_io_read = rrdset_create("services", "io_read", NULL, "disk", "services.io_read", "Systemd Services Disk Read Bandwidth", "KB/s", 30012, update_every, RRDSET_TYPE_STACKED);
+                st_io_read = rrdset_create("services", "io_read", NULL, "disk", "services.io_read", "Systemd Services Disk Read Bandwidth", "KB/s", CHART_PRIORITY_SYSTEMD_SERVICES + 120, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_io_read);
@@ -1564,7 +1663,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_io_write)) {
             st_io_write = rrdset_find_bytype("services", "io_write");
             if(likely(!st_io_write))
-                st_io_write = rrdset_create("services", "io_write", NULL, "disk", "services.io_write", "Systemd Services Disk Write Bandwidth", "KB/s", 30013, update_every, RRDSET_TYPE_STACKED);
+                st_io_write = rrdset_create("services", "io_write", NULL, "disk", "services.io_write", "Systemd Services Disk Write Bandwidth", "KB/s", CHART_PRIORITY_SYSTEMD_SERVICES + 130, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_io_write);
@@ -1574,7 +1673,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_io_serviced_read)) {
             st_io_serviced_read = rrdset_find_bytype("services", "io_ops_read");
             if(likely(!st_io_serviced_read))
-                st_io_serviced_read = rrdset_create("services", "io_ops_read", NULL, "disk", "services.io_ops_read", "Systemd Services Disk Read Operations", "operations/s", 30014, update_every, RRDSET_TYPE_STACKED);
+                st_io_serviced_read = rrdset_create("services", "io_ops_read", NULL, "disk", "services.io_ops_read", "Systemd Services Disk Read Operations", "operations/s", CHART_PRIORITY_SYSTEMD_SERVICES + 140, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_io_serviced_read);
@@ -1582,7 +1681,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_io_serviced_write)) {
             st_io_serviced_write = rrdset_find_bytype("services", "io_ops_write");
             if(likely(!st_io_serviced_write))
-                st_io_serviced_write = rrdset_create("services", "io_ops_write", NULL, "disk", "services.io_ops_write", "Systemd Services Disk Write Operations", "operations/s", 30015, update_every, RRDSET_TYPE_STACKED);
+                st_io_serviced_write = rrdset_create("services", "io_ops_write", NULL, "disk", "services.io_ops_write", "Systemd Services Disk Write Operations", "operations/s", CHART_PRIORITY_SYSTEMD_SERVICES + 150, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_io_serviced_write);
@@ -1592,7 +1691,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_throttle_io_read)) {
             st_throttle_io_read = rrdset_find_bytype("services", "throttle_io_read");
             if(likely(!st_throttle_io_read))
-                st_throttle_io_read = rrdset_create("services", "throttle_io_read", NULL, "disk", "services.throttle_io_read", "Systemd Services Throttle Disk Read Bandwidth", "KB/s", 30016, update_every, RRDSET_TYPE_STACKED);
+                st_throttle_io_read = rrdset_create("services", "throttle_io_read", NULL, "disk", "services.throttle_io_read", "Systemd Services Throttle Disk Read Bandwidth", "KB/s", CHART_PRIORITY_SYSTEMD_SERVICES + 160, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_throttle_io_read);
@@ -1600,7 +1699,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_throttle_io_write)) {
             st_throttle_io_write = rrdset_find_bytype("services", "throttle_io_write");
             if(likely(!st_throttle_io_write))
-                st_throttle_io_write = rrdset_create("services", "throttle_io_write", NULL, "disk", "services.throttle_io_write", "Systemd Services Throttle Disk Write Bandwidth", "KB/s", 30017, update_every, RRDSET_TYPE_STACKED);
+                st_throttle_io_write = rrdset_create("services", "throttle_io_write", NULL, "disk", "services.throttle_io_write", "Systemd Services Throttle Disk Write Bandwidth", "KB/s", CHART_PRIORITY_SYSTEMD_SERVICES + 170, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_throttle_io_write);
@@ -1610,7 +1709,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_throttle_ops_read)) {
             st_throttle_ops_read = rrdset_find_bytype("services", "throttle_io_ops_read");
             if(likely(!st_throttle_ops_read))
-                st_throttle_ops_read = rrdset_create("services", "throttle_io_ops_read", NULL, "disk", "services.throttle_io_ops_read", "Systemd Services Throttle Disk Read Operations", "operations/s", 30018, update_every, RRDSET_TYPE_STACKED);
+                st_throttle_ops_read = rrdset_create("services", "throttle_io_ops_read", NULL, "disk", "services.throttle_io_ops_read", "Systemd Services Throttle Disk Read Operations", "operations/s", CHART_PRIORITY_SYSTEMD_SERVICES + 180, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_throttle_ops_read);
@@ -1618,7 +1717,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_throttle_ops_write)) {
             st_throttle_ops_write = rrdset_find_bytype("services", "throttle_io_ops_write");
             if(likely(!st_throttle_ops_write))
-                st_throttle_ops_write = rrdset_create("services", "throttle_io_ops_write", NULL, "disk", "services.throttle_io_ops_write", "Systemd Services Throttle Disk Write Operations", "operations/s", 30019, update_every, RRDSET_TYPE_STACKED);
+                st_throttle_ops_write = rrdset_create("services", "throttle_io_ops_write", NULL, "disk", "services.throttle_io_ops_write", "Systemd Services Throttle Disk Write Operations", "operations/s", CHART_PRIORITY_SYSTEMD_SERVICES + 190, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_throttle_ops_write);
@@ -1628,7 +1727,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_queued_ops_read)) {
             st_queued_ops_read = rrdset_find_bytype("services", "queued_io_ops_read");
             if(likely(!st_queued_ops_read))
-                st_queued_ops_read = rrdset_create("services", "queued_io_ops_read", NULL, "disk", "services.queued_io_ops_read", "Systemd Services Queued Disk Read Operations", "operations/s", 30020, update_every, RRDSET_TYPE_STACKED);
+                st_queued_ops_read = rrdset_create("services", "queued_io_ops_read", NULL, "disk", "services.queued_io_ops_read", "Systemd Services Queued Disk Read Operations", "operations/s", CHART_PRIORITY_SYSTEMD_SERVICES + 200, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_queued_ops_read);
@@ -1636,7 +1735,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_queued_ops_write)) {
             st_queued_ops_write = rrdset_find_bytype("services", "queued_io_ops_write");
             if(likely(!st_queued_ops_write))
-                st_queued_ops_write = rrdset_create("services", "queued_io_ops_write", NULL, "disk", "services.queued_io_ops_write", "Systemd Services Queued Disk Write Operations", "operations/s", 30021, update_every, RRDSET_TYPE_STACKED);
+                st_queued_ops_write = rrdset_create("services", "queued_io_ops_write", NULL, "disk", "services.queued_io_ops_write", "Systemd Services Queued Disk Write Operations", "operations/s", CHART_PRIORITY_SYSTEMD_SERVICES + 210, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_queued_ops_write);
@@ -1646,7 +1745,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_merged_ops_read)) {
             st_merged_ops_read = rrdset_find_bytype("services", "merged_io_ops_read");
             if(likely(!st_merged_ops_read))
-                st_merged_ops_read = rrdset_create("services", "merged_io_ops_read", NULL, "disk", "services.merged_io_ops_read", "Systemd Services Merged Disk Read Operations", "operations/s", 30022, update_every, RRDSET_TYPE_STACKED);
+                st_merged_ops_read = rrdset_create("services", "merged_io_ops_read", NULL, "disk", "services.merged_io_ops_read", "Systemd Services Merged Disk Read Operations", "operations/s", CHART_PRIORITY_SYSTEMD_SERVICES + 220, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_merged_ops_read);
@@ -1654,7 +1753,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_merged_ops_write)) {
             st_merged_ops_write = rrdset_find_bytype("services", "merged_io_ops_write");
             if(likely(!st_merged_ops_write))
-                st_merged_ops_write = rrdset_create("services", "merged_io_ops_write", NULL, "disk", "services.merged_io_ops_write", "Systemd Services Merged Disk Write Operations", "operations/s", 30023, update_every, RRDSET_TYPE_STACKED);
+                st_merged_ops_write = rrdset_create("services", "merged_io_ops_write", NULL, "disk", "services.merged_io_ops_write", "Systemd Services Merged Disk Write Operations", "operations/s", CHART_PRIORITY_SYSTEMD_SERVICES + 230, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_merged_ops_write);
@@ -1673,21 +1772,55 @@ void update_services_charts(int update_every,
             rrddim_set_by_pointer(st_cpu, cg->rd_cpu, cg->cpuacct_stat.user + cg->cpuacct_stat.system);
         }
 
-        if(likely(do_mem_usage && cg->memory.usage_in_bytes_updated)) {
+        if(likely(do_mem_usage && cg->memory.updated_usage_in_bytes)) {
             if(unlikely(!cg->rd_mem_usage))
                 cg->rd_mem_usage = rrddim_add(st_mem_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 
             rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes);
         }
 
-        if(likely(do_mem_failcnt && cg->memory.failcnt_updated)) {
+        if(likely(do_mem_detailed && cg->memory.updated_detailed)) {
+            if(unlikely(!cg->rd_mem_detailed_rss))
+                cg->rd_mem_detailed_rss = rrddim_add(st_mem_detailed_rss, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+            rrddim_set_by_pointer(st_mem_detailed_rss, cg->rd_mem_detailed_rss, cg->memory.rss + cg->memory.rss_huge);
+
+            if(unlikely(!cg->rd_mem_detailed_mapped))
+                cg->rd_mem_detailed_mapped = rrddim_add(st_mem_detailed_mapped, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+            rrddim_set_by_pointer(st_mem_detailed_mapped, cg->rd_mem_detailed_mapped, cg->memory.mapped_file);
+
+            if(unlikely(!cg->rd_mem_detailed_cache))
+                cg->rd_mem_detailed_cache = rrddim_add(st_mem_detailed_cache, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+            rrddim_set_by_pointer(st_mem_detailed_cache, cg->rd_mem_detailed_cache, cg->memory.cache);
+
+            if(unlikely(!cg->rd_mem_detailed_writeback))
+                cg->rd_mem_detailed_writeback = rrddim_add(st_mem_detailed_writeback, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+            rrddim_set_by_pointer(st_mem_detailed_writeback, cg->rd_mem_detailed_writeback, cg->memory.writeback);
+
+            if(unlikely(!cg->rd_mem_detailed_pgfault))
+                cg->rd_mem_detailed_pgfault = rrddim_add(st_mem_detailed_pgfault, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRDDIM_INCREMENTAL);
+            rrddim_set_by_pointer(st_mem_detailed_pgfault, cg->rd_mem_detailed_pgfault, cg->memory.pgfault);
+
+            if(unlikely(!cg->rd_mem_detailed_pgmajfault))
+                cg->rd_mem_detailed_pgmajfault = rrddim_add(st_mem_detailed_pgmajfault, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRDDIM_INCREMENTAL);
+            rrddim_set_by_pointer(st_mem_detailed_pgmajfault, cg->rd_mem_detailed_pgmajfault, cg->memory.pgmajfault);
+
+            if(unlikely(!cg->rd_mem_detailed_pgpgin))
+                cg->rd_mem_detailed_pgpgin = rrddim_add(st_mem_detailed_pgpgin, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRDDIM_INCREMENTAL);
+            rrddim_set_by_pointer(st_mem_detailed_pgpgin, cg->rd_mem_detailed_pgpgin, cg->memory.pgpgin);
+
+            if(unlikely(!cg->rd_mem_detailed_pgpgout))
+                cg->rd_mem_detailed_pgpgout = rrddim_add(st_mem_detailed_pgpgout, cg->chart_id, cg->chart_title, system_page_size, 1024 * 1024, RRDDIM_INCREMENTAL);
+            rrddim_set_by_pointer(st_mem_detailed_pgpgout, cg->rd_mem_detailed_pgpgout, cg->memory.pgpgout);
+        }
+
+        if(likely(do_mem_failcnt && cg->memory.updated_failcnt)) {
             if(unlikely(!cg->rd_mem_failcnt))
                 cg->rd_mem_failcnt = rrddim_add(st_mem_failcnt, cg->chart_id, cg->chart_title, 1, 1, RRDDIM_INCREMENTAL);
 
             rrddim_set_by_pointer(st_mem_failcnt, cg->rd_mem_failcnt, cg->memory.failcnt);
         }
 
-        if(likely(do_swap_usage && cg->memory.msw_usage_in_bytes_updated)) {
+        if(likely(do_swap_usage && cg->memory.updated_msw_usage_in_bytes)) {
             if(unlikely(!cg->rd_swap_usage))
                 cg->rd_swap_usage = rrddim_add(st_swap_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 
@@ -1774,6 +1907,17 @@ void update_services_charts(int update_every,
     if(likely(do_mem_usage))
         rrdset_done(st_mem_usage);
 
+    if(unlikely(do_mem_detailed)) {
+        rrdset_done(st_mem_detailed_cache);
+        rrdset_done(st_mem_detailed_rss);
+        rrdset_done(st_mem_detailed_mapped);
+        rrdset_done(st_mem_detailed_writeback);
+        rrdset_done(st_mem_detailed_pgfault);
+        rrdset_done(st_mem_detailed_pgmajfault);
+        rrdset_done(st_mem_detailed_pgpgin);
+        rrdset_done(st_mem_detailed_pgpgout);
+    }
+
     if(likely(do_mem_failcnt))
         rrdset_done(st_mem_failcnt);
 
@@ -1831,6 +1975,7 @@ void update_cgroup_charts(int update_every) {
 
     int services_do_cpu = 0,
             services_do_mem_usage = 0,
+            services_do_mem_detailed = 0,
             services_do_mem_failcnt = 0,
             services_do_swap_usage = 0,
             services_do_io = 0,
@@ -1848,9 +1993,10 @@ void update_cgroup_charts(int update_every) {
         if(likely(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) {
             if(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_ONDEMAND_YES) services_do_cpu++;
 
-            if(cg->memory.usage_in_bytes_updated && cg->memory.enabled_usage == CONFIG_ONDEMAND_YES) services_do_mem_usage++;
-            if(cg->memory.failcnt_updated && cg->memory.enabled_failcnt == CONFIG_ONDEMAND_YES) services_do_mem_failcnt++;
-            if(cg->memory.msw_usage_in_bytes_updated && cg->memory.enabled_swap == CONFIG_ONDEMAND_YES) services_do_swap_usage++;
+            if(cg->memory.updated_detailed && cg->memory.enabled_detailed) services_do_mem_detailed++;
+            if(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_ONDEMAND_YES) services_do_mem_usage++;
+            if(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_ONDEMAND_YES) services_do_mem_failcnt++;
+            if(cg->memory.updated_msw_usage_in_bytes && cg->memory.enabled_msw_usage_in_bytes == CONFIG_ONDEMAND_YES) services_do_swap_usage++;
 
             if(cg->io_service_bytes.updated && cg->io_service_bytes.enabled == CONFIG_ONDEMAND_YES) services_do_io++;
             if(cg->io_serviced.updated && cg->io_serviced.enabled == CONFIG_ONDEMAND_YES) services_do_io_ops++;
@@ -1868,7 +2014,7 @@ void update_cgroup_charts(int update_every) {
                 cg->st_cpu = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "cpu");
                 if(likely(!cg->st_cpu)) {
                     snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
-                    cg->st_cpu = rrdset_create(type, "cpu", NULL, "cpu", "cgroup.cpu", title, "%", 40000, update_every, RRDSET_TYPE_STACKED);
+                    cg->st_cpu = rrdset_create(type, "cpu", NULL, "cpu", "cgroup.cpu", title, "%", CHART_PRIORITY_CONTAINERS, update_every, RRDSET_TYPE_STACKED);
                 }
                 rrddim_add(cg->st_cpu, "user", NULL, 100, hz, RRDDIM_INCREMENTAL);
                 rrddim_add(cg->st_cpu, "system", NULL, 100, hz, RRDDIM_INCREMENTAL);
@@ -1889,7 +2035,7 @@ void update_cgroup_charts(int update_every) {
                 cg->st_cpu_per_core = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "cpu_per_core");
                 if(likely(!cg->st_cpu_per_core)) {
                     snprintfz(title, CHART_TITLE_MAX, "CPU Usage (%d%% = %d core%s) Per Core for cgroup %s", (processors * 100), processors, (processors > 1) ? "s" : "", cg->chart_title);
-                    cg->st_cpu_per_core = rrdset_create(type, "cpu_per_core", NULL, "cpu", "cgroup.cpu_per_core", title, "%", 40100, update_every, RRDSET_TYPE_STACKED);
+                    cg->st_cpu_per_core = rrdset_create(type, "cpu_per_core", NULL, "cpu", "cgroup.cpu_per_core", title, "%", CHART_PRIORITY_CONTAINERS + 100, update_every, RRDSET_TYPE_STACKED);
                 }
                 for(i = 0; i < cg->cpuacct_usage.cpus; i++) {
                     snprintfz(id, CHART_TITLE_MAX, "cpu%u", i);
@@ -1906,17 +2052,17 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_cpu_per_core);
         }
 
-        if(likely(cg->memory.updated && cg->memory.enabled_detailed == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->memory.updated_detailed && cg->memory.enabled_detailed == CONFIG_ONDEMAND_YES)) {
             if(unlikely(!cg->st_mem)) {
                 cg->st_mem = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem");
                 if(likely(!cg->st_mem)) {
                     snprintfz(title, CHART_TITLE_MAX, "Memory Usage for cgroup %s", cg->chart_title);
-                    cg->st_mem = rrdset_create(type, "mem", NULL, "mem", "cgroup.mem", title, "MB", 40210, update_every, RRDSET_TYPE_STACKED);
+                    cg->st_mem = rrdset_create(type, "mem", NULL, "mem", "cgroup.mem", title, "MB", CHART_PRIORITY_CONTAINERS + 210, update_every, RRDSET_TYPE_STACKED);
                 }
 
                 rrddim_add(cg->st_mem, "cache", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_mem, "rss", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-                if(cg->memory.has_dirty_swap)
+                if(cg->memory.detailed_has_dirty_swap)
                     rrddim_add(cg->st_mem, "swap", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_mem, "rss_huge", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_mem, "mapped_file", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
@@ -1926,7 +2072,7 @@ void update_cgroup_charts(int update_every) {
 
             rrddim_set(cg->st_mem, "cache", cg->memory.cache);
             rrddim_set(cg->st_mem, "rss", cg->memory.rss);
-            if(cg->memory.has_dirty_swap)
+            if(cg->memory.detailed_has_dirty_swap)
                 rrddim_set(cg->st_mem, "swap", cg->memory.swap);
             rrddim_set(cg->st_mem, "rss_huge", cg->memory.rss_huge);
             rrddim_set(cg->st_mem, "mapped_file", cg->memory.mapped_file);
@@ -1936,17 +2082,17 @@ void update_cgroup_charts(int update_every) {
                 cg->st_writeback = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "writeback");
                 if(likely(!cg->st_writeback)) {
                     snprintfz(title, CHART_TITLE_MAX, "Writeback Memory for cgroup %s", cg->chart_title);
-                    cg->st_writeback = rrdset_create(type, "writeback", NULL, "mem", "cgroup.writeback", title, "MB", 40300, update_every, RRDSET_TYPE_AREA);
+                    cg->st_writeback = rrdset_create(type, "writeback", NULL, "mem", "cgroup.writeback", title, "MB", CHART_PRIORITY_CONTAINERS + 300, update_every, RRDSET_TYPE_AREA);
                 }
 
-                if(cg->memory.has_dirty_swap)
+                if(cg->memory.detailed_has_dirty_swap)
                     rrddim_add(cg->st_writeback, "dirty", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_writeback, "writeback", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
             }
             else
                 rrdset_next(cg->st_writeback);
 
-            if(cg->memory.has_dirty_swap)
+            if(cg->memory.detailed_has_dirty_swap)
                 rrddim_set(cg->st_writeback, "dirty", cg->memory.dirty);
             rrddim_set(cg->st_writeback, "writeback", cg->memory.writeback);
             rrdset_done(cg->st_writeback);
@@ -1955,10 +2101,10 @@ void update_cgroup_charts(int update_every) {
                 cg->st_mem_activity = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem_activity");
                 if(likely(!cg->st_mem_activity)) {
                     snprintfz(title, CHART_TITLE_MAX, "Memory Activity for cgroup %s", cg->chart_title);
-                    cg->st_mem_activity = rrdset_create(type, "mem_activity", NULL, "mem", "cgroup.mem_activity", title, "MB/s", 40400, update_every, RRDSET_TYPE_LINE);
+                    cg->st_mem_activity = rrdset_create(type, "mem_activity", NULL, "mem", "cgroup.mem_activity", title, "MB/s", CHART_PRIORITY_CONTAINERS + 400, update_every, RRDSET_TYPE_LINE);
                 }
-                rrddim_add(cg->st_mem_activity, "pgpgin", "in", sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
-                rrddim_add(cg->st_mem_activity, "pgpgout", "out", -sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(cg->st_mem_activity, "pgpgin", "in", system_page_size, 1024 * 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(cg->st_mem_activity, "pgpgout", "out", -system_page_size, 1024 * 1024, RRDDIM_INCREMENTAL);
             }
             else
                 rrdset_next(cg->st_mem_activity);
@@ -1971,10 +2117,10 @@ void update_cgroup_charts(int update_every) {
                 cg->st_pgfaults = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "pgfaults");
                 if(likely(!cg->st_pgfaults)) {
                     snprintfz(title, CHART_TITLE_MAX, "Memory Page Faults for cgroup %s", cg->chart_title);
-                    cg->st_pgfaults = rrdset_create(type, "pgfaults", NULL, "mem", "cgroup.pgfaults", title, "MB/s", 40500, update_every, RRDSET_TYPE_LINE);
+                    cg->st_pgfaults = rrdset_create(type, "pgfaults", NULL, "mem", "cgroup.pgfaults", title, "MB/s", CHART_PRIORITY_CONTAINERS + 500, update_every, RRDSET_TYPE_LINE);
                 }
-                rrddim_add(cg->st_pgfaults, "pgfault", NULL, sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
-                rrddim_add(cg->st_pgfaults, "pgmajfault", "swap", -sysconf(_SC_PAGESIZE), 1024 * 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(cg->st_pgfaults, "pgfault", NULL, system_page_size, 1024 * 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(cg->st_pgfaults, "pgmajfault", "swap", -system_page_size, 1024 * 1024, RRDDIM_INCREMENTAL);
             }
             else
                 rrdset_next(cg->st_pgfaults);
@@ -1984,12 +2130,12 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_pgfaults);
         }
 
-        if(likely(cg->memory.usage_in_bytes_updated && cg->memory.enabled_usage == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_ONDEMAND_YES)) {
             if(unlikely(!cg->st_mem_usage)) {
                 cg->st_mem_usage = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem_usage");
                 if(likely(!cg->st_mem_usage)) {
                     snprintfz(title, CHART_TITLE_MAX, "Total Memory for cgroup %s", cg->chart_title);
-                    cg->st_mem_usage = rrdset_create(type, "mem_usage", NULL, "mem", "cgroup.mem_usage", title, "MB", 40200, update_every, RRDSET_TYPE_STACKED);
+                    cg->st_mem_usage = rrdset_create(type, "mem_usage", NULL, "mem", "cgroup.mem_usage", title, "MB", CHART_PRIORITY_CONTAINERS + 200, update_every, RRDSET_TYPE_STACKED);
                 }
                 rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_mem_usage, "swap", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
@@ -2002,12 +2148,12 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_mem_usage);
         }
 
-        if(likely(cg->memory.failcnt_updated && cg->memory.enabled_failcnt == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_ONDEMAND_YES)) {
             if(unlikely(!cg->st_mem_failcnt)) {
                 cg->st_mem_failcnt = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem_failcnt");
                 if(likely(!cg->st_mem_failcnt)) {
                     snprintfz(title, CHART_TITLE_MAX, "Memory Limit Failures for cgroup %s", cg->chart_title);
-                    cg->st_mem_failcnt = rrdset_create(type, "mem_failcnt", NULL, "mem", "cgroup.mem_failcnt", title, "count", 40250, update_every, RRDSET_TYPE_LINE);
+                    cg->st_mem_failcnt = rrdset_create(type, "mem_failcnt", NULL, "mem", "cgroup.mem_failcnt", title, "count", CHART_PRIORITY_CONTAINERS + 250, update_every, RRDSET_TYPE_LINE);
                 }
                 rrddim_add(cg->st_mem_failcnt, "failures", NULL, 1, 1, RRDDIM_INCREMENTAL);
             }
@@ -2023,7 +2169,7 @@ void update_cgroup_charts(int update_every) {
                 cg->st_io = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "io");
                 if(likely(!cg->st_io)) {
                     snprintfz(title, CHART_TITLE_MAX, "I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
-                    cg->st_io = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", 41200, update_every, RRDSET_TYPE_AREA);
+                    cg->st_io = rrdset_create(type, "io", NULL, "disk", "cgroup.io", title, "KB/s", CHART_PRIORITY_CONTAINERS + 1200, update_every, RRDSET_TYPE_AREA);
                 }
                 rrddim_add(cg->st_io, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(cg->st_io, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
@@ -2041,7 +2187,7 @@ void update_cgroup_charts(int update_every) {
                 cg->st_serviced_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "serviced_ops");
                 if(likely(!cg->st_serviced_ops)) {
                     snprintfz(title, CHART_TITLE_MAX, "Serviced I/O Operations (all disks) for cgroup %s", cg->chart_title);
-                    cg->st_serviced_ops = rrdset_create(type, "serviced_ops", NULL, "disk", "cgroup.serviced_ops", title, "operations/s", 41200, update_every, RRDSET_TYPE_LINE);
+                    cg->st_serviced_ops = rrdset_create(type, "serviced_ops", NULL, "disk", "cgroup.serviced_ops", title, "operations/s", CHART_PRIORITY_CONTAINERS + 1200, update_every, RRDSET_TYPE_LINE);
                 }
                 rrddim_add(cg->st_serviced_ops, "read", NULL, 1, 1, RRDDIM_INCREMENTAL);
                 rrddim_add(cg->st_serviced_ops, "write", NULL, -1, 1, RRDDIM_INCREMENTAL);
@@ -2059,7 +2205,7 @@ void update_cgroup_charts(int update_every) {
                 cg->st_throttle_io = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "throttle_io");
                 if(likely(!cg->st_throttle_io)) {
                     snprintfz(title, CHART_TITLE_MAX, "Throttle I/O Bandwidth (all disks) for cgroup %s", cg->chart_title);
-                    cg->st_throttle_io = rrdset_create(type, "throttle_io", NULL, "disk", "cgroup.throttle_io", title, "KB/s", 41200, update_every, RRDSET_TYPE_AREA);
+                    cg->st_throttle_io = rrdset_create(type, "throttle_io", NULL, "disk", "cgroup.throttle_io", title, "KB/s", CHART_PRIORITY_CONTAINERS + 1200, update_every, RRDSET_TYPE_AREA);
                 }
                 rrddim_add(cg->st_throttle_io, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(cg->st_throttle_io, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
@@ -2077,7 +2223,7 @@ void update_cgroup_charts(int update_every) {
                 cg->st_throttle_serviced_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "throttle_serviced_ops");
                 if(likely(!cg->st_throttle_serviced_ops)) {
                     snprintfz(title, CHART_TITLE_MAX, "Throttle Serviced I/O Operations (all disks) for cgroup %s", cg->chart_title);
-                    cg->st_throttle_serviced_ops = rrdset_create(type, "throttle_serviced_ops", NULL, "disk", "cgroup.throttle_serviced_ops", title, "operations/s", 41200, update_every, RRDSET_TYPE_LINE);
+                    cg->st_throttle_serviced_ops = rrdset_create(type, "throttle_serviced_ops", NULL, "disk", "cgroup.throttle_serviced_ops", title, "operations/s", CHART_PRIORITY_CONTAINERS + 1200, update_every, RRDSET_TYPE_LINE);
                 }
                 rrddim_add(cg->st_throttle_serviced_ops, "read", NULL, 1, 1, RRDDIM_INCREMENTAL);
                 rrddim_add(cg->st_throttle_serviced_ops, "write", NULL, -1, 1, RRDDIM_INCREMENTAL);
@@ -2095,7 +2241,7 @@ void update_cgroup_charts(int update_every) {
                 cg->st_queued_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "queued_ops");
                 if(likely(!cg->st_queued_ops)) {
                     snprintfz(title, CHART_TITLE_MAX, "Queued I/O Operations (all disks) for cgroup %s", cg->chart_title);
-                    cg->st_queued_ops = rrdset_create(type, "queued_ops", NULL, "disk", "cgroup.queued_ops", title, "operations", 42000, update_every, RRDSET_TYPE_LINE);
+                    cg->st_queued_ops = rrdset_create(type, "queued_ops", NULL, "disk", "cgroup.queued_ops", title, "operations", CHART_PRIORITY_CONTAINERS + 2000, update_every, RRDSET_TYPE_LINE);
                 }
                 rrddim_add(cg->st_queued_ops, "read", NULL, 1, 1, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_queued_ops, "write", NULL, -1, 1, RRDDIM_ABSOLUTE);
@@ -2113,7 +2259,7 @@ void update_cgroup_charts(int update_every) {
                 cg->st_merged_ops = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "merged_ops");
                 if(likely(!cg->st_merged_ops)) {
                     snprintfz(title, CHART_TITLE_MAX, "Merged I/O Operations (all disks) for cgroup %s", cg->chart_title);
-                    cg->st_merged_ops = rrdset_create(type, "merged_ops", NULL, "disk", "cgroup.merged_ops", title, "operations/s", 42100, update_every, RRDSET_TYPE_LINE);
+                    cg->st_merged_ops = rrdset_create(type, "merged_ops", NULL, "disk", "cgroup.merged_ops", title, "operations/s", CHART_PRIORITY_CONTAINERS + 2100, update_every, RRDSET_TYPE_LINE);
                 }
                 rrddim_add(cg->st_merged_ops, "read", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                 rrddim_add(cg->st_merged_ops, "write", NULL, -1, 1024, RRDDIM_INCREMENTAL);
@@ -2131,6 +2277,7 @@ void update_cgroup_charts(int update_every) {
         update_services_charts(update_every,
                 services_do_cpu,
                 services_do_mem_usage,
+                services_do_mem_detailed,
                 services_do_mem_failcnt,
                 services_do_swap_usage,
                 services_do_io,
