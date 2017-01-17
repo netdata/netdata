@@ -20,8 +20,10 @@ static int cgroup_enable_blkio_throttle_io = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_blkio_throttle_ops = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_blkio_merged_ops = CONFIG_ONDEMAND_ONDEMAND;
 static int cgroup_enable_blkio_queued_ops = CONFIG_ONDEMAND_ONDEMAND;
+
 static int cgroup_enable_systemd_services = CONFIG_ONDEMAND_YES;
 static int cgroup_enable_systemd_services_detailed_memory = CONFIG_ONDEMAND_NO;
+static int cgroup_used_memory_without_cache = CONFIG_ONDEMAND_YES;
 
 static int cgroup_search_in_devices = 1;
 
@@ -163,6 +165,7 @@ void read_cgroup_plugin_configuration() {
 
     cgroup_enable_systemd_services = config_get_boolean("plugin:cgroups", "enable systemd services", cgroup_enable_systemd_services);
     cgroup_enable_systemd_services_detailed_memory = config_get_boolean("plugin:cgroups", "enable systemd services detailed memory", cgroup_enable_systemd_services_detailed_memory);
+    cgroup_used_memory_without_cache = config_get_boolean("plugin:cgroups", "report used memory without cache", cgroup_used_memory_without_cache);
 
     char filename[FILENAME_MAX + 1], *s;
     struct mountinfo *mi, *root = mountinfo_read(0);
@@ -1376,11 +1379,11 @@ static inline void find_all_cgroups() {
                 debug(D_CGROUP, "cpuacct.usage_percpu file for cgroup '%s': '%s' does not exist.", cg->id, filename);
         }
 
-        if(unlikely(cgroup_enable_detailed_memory && !cg->memory.filename_detailed && (cgroup_enable_systemd_services_detailed_memory || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))) {
+        if(unlikely((cgroup_enable_detailed_memory || cgroup_used_memory_without_cache) && !cg->memory.filename_detailed && (cgroup_used_memory_without_cache || cgroup_enable_systemd_services_detailed_memory || !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)))) {
             snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
             if(likely(stat(filename, &buf) != -1)) {
                 cg->memory.filename_detailed = strdupz(filename);
-                cg->memory.enabled_detailed = cgroup_enable_detailed_memory;
+                cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_ONDEMAND_YES)?CONFIG_ONDEMAND_YES:CONFIG_ONDEMAND_ONDEMAND;
                 debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
             }
             else
@@ -1775,7 +1778,7 @@ void update_services_charts(int update_every,
             if(unlikely(!cg->rd_mem_usage))
                 cg->rd_mem_usage = rrddim_add(st_mem_usage, cg->chart_id, cg->chart_title, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
 
-            rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes);
+            rrddim_set_by_pointer(st_mem_usage, cg->rd_mem_usage, cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.cache:0));
         }
 
         if(likely(do_mem_detailed && cg->memory.updated_detailed)) {
@@ -1992,7 +1995,7 @@ void update_cgroup_charts(int update_every) {
         if(likely(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) {
             if(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_ONDEMAND_YES) services_do_cpu++;
 
-            if(cg->memory.updated_detailed && cg->memory.enabled_detailed) services_do_mem_detailed++;
+            if(cgroup_enable_systemd_services_detailed_memory && cg->memory.updated_detailed && cg->memory.enabled_detailed) services_do_mem_detailed++;
             if(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_ONDEMAND_YES) services_do_mem_usage++;
             if(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_ONDEMAND_YES) services_do_mem_failcnt++;
             if(cg->memory.updated_msw_usage_in_bytes && cg->memory.enabled_msw_usage_in_bytes == CONFIG_ONDEMAND_YES) services_do_swap_usage++;
@@ -2142,7 +2145,7 @@ void update_cgroup_charts(int update_every) {
             else
                 rrdset_next(cg->st_mem_usage);
 
-            rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes);
+            rrddim_set(cg->st_mem_usage, "ram", cg->memory.usage_in_bytes - ((cgroup_used_memory_without_cache)?cg->memory.cache:0));
             rrddim_set(cg->st_mem_usage, "swap", (cg->memory.msw_usage_in_bytes > cg->memory.usage_in_bytes)?cg->memory.msw_usage_in_bytes - cg->memory.usage_in_bytes:0);
             rrdset_done(cg->st_mem_usage);
         }
