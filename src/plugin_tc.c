@@ -247,7 +247,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     // we need the root qdisc
     for(c = d->classes ; c ; c = c->next) {
         // debug(D_TC_LOOP, "TC: Device '%s', class '%s', isLeaf=%d, HasParent=%d, Seen=%d", d->name?d->name:d->id, c->name?c->name:c->id, c->isleaf, c->hasparent, c->seen);
-        debug(D_TC_LOOP, "TC: Device '%s', class '%s', isleaf=%s, isqdisc=%s, hasparent=%s bytes=%d, packtes=%d, dropped=%d, tokens=%d, ctokens=%d", d->name?d->name:d->id, c->name?c->name:c->id, c->isleaf?"true":"false", c->isqdisc?"true":"false", c->hasparent?"true":"false", c->bytes, c->packets, c->dropped, c->tokens, c->ctokens);
+        debug(D_TC_LOOP, "TC: Device '%s', class '%s', isleaf=%s, isqdisc=%s, hasparent=%s bytes=%llu, packtes=%llu, dropped=%llu, tokens=%llu, ctokens=%llu", d->name?d->name:d->id, c->name?c->name:c->id, c->isleaf?"true":"false", c->isqdisc?"true":"false", c->hasparent?"true":"false", c->bytes, c->packets, c->dropped, c->tokens, c->ctokens);
         if(unlikely(c->updated && c->isqdisc && !c->parentid)) {
             active_qos = 1;
             bytes_sum = c->bytes;
@@ -846,7 +846,7 @@ void *tc_main(void *ptr) {
                     char *leafid   = words[6];  // leafid
                     char qdisc = 0;
 
-                    if(strcmp(words[0], "qdisc") == 0) {
+                    if(first_hash == QDISC_HASH) {
                         qdisc = 1;
                     }
                     if(strcmp(parent, "root") == 0) {
