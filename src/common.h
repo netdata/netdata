@@ -207,12 +207,10 @@
 #include "unit_test.h"
 #include "ipc.h"
 #include "backends.h"
+#include "inlined.h"
 
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);
-
-extern uint32_t simple_hash(const char *name);
-extern uint32_t simple_uhash(const char *name);
 
 extern void strreverse(char* begin, char* end);
 extern char *mystrsep(char **ptr, char *s);
@@ -276,7 +274,5 @@ extern void get_system_HZ(void);
 #define RUSAGE_THREAD RUSAGE_CHILDREN
 #endif
 #endif
-
-extern int read_single_number_file(const char *filename, unsigned long long *result);
 
 #endif /* NETDATA_COMMON_H */

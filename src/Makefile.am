@@ -37,6 +37,7 @@ netdata_SOURCES = \
 	eval.c eval.h \
 	global_statistics.c global_statistics.h \
 	health.c health.h \
+	inlined.h \
 	log.c log.h \
 	main.c main.h \
 	plugin_checks.c plugin_checks.h \
@@ -124,6 +125,7 @@ apps_plugin_SOURCES = \
 	avl.c avl.h \
 	clocks.c clocks.h \
 	common.c common.h \
+	inlined.h \
 	log.c log.h \
 	procfile.c procfile.h \
 	web_buffer.c web_buffer.h \
