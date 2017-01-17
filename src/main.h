@@ -17,6 +17,7 @@
  * [doxygen_syntax]: http://www.stack.nl/~dimitri/doxygen/manual/docblocks.html "Doxygen Syntax"
  * 
  * - Header files must be documentented with [doxygen_syntax].
+ * - To search for `string` in a list always use a hash to gain performance. User simple_hash() for this.
  */
 
  /**
