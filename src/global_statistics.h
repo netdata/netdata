@@ -2,18 +2,23 @@
 #define NETDATA_GLOBAL_STATISTICS_H 1
 
 // ----------------------------------------------------------------------------
-// global statistics
-
+/// global statistics
 struct global_statistics {
-    volatile uint16_t connected_clients;
+    volatile uint16_t connected_clients; ///< number of connected clients
 
-    volatile uint64_t web_requests;
+    volatile uint64_t web_requests;            ///< Number of web requests.
+    /// \brief Total duration to serve web_requests.
+    ///
+    /// Summed duration from the reception of a request, to the dispatch of the last byte.
     volatile uint64_t web_usec;
+    /// \brief Maximum duration of a request for the last iteration.
+    ///
+    /// The max time to serve a request. This is reset to zero every time the chart is updated, so it shows the max time for each iteration.
     volatile uint64_t web_usec_max;
-    volatile uint64_t bytes_received;
-    volatile uint64_t bytes_sent;
-    volatile uint64_t content_size;
-    volatile uint64_t compressed_content_size;
+    volatile uint64_t bytes_received;          ///< Number of bytes received.
+    volatile uint64_t bytes_sent;              ///< Number of bytes sent.
+    volatile uint64_t content_size;            ///< Size of contetnt.
+    volatile uint64_t compressed_content_size; ///< Size of compressed content.
 };
 
 extern volatile struct global_statistics global_statistics;

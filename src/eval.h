@@ -3,31 +3,39 @@
 
 #define EVAL_MAX_VARIABLE_NAME_LENGTH 300
 
+/** List of `struct rrdvar`*/
 typedef struct eval_variable {
-    char *name;
-    uint32_t hash;
-    struct rrdvar *rrdvar;
-    struct eval_variable *next;
+    char *name;                 ///< Uniqe name
+    uint32_t hash;              ///< Hash of `name`
+    struct rrdvar *rrdvar;      ///< The variable
+    struct eval_variable *next; ///< Next item in the list
 } EVAL_VARIABLE;
 
+/**
+ * The internal representation infix expressions used in alarms.
+ *
+ * @author Costa Tsaousis
+ *
+ * The expression is split a tree. Each node is performing a calculation.
+ */
 typedef struct eval_expression {
-    const char *source;
-    const char *parsed_as;
+    const char *source;    ///< The source string
+    const char *parsed_as; ///< The passed expression
 
-    int *status;
-    calculated_number *this;
-    time_t *after;
-    time_t *before;
+    int *status;             ///< EVAL_VALUE_*
+    calculated_number *this; ///< Number calculated from expression
+    time_t *after;           ///< Next eval_expression of this
+    time_t *before;          ///< Preceding eval_expression of this
 
-    calculated_number result;
+    calculated_number result; ///< Result of the expression
 
-    int error;
-    BUFFER *error_msg;
+    int error;         ///< EVAL_ERROR_*
+    BUFFER *error_msg; ///< Reason why `error` occured.
 
-    // hidden EVAL_NODE *
+    /// hidden EVAL_NODE *
     void *nodes;
 
-    // custom data to be used for looking up variables
+    /// custom data to be used for looking up variables
     struct rrdcalc *rrdcalc;
 } EVAL_EXPRESSION;
 

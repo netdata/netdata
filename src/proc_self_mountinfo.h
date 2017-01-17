@@ -10,48 +10,54 @@
  * To free the list, run mountinfo_free().
  */
 
-#define MOUNTINFO_IS_DUMMY      0x00000001
-#define MOUNTINFO_IS_REMOTE     0x00000002
-#define MOUNTINFO_IS_BIND       0x00000004
-#define MOUNTINFO_IS_SAME_DEV   0x00000008
-#define MOUNTINFO_NO_STAT       0x00000010
-#define MOUNTINFO_NO_SIZE       0x00000020
-#define MOUNTINFO_READONLY      0x00000040
+#define MOUNTINFO_IS_DUMMY      0x00000001 ///< dummy mountinfo
+#define MOUNTINFO_IS_REMOTE     0x00000002 ///< mounts a remote device
+#define MOUNTINFO_IS_BIND       0x00000004 ///< mountinfo is bind
+#define MOUNTINFO_IS_SAME_DEV   0x00000008 ///< mount is on same dev
+#define MOUNTINFO_NO_STAT       0x00000010 ///< cannot `stat()` mountinfo
+#define MOUNTINFO_NO_SIZE       0x00000020 ///< size not available
+#define MOUNTINFO_READONLY      0x00000040 ///< mounted readonly
 
+/** One mountpoint */
 struct mountinfo {
-    long id;                // mount ID: unique identifier of the mount (may be reused after umount(2)).
-    long parentid;          // parent ID: ID of parent mount (or of self for the top of the mount tree).
-    unsigned long major;    // major:minor: value of st_dev for files on filesystem (see stat(2)).
-    unsigned long minor;
+    long id;                ///< mount ID: unique identifier of the mount (may be reused after umount(2)).
+    long parentid;          ///< parent ID: ID of parent mount (or of self for the top of the mount tree).
+    unsigned long major;    ///< major: value of st_dev for files on filesystem @see man 2 stat
+    unsigned long minor;    ///< minor: value of st_dev for files on filesystem @see man 2 stat
 
-    char *persistent_id;    // a calculated persistent id for the mount point
-    uint32_t persistent_id_hash;
+    char *persistent_id;         ///< a calculated persistent id for the mount point
+    uint32_t persistent_id_hash; ///<hash of `president_id`
 
-    char *root;             // root: root of the mount within the filesystem.
-    uint32_t root_hash;
+    char *root;             ///< root of the mount within the filesystem.
+    uint32_t root_hash;     ///< hash of `root`
 
-    char *mount_point;      // mount point: mount point relative to the process's root.
-    uint32_t mount_point_hash;
+    char *mount_point;         ///< mount point relative to the process's root.
+    uint32_t mount_point_hash; ///< hash of `mount_point`
 
-    char *mount_options;    // mount options: per-mount options.
+    char *mount_options; ///< per-mount options.
 
+    /// Number of optional fields
+    ///
+    /// optional fields are terminated with a field with contents -.
+    /// This counts how many of such fields are there.
+    /// Until we found a system where this is non zero we do not support optional fields.
     int optional_fields_count;
 /*
     char ***optional_fields; // optional fields: zero or more fields of the form "tag[:value]".
 */
-    char *filesystem;       // filesystem type: name of filesystem in the form "type[.subtype]".
-    uint32_t filesystem_hash;
+    char *filesystem;          ///< filesystem type: name of filesystem in the form "type[.subtype]".
+    uint32_t filesystem_hash;  ///< hash of `filesystem`
 
-    char *mount_source;     // mount source: filesystem-specific information or "none".
-    uint32_t mount_source_hash;
+    char *mount_source;         ///< filesystem-specific information or "none".
+    uint32_t mount_source_hash; ///< hash of `mount_source`
 
-    char *super_options;    // super options: per-superblock options.
+    char *super_options;    ///< per-superblock options.
 
-    uint32_t flags;
+    uint32_t flags; ///< MOUNTINFO_*
 
-    dev_t st_dev;           // id of device as given by stat()
+    dev_t st_dev;           ///< id of device as given by `stat()`
 
-    struct mountinfo *next;
+    struct mountinfo *next; ///< next item in list
 };
 
 /**

@@ -27,28 +27,27 @@
 #define NETDATA_PROCFILE_H 1
 
 // ----------------------------------------------------------------------------
-// An array of words
-
+/// An array of words
 typedef struct {
-    size_t len;     // used entries
-    size_t size;    // capacity
-    char *words[];  // array of pointers
+    size_t len;     ///< used entries
+    size_t size;    ///< capacity
+    char *words[];  ///< array of pointers
 } pfwords;
 
 
 // ----------------------------------------------------------------------------
-// An array of lines
-
+/// An array of lines
 typedef struct {
-    size_t words;   // how many words this line has
-    size_t first;   // the id of the first word of this line
-                    // in the words array
+    size_t words;     ///< how many words this line has
+    size_t first;     ///< the id of the first word of this line
+                      ///< in the words array
 } ffline;
 
+/// Collection of lines
 typedef struct {
-    size_t len;     // used entries
-    size_t size;    // capacity
-    ffline lines[]; // array of lines
+    size_t len;       ///< used entries
+    size_t size;      ///< capacity
+    ffline lines[];   ///< array of lines
 } pflines;
 
 
@@ -67,17 +66,18 @@ typedef enum procfile_separator {
     PF_CHAR_IS_CLOSE
 } PF_CHAR_TYPE;
 
+/** The procfile */
 typedef struct {
-    char filename[FILENAME_MAX + 1]; // not populated until profile_filename() is called
-
-    uint32_t flags;
-    int fd;               // the file desriptor
-    size_t len;           // the bytes we have placed into data
-    size_t size;          // the bytes we have allocated for data
-    pflines *lines;
-    pfwords *words;
-    PF_CHAR_TYPE separators[256];
-    char data[];          // allocated buffer to keep file contents
+    char filename[FILENAME_MAX + 1]; ///< The filename. It is not populated until profile_filename() is called.
+    
+    uint32_t flags;       ///< PROCFILE_FLAG_*
+    int fd;               ///< The file desriptor.
+    size_t len;           ///< The bytes we have placed into data.
+    size_t size;          ///< The bytes we have allocated for data.
+    pflines *lines;       ///< Lines of the file.
+    pfwords *words;       ///< Words of the file.
+    char separators[256]; ///< Separator chars (procfile_separator).
+    char data[];          ///< Allocated buffer to keep file contents.
 } procfile;
 
 // close the proc file and free all related memory

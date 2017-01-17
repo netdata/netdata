@@ -3,14 +3,15 @@
 
 #define WEB_DATA_LENGTH_INCREASE_STEP 1024
 
+/** web buffer */
 typedef struct web_buffer {
-    size_t size;        	// allocation size of buffer, in bytes
-    size_t len;     		// current data length in buffer, in bytes
-    char *buffer;   		// the buffer itself
-    uint8_t contenttype;	// the content type of the data in the buffer
-    uint8_t options;		// options related to the content
-    time_t date;    		// the timestamp this content has been generated
-    time_t expires;			// the timestamp this content expires
+    size_t size;        	///< allocation size of buffer, in bytes
+    size_t len;     		///< current data length in buffer, in bytes
+    char *buffer;   		///< the buffer itself
+    uint8_t contenttype;	///< the content type of the data in the buffer
+    uint8_t options;		///< options related to the content
+    time_t date;    		///< the timestamp this content has been generated
+    time_t expires;			///< the timestamp this content expires
 } BUFFER;
 
 // options

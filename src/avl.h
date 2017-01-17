@@ -33,8 +33,10 @@
 // #define AVL_LOCK_WITH_MUTEX 1
 
 #ifdef AVL_LOCK_WITH_MUTEX
+/// Initializes avl_tree_lock->mutex
 #define AVL_LOCK_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 #else /* AVL_LOCK_WITH_MUTEX */
+/// Initializes avl_tree_lock->rwlock
 #define AVL_LOCK_INITIALIZER PTHREAD_RWLOCK_INITIALIZER
 #endif /* AVL_LOCK_WITH_MUTEX */
 
@@ -82,7 +84,7 @@ typedef struct avl_tree_lock {
  *
  * @param t avl tree
  * @param a element to insert
- * @retrun `a` or an equal element
+ * @return `a` or an equal element
  */
 avl *avl_insert_lock(avl_tree_lock *t, avl *a) NEVERNULL WARNUNUSED;
 /** 
@@ -94,7 +96,7 @@ avl *avl_insert_lock(avl_tree_lock *t, avl *a) NEVERNULL WARNUNUSED;
  *
  * @param t AVL tree
  * @param a element to insert
- * @retrun `a` or an equal element
+ * @return `a` or an equal element
  */
 avl *avl_insert(avl_tree *t, avl *a) NEVERNULL WARNUNUSED;
 

@@ -4,19 +4,19 @@
 #include "registry_internals.h"
 
 // ----------------------------------------------------------------------------
-// URL structures
-// Save memory by de-duplicating URLs
-// so instead of storing URLs all over the place
-// we store them here and we keep pointers elsewhere
-
+/// \brief URL structures.
+///
+/// Save memory by de-duplicating URLs
+/// so instead of storing URLs all over the place
+/// we store them here and we keep pointers elsewhere
 struct registry_url {
-    avl avl;
-    uint32_t hash;  // the index hash
+    avl avl;        ///< The index
+    uint32_t hash;  ///< the index hash
 
-    uint32_t links; // the number of links to this URL - when none is left, we free it
+    uint32_t links; ///< the number of links to this URL - when none is left, we free it
 
-    uint16_t len;   // the length of the URL in bytes
-    char url[1];    // the URL - dynamically allocated to more size
+    uint16_t len;   ///< the length of the URL in bytes
+    char url[1];    ///< the URL - dynamically allocated to more size
 };
 typedef struct registry_url REGISTRY_URL;
 

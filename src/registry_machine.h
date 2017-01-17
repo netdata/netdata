@@ -6,29 +6,29 @@
 // ----------------------------------------------------------------------------
 // MACHINE structures
 
-// For each MACHINE-URL pair we keep this
+/** For each MACHINE-URL pair we keep this */
 struct registry_machine_url {
-    REGISTRY_URL *url;          // de-duplicated URL
+    REGISTRY_URL *url;          ///< de-duplicated URL
 
-    uint8_t flags;
+    uint8_t flags;              ///< REGISTRY_URL_FLAGS_DEFAULT|REGISTRY_URL_FLAGS_EXPIRED
 
-    uint32_t first_t;           // the first time we saw this
-    uint32_t last_t;            // the last time we saw this
-    uint32_t usages;            // how many times this has been accessed
+    uint32_t first_t;           ///< the first time we saw this
+    uint32_t last_t;            ///< the last time we saw this
+    uint32_t usages;            ///< how many times this has been accessed
 };
 typedef struct registry_machine_url REGISTRY_MACHINE_URL;
 
-// A machine
+/** A machine */
 struct registry_machine {
-    char guid[GUID_LEN + 1];    // the GUID
+    char guid[GUID_LEN + 1];    ///< the GUID
 
-    uint32_t links;             // the number of REGISTRY_PERSON_URL linked to this machine
+    uint32_t links;             ///< the number of REGISTRY_PERSON_URL linked to this machine
 
-    DICTIONARY *machine_urls;   // MACHINE_URL *
+    DICTIONARY *machine_urls;   ///< MACHINE_URL *
 
-    uint32_t first_t;           // the first time we saw this
-    uint32_t last_t;            // the last time we saw this
-    uint32_t usages;            // how many times this has been accessed
+    uint32_t first_t;           ///< the first time we saw this
+    uint32_t last_t;            ///< the last time we saw this
+    uint32_t usages;            ///< how many times this has been accessed
 };
 typedef struct registry_machine REGISTRY_MACHINE;
 

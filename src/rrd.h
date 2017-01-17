@@ -72,108 +72,110 @@ extern const char *rrddim_algorithm_name(int chart_type);
 // ----------------------------------------------------------------------------
 // flags
 
-#define RRDDIM_FLAG_HIDDEN 0x00000001 // this dimension will not be offered to callers
-#define RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS 0x00000002 // do not offer RESET or OVERFLOW info to callers
+#define RRDDIM_FLAG_HIDDEN 0x00000001 ///< this dimension will not be offered to callers
+#define RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS 0x00000002 ///< do not offer RESET or OVERFLOW info to callers
 
 // ----------------------------------------------------------------------------
 // RRD CONTEXT
 
+/** family to group rrdset */
 struct rrdfamily {
-    avl avl;
+    avl avl; ///< the tree
 
-    const char *family;
-    uint32_t hash_family;
+    const char *family;   ///< name of family
+    uint32_t hash_family; ///< hash of `family`
 
-    size_t use_count;
+    size_t use_count; ///< statistic of access
 
-    avl_tree_lock variables_root_index;
+    avl_tree_lock variables_root_index; ///< variables index
 };
 typedef struct rrdfamily RRDFAMILY;
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION
 
+/** Round robin database dimentsion */
 struct rrddim {
     // ------------------------------------------------------------------------
     // binary indexing structures
 
-    avl avl;                                        // the binary index - this has to be first member!
+    avl avl;                                        ///< the binary index - this has to be first member!
 
     // ------------------------------------------------------------------------
     // the dimension definition
 
-    char id[RRD_ID_LENGTH_MAX + 1];                 // the id of this dimension (for internal identification)
+    char id[RRD_ID_LENGTH_MAX + 1];                 ///< the id of this dimension (for internal identification)
 
-    const char *name;                               // the name of this dimension (as presented to user)
-                                                    // this is a pointer to the config structure
-                                                    // since the config always has a higher priority
-                                                    // (the user overwrites the name of the charts)
+    const char *name;                               ///<  the name of this dimension (as presented to user)
+                                                    ///< this is a pointer to the config structure
+                                                    ///< since the config always has a higher priority
+                                                    ///< (the user overwrites the name of the charts)
 
-    int algorithm;                                  // the algorithm that is applied to add new collected values
-    long multiplier;                                // the multiplier of the collected values
-    long divisor;                                   // the divider of the collected values
+    int algorithm;                                  ///< the algorithm that is applied to add new collected values
+    long multiplier;                                ///< the multiplier of the collected values
+    long divisor;                                   ///< the divider of the collected values
 
-    int mapped;                                     // if set to non zero, this dimension is mapped to a file
+    int mapped;                                     ///< if set to non zero, this dimension is mapped to a file
 
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
 
-    uint32_t hash;                                  // a simple hash of the id, to speed up searching / indexing
-                                                    // instead of strcmp() every item in the binary index
-                                                    // we first compare the hashes
+    uint32_t hash;                                  ///< a simple hash of the id, to speed up searching / indexing
+                                                    ///< instead of strcmp() every item in the binary index
+                                                    ///< we first compare the hashes
 
     // FIXME
     // we need the hash_name too!
     // needed at rrdr_disable_not_selected_dimensions()
 
-    uint32_t flags;
+    uint32_t flags; ///< RRDIM_FLAG_*
 
-    char cache_filename[FILENAME_MAX+1];            // the filename we load/save from/to this set
+    char cache_filename[FILENAME_MAX+1];            ///< the filename we load/save from/to this set
 
-    unsigned long counter;                          // the number of times we added values to this rrdim
+    unsigned long counter;                          ///< the number of times we added values to this rrdim
 
-    int updated;                                    // set to 0 after each calculation, to 1 after each collected value
-                                                    // we use this to detect that a dimension is not updated
+    int updated;                                    ///< set to 0 after each calculation, to 1 after each collected value
+                                                    ///< we use this to detect that a dimension is not updated
 
-    struct timeval last_collected_time;             // when was this dimension last updated
-                                                    // this is actual date time we updated the last_collected_value
-                                                    // THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
+    struct timeval last_collected_time;             ///< when was this dimension last updated
+                                                    ///< this is actual date time we updated the last_collected_value
+                                                    ///< THIS IS DIFFERENT FROM THE SAME MEMBER OF RRDSET
 
-    calculated_number calculated_value;             // the current calculated value, after applying the algorithm - resets to zero after being used
-    calculated_number last_calculated_value;        // the last calculated value processed
+    calculated_number calculated_value;             ///< the current calculated value, after applying the algorithm - resets to zero after being used
+    calculated_number last_calculated_value;        ///< the last calculated value processed
 
-    calculated_number last_stored_value;            // the last value as stored in the database (after interpolation)
+    calculated_number last_stored_value;            ///< the last value as stored in the database (after interpolation)
 
-    collected_number collected_value;               // the current value, as collected - resets to 0 after being used
-    collected_number last_collected_value;          // the last value that was collected, after being processed
+    collected_number collected_value;               ///< the current value, as collected - resets to 0 after being used
+    collected_number last_collected_value;          ///< the last value that was collected, after being processed
 
     // the *_volume members are used to calculate the accuracy of the rounding done by the
     // storage number - they are printed to debug.log when debug is enabled for a set.
-    calculated_number collected_volume;             // the sum of all collected values so far
-    calculated_number stored_volume;                // the sum of all stored values so far
+    calculated_number collected_volume;             ///< the sum of all collected values so far
+    calculated_number stored_volume;                ///< the sum of all stored values so far
 
-    struct rrddim *next;                            // linking of dimensions within the same data set
-    struct rrdset *rrdset;
+    struct rrddim *next;                            ///< linking of dimensions within the same data set
+    struct rrdset *rrdset;                          ///< round robin database set
 
     // ------------------------------------------------------------------------
     // members for checking the data when loading from disk
 
-    long entries;                                   // how many entries this dimension has in ram
-                                                    // this is the same to the entries of the data set
-                                                    // we set it here, to check the data when we load it from disk.
+    long entries;                                   ///< how many entries this dimension has in ram
+                                                    ///< this is the same to the entries of the data set
+                                                    ///< we set it here, to check the data when we load it from disk.
 
-    int update_every;                               // every how many seconds is this updated
+    int update_every;                               ///< every how many seconds is this updated
 
-    unsigned long memsize;                          // the memory allocated for this dimension
+    unsigned long memsize;                          ///< the memory allocated for this dimension
 
-    char magic[sizeof(RRDDIMENSION_MAGIC) + 1];     // a string to be saved, used to identify our data file
+    char magic[sizeof(RRDDIMENSION_MAGIC) + 1];     ///< a string to be saved, used to identify our data file
 
-    struct rrddimvar *variables;
+    struct rrddimvar *variables;                    ///< health variables
 
     // ------------------------------------------------------------------------
     // the values stored in this dimension, using our floating point numbers
 
-    storage_number values[];                        // the array of values - THIS HAS TO BE THE LAST MEMBER
+    storage_number values[];                        ///< the array of values - THIS HAS TO BE THE LAST MEMBER
 };
 typedef struct rrddim RRDDIM;
 
@@ -181,105 +183,107 @@ typedef struct rrddim RRDDIM;
 // ----------------------------------------------------------------------------
 // RRDSET
 
+/** round robin database set */
 struct rrdset {
     // ------------------------------------------------------------------------
     // binary indexing structures
 
-    avl avl;                                        // the index, with key the id - this has to be first!
-    avl avlname;                                    // the index, with key the name
+    avl avl;                                        ///< the index, with key the id - this has to be first!
+    avl avlname;                                    ///< the index, with key the name
 
     // ------------------------------------------------------------------------
     // the set configuration
 
-    char id[RRD_ID_LENGTH_MAX + 1];                 // id of the data set
+    char id[RRD_ID_LENGTH_MAX + 1];                 ///< id of the data set
 
-    const char *name;                               // the name of this dimension (as presented to user)
-                                                    // this is a pointer to the config structure
-                                                    // since the config always has a higher priority
-                                                    // (the user overwrites the name of the charts)
+    const char *name;                               ///< the name of this dimension (as presented to user)
+                                                    ///< this is a pointer to the config structure
+                                                    ///< since the config always has a higher priority
+                                                    ///< (the user overwrites the name of the charts)
 
-    char *type;                                     // the type of graph RRD_TYPE_* (a category, for determining graphing options)
-    char *family;                                   // grouping sets under the same family
-    char *title;                                    // title shown to user
-    char *units;                                    // units of measurement
+    char *type;                                     ///< the type of graph RRD_TYPE_* (a category, for determining graphing options)
+    char *family;                                   ///< grouping sets under the same family
+    char *title;                                    ///< title shown to user
+    char *units;                                    ///< units of measurement
 
-    char *context;                                  // the template of this data set
-    uint32_t hash_context;
+    char *context;                                  ///< the template of this data set
+    uint32_t hash_context;                          ///< hash of `context`
 
-    int chart_type;
+    int chart_type;                                 ///< RRDSET_TYPE_LINE|RRDSET_TYPE_AREA|RRDSET_TYPE_STACKED
 
-    int update_every;                               // every how many seconds is this updated?
 
-    long entries;                                   // total number of entries in the data set
+    int update_every;                               ///< every how many seconds is this updated?
 
-    long current_entry;                             // the entry that is currently being updated
-                                                    // it goes around in a round-robin fashion
+    long entries;                                   ///< total number of entries in the data set
 
-    int enabled;
+    long current_entry;                             ///< the entry that is currently being updated
+                                                    ///< it goes around in a round-robin fashion
 
-    int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
-                                                    // netdata will interpolate values for gaps lower than this
+    int enabled;                                    ///< boolean
 
-    long priority;
+    int gap_when_lost_iterations_above;             ///< after how many lost iterations a gap should be stored
+                                                    ///< netdata will interpolate values for gaps lower than this
 
-    int isdetail;                                   // if set, the data set should be considered as a detail of another
-                                                    // (the master data set should be the one that has the same family and is not detail)
+    long priority;                                  ///< used for sorting
+
+    int isdetail;                                   ///< if set, the data set should be considered as a detail of another
+                                                    ///< (the master data set should be the one that has the same family and is not detail)
 
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
 
-    int mapped;                                     // if set to 1, this is memory mapped
+    int mapped;                                     ///< if set to 1, this is memory mapped
 
-    int debug;
+    int debug;                                      ///< boolean to enable debugging output for this set                                      
 
-    char *cache_dir;                                // the directory to store dimensions
-    char cache_filename[FILENAME_MAX+1];            // the filename to store this set
+    char *cache_dir;                                ///< the directory to store dimensions
+    char cache_filename[FILENAME_MAX+1];            ///< the filename to store this set
 
-    pthread_rwlock_t rwlock;
+    pthread_rwlock_t rwlock;                        ///< Lock to synchronize access this set
 
-    unsigned long counter;                          // the number of times we added values to this rrd
-    unsigned long counter_done;                     // the number of times we added values to this rrd
+    unsigned long counter;                          ///< the number of times we added values to this rrd
+    unsigned long counter_done;                     ///< the number of times we added values to this rrd
 
-    uint32_t hash;                                  // a simple hash on the id, to speed up searching
-                                                    // we first compare hashes, and only if the hashes are equal we do string comparisons
+    uint32_t hash;                                  ///< a simple hash on the id, to speed up searching
+                                                    ///< we first compare hashes, and only if the hashes are equal we do string comparisons
 
-    uint32_t hash_name;                             // a simple hash on the name
+    uint32_t hash_name;                             ///< a simple hash on the name
 
-    usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
+    usec_t usec_since_last_update;                  ///< the time in microseconds since the last collection of data
 
-    struct timeval last_updated;                    // when this data set was last updated (updated every time the rrd_stats_done() function)
-    struct timeval last_collected_time;             // when did this data set last collected values
+    struct timeval last_updated;                    ///< when this data set was last updated (updated every time the rrd_stats_done() function)
+    struct timeval last_collected_time;             ///< when did this data set last collected values
 
-    total_number collected_total;                   // used internally to calculate percentages
-    total_number last_collected_total;              // used internally to calculate percentages
+    total_number collected_total;                   ///< used internally to calculate percentages
+    total_number last_collected_total;              ///< used internally to calculate percentages
 
-    RRDFAMILY *rrdfamily;
-    struct rrdhost *rrdhost;
+    RRDFAMILY *rrdfamily;                           ///< family this set is in
+    struct rrdhost *rrdhost;                        ///< host this thread is mapped to
 
-    struct rrdset *next;                            // linking of rrdsets
+    struct rrdset *next;                            ///< linking of rrdsets
 
     // ------------------------------------------------------------------------
     // local variables
 
-    calculated_number green;
-    calculated_number red;
+    calculated_number green; ///< the green threshold of this 
+    calculated_number red;   ///< the red threshold of this
 
-    avl_tree_lock variables_root_index;
-    RRDSETVAR *variables;
-    RRDCALC *alarms;
+    avl_tree_lock variables_root_index; ///< health variable index
+    RRDSETVAR *variables;               ///< health variables
+    RRDCALC *alarms;                    ///< alarms
 
     // ------------------------------------------------------------------------
     // members for checking the data when loading from disk
 
-    unsigned long memsize;                          // how much mem we have allocated for this (without dimensions)
+    unsigned long memsize;                          ///< how much mem we have allocated for this (without dimensions)
 
-    char magic[sizeof(RRDSET_MAGIC) + 1];           // our magic
+    char magic[sizeof(RRDSET_MAGIC) + 1];           ///< our magic
 
     // ------------------------------------------------------------------------
     // the dimensions
 
-    avl_tree_lock dimensions_index;                 // the root of the dimensions index
-    RRDDIM *dimensions;                             // the actual data for every dimension
+    avl_tree_lock dimensions_index;                 ///< the root of the dimensions index
+    RRDDIM *dimensions;                             ///< the actual data for every dimension
 
 };
 typedef struct rrdset RRDSET;
@@ -287,27 +291,28 @@ typedef struct rrdset RRDSET;
 // ----------------------------------------------------------------------------
 // RRD HOST
 
+/** round robin database host */
 struct rrdhost {
-    avl avl;
+    avl avl; ///< The AVL tree
 
-    char *hostname;
+    char *hostname; ///< hostname
 
-    RRDSET *rrdset_root;
-    pthread_rwlock_t rrdset_root_rwlock;
+    RRDSET *rrdset_root;                 ///< The root RRDSET         
+    pthread_rwlock_t rrdset_root_rwlock; ///< lock for `rrdset_root`
 
-    avl_tree_lock rrdset_root_index;
-    avl_tree_lock rrdset_root_index_name;
+    avl_tree_lock rrdset_root_index;      ///< index of rrdsets
+    avl_tree_lock rrdset_root_index_name; ///< index of rrdset names
 
-    avl_tree_lock rrdfamily_root_index;
-    avl_tree_lock variables_root_index;
+    avl_tree_lock rrdfamily_root_index; ///< index of rrdfamalys
+    avl_tree_lock variables_root_index; ///< index of variables
 
-    // all RRDCALCs are primarily allocated and linked here
-    // RRDCALCs may be linked to charts at any point
-    // (charts may or may not exist when these are loaded)
-    RRDCALC *alarms;
-    ALARM_LOG health_log;
+    /// all RRDCALCs are primarily allocated and linked here
+    /// RRDCALCs may be linked to charts at any point
+    /// (charts may or may not exist when these are loaded)
+    RRDCALC *alarms; ///< alarms
+    ALARM_LOG health_log; ///< log for alarms
 
-    RRDCALCTEMPLATE *templates;
+    RRDCALCTEMPLATE *templates; ///< claculation templates
 };
 typedef struct rrdhost RRDHOST;
 extern RRDHOST localhost;

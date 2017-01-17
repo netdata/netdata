@@ -23,73 +23,76 @@ extern char *web_x_frame_options;
 #define COOKIE_MAX 1024
 #define ORIGIN_MAX 1024
 
+/** Web client response message. */
 struct response {
-    BUFFER *header;                 // our response header
-    BUFFER *header_output;          // internal use
-    BUFFER *data;                   // our response data buffer
+    BUFFER *header;                 ///< our response header
+    BUFFER *header_output;          ///< internal use
+    BUFFER *data;                   ///< our response data buffer
 
-    int code;                       // the HTTP response code
+    int code;                       ///< the HTTP response code
 
-    size_t rlen;                    // if non-zero, the excepted size of ifd (input of firecopy)
-    size_t sent;                    // current data length sent to output
+    size_t rlen;                    ///< if non-zero, the excepted size of ifd (input of firecopy)
+    size_t sent;                    ///< current data length sent to output
 
-    int zoutput;                    // if set to 1, web_client_send() will send compressed data
+    int zoutput;                    ///< if set to 1, web_client_send() will send compressed data
 #ifdef NETDATA_WITH_ZLIB
-    z_stream zstream;               // zlib stream for sending compressed output to client
-    Bytef zbuffer[ZLIB_CHUNK];      // temporary buffer for storing compressed output
-    size_t zsent;                   // the compressed bytes we have sent to the client
-    size_t zhave;                   // the compressed bytes that we have received from zlib
-    int zinitialized:1;
+    z_stream zstream;               ///< zlib stream for sending compressed output to client
+    Bytef zbuffer[ZLIB_CHUNK];      ///< temporary buffer for storing compressed output
+    size_t zsent;                   ///< the compressed bytes we have sent to the client
+    size_t zhave;                   ///< the compressed bytes that we have received from zlib
+    int zinitialized:1;             ///< boolean. Compression Library initialzied.
 #endif /* NETDATA_WITH_ZLIB */
 
 };
 
+/** Doubly linked list of web clients */
 struct web_client {
-    unsigned long long id;
+    unsigned long long id;              ///< web client id
 
-    uint8_t obsolete:1;                 // if set to 1, the listener will remove this client
-                                        // after setting this to 1, you should not touch
-                                        // this web_client
+    uint8_t obsolete:1;                 ///< if set to 1, the listener will remove this client
+                                        ///< after setting this to 1, you should not touch
+                                        ///< this web_client
 
-    uint8_t dead:1;                     // if set to 1, this client is dead
+    uint8_t dead:1;                     ///< if set to 1, this client is dead
 
-    uint8_t keepalive:1;                // if set to 1, the web client will be re-used
+    uint8_t keepalive:1;                ///< if set to 1, the web client will be re-used
 
-    uint8_t mode:3;                     // the operational mode of the client
+    uint8_t mode:3;                     ///< the operational mode of the client
 
-    uint8_t wait_receive:1;             // 1 = we are waiting more input data
-    uint8_t wait_send:1;                // 1 = we have data to send to the client
+    uint8_t wait_receive:1;             ///< 1 = we are waiting more input data
+    uint8_t wait_send:1;                ///< 1 = we have data to send to the client
 
-    uint8_t donottrack:1;               // 1 = we should not set cookies on this client
-    uint8_t tracking_required:1;        // 1 = if the request requires cookies
+    uint8_t donottrack:1;               ///< 1 = we should not set cookies on this client
+    uint8_t tracking_required:1;        ///< 1 = if the request requires cookies
 
-    int tcp_cork;                       // 1 = we have a cork on the socket
+    int tcp_cork;                       ///< 1 = we have a cork on the socket
 
-    int ifd;
-    int ofd;
+    int ifd; ///< Input socket
+    int ofd; ///< Output socket
 
-    char client_ip[NI_MAXHOST+1];
-    char client_port[NI_MAXSERV+1];
+    char client_ip[NI_MAXHOST+1];   ///< IP address of the client
+    char client_port[NI_MAXSERV+1]; ///< Port of the client
 
-    char decoded_url[URL_MAX + 1];  // we decode the URL in this buffer
-    char last_url[URL_MAX+1];       // we keep a copy of the decoded URL here
+    char decoded_url[URL_MAX + 1];  ///< we decode the URL in this buffer
+    char last_url[URL_MAX+1];       ///< we keep a copy of the decoded URL here
 
-    struct timeval tv_in, tv_ready;
+    struct timeval tv_in;    ///< Start time processing the request.
+    struct timeval tv_ready; ///< Response ready. Time finshed processing the request.
 
-    char cookie1[COOKIE_MAX+1];
-    char cookie2[COOKIE_MAX+1];
-    char origin[ORIGIN_MAX+1];
+    char cookie1[COOKIE_MAX+1]; ///< Host cookie used by the registry to track web browsers.
+    char cookie2[COOKIE_MAX+1]; ///< Domain cookie used by the registry to track web browsers.
+    char origin[ORIGIN_MAX+1];  ///< The origin HTTP header. Enables CORS for this specific origin instead of *.
 
-    struct sockaddr_storage clientaddr;
-    struct response response;
+    struct sockaddr_storage clientaddr; ///< address of the client
+    struct response response;           ///< response message
 
-    size_t stats_received_bytes;
-    size_t stats_sent_bytes;
+    size_t stats_received_bytes; ///< recived bytes
+    size_t stats_sent_bytes;     ///< sent bytes
 
-    pthread_t thread;               // the thread servicing this client
+    pthread_t thread;               ///< the thread servicing this client
 
-    struct web_client *prev;
-    struct web_client *next;
+    struct web_client *prev; ///< previous item in list
+    struct web_client *next; ///< next intem in list
 };
 
 #define WEB_CLIENT_IS_DEAD(w) (w)->dead=1

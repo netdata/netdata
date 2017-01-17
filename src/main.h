@@ -47,7 +47,7 @@ struct option_def {
 extern struct option_def options[];
 
 /**
- * Static threads of netdata.
+ * A static thread of netdata.
  */
 struct netdata_static_thread {
     /**
@@ -62,7 +62,7 @@ struct netdata_static_thread {
 
     volatile int enabled; ///< boolean
 
-    pthread_t *thread; ///<
+    pthread_t *thread; ///< the thread itself
 
     void (*init_routine) (void);     ///< function called before thread starts
     void *(*start_routine) (void *); ///< function the thread executes

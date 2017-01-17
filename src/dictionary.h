@@ -1,30 +1,34 @@
 #ifndef NETDATA_DICTIONARY_H
 #define NETDATA_DICTIONARY_H 1
 
+/** Statistics of a dictionary */
 struct dictionary_stats {
-    unsigned long long inserts;
-    unsigned long long deletes;
-    unsigned long long searches;
-    unsigned long long entries;
+    unsigned long long inserts;  ///< Number of inserts completed.
+    unsigned long long deletes;  ///< Number of deletes completed.
+    unsigned long long searches; ///< Number of searches made.
+    unsigned long long entries;  ///< Number of entries.
 };
 
+/** Name value pair */
 typedef struct name_value {
-    avl avl;                // the index - this has to be first!
+    // this has to be first!
+    avl avl;                ///< the index
 
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
+    uint32_t hash;          ///< a simple hash to speed up searching
+                            ///< we first compare hashes, and only if the hashes are equal we do string comparisons
 
-    char *name;
-    void *value;
+    char *name;  ///< name
+    void *value; ///< value
 } NAME_VALUE;
 
+/** A dictionary */
 typedef struct dictionary {
-    avl_tree values_index;
+    avl_tree values_index; ///< tree of values
 
-    uint8_t flags;
+    uint8_t flags; ///< DICTIONARY_FLAG_*
 
-    struct dictionary_stats *stats;
-    pthread_rwlock_t *rwlock;
+    struct dictionary_stats *stats; ///< statistics of this dictionary
+    pthread_rwlock_t *rwlock;       ///< lock for synchronizing access to this
 } DICTIONARY;
 
 #define DICTIONARY_FLAG_DEFAULT                 0x00000000
