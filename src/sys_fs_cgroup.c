@@ -1021,8 +1021,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
     cgroup_root_count++;
 
     // fix the chart_id and title by calling the external script
-    if(simple_pattern_matches(enabled_cgroup_renames, cg->id) ||
-       simple_pattern_matches(enabled_cgroup_renames, cg->chart_id)) {
+    if(simple_pattern_matches(enabled_cgroup_renames, cg->id)) {
 
         cgroup_get_chart_name(cg);
 
