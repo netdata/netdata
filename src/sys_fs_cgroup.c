@@ -1551,7 +1551,7 @@ void update_services_charts(int update_every,
         if(unlikely(!st_mem_usage)) {
             st_mem_usage = rrdset_find_bytype("services", "mem_usage");
             if(likely(!st_mem_usage))
-                st_mem_usage = rrdset_create("services", "mem_usage", NULL, "mem", "services.mem_usage", "Systemd Services Used Memory", "MB", CHART_PRIORITY_SYSTEMD_SERVICES + 10, update_every, RRDSET_TYPE_STACKED);
+                st_mem_usage = rrdset_create("services", "mem_usage", NULL, "mem", "services.mem_usage", (cgroup_used_memory_without_cache)?"Systemd Services Used Memory without Cache":"Systemd Services Used Memory", "MB", CHART_PRIORITY_SYSTEMD_SERVICES + 10, update_every, RRDSET_TYPE_STACKED);
         }
         else
             rrdset_next(st_mem_usage);
@@ -2126,7 +2126,7 @@ void update_cgroup_charts(int update_every) {
             if(unlikely(!cg->st_mem_usage)) {
                 cg->st_mem_usage = rrdset_find_bytype(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem_usage");
                 if(likely(!cg->st_mem_usage)) {
-                    snprintfz(title, CHART_TITLE_MAX, "Total Memory for cgroup %s", cg->chart_title);
+                    snprintfz(title, CHART_TITLE_MAX, "Used Memory %sfor cgroup %s", (cgroup_used_memory_without_cache && cg->memory.updated_detailed)?"without Cache ":"", cg->chart_title);
                     cg->st_mem_usage = rrdset_create(type, "mem_usage", NULL, "mem", "cgroup.mem_usage", title, "MB", CHART_PRIORITY_CONTAINERS + 200, update_every, RRDSET_TYPE_STACKED);
                 }
                 rrddim_add(cg->st_mem_usage, "ram", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
