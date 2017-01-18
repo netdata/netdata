@@ -101,7 +101,7 @@ set(NETDATA_SOURCE_FILES
         src/registry_person.c
         src/registry_person.h
         src/registry_machine.c
-        src/registry_machine.h src/registry_internals.c src/registry_init.c src/registry_db.c src/registry_log.c src/proc_uptime.c src/sys_devices_system_edac_mc.c src/plugin_proc_diskspace.c src/plugin_proc_diskspace.h src/simple_pattern.c src/simple_pattern.h)
+        src/registry_machine.h src/registry_internals.c src/registry_init.c src/registry_db.c src/registry_log.c src/proc_uptime.c src/sys_devices_system_edac_mc.c src/plugin_proc_diskspace.c src/plugin_proc_diskspace.h src/simple_pattern.c src/simple_pattern.h src/inlined.h)
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c
@@ -126,5 +126,5 @@ add_definitions(-DHAVE_CONFIG_H -DCACHE_DIR="/var/cache/netdata" -DCONFIG_DIR="/
 add_executable(netdata ${NETDATA_SOURCE_FILES})
 target_link_libraries (netdata m z uuid ${CMAKE_THREAD_LIBS_INIT})
 
-add_executable(apps.plugin ${APPS_PLUGIN_SOURCE_FILES})
+add_executable(apps.plugin ${APPS_PLUGIN_SOURCE_FILES} src/inlined.h)
 target_link_libraries (apps.plugin m ${CMAKE_THREAD_LIBS_INIT})
