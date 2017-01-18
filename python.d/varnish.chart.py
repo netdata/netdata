@@ -123,7 +123,7 @@ class Service(SimpleService):
             self.rgx_bck = self.rgx_bck[0]
         else:
             self.backend_list = self.rgx_bck[1].findall(reply)[::2]
-            self.rgx_bck = self.rgx_back[1]
+            self.rgx_bck = self.rgx_bck[1]
 
         # We are about to start!
         self.create_charts()
