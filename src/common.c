@@ -1194,3 +1194,18 @@ void get_system_HZ(void) {
 
     hz = (unsigned int) ticks;
 }
+
+/*
+// poor man cycle counting
+static unsigned long tsc;
+void begin_tsc(void) {
+    unsigned long a, d;
+    asm volatile ("cpuid\nrdtsc" : "=a" (a), "=d" (d) : "0" (0) : "ebx", "ecx");
+    tsc = ((unsigned long)d << 32) | (unsigned long)a;
+}
+unsigned long end_tsc(void) {
+    unsigned long a, d;
+    asm volatile ("rdtscp" : "=a" (a), "=d" (d) : : "ecx");
+    return (((unsigned long)d << 32) | (unsigned long)a) - tsc;
+}
+*/

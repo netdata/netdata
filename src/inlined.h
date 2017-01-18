@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-#ifdef HAVE_STMT_EXPR
+#ifdef HAVE_STMT_EXPR_NON_EXISTING
 // GCC extension to define a function as a preprocessor macro
 
 #define simple_hash(name) ({                                         \
@@ -54,6 +54,41 @@ static inline uint32_t simple_uhash(const char *name) {
 }
 
 #endif /* HAVE_STMT_EXPR */
+
+static inline long str2l(const char *s) {
+    register long n = 0;
+    register char c, negative = (*s == '-');
+
+    for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' ; c = *(++s)) {
+        n *= 10;
+        n += c - '0';
+    }
+
+    if(unlikely(negative))
+        return -n;
+
+    return n;
+}
+
+static inline unsigned long str2ul(const char *s) {
+    register unsigned long n = 0;
+    register char c;
+    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+        n *= 10;
+        n += c - '0';
+    }
+    return n;
+}
+
+static inline unsigned long long str2ull(const char *s) {
+    register unsigned long long n = 0;
+    register char c;
+    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+        n *= 10;
+        n += c - '0';
+    }
+    return n;
+}
 
 static inline int read_single_number_file(const char *filename, unsigned long long *result) {
     char buffer[1024 + 1];

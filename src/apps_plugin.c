@@ -609,85 +609,85 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     p->stat_collected_usec = now_realtime_usec();
     file_counter++;
 
-    // p->pid           = atol(procfile_lineword(ff, 0, 0+i));
+    // p->pid           = str2ul(procfile_lineword(ff, 0, 0+i));
 
     strncpyz(p->comm, procfile_lineword(ff, 0, 1), MAX_COMPARE_NAME);
 
     // p->state         = *(procfile_lineword(ff, 0, 2));
-    p->ppid             = (int32_t) atol(procfile_lineword(ff, 0, 3));
-    // p->pgrp          = atol(procfile_lineword(ff, 0, 4));
-    // p->session       = atol(procfile_lineword(ff, 0, 5));
-    // p->tty_nr        = atol(procfile_lineword(ff, 0, 6));
-    // p->tpgid         = atol(procfile_lineword(ff, 0, 7));
-    // p->flags         = strtoull(procfile_lineword(ff, 0, 8), NULL, 10);
+    p->ppid             = (int32_t)str2ul(procfile_lineword(ff, 0, 3));
+    // p->pgrp          = str2ul(procfile_lineword(ff, 0, 4));
+    // p->session       = str2ul(procfile_lineword(ff, 0, 5));
+    // p->tty_nr        = str2ul(procfile_lineword(ff, 0, 6));
+    // p->tpgid         = str2ul(procfile_lineword(ff, 0, 7));
+    // p->flags         = str2ull(procfile_lineword(ff, 0, 8));
 
     unsigned long long last;
 
     last = p->minflt_raw;
-    p->minflt_raw       = strtoull(procfile_lineword(ff, 0, 9), NULL, 10);
+    p->minflt_raw       = str2ull(procfile_lineword(ff, 0, 9));
     p->minflt = (p->minflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cminflt_raw;
-    p->cminflt_raw      = strtoull(procfile_lineword(ff, 0, 10), NULL, 10);
+    p->cminflt_raw      = str2ull(procfile_lineword(ff, 0, 10));
     p->cminflt = (p->cminflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->majflt_raw;
-    p->majflt_raw       = strtoull(procfile_lineword(ff, 0, 11), NULL, 10);
+    p->majflt_raw       = str2ull(procfile_lineword(ff, 0, 11));
     p->majflt = (p->majflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cmajflt_raw;
-    p->cmajflt_raw      = strtoull(procfile_lineword(ff, 0, 12), NULL, 10);
+    p->cmajflt_raw      = str2ull(procfile_lineword(ff, 0, 12));
     p->cmajflt = (p->cmajflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->utime_raw;
-    p->utime_raw        = strtoull(procfile_lineword(ff, 0, 13), NULL, 10);
+    p->utime_raw        = str2ull(procfile_lineword(ff, 0, 13));
     p->utime = (p->utime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->stime_raw;
-    p->stime_raw        = strtoull(procfile_lineword(ff, 0, 14), NULL, 10);
+    p->stime_raw        = str2ull(procfile_lineword(ff, 0, 14));
     p->stime = (p->stime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cutime_raw;
-    p->cutime_raw       = strtoull(procfile_lineword(ff, 0, 15), NULL, 10);
+    p->cutime_raw       = str2ull(procfile_lineword(ff, 0, 15));
     p->cutime = (p->cutime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cstime_raw;
-    p->cstime_raw       = strtoull(procfile_lineword(ff, 0, 16), NULL, 10);
+    p->cstime_raw       = str2ull(procfile_lineword(ff, 0, 16));
     p->cstime = (p->cstime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
-    // p->priority      = strtoull(procfile_lineword(ff, 0, 17), NULL, 10);
-    // p->nice          = strtoull(procfile_lineword(ff, 0, 18), NULL, 10);
-    p->num_threads      = (int32_t) atol(procfile_lineword(ff, 0, 19));
-    // p->itrealvalue   = strtoull(procfile_lineword(ff, 0, 20), NULL, 10);
-    // p->starttime     = strtoull(procfile_lineword(ff, 0, 21), NULL, 10);
-    // p->vsize         = strtoull(procfile_lineword(ff, 0, 22), NULL, 10);
-    // p->rss           = strtoull(procfile_lineword(ff, 0, 23), NULL, 10);
-    // p->rsslim        = strtoull(procfile_lineword(ff, 0, 24), NULL, 10);
-    // p->starcode      = strtoull(procfile_lineword(ff, 0, 25), NULL, 10);
-    // p->endcode       = strtoull(procfile_lineword(ff, 0, 26), NULL, 10);
-    // p->startstack    = strtoull(procfile_lineword(ff, 0, 27), NULL, 10);
-    // p->kstkesp       = strtoull(procfile_lineword(ff, 0, 28), NULL, 10);
-    // p->kstkeip       = strtoull(procfile_lineword(ff, 0, 29), NULL, 10);
-    // p->signal        = strtoull(procfile_lineword(ff, 0, 30), NULL, 10);
-    // p->blocked       = strtoull(procfile_lineword(ff, 0, 31), NULL, 10);
-    // p->sigignore     = strtoull(procfile_lineword(ff, 0, 32), NULL, 10);
-    // p->sigcatch      = strtoull(procfile_lineword(ff, 0, 33), NULL, 10);
-    // p->wchan         = strtoull(procfile_lineword(ff, 0, 34), NULL, 10);
-    // p->nswap         = strtoull(procfile_lineword(ff, 0, 35), NULL, 10);
-    // p->cnswap        = strtoull(procfile_lineword(ff, 0, 36), NULL, 10);
-    // p->exit_signal   = atol(procfile_lineword(ff, 0, 37));
-    // p->processor     = atol(procfile_lineword(ff, 0, 38));
-    // p->rt_priority   = strtoul(procfile_lineword(ff, 0, 39), NULL, 10);
-    // p->policy        = strtoul(procfile_lineword(ff, 0, 40), NULL, 10);
-    // p->delayacct_blkio_ticks = strtoull(procfile_lineword(ff, 0, 41), NULL, 10);
+    // p->priority      = str2ull(procfile_lineword(ff, 0, 17));
+    // p->nice          = str2ull(procfile_lineword(ff, 0, 18));
+    p->num_threads      = (int32_t)str2ul(procfile_lineword(ff, 0, 19));
+    // p->itrealvalue   = str2ull(procfile_lineword(ff, 0, 20));
+    // p->starttime     = str2ull(procfile_lineword(ff, 0, 21));
+    // p->vsize         = str2ull(procfile_lineword(ff, 0, 22));
+    // p->rss           = str2ull(procfile_lineword(ff, 0, 23));
+    // p->rsslim        = str2ull(procfile_lineword(ff, 0, 24));
+    // p->starcode      = str2ull(procfile_lineword(ff, 0, 25));
+    // p->endcode       = str2ull(procfile_lineword(ff, 0, 26));
+    // p->startstack    = str2ull(procfile_lineword(ff, 0, 27));
+    // p->kstkesp       = str2ull(procfile_lineword(ff, 0, 28));
+    // p->kstkeip       = str2ull(procfile_lineword(ff, 0, 29));
+    // p->signal        = str2ull(procfile_lineword(ff, 0, 30));
+    // p->blocked       = str2ull(procfile_lineword(ff, 0, 31));
+    // p->sigignore     = str2ull(procfile_lineword(ff, 0, 32));
+    // p->sigcatch      = str2ull(procfile_lineword(ff, 0, 33));
+    // p->wchan         = str2ull(procfile_lineword(ff, 0, 34));
+    // p->nswap         = str2ull(procfile_lineword(ff, 0, 35));
+    // p->cnswap        = str2ull(procfile_lineword(ff, 0, 36));
+    // p->exit_signal   = str2ul(procfile_lineword(ff, 0, 37));
+    // p->processor     = str2ul(procfile_lineword(ff, 0, 38));
+    // p->rt_priority   = str2ul(procfile_lineword(ff, 0, 39));
+    // p->policy        = str2ul(procfile_lineword(ff, 0, 40));
+    // p->delayacct_blkio_ticks = str2ull(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
         last = p->gtime_raw;
-        p->gtime_raw        = strtoull(procfile_lineword(ff, 0, 42), NULL, 10);
+        p->gtime_raw        = str2ull(procfile_lineword(ff, 0, 42));
         p->gtime = (p->gtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         last = p->cgtime_raw;
-        p->cgtime_raw       = strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
+        p->cgtime_raw       = str2ull(procfile_lineword(ff, 0, 43));
         p->cgtime = (p->cgtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         if (show_guest_time || p->gtime || p->cgtime) {
@@ -748,13 +748,13 @@ static inline int read_proc_pid_statm(struct pid_stat *p) {
 
     file_counter++;
 
-    p->statm_size           = strtoull(procfile_lineword(ff, 0, 0), NULL, 10);
-    p->statm_resident       = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
-    p->statm_share          = strtoull(procfile_lineword(ff, 0, 2), NULL, 10);
-    // p->statm_text           = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
-    // p->statm_lib            = strtoull(procfile_lineword(ff, 0, 4), NULL, 10);
-    // p->statm_data           = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
-    // p->statm_dirty          = strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
+    p->statm_size           = str2ull(procfile_lineword(ff, 0, 0));
+    p->statm_resident       = str2ull(procfile_lineword(ff, 0, 1));
+    p->statm_share          = str2ull(procfile_lineword(ff, 0, 2));
+    // p->statm_text           = str2ull(procfile_lineword(ff, 0, 3));
+    // p->statm_lib            = str2ull(procfile_lineword(ff, 0, 4));
+    // p->statm_data           = str2ull(procfile_lineword(ff, 0, 5));
+    // p->statm_dirty          = str2ull(procfile_lineword(ff, 0, 6));
 
     return 1;
 
@@ -793,31 +793,31 @@ static inline int read_proc_pid_io(struct pid_stat *p) {
     unsigned long long last;
 
     last = p->io_logical_bytes_read_raw;
-    p->io_logical_bytes_read_raw = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
+    p->io_logical_bytes_read_raw = str2ull(procfile_lineword(ff, 0, 1));
     p->io_logical_bytes_read = (p->io_logical_bytes_read_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_logical_bytes_written_raw;
-    p->io_logical_bytes_written_raw = strtoull(procfile_lineword(ff, 1, 1), NULL, 10);
+    p->io_logical_bytes_written_raw = str2ull(procfile_lineword(ff, 1, 1));
     p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     // last = p->io_read_calls_raw;
-    // p->io_read_calls_raw = strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
+    // p->io_read_calls_raw = str2ull(procfile_lineword(ff, 2, 1));
     // p->io_read_calls = (p->io_read_calls_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     // last = p->io_write_calls_raw;
-    // p->io_write_calls_raw = strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
+    // p->io_write_calls_raw = str2ull(procfile_lineword(ff, 3, 1));
     // p->io_write_calls = (p->io_write_calls_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_storage_bytes_read_raw;
-    p->io_storage_bytes_read_raw = strtoull(procfile_lineword(ff, 4, 1), NULL, 10);
+    p->io_storage_bytes_read_raw = str2ull(procfile_lineword(ff, 4, 1));
     p->io_storage_bytes_read = (p->io_storage_bytes_read_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_storage_bytes_written_raw;
-    p->io_storage_bytes_written_raw = strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
+    p->io_storage_bytes_written_raw = str2ull(procfile_lineword(ff, 5, 1));
     p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     // last = p->io_cancelled_write_bytes_raw;
-    // p->io_cancelled_write_bytes_raw = strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
+    // p->io_cancelled_write_bytes_raw = str2ull(procfile_lineword(ff, 6, 1));
     // p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     if(unlikely(global_iterations_counter == 1)) {
@@ -870,26 +870,26 @@ static inline int read_proc_stat() {
     unsigned long long last;
 
     last = utime_raw;
-    utime_raw = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
+    utime_raw = str2ull(procfile_lineword(ff, 0, 1));
     global_utime = (utime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     // nice time, on user time
     last = ntime_raw;
-    ntime_raw = strtoull(procfile_lineword(ff, 0, 2), NULL, 10);
+    ntime_raw = str2ull(procfile_lineword(ff, 0, 2));
     global_utime += (ntime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     last = stime_raw;
-    stime_raw = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
+    stime_raw = str2ull(procfile_lineword(ff, 0, 3));
     global_stime = (stime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     last = gtime_raw;
-    gtime_raw = strtoull(procfile_lineword(ff, 0, 10), NULL, 10);
+    gtime_raw = str2ull(procfile_lineword(ff, 0, 10));
     global_gtime = (gtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     if(enable_guest_charts) {
         // guest nice time, on guest time
         last = gntime_raw;
-        gntime_raw = strtoull(procfile_lineword(ff, 0, 11), NULL, 10);
+        gntime_raw = str2ull(procfile_lineword(ff, 0, 11));
         global_gtime += (gntime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
         // remove guest time from user time
@@ -1177,7 +1177,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
                 continue;
 
             // check if the fds array is small
-            int fdid = atoi(de->d_name);
+            int fdid = (int)str2l(de->d_name);
             if(fdid < 0) continue;
             if(fdid >= p->fds_size) {
                 // it is small, extend it
@@ -2677,7 +2677,7 @@ static void parse_args(int argc, char **argv)
 
     for(i = 1; i < argc; i++) {
         if(!freq) {
-            int n = atoi(argv[i]);
+            int n = (int)str2l(argv[i]);
             if(n > 0) {
                 freq = n;
                 continue;
