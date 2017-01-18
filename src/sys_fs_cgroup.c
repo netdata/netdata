@@ -313,7 +313,8 @@ struct memory {
     char *filename_msw_usage_in_bytes;
     char *filename_failcnt;
 
-    int detailed_has_dirty_swap;
+    int detailed_has_dirty;
+    int detailed_has_swap;
 
     // detailed metrics
     unsigned long long cache;
@@ -707,13 +708,13 @@ static inline void cgroup_read_memory(struct memory *mem) {
 
             if(unlikely(hash == dirty_hash && !strcmp(s, "dirty"))) {
                 mem->dirty = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                mem->detailed_has_dirty_swap = 1;
+                mem->detailed_has_dirty = 1;
                 continue;
             }
 
             if(unlikely(hash == swap_hash && !strcmp(s, "swap"))) {
                 mem->swap = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                mem->detailed_has_dirty_swap = 1;
+                mem->detailed_has_swap = 1;
                 continue;
             }
 
@@ -866,26 +867,16 @@ memory_next:
 
     // read usage_in_bytes
     if(likely(mem->filename_usage_in_bytes)) {
-        if(likely(!read_single_number_file(mem->filename_usage_in_bytes, &mem->usage_in_bytes))) {
-            mem->updated_usage_in_bytes = 1;
-
-            if(unlikely(mem->enabled_usage_in_bytes == CONFIG_ONDEMAND_ONDEMAND && mem->usage_in_bytes))
-                mem->enabled_usage_in_bytes = CONFIG_ONDEMAND_YES;
-        }
-        else
-            mem->updated_usage_in_bytes = 0;
+        mem->updated_usage_in_bytes = !read_single_number_file(mem->filename_usage_in_bytes, &mem->usage_in_bytes);
+        if(unlikely(mem->updated_usage_in_bytes && mem->enabled_usage_in_bytes == CONFIG_ONDEMAND_ONDEMAND && mem->usage_in_bytes))
+            mem->enabled_usage_in_bytes = CONFIG_ONDEMAND_YES;
     }
 
     // read msw_usage_in_bytes
     if(likely(mem->filename_msw_usage_in_bytes)) {
-        if(likely(!read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes))) {
-            mem->updated_msw_usage_in_bytes = 1;
-
-            if(unlikely(mem->enabled_msw_usage_in_bytes == CONFIG_ONDEMAND_ONDEMAND && mem->msw_usage_in_bytes))
-                mem->enabled_msw_usage_in_bytes = CONFIG_ONDEMAND_YES;
-        }
-        else
-            mem->updated_msw_usage_in_bytes = 0;
+        mem->updated_msw_usage_in_bytes = !read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes);
+        if(unlikely(mem->updated_msw_usage_in_bytes && mem->enabled_msw_usage_in_bytes == CONFIG_ONDEMAND_ONDEMAND && mem->msw_usage_in_bytes))
+            mem->enabled_msw_usage_in_bytes = CONFIG_ONDEMAND_YES;
     }
 
     // read failcnt
@@ -894,10 +885,9 @@ memory_next:
             mem->updated_failcnt = 0;
             mem->delay_counter_failcnt--;
         }
-        else if(likely(!read_single_number_file(mem->filename_failcnt, &mem->failcnt))) {
-            mem->updated_failcnt = 1;
-
-            if(unlikely(mem->enabled_failcnt == CONFIG_ONDEMAND_ONDEMAND)) {
+        else {
+            mem->updated_failcnt = !read_single_number_file(mem->filename_failcnt, &mem->failcnt);
+            if(unlikely(mem->updated_failcnt && mem->enabled_failcnt == CONFIG_ONDEMAND_ONDEMAND)) {
                 if(unlikely(!mem->failcnt))
                     mem->delay_counter_failcnt = cgroup_recheck_zero_mem_failcnt_every_iterations;
                 else
@@ -2064,7 +2054,7 @@ void update_cgroup_charts(int update_every) {
 
                 rrddim_add(cg->st_mem, "cache", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_mem, "rss", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-                if(cg->memory.detailed_has_dirty_swap)
+                if(cg->memory.detailed_has_swap)
                     rrddim_add(cg->st_mem, "swap", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_mem, "rss_huge", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_mem, "mapped_file", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
@@ -2074,7 +2064,7 @@ void update_cgroup_charts(int update_every) {
 
             rrddim_set(cg->st_mem, "cache", cg->memory.cache);
             rrddim_set(cg->st_mem, "rss", cg->memory.rss);
-            if(cg->memory.detailed_has_dirty_swap)
+            if(cg->memory.detailed_has_swap)
                 rrddim_set(cg->st_mem, "swap", cg->memory.swap);
             rrddim_set(cg->st_mem, "rss_huge", cg->memory.rss_huge);
             rrddim_set(cg->st_mem, "mapped_file", cg->memory.mapped_file);
@@ -2087,14 +2077,14 @@ void update_cgroup_charts(int update_every) {
                     cg->st_writeback = rrdset_create(type, "writeback", NULL, "mem", "cgroup.writeback", title, "MB", CHART_PRIORITY_CONTAINERS + 300, update_every, RRDSET_TYPE_AREA);
                 }
 
-                if(cg->memory.detailed_has_dirty_swap)
+                if(cg->memory.detailed_has_dirty)
                     rrddim_add(cg->st_writeback, "dirty", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
                 rrddim_add(cg->st_writeback, "writeback", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
             }
             else
                 rrdset_next(cg->st_writeback);
 
-            if(cg->memory.detailed_has_dirty_swap)
+            if(cg->memory.detailed_has_dirty)
                 rrddim_set(cg->st_writeback, "dirty", cg->memory.dirty);
             rrddim_set(cg->st_writeback, "writeback", cg->memory.writeback);
             rrdset_done(cg->st_writeback);
