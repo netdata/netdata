@@ -36,6 +36,7 @@ dist_python_SCRIPTS = \
     sensors.chart.py \
     squid.chart.py \
     tomcat.chart.py \
+    varnish.chart.py \
     python-modules-installer.sh \
     $(NULL)
 
