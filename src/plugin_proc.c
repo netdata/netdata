@@ -29,6 +29,7 @@ static struct proc_module {
         { .name = "/proc/meminfo", .dim = "meminfo", .func = do_proc_meminfo },
         { .name = "/sys/kernel/mm/ksm", .dim = "ksm", .func = do_sys_kernel_mm_ksm },
         { .name = "/sys/devices/system/edac/mc", .dim = "ecc", .func = do_proc_sys_devices_system_edac_mc },
+        { .name = "/sys/devices/system/node", .dim = "numa", .func = do_proc_sys_devices_system_node },
 
         // network metrics
         { .name = "/proc/net/dev", .dim = "netdev", .func = do_proc_net_dev },
@@ -150,4 +151,38 @@ void *proc_main(void *ptr) {
     static_thread->enabled = 0;
     pthread_exit(NULL);
     return NULL;
+}
+
+int get_numa_node_count(void)
+{
+    static int numa_node_count = -1;
+
+    if (numa_node_count != -1)
+        return numa_node_count;
+
+    numa_node_count = 0;
+
+    char name[FILENAME_MAX + 1];
+    snprintfz(name, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/devices/system/node");
+    char *dirname = config_get("plugin:proc:/sys/devices/system/node", "directory to monitor", name);
+
+    DIR *dir = opendir(dirname);
+    if(dir) {
+        struct dirent *de = NULL;
+        while((de = readdir(dir))) {
+            if(de->d_type != DT_DIR)
+                continue;
+
+            if(strncmp(de->d_name, "node", 4) != 0)
+                continue;
+
+            if(!isdigit(de->d_name[4]))
+                continue;
+
+            numa_node_count++;
+        }
+        closedir(dir);
+    }
+
+    return numa_node_count;
 }
