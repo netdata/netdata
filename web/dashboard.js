@@ -4336,6 +4336,8 @@ var NETDATA = window.NETDATA || {};
                         var series = data.series[i];
                         if(series.isVisible === true)
                             state.legendSetLabelValue(series.label, series.y);
+                        else
+                            state.legendSetLabelValue(series.label, null);
                     }
                 }
 
