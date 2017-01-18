@@ -1,25 +1,6 @@
 #ifndef NETDATA_MAIN_H
 #define NETDATA_MAIN_H 1
 
-/*! 
- * \mainpage
- *
- * \tableofcontents
- *
- * \section sec_outline Outline
- *
- * \todo 
- * - Tell the reader where he is here.
- * - Give an overview about how the code is structured.
- * 
- * \section sec_rules Coding Conventions
- *
- * [doxygen_syntax]: http://www.stack.nl/~dimitri/doxygen/manual/docblocks.html "Doxygen Syntax"
- * 
- * - Header files must be documentented with [doxygen_syntax].
- * - To search for `string` in a list always use a hash to gain performance. User simple_hash() for this.
- */
-
  /**
  * @file main.h
  * @brief This file holds the API of global netdata elements.

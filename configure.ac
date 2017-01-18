@@ -55,7 +55,7 @@ AC_CHECK_FUNCS([sched_setscheduler sched_get_priority_min sched_get_priority_max
 
 # Doxygen support
 m4_pattern_allow(AM_DEFAULT_VERBOSITY)
-DX_INIT_DOXYGEN(AC_PACKAGE_NAME, doxygen.conf, doc)
+DX_INIT_DOXYGEN(AC_PACKAGE_NAME, doxygen/Doxyfile, doc)
 
 # Check system type
 case "$host_os" in
