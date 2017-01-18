@@ -1,5 +1,6 @@
-/*
- * procfile is a library for reading kernel files from /proc
+/**
+ * @file procfile.h
+ * @brief Library for reading kernel files from /proc.
  *
  * The idea is this:
  *
@@ -22,7 +23,6 @@
  *     - a J1900 celeron processor can process 23.000+ files / sec.
 */
 
-
 #ifndef NETDATA_PROCFILE_H
 #define NETDATA_PROCFILE_H 1
 
@@ -33,7 +33,6 @@ typedef struct {
     size_t size;    ///< capacity
     char *words[];  ///< array of pointers
 } pfwords;
-
 
 // ----------------------------------------------------------------------------
 /// An array of lines
@@ -50,13 +49,15 @@ typedef struct {
     ffline lines[];   ///< array of lines
 } pflines;
 
-
 // ----------------------------------------------------------------------------
 // The procfile
 
-#define PROCFILE_FLAG_DEFAULT             0x00000000
-#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001
+#define PROCFILE_FLAG_DEFAULT 0x00000000             ///< default flag
+#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001 ///< do not fail/error on file io
 
+/**
+ * Constants used to classify a char in a procfile.
+ */
 typedef enum procfile_separator {
     PF_CHAR_IS_SEPARATOR,
     PF_CHAR_IS_NEWLINE,
@@ -68,7 +69,7 @@ typedef enum procfile_separator {
 
 /** The procfile */
 typedef struct {
-    char filename[FILENAME_MAX + 1]; ///< The filename. It is not populated until profile_filename() is called.
+    char filename[FILENAME_MAX + 1]; ///< the filename
     
     uint32_t flags;       ///< PROCFILE_FLAG_*
     int fd;               ///< The file desriptor.
@@ -80,45 +81,134 @@ typedef struct {
     char data[];          ///< Allocated buffer to keep file contents.
 } procfile;
 
-// close the proc file and free all related memory
+/**
+ * Close the proc file and free all related memory.
+ *
+ * @param ff File to close.
+ */
 extern void procfile_close(procfile *ff);
 
-// (re)read and parse the proc file
+/**
+ * Parse an open procfile.
+ *
+ * (re)read and parse the proc file
+ *
+ * @param ff File to parse.
+ * @return The parsed file. `NULL` on error.
+ */
 extern procfile *procfile_readall(procfile *ff);
 
-// open a /proc or /sys file
+/**
+ * Open a /proc or /sys file.
+ *
+ * @param filename to open
+ * @param separators used to seperate columns
+ * @param flags PROCFILE_FLAG_*
+ * @return the opend procfile. `NULL` on error.
+ */
 extern procfile *procfile_open(const char *filename, const char *separators, uint32_t flags);
 
-// re-open a file
-// if separators == NULL, the last separators are used
+/**
+ * re-open a /proc or /sys file.
+ *
+ * If `separators == NULL`, the last separators are used
+ *
+ * @param ff Closed procfile.
+ * @param filename to re-open
+ * @param separators used to seperate columns or `NULL`
+ * @param flags PROCFILE_FLAG_*
+ * @return the opend procfile. `NULL` on error.
+ */
 extern procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags);
 
-// example walk-through a procfile parsed file
+/**
+ * Example walk-through a procfile parsed file.
+ *
+ * @param ff File to print.
+ */
 extern void procfile_print(procfile *ff);
 
+/** 
+ * Add characters in quotes to the set of quotes.
+ *
+ * @param ff Proc file.
+ * @param quotes Characters to set as quote.
+ */
 extern void procfile_set_quotes(procfile *ff, const char *quotes);
+/**
+ * Set opening and closing character used for marking multiword keywords.
+ *
+ * procfile supports quotes and opening / closing characters.
+ * So, if you set this to `(` and `)`, the tokenizer will assume everything in parenthesis as a single keyword.
+ *
+ * @param ff Proc file.
+ * @param open start keyword mark
+ * @param close end keyword mark
+ */
 extern void procfile_set_open_close(procfile *ff, const char *open, const char *close);
 
+/**
+ * Return the filename of procfile `ff`.
+ *
+ * If not set read it from proc.
+ *
+ * @param ff Procfile to get filename for.
+ * @return the filename of `ff`
+ */
 extern char *procfile_filename(procfile *ff);
 
 // ----------------------------------------------------------------------------
 
-// set this to 1, to have procfile adapt its initial buffer allocation to the max allocation used so far
+/**
+ * @brief boolean. Adapt initial buffer allocation.
+ *
+ * Set this to 1, to have procfile adapt its initial buffer allocation to the max allocation used so far.
+ */
 extern int procfile_adaptive_initial_allocation;
 
-// return the number of lines present
+/**
+ * Return the number of lines present.
+ *
+ * @param ff Proc file.
+ * @return number of lines
+ */
 #define procfile_lines(ff) (ff->lines->len)
 
-// return the number of words of the Nth line
+/**
+ * Return the number of words of the Nth line.
+ *
+ * @param ff Proc file.
+ * @param line to count words in
+ * @return number of words
+ */
 #define procfile_linewords(ff, line) (((line) < procfile_lines(ff)) ? (ff)->lines->lines[(line)].words : 0)
 
-// return the Nth word of the file, or empty string
+/**
+ * Return the Nth word of the file, or empty string.
+ *
+ * @param ff Proc file.
+ * @param word Number which word to return.
+ * @return a word
+ */
 #define procfile_word(ff, word) (((word) < (ff)->words->len) ? (ff)->words->words[(word)] : "")
 
-// return the first word of the Nth line, or empty string
+/**
+ * Return the first word of the Nth line, or empty string.
+ *
+ * @param ff Proc file.
+ * @param line number
+ * @return First word on line `line`
+ */
 #define procfile_line(ff, line) (((line) < procfile_lines(ff)) ? procfile_word((ff), (ff)->lines->lines[(line)].first) : "")
 
-// return the Nth word of the current line
+/**
+ * Return the Nth word of the Nth line.
+ *
+ * @param ff Proc file.
+ * @param line number
+ * @param word number
+ * @param word number `word` on line `line`
+ */
 #define procfile_lineword(ff, line, word) (((line) < procfile_lines(ff) && (word) < procfile_linewords(ff, (line))) ? procfile_word((ff), (ff)->lines->lines[(line)].first + word) : "")
 
 #endif /* NETDATA_PROCFILE_H */
