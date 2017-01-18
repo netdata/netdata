@@ -807,7 +807,7 @@ uint32_t simple_hash(const char *name)
 }
 */
 
-
+/*
 // http://isthe.com/chongo/tech/comp/fnv/#FNV-1a
 uint32_t simple_hash(const char *name) {
     unsigned char *s = (unsigned char *) name;
@@ -842,6 +842,7 @@ uint32_t simple_uhash(const char *name) {
     }
     return hval;
 }
+*/
 
 /*
 // http://eternallyconfuzzled.com/tuts/algorithms/jsw_tut_hashing.aspx
@@ -1165,25 +1166,8 @@ void get_system_HZ(void) {
     long ticks;
 
     if ((ticks = sysconf(_SC_CLK_TCK)) == -1) {
-        perror("sysconf");
+        error("Cannot get system clock ticks");
     }
 
     hz = (unsigned int) ticks;
-}
-
-int read_single_number_file(const char *filename, unsigned long long *result) {
-    char buffer[1024 + 1];
-
-    int fd = open(filename, O_RDONLY, 0666);
-    if(unlikely(fd == -1)) return 1;
-
-    ssize_t r = read(fd, buffer, 1024);
-    if(unlikely(r == -1)) {
-        close(fd);
-        return 2;
-    }
-
-    close(fd);
-    *result = strtoull(buffer, NULL, 0);
-    return 0;
 }

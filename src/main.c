@@ -251,7 +251,7 @@ void help(int exitcode) {
     if(max_len_arg > 30) max_len_arg = 30;
     if(max_len_arg < 20) max_len_arg = 20;
 
-    fprintf(stream, "\n"
+    fprintf(stream, "%s", "\n"
             " ^\n"
             " |.-.   .-.   .-.   .-.   .  netdata                                         \n"
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
