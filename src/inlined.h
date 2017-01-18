@@ -59,10 +59,14 @@ static inline int read_single_number_file(const char *filename, unsigned long lo
     char buffer[1024 + 1];
 
     int fd = open(filename, O_RDONLY, 0666);
-    if(unlikely(fd == -1)) return 1;
+    if(unlikely(fd == -1)) {
+        *result = 0;
+        return 1;
+    }
 
     ssize_t r = read(fd, buffer, 1024);
     if(unlikely(r == -1)) {
+        *result = 0;
         close(fd);
         return 2;
     }
