@@ -1,4 +1,4 @@
-Doxygen related files
+Doxygen Related Files
 =====================
 
 `doxygen/` contains all doxygen related files.
