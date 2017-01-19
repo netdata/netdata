@@ -55,7 +55,6 @@ extern int become_user(const char *username, int pid_fd);
  * @return 0 on success, -1 on error
  */
 extern int become_daemon(int dont_fork, const char *user);
-extern int become_daemon(int dont_fork, const char *user, int oom_score);
 
 /**
  * Exit netdata the save way.
