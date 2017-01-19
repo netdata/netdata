@@ -62,7 +62,7 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
 
         for(w = 0; w < words ; w++) {
             if(unlikely(softnet_column_name(w))) {
-                uint32_t t = strtoul(procfile_lineword(ff, l, w), NULL, 16);
+                uint32_t t = (uint32_t)strtoul(procfile_lineword(ff, l, w), NULL, 16);
                 data[w] += t;
                 data[((l + 1) * allocated_columns) + w] = t;
             }

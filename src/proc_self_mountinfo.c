@@ -197,8 +197,8 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
         mi = mallocz(sizeof(struct mountinfo));
 
         unsigned long w = 0;
-        mi->id = strtoul(procfile_lineword(ff, l, w), NULL, 10); w++;
-        mi->parentid = strtoul(procfile_lineword(ff, l, w), NULL, 10); w++;
+        mi->id = str2ul(procfile_lineword(ff, l, w)); w++;
+        mi->parentid = str2ul(procfile_lineword(ff, l, w)); w++;
 
         char *major = procfile_lineword(ff, l, w), *minor; w++;
         for(minor = major; *minor && *minor != ':' ;minor++) ;
@@ -214,8 +214,8 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
         mi->flags = 0;
 
-        mi->major = strtoul(major, NULL, 10);
-        mi->minor = strtoul(minor, NULL, 10);
+        mi->major = str2ul(major);
+        mi->minor = str2ul(minor);
 
         mi->root = strdupz(procfile_lineword(ff, l, w)); w++;
         mi->root_hash = simple_hash(mi->root);

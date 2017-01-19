@@ -912,12 +912,12 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         }
     }
 
-    long long multiply  = (multiply_str  && *multiply_str )?atol(multiply_str):1;
-    long long divide    = (divide_str    && *divide_str   )?atol(divide_str):1;
-    long long before    = (before_str    && *before_str   )?atol(before_str):0;
-    long long after     = (after_str     && *after_str    )?atol(after_str):-st->update_every;
-    int       points    = (points_str    && *points_str   )?atoi(points_str):1;
-    int       precision = (precision_str && *precision_str)?atoi(precision_str):-1;
+    long long multiply  = (multiply_str  && *multiply_str )?str2l(multiply_str):1;
+    long long divide    = (divide_str    && *divide_str   )?str2l(divide_str):1;
+    long long before    = (before_str    && *before_str   )?str2l(before_str):0;
+    long long after     = (after_str     && *after_str    )?str2l(after_str):-st->update_every;
+    int       points    = (points_str    && *points_str   )?str2i(points_str):1;
+    int       precision = (precision_str && *precision_str)?str2i(precision_str):-1;
 
     if(!multiply) multiply = 1;
     if(!divide) divide = 1;
@@ -934,7 +934,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
             }
         }
         else {
-            refresh = atoi(refresh_str);
+            refresh = str2i(refresh_str);
             if(refresh < 0) refresh = -refresh;
         }
     }
@@ -1192,9 +1192,9 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
         goto cleanup;
     }
 
-    long long before = (before_str && *before_str)?atol(before_str):0;
-    long long after  = (after_str  && *after_str) ?atol(after_str):0;
-    int       points = (points_str && *points_str)?atoi(points_str):0;
+    long long before = (before_str && *before_str)?str2l(before_str):0;
+    long long after  = (after_str  && *after_str) ?str2l(after_str):0;
+    int       points = (points_str && *points_str)?str2i(points_str):0;
 
     debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', format '%u', options '0x%08x'"
             , w->id
@@ -1550,13 +1550,13 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
     if(url) {
         // parse the lines required
         tok = mystrsep(&url, "/");
-        if(tok) lines = atoi(tok);
+        if(tok) lines = str2i(tok);
         if(lines < 1) lines = 1;
     }
     if(url) {
         // parse the group count required
         tok = mystrsep(&url, "/");
-        if(tok && *tok) group_count = atoi(tok);
+        if(tok && *tok) group_count = str2i(tok);
         if(group_count < 1) group_count = 1;
         //if(group_count > save_history / 20) group_count = save_history / 20;
     }
@@ -1573,13 +1573,13 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
     if(url) {
         // parse after time
         tok = mystrsep(&url, "/");
-        if(tok && *tok) after = strtoul(tok, NULL, 10);
+        if(tok && *tok) after = str2ul(tok);
         if(after < 0) after = 0;
     }
     if(url) {
         // parse before time
         tok = mystrsep(&url, "/");
-        if(tok && *tok) before = strtoul(tok, NULL, 10);
+        if(tok && *tok) before = str2ul(tok);
         if(before < 0) before = 0;
     }
     if(url) {

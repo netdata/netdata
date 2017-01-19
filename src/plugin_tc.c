@@ -887,7 +887,7 @@ void *tc_main(void *ptr) {
             else if(unlikely(device && class && first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0)) {
                 // debug(D_TC_LOOP, "SENT line '%s'", words[1]);
                 if(likely(words[1] && *words[1])) {
-                    class->bytes = strtoull(words[1], NULL, 10);
+                    class->bytes = str2ull(words[1]);
                     class->updated = 1;
                 }
                 else {
@@ -895,35 +895,35 @@ void *tc_main(void *ptr) {
                 }
 
                 if(likely(words[3] && *words[3]))
-                    class->packets = strtoull(words[3], NULL, 10);
+                    class->packets = str2ull(words[3]);
 
                 if(likely(words[6] && *words[6]))
-                    class->dropped = strtoull(words[6], NULL, 10);
+                    class->dropped = str2ull(words[6]);
 
                 if(likely(words[8] && *words[8]))
-                    class->overlimits = strtoull(words[8], NULL, 10);
+                    class->overlimits = str2ull(words[8]);
 
                 if(likely(words[10] && *words[10]))
-                    class->requeues = strtoull(words[8], NULL, 10);
+                    class->requeues = str2ull(words[8]);
             }
             else if(unlikely(device && class && class->updated && first_hash == LENDED_HASH && strcmp(words[0], "lended:") == 0)) {
                 // debug(D_TC_LOOP, "LENDED line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
-                    class->lended = strtoull(words[1], NULL, 10);
+                    class->lended = str2ull(words[1]);
 
                 if(likely(words[3] && *words[3]))
-                    class->borrowed = strtoull(words[3], NULL, 10);
+                    class->borrowed = str2ull(words[3]);
 
                 if(likely(words[5] && *words[5]))
-                    class->giants = strtoull(words[5], NULL, 10);
+                    class->giants = str2ull(words[5]);
             }
             else if(unlikely(device && class && class->updated && first_hash == TOKENS_HASH && strcmp(words[0], "tokens:") == 0)) {
                 // debug(D_TC_LOOP, "TOKENS line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
-                    class->tokens = strtoull(words[1], NULL, 10);
+                    class->tokens = str2ull(words[1]);
 
                 if(likely(words[3] && *words[3]))
-                    class->ctokens = strtoull(words[3], NULL, 10);
+                    class->ctokens = str2ull(words[3]);
             }
             else if(unlikely(device && first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0)) {
                 // debug(D_TC_LOOP, "SETDEVICENAME line '%s'", words[1]);

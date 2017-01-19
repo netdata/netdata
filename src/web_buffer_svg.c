@@ -470,7 +470,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
                     break;
             }
             else {
-                calculated_number v = strtold(value_buffer, NULL);
+                calculated_number v = str2l(value_buffer);
 
                      if(comparison == '<' && value < v) break;
                 else if(comparison == '(' && value <= v) break;

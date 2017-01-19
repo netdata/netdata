@@ -183,7 +183,7 @@ static void parse_line_pair(procfile *ff, struct netstat_columns *nc, uint32_t h
 
         for(i = 0 ; nc[i].name ;i++) {
             if(unlikely(hash == nc[i].hash && !strcmp(key, nc[i].name))) {
-                nc[i].value = strtoull(procfile_lineword(ff, values_line, w), NULL, 10);
+                nc[i].value = str2ull(procfile_lineword(ff, values_line, w));
                 break;
             }
         }
