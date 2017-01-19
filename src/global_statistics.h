@@ -1,6 +1,11 @@
 #ifndef NETDATA_GLOBAL_STATISTICS_H
 #define NETDATA_GLOBAL_STATISTICS_H 1
 
+/**
+ * @file global_statistics.h
+ * @brief The global web server statistics.
+ */
+
 // ----------------------------------------------------------------------------
 /// global statistics
 struct global_statistics {
@@ -21,21 +26,51 @@ struct global_statistics {
     volatile uint64_t compressed_content_size; ///< Size of compressed content.
 };
 
-extern volatile struct global_statistics global_statistics;
-
-extern void global_statistics_lock(void);
-extern void global_statistics_unlock(void);
+/**
+ * Update the statistics after a finished web reqest.
+ *
+ * @param dt Duration of the request.
+ * @param bytes_received on the request
+ * @param bytes_sent as response
+ * @param content_size of the response
+ * @param compressed_content_size of the response
+ */
 extern void finished_web_request_statistics(uint64_t dt,
                                      uint64_t bytes_received,
                                      uint64_t bytes_sent,
                                      uint64_t content_size,
                                      uint64_t compressed_content_size);
 
+/**
+ * Update the statistics after a web client connected.
+ */
 extern void web_client_connected(void);
+/**
+ * Update the statistics after a web client disconnected.
+ */
 extern void web_client_disconnected(void);
 
+/**
+ * Reset the max response time.
+ *
+ * The caller will set this to indicate that the max value has been used and it can now be reset.
+ * Without there was no way to find the max duration per second.
+ */
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
+/**
+ * Copy the current web server statistics.
+ *
+ * After this `gs` can be read.
+ *
+ * @param gs Pointer to write to.
+ * @param options GLOBAL_STATS_*
+ */
 extern void global_statistics_copy(struct global_statistics *gs, uint8_t options);
+/**
+ * Update global statistic charts.
+ *
+ * This updates the global statistic netdata charts exposed to clients.
+ */
 extern void global_statistics_charts(void);
 
 #endif /* NETDATA_GLOBAL_STATISTICS_H */
