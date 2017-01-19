@@ -78,7 +78,7 @@ static inline unsigned long long str2ull(const char *s) {
 }
 
 static inline int read_single_number_file(const char *filename, unsigned long long *result) {
-    char buffer[1024 + 1];
+    char buffer[30 + 1];
 
     int fd = open(filename, O_RDONLY, 0666);
     if(unlikely(fd == -1)) {
@@ -86,7 +86,7 @@ static inline int read_single_number_file(const char *filename, unsigned long lo
         return 1;
     }
 
-    ssize_t r = read(fd, buffer, 1024);
+    ssize_t r = read(fd, buffer, 30);
     if(unlikely(r == -1)) {
         *result = 0;
         close(fd);
@@ -94,6 +94,7 @@ static inline int read_single_number_file(const char *filename, unsigned long lo
     }
 
     close(fd);
+    buffer[30] = '\0';
     *result = str2ull(buffer);
     return 0;
 }
