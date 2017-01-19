@@ -153,7 +153,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
             char *tmp = fgets(buffer2, 1024, fpss);
 
             if(likely(tmp)) {
-                d->sector_size = atoi(tmp);
+                d->sector_size = str2i(tmp);
                 if(unlikely(d->sector_size <= 0)) {
                     error("Invalid sector size %d for device %s in %s. Assuming 512.", d->sector_size, d->disk, buffer);
                     d->sector_size = 512;
@@ -263,41 +263,41 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         uint32_t words = procfile_linewords(ff, l);
         if(unlikely(words < 14)) continue;
 
-        major           = strtoul(procfile_lineword(ff, l, 0), NULL, 10);
-        minor           = strtoul(procfile_lineword(ff, l, 1), NULL, 10);
+        major           = str2ul(procfile_lineword(ff, l, 0));
+        minor           = str2ul(procfile_lineword(ff, l, 1));
         disk            = procfile_lineword(ff, l, 2);
 
         // # of reads completed # of writes completed
         // This is the total number of reads or writes completed successfully.
-        reads           = strtoull(procfile_lineword(ff, l, 3), NULL, 10);  // rd_ios
-        writes          = strtoull(procfile_lineword(ff, l, 7), NULL, 10);  // wr_ios
+        reads           = str2ull(procfile_lineword(ff, l, 3));  // rd_ios
+        writes          = str2ull(procfile_lineword(ff, l, 7));  // wr_ios
 
         // # of reads merged # of writes merged
         // Reads and writes which are adjacent to each other may be merged for
         // efficiency.  Thus two 4K reads may become one 8K read before it is
         // ultimately handed to the disk, and so it will be counted (and queued)
-        mreads          = strtoull(procfile_lineword(ff, l, 4), NULL, 10);  // rd_merges_or_rd_sec
-        mwrites         = strtoull(procfile_lineword(ff, l, 8), NULL, 10);  // wr_merges
+        mreads          = str2ull(procfile_lineword(ff, l, 4));  // rd_merges_or_rd_sec
+        mwrites         = str2ull(procfile_lineword(ff, l, 8));  // wr_merges
 
         // # of sectors read # of sectors written
         // This is the total number of sectors read or written successfully.
-        readsectors     = strtoull(procfile_lineword(ff, l, 5), NULL, 10);  // rd_sec_or_wr_ios
-        writesectors    = strtoull(procfile_lineword(ff, l, 9), NULL, 10);  // wr_sec
+        readsectors     = str2ull(procfile_lineword(ff, l, 5));  // rd_sec_or_wr_ios
+        writesectors    = str2ull(procfile_lineword(ff, l, 9));  // wr_sec
 
         // # of milliseconds spent reading # of milliseconds spent writing
         // This is the total number of milliseconds spent by all reads or writes (as
         // measured from __make_request() to end_that_request_last()).
-        readms          = strtoull(procfile_lineword(ff, l, 6), NULL, 10);  // rd_ticks_or_wr_sec
-        writems         = strtoull(procfile_lineword(ff, l, 10), NULL, 10); // wr_ticks
+        readms          = str2ull(procfile_lineword(ff, l, 6));  // rd_ticks_or_wr_sec
+        writems         = str2ull(procfile_lineword(ff, l, 10)); // wr_ticks
 
         // # of I/Os currently in progress
         // The only field that should go to zero. Incremented as requests are
         // given to appropriate struct request_queue and decremented as they finish.
-        queued_ios      = strtoull(procfile_lineword(ff, l, 11), NULL, 10); // ios_pgr
+        queued_ios      = str2ull(procfile_lineword(ff, l, 11)); // ios_pgr
 
         // # of milliseconds spent doing I/Os
         // This field increases so long as field queued_ios is nonzero.
-        busy_ms         = strtoull(procfile_lineword(ff, l, 12), NULL, 10); // tot_ticks
+        busy_ms         = str2ull(procfile_lineword(ff, l, 12)); // tot_ticks
 
         // weighted # of milliseconds spent doing I/Os
         // This field is incremented at each I/O start, I/O completion, I/O
@@ -305,7 +305,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // (field queued_ios) times the number of milliseconds spent doing I/O since the
         // last update of this field.  This can provide an easy measure of both
         // I/O completion time and the backlog that may be accumulating.
-        backlog_ms      = strtoull(procfile_lineword(ff, l, 13), NULL, 10); // rq_ticks
+        backlog_ms      = str2ull(procfile_lineword(ff, l, 13)); // rq_ticks
 
 
         // --------------------------------------------------------------------------

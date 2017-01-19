@@ -188,7 +188,7 @@ void *pluginsd_worker_thread(void *arg)
 
                 if(likely(st->counter_done)) {
                     usec_t microseconds = 0;
-                    if(microseconds_txt && *microseconds_txt) microseconds = strtoull(microseconds_txt, NULL, 10);
+                    if(microseconds_txt && *microseconds_txt) microseconds = str2ull(microseconds_txt);
                     if(microseconds) rrdset_next_usec(st, microseconds);
                     else rrdset_next(st);
                 }
@@ -242,10 +242,10 @@ void *pluginsd_worker_thread(void *arg)
                 }
 
                 int priority = 1000;
-                if(likely(priority_s)) priority = atoi(priority_s);
+                if(likely(priority_s)) priority = str2i(priority_s);
 
                 int update_every = cd->update_every;
-                if(likely(update_every_s)) update_every = atoi(update_every_s);
+                if(likely(update_every_s)) update_every = str2i(update_every_s);
                 if(unlikely(!update_every)) update_every = cd->update_every;
 
                 int chart_type = RRDSET_TYPE_LINE;

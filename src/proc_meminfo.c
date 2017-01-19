@@ -160,56 +160,61 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             //DirectMap2M = 0,
             HardwareCorrupted = 0;
 
+    unsigned long long *value = NULL;
     for(l = 0; l < lines ;l++) {
         uint32_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) continue;
 
         char *name = procfile_lineword(ff, l, 0);
         uint32_t hash = simple_hash(name);
-        unsigned long long value = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
 
-             if(hash == MemTotal_hash && strcmp(name, "MemTotal") == 0) MemTotal = value;
-        else if(hash == MemFree_hash && strcmp(name, "MemFree") == 0) MemFree = value;
-        else if(hash == Buffers_hash && strcmp(name, "Buffers") == 0) Buffers = value;
-        else if(hash == Cached_hash && strcmp(name, "Cached") == 0) Cached = value;
-        //else if(hash == SwapCached_hash && strcmp(name, "SwapCached") == 0) SwapCached = value;
-        //else if(hash == Active_hash && strcmp(name, "Active") == 0) Active = value;
-        //else if(hash == Inactive_hash && strcmp(name, "Inactive") == 0) Inactive = value;
-        //else if(hash == ActiveAnon_hash && strcmp(name, "ActiveAnon") == 0) ActiveAnon = value;
-        //else if(hash == InactiveAnon_hash && strcmp(name, "InactiveAnon") == 0) InactiveAnon = value;
-        //else if(hash == ActiveFile_hash && strcmp(name, "ActiveFile") == 0) ActiveFile = value;
-        //else if(hash == InactiveFile_hash && strcmp(name, "InactiveFile") == 0) InactiveFile = value;
-        //else if(hash == Unevictable_hash && strcmp(name, "Unevictable") == 0) Unevictable = value;
-        //else if(hash == Mlocked_hash && strcmp(name, "Mlocked") == 0) Mlocked = value;
-        else if(hash == SwapTotal_hash && strcmp(name, "SwapTotal") == 0) SwapTotal = value;
-        else if(hash == SwapFree_hash && strcmp(name, "SwapFree") == 0) SwapFree = value;
-        else if(hash == Dirty_hash && strcmp(name, "Dirty") == 0) Dirty = value;
-        else if(hash == Writeback_hash && strcmp(name, "Writeback") == 0) Writeback = value;
-        //else if(hash == AnonPages_hash && strcmp(name, "AnonPages") == 0) AnonPages = value;
-        //else if(hash == Mapped_hash && strcmp(name, "Mapped") == 0) Mapped = value;
-        //else if(hash == Shmem_hash && strcmp(name, "Shmem") == 0) Shmem = value;
-        else if(hash == Slab_hash && strcmp(name, "Slab") == 0) Slab = value;
-        else if(hash == SReclaimable_hash && strcmp(name, "SReclaimable") == 0) SReclaimable = value;
-        else if(hash == SUnreclaim_hash && strcmp(name, "SUnreclaim") == 0) SUnreclaim = value;
-        else if(hash == KernelStack_hash && strcmp(name, "KernelStack") == 0) KernelStack = value;
-        else if(hash == PageTables_hash && strcmp(name, "PageTables") == 0) PageTables = value;
-        else if(hash == NFS_Unstable_hash && strcmp(name, "NFS_Unstable") == 0) NFS_Unstable = value;
-        else if(hash == Bounce_hash && strcmp(name, "Bounce") == 0) Bounce = value;
-        else if(hash == WritebackTmp_hash && strcmp(name, "WritebackTmp") == 0) WritebackTmp = value;
-        //else if(hash == CommitLimit_hash && strcmp(name, "CommitLimit") == 0) CommitLimit = value;
-        else if(hash == Committed_AS_hash && strcmp(name, "Committed_AS") == 0) Committed_AS = value;
-        //else if(hash == VmallocTotal_hash && strcmp(name, "VmallocTotal") == 0) VmallocTotal = value;
-        else if(hash == VmallocUsed_hash && strcmp(name, "VmallocUsed") == 0) VmallocUsed = value;
-        //else if(hash == VmallocChunk_hash && strcmp(name, "VmallocChunk") == 0) VmallocChunk = value;
-        else if(hash == HardwareCorrupted_hash && strcmp(name, "HardwareCorrupted") == 0) { HardwareCorrupted = value; hwcorrupted = 1; }
-        //else if(hash == AnonHugePages_hash && strcmp(name, "AnonHugePages") == 0) AnonHugePages = value;
-        //else if(hash == HugePages_Total_hash && strcmp(name, "HugePages_Total") == 0) HugePages_Total = value;
-        //else if(hash == HugePages_Free_hash && strcmp(name, "HugePages_Free") == 0) HugePages_Free = value;
-        //else if(hash == HugePages_Rsvd_hash && strcmp(name, "HugePages_Rsvd") == 0) HugePages_Rsvd = value;
-        //else if(hash == HugePages_Surp_hash && strcmp(name, "HugePages_Surp") == 0) HugePages_Surp = value;
-        //else if(hash == Hugepagesize_hash && strcmp(name, "Hugepagesize") == 0) Hugepagesize = value;
-        //else if(hash == DirectMap4k_hash && strcmp(name, "DirectMap4k") == 0) DirectMap4k = value;
-        //else if(hash == DirectMap2M_hash && strcmp(name, "DirectMap2M") == 0) DirectMap2M = value;
+             if(hash == MemTotal_hash && strcmp(name, "MemTotal") == 0) value = &MemTotal;
+        else if(hash == MemFree_hash && strcmp(name, "MemFree") == 0) value = &MemFree;
+        else if(hash == Buffers_hash && strcmp(name, "Buffers") == 0) value = &Buffers;
+        else if(hash == Cached_hash && strcmp(name, "Cached") == 0) value = &Cached;
+        //else if(hash == SwapCached_hash && strcmp(name, "SwapCached") == 0) value = &SwapCached;
+        //else if(hash == Active_hash && strcmp(name, "Active") == 0) value = &Active;
+        //else if(hash == Inactive_hash && strcmp(name, "Inactive") == 0) value = &Inactive;
+        //else if(hash == ActiveAnon_hash && strcmp(name, "ActiveAnon") == 0) value = &ActiveAnon;
+        //else if(hash == InactiveAnon_hash && strcmp(name, "InactiveAnon") == 0) value = &InactiveAnon;
+        //else if(hash == ActiveFile_hash && strcmp(name, "ActiveFile") == 0) value = &ActiveFile;
+        //else if(hash == InactiveFile_hash && strcmp(name, "InactiveFile") == 0) value = &InactiveFile;
+        //else if(hash == Unevictable_hash && strcmp(name, "Unevictable") == 0) value = &Unevictable;
+        //else if(hash == Mlocked_hash && strcmp(name, "Mlocked") == 0) value = &Mlocked;
+        else if(hash == SwapTotal_hash && strcmp(name, "SwapTotal") == 0) value = &SwapTotal;
+        else if(hash == SwapFree_hash && strcmp(name, "SwapFree") == 0) value = &SwapFree;
+        else if(hash == Dirty_hash && strcmp(name, "Dirty") == 0) value = &Dirty;
+        else if(hash == Writeback_hash && strcmp(name, "Writeback") == 0) value = &Writeback;
+        //else if(hash == AnonPages_hash && strcmp(name, "AnonPages") == 0) value = &AnonPages;
+        //else if(hash == Mapped_hash && strcmp(name, "Mapped") == 0) value = &Mapped;
+        //else if(hash == Shmem_hash && strcmp(name, "Shmem") == 0) value = &Shmem;
+        else if(hash == Slab_hash && strcmp(name, "Slab") == 0) value = &Slab;
+        else if(hash == SReclaimable_hash && strcmp(name, "SReclaimable") == 0) value = &SReclaimable;
+        else if(hash == SUnreclaim_hash && strcmp(name, "SUnreclaim") == 0) value = &SUnreclaim;
+        else if(hash == KernelStack_hash && strcmp(name, "KernelStack") == 0) value = &KernelStack;
+        else if(hash == PageTables_hash && strcmp(name, "PageTables") == 0) value = &PageTables;
+        else if(hash == NFS_Unstable_hash && strcmp(name, "NFS_Unstable") == 0) value = &NFS_Unstable;
+        else if(hash == Bounce_hash && strcmp(name, "Bounce") == 0) value = &Bounce;
+        else if(hash == WritebackTmp_hash && strcmp(name, "WritebackTmp") == 0) value = &WritebackTmp;
+        //else if(hash == CommitLimit_hash && strcmp(name, "CommitLimit") == 0) value = &CommitLimit;
+        else if(hash == Committed_AS_hash && strcmp(name, "Committed_AS") == 0) value = &Committed_AS;
+        //else if(hash == VmallocTotal_hash && strcmp(name, "VmallocTotal") == 0) value = &VmallocTotal;
+        else if(hash == VmallocUsed_hash && strcmp(name, "VmallocUsed") == 0) value = &VmallocUsed;
+        //else if(hash == VmallocChunk_hash && strcmp(name, "VmallocChunk") == 0) value = &VmallocChunk;
+        else if(hash == HardwareCorrupted_hash && strcmp(name, "HardwareCorrupted") == 0) { value = &HardwareCorrupted; hwcorrupted = 1; }
+        //else if(hash == AnonHugePages_hash && strcmp(name, "AnonHugePages") == 0) value = &AnonHugePages;
+        //else if(hash == HugePages_Total_hash && strcmp(name, "HugePages_Total") == 0) value = &HugePages_Total;
+        //else if(hash == HugePages_Free_hash && strcmp(name, "HugePages_Free") == 0) value = &HugePages_Free;
+        //else if(hash == HugePages_Rsvd_hash && strcmp(name, "HugePages_Rsvd") == 0) value = &HugePages_Rsvd;
+        //else if(hash == HugePages_Surp_hash && strcmp(name, "HugePages_Surp") == 0) value = &HugePages_Surp;
+        //else if(hash == Hugepagesize_hash && strcmp(name, "Hugepagesize") == 0) value = &Hugepagesize;
+        //else if(hash == DirectMap4k_hash && strcmp(name, "DirectMap4k") == 0) value = &DirectMap4k;
+        //else if(hash == DirectMap2M_hash && strcmp(name, "DirectMap2M") == 0) value = &DirectMap2M;
+
+        if(value) {
+            *value = str2ull(procfile_lineword(ff, l, 1));
+            value = NULL;
+        }
     }
 
     RRDSET *st;

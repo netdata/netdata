@@ -55,6 +55,21 @@ static inline uint32_t simple_uhash(const char *name) {
 
 #endif /* HAVE_STMT_EXPR */
 
+static inline int str2i(const char *s) {
+    register int n = 0;
+    register char c, negative = (*s == '-');
+
+    for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' ; c = *(++s)) {
+        n *= 10;
+        n += c - '0';
+    }
+
+    if(unlikely(negative))
+        return -n;
+
+    return n;
+}
+
 static inline long str2l(const char *s) {
     register long n = 0;
     register char c, negative = (*s == '-');
@@ -107,7 +122,7 @@ static inline int read_single_number_file(const char *filename, unsigned long lo
     }
 
     close(fd);
-    *result = strtoull(buffer, NULL, 0);
+    *result = str2ull(buffer);
     return 0;
 }
 
