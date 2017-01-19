@@ -3,35 +3,9 @@
 
 #include "common.h"
 
-#ifdef HAVE_STMT_EXPR_NON_EXISTING
-// GCC extension to define a function as a preprocessor macro
-
-#define simple_hash(name) ({                                         \
-    register unsigned char *__hash_source = (unsigned char *)(name); \
-    register uint32_t __hash_value = 0x811c9dc5;                     \
-    while (*__hash_source) {                                         \
-        __hash_value *= 16777619;                                    \
-        __hash_value ^= (uint32_t) *__hash_source++;                 \
-    }                                                                \
-    __hash_value;                                                    \
-})
-
-#define simple_uhash(name) ({                                        \
-    register unsigned char *__hash_source = (unsigned char *)(name); \
-    register uint32_t __hash_value = 0x811c9dc5, __hash_char;        \
-    while ((__hash_char = *__hash_source++)) {                       \
-        if (unlikely(__hash_char >= 'A' && __hash_char <= 'Z'))      \
-            __hash_char += 'a' - 'A';                                \
-        __hash_value *= 16777619;                                    \
-        __hash_value ^= __hash_char;                                 \
-    }                                                                \
-    __hash_value;                                                    \
-})
-
-#else /* ! HAVE_STMT_EXPR */
-
 // for faster execution, allow the compiler to inline
-// these functions that are called to hash strings
+// these functions that are called thousands of times per second
+
 static inline uint32_t simple_hash(const char *name) {
     register unsigned char *s = (unsigned char *) name;
     register uint32_t hval = 0x811c9dc5;
@@ -52,8 +26,6 @@ static inline uint32_t simple_uhash(const char *name) {
     }
     return hval;
 }
-
-#endif /* HAVE_STMT_EXPR */
 
 static inline int str2i(const char *s) {
     register int n = 0;
