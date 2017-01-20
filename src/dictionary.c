@@ -56,7 +56,7 @@ static inline void dictionary_unlock(DICTIONARY *dict) {
 static int name_value_compare(void* a, void* b) {
     if(((NAME_VALUE *)a)->hash < ((NAME_VALUE *)b)->hash) return -1;
     else if(((NAME_VALUE *)a)->hash > ((NAME_VALUE *)b)->hash) return 1;
-    else return strcmp(((NAME_VALUE *)a)->name, ((NAME_VALUE *)b)->name);
+    else return strsame(((NAME_VALUE *)a)->name, ((NAME_VALUE *)b)->name);
 }
 
 static inline NAME_VALUE *dictionary_name_value_index_find_nolock(DICTIONARY *dict, const char *name, uint32_t hash) {

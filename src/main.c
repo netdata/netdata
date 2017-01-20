@@ -77,15 +77,15 @@ void web_server_threading_selection(void) {
     web_enable_gzip = config_get_boolean("global", "enable web responses gzip compression", web_enable_gzip);
 
     char *s = config_get("global", "web compression strategy", "default");
-    if(!strcmp(s, "default"))
+    if(!strsame(s, "default"))
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
-    else if(!strcmp(s, "filtered"))
+    else if(!strsame(s, "filtered"))
         web_gzip_strategy = Z_FILTERED;
-    else if(!strcmp(s, "huffman only"))
+    else if(!strsame(s, "huffman only"))
         web_gzip_strategy = Z_HUFFMAN_ONLY;
-    else if(!strcmp(s, "rle"))
+    else if(!strsame(s, "rle"))
         web_gzip_strategy = Z_RLE;
-    else if(!strcmp(s, "fixed"))
+    else if(!strsame(s, "fixed"))
         web_gzip_strategy = Z_FIXED;
     else {
         error("Invalid compression strategy '%s'. Valid strategies are 'default', 'filtered', 'huffman only', 'rle' and 'fixed'. Proceeding with 'default'.", s);
@@ -351,22 +351,22 @@ int main(int argc, char **argv)
     {
         i = 1;
         while(i < argc) {
-            if(strcmp(argv[i], "-pidfile") == 0 && (i+1) < argc) {
+            if(strsame(argv[i], "-pidfile") == 0 && (i+1) < argc) {
                 strncpyz(pidfile, argv[i+1], FILENAME_MAX);
                 fprintf(stderr, "%s: deprecated option -- %s -- please use -P instead.\n", argv[0], argv[i]);
                 remove_option(i, &argc, argv);
             }
-            else if(strcmp(argv[i], "-nodaemon") == 0 || strcmp(argv[i], "-nd") == 0) {
+            else if(strsame(argv[i], "-nodaemon") == 0 || strsame(argv[i], "-nd") == 0) {
                 dont_fork = 1;
                 fprintf(stderr, "%s: deprecated option -- %s -- please use -D instead.\n ", argv[0], argv[i]);
                 remove_option(i, &argc, argv);
             }
-            else if(strcmp(argv[i], "-ch") == 0 && (i+1) < argc) {
+            else if(strsame(argv[i], "-ch") == 0 && (i+1) < argc) {
                 config_set("global", "host access prefix", argv[i+1]);
                 fprintf(stderr, "%s: deprecated option -- %s -- please use -s instead.\n", argv[0], argv[i]);
                 remove_option(i, &argc, argv);
             }
-            else if(strcmp(argv[i], "-l") == 0 && (i+1) < argc) {
+            else if(strsame(argv[i], "-l") == 0 && (i+1) < argc) {
                 config_set("global", "history", argv[i+1]);
                 fprintf(stderr, "%s: deprecated option -- %s -- This option will be removed with V2.*.\n", argv[0], argv[i]);
                 remove_option(i, &argc, argv);
@@ -443,14 +443,14 @@ int main(int argc, char **argv)
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
-                        if(strcmp(optarg, "unittest") == 0) {
+                        if(strsame(optarg, "unittest") == 0) {
                             rrd_update_every = 1;
                             if(run_all_mockup_tests()) exit(1);
                             if(unit_test_storage()) exit(1);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             exit(0);
                         }
-                        else if(strcmp(optarg, "simple-pattern") == 0) {
+                        else if(strsame(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"
                                         " Checks if 'pattern' matches the given 'string'.\n"

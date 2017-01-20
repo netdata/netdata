@@ -544,29 +544,29 @@ uint32_t web_client_api_request_v1_data_options(char *o)
     while(o && *o && (tok = mystrsep(&o, ", |"))) {
         if(!*tok) continue;
 
-        if(!strcmp(tok, "nonzero"))
+        if(!strsame(tok, "nonzero"))
             ret |= RRDR_OPTION_NONZERO;
-        else if(!strcmp(tok, "flip") || !strcmp(tok, "reversed") || !strcmp(tok, "reverse"))
+        else if(!strsame(tok, "flip") || !strsame(tok, "reversed") || !strsame(tok, "reverse"))
             ret |= RRDR_OPTION_REVERSED;
-        else if(!strcmp(tok, "jsonwrap"))
+        else if(!strsame(tok, "jsonwrap"))
             ret |= RRDR_OPTION_JSON_WRAP;
-        else if(!strcmp(tok, "min2max"))
+        else if(!strsame(tok, "min2max"))
             ret |= RRDR_OPTION_MIN2MAX;
-        else if(!strcmp(tok, "ms") || !strcmp(tok, "milliseconds"))
+        else if(!strsame(tok, "ms") || !strsame(tok, "milliseconds"))
             ret |= RRDR_OPTION_MILLISECONDS;
-        else if(!strcmp(tok, "abs") || !strcmp(tok, "absolute") || !strcmp(tok, "absolute_sum") || !strcmp(tok, "absolute-sum"))
+        else if(!strsame(tok, "abs") || !strsame(tok, "absolute") || !strsame(tok, "absolute_sum") || !strsame(tok, "absolute-sum"))
             ret |= RRDR_OPTION_ABSOLUTE;
-        else if(!strcmp(tok, "seconds"))
+        else if(!strsame(tok, "seconds"))
             ret |= RRDR_OPTION_SECONDS;
-        else if(!strcmp(tok, "null2zero"))
+        else if(!strsame(tok, "null2zero"))
             ret |= RRDR_OPTION_NULL2ZERO;
-        else if(!strcmp(tok, "objectrows"))
+        else if(!strsame(tok, "objectrows"))
             ret |= RRDR_OPTION_OBJECTSROWS;
-        else if(!strcmp(tok, "google_json"))
+        else if(!strsame(tok, "google_json"))
             ret |= RRDR_OPTION_GOOGLE_JSON;
-        else if(!strcmp(tok, "percentage"))
+        else if(!strsame(tok, "percentage"))
             ret |= RRDR_OPTION_PERCENTAGE;
-        else if(!strcmp(tok, "unaligned"))
+        else if(!strsame(tok, "unaligned"))
             ret |= RRDR_OPTION_NOT_ALIGNED;
     }
 
@@ -575,37 +575,37 @@ uint32_t web_client_api_request_v1_data_options(char *o)
 
 uint32_t web_client_api_request_v1_data_format(char *name)
 {
-    if(!strcmp(name, DATASOURCE_FORMAT_DATATABLE_JSON)) // datatable
+    if(!strsame(name, DATASOURCE_FORMAT_DATATABLE_JSON)) // datatable
         return DATASOURCE_DATATABLE_JSON;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_DATATABLE_JSONP)) // datasource
+    else if(!strsame(name, DATASOURCE_FORMAT_DATATABLE_JSONP)) // datasource
         return DATASOURCE_DATATABLE_JSONP;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_JSON)) // json
+    else if(!strsame(name, DATASOURCE_FORMAT_JSON)) // json
         return DATASOURCE_JSON;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_JSONP)) // jsonp
+    else if(!strsame(name, DATASOURCE_FORMAT_JSONP)) // jsonp
         return DATASOURCE_JSONP;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_SSV)) // ssv
+    else if(!strsame(name, DATASOURCE_FORMAT_SSV)) // ssv
         return DATASOURCE_SSV;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_CSV)) // csv
+    else if(!strsame(name, DATASOURCE_FORMAT_CSV)) // csv
         return DATASOURCE_CSV;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_TSV) || !strcmp(name, "tsv-excel")) // tsv
+    else if(!strsame(name, DATASOURCE_FORMAT_TSV) || !strsame(name, "tsv-excel")) // tsv
         return DATASOURCE_TSV;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_HTML)) // html
+    else if(!strsame(name, DATASOURCE_FORMAT_HTML)) // html
         return DATASOURCE_HTML;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_JS_ARRAY)) // array
+    else if(!strsame(name, DATASOURCE_FORMAT_JS_ARRAY)) // array
         return DATASOURCE_JS_ARRAY;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_SSV_COMMA)) // ssvcomma
+    else if(!strsame(name, DATASOURCE_FORMAT_SSV_COMMA)) // ssvcomma
         return DATASOURCE_SSV_COMMA;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_CSV_JSON_ARRAY)) // csvjsonarray
+    else if(!strsame(name, DATASOURCE_FORMAT_CSV_JSON_ARRAY)) // csvjsonarray
         return DATASOURCE_CSV_JSON_ARRAY;
 
     return DATASOURCE_JSON;
@@ -613,16 +613,16 @@ uint32_t web_client_api_request_v1_data_format(char *name)
 
 uint32_t web_client_api_request_v1_data_google_format(char *name)
 {
-    if(!strcmp(name, "json"))
+    if(!strsame(name, "json"))
         return DATASOURCE_DATATABLE_JSONP;
 
-    else if(!strcmp(name, "html"))
+    else if(!strsame(name, "html"))
         return DATASOURCE_HTML;
 
-    else if(!strcmp(name, "csv"))
+    else if(!strsame(name, "csv"))
         return DATASOURCE_CSV;
 
-    else if(!strcmp(name, "tsv-excel"))
+    else if(!strsame(name, "tsv-excel"))
         return DATASOURCE_TSV;
 
     return DATASOURCE_JSON;
@@ -655,19 +655,19 @@ const char *group_method2string(int group) {
 
 int web_client_api_request_v1_data_group(char *name, int def)
 {
-    if(!strcmp(name, "average"))
+    if(!strsame(name, "average"))
         return GROUP_AVERAGE;
 
-    else if(!strcmp(name, "min"))
+    else if(!strsame(name, "min"))
         return GROUP_MIN;
 
-    else if(!strcmp(name, "max"))
+    else if(!strsame(name, "max"))
         return GROUP_MAX;
 
-    else if(!strcmp(name, "sum"))
+    else if(!strsame(name, "sum"))
         return GROUP_SUM;
 
-    else if(!strcmp(name, "incremental-sum"))
+    else if(!strsame(name, "incremental-sum"))
         return GROUP_INCREMENTAL_SUM;
 
     return def;
@@ -681,8 +681,8 @@ int web_client_api_request_v1_alarms(struct web_client *w, char *url)
         char *value = mystrsep(&url, "?&");
         if (!value || !*value) continue;
 
-        if(!strcmp(value, "all")) all = 1;
-        else if(!strcmp(value, "active")) all = 0;
+        if(!strsame(value, "all")) all = 1;
+        else if(!strsame(value, "active")) all = 0;
     }
 
     buffer_flush(w->response.data);
@@ -703,7 +703,7 @@ int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        if(!strcmp(name, "after")) after = strtoul(value, NULL, 0);
+        if(!strsame(name, "after")) after = strtoul(value, NULL, 0);
     }
 
     buffer_flush(w->response.data);
@@ -730,7 +730,7 @@ int web_client_api_request_single_chart(struct web_client *w, char *url, void ca
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "chart")) chart = value;
+        if(!strsame(name, "chart")) chart = value;
         //else {
         /// buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
@@ -786,10 +786,10 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        if(!strcmp(name, "format")) {
-            if(!strcmp(value, ALLMETRICS_FORMAT_SHELL))
+        if(!strsame(name, "format")) {
+            if(!strsame(value, ALLMETRICS_FORMAT_SHELL))
                 format = ALLMETRICS_SHELL;
-            else if(!strcmp(value, ALLMETRICS_FORMAT_PROMETHEUS))
+            else if(!strsame(value, ALLMETRICS_FORMAT_PROMETHEUS))
                 format = ALLMETRICS_PROMETHEUS;
             else
                 format = 0;
@@ -858,32 +858,32 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "chart")) chart = value;
-        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
+        if(!strsame(name, "chart")) chart = value;
+        else if(!strsame(name, "dimension") || !strsame(name, "dim") || !strsame(name, "dimensions") || !strsame(name, "dims")) {
             if(!dimensions)
                 dimensions = buffer_create(100);
 
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
-        else if(!strcmp(name, "after")) after_str = value;
-        else if(!strcmp(name, "before")) before_str = value;
-        else if(!strcmp(name, "points")) points_str = value;
-        else if(!strcmp(name, "group")) {
+        else if(!strsame(name, "after")) after_str = value;
+        else if(!strsame(name, "before")) before_str = value;
+        else if(!strsame(name, "points")) points_str = value;
+        else if(!strsame(name, "group")) {
             group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
         }
-        else if(!strcmp(name, "options")) {
+        else if(!strsame(name, "options")) {
             options |= web_client_api_request_v1_data_options(value);
         }
-        else if(!strcmp(name, "label")) label = value;
-        else if(!strcmp(name, "units")) units = value;
-        else if(!strcmp(name, "label_color")) label_color = value;
-        else if(!strcmp(name, "value_color")) value_color = value;
-        else if(!strcmp(name, "multiply")) multiply_str = value;
-        else if(!strcmp(name, "divide")) divide_str = value;
-        else if(!strcmp(name, "refresh")) refresh_str = value;
-        else if(!strcmp(name, "precision")) precision_str = value;
-        else if(!strcmp(name, "alarm")) alarm = value;
+        else if(!strsame(name, "label")) label = value;
+        else if(!strsame(name, "units")) units = value;
+        else if(!strsame(name, "label_color")) label_color = value;
+        else if(!strsame(name, "value_color")) value_color = value;
+        else if(!strsame(name, "multiply")) multiply_str = value;
+        else if(!strsame(name, "divide")) divide_str = value;
+        else if(!strsame(name, "refresh")) refresh_str = value;
+        else if(!strsame(name, "precision")) precision_str = value;
+        else if(!strsame(name, "alarm")) alarm = value;
     }
 
     if(!chart || !*chart) {
@@ -924,7 +924,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
 
     int refresh = 0;
     if(refresh_str && *refresh_str) {
-        if(!strcmp(refresh_str, "auto")) {
+        if(!strsame(refresh_str, "auto")) {
             if(rc) refresh = rc->update_every;
             else if(options & RRDR_OPTION_NOT_ALIGNED)
                 refresh = st->update_every;
@@ -1121,31 +1121,31 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "chart")) chart = value;
-        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
+        if(!strsame(name, "chart")) chart = value;
+        else if(!strsame(name, "dimension") || !strsame(name, "dim") || !strsame(name, "dimensions") || !strsame(name, "dims")) {
             if(!dimensions) dimensions = buffer_create(100);
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
-        else if(!strcmp(name, "after")) after_str = value;
-        else if(!strcmp(name, "before")) before_str = value;
-        else if(!strcmp(name, "points")) points_str = value;
-        else if(!strcmp(name, "group")) {
+        else if(!strsame(name, "after")) after_str = value;
+        else if(!strsame(name, "before")) before_str = value;
+        else if(!strsame(name, "points")) points_str = value;
+        else if(!strsame(name, "group")) {
             group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
         }
-        else if(!strcmp(name, "format")) {
+        else if(!strsame(name, "format")) {
             format = web_client_api_request_v1_data_format(value);
         }
-        else if(!strcmp(name, "options")) {
+        else if(!strsame(name, "options")) {
             options |= web_client_api_request_v1_data_options(value);
         }
-        else if(!strcmp(name, "callback")) {
+        else if(!strsame(name, "callback")) {
             responseHandler = value;
         }
-        else if(!strcmp(name, "filename")) {
+        else if(!strsame(name, "filename")) {
             outFileName = value;
         }
-        else if(!strcmp(name, "tqx")) {
+        else if(!strsame(name, "tqx")) {
             // parse Google Visualization API options
             // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
             char *tqx_name, *tqx_value;
@@ -1158,21 +1158,21 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
                 if(!tqx_name || !*tqx_name) continue;
                 if(!tqx_value || !*tqx_value) continue;
 
-                if(!strcmp(tqx_name, "version"))
+                if(!strsame(tqx_name, "version"))
                     google_version = tqx_value;
-                else if(!strcmp(tqx_name, "reqId"))
+                else if(!strsame(tqx_name, "reqId"))
                     google_reqId = tqx_value;
-                else if(!strcmp(tqx_name, "sig")) {
+                else if(!strsame(tqx_name, "sig")) {
                     google_sig = tqx_value;
                     google_timestamp = strtoul(google_sig, NULL, 0);
                 }
-                else if(!strcmp(tqx_name, "out")) {
+                else if(!strsame(tqx_name, "out")) {
                     google_out = tqx_value;
                     format = web_client_api_request_v1_data_google_format(google_out);
                 }
-                else if(!strcmp(tqx_name, "responseHandler"))
+                else if(!strsame(tqx_name, "responseHandler"))
                     responseHandler = tqx_value;
-                else if(!strcmp(tqx_name, "outFileName"))
+                else if(!strsame(tqx_name, "outFileName"))
                     outFileName = tqx_value;
             }
         }
@@ -1314,42 +1314,42 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 
         uint32_t hash = simple_hash(name);
 
-        if(hash == hash_action && !strcmp(name, "action")) {
+        if(hash == hash_action && !strsame(name, "action")) {
             uint32_t vhash = simple_hash(value);
 
-            if(vhash == hash_access && !strcmp(value, "access")) action = 'A';
-            else if(vhash == hash_hello && !strcmp(value, "hello")) action = 'H';
-            else if(vhash == hash_delete && !strcmp(value, "delete")) action = 'D';
-            else if(vhash == hash_search && !strcmp(value, "search")) action = 'S';
-            else if(vhash == hash_switch && !strcmp(value, "switch")) action = 'W';
+            if(vhash == hash_access && !strsame(value, "access")) action = 'A';
+            else if(vhash == hash_hello && !strsame(value, "hello")) action = 'H';
+            else if(vhash == hash_delete && !strsame(value, "delete")) action = 'D';
+            else if(vhash == hash_search && !strsame(value, "search")) action = 'S';
+            else if(vhash == hash_switch && !strsame(value, "switch")) action = 'W';
 #ifdef NETDATA_INTERNAL_CHECKS
             else error("unknown registry action '%s'", value);
 #endif /* NETDATA_INTERNAL_CHECKS */
         }
 /*
-        else if(hash == hash_redirects && !strcmp(name, "redirects"))
+        else if(hash == hash_redirects && !strsame(name, "redirects"))
             redirects = atoi(value);
 */
-        else if(hash == hash_machine && !strcmp(name, "machine"))
+        else if(hash == hash_machine && !strsame(name, "machine"))
             machine_guid = value;
 
-        else if(hash == hash_url && !strcmp(name, "url"))
+        else if(hash == hash_url && !strsame(name, "url"))
             machine_url = value;
 
         else if(action == 'A') {
-            if(hash == hash_name && !strcmp(name, "name"))
+            if(hash == hash_name && !strsame(name, "name"))
                 url_name = value;
         }
         else if(action == 'D') {
-            if(hash == hash_delete_url && !strcmp(name, "delete_url"))
+            if(hash == hash_delete_url && !strsame(name, "delete_url"))
                 delete_url = value;
         }
         else if(action == 'S') {
-            if(hash == hash_for && !strcmp(name, "for"))
+            if(hash == hash_for && !strsame(name, "for"))
                 search_machine_guid = value;
         }
         else if(action == 'W') {
-            if(hash == hash_to && !strcmp(name, "to"))
+            if(hash == hash_to && !strsame(name, "to"))
                 to_person_guid = value;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1440,31 +1440,31 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
         debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
         uint32_t hash = simple_hash(tok);
 
-        if(hash == hash_data && !strcmp(tok, "data"))
+        if(hash == hash_data && !strsame(tok, "data"))
             return web_client_api_request_v1_data(w, url);
 
-        else if(hash == hash_chart && !strcmp(tok, "chart"))
+        else if(hash == hash_chart && !strsame(tok, "chart"))
             return web_client_api_request_v1_chart(w, url);
 
-        else if(hash == hash_charts && !strcmp(tok, "charts"))
+        else if(hash == hash_charts && !strsame(tok, "charts"))
             return web_client_api_request_v1_charts(w, url);
 
-        else if(hash == hash_registry && !strcmp(tok, "registry"))
+        else if(hash == hash_registry && !strsame(tok, "registry"))
             return web_client_api_request_v1_registry(w, url);
 
-        else if(hash == hash_badge && !strcmp(tok, "badge.svg"))
+        else if(hash == hash_badge && !strsame(tok, "badge.svg"))
             return web_client_api_request_v1_badge(w, url);
 
-        else if(hash == hash_alarms && !strcmp(tok, "alarms"))
+        else if(hash == hash_alarms && !strsame(tok, "alarms"))
             return web_client_api_request_v1_alarms(w, url);
 
-        else if(hash == hash_alarm_log && !strcmp(tok, "alarm_log"))
+        else if(hash == hash_alarm_log && !strsame(tok, "alarm_log"))
             return web_client_api_request_v1_alarm_log(w, url);
 
-        else if(hash == hash_alarm_variables && !strcmp(tok, "alarm_variables"))
+        else if(hash == hash_alarm_variables && !strsame(tok, "alarm_variables"))
             return web_client_api_request_v1_alarm_variables(w, url);
 
-        else if(hash == hash_raw && !strcmp(tok, "allmetrics"))
+        else if(hash == hash_raw && !strsame(tok, "allmetrics"))
             return web_client_api_request_v1_allmetrics(w, url);
 
         else {
@@ -1487,7 +1487,7 @@ int web_client_api_request(struct web_client *w, char *url)
     char *tok = mystrsep(&url, "/?&");
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
-        if(strcmp(tok, "v1") == 0)
+        if(strsame(tok, "v1") == 0)
             return web_client_api_request_v1(w, url);
         else {
             buffer_flush(w->response.data);
@@ -1564,9 +1564,9 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
         // parse the grouping method required
         tok = mystrsep(&url, "/");
         if(tok && *tok) {
-            if(strcmp(tok, "max") == 0) group_method = GROUP_MAX;
-            else if(strcmp(tok, "average") == 0) group_method = GROUP_AVERAGE;
-            else if(strcmp(tok, "sum") == 0) group_method = GROUP_SUM;
+            if(strsame(tok, "max") == 0) group_method = GROUP_MAX;
+            else if(strsame(tok, "average") == 0) group_method = GROUP_AVERAGE;
+            else if(strsame(tok, "sum") == 0) group_method = GROUP_SUM;
             else debug(D_WEB_CLIENT, "%llu: Unknown group method '%s'", w->id, tok);
         }
     }
@@ -1585,7 +1585,7 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
     if(url) {
         // parse nonzero
         tok = mystrsep(&url, "/");
-        if(tok && *tok && strcmp(tok, "nonzero") == 0) nonzero = 1;
+        if(tok && *tok && strsame(tok, "nonzero") == 0) nonzero = 1;
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
@@ -1606,26 +1606,26 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
             tok = mystrsep(&args, "&");
             if(tok && *tok) {
                 char *name = mystrsep(&tok, "=");
-                if(name && *name && strcmp(name, "tqx") == 0) {
+                if(name && *name && strsame(name, "tqx") == 0) {
                     char *key = mystrsep(&tok, ":");
                     char *value = mystrsep(&tok, ";");
                     if(key && value && *key && *value) {
-                        if(strcmp(key, "version") == 0)
+                        if(strsame(key, "version") == 0)
                             google_version = value;
 
-                        else if(strcmp(key, "reqId") == 0)
+                        else if(strsame(key, "reqId") == 0)
                             google_reqId = value;
 
-                        else if(strcmp(key, "sig") == 0)
+                        else if(strsame(key, "sig") == 0)
                             google_sig = value;
 
-                        else if(strcmp(key, "out") == 0)
+                        else if(strsame(key, "out") == 0)
                             google_out = value;
 
-                        else if(strcmp(key, "responseHandler") == 0)
+                        else if(strsame(key, "responseHandler") == 0)
                             google_responseHandler = value;
 
-                        else if(strcmp(key, "outFileName") == 0)
+                        else if(strsame(key, "outFileName") == 0)
                             google_outFileName = value;
                     }
                 }
@@ -1640,7 +1640,7 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
             last_timestamp_in_data = strtoul(google_sig, NULL, 0);
 
             // check the client wants json
-            if(strcmp(google_out, "json") != 0) {
+            if(strsame(google_out, "json") != 0) {
                 buffer_sprintf(w->response.data,
                     "%s({version:'%s',reqId:'%s',status:'error',errors:[{reason:'invalid_query',message:'output format is not supported',detailed_message:'the format %s requested is not supported by netdata.'}]});",
                     google_responseHandler, google_version, google_reqId, google_out);
@@ -2012,11 +2012,11 @@ void web_client_process(struct web_client *w) {
                 uint32_t hash = simple_hash(tok);
                 debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-                if(hash == hash_api && strcmp(tok, "api") == 0) {
+                if(hash == hash_api && strsame(tok, "api") == 0) {
                     // the client is requesting api access
                     code = web_client_api_request(w, url);
                 }
-                else if(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0) {
+                else if(hash == hash_netdata_conf && strsame(tok, "netdata.conf") == 0) {
                     code = 200;
                     debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
 
@@ -2024,15 +2024,15 @@ void web_client_process(struct web_client *w) {
                     buffer_flush(w->response.data);
                     generate_config(w->response.data, 0);
                 }
-                else if(hash == hash_data && strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
+                else if(hash == hash_data && strsame(tok, WEB_PATH_DATA) == 0) { // "data"
                     // the client is requesting rrd data -- OLD API
                     code = web_client_api_old_data_request(w, url, DATASOURCE_JSON);
                 }
-                else if(hash == hash_datasource && strcmp(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
+                else if(hash == hash_datasource && strsame(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
                     // the client is requesting google datasource -- OLD API
                     code = web_client_api_old_data_request(w, url, DATASOURCE_DATATABLE_JSONP);
                 }
-                else if(hash == hash_graph && strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
+                else if(hash == hash_graph && strsame(tok, WEB_PATH_GRAPH) == 0) { // "graph"
                     // the client is requesting an rrd graph -- OLD API
 
                     // get the name of the data to show
@@ -2063,7 +2063,7 @@ void web_client_process(struct web_client *w) {
                         buffer_strcat(w->response.data, "Graph name?\r\n");
                     }
                 }
-                else if(hash == hash_list && strcmp(tok, "list") == 0) {
+                else if(hash == hash_list && strsame(tok, "list") == 0) {
                     // OLD API
                     code = 200;
 
@@ -2075,7 +2075,7 @@ void web_client_process(struct web_client *w) {
                     for ( ; st ; st = st->next )
                         buffer_sprintf(w->response.data, "%s\n", st->name);
                 }
-                else if(hash == hash_all_json && strcmp(tok, "all.json") == 0) {
+                else if(hash == hash_all_json && strsame(tok, "all.json") == 0) {
                     // OLD API
                     code = 200;
                     debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
@@ -2085,7 +2085,7 @@ void web_client_process(struct web_client *w) {
                     rrd_stats_all_json(w->response.data);
                 }
 #ifdef NETDATA_INTERNAL_CHECKS
-                else if(hash == hash_exit && strcmp(tok, "exit") == 0) {
+                else if(hash == hash_exit && strsame(tok, "exit") == 0) {
                     code = 200;
                     w->response.data->contenttype = CT_TEXT_PLAIN;
                     buffer_flush(w->response.data);
@@ -2098,7 +2098,7 @@ void web_client_process(struct web_client *w) {
                     error("web request to exit received.");
                     netdata_cleanup_and_exit(0);
                 }
-                else if(hash == hash_debug && strcmp(tok, "debug") == 0) {
+                else if(hash == hash_debug && strsame(tok, "debug") == 0) {
                     buffer_flush(w->response.data);
 
                     // get the name of the data to show
@@ -2130,7 +2130,7 @@ void web_client_process(struct web_client *w) {
                         buffer_strcat(w->response.data, "debug which chart?\r\n");
                     }
                 }
-                else if(hash == hash_mirror && strcmp(tok, "mirror") == 0) {
+                else if(hash == hash_mirror && strsame(tok, "mirror") == 0) {
                     code = 200;
 
                     debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);

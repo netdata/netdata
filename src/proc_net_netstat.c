@@ -161,19 +161,19 @@ static unsigned long long *netstat_columns_find(struct netstat_columns *nc, cons
     uint32_t i, hash = simple_hash(name);
 
     for(i = 0; nc[i].name ;i++)
-        if(unlikely(nc[i].hash == hash && !strcmp(nc[i].name, name)))
+        if(unlikely(nc[i].hash == hash && !strsame(nc[i].name, name)))
             return &nc[i].value;
 
     fatal("Cannot find key '%s' in /proc/net/netstat internal array.", name);
 }
 
-static void parse_line_pair(procfile *ff, struct netstat_columns *nc, uint32_t header_line, uint32_t values_line) {
-    uint32_t hwords = procfile_linewords(ff, header_line);
-    uint32_t vwords = procfile_linewords(ff, values_line);
-    uint32_t w, i;
+static void parse_line_pair(procfile *ff, struct netstat_columns *nc, size_t header_line, size_t values_line) {
+    size_t hwords = procfile_linewords(ff, header_line);
+    size_t vwords = procfile_linewords(ff, values_line);
+    size_t w, i;
 
     if(unlikely(vwords > hwords)) {
-        error("File /proc/net/netstat on header line %u has %u words, but on value line %u has %u words.", header_line, hwords, values_line, vwords);
+        error("File /proc/net/netstat on header line %zu has %zu words, but on value line %zu has %zu words.", header_line, hwords, values_line, vwords);
         vwords = hwords;
     }
 
@@ -182,7 +182,7 @@ static void parse_line_pair(procfile *ff, struct netstat_columns *nc, uint32_t h
         uint32_t hash = simple_hash(key);
 
         for(i = 0 ; nc[i].name ;i++) {
-            if(unlikely(hash == nc[i].hash && !strcmp(key, nc[i].name))) {
+            if(unlikely(hash == nc[i].hash && !strsame(key, nc[i].name))) {
                 nc[i].value = str2ull(procfile_lineword(ff, values_line, w));
                 break;
             }
@@ -549,23 +549,23 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
-    uint32_t words;
+    size_t lines = procfile_lines(ff), l;
+    size_t words;
 
     for(l = 0; l < lines ;l++) {
         char *key = procfile_lineword(ff, l, 0);
         uint32_t hash = simple_hash(key);
 
-        if(unlikely(hash == hash_ipext && strcmp(key, "IpExt") == 0)) {
-            uint32_t h = l++;
+        if(unlikely(hash == hash_ipext && strsame(key, "IpExt") == 0)) {
+            size_t h = l++;
 
-            if(unlikely(strcmp(procfile_lineword(ff, l, 0), "IpExt") != 0)) {
+            if(unlikely(strsame(procfile_lineword(ff, l, 0), "IpExt") != 0)) {
                 error("Cannot read IpExt line from /proc/net/netstat.");
                 break;
             }
             words = procfile_linewords(ff, l);
             if(unlikely(words < 2)) {
-                error("Cannot read /proc/net/netstat IpExt line. Expected 2+ params, read %u.", words);
+                error("Cannot read /proc/net/netstat IpExt line. Expected 2+ params, read %zu.", words);
                 continue;
             }
 
@@ -711,16 +711,16 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_tcpext && strcmp(key, "TcpExt") == 0)) {
-            uint32_t h = l++;
+        else if(unlikely(hash == hash_tcpext && strsame(key, "TcpExt") == 0)) {
+            size_t h = l++;
 
-            if(unlikely(strcmp(procfile_lineword(ff, l, 0), "TcpExt") != 0)) {
+            if(unlikely(strsame(procfile_lineword(ff, l, 0), "TcpExt") != 0)) {
                 error("Cannot read TcpExt line from /proc/net/netstat.");
                 break;
             }
             words = procfile_linewords(ff, l);
             if(unlikely(words < 2)) {
-                error("Cannot read /proc/net/netstat TcpExt line. Expected 2+ params, read %u.", words);
+                error("Cannot read /proc/net/netstat TcpExt line. Expected 2+ params, read %zu.", words);
                 continue;
             }
 

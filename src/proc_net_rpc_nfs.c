@@ -151,28 +151,28 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     if(do_proc4 == -1) do_proc4 = config_get_boolean("plugin:proc:/proc/net/rpc/nfs", "NFS v4 procedures", 1);
 
     // if they are enabled, reset them to 1
-    // later we do them =2 to avoid doing strcmp for all lines
+    // later we do them =2 to avoid doing strsame() for all lines
     if(do_net) do_net = 1;
     if(do_rpc) do_rpc = 1;
     if(do_proc2) do_proc2 = 1;
     if(do_proc3) do_proc3 = 1;
     if(do_proc4) do_proc4 = 1;
 
-    uint32_t lines = procfile_lines(ff), l;
+    size_t lines = procfile_lines(ff), l;
 
     char *type;
     unsigned long long net_count = 0, net_udp_count = 0, net_tcp_count = 0, net_tcp_connections = 0;
     unsigned long long rpc_calls = 0, rpc_retransmits = 0, rpc_auth_refresh = 0;
 
     for(l = 0; l < lines ;l++) {
-        uint32_t words = procfile_linewords(ff, l);
+        size_t words = procfile_linewords(ff, l);
         if(!words) continue;
 
         type        = procfile_lineword(ff, l, 0);
 
-        if(do_net == 1 && strcmp(type, "net") == 0) {
+        if(do_net == 1 && strsame(type, "net") == 0) {
             if(words < 5) {
-                error("%s line of /proc/net/rpc/nfs has %u words, expected %d", type, words, 5);
+                error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 5);
                 continue;
             }
 
@@ -185,9 +185,9 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             if(sum == 0ULL) do_net = -1;
             else do_net = 2;
         }
-        else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
+        else if(do_rpc == 1 && strsame(type, "rpc") == 0) {
             if(words < 4) {
-                error("%s line of /proc/net/rpc/nfs has %u words, expected %d", type, words, 6);
+                error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
@@ -199,7 +199,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             if(sum == 0ULL) do_rpc = -1;
             else do_rpc = 2;
         }
-        else if(do_proc2 == 1 && strcmp(type, "proc2") == 0) {
+        else if(do_proc2 == 1 && strsame(type, "proc2") == 0) {
             // the first number is the count of numbers present
             // so we start for word 2
 
@@ -220,7 +220,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             }
             else do_proc2 = 2;
         }
-        else if(do_proc3 == 1 && strcmp(type, "proc3") == 0) {
+        else if(do_proc3 == 1 && strsame(type, "proc3") == 0) {
             // the first number is the count of numbers present
             // so we start for word 2
 
@@ -241,7 +241,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             }
             else do_proc3 = 2;
         }
-        else if(do_proc4 == 1 && strcmp(type, "proc4") == 0) {
+        else if(do_proc4 == 1 && strsame(type, "proc4") == 0) {
             // the first number is the count of numbers present
             // so we start for word 2
 

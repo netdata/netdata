@@ -147,7 +147,7 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
                 break;
 
             case SIMPLE_PATTERN_SUFFIX:
-                if(unlikely(strcmp(&str[len - m->len], m->match) == 0)) {
+                if(unlikely(strsame(&str[len - m->len], m->match) == 0)) {
                     if(!m->child) return 1;
                     return 0;
                 }
@@ -155,7 +155,7 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
 
             case SIMPLE_PATTERN_EXACT:
             default:
-                if(unlikely(strcmp(str, m->match) == 0)) {
+                if(unlikely(strsame(str, m->match) == 0)) {
                     if(!m->child) return 1;
                     return 0;
                 }

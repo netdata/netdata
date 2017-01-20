@@ -6,7 +6,7 @@
 int registry_url_compare(void *a, void *b) {
     if(((REGISTRY_URL *)a)->hash < ((REGISTRY_URL *)b)->hash) return -1;
     else if(((REGISTRY_URL *)a)->hash > ((REGISTRY_URL *)b)->hash) return 1;
-    else return strcmp(((REGISTRY_URL *)a)->url, ((REGISTRY_URL *)b)->url);
+    else return strsame(((REGISTRY_URL *)a)->url, ((REGISTRY_URL *)b)->url);
 }
 
 inline REGISTRY_URL *registry_url_index_add(REGISTRY_URL *u) {

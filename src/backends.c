@@ -169,13 +169,13 @@ void *backends_main(void *ptr) {
     if(!enabled || frequency < 1)
         goto cleanup;
 
-    if(!strcmp(source, "as collected")) {
+    if(!strsame(source, "as collected")) {
         options = BACKEND_SOURCE_DATA_AS_COLLECTED;
     }
-    else if(!strcmp(source, "average")) {
+    else if(!strsame(source, "average")) {
         options = BACKEND_SOURCE_DATA_AVERAGE;
     }
-    else if(!strcmp(source, "sum") || !strcmp(source, "volume")) {
+    else if(!strsame(source, "sum") || !strsame(source, "volume")) {
         options = BACKEND_SOURCE_DATA_SUM;
     }
     else {
@@ -183,7 +183,7 @@ void *backends_main(void *ptr) {
         goto cleanup;
     }
 
-    if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
+    if(!strsame(type, "graphite") || !strsame(type, "graphite:plaintext")) {
         default_port = 2003;
         if(options == BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_graphite_plaintext;
@@ -192,7 +192,7 @@ void *backends_main(void *ptr) {
 
         backend_response_checker = process_graphite_response;
     }
-    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+    else if(!strsame(type, "opentsdb") || !strsame(type, "opentsdb:telnet")) {
         default_port = 4242;
         if(options == BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_opentsdb_telnet;

@@ -77,7 +77,7 @@ static struct netdev *get_netdev(const char *name) {
 
     // search it, from the last position to the end
     for(d = last ; d ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
+        if(unlikely(hash == d->hash && !strsame(name, d->name))) {
             last = d->next;
             return d;
         }
@@ -85,7 +85,7 @@ static struct netdev *get_netdev(const char *name) {
 
     // search it from the beginning to the last position we used
     for(d = netdev_root ; d != last ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
+        if(unlikely(hash == d->hash && !strsame(name, d->name))) {
             last = d->next;
             return d;
         }
@@ -143,7 +143,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
+    size_t lines = procfile_lines(ff), l;
     for(l = 2; l < lines ;l++) {
         // require 17 words on each line
         if(unlikely(procfile_linewords(ff, l) < 17)) continue;

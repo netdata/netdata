@@ -71,13 +71,13 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
+    size_t lines = procfile_lines(ff), l;
 
     arl_begin(arl_base);
     for(l = 0; l < lines ;l++) {
-        uint32_t words = procfile_linewords(ff, l);
+        size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) {
-            if(unlikely(words)) error("Cannot read /proc/vmstat line %u. Expected 2 params, read %u.", l, words);
+            if(unlikely(words)) error("Cannot read /proc/vmstat line %zu. Expected 2 params, read %zu.", l, words);
             continue;
         }
 

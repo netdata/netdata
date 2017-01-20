@@ -69,7 +69,7 @@ static inline void config_section_unlock(struct config *co) {
 static int config_value_compare(void* a, void* b) {
     if(((struct config_value *)a)->hash < ((struct config_value *)b)->hash) return -1;
     else if(((struct config_value *)a)->hash > ((struct config_value *)b)->hash) return 1;
-    else return strcmp(((struct config_value *)a)->name, ((struct config_value *)b)->name);
+    else return strsame(((struct config_value *)a)->name, ((struct config_value *)b)->name);
 }
 
 #define config_value_index_add(co, cv) (struct config_value *)avl_insert_lock(&((co)->values_index), (avl *)(cv))
@@ -90,7 +90,7 @@ static struct config_value *config_value_index_find(struct config *co, const cha
 static int config_compare(void* a, void* b) {
     if(((struct config *)a)->hash < ((struct config *)b)->hash) return -1;
     else if(((struct config *)a)->hash > ((struct config *)b)->hash) return 1;
-    else return strcmp(((struct config *)a)->name, ((struct config *)b)->name);
+    else return strsame(((struct config *)a)->name, ((struct config *)b)->name);
 }
 
 avl_tree_lock config_root_index = {
@@ -238,7 +238,7 @@ char *config_get(const char *section, const char *name, const char *default_valu
         // this is a loaded value from the config file
         // if it is different that the default, mark it
         if(!(cv->flags & CONFIG_VALUE_CHECKED)) {
-            if(strcmp(cv->value, default_value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
+            if(strsame(cv->value, default_value) != 0) cv->flags |= CONFIG_VALUE_CHANGED;
             cv->flags |= CONFIG_VALUE_CHECKED;
         }
     }
@@ -266,7 +266,7 @@ int config_get_boolean(const char *section, const char *name, int value)
     s = config_get(section, name, s);
     if(!s) return value;
 
-    if(!strcmp(s, "yes") || !strcmp(s, "auto") || !strcmp(s, "on demand")) return 1;
+    if(!strsame(s, "yes") || !strsame(s, "auto") || !strsame(s, "on demand")) return 1;
     return 0;
 }
 
@@ -286,11 +286,11 @@ int config_get_boolean_ondemand(const char *section, const char *name, int value
     s = config_get(section, name, s);
     if(!s) return value;
 
-    if(!strcmp(s, "yes"))
+    if(!strsame(s, "yes"))
         return CONFIG_ONDEMAND_YES;
-    else if(!strcmp(s, "no"))
+    else if(!strsame(s, "no"))
         return CONFIG_ONDEMAND_NO;
-    else if(!strcmp(s, "auto") || !strcmp(s, "on demand"))
+    else if(!strsame(s, "auto") || !strsame(s, "on demand"))
         return CONFIG_ONDEMAND_ONDEMAND;
 
     return value;
@@ -313,7 +313,7 @@ const char *config_set_default(const char *section, const char *name, const char
     if(cv->flags & CONFIG_VALUE_LOADED)
         return cv->value;
 
-    if(strcmp(cv->value, value) != 0) {
+    if(strsame(cv->value, value) != 0) {
         cv->flags |= CONFIG_VALUE_CHANGED;
 
         freez(cv->value);
@@ -336,7 +336,7 @@ const char *config_set(const char *section, const char *name, const char *value)
     if(!cv) cv = config_value_create(co, name, value);
     cv->flags |= CONFIG_VALUE_USED;
 
-    if(strcmp(cv->value, value) != 0) {
+    if(strsame(cv->value, value) != 0) {
         cv->flags |= CONFIG_VALUE_CHANGED;
 
         freez(cv->value);
@@ -492,11 +492,11 @@ void generate_config(BUFFER *wb, int only_changed)
 
         config_global_write_lock();
         for(co = config_root; co ; co = co->next) {
-            if(!strcmp(co->name, "global") ||
-                    !strcmp(co->name, "plugins")  ||
-                    !strcmp(co->name, "registry") ||
-                    !strcmp(co->name, "health")   ||
-                    !strcmp(co->name, "backend"))
+            if(!strsame(co->name, "global") ||
+                    !strsame(co->name, "plugins")  ||
+                    !strsame(co->name, "registry") ||
+                    !strsame(co->name, "health")   ||
+                    !strsame(co->name, "backend"))
                 pri = 0;
             else if(!strncmp(co->name, "plugin:", 7)) pri = 1;
             else pri = 2;
