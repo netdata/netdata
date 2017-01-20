@@ -224,7 +224,7 @@ class Service(UrlService):
                         (self._get_cluster_stats, url_cluster_stats)]
 
         # Remove disabled API calls from 'avail methods'
-        self.methods = [choice[0] for choice in list(zip(avail_methods, user_choice)) if choice[1]]
+        self.methods = [avail_methods[_] for _ in range(len(avail_methods)) if user_choice[_]]
 
         # Run _get_data for ALL active API calls. 
         api_result = {}
@@ -284,10 +284,9 @@ class Service(UrlService):
 
             to_netdata = dict()
             to_netdata.update(update_key('health', data))
-            to_netdata['status_green'] = 1 if to_netdata.get('health_status') == 'green' else 0
-            to_netdata['status_red'] = 1 if to_netdata.get('health_status') == 'red' else 0
-            to_netdata['status_yellow'] = 1 if to_netdata.get('health_status') == 'yellow' else 0
-            to_netdata['status_foo1'], to_netdata['status_foo2'], to_netdata['status_foo3'] = 0, 0, 0
+            to_netdata.update({'status_green': 0, 'status_red': 0, 'status_yellow': 0,
+                               'status_foo1': 0, 'status_foo2': 0, 'status_foo3': 0})
+            to_netdata[''.join(['status_', to_netdata.get('health_status', '')])] = 1
 
             queue.put(to_netdata)
 
@@ -360,7 +359,7 @@ class Service(UrlService):
             queue.put(to_netdata)
 
     def find_avg(self, value1, value2, key):
-        if key not in self.latency.keys():
+        if key not in self.latency:
             self.latency.update({key: [value1, value2]})
             return 0
         else:
