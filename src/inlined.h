@@ -77,11 +77,15 @@ static inline unsigned long long str2ull(const char *s) {
     return n;
 }
 
+#ifdef NETDATA_STRSAME
 static inline int strsame(register const char *a, register const char *b) {
     if(unlikely(a == b)) return 0;
     while(*a && *a == *b) { a++; b++; }
     return *a - *b;
 }
+#else
+#define strsame(a, b) strcmp(a, b)
+#endif // NETDATA_STRSAME
 
 static inline int read_single_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
