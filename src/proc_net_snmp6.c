@@ -1,5 +1,4 @@
 #include "common.h"
-#include "adaptive_resortable_list.h"
 
 #define RRD_TYPE_NET_SNMP6          "ipv6"
 
@@ -258,6 +257,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
         return 0; // we return 0, so that we will retry to open it next time
 
     size_t lines = procfile_lines(ff), l;
+
+    arl_begin(arl_base);
 
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);

@@ -1,5 +1,4 @@
 #include "common.h"
-#include "adaptive_resortable_list.h"
 
 // ----------------------------------------------------------------------------
 // cgroup globals
