@@ -162,7 +162,7 @@ CHARTS = {
             ['store_size_in_bytes', 'size', 'absolute', 1, 1048567]
         ]},
     'cluster_stats_indices_shards': {
-        'options': [None, 'Inidecs and shards statistics', 'count', 'Cluster stats API',
+        'options': [None, 'Indices and shards statistics', 'count', 'Cluster stats API',
                     'es.cluster_stats_ind_sha', 'stacked'],
         'lines': [
             ['indices_count', 'indices', 'absolute'],
@@ -256,10 +256,7 @@ class Service(UrlService):
             thread.join()
             result.update(queue.get())
 
-        if result:
-            return result
-        else:
-            return None
+        return result or None
 
     def _get_cluster_health(self, queue, url):
         """
