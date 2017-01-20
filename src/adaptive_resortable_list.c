@@ -51,14 +51,17 @@ void arl_begin(ARL_BASE *base) {
     ARL_ENTRY *e;
 
     /*
-    info("iteration %zu, expected %zu, wanted %zu, allocated %zu, relinkings %zu, found %zu, added %zu"
+    info("iteration %zu, expected %zu, wanted %zu, allocated %zu, fred %zu, relinkings %zu, found %zu, added %zu, fast %zu, slow %zu"
          , base->iteration
          , base->expected
          , base->wanted
          , base->allocated
+         , base->fred
          , base->relinkings
          , base->found
          , base->added
+         , base->fast
+         , base->slow
     );
     for(e = base->head; e ; e = e->next) fprintf(stderr, "%s ", e->name);
     fprintf(stderr, "\n");
@@ -67,9 +70,29 @@ void arl_begin(ARL_BASE *base) {
     if(unlikely(base->added || base->iteration % base->rechecks) == 1) {
         base->added = 0;
         base->wanted = 0;
-        for(e = base->head; e ; e = e->next)
-            if(e->flags & ARL_ENTRY_FLAG_FOUND && e->flags & ARL_ENTRY_FLAG_EXPECTED)
-                base->wanted++;
+        for(e = base->head; e ; e = e->next) {
+            if(e->flags & ARL_ENTRY_FLAG_FOUND) {
+
+                // remove the found flag
+                e->flags &= ~ARL_ENTRY_FLAG_FOUND;
+
+                // count it in wanted
+                if(e->flags & ARL_ENTRY_FLAG_EXPECTED)
+                    base->wanted++;
+            }
+            else if(e->flags & ARL_ENTRY_FLAG_DYNAMIC) {
+                // we can remove this entry
+                // it is not found, and it was created because
+                // it was found in the source file
+                if(e->next) e->next->prev = e->prev;
+                if(e->prev) e->prev->next = e->next;
+                if(base->head == e) base->head = e->next;
+                freez(e->name);
+                freez(e);
+
+                base->fred++;
+            }
+        }
     }
 
     base->iteration++;
@@ -152,14 +175,14 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, uint32_t hash, 
         e->prev = base->next_keyword->prev;
         base->next_keyword->prev = e;
 
+        if(e->prev)
+            e->prev->next = e;
+
         if(base->head == base->next_keyword)
             base->head = e;
     }
     else
         e->prev = NULL;
-
-    if(e->prev)
-        e->prev->next = e;
 
     base->next_keyword = e->next;
     if(unlikely(!base->next_keyword))
