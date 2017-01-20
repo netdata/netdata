@@ -20,7 +20,7 @@ retries = 60
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['search_perf_total', 'search_perf_time', 'search_latency', 'index_perf_total', 'index_perf_time',
          'index_latency', 'jvm_mem_heap', 'jvm_gc_count', 'jvm_gc_time', 'thread_pool_qr', 'fdata_cache',
-         'fdata_ev_tr', 'cluster_health_nodes', 'cluster_health_shards', 'cluster_stats_nodes',
+         'fdata_ev_tr', 'cluster_health_status', 'cluster_health_nodes', 'cluster_health_shards', 'cluster_stats_nodes',
          'cluster_stats_query_cache', 'cluster_stats_docs', 'cluster_stats_store', 'cluster_stats_indices_shards']
 
 CHARTS = {
@@ -120,6 +120,17 @@ CHARTS = {
             ["health_number_of_data_nodes", 'data_nodes', 'absolute'],
             ["health_number_of_pending_tasks", 'pending_tasks', 'absolute'],
             ["health_number_of_in_flight_fetch", 'inflight_fetch', 'absolute']
+        ]},
+    'cluster_health_status': {
+        'options': [None, 'Cluster status', 'status', 'Cluster health API',
+                    'es.cluster_health_status', 'area'],
+        'lines': [
+            ["status_green", 'green', 'absolute'],
+            ["status_red", 'red', 'absolute'],
+            ["status_foo1", None, 'absolute'],
+            ["status_foo2", None, 'absolute'],
+            ["status_foo3", None, 'absolute'],
+            ["status_yellow", 'yellow', 'absolute']
         ]},
     'cluster_health_shards': {
         'options': [None, 'Shards statistics', 'shards', 'Cluster health API',
@@ -273,6 +284,10 @@ class Service(UrlService):
 
             to_netdata = dict()
             to_netdata.update(update_key('health', data))
+            to_netdata['status_green'] = 1 if to_netdata.get('health_status') == 'green' else 0
+            to_netdata['status_red'] = 1 if to_netdata.get('health_status') == 'red' else 0
+            to_netdata['status_yellow'] = 1 if to_netdata.get('health_status') == 'yellow' else 0
+            to_netdata['status_foo1'], to_netdata['status_foo2'], to_netdata['status_foo3'] = 0, 0, 0
 
             queue.put(to_netdata)
 
