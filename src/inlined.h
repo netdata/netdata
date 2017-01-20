@@ -7,8 +7,8 @@
 // these functions that are called thousands of times per second
 
 static inline uint32_t simple_hash(const char *name) {
-    register unsigned char *s = (unsigned char *) name;
-    register uint32_t hval = 0x811c9dc5;
+    unsigned char *s = (unsigned char *) name;
+    uint32_t hval = 0x811c9dc5;
     while (*s) {
         hval *= 16777619;
         hval ^= (uint32_t) *s++;
@@ -17,8 +17,8 @@ static inline uint32_t simple_hash(const char *name) {
 }
 
 static inline uint32_t simple_uhash(const char *name) {
-    register unsigned char *s = (unsigned char *) name;
-    register uint32_t hval = 0x811c9dc5, c;
+    unsigned char *s = (unsigned char *) name;
+    uint32_t hval = 0x811c9dc5, c;
     while ((c = *s++)) {
         if (unlikely(c >= 'A' && c <= 'Z')) c += 'a' - 'A';
         hval *= 16777619;
@@ -28,8 +28,8 @@ static inline uint32_t simple_uhash(const char *name) {
 }
 
 static inline int str2i(const char *s) {
-    register int n = 0;
-    register char c, negative = (*s == '-');
+    int n = 0;
+    char c, negative = (*s == '-');
 
     for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' ; c = *(++s)) {
         n *= 10;
@@ -43,8 +43,8 @@ static inline int str2i(const char *s) {
 }
 
 static inline long str2l(const char *s) {
-    register long n = 0;
-    register char c, negative = (*s == '-');
+    long n = 0;
+    char c, negative = (*s == '-');
 
     for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' ; c = *(++s)) {
         n *= 10;
@@ -58,8 +58,8 @@ static inline long str2l(const char *s) {
 }
 
 static inline unsigned long str2ul(const char *s) {
-    register unsigned long n = 0;
-    register char c;
+    unsigned long n = 0;
+    char c;
     for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
         n *= 10;
         n += c - '0';
@@ -68,8 +68,8 @@ static inline unsigned long str2ul(const char *s) {
 }
 
 static inline unsigned long long str2ull(const char *s) {
-    register unsigned long long n = 0;
-    register char c;
+    unsigned long long n = 0;
+    char c;
     for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
         n *= 10;
         n += c - '0';
@@ -78,7 +78,7 @@ static inline unsigned long long str2ull(const char *s) {
 }
 
 #ifdef NETDATA_STRSAME
-static inline int strsame(register const char *a, register const char *b) {
+static inline int strsame(const char *a, const char *b) {
     if(unlikely(a == b)) return 0;
     while(*a && *a == *b) { a++; b++; }
     return *a - *b;
