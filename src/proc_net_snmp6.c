@@ -1,4 +1,5 @@
 #include "common.h"
+#include "adaptive_resortable_list.h"
 
 #define RRD_TYPE_NET_SNMP6          "ipv6"
 
@@ -6,215 +7,126 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
     (void)dt;
 
     static procfile *ff = NULL;
-    static int initialized = 0;
 
-    static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
-        do_udplite_packets = -1, do_udplite_errors = -1,
-        do_udp_packets = -1, do_udp_errors = -1,
-        do_bandwidth = -1, do_mcast = -1, do_bcast = -1, do_mcast_p = -1,
-        do_icmp = -1, do_icmp_redir = -1, do_icmp_errors = -1, do_icmp_echos = -1, do_icmp_groupmemb = -1,
-        do_icmp_router = -1, do_icmp_neighbor = -1, do_icmp_mldv2 = -1, do_icmp_types = -1, do_ect = -1;
+    static int do_ip_packets = -1,
+            do_ip_fragsout = -1,
+            do_ip_fragsin = -1,
+            do_ip_errors = -1,
+            do_udplite_packets = -1,
+            do_udplite_errors = -1,
+            do_udp_packets = -1,
+            do_udp_errors = -1,
+            do_bandwidth = -1,
+            do_mcast = -1,
+            do_bcast = -1,
+            do_mcast_p = -1,
+            do_icmp = -1,
+            do_icmp_redir = -1,
+            do_icmp_errors = -1,
+            do_icmp_echos = -1,
+            do_icmp_groupmemb = -1,
+            do_icmp_router = -1,
+            do_icmp_neighbor = -1,
+            do_icmp_mldv2 = -1,
+            do_icmp_types = -1,
+            do_ect = -1;
 
-    static uint32_t hash_Ip6InReceives = 0;
+    static ARL_BASE *arl_base = NULL;
 
-    static uint32_t hash_Ip6InHdrErrors = 0;
-    static uint32_t hash_Ip6InTooBigErrors = 0;
-    static uint32_t hash_Ip6InNoRoutes = 0;
-    static uint32_t hash_Ip6InAddrErrors = 0;
-    static uint32_t hash_Ip6InUnknownProtos = 0;
-    static uint32_t hash_Ip6InTruncatedPkts = 0;
-    static uint32_t hash_Ip6InDiscards = 0;
-    static uint32_t hash_Ip6InDelivers = 0;
+    static unsigned long long Ip6InReceives = 0ULL;
+    static unsigned long long Ip6InHdrErrors = 0ULL;
+    static unsigned long long Ip6InTooBigErrors = 0ULL;
+    static unsigned long long Ip6InNoRoutes = 0ULL;
+    static unsigned long long Ip6InAddrErrors = 0ULL;
+    static unsigned long long Ip6InUnknownProtos = 0ULL;
+    static unsigned long long Ip6InTruncatedPkts = 0ULL;
+    static unsigned long long Ip6InDiscards = 0ULL;
+    static unsigned long long Ip6InDelivers = 0ULL;
+    static unsigned long long Ip6OutForwDatagrams = 0ULL;
+    static unsigned long long Ip6OutRequests = 0ULL;
+    static unsigned long long Ip6OutDiscards = 0ULL;
+    static unsigned long long Ip6OutNoRoutes = 0ULL;
+    static unsigned long long Ip6ReasmTimeout = 0ULL;
+    static unsigned long long Ip6ReasmReqds = 0ULL;
+    static unsigned long long Ip6ReasmOKs = 0ULL;
+    static unsigned long long Ip6ReasmFails = 0ULL;
+    static unsigned long long Ip6FragOKs = 0ULL;
+    static unsigned long long Ip6FragFails = 0ULL;
+    static unsigned long long Ip6FragCreates = 0ULL;
+    static unsigned long long Ip6InMcastPkts = 0ULL;
+    static unsigned long long Ip6OutMcastPkts = 0ULL;
+    static unsigned long long Ip6InOctets = 0ULL;
+    static unsigned long long Ip6OutOctets = 0ULL;
+    static unsigned long long Ip6InMcastOctets = 0ULL;
+    static unsigned long long Ip6OutMcastOctets = 0ULL;
+    static unsigned long long Ip6InBcastOctets = 0ULL;
+    static unsigned long long Ip6OutBcastOctets = 0ULL;
+    static unsigned long long Ip6InNoECTPkts = 0ULL;
+    static unsigned long long Ip6InECT1Pkts = 0ULL;
+    static unsigned long long Ip6InECT0Pkts = 0ULL;
+    static unsigned long long Ip6InCEPkts = 0ULL;
+    static unsigned long long Icmp6InMsgs = 0ULL;
+    static unsigned long long Icmp6InErrors = 0ULL;
+    static unsigned long long Icmp6OutMsgs = 0ULL;
+    static unsigned long long Icmp6OutErrors = 0ULL;
+    static unsigned long long Icmp6InCsumErrors = 0ULL;
+    static unsigned long long Icmp6InDestUnreachs = 0ULL;
+    static unsigned long long Icmp6InPktTooBigs = 0ULL;
+    static unsigned long long Icmp6InTimeExcds = 0ULL;
+    static unsigned long long Icmp6InParmProblems = 0ULL;
+    static unsigned long long Icmp6InEchos = 0ULL;
+    static unsigned long long Icmp6InEchoReplies = 0ULL;
+    static unsigned long long Icmp6InGroupMembQueries = 0ULL;
+    static unsigned long long Icmp6InGroupMembResponses = 0ULL;
+    static unsigned long long Icmp6InGroupMembReductions = 0ULL;
+    static unsigned long long Icmp6InRouterSolicits = 0ULL;
+    static unsigned long long Icmp6InRouterAdvertisements = 0ULL;
+    static unsigned long long Icmp6InNeighborSolicits = 0ULL;
+    static unsigned long long Icmp6InNeighborAdvertisements = 0ULL;
+    static unsigned long long Icmp6InRedirects = 0ULL;
+    static unsigned long long Icmp6InMLDv2Reports = 0ULL;
+    static unsigned long long Icmp6OutDestUnreachs = 0ULL;
+    static unsigned long long Icmp6OutPktTooBigs = 0ULL;
+    static unsigned long long Icmp6OutTimeExcds = 0ULL;
+    static unsigned long long Icmp6OutParmProblems = 0ULL;
+    static unsigned long long Icmp6OutEchos = 0ULL;
+    static unsigned long long Icmp6OutEchoReplies = 0ULL;
+    static unsigned long long Icmp6OutGroupMembQueries = 0ULL;
+    static unsigned long long Icmp6OutGroupMembResponses = 0ULL;
+    static unsigned long long Icmp6OutGroupMembReductions = 0ULL;
+    static unsigned long long Icmp6OutRouterSolicits = 0ULL;
+    static unsigned long long Icmp6OutRouterAdvertisements = 0ULL;
+    static unsigned long long Icmp6OutNeighborSolicits = 0ULL;
+    static unsigned long long Icmp6OutNeighborAdvertisements = 0ULL;
+    static unsigned long long Icmp6OutRedirects = 0ULL;
+    static unsigned long long Icmp6OutMLDv2Reports = 0ULL;
+    static unsigned long long Icmp6InType1 = 0ULL;
+    static unsigned long long Icmp6InType128 = 0ULL;
+    static unsigned long long Icmp6InType129 = 0ULL;
+    static unsigned long long Icmp6InType136 = 0ULL;
+    static unsigned long long Icmp6OutType1 = 0ULL;
+    static unsigned long long Icmp6OutType128 = 0ULL;
+    static unsigned long long Icmp6OutType129 = 0ULL;
+    static unsigned long long Icmp6OutType133 = 0ULL;
+    static unsigned long long Icmp6OutType135 = 0ULL;
+    static unsigned long long Icmp6OutType143 = 0ULL;
+    static unsigned long long Udp6InDatagrams = 0ULL;
+    static unsigned long long Udp6NoPorts = 0ULL;
+    static unsigned long long Udp6InErrors = 0ULL;
+    static unsigned long long Udp6OutDatagrams = 0ULL;
+    static unsigned long long Udp6RcvbufErrors = 0ULL;
+    static unsigned long long Udp6SndbufErrors = 0ULL;
+    static unsigned long long Udp6InCsumErrors = 0ULL;
+    static unsigned long long Udp6IgnoredMulti = 0ULL;
+    static unsigned long long UdpLite6InDatagrams = 0ULL;
+    static unsigned long long UdpLite6NoPorts = 0ULL;
+    static unsigned long long UdpLite6InErrors = 0ULL;
+    static unsigned long long UdpLite6OutDatagrams = 0ULL;
+    static unsigned long long UdpLite6RcvbufErrors = 0ULL;
+    static unsigned long long UdpLite6SndbufErrors = 0ULL;
+    static unsigned long long UdpLite6InCsumErrors = 0ULL;
 
-    static uint32_t hash_Ip6OutForwDatagrams = 0;
-    static uint32_t hash_Ip6OutRequests = 0;
-    static uint32_t hash_Ip6OutDiscards = 0;
-    static uint32_t hash_Ip6OutNoRoutes = 0;
-
-    static uint32_t hash_Ip6ReasmTimeout = 0;
-    static uint32_t hash_Ip6ReasmReqds = 0;
-    static uint32_t hash_Ip6ReasmOKs = 0;
-    static uint32_t hash_Ip6ReasmFails = 0;
-
-    static uint32_t hash_Ip6FragOKs = 0;
-    static uint32_t hash_Ip6FragFails = 0;
-    static uint32_t hash_Ip6FragCreates = 0;
-
-    static uint32_t hash_Ip6InMcastPkts = 0;
-    static uint32_t hash_Ip6OutMcastPkts = 0;
-
-    static uint32_t hash_Ip6InOctets = 0;
-    static uint32_t hash_Ip6OutOctets = 0;
-
-    static uint32_t hash_Ip6InMcastOctets = 0;
-    static uint32_t hash_Ip6OutMcastOctets = 0;
-    static uint32_t hash_Ip6InBcastOctets = 0;
-    static uint32_t hash_Ip6OutBcastOctets = 0;
-
-    static uint32_t hash_Ip6InNoECTPkts = 0;
-    static uint32_t hash_Ip6InECT1Pkts = 0;
-    static uint32_t hash_Ip6InECT0Pkts = 0;
-    static uint32_t hash_Ip6InCEPkts = 0;
-
-    static uint32_t hash_Icmp6InMsgs = 0;
-    static uint32_t hash_Icmp6InErrors = 0;
-    static uint32_t hash_Icmp6OutMsgs = 0;
-    static uint32_t hash_Icmp6OutErrors = 0;
-    static uint32_t hash_Icmp6InCsumErrors = 0;
-    static uint32_t hash_Icmp6InDestUnreachs = 0;
-    static uint32_t hash_Icmp6InPktTooBigs = 0;
-    static uint32_t hash_Icmp6InTimeExcds = 0;
-    static uint32_t hash_Icmp6InParmProblems = 0;
-    static uint32_t hash_Icmp6InEchos = 0;
-    static uint32_t hash_Icmp6InEchoReplies = 0;
-    static uint32_t hash_Icmp6InGroupMembQueries = 0;
-    static uint32_t hash_Icmp6InGroupMembResponses = 0;
-    static uint32_t hash_Icmp6InGroupMembReductions = 0;
-    static uint32_t hash_Icmp6InRouterSolicits = 0;
-    static uint32_t hash_Icmp6InRouterAdvertisements = 0;
-    static uint32_t hash_Icmp6InNeighborSolicits = 0;
-    static uint32_t hash_Icmp6InNeighborAdvertisements = 0;
-    static uint32_t hash_Icmp6InRedirects = 0;
-    static uint32_t hash_Icmp6InMLDv2Reports = 0;
-    static uint32_t hash_Icmp6OutDestUnreachs = 0;
-    static uint32_t hash_Icmp6OutPktTooBigs = 0;
-    static uint32_t hash_Icmp6OutTimeExcds = 0;
-    static uint32_t hash_Icmp6OutParmProblems = 0;
-    static uint32_t hash_Icmp6OutEchos = 0;
-    static uint32_t hash_Icmp6OutEchoReplies = 0;
-    static uint32_t hash_Icmp6OutGroupMembQueries = 0;
-    static uint32_t hash_Icmp6OutGroupMembResponses = 0;
-    static uint32_t hash_Icmp6OutGroupMembReductions = 0;
-    static uint32_t hash_Icmp6OutRouterSolicits = 0;
-    static uint32_t hash_Icmp6OutRouterAdvertisements = 0;
-    static uint32_t hash_Icmp6OutNeighborSolicits = 0;
-    static uint32_t hash_Icmp6OutNeighborAdvertisements = 0;
-    static uint32_t hash_Icmp6OutRedirects = 0;
-    static uint32_t hash_Icmp6OutMLDv2Reports = 0;
-    static uint32_t hash_Icmp6InType1 = 0;
-    static uint32_t hash_Icmp6InType128 = 0;
-    static uint32_t hash_Icmp6InType129 = 0;
-    static uint32_t hash_Icmp6InType136 = 0;
-    static uint32_t hash_Icmp6OutType1 = 0;
-    static uint32_t hash_Icmp6OutType128 = 0;
-    static uint32_t hash_Icmp6OutType129 = 0;
-    static uint32_t hash_Icmp6OutType133 = 0;
-    static uint32_t hash_Icmp6OutType135 = 0;
-    static uint32_t hash_Icmp6OutType143 = 0;
-
-    static uint32_t hash_Udp6InDatagrams = 0;
-    static uint32_t hash_Udp6NoPorts = 0;
-    static uint32_t hash_Udp6InErrors = 0;
-    static uint32_t hash_Udp6OutDatagrams = 0;
-    static uint32_t hash_Udp6RcvbufErrors = 0;
-    static uint32_t hash_Udp6SndbufErrors = 0;
-    static uint32_t hash_Udp6InCsumErrors = 0;
-    static uint32_t hash_Udp6IgnoredMulti = 0;
-
-    static uint32_t hash_UdpLite6InDatagrams = 0;
-    static uint32_t hash_UdpLite6NoPorts = 0;
-    static uint32_t hash_UdpLite6InErrors = 0;
-    static uint32_t hash_UdpLite6OutDatagrams = 0;
-    static uint32_t hash_UdpLite6RcvbufErrors = 0;
-    static uint32_t hash_UdpLite6SndbufErrors = 0;
-    static uint32_t hash_UdpLite6InCsumErrors = 0;
-
-    if(unlikely(!initialized)) {
-        initialized = 1;
-
-        hash_Ip6InReceives = simple_hash("Ip6InReceives");
-        hash_Ip6InHdrErrors = simple_hash("Ip6InHdrErrors");
-        hash_Ip6InTooBigErrors = simple_hash("Ip6InTooBigErrors");
-        hash_Ip6InNoRoutes = simple_hash("Ip6InNoRoutes");
-        hash_Ip6InAddrErrors = simple_hash("Ip6InAddrErrors");
-        hash_Ip6InUnknownProtos = simple_hash("Ip6InUnknownProtos");
-        hash_Ip6InTruncatedPkts = simple_hash("Ip6InTruncatedPkts");
-        hash_Ip6InDiscards = simple_hash("Ip6InDiscards");
-        hash_Ip6InDelivers = simple_hash("Ip6InDelivers");
-        hash_Ip6OutForwDatagrams = simple_hash("Ip6OutForwDatagrams");
-        hash_Ip6OutRequests = simple_hash("Ip6OutRequests");
-        hash_Ip6OutDiscards = simple_hash("Ip6OutDiscards");
-        hash_Ip6OutNoRoutes = simple_hash("Ip6OutNoRoutes");
-        hash_Ip6ReasmTimeout = simple_hash("Ip6ReasmTimeout");
-        hash_Ip6ReasmReqds = simple_hash("Ip6ReasmReqds");
-        hash_Ip6ReasmOKs = simple_hash("Ip6ReasmOKs");
-        hash_Ip6ReasmFails = simple_hash("Ip6ReasmFails");
-        hash_Ip6FragOKs = simple_hash("Ip6FragOKs");
-        hash_Ip6FragFails = simple_hash("Ip6FragFails");
-        hash_Ip6FragCreates = simple_hash("Ip6FragCreates");
-        hash_Ip6InMcastPkts = simple_hash("Ip6InMcastPkts");
-        hash_Ip6OutMcastPkts = simple_hash("Ip6OutMcastPkts");
-        hash_Ip6InOctets = simple_hash("Ip6InOctets");
-        hash_Ip6OutOctets = simple_hash("Ip6OutOctets");
-        hash_Ip6InMcastOctets = simple_hash("Ip6InMcastOctets");
-        hash_Ip6OutMcastOctets = simple_hash("Ip6OutMcastOctets");
-        hash_Ip6InBcastOctets = simple_hash("Ip6InBcastOctets");
-        hash_Ip6OutBcastOctets = simple_hash("Ip6OutBcastOctets");
-        hash_Ip6InNoECTPkts = simple_hash("Ip6InNoECTPkts");
-        hash_Ip6InECT1Pkts = simple_hash("Ip6InECT1Pkts");
-        hash_Ip6InECT0Pkts = simple_hash("Ip6InECT0Pkts");
-        hash_Ip6InCEPkts = simple_hash("Ip6InCEPkts");
-        hash_Icmp6InMsgs = simple_hash("Icmp6InMsgs");
-        hash_Icmp6InErrors = simple_hash("Icmp6InErrors");
-        hash_Icmp6OutMsgs = simple_hash("Icmp6OutMsgs");
-        hash_Icmp6OutErrors = simple_hash("Icmp6OutErrors");
-        hash_Icmp6InCsumErrors = simple_hash("Icmp6InCsumErrors");
-        hash_Icmp6InDestUnreachs = simple_hash("Icmp6InDestUnreachs");
-        hash_Icmp6InPktTooBigs = simple_hash("Icmp6InPktTooBigs");
-        hash_Icmp6InTimeExcds = simple_hash("Icmp6InTimeExcds");
-        hash_Icmp6InParmProblems = simple_hash("Icmp6InParmProblems");
-        hash_Icmp6InEchos = simple_hash("Icmp6InEchos");
-        hash_Icmp6InEchoReplies = simple_hash("Icmp6InEchoReplies");
-        hash_Icmp6InGroupMembQueries = simple_hash("Icmp6InGroupMembQueries");
-        hash_Icmp6InGroupMembResponses = simple_hash("Icmp6InGroupMembResponses");
-        hash_Icmp6InGroupMembReductions = simple_hash("Icmp6InGroupMembReductions");
-        hash_Icmp6InRouterSolicits = simple_hash("Icmp6InRouterSolicits");
-        hash_Icmp6InRouterAdvertisements = simple_hash("Icmp6InRouterAdvertisements");
-        hash_Icmp6InNeighborSolicits = simple_hash("Icmp6InNeighborSolicits");
-        hash_Icmp6InNeighborAdvertisements = simple_hash("Icmp6InNeighborAdvertisements");
-        hash_Icmp6InRedirects = simple_hash("Icmp6InRedirects");
-        hash_Icmp6InMLDv2Reports = simple_hash("Icmp6InMLDv2Reports");
-        hash_Icmp6OutDestUnreachs = simple_hash("Icmp6OutDestUnreachs");
-        hash_Icmp6OutPktTooBigs = simple_hash("Icmp6OutPktTooBigs");
-        hash_Icmp6OutTimeExcds = simple_hash("Icmp6OutTimeExcds");
-        hash_Icmp6OutParmProblems = simple_hash("Icmp6OutParmProblems");
-        hash_Icmp6OutEchos = simple_hash("Icmp6OutEchos");
-        hash_Icmp6OutEchoReplies = simple_hash("Icmp6OutEchoReplies");
-        hash_Icmp6OutGroupMembQueries = simple_hash("Icmp6OutGroupMembQueries");
-        hash_Icmp6OutGroupMembResponses = simple_hash("Icmp6OutGroupMembResponses");
-        hash_Icmp6OutGroupMembReductions = simple_hash("Icmp6OutGroupMembReductions");
-        hash_Icmp6OutRouterSolicits = simple_hash("Icmp6OutRouterSolicits");
-        hash_Icmp6OutRouterAdvertisements = simple_hash("Icmp6OutRouterAdvertisements");
-        hash_Icmp6OutNeighborSolicits = simple_hash("Icmp6OutNeighborSolicits");
-        hash_Icmp6OutNeighborAdvertisements = simple_hash("Icmp6OutNeighborAdvertisements");
-        hash_Icmp6OutRedirects = simple_hash("Icmp6OutRedirects");
-        hash_Icmp6OutMLDv2Reports = simple_hash("Icmp6OutMLDv2Reports");
-        hash_Icmp6InType1 = simple_hash("Icmp6InType1");
-        hash_Icmp6InType128 = simple_hash("Icmp6InType128");
-        hash_Icmp6InType129 = simple_hash("Icmp6InType129");
-        hash_Icmp6InType136 = simple_hash("Icmp6InType136");
-        hash_Icmp6OutType1 = simple_hash("Icmp6OutType1");
-        hash_Icmp6OutType128 = simple_hash("Icmp6OutType128");
-        hash_Icmp6OutType129 = simple_hash("Icmp6OutType129");
-        hash_Icmp6OutType133 = simple_hash("Icmp6OutType133");
-        hash_Icmp6OutType135 = simple_hash("Icmp6OutType135");
-        hash_Icmp6OutType143 = simple_hash("Icmp6OutType143");
-        hash_Udp6InDatagrams = simple_hash("Udp6InDatagrams");
-        hash_Udp6NoPorts = simple_hash("Udp6NoPorts");
-        hash_Udp6InErrors = simple_hash("Udp6InErrors");
-        hash_Udp6OutDatagrams = simple_hash("Udp6OutDatagrams");
-        hash_Udp6RcvbufErrors = simple_hash("Udp6RcvbufErrors");
-        hash_Udp6SndbufErrors = simple_hash("Udp6SndbufErrors");
-        hash_Udp6InCsumErrors = simple_hash("Udp6InCsumErrors");
-        hash_Udp6IgnoredMulti = simple_hash("Udp6IgnoredMulti");
-        hash_UdpLite6InDatagrams = simple_hash("UdpLite6InDatagrams");
-        hash_UdpLite6NoPorts = simple_hash("UdpLite6NoPorts");
-        hash_UdpLite6InErrors = simple_hash("UdpLite6InErrors");
-        hash_UdpLite6OutDatagrams = simple_hash("UdpLite6OutDatagrams");
-        hash_UdpLite6RcvbufErrors = simple_hash("UdpLite6RcvbufErrors");
-        hash_UdpLite6SndbufErrors = simple_hash("UdpLite6SndbufErrors");
-        hash_UdpLite6InCsumErrors = simple_hash("UdpLite6InCsumErrors");
-
+    if(unlikely(!arl_base)) {
         do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 packets", CONFIG_ONDEMAND_ONDEMAND);
         do_ip_fragsout      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments sent", CONFIG_ONDEMAND_ONDEMAND);
         do_ip_fragsin       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments assembly", CONFIG_ONDEMAND_ONDEMAND);
@@ -237,6 +149,100 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
         do_icmp_mldv2       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp mldv2", CONFIG_ONDEMAND_ONDEMAND);
         do_icmp_types       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp types", CONFIG_ONDEMAND_ONDEMAND);
         do_ect              = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ect", CONFIG_ONDEMAND_ONDEMAND);
+
+        arl_base = arl_create(NULL, 60);
+        arl_expect(arl_base, "Ip6InReceives", &Ip6InReceives);
+        arl_expect(arl_base, "Ip6InHdrErrors", &Ip6InHdrErrors);
+        arl_expect(arl_base, "Ip6InTooBigErrors", &Ip6InTooBigErrors);
+        arl_expect(arl_base, "Ip6InNoRoutes", &Ip6InNoRoutes);
+        arl_expect(arl_base, "Ip6InAddrErrors", &Ip6InAddrErrors);
+        arl_expect(arl_base, "Ip6InUnknownProtos", &Ip6InUnknownProtos);
+        arl_expect(arl_base, "Ip6InTruncatedPkts", &Ip6InTruncatedPkts);
+        arl_expect(arl_base, "Ip6InDiscards", &Ip6InDiscards);
+        arl_expect(arl_base, "Ip6InDelivers", &Ip6InDelivers);
+        arl_expect(arl_base, "Ip6OutForwDatagrams", &Ip6OutForwDatagrams);
+        arl_expect(arl_base, "Ip6OutRequests", &Ip6OutRequests);
+        arl_expect(arl_base, "Ip6OutDiscards", &Ip6OutDiscards);
+        arl_expect(arl_base, "Ip6OutNoRoutes", &Ip6OutNoRoutes);
+        arl_expect(arl_base, "Ip6ReasmTimeout", &Ip6ReasmTimeout);
+        arl_expect(arl_base, "Ip6ReasmReqds", &Ip6ReasmReqds);
+        arl_expect(arl_base, "Ip6ReasmOKs", &Ip6ReasmOKs);
+        arl_expect(arl_base, "Ip6ReasmFails", &Ip6ReasmFails);
+        arl_expect(arl_base, "Ip6FragOKs", &Ip6FragOKs);
+        arl_expect(arl_base, "Ip6FragFails", &Ip6FragFails);
+        arl_expect(arl_base, "Ip6FragCreates", &Ip6FragCreates);
+        arl_expect(arl_base, "Ip6InMcastPkts", &Ip6InMcastPkts);
+        arl_expect(arl_base, "Ip6OutMcastPkts", &Ip6OutMcastPkts);
+        arl_expect(arl_base, "Ip6InOctets", &Ip6InOctets);
+        arl_expect(arl_base, "Ip6OutOctets", &Ip6OutOctets);
+        arl_expect(arl_base, "Ip6InMcastOctets", &Ip6InMcastOctets);
+        arl_expect(arl_base, "Ip6OutMcastOctets", &Ip6OutMcastOctets);
+        arl_expect(arl_base, "Ip6InBcastOctets", &Ip6InBcastOctets);
+        arl_expect(arl_base, "Ip6OutBcastOctets", &Ip6OutBcastOctets);
+        arl_expect(arl_base, "Ip6InNoECTPkts", &Ip6InNoECTPkts);
+        arl_expect(arl_base, "Ip6InECT1Pkts", &Ip6InECT1Pkts);
+        arl_expect(arl_base, "Ip6InECT0Pkts", &Ip6InECT0Pkts);
+        arl_expect(arl_base, "Ip6InCEPkts", &Ip6InCEPkts);
+        arl_expect(arl_base, "Icmp6InMsgs", &Icmp6InMsgs);
+        arl_expect(arl_base, "Icmp6InErrors", &Icmp6InErrors);
+        arl_expect(arl_base, "Icmp6OutMsgs", &Icmp6OutMsgs);
+        arl_expect(arl_base, "Icmp6OutErrors", &Icmp6OutErrors);
+        arl_expect(arl_base, "Icmp6InCsumErrors", &Icmp6InCsumErrors);
+        arl_expect(arl_base, "Icmp6InDestUnreachs", &Icmp6InDestUnreachs);
+        arl_expect(arl_base, "Icmp6InPktTooBigs", &Icmp6InPktTooBigs);
+        arl_expect(arl_base, "Icmp6InTimeExcds", &Icmp6InTimeExcds);
+        arl_expect(arl_base, "Icmp6InParmProblems", &Icmp6InParmProblems);
+        arl_expect(arl_base, "Icmp6InEchos", &Icmp6InEchos);
+        arl_expect(arl_base, "Icmp6InEchoReplies", &Icmp6InEchoReplies);
+        arl_expect(arl_base, "Icmp6InGroupMembQueries", &Icmp6InGroupMembQueries);
+        arl_expect(arl_base, "Icmp6InGroupMembResponses", &Icmp6InGroupMembResponses);
+        arl_expect(arl_base, "Icmp6InGroupMembReductions", &Icmp6InGroupMembReductions);
+        arl_expect(arl_base, "Icmp6InRouterSolicits", &Icmp6InRouterSolicits);
+        arl_expect(arl_base, "Icmp6InRouterAdvertisements", &Icmp6InRouterAdvertisements);
+        arl_expect(arl_base, "Icmp6InNeighborSolicits", &Icmp6InNeighborSolicits);
+        arl_expect(arl_base, "Icmp6InNeighborAdvertisements", &Icmp6InNeighborAdvertisements);
+        arl_expect(arl_base, "Icmp6InRedirects", &Icmp6InRedirects);
+        arl_expect(arl_base, "Icmp6InMLDv2Reports", &Icmp6InMLDv2Reports);
+        arl_expect(arl_base, "Icmp6OutDestUnreachs", &Icmp6OutDestUnreachs);
+        arl_expect(arl_base, "Icmp6OutPktTooBigs", &Icmp6OutPktTooBigs);
+        arl_expect(arl_base, "Icmp6OutTimeExcds", &Icmp6OutTimeExcds);
+        arl_expect(arl_base, "Icmp6OutParmProblems", &Icmp6OutParmProblems);
+        arl_expect(arl_base, "Icmp6OutEchos", &Icmp6OutEchos);
+        arl_expect(arl_base, "Icmp6OutEchoReplies", &Icmp6OutEchoReplies);
+        arl_expect(arl_base, "Icmp6OutGroupMembQueries", &Icmp6OutGroupMembQueries);
+        arl_expect(arl_base, "Icmp6OutGroupMembResponses", &Icmp6OutGroupMembResponses);
+        arl_expect(arl_base, "Icmp6OutGroupMembReductions", &Icmp6OutGroupMembReductions);
+        arl_expect(arl_base, "Icmp6OutRouterSolicits", &Icmp6OutRouterSolicits);
+        arl_expect(arl_base, "Icmp6OutRouterAdvertisements", &Icmp6OutRouterAdvertisements);
+        arl_expect(arl_base, "Icmp6OutNeighborSolicits", &Icmp6OutNeighborSolicits);
+        arl_expect(arl_base, "Icmp6OutNeighborAdvertisements", &Icmp6OutNeighborAdvertisements);
+        arl_expect(arl_base, "Icmp6OutRedirects", &Icmp6OutRedirects);
+        arl_expect(arl_base, "Icmp6OutMLDv2Reports", &Icmp6OutMLDv2Reports);
+        arl_expect(arl_base, "Icmp6InType1", &Icmp6InType1);
+        arl_expect(arl_base, "Icmp6InType128", &Icmp6InType128);
+        arl_expect(arl_base, "Icmp6InType129", &Icmp6InType129);
+        arl_expect(arl_base, "Icmp6InType136", &Icmp6InType136);
+        arl_expect(arl_base, "Icmp6OutType1", &Icmp6OutType1);
+        arl_expect(arl_base, "Icmp6OutType128", &Icmp6OutType128);
+        arl_expect(arl_base, "Icmp6OutType129", &Icmp6OutType129);
+        arl_expect(arl_base, "Icmp6OutType133", &Icmp6OutType133);
+        arl_expect(arl_base, "Icmp6OutType135", &Icmp6OutType135);
+        arl_expect(arl_base, "Icmp6OutType143", &Icmp6OutType143);
+        arl_expect(arl_base, "Udp6InDatagrams", &Udp6InDatagrams);
+        arl_expect(arl_base, "Udp6NoPorts", &Udp6NoPorts);
+        arl_expect(arl_base, "Udp6InErrors", &Udp6InErrors);
+        arl_expect(arl_base, "Udp6OutDatagrams", &Udp6OutDatagrams);
+        arl_expect(arl_base, "Udp6RcvbufErrors", &Udp6RcvbufErrors);
+        arl_expect(arl_base, "Udp6SndbufErrors", &Udp6SndbufErrors);
+        arl_expect(arl_base, "Udp6InCsumErrors", &Udp6InCsumErrors);
+        arl_expect(arl_base, "Udp6IgnoredMulti", &Udp6IgnoredMulti);
+        arl_expect(arl_base, "UdpLite6InDatagrams", &UdpLite6InDatagrams);
+        arl_expect(arl_base, "UdpLite6NoPorts", &UdpLite6NoPorts);
+        arl_expect(arl_base, "UdpLite6InErrors", &UdpLite6InErrors);
+        arl_expect(arl_base, "UdpLite6OutDatagrams", &UdpLite6OutDatagrams);
+        arl_expect(arl_base, "UdpLite6RcvbufErrors", &UdpLite6RcvbufErrors);
+        arl_expect(arl_base, "UdpLite6SndbufErrors", &UdpLite6SndbufErrors);
+        arl_expect(arl_base, "UdpLite6InCsumErrors", &UdpLite6InCsumErrors);
     }
 
     if(unlikely(!ff)) {
@@ -253,101 +259,6 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     size_t lines = procfile_lines(ff), l;
 
-    unsigned long long Ip6InReceives = 0ULL;
-    unsigned long long Ip6InHdrErrors = 0ULL;
-    unsigned long long Ip6InTooBigErrors = 0ULL;
-    unsigned long long Ip6InNoRoutes = 0ULL;
-    unsigned long long Ip6InAddrErrors = 0ULL;
-    unsigned long long Ip6InUnknownProtos = 0ULL;
-    unsigned long long Ip6InTruncatedPkts = 0ULL;
-    unsigned long long Ip6InDiscards = 0ULL;
-    unsigned long long Ip6InDelivers = 0ULL;
-    unsigned long long Ip6OutForwDatagrams = 0ULL;
-    unsigned long long Ip6OutRequests = 0ULL;
-    unsigned long long Ip6OutDiscards = 0ULL;
-    unsigned long long Ip6OutNoRoutes = 0ULL;
-    unsigned long long Ip6ReasmTimeout = 0ULL;
-    unsigned long long Ip6ReasmReqds = 0ULL;
-    unsigned long long Ip6ReasmOKs = 0ULL;
-    unsigned long long Ip6ReasmFails = 0ULL;
-    unsigned long long Ip6FragOKs = 0ULL;
-    unsigned long long Ip6FragFails = 0ULL;
-    unsigned long long Ip6FragCreates = 0ULL;
-    unsigned long long Ip6InMcastPkts = 0ULL;
-    unsigned long long Ip6OutMcastPkts = 0ULL;
-    unsigned long long Ip6InOctets = 0ULL;
-    unsigned long long Ip6OutOctets = 0ULL;
-    unsigned long long Ip6InMcastOctets = 0ULL;
-    unsigned long long Ip6OutMcastOctets = 0ULL;
-    unsigned long long Ip6InBcastOctets = 0ULL;
-    unsigned long long Ip6OutBcastOctets = 0ULL;
-    unsigned long long Ip6InNoECTPkts = 0ULL;
-    unsigned long long Ip6InECT1Pkts = 0ULL;
-    unsigned long long Ip6InECT0Pkts = 0ULL;
-    unsigned long long Ip6InCEPkts = 0ULL;
-    unsigned long long Icmp6InMsgs = 0ULL;
-    unsigned long long Icmp6InErrors = 0ULL;
-    unsigned long long Icmp6OutMsgs = 0ULL;
-    unsigned long long Icmp6OutErrors = 0ULL;
-    unsigned long long Icmp6InCsumErrors = 0ULL;
-    unsigned long long Icmp6InDestUnreachs = 0ULL;
-    unsigned long long Icmp6InPktTooBigs = 0ULL;
-    unsigned long long Icmp6InTimeExcds = 0ULL;
-    unsigned long long Icmp6InParmProblems = 0ULL;
-    unsigned long long Icmp6InEchos = 0ULL;
-    unsigned long long Icmp6InEchoReplies = 0ULL;
-    unsigned long long Icmp6InGroupMembQueries = 0ULL;
-    unsigned long long Icmp6InGroupMembResponses = 0ULL;
-    unsigned long long Icmp6InGroupMembReductions = 0ULL;
-    unsigned long long Icmp6InRouterSolicits = 0ULL;
-    unsigned long long Icmp6InRouterAdvertisements = 0ULL;
-    unsigned long long Icmp6InNeighborSolicits = 0ULL;
-    unsigned long long Icmp6InNeighborAdvertisements = 0ULL;
-    unsigned long long Icmp6InRedirects = 0ULL;
-    unsigned long long Icmp6InMLDv2Reports = 0ULL;
-    unsigned long long Icmp6OutDestUnreachs = 0ULL;
-    unsigned long long Icmp6OutPktTooBigs = 0ULL;
-    unsigned long long Icmp6OutTimeExcds = 0ULL;
-    unsigned long long Icmp6OutParmProblems = 0ULL;
-    unsigned long long Icmp6OutEchos = 0ULL;
-    unsigned long long Icmp6OutEchoReplies = 0ULL;
-    unsigned long long Icmp6OutGroupMembQueries = 0ULL;
-    unsigned long long Icmp6OutGroupMembResponses = 0ULL;
-    unsigned long long Icmp6OutGroupMembReductions = 0ULL;
-    unsigned long long Icmp6OutRouterSolicits = 0ULL;
-    unsigned long long Icmp6OutRouterAdvertisements = 0ULL;
-    unsigned long long Icmp6OutNeighborSolicits = 0ULL;
-    unsigned long long Icmp6OutNeighborAdvertisements = 0ULL;
-    unsigned long long Icmp6OutRedirects = 0ULL;
-    unsigned long long Icmp6OutMLDv2Reports = 0ULL;
-    unsigned long long Icmp6InType1 = 0ULL;
-    unsigned long long Icmp6InType128 = 0ULL;
-    unsigned long long Icmp6InType129 = 0ULL;
-    unsigned long long Icmp6InType136 = 0ULL;
-    unsigned long long Icmp6OutType1 = 0ULL;
-    unsigned long long Icmp6OutType128 = 0ULL;
-    unsigned long long Icmp6OutType129 = 0ULL;
-    unsigned long long Icmp6OutType133 = 0ULL;
-    unsigned long long Icmp6OutType135 = 0ULL;
-    unsigned long long Icmp6OutType143 = 0ULL;
-    unsigned long long Udp6InDatagrams = 0ULL;
-    unsigned long long Udp6NoPorts = 0ULL;
-    unsigned long long Udp6InErrors = 0ULL;
-    unsigned long long Udp6OutDatagrams = 0ULL;
-    unsigned long long Udp6RcvbufErrors = 0ULL;
-    unsigned long long Udp6SndbufErrors = 0ULL;
-    unsigned long long Udp6InCsumErrors = 0ULL;
-    unsigned long long Udp6IgnoredMulti = 0ULL;
-    unsigned long long UdpLite6InDatagrams = 0ULL;
-    unsigned long long UdpLite6NoPorts = 0ULL;
-    unsigned long long UdpLite6InErrors = 0ULL;
-    unsigned long long UdpLite6OutDatagrams = 0ULL;
-    unsigned long long UdpLite6RcvbufErrors = 0ULL;
-    unsigned long long UdpLite6SndbufErrors = 0ULL;
-    unsigned long long UdpLite6InCsumErrors = 0ULL;
-
-    unsigned long long *ptr = NULL;
-
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) {
@@ -355,110 +266,9 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             continue;
         }
 
-        char *name = procfile_lineword(ff, l, 0);
-        char * value = procfile_lineword(ff, l, 1);
-        if(unlikely(!name || !*name || !value || !*value))
-            continue;
-
-        uint32_t hash = simple_hash(name);
-
-             if(unlikely(hash == hash_Ip6InReceives && strsame(name, "Ip6InReceives") == 0)) ptr = &Ip6InReceives;
-        else if(unlikely(hash == hash_Ip6InHdrErrors && strsame(name, "Ip6InHdrErrors") == 0)) ptr = &Ip6InHdrErrors;
-        else if(unlikely(hash == hash_Ip6InTooBigErrors && strsame(name, "Ip6InTooBigErrors") == 0)) ptr = &Ip6InTooBigErrors;
-        else if(unlikely(hash == hash_Ip6InNoRoutes && strsame(name, "Ip6InNoRoutes") == 0)) ptr = &Ip6InNoRoutes;
-        else if(unlikely(hash == hash_Ip6InAddrErrors && strsame(name, "Ip6InAddrErrors") == 0)) ptr = &Ip6InAddrErrors;
-        else if(unlikely(hash == hash_Ip6InUnknownProtos && strsame(name, "Ip6InUnknownProtos") == 0)) ptr = &Ip6InUnknownProtos;
-        else if(unlikely(hash == hash_Ip6InTruncatedPkts && strsame(name, "Ip6InTruncatedPkts") == 0)) ptr = &Ip6InTruncatedPkts;
-        else if(unlikely(hash == hash_Ip6InDiscards && strsame(name, "Ip6InDiscards") == 0)) ptr = &Ip6InDiscards;
-        else if(unlikely(hash == hash_Ip6InDelivers && strsame(name, "Ip6InDelivers") == 0)) ptr = &Ip6InDelivers;
-        else if(unlikely(hash == hash_Ip6OutForwDatagrams && strsame(name, "Ip6OutForwDatagrams") == 0)) ptr = &Ip6OutForwDatagrams;
-        else if(unlikely(hash == hash_Ip6OutRequests && strsame(name, "Ip6OutRequests") == 0)) ptr = &Ip6OutRequests;
-        else if(unlikely(hash == hash_Ip6OutDiscards && strsame(name, "Ip6OutDiscards") == 0)) ptr = &Ip6OutDiscards;
-        else if(unlikely(hash == hash_Ip6OutNoRoutes && strsame(name, "Ip6OutNoRoutes") == 0)) ptr = &Ip6OutNoRoutes;
-        else if(unlikely(hash == hash_Ip6ReasmTimeout && strsame(name, "Ip6ReasmTimeout") == 0)) ptr = &Ip6ReasmTimeout;
-        else if(unlikely(hash == hash_Ip6ReasmReqds && strsame(name, "Ip6ReasmReqds") == 0)) ptr = &Ip6ReasmReqds;
-        else if(unlikely(hash == hash_Ip6ReasmOKs && strsame(name, "Ip6ReasmOKs") == 0)) ptr = &Ip6ReasmOKs;
-        else if(unlikely(hash == hash_Ip6ReasmFails && strsame(name, "Ip6ReasmFails") == 0)) ptr = &Ip6ReasmFails;
-        else if(unlikely(hash == hash_Ip6FragOKs && strsame(name, "Ip6FragOKs") == 0)) ptr = &Ip6FragOKs;
-        else if(unlikely(hash == hash_Ip6FragFails && strsame(name, "Ip6FragFails") == 0)) ptr = &Ip6FragFails;
-        else if(unlikely(hash == hash_Ip6FragCreates && strsame(name, "Ip6FragCreates") == 0)) ptr = &Ip6FragCreates;
-        else if(unlikely(hash == hash_Ip6InMcastPkts && strsame(name, "Ip6InMcastPkts") == 0)) ptr = &Ip6InMcastPkts;
-        else if(unlikely(hash == hash_Ip6OutMcastPkts && strsame(name, "Ip6OutMcastPkts") == 0)) ptr = &Ip6OutMcastPkts;
-        else if(unlikely(hash == hash_Ip6InOctets && strsame(name, "Ip6InOctets") == 0)) ptr = &Ip6InOctets;
-        else if(unlikely(hash == hash_Ip6OutOctets && strsame(name, "Ip6OutOctets") == 0)) ptr = &Ip6OutOctets;
-        else if(unlikely(hash == hash_Ip6InMcastOctets && strsame(name, "Ip6InMcastOctets") == 0)) ptr = &Ip6InMcastOctets;
-        else if(unlikely(hash == hash_Ip6OutMcastOctets && strsame(name, "Ip6OutMcastOctets") == 0)) ptr = &Ip6OutMcastOctets;
-        else if(unlikely(hash == hash_Ip6InBcastOctets && strsame(name, "Ip6InBcastOctets") == 0)) ptr = &Ip6InBcastOctets;
-        else if(unlikely(hash == hash_Ip6OutBcastOctets && strsame(name, "Ip6OutBcastOctets") == 0)) ptr = &Ip6OutBcastOctets;
-        else if(unlikely(hash == hash_Ip6InNoECTPkts && strsame(name, "Ip6InNoECTPkts") == 0)) ptr = &Ip6InNoECTPkts;
-        else if(unlikely(hash == hash_Ip6InECT1Pkts && strsame(name, "Ip6InECT1Pkts") == 0)) ptr = &Ip6InECT1Pkts;
-        else if(unlikely(hash == hash_Ip6InECT0Pkts && strsame(name, "Ip6InECT0Pkts") == 0)) ptr = &Ip6InECT0Pkts;
-        else if(unlikely(hash == hash_Ip6InCEPkts && strsame(name, "Ip6InCEPkts") == 0)) ptr = &Ip6InCEPkts;
-        else if(unlikely(hash == hash_Icmp6InMsgs && strsame(name, "Icmp6InMsgs") == 0)) ptr = &Icmp6InMsgs;
-        else if(unlikely(hash == hash_Icmp6InErrors && strsame(name, "Icmp6InErrors") == 0)) ptr = &Icmp6InErrors;
-        else if(unlikely(hash == hash_Icmp6OutMsgs && strsame(name, "Icmp6OutMsgs") == 0)) ptr = &Icmp6OutMsgs;
-        else if(unlikely(hash == hash_Icmp6OutErrors && strsame(name, "Icmp6OutErrors") == 0)) ptr = &Icmp6OutErrors;
-        else if(unlikely(hash == hash_Icmp6InCsumErrors && strsame(name, "Icmp6InCsumErrors") == 0)) ptr = &Icmp6InCsumErrors;
-        else if(unlikely(hash == hash_Icmp6InDestUnreachs && strsame(name, "Icmp6InDestUnreachs") == 0)) ptr = &Icmp6InDestUnreachs;
-        else if(unlikely(hash == hash_Icmp6InPktTooBigs && strsame(name, "Icmp6InPktTooBigs") == 0)) ptr = &Icmp6InPktTooBigs;
-        else if(unlikely(hash == hash_Icmp6InTimeExcds && strsame(name, "Icmp6InTimeExcds") == 0)) ptr = &Icmp6InTimeExcds;
-        else if(unlikely(hash == hash_Icmp6InParmProblems && strsame(name, "Icmp6InParmProblems") == 0)) ptr = &Icmp6InParmProblems;
-        else if(unlikely(hash == hash_Icmp6InEchos && strsame(name, "Icmp6InEchos") == 0)) ptr = &Icmp6InEchos;
-        else if(unlikely(hash == hash_Icmp6InEchoReplies && strsame(name, "Icmp6InEchoReplies") == 0)) ptr = &Icmp6InEchoReplies;
-        else if(unlikely(hash == hash_Icmp6InGroupMembQueries && strsame(name, "Icmp6InGroupMembQueries") == 0)) ptr = &Icmp6InGroupMembQueries;
-        else if(unlikely(hash == hash_Icmp6InGroupMembResponses && strsame(name, "Icmp6InGroupMembResponses") == 0)) ptr = &Icmp6InGroupMembResponses;
-        else if(unlikely(hash == hash_Icmp6InGroupMembReductions && strsame(name, "Icmp6InGroupMembReductions") == 0)) ptr = &Icmp6InGroupMembReductions;
-        else if(unlikely(hash == hash_Icmp6InRouterSolicits && strsame(name, "Icmp6InRouterSolicits") == 0)) ptr = &Icmp6InRouterSolicits;
-        else if(unlikely(hash == hash_Icmp6InRouterAdvertisements && strsame(name, "Icmp6InRouterAdvertisements") == 0)) ptr = &Icmp6InRouterAdvertisements;
-        else if(unlikely(hash == hash_Icmp6InNeighborSolicits && strsame(name, "Icmp6InNeighborSolicits") == 0)) ptr = &Icmp6InNeighborSolicits;
-        else if(unlikely(hash == hash_Icmp6InNeighborAdvertisements && strsame(name, "Icmp6InNeighborAdvertisements") == 0)) ptr = &Icmp6InNeighborAdvertisements;
-        else if(unlikely(hash == hash_Icmp6InRedirects && strsame(name, "Icmp6InRedirects") == 0)) ptr = &Icmp6InRedirects;
-        else if(unlikely(hash == hash_Icmp6InMLDv2Reports && strsame(name, "Icmp6InMLDv2Reports") == 0)) ptr = &Icmp6InMLDv2Reports;
-        else if(unlikely(hash == hash_Icmp6OutDestUnreachs && strsame(name, "Icmp6OutDestUnreachs") == 0)) ptr = &Icmp6OutDestUnreachs;
-        else if(unlikely(hash == hash_Icmp6OutPktTooBigs && strsame(name, "Icmp6OutPktTooBigs") == 0)) ptr = &Icmp6OutPktTooBigs;
-        else if(unlikely(hash == hash_Icmp6OutTimeExcds && strsame(name, "Icmp6OutTimeExcds") == 0)) ptr = &Icmp6OutTimeExcds;
-        else if(unlikely(hash == hash_Icmp6OutParmProblems && strsame(name, "Icmp6OutParmProblems") == 0)) ptr = &Icmp6OutParmProblems;
-        else if(unlikely(hash == hash_Icmp6OutEchos && strsame(name, "Icmp6OutEchos") == 0)) ptr = &Icmp6OutEchos;
-        else if(unlikely(hash == hash_Icmp6OutEchoReplies && strsame(name, "Icmp6OutEchoReplies") == 0)) ptr = &Icmp6OutEchoReplies;
-        else if(unlikely(hash == hash_Icmp6OutGroupMembQueries && strsame(name, "Icmp6OutGroupMembQueries") == 0)) ptr = &Icmp6OutGroupMembQueries;
-        else if(unlikely(hash == hash_Icmp6OutGroupMembResponses && strsame(name, "Icmp6OutGroupMembResponses") == 0)) ptr = &Icmp6OutGroupMembResponses;
-        else if(unlikely(hash == hash_Icmp6OutGroupMembReductions && strsame(name, "Icmp6OutGroupMembReductions") == 0)) ptr = &Icmp6OutGroupMembReductions;
-        else if(unlikely(hash == hash_Icmp6OutRouterSolicits && strsame(name, "Icmp6OutRouterSolicits") == 0)) ptr = &Icmp6OutRouterSolicits;
-        else if(unlikely(hash == hash_Icmp6OutRouterAdvertisements && strsame(name, "Icmp6OutRouterAdvertisements") == 0)) ptr = &Icmp6OutRouterAdvertisements;
-        else if(unlikely(hash == hash_Icmp6OutNeighborSolicits && strsame(name, "Icmp6OutNeighborSolicits") == 0)) ptr = &Icmp6OutNeighborSolicits;
-        else if(unlikely(hash == hash_Icmp6OutNeighborAdvertisements && strsame(name, "Icmp6OutNeighborAdvertisements") == 0)) ptr = &Icmp6OutNeighborAdvertisements;
-        else if(unlikely(hash == hash_Icmp6OutRedirects && strsame(name, "Icmp6OutRedirects") == 0)) ptr = &Icmp6OutRedirects;
-        else if(unlikely(hash == hash_Icmp6OutMLDv2Reports && strsame(name, "Icmp6OutMLDv2Reports") == 0)) ptr = &Icmp6OutMLDv2Reports;
-        else if(unlikely(hash == hash_Icmp6InType1 && strsame(name, "Icmp6InType1") == 0)) ptr = &Icmp6InType1;
-        else if(unlikely(hash == hash_Icmp6InType128 && strsame(name, "Icmp6InType128") == 0)) ptr = &Icmp6InType128;
-        else if(unlikely(hash == hash_Icmp6InType129 && strsame(name, "Icmp6InType129") == 0)) ptr = &Icmp6InType129;
-        else if(unlikely(hash == hash_Icmp6InType136 && strsame(name, "Icmp6InType136") == 0)) ptr = &Icmp6InType136;
-        else if(unlikely(hash == hash_Icmp6OutType1 && strsame(name, "Icmp6OutType1") == 0)) ptr = &Icmp6OutType1;
-        else if(unlikely(hash == hash_Icmp6OutType128 && strsame(name, "Icmp6OutType128") == 0)) ptr = &Icmp6OutType128;
-        else if(unlikely(hash == hash_Icmp6OutType129 && strsame(name, "Icmp6OutType129") == 0)) ptr = &Icmp6OutType129;
-        else if(unlikely(hash == hash_Icmp6OutType133 && strsame(name, "Icmp6OutType133") == 0)) ptr = &Icmp6OutType133;
-        else if(unlikely(hash == hash_Icmp6OutType135 && strsame(name, "Icmp6OutType135") == 0)) ptr = &Icmp6OutType135;
-        else if(unlikely(hash == hash_Icmp6OutType143 && strsame(name, "Icmp6OutType143") == 0)) ptr = &Icmp6OutType143;
-        else if(unlikely(hash == hash_Udp6InDatagrams && strsame(name, "Udp6InDatagrams") == 0)) ptr = &Udp6InDatagrams;
-        else if(unlikely(hash == hash_Udp6NoPorts && strsame(name, "Udp6NoPorts") == 0)) ptr = &Udp6NoPorts;
-        else if(unlikely(hash == hash_Udp6InErrors && strsame(name, "Udp6InErrors") == 0)) ptr = &Udp6InErrors;
-        else if(unlikely(hash == hash_Udp6OutDatagrams && strsame(name, "Udp6OutDatagrams") == 0)) ptr = &Udp6OutDatagrams;
-        else if(unlikely(hash == hash_Udp6RcvbufErrors && strsame(name, "Udp6RcvbufErrors") == 0)) ptr = &Udp6RcvbufErrors;
-        else if(unlikely(hash == hash_Udp6SndbufErrors && strsame(name, "Udp6SndbufErrors") == 0)) ptr = &Udp6SndbufErrors;
-        else if(unlikely(hash == hash_Udp6InCsumErrors && strsame(name, "Udp6InCsumErrors") == 0)) ptr = &Udp6InCsumErrors;
-        else if(unlikely(hash == hash_Udp6IgnoredMulti && strsame(name, "Udp6IgnoredMulti") == 0)) ptr = &Udp6IgnoredMulti;
-        else if(unlikely(hash == hash_UdpLite6InDatagrams && strsame(name, "UdpLite6InDatagrams") == 0)) ptr = &UdpLite6InDatagrams;
-        else if(unlikely(hash == hash_UdpLite6NoPorts && strsame(name, "UdpLite6NoPorts") == 0)) ptr = &UdpLite6NoPorts;
-        else if(unlikely(hash == hash_UdpLite6InErrors && strsame(name, "UdpLite6InErrors") == 0)) ptr = &UdpLite6InErrors;
-        else if(unlikely(hash == hash_UdpLite6OutDatagrams && strsame(name, "UdpLite6OutDatagrams") == 0)) ptr = &UdpLite6OutDatagrams;
-        else if(unlikely(hash == hash_UdpLite6RcvbufErrors && strsame(name, "UdpLite6RcvbufErrors") == 0)) ptr = &UdpLite6RcvbufErrors;
-        else if(unlikely(hash == hash_UdpLite6SndbufErrors && strsame(name, "UdpLite6SndbufErrors") == 0)) ptr = &UdpLite6SndbufErrors;
-        else if(unlikely(hash == hash_UdpLite6InCsumErrors && strsame(name, "UdpLite6InCsumErrors") == 0)) ptr = &UdpLite6InCsumErrors;
-
-        if(unlikely(ptr)) {
-            *ptr = str2ull(value);
-            ptr = NULL;
-        }
+        if(unlikely(arl_check(arl_base,
+                procfile_lineword(ff, l, 0),
+                procfile_lineword(ff, l, 1)))) break;
     }
 
     RRDSET *st;
