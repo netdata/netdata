@@ -163,6 +163,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     int numdevs;
     static void *devstat_data = NULL;
     struct devstat *dstat;
+    char disk[DEVSTAT_NAME_LEN + 10 + 1]; // 10 - maximum number of digits for int
     struct cur_dstat {
         collected_number duration_read_ms;
         collected_number duration_write_ms;
@@ -609,34 +610,35 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 error("DISABLED: disk.io");
             } else {
                 dstat = devstat_data + sizeof(long); // skip generation number
-                collected_number total_disk_reads = 0;
-                collected_number total_disk_writes = 0;
+                collected_number total_disk_kbytes_read = 0;
+                collected_number total_disk_kbytes_write = 0;
 
                 for (i = 0; i < numdevs; i++) {
                     if (((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_DIRECT) || ((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_STORARRAY)) {
+                        sprintf(disk, "%s%d", dstat[i].device_name, dstat[i].unit_number);
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype(RRD_TYPE_DISK, dstat[i].device_name);
+                        st = rrdset_find_bytype(RRD_TYPE_DISK, disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create(RRD_TYPE_DISK, dstat[i].device_name, NULL, dstat[i].device_name, "disk.io", "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
+                            st = rrdset_create(RRD_TYPE_DISK, disk, NULL, disk, "disk.io", "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
 
                             rrddim_add(st, "reads", NULL, 1, 1024, RRDDIM_INCREMENTAL);
                             rrddim_add(st, "writes", NULL, -1, 1024, RRDDIM_INCREMENTAL);
                         }
                         else rrdset_next(st);
 
-                        total_disk_reads += dstat[i].bytes[DEVSTAT_READ];
-                        total_disk_writes += dstat[i].bytes[DEVSTAT_WRITE];
+                        total_disk_kbytes_read += dstat[i].bytes[DEVSTAT_READ]/KILO_FACTOR;
+                        total_disk_kbytes_write += dstat[i].bytes[DEVSTAT_WRITE]/KILO_FACTOR;
                         prev_dstat.bytes_read = rrddim_set(st, "reads", dstat[i].bytes[DEVSTAT_READ]);
                         prev_dstat.bytes_write = rrddim_set(st, "writes", dstat[i].bytes[DEVSTAT_WRITE]);
                         rrdset_done(st);
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype("disk_ops", dstat[i].device_name);
+                        st = rrdset_find_bytype("disk_ops", disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_ops", dstat[i].device_name, NULL, dstat[i].device_name, "disk.ops", "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
+                            st = rrdset_create("disk_ops", disk, NULL, disk, "disk.ops", "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
                             st->isdetail = 1;
 
                             rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -650,9 +652,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype("disk_qops", dstat[i].device_name);
+                        st = rrdset_find_bytype("disk_qops", disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_qops", dstat[i].device_name, NULL, dstat[i].device_name, "disk.qops", "Disk Current I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
+                            st = rrdset_create("disk_qops", disk, NULL, disk, "disk.qops", "Disk Current I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
                             st->isdetail = 1;
 
                             rrddim_add(st, "operations", NULL, 1, 1, RRDDIM_ABSOLUTE);
@@ -664,9 +666,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype("disk_util", dstat[i].device_name);
+                        st = rrdset_find_bytype("disk_util", disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_util", dstat[i].device_name, NULL, dstat[i].device_name, "disk.util", "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
+                            st = rrdset_create("disk_util", disk, NULL, disk, "disk.util", "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
                             st->isdetail = 1;
 
                             rrddim_add(st, "utilization", NULL, 1, 10, RRDDIM_INCREMENTAL);
@@ -679,9 +681,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype("disk_iotime", dstat[i].device_name);
+                        st = rrdset_find_bytype("disk_iotime", disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_iotime", dstat[i].device_name, NULL, dstat[i].device_name, "disk.iotime", "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
+                            st = rrdset_create("disk_iotime", disk, NULL, disk, "disk.iotime", "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
                             st->isdetail = 1;
 
                             rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
@@ -703,9 +705,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                             // --------------------------------------------------------------------
 
-                            st = rrdset_find_bytype("disk_await", dstat[i].device_name);
+                            st = rrdset_find_bytype("disk_await", disk);
                             if (unlikely(!st)) {
-                                st = rrdset_create("disk_await", dstat[i].device_name, NULL, dstat[i].device_name, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
+                                st = rrdset_create("disk_await", disk, NULL, disk, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
                                 st->isdetail = 1;
 
                                 rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ABSOLUTE);
@@ -721,9 +723,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                             // --------------------------------------------------------------------
 
-                            st = rrdset_find_bytype("disk_avgsz", dstat[i].device_name);
+                            st = rrdset_find_bytype("disk_avgsz", disk);
                             if (unlikely(!st)) {
-                                st = rrdset_create("disk_avgsz", dstat[i].device_name, NULL, dstat[i].device_name, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
+                                st = rrdset_create("disk_avgsz", disk, NULL, disk, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
                                 st->isdetail = 1;
 
                                 rrddim_add(st, "reads", NULL, 1, 1024, RRDDIM_ABSOLUTE);
@@ -739,9 +741,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                             // --------------------------------------------------------------------
 
-                            st = rrdset_find_bytype("disk_svctm", dstat[i].device_name);
+                            st = rrdset_find_bytype("disk_svctm", disk);
                             if (unlikely(!st)) {
-                                st = rrdset_create("disk_svctm", dstat[i].device_name, NULL, dstat[i].device_name, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
+                                st = rrdset_create("disk_svctm", disk, NULL, disk, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
                                 st->isdetail = 1;
 
                                 rrddim_add(st, "svctm", NULL, 1, 1, RRDDIM_ABSOLUTE);
@@ -753,21 +755,21 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                             rrdset_done(st);
                         }
                     }
-
-                    // --------------------------------------------------------------------
-
-                    st = rrdset_find_bytype("system", "io");
-                    if (unlikely(!st)) {
-                        st = rrdset_create("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150, update_every, RRDSET_TYPE_AREA);
-                        rrddim_add(st, "in",  NULL,  1, 1024, RRDDIM_INCREMENTAL);
-                        rrddim_add(st, "out", NULL, -1, 1024, RRDDIM_INCREMENTAL);
-                    }
-                    else rrdset_next(st);
-
-                    rrddim_set(st, "in", total_disk_reads);
-                    rrddim_set(st, "out", total_disk_writes);
-                    rrdset_done(st);
                 }
+
+                // --------------------------------------------------------------------
+
+                st = rrdset_find_bytype("system", "io");
+                if (unlikely(!st)) {
+                    st = rrdset_create("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150, update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "in",  NULL,  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "out", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set(st, "in", total_disk_kbytes_read);
+                rrddim_set(st, "out", total_disk_kbytes_write);
+                rrdset_done(st);
             }
         }
     }
