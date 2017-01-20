@@ -63,7 +63,9 @@ typedef struct arl_base {
                         // i.e. the number of keywords found and expected
 
     size_t relinkings;  // the number of relinkings we have made so far
+
     size_t allocated;   // the number of keywords allocated
+    size_t fred;        // the number of keywords cleaned up
 
     size_t rechecks;    // the number of iterations between re-checks of the
                         // wanted number of keywords
@@ -73,6 +75,11 @@ typedef struct arl_base {
     size_t added;       // it is non-zero if new keywords have been added
                         // this is only needed to detect new lines have
                         // been added to the file, over time.
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    size_t fast;        // the number of times we have taken the fast path
+    size_t slow;        // the number of times we have taken the slow path
+#endif
 
     // the processor to do the job
     void (*processor)(const char *name, uint32_t hash, const char *value, void *dst);
@@ -114,6 +121,10 @@ static inline int arl_check(ARL_BASE *base, const char *keyword, const char *val
     if(likely(hash == e->hash && !strcmp(keyword, e->name))) {
         // it is
 
+#ifdef NETDATA_INTERNAL_CHECKS
+        base->fast++;
+#endif
+
         e->flags |= ARL_ENTRY_FLAG_FOUND;
 
         // execute the processor
@@ -133,6 +144,10 @@ static inline int arl_check(ARL_BASE *base, const char *keyword, const char *val
 
         return 0;
     }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    base->slow++;
+#endif
 
     // we read from source, a not-expected keyword
     return arl_find_or_create_and_relink(base, keyword, hash, value);
