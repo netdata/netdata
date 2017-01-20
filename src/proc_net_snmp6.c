@@ -1,7 +1,6 @@
 #include "common.h"
 
 #define RRD_TYPE_NET_SNMP6          "ipv6"
-#define RRD_TYPE_NET_SNMP6_LEN      strlen(RRD_TYPE_NET_SNMP6)
 
 int do_proc_net_snmp6(int update_every, usec_t dt) {
     (void)dt;
@@ -252,7 +251,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
     if(unlikely(!ff))
         return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
+    size_t lines = procfile_lines(ff), l;
 
     unsigned long long Ip6InReceives = 0ULL;
     unsigned long long Ip6InHdrErrors = 0ULL;
@@ -350,9 +349,9 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
     unsigned long long *ptr = NULL;
 
     for(l = 0; l < lines ;l++) {
-        uint32_t words = procfile_linewords(ff, l);
+        size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) {
-            if(unlikely(words)) error("Cannot read /proc/net/snmp6 line %u. Expected 2 params, read %u.", l, words);
+            if(unlikely(words)) error("Cannot read /proc/net/snmp6 line %zu. Expected 2 params, read %zu.", l, words);
             continue;
         }
 
@@ -363,98 +362,98 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
         uint32_t hash = simple_hash(name);
 
-             if(unlikely(hash == hash_Ip6InReceives && strcmp(name, "Ip6InReceives") == 0)) ptr = &Ip6InReceives;
-        else if(unlikely(hash == hash_Ip6InHdrErrors && strcmp(name, "Ip6InHdrErrors") == 0)) ptr = &Ip6InHdrErrors;
-        else if(unlikely(hash == hash_Ip6InTooBigErrors && strcmp(name, "Ip6InTooBigErrors") == 0)) ptr = &Ip6InTooBigErrors;
-        else if(unlikely(hash == hash_Ip6InNoRoutes && strcmp(name, "Ip6InNoRoutes") == 0)) ptr = &Ip6InNoRoutes;
-        else if(unlikely(hash == hash_Ip6InAddrErrors && strcmp(name, "Ip6InAddrErrors") == 0)) ptr = &Ip6InAddrErrors;
-        else if(unlikely(hash == hash_Ip6InUnknownProtos && strcmp(name, "Ip6InUnknownProtos") == 0)) ptr = &Ip6InUnknownProtos;
-        else if(unlikely(hash == hash_Ip6InTruncatedPkts && strcmp(name, "Ip6InTruncatedPkts") == 0)) ptr = &Ip6InTruncatedPkts;
-        else if(unlikely(hash == hash_Ip6InDiscards && strcmp(name, "Ip6InDiscards") == 0)) ptr = &Ip6InDiscards;
-        else if(unlikely(hash == hash_Ip6InDelivers && strcmp(name, "Ip6InDelivers") == 0)) ptr = &Ip6InDelivers;
-        else if(unlikely(hash == hash_Ip6OutForwDatagrams && strcmp(name, "Ip6OutForwDatagrams") == 0)) ptr = &Ip6OutForwDatagrams;
-        else if(unlikely(hash == hash_Ip6OutRequests && strcmp(name, "Ip6OutRequests") == 0)) ptr = &Ip6OutRequests;
-        else if(unlikely(hash == hash_Ip6OutDiscards && strcmp(name, "Ip6OutDiscards") == 0)) ptr = &Ip6OutDiscards;
-        else if(unlikely(hash == hash_Ip6OutNoRoutes && strcmp(name, "Ip6OutNoRoutes") == 0)) ptr = &Ip6OutNoRoutes;
-        else if(unlikely(hash == hash_Ip6ReasmTimeout && strcmp(name, "Ip6ReasmTimeout") == 0)) ptr = &Ip6ReasmTimeout;
-        else if(unlikely(hash == hash_Ip6ReasmReqds && strcmp(name, "Ip6ReasmReqds") == 0)) ptr = &Ip6ReasmReqds;
-        else if(unlikely(hash == hash_Ip6ReasmOKs && strcmp(name, "Ip6ReasmOKs") == 0)) ptr = &Ip6ReasmOKs;
-        else if(unlikely(hash == hash_Ip6ReasmFails && strcmp(name, "Ip6ReasmFails") == 0)) ptr = &Ip6ReasmFails;
-        else if(unlikely(hash == hash_Ip6FragOKs && strcmp(name, "Ip6FragOKs") == 0)) ptr = &Ip6FragOKs;
-        else if(unlikely(hash == hash_Ip6FragFails && strcmp(name, "Ip6FragFails") == 0)) ptr = &Ip6FragFails;
-        else if(unlikely(hash == hash_Ip6FragCreates && strcmp(name, "Ip6FragCreates") == 0)) ptr = &Ip6FragCreates;
-        else if(unlikely(hash == hash_Ip6InMcastPkts && strcmp(name, "Ip6InMcastPkts") == 0)) ptr = &Ip6InMcastPkts;
-        else if(unlikely(hash == hash_Ip6OutMcastPkts && strcmp(name, "Ip6OutMcastPkts") == 0)) ptr = &Ip6OutMcastPkts;
-        else if(unlikely(hash == hash_Ip6InOctets && strcmp(name, "Ip6InOctets") == 0)) ptr = &Ip6InOctets;
-        else if(unlikely(hash == hash_Ip6OutOctets && strcmp(name, "Ip6OutOctets") == 0)) ptr = &Ip6OutOctets;
-        else if(unlikely(hash == hash_Ip6InMcastOctets && strcmp(name, "Ip6InMcastOctets") == 0)) ptr = &Ip6InMcastOctets;
-        else if(unlikely(hash == hash_Ip6OutMcastOctets && strcmp(name, "Ip6OutMcastOctets") == 0)) ptr = &Ip6OutMcastOctets;
-        else if(unlikely(hash == hash_Ip6InBcastOctets && strcmp(name, "Ip6InBcastOctets") == 0)) ptr = &Ip6InBcastOctets;
-        else if(unlikely(hash == hash_Ip6OutBcastOctets && strcmp(name, "Ip6OutBcastOctets") == 0)) ptr = &Ip6OutBcastOctets;
-        else if(unlikely(hash == hash_Ip6InNoECTPkts && strcmp(name, "Ip6InNoECTPkts") == 0)) ptr = &Ip6InNoECTPkts;
-        else if(unlikely(hash == hash_Ip6InECT1Pkts && strcmp(name, "Ip6InECT1Pkts") == 0)) ptr = &Ip6InECT1Pkts;
-        else if(unlikely(hash == hash_Ip6InECT0Pkts && strcmp(name, "Ip6InECT0Pkts") == 0)) ptr = &Ip6InECT0Pkts;
-        else if(unlikely(hash == hash_Ip6InCEPkts && strcmp(name, "Ip6InCEPkts") == 0)) ptr = &Ip6InCEPkts;
-        else if(unlikely(hash == hash_Icmp6InMsgs && strcmp(name, "Icmp6InMsgs") == 0)) ptr = &Icmp6InMsgs;
-        else if(unlikely(hash == hash_Icmp6InErrors && strcmp(name, "Icmp6InErrors") == 0)) ptr = &Icmp6InErrors;
-        else if(unlikely(hash == hash_Icmp6OutMsgs && strcmp(name, "Icmp6OutMsgs") == 0)) ptr = &Icmp6OutMsgs;
-        else if(unlikely(hash == hash_Icmp6OutErrors && strcmp(name, "Icmp6OutErrors") == 0)) ptr = &Icmp6OutErrors;
-        else if(unlikely(hash == hash_Icmp6InCsumErrors && strcmp(name, "Icmp6InCsumErrors") == 0)) ptr = &Icmp6InCsumErrors;
-        else if(unlikely(hash == hash_Icmp6InDestUnreachs && strcmp(name, "Icmp6InDestUnreachs") == 0)) ptr = &Icmp6InDestUnreachs;
-        else if(unlikely(hash == hash_Icmp6InPktTooBigs && strcmp(name, "Icmp6InPktTooBigs") == 0)) ptr = &Icmp6InPktTooBigs;
-        else if(unlikely(hash == hash_Icmp6InTimeExcds && strcmp(name, "Icmp6InTimeExcds") == 0)) ptr = &Icmp6InTimeExcds;
-        else if(unlikely(hash == hash_Icmp6InParmProblems && strcmp(name, "Icmp6InParmProblems") == 0)) ptr = &Icmp6InParmProblems;
-        else if(unlikely(hash == hash_Icmp6InEchos && strcmp(name, "Icmp6InEchos") == 0)) ptr = &Icmp6InEchos;
-        else if(unlikely(hash == hash_Icmp6InEchoReplies && strcmp(name, "Icmp6InEchoReplies") == 0)) ptr = &Icmp6InEchoReplies;
-        else if(unlikely(hash == hash_Icmp6InGroupMembQueries && strcmp(name, "Icmp6InGroupMembQueries") == 0)) ptr = &Icmp6InGroupMembQueries;
-        else if(unlikely(hash == hash_Icmp6InGroupMembResponses && strcmp(name, "Icmp6InGroupMembResponses") == 0)) ptr = &Icmp6InGroupMembResponses;
-        else if(unlikely(hash == hash_Icmp6InGroupMembReductions && strcmp(name, "Icmp6InGroupMembReductions") == 0)) ptr = &Icmp6InGroupMembReductions;
-        else if(unlikely(hash == hash_Icmp6InRouterSolicits && strcmp(name, "Icmp6InRouterSolicits") == 0)) ptr = &Icmp6InRouterSolicits;
-        else if(unlikely(hash == hash_Icmp6InRouterAdvertisements && strcmp(name, "Icmp6InRouterAdvertisements") == 0)) ptr = &Icmp6InRouterAdvertisements;
-        else if(unlikely(hash == hash_Icmp6InNeighborSolicits && strcmp(name, "Icmp6InNeighborSolicits") == 0)) ptr = &Icmp6InNeighborSolicits;
-        else if(unlikely(hash == hash_Icmp6InNeighborAdvertisements && strcmp(name, "Icmp6InNeighborAdvertisements") == 0)) ptr = &Icmp6InNeighborAdvertisements;
-        else if(unlikely(hash == hash_Icmp6InRedirects && strcmp(name, "Icmp6InRedirects") == 0)) ptr = &Icmp6InRedirects;
-        else if(unlikely(hash == hash_Icmp6InMLDv2Reports && strcmp(name, "Icmp6InMLDv2Reports") == 0)) ptr = &Icmp6InMLDv2Reports;
-        else if(unlikely(hash == hash_Icmp6OutDestUnreachs && strcmp(name, "Icmp6OutDestUnreachs") == 0)) ptr = &Icmp6OutDestUnreachs;
-        else if(unlikely(hash == hash_Icmp6OutPktTooBigs && strcmp(name, "Icmp6OutPktTooBigs") == 0)) ptr = &Icmp6OutPktTooBigs;
-        else if(unlikely(hash == hash_Icmp6OutTimeExcds && strcmp(name, "Icmp6OutTimeExcds") == 0)) ptr = &Icmp6OutTimeExcds;
-        else if(unlikely(hash == hash_Icmp6OutParmProblems && strcmp(name, "Icmp6OutParmProblems") == 0)) ptr = &Icmp6OutParmProblems;
-        else if(unlikely(hash == hash_Icmp6OutEchos && strcmp(name, "Icmp6OutEchos") == 0)) ptr = &Icmp6OutEchos;
-        else if(unlikely(hash == hash_Icmp6OutEchoReplies && strcmp(name, "Icmp6OutEchoReplies") == 0)) ptr = &Icmp6OutEchoReplies;
-        else if(unlikely(hash == hash_Icmp6OutGroupMembQueries && strcmp(name, "Icmp6OutGroupMembQueries") == 0)) ptr = &Icmp6OutGroupMembQueries;
-        else if(unlikely(hash == hash_Icmp6OutGroupMembResponses && strcmp(name, "Icmp6OutGroupMembResponses") == 0)) ptr = &Icmp6OutGroupMembResponses;
-        else if(unlikely(hash == hash_Icmp6OutGroupMembReductions && strcmp(name, "Icmp6OutGroupMembReductions") == 0)) ptr = &Icmp6OutGroupMembReductions;
-        else if(unlikely(hash == hash_Icmp6OutRouterSolicits && strcmp(name, "Icmp6OutRouterSolicits") == 0)) ptr = &Icmp6OutRouterSolicits;
-        else if(unlikely(hash == hash_Icmp6OutRouterAdvertisements && strcmp(name, "Icmp6OutRouterAdvertisements") == 0)) ptr = &Icmp6OutRouterAdvertisements;
-        else if(unlikely(hash == hash_Icmp6OutNeighborSolicits && strcmp(name, "Icmp6OutNeighborSolicits") == 0)) ptr = &Icmp6OutNeighborSolicits;
-        else if(unlikely(hash == hash_Icmp6OutNeighborAdvertisements && strcmp(name, "Icmp6OutNeighborAdvertisements") == 0)) ptr = &Icmp6OutNeighborAdvertisements;
-        else if(unlikely(hash == hash_Icmp6OutRedirects && strcmp(name, "Icmp6OutRedirects") == 0)) ptr = &Icmp6OutRedirects;
-        else if(unlikely(hash == hash_Icmp6OutMLDv2Reports && strcmp(name, "Icmp6OutMLDv2Reports") == 0)) ptr = &Icmp6OutMLDv2Reports;
-        else if(unlikely(hash == hash_Icmp6InType1 && strcmp(name, "Icmp6InType1") == 0)) ptr = &Icmp6InType1;
-        else if(unlikely(hash == hash_Icmp6InType128 && strcmp(name, "Icmp6InType128") == 0)) ptr = &Icmp6InType128;
-        else if(unlikely(hash == hash_Icmp6InType129 && strcmp(name, "Icmp6InType129") == 0)) ptr = &Icmp6InType129;
-        else if(unlikely(hash == hash_Icmp6InType136 && strcmp(name, "Icmp6InType136") == 0)) ptr = &Icmp6InType136;
-        else if(unlikely(hash == hash_Icmp6OutType1 && strcmp(name, "Icmp6OutType1") == 0)) ptr = &Icmp6OutType1;
-        else if(unlikely(hash == hash_Icmp6OutType128 && strcmp(name, "Icmp6OutType128") == 0)) ptr = &Icmp6OutType128;
-        else if(unlikely(hash == hash_Icmp6OutType129 && strcmp(name, "Icmp6OutType129") == 0)) ptr = &Icmp6OutType129;
-        else if(unlikely(hash == hash_Icmp6OutType133 && strcmp(name, "Icmp6OutType133") == 0)) ptr = &Icmp6OutType133;
-        else if(unlikely(hash == hash_Icmp6OutType135 && strcmp(name, "Icmp6OutType135") == 0)) ptr = &Icmp6OutType135;
-        else if(unlikely(hash == hash_Icmp6OutType143 && strcmp(name, "Icmp6OutType143") == 0)) ptr = &Icmp6OutType143;
-        else if(unlikely(hash == hash_Udp6InDatagrams && strcmp(name, "Udp6InDatagrams") == 0)) ptr = &Udp6InDatagrams;
-        else if(unlikely(hash == hash_Udp6NoPorts && strcmp(name, "Udp6NoPorts") == 0)) ptr = &Udp6NoPorts;
-        else if(unlikely(hash == hash_Udp6InErrors && strcmp(name, "Udp6InErrors") == 0)) ptr = &Udp6InErrors;
-        else if(unlikely(hash == hash_Udp6OutDatagrams && strcmp(name, "Udp6OutDatagrams") == 0)) ptr = &Udp6OutDatagrams;
-        else if(unlikely(hash == hash_Udp6RcvbufErrors && strcmp(name, "Udp6RcvbufErrors") == 0)) ptr = &Udp6RcvbufErrors;
-        else if(unlikely(hash == hash_Udp6SndbufErrors && strcmp(name, "Udp6SndbufErrors") == 0)) ptr = &Udp6SndbufErrors;
-        else if(unlikely(hash == hash_Udp6InCsumErrors && strcmp(name, "Udp6InCsumErrors") == 0)) ptr = &Udp6InCsumErrors;
-        else if(unlikely(hash == hash_Udp6IgnoredMulti && strcmp(name, "Udp6IgnoredMulti") == 0)) ptr = &Udp6IgnoredMulti;
-        else if(unlikely(hash == hash_UdpLite6InDatagrams && strcmp(name, "UdpLite6InDatagrams") == 0)) ptr = &UdpLite6InDatagrams;
-        else if(unlikely(hash == hash_UdpLite6NoPorts && strcmp(name, "UdpLite6NoPorts") == 0)) ptr = &UdpLite6NoPorts;
-        else if(unlikely(hash == hash_UdpLite6InErrors && strcmp(name, "UdpLite6InErrors") == 0)) ptr = &UdpLite6InErrors;
-        else if(unlikely(hash == hash_UdpLite6OutDatagrams && strcmp(name, "UdpLite6OutDatagrams") == 0)) ptr = &UdpLite6OutDatagrams;
-        else if(unlikely(hash == hash_UdpLite6RcvbufErrors && strcmp(name, "UdpLite6RcvbufErrors") == 0)) ptr = &UdpLite6RcvbufErrors;
-        else if(unlikely(hash == hash_UdpLite6SndbufErrors && strcmp(name, "UdpLite6SndbufErrors") == 0)) ptr = &UdpLite6SndbufErrors;
-        else if(unlikely(hash == hash_UdpLite6InCsumErrors && strcmp(name, "UdpLite6InCsumErrors") == 0)) ptr = &UdpLite6InCsumErrors;
+             if(unlikely(hash == hash_Ip6InReceives && strsame(name, "Ip6InReceives") == 0)) ptr = &Ip6InReceives;
+        else if(unlikely(hash == hash_Ip6InHdrErrors && strsame(name, "Ip6InHdrErrors") == 0)) ptr = &Ip6InHdrErrors;
+        else if(unlikely(hash == hash_Ip6InTooBigErrors && strsame(name, "Ip6InTooBigErrors") == 0)) ptr = &Ip6InTooBigErrors;
+        else if(unlikely(hash == hash_Ip6InNoRoutes && strsame(name, "Ip6InNoRoutes") == 0)) ptr = &Ip6InNoRoutes;
+        else if(unlikely(hash == hash_Ip6InAddrErrors && strsame(name, "Ip6InAddrErrors") == 0)) ptr = &Ip6InAddrErrors;
+        else if(unlikely(hash == hash_Ip6InUnknownProtos && strsame(name, "Ip6InUnknownProtos") == 0)) ptr = &Ip6InUnknownProtos;
+        else if(unlikely(hash == hash_Ip6InTruncatedPkts && strsame(name, "Ip6InTruncatedPkts") == 0)) ptr = &Ip6InTruncatedPkts;
+        else if(unlikely(hash == hash_Ip6InDiscards && strsame(name, "Ip6InDiscards") == 0)) ptr = &Ip6InDiscards;
+        else if(unlikely(hash == hash_Ip6InDelivers && strsame(name, "Ip6InDelivers") == 0)) ptr = &Ip6InDelivers;
+        else if(unlikely(hash == hash_Ip6OutForwDatagrams && strsame(name, "Ip6OutForwDatagrams") == 0)) ptr = &Ip6OutForwDatagrams;
+        else if(unlikely(hash == hash_Ip6OutRequests && strsame(name, "Ip6OutRequests") == 0)) ptr = &Ip6OutRequests;
+        else if(unlikely(hash == hash_Ip6OutDiscards && strsame(name, "Ip6OutDiscards") == 0)) ptr = &Ip6OutDiscards;
+        else if(unlikely(hash == hash_Ip6OutNoRoutes && strsame(name, "Ip6OutNoRoutes") == 0)) ptr = &Ip6OutNoRoutes;
+        else if(unlikely(hash == hash_Ip6ReasmTimeout && strsame(name, "Ip6ReasmTimeout") == 0)) ptr = &Ip6ReasmTimeout;
+        else if(unlikely(hash == hash_Ip6ReasmReqds && strsame(name, "Ip6ReasmReqds") == 0)) ptr = &Ip6ReasmReqds;
+        else if(unlikely(hash == hash_Ip6ReasmOKs && strsame(name, "Ip6ReasmOKs") == 0)) ptr = &Ip6ReasmOKs;
+        else if(unlikely(hash == hash_Ip6ReasmFails && strsame(name, "Ip6ReasmFails") == 0)) ptr = &Ip6ReasmFails;
+        else if(unlikely(hash == hash_Ip6FragOKs && strsame(name, "Ip6FragOKs") == 0)) ptr = &Ip6FragOKs;
+        else if(unlikely(hash == hash_Ip6FragFails && strsame(name, "Ip6FragFails") == 0)) ptr = &Ip6FragFails;
+        else if(unlikely(hash == hash_Ip6FragCreates && strsame(name, "Ip6FragCreates") == 0)) ptr = &Ip6FragCreates;
+        else if(unlikely(hash == hash_Ip6InMcastPkts && strsame(name, "Ip6InMcastPkts") == 0)) ptr = &Ip6InMcastPkts;
+        else if(unlikely(hash == hash_Ip6OutMcastPkts && strsame(name, "Ip6OutMcastPkts") == 0)) ptr = &Ip6OutMcastPkts;
+        else if(unlikely(hash == hash_Ip6InOctets && strsame(name, "Ip6InOctets") == 0)) ptr = &Ip6InOctets;
+        else if(unlikely(hash == hash_Ip6OutOctets && strsame(name, "Ip6OutOctets") == 0)) ptr = &Ip6OutOctets;
+        else if(unlikely(hash == hash_Ip6InMcastOctets && strsame(name, "Ip6InMcastOctets") == 0)) ptr = &Ip6InMcastOctets;
+        else if(unlikely(hash == hash_Ip6OutMcastOctets && strsame(name, "Ip6OutMcastOctets") == 0)) ptr = &Ip6OutMcastOctets;
+        else if(unlikely(hash == hash_Ip6InBcastOctets && strsame(name, "Ip6InBcastOctets") == 0)) ptr = &Ip6InBcastOctets;
+        else if(unlikely(hash == hash_Ip6OutBcastOctets && strsame(name, "Ip6OutBcastOctets") == 0)) ptr = &Ip6OutBcastOctets;
+        else if(unlikely(hash == hash_Ip6InNoECTPkts && strsame(name, "Ip6InNoECTPkts") == 0)) ptr = &Ip6InNoECTPkts;
+        else if(unlikely(hash == hash_Ip6InECT1Pkts && strsame(name, "Ip6InECT1Pkts") == 0)) ptr = &Ip6InECT1Pkts;
+        else if(unlikely(hash == hash_Ip6InECT0Pkts && strsame(name, "Ip6InECT0Pkts") == 0)) ptr = &Ip6InECT0Pkts;
+        else if(unlikely(hash == hash_Ip6InCEPkts && strsame(name, "Ip6InCEPkts") == 0)) ptr = &Ip6InCEPkts;
+        else if(unlikely(hash == hash_Icmp6InMsgs && strsame(name, "Icmp6InMsgs") == 0)) ptr = &Icmp6InMsgs;
+        else if(unlikely(hash == hash_Icmp6InErrors && strsame(name, "Icmp6InErrors") == 0)) ptr = &Icmp6InErrors;
+        else if(unlikely(hash == hash_Icmp6OutMsgs && strsame(name, "Icmp6OutMsgs") == 0)) ptr = &Icmp6OutMsgs;
+        else if(unlikely(hash == hash_Icmp6OutErrors && strsame(name, "Icmp6OutErrors") == 0)) ptr = &Icmp6OutErrors;
+        else if(unlikely(hash == hash_Icmp6InCsumErrors && strsame(name, "Icmp6InCsumErrors") == 0)) ptr = &Icmp6InCsumErrors;
+        else if(unlikely(hash == hash_Icmp6InDestUnreachs && strsame(name, "Icmp6InDestUnreachs") == 0)) ptr = &Icmp6InDestUnreachs;
+        else if(unlikely(hash == hash_Icmp6InPktTooBigs && strsame(name, "Icmp6InPktTooBigs") == 0)) ptr = &Icmp6InPktTooBigs;
+        else if(unlikely(hash == hash_Icmp6InTimeExcds && strsame(name, "Icmp6InTimeExcds") == 0)) ptr = &Icmp6InTimeExcds;
+        else if(unlikely(hash == hash_Icmp6InParmProblems && strsame(name, "Icmp6InParmProblems") == 0)) ptr = &Icmp6InParmProblems;
+        else if(unlikely(hash == hash_Icmp6InEchos && strsame(name, "Icmp6InEchos") == 0)) ptr = &Icmp6InEchos;
+        else if(unlikely(hash == hash_Icmp6InEchoReplies && strsame(name, "Icmp6InEchoReplies") == 0)) ptr = &Icmp6InEchoReplies;
+        else if(unlikely(hash == hash_Icmp6InGroupMembQueries && strsame(name, "Icmp6InGroupMembQueries") == 0)) ptr = &Icmp6InGroupMembQueries;
+        else if(unlikely(hash == hash_Icmp6InGroupMembResponses && strsame(name, "Icmp6InGroupMembResponses") == 0)) ptr = &Icmp6InGroupMembResponses;
+        else if(unlikely(hash == hash_Icmp6InGroupMembReductions && strsame(name, "Icmp6InGroupMembReductions") == 0)) ptr = &Icmp6InGroupMembReductions;
+        else if(unlikely(hash == hash_Icmp6InRouterSolicits && strsame(name, "Icmp6InRouterSolicits") == 0)) ptr = &Icmp6InRouterSolicits;
+        else if(unlikely(hash == hash_Icmp6InRouterAdvertisements && strsame(name, "Icmp6InRouterAdvertisements") == 0)) ptr = &Icmp6InRouterAdvertisements;
+        else if(unlikely(hash == hash_Icmp6InNeighborSolicits && strsame(name, "Icmp6InNeighborSolicits") == 0)) ptr = &Icmp6InNeighborSolicits;
+        else if(unlikely(hash == hash_Icmp6InNeighborAdvertisements && strsame(name, "Icmp6InNeighborAdvertisements") == 0)) ptr = &Icmp6InNeighborAdvertisements;
+        else if(unlikely(hash == hash_Icmp6InRedirects && strsame(name, "Icmp6InRedirects") == 0)) ptr = &Icmp6InRedirects;
+        else if(unlikely(hash == hash_Icmp6InMLDv2Reports && strsame(name, "Icmp6InMLDv2Reports") == 0)) ptr = &Icmp6InMLDv2Reports;
+        else if(unlikely(hash == hash_Icmp6OutDestUnreachs && strsame(name, "Icmp6OutDestUnreachs") == 0)) ptr = &Icmp6OutDestUnreachs;
+        else if(unlikely(hash == hash_Icmp6OutPktTooBigs && strsame(name, "Icmp6OutPktTooBigs") == 0)) ptr = &Icmp6OutPktTooBigs;
+        else if(unlikely(hash == hash_Icmp6OutTimeExcds && strsame(name, "Icmp6OutTimeExcds") == 0)) ptr = &Icmp6OutTimeExcds;
+        else if(unlikely(hash == hash_Icmp6OutParmProblems && strsame(name, "Icmp6OutParmProblems") == 0)) ptr = &Icmp6OutParmProblems;
+        else if(unlikely(hash == hash_Icmp6OutEchos && strsame(name, "Icmp6OutEchos") == 0)) ptr = &Icmp6OutEchos;
+        else if(unlikely(hash == hash_Icmp6OutEchoReplies && strsame(name, "Icmp6OutEchoReplies") == 0)) ptr = &Icmp6OutEchoReplies;
+        else if(unlikely(hash == hash_Icmp6OutGroupMembQueries && strsame(name, "Icmp6OutGroupMembQueries") == 0)) ptr = &Icmp6OutGroupMembQueries;
+        else if(unlikely(hash == hash_Icmp6OutGroupMembResponses && strsame(name, "Icmp6OutGroupMembResponses") == 0)) ptr = &Icmp6OutGroupMembResponses;
+        else if(unlikely(hash == hash_Icmp6OutGroupMembReductions && strsame(name, "Icmp6OutGroupMembReductions") == 0)) ptr = &Icmp6OutGroupMembReductions;
+        else if(unlikely(hash == hash_Icmp6OutRouterSolicits && strsame(name, "Icmp6OutRouterSolicits") == 0)) ptr = &Icmp6OutRouterSolicits;
+        else if(unlikely(hash == hash_Icmp6OutRouterAdvertisements && strsame(name, "Icmp6OutRouterAdvertisements") == 0)) ptr = &Icmp6OutRouterAdvertisements;
+        else if(unlikely(hash == hash_Icmp6OutNeighborSolicits && strsame(name, "Icmp6OutNeighborSolicits") == 0)) ptr = &Icmp6OutNeighborSolicits;
+        else if(unlikely(hash == hash_Icmp6OutNeighborAdvertisements && strsame(name, "Icmp6OutNeighborAdvertisements") == 0)) ptr = &Icmp6OutNeighborAdvertisements;
+        else if(unlikely(hash == hash_Icmp6OutRedirects && strsame(name, "Icmp6OutRedirects") == 0)) ptr = &Icmp6OutRedirects;
+        else if(unlikely(hash == hash_Icmp6OutMLDv2Reports && strsame(name, "Icmp6OutMLDv2Reports") == 0)) ptr = &Icmp6OutMLDv2Reports;
+        else if(unlikely(hash == hash_Icmp6InType1 && strsame(name, "Icmp6InType1") == 0)) ptr = &Icmp6InType1;
+        else if(unlikely(hash == hash_Icmp6InType128 && strsame(name, "Icmp6InType128") == 0)) ptr = &Icmp6InType128;
+        else if(unlikely(hash == hash_Icmp6InType129 && strsame(name, "Icmp6InType129") == 0)) ptr = &Icmp6InType129;
+        else if(unlikely(hash == hash_Icmp6InType136 && strsame(name, "Icmp6InType136") == 0)) ptr = &Icmp6InType136;
+        else if(unlikely(hash == hash_Icmp6OutType1 && strsame(name, "Icmp6OutType1") == 0)) ptr = &Icmp6OutType1;
+        else if(unlikely(hash == hash_Icmp6OutType128 && strsame(name, "Icmp6OutType128") == 0)) ptr = &Icmp6OutType128;
+        else if(unlikely(hash == hash_Icmp6OutType129 && strsame(name, "Icmp6OutType129") == 0)) ptr = &Icmp6OutType129;
+        else if(unlikely(hash == hash_Icmp6OutType133 && strsame(name, "Icmp6OutType133") == 0)) ptr = &Icmp6OutType133;
+        else if(unlikely(hash == hash_Icmp6OutType135 && strsame(name, "Icmp6OutType135") == 0)) ptr = &Icmp6OutType135;
+        else if(unlikely(hash == hash_Icmp6OutType143 && strsame(name, "Icmp6OutType143") == 0)) ptr = &Icmp6OutType143;
+        else if(unlikely(hash == hash_Udp6InDatagrams && strsame(name, "Udp6InDatagrams") == 0)) ptr = &Udp6InDatagrams;
+        else if(unlikely(hash == hash_Udp6NoPorts && strsame(name, "Udp6NoPorts") == 0)) ptr = &Udp6NoPorts;
+        else if(unlikely(hash == hash_Udp6InErrors && strsame(name, "Udp6InErrors") == 0)) ptr = &Udp6InErrors;
+        else if(unlikely(hash == hash_Udp6OutDatagrams && strsame(name, "Udp6OutDatagrams") == 0)) ptr = &Udp6OutDatagrams;
+        else if(unlikely(hash == hash_Udp6RcvbufErrors && strsame(name, "Udp6RcvbufErrors") == 0)) ptr = &Udp6RcvbufErrors;
+        else if(unlikely(hash == hash_Udp6SndbufErrors && strsame(name, "Udp6SndbufErrors") == 0)) ptr = &Udp6SndbufErrors;
+        else if(unlikely(hash == hash_Udp6InCsumErrors && strsame(name, "Udp6InCsumErrors") == 0)) ptr = &Udp6InCsumErrors;
+        else if(unlikely(hash == hash_Udp6IgnoredMulti && strsame(name, "Udp6IgnoredMulti") == 0)) ptr = &Udp6IgnoredMulti;
+        else if(unlikely(hash == hash_UdpLite6InDatagrams && strsame(name, "UdpLite6InDatagrams") == 0)) ptr = &UdpLite6InDatagrams;
+        else if(unlikely(hash == hash_UdpLite6NoPorts && strsame(name, "UdpLite6NoPorts") == 0)) ptr = &UdpLite6NoPorts;
+        else if(unlikely(hash == hash_UdpLite6InErrors && strsame(name, "UdpLite6InErrors") == 0)) ptr = &UdpLite6InErrors;
+        else if(unlikely(hash == hash_UdpLite6OutDatagrams && strsame(name, "UdpLite6OutDatagrams") == 0)) ptr = &UdpLite6OutDatagrams;
+        else if(unlikely(hash == hash_UdpLite6RcvbufErrors && strsame(name, "UdpLite6RcvbufErrors") == 0)) ptr = &UdpLite6RcvbufErrors;
+        else if(unlikely(hash == hash_UdpLite6SndbufErrors && strsame(name, "UdpLite6SndbufErrors") == 0)) ptr = &UdpLite6SndbufErrors;
+        else if(unlikely(hash == hash_UdpLite6InCsumErrors && strsame(name, "UdpLite6InCsumErrors") == 0)) ptr = &UdpLite6InCsumErrors;
 
         if(unlikely(ptr)) {
             *ptr = str2ull(value);

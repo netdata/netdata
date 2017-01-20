@@ -91,7 +91,7 @@ void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *funct
 static int rrdfamily_compare(void *a, void *b) {
     if(((RRDFAMILY *)a)->hash_family < ((RRDFAMILY *)b)->hash_family) return -1;
     else if(((RRDFAMILY *)a)->hash_family > ((RRDFAMILY *)b)->hash_family) return 1;
-    else return strcmp(((RRDFAMILY *)a)->family, ((RRDFAMILY *)b)->family);
+    else return strsame(((RRDFAMILY *)a)->family, ((RRDFAMILY *)b)->family);
 }
 
 #define rrdfamily_index_add(host, rc) (RRDFAMILY *)avl_insert_lock(&((host)->rrdfamily_root_index), (avl *)(rc))
@@ -146,7 +146,7 @@ void rrdfamily_free(RRDFAMILY *rc) {
 static int rrdset_compare(void* a, void* b) {
     if(((RRDSET *)a)->hash < ((RRDSET *)b)->hash) return -1;
     else if(((RRDSET *)a)->hash > ((RRDSET *)b)->hash) return 1;
-    else return strcmp(((RRDSET *)a)->id, ((RRDSET *)b)->id);
+    else return strsame(((RRDSET *)a)->id, ((RRDSET *)b)->id);
 }
 
 #define rrdset_index_add(host, st) (RRDSET *)avl_insert_lock(&((host)->rrdset_root_index), (avl *)(st))
@@ -173,7 +173,7 @@ static int rrdset_compare_name(void* a, void* b) {
 
     if(A->hash_name < B->hash_name) return -1;
     else if(A->hash_name > B->hash_name) return 1;
-    else return strcmp(A->name, B->name);
+    else return strsame(A->name, B->name);
 }
 
 RRDSET *rrdset_index_add_name(RRDHOST *host, RRDSET *st) {
@@ -202,7 +202,7 @@ static RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, uint32_t 
     result = avl_search_lock(&host->rrdset_root_index_name, (avl *) (&(tmp.avlname)));
     if(result) {
         RRDSET *st = rrdset_from_avlname(result);
-        if(strcmp(st->magic, RRDSET_MAGIC))
+        if(strsame(st->magic, RRDSET_MAGIC))
             error("Search for RRDSET %s returned an invalid RRDSET %s (name %s)", name, st->id, st->name);
 
         // fprintf(stderr, "FOUND: %s\n", name);
@@ -219,7 +219,7 @@ static RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, uint32_t 
 static int rrddim_compare(void* a, void* b) {
     if(((RRDDIM *)a)->hash < ((RRDDIM *)b)->hash) return -1;
     else if(((RRDDIM *)a)->hash > ((RRDDIM *)b)->hash) return 1;
-    else return strcmp(((RRDDIM *)a)->id, ((RRDDIM *)b)->id);
+    else return strsame(((RRDDIM *)a)->id, ((RRDDIM *)b)->id);
 }
 
 #define rrddim_index_add(st, rd) (RRDDIM *)avl_insert_lock(&((st)->dimensions_index), (avl *)(rd))
@@ -238,9 +238,9 @@ static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
 
 int rrdset_type_id(const char *name)
 {
-    if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0)) return RRDSET_TYPE_AREA;
-    else if(unlikely(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0)) return RRDSET_TYPE_STACKED;
-    else if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0)) return RRDSET_TYPE_LINE;
+    if(unlikely(strsame(name, RRDSET_TYPE_AREA_NAME) == 0)) return RRDSET_TYPE_AREA;
+    else if(unlikely(strsame(name, RRDSET_TYPE_STACKED_NAME) == 0)) return RRDSET_TYPE_STACKED;
+    else if(unlikely(strsame(name, RRDSET_TYPE_LINE_NAME) == 0)) return RRDSET_TYPE_LINE;
     return RRDSET_TYPE_LINE;
 }
 
@@ -289,9 +289,9 @@ const char *rrd_memory_mode_name(int id)
 
 int rrd_memory_mode_id(const char *name)
 {
-    if(unlikely(!strcmp(name, RRD_MEMORY_MODE_RAM_NAME)))
+    if(unlikely(!strsame(name, RRD_MEMORY_MODE_RAM_NAME)))
         return RRD_MEMORY_MODE_RAM;
-    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_MAP_NAME)))
+    else if(unlikely(!strsame(name, RRD_MEMORY_MODE_MAP_NAME)))
         return RRD_MEMORY_MODE_MAP;
 
     return RRD_MEMORY_MODE_SAVE;
@@ -302,10 +302,10 @@ int rrd_memory_mode_id(const char *name)
 
 int rrddim_algorithm_id(const char *name)
 {
-    if(strcmp(name, RRDDIM_INCREMENTAL_NAME) == 0)          return RRDDIM_INCREMENTAL;
-    if(strcmp(name, RRDDIM_ABSOLUTE_NAME) == 0)             return RRDDIM_ABSOLUTE;
-    if(strcmp(name, RRDDIM_PCENT_OVER_ROW_TOTAL_NAME) == 0)         return RRDDIM_PCENT_OVER_ROW_TOTAL;
-    if(strcmp(name, RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME) == 0)    return RRDDIM_PCENT_OVER_DIFF_TOTAL;
+    if(strsame(name, RRDDIM_INCREMENTAL_NAME) == 0)          return RRDDIM_INCREMENTAL;
+    if(strsame(name, RRDDIM_ABSOLUTE_NAME) == 0)             return RRDDIM_ABSOLUTE;
+    if(strsame(name, RRDDIM_PCENT_OVER_ROW_TOTAL_NAME) == 0)         return RRDDIM_PCENT_OVER_ROW_TOTAL;
+    if(strsame(name, RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME) == 0)    return RRDDIM_PCENT_OVER_DIFF_TOTAL;
     return RRDDIM_ABSOLUTE;
 }
 
@@ -353,7 +353,7 @@ char *rrdset_strncpyz_name(char *to, const char *from, size_t length)
 
 void rrdset_set_name(RRDSET *st, const char *name)
 {
-    if(unlikely(st->name && !strcmp(st->name, name)))
+    if(unlikely(st->name && !strsame(st->name, name)))
         return;
 
     debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
@@ -504,12 +504,12 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
     if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) st = (RRDSET *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 0);
     if(st) {
-        if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
+        if(strsame(st->magic, RRDSET_MAGIC) != 0) {
             errno = 0;
             info("Initializing file %s.", fullfilename);
             memset(st, 0, size);
         }
-        else if(strcmp(st->id, fullid) != 0) {
+        else if(strsame(st->id, fullid) != 0) {
             errno = 0;
             error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
             // munmap(st, size);
@@ -588,7 +588,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
     st->isdetail = 0;
     st->debug = 0;
 
-    // if(!strcmp(st->id, "disk_util.dm-0")) {
+    // if(!strsame(st->id, "disk_util.dm-0")) {
     //     st->debug = 1;
     //     error("enabled debugging for '%s'", st->id);
     // }
@@ -672,7 +672,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
         struct timeval now;
         now_realtime_timeval(&now);
 
-        if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
+        if(strsame(rd->magic, RRDDIMENSION_MAGIC) != 0) {
             errno = 0;
             info("Initializing file %s.", fullfilename);
             memset(rd, 0, size);
@@ -707,7 +707,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
             error("File %s is too old. Clearing it.", fullfilename);
             memset(rd, 0, size);
         }
-        else if(strcmp(rd->id, id) != 0) {
+        else if(strsame(rd->id, id) != 0) {
             errno = 0;
             error("File %s contents are not for dimension %s. Clearing it.", fullfilename, id);
             // munmap(rd, size);
@@ -795,7 +795,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 {
-    if(unlikely(rd->name && !strcmp(rd->name, name)))
+    if(unlikely(rd->name && !strsame(rd->name, name)))
         return;
 
     debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);

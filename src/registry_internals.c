@@ -17,7 +17,7 @@ int registry_regenerate_guid(const char *guid, char *result) {
         uuid_unparse_lower(uuid, result);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        if(strcmp(guid, result))
+        if(strsame(guid, result))
             info("Registry: source GUID '%s' and re-generated GUID '%s' differ!", guid, result);
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
@@ -175,7 +175,7 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
     delete_url = registry_fix_url(delete_url, NULL);
 
     // make sure the user is not deleting the url it uses
-    if(!strcmp(delete_url, pu->url->url)) {
+    if(!strsame(delete_url, pu->url->url)) {
         info("Registry Delete Request: delete URL is the one currently accessed, person: '%s', machine '%s', url '%s', delete url '%s'"
              , p->guid, m->guid, pu->url->url, delete_url);
         return NULL;
@@ -264,8 +264,8 @@ static inline int is_machine_guid_blacklisted(const char *guid) {
     // we blacklist them here, so that the next version of netdata will generate
     // new ones.
 
-    if(!strcmp(guid, "8a795b0c-2311-11e6-8563-000c295076a6")
-       || !strcmp(guid, "4aed1458-1c3e-11e6-a53f-000c290fc8f5")
+    if(!strsame(guid, "8a795b0c-2311-11e6-8563-000c295076a6")
+       || !strsame(guid, "4aed1458-1c3e-11e6-a53f-000c290fc8f5")
             ) {
         error("Blacklisted machine GUID '%s' found.", guid);
         return 1;

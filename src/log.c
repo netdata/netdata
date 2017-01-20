@@ -26,10 +26,10 @@ void syslog_init(void) {
 int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) {
     int f;
 
-    if(!filename || !*filename || !strcmp(filename, "none"))
+    if(!filename || !*filename || !strsame(filename, "none"))
         filename = "/dev/null";
 
-    if(!strcmp(filename, "syslog")) {
+    if(!strsame(filename, "syslog")) {
         filename = "/dev/null";
         syslog_init();
         if(enabled_syslog) *enabled_syslog = 1;
@@ -38,15 +38,15 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
 
     // don't do anything if the user is willing
     // to have the standard one
-    if(!strcmp(filename, "system")) {
+    if(!strsame(filename, "system")) {
         if(fd != -1) return fd;
         filename = "stdout";
     }
 
-    if(!strcmp(filename, "stdout"))
+    if(!strsame(filename, "stdout"))
         f = STDOUT_FILENO;
 
-    else if(!strcmp(filename, "stderr"))
+    else if(!strsame(filename, "stderr"))
         f = STDERR_FILENO;
 
     else {

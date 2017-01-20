@@ -54,88 +54,16 @@ static char *cgroups_rename_script = PLUGINS_DIR "/cgroup-name.sh";
 
 static uint32_t Read_hash = 0;
 static uint32_t Write_hash = 0;
-static uint32_t Sync_hash = 0;
-static uint32_t Async_hash = 0;
-static uint32_t Total_hash = 0;
 static uint32_t user_hash = 0;
 static uint32_t system_hash = 0;
-static uint32_t cache_hash = 0;
-static uint32_t rss_hash = 0;
-static uint32_t rss_huge_hash = 0;
-static uint32_t mapped_file_hash = 0;
-static uint32_t writeback_hash = 0;
-static uint32_t dirty_hash = 0;
-static uint32_t swap_hash = 0;
-static uint32_t pgpgin_hash = 0;
-static uint32_t pgpgout_hash = 0;
-static uint32_t pgfault_hash = 0;
-static uint32_t pgmajfault_hash = 0;
-static uint32_t inactive_anon_hash = 0;
-static uint32_t active_anon_hash = 0;
-static uint32_t inactive_file_hash = 0;
-static uint32_t active_file_hash = 0;
-static uint32_t unevictable_hash = 0;
-static uint32_t hierarchical_memory_limit_hash = 0;
-static uint32_t total_cache_hash = 0;
-static uint32_t total_rss_hash = 0;
-static uint32_t total_rss_huge_hash = 0;
-static uint32_t total_mapped_file_hash = 0;
-static uint32_t total_writeback_hash = 0;
-static uint32_t total_dirty_hash = 0;
-static uint32_t total_swap_hash = 0;
-static uint32_t total_pgpgin_hash = 0;
-static uint32_t total_pgpgout_hash = 0;
-static uint32_t total_pgfault_hash = 0;
-static uint32_t total_pgmajfault_hash = 0;
-static uint32_t total_inactive_anon_hash = 0;
-static uint32_t total_active_anon_hash = 0;
-static uint32_t total_inactive_file_hash = 0;
-static uint32_t total_active_file_hash = 0;
-static uint32_t total_unevictable_hash = 0;
 
 void read_cgroup_plugin_configuration() {
     system_page_size = sysconf(_SC_PAGESIZE);
 
     Read_hash = simple_hash("Read");
     Write_hash = simple_hash("Write");
-    Sync_hash = simple_hash("Sync");
-    Async_hash = simple_hash("Async");
-    Total_hash = simple_hash("Total");
     user_hash = simple_hash("user");
     system_hash = simple_hash("system");
-    cache_hash = simple_hash("cache");
-    rss_hash = simple_hash("rss");
-    rss_huge_hash = simple_hash("rss_huge");
-    mapped_file_hash = simple_hash("mapped_file");
-    writeback_hash = simple_hash("writeback");
-    dirty_hash = simple_hash("dirty");
-    swap_hash = simple_hash("swap");
-    pgpgin_hash = simple_hash("pgpgin");
-    pgpgout_hash = simple_hash("pgpgout");
-    pgfault_hash = simple_hash("pgfault");
-    pgmajfault_hash = simple_hash("pgmajfault");
-    inactive_anon_hash = simple_hash("inactive_anon");
-    active_anon_hash = simple_hash("active_anon");
-    inactive_file_hash = simple_hash("inactive_file");
-    active_file_hash = simple_hash("active_file");
-    unevictable_hash = simple_hash("unevictable");
-    hierarchical_memory_limit_hash = simple_hash("hierarchical_memory_limit");
-    total_cache_hash = simple_hash("total_cache");
-    total_rss_hash = simple_hash("total_rss");
-    total_rss_huge_hash = simple_hash("total_rss_huge");
-    total_mapped_file_hash = simple_hash("total_mapped_file");
-    total_writeback_hash = simple_hash("total_writeback");
-    total_dirty_hash = simple_hash("total_dirty");
-    total_swap_hash = simple_hash("total_swap");
-    total_pgpgin_hash = simple_hash("total_pgpgin");
-    total_pgpgout_hash = simple_hash("total_pgpgout");
-    total_pgfault_hash = simple_hash("total_pgfault");
-    total_pgmajfault_hash = simple_hash("total_pgmajfault");
-    total_inactive_anon_hash = simple_hash("total_inactive_anon");
-    total_active_anon_hash = simple_hash("total_active_anon");
-    total_inactive_file_hash = simple_hash("total_inactive_file");
-    total_active_file_hash = simple_hash("total_active_file");
-    total_unevictable_hash = simple_hash("total_unevictable");
 
     cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", rrd_update_every);
     if(cgroup_update_every < rrd_update_every)
@@ -443,8 +371,6 @@ struct cgroup {
     RRDDIM *rd_mem_detailed_rss;
     RRDDIM *rd_mem_detailed_mapped;
     RRDDIM *rd_mem_detailed_writeback;
-    RRDDIM *rd_mem_detailed_dirty;
-    RRDDIM *rd_mem_detailed_swap;
     RRDDIM *rd_mem_detailed_pgpgin;
     RRDDIM *rd_mem_detailed_pgpgout;
     RRDDIM *rd_mem_detailed_pgfault;
@@ -499,10 +425,10 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
             char *s = procfile_lineword(ff, i, 0);
             uint32_t hash = simple_hash(s);
 
-            if(unlikely(hash == user_hash && !strcmp(s, "user")))
+            if(unlikely(hash == user_hash && !strsame(s, "user")))
                 cp->user = str2ull(procfile_lineword(ff, i, 1));
 
-            else if(unlikely(hash == system_hash && !strcmp(s, "system")))
+            else if(unlikely(hash == system_hash && !strsame(s, "system")))
                 cp->system = str2ull(procfile_lineword(ff, i, 1));
         }
 
@@ -530,7 +456,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
         }
 
         if(unlikely(procfile_lines(ff) < 1)) {
-            error("File '%s' should have 1+ lines but has %u.", ca->filename, procfile_lines(ff));
+            error("File '%s' should have 1+ lines but has %zu.", ca->filename, procfile_lines(ff));
             ca->updated = 0;
             return;
         }
@@ -609,20 +535,20 @@ static inline void cgroup_read_blkio(struct blkio *io) {
             char *s = procfile_lineword(ff, i, 1);
             uint32_t hash = simple_hash(s);
 
-            if(unlikely(hash == Read_hash && !strcmp(s, "Read")))
+            if(unlikely(hash == Read_hash && !strsame(s, "Read")))
                 io->Read += str2ull(procfile_lineword(ff, i, 2));
 
-            else if(unlikely(hash == Write_hash && !strcmp(s, "Write")))
+            else if(unlikely(hash == Write_hash && !strsame(s, "Write")))
                 io->Write += str2ull(procfile_lineword(ff, i, 2));
 
 /*
-            else if(unlikely(hash == Sync_hash && !strcmp(s, "Sync")))
+            else if(unlikely(hash == Sync_hash && !strsame(s, "Sync")))
                 io->Sync += str2ull(procfile_lineword(ff, i, 2));
 
-            else if(unlikely(hash == Async_hash && !strcmp(s, "Async")))
+            else if(unlikely(hash == Async_hash && !strsame(s, "Async")))
                 io->Async += str2ull(procfile_lineword(ff, i, 2));
 
-            else if(unlikely(hash == Total_hash && !strcmp(s, "Total")))
+            else if(unlikely(hash == Total_hash && !strsame(s, "Total")))
                 io->Total += str2ull(procfile_lineword(ff, i, 2));
 */
         }
@@ -921,7 +847,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
     if(cg->enabled) {
         struct cgroup *t;
         for (t = cgroup_root; t; t = t->next) {
-            if (t != cg && t->enabled && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
+            if (t != cg && t->enabled && t->hash_chart == cg->hash_chart && !strsame(t->chart_id, cg->chart_id)) {
                 if (!strncmp(t->chart_id, "/system.slice/", 14) && !strncmp(cg->chart_id, "/init.scope/system.slice/", 25)) {
                     error("Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
                           cg->chart_id, t->id, cg->id, t->id);
@@ -989,7 +915,7 @@ static inline struct cgroup *cgroup_find(const char *id) {
 
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(hash == cg->hash && strcmp(id, cg->id) == 0)
+        if(hash == cg->hash && strsame(id, cg->id) == 0)
             break;
     }
 
@@ -1109,7 +1035,7 @@ static inline void cleanup_all_cgroups() {
             {
                 struct cgroup *t;
                 for(t = cgroup_root; t ; t = t->next) {
-                    if(t != cg && t->available && !t->enabled && t->options & CGROUP_OPTIONS_DISABLED_DUPLICATE && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
+                    if(t != cg && t->available && !t->enabled && t->options & CGROUP_OPTIONS_DISABLED_DUPLICATE && t->hash_chart == cg->hash_chart && !strsame(t->chart_id, cg->chart_id)) {
                         debug(D_CGROUP, "Enabling duplicate of cgroup '%s' with id '%s', because the original with id '%s' stopped.", t->chart_id, t->id, cg->id);
                         t->enabled = 1;
                         t->options &= ~CGROUP_OPTIONS_DISABLED_DUPLICATE;

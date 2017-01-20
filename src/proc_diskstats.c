@@ -91,7 +91,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
             struct dirent *dp;
             while( (dp = readdir(dirp)) ) {
                 // . and .. are also files in empty folders.
-                if(unlikely(strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)) {
+                if(unlikely(strsame(dp->d_name, ".") == 0 || strsame(dp->d_name, "..") == 0)) {
                     continue;
                 }
 
@@ -243,7 +243,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
+    size_t lines = procfile_lines(ff), l;
 
     for(l = 0; l < lines ;l++) {
         // --------------------------------------------------------------------------
@@ -260,7 +260,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             last_writes = 0, last_writesectors = 0, last_writems = 0,
                             last_busy_ms = 0;
 
-        uint32_t words = procfile_linewords(ff, l);
+        size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 14)) continue;
 
         major           = str2ul(procfile_lineword(ff, l, 0));

@@ -128,7 +128,7 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, uint32_t hash, 
 
     // find if it already exists in the data
     for(e = base->head; e ; e = e->next)
-        if(e->hash == hash && !strcmp(e->name, s))
+        if(e->hash == hash && !strsame(e->name, s))
             break;
 
 #ifdef NETDATA_INTERNAL_CHECKS

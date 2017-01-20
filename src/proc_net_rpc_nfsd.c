@@ -239,7 +239,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     if(do_proc4ops == -1) do_proc4ops = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v4 operations", 1);
 
     // if they are enabled, reset them to 1
-    // later we do them =2 to avoid doing strcmp for all lines
+    // later we do them =2 to avoid doing strsame() for all lines
     if(do_rc) do_rc = 1;
     if(do_fh) do_fh = 1;
     if(do_io) do_io = 1;
@@ -252,7 +252,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     if(do_proc4) do_proc4 = 1;
     if(do_proc4ops) do_proc4ops = 1;
 
-    uint32_t lines = procfile_lines(ff), l;
+    size_t lines = procfile_lines(ff), l;
 
     char *type;
     unsigned long long rc_hits = 0, rc_misses = 0, rc_nocache = 0;
@@ -264,14 +264,14 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     unsigned long long rpc_calls = 0, rpc_bad_format = 0, rpc_bad_auth = 0, rpc_bad_client = 0;
 
     for(l = 0; l < lines ;l++) {
-        uint32_t words = procfile_linewords(ff, l);
+        size_t words = procfile_linewords(ff, l);
         if(!words) continue;
 
         type = procfile_lineword(ff, l, 0);
 
-        if(do_rc == 1 && strcmp(type, "rc") == 0) {
+        if(do_rc == 1 && strsame(type, "rc") == 0) {
             if(words < 4) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 4);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
                 continue;
             }
 
@@ -283,9 +283,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             if(sum == 0ULL) do_rc = -1;
             else do_rc = 2;
         }
-        else if(do_fh == 1 && strcmp(type, "fh") == 0) {
+        else if(do_fh == 1 && strsame(type, "fh") == 0) {
             if(words < 6) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 6);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
@@ -299,9 +299,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             if(sum == 0ULL) do_fh = -1;
             else do_fh = 2;
         }
-        else if(do_io == 1 && strcmp(type, "io") == 0) {
+        else if(do_io == 1 && strsame(type, "io") == 0) {
             if(words < 3) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 3);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 3);
                 continue;
             }
 
@@ -312,9 +312,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             if(sum == 0ULL) do_io = -1;
             else do_io = 2;
         }
-        else if(do_th == 1 && strcmp(type, "th") == 0) {
+        else if(do_th == 1 && strsame(type, "th") == 0) {
             if(words < 13) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 13);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
 
@@ -343,9 +343,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
             else do_th = 2;
         }
-        else if(do_ra == 1 && strcmp(type, "ra") == 0) {
+        else if(do_ra == 1 && strsame(type, "ra") == 0) {
             if(words < 13) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 13);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
 
@@ -372,9 +372,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
             else do_ra = 2;
         }
-        else if(do_net == 1 && strcmp(type, "net") == 0) {
+        else if(do_net == 1 && strsame(type, "net") == 0) {
             if(words < 5) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 5);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 5);
                 continue;
             }
 
@@ -387,9 +387,9 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             if(sum == 0ULL) do_net = -1;
             else do_net = 2;
         }
-        else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
+        else if(do_rpc == 1 && strsame(type, "rpc") == 0) {
             if(words < 6) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 6);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
@@ -402,7 +402,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             if(sum == 0ULL) do_rpc = -1;
             else do_rpc = 2;
         }
-        else if(do_proc2 == 1 && strcmp(type, "proc2") == 0) {
+        else if(do_proc2 == 1 && strsame(type, "proc2") == 0) {
             // the first number is the count of numbers present
             // so we start for word 2
 
@@ -423,7 +423,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
             else do_proc2 = 2;
         }
-        else if(do_proc3 == 1 && strcmp(type, "proc3") == 0) {
+        else if(do_proc3 == 1 && strsame(type, "proc3") == 0) {
             // the first number is the count of numbers present
             // so we start for word 2
 
@@ -444,7 +444,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
             else do_proc3 = 2;
         }
-        else if(do_proc4 == 1 && strcmp(type, "proc4") == 0) {
+        else if(do_proc4 == 1 && strsame(type, "proc4") == 0) {
             // the first number is the count of numbers present
             // so we start for word 2
 
@@ -465,7 +465,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             }
             else do_proc4 = 2;
         }
-        else if(do_proc4ops == 1 && strcmp(type, "proc4ops") == 0) {
+        else if(do_proc4ops == 1 && strsame(type, "proc4ops") == 0) {
             // the first number is the count of numbers present
             // so we start for word 2
 

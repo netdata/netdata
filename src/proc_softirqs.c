@@ -23,9 +23,9 @@ struct interrupt {
 // given a base, get a pointer to each record
 #define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[line * recordsize(cpus)])
 
-static inline struct interrupt *get_interrupts_array(uint32_t lines, int cpus) {
+static inline struct interrupt *get_interrupts_array(size_t lines, int cpus) {
     static struct interrupt *irrs = NULL;
-    static uint32_t allocated = 0;
+    static size_t allocated = 0;
 
     if(unlikely(lines != allocated)) {
         uint32_t l;
@@ -66,8 +66,8 @@ int do_proc_softirqs(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
-    uint32_t words = procfile_linewords(ff, 0);
+    size_t lines = procfile_lines(ff), l;
+    size_t words = procfile_linewords(ff, 0);
 
     if(unlikely(!lines)) {
         error("Cannot read /proc/softirqs, zero lines reported.");
@@ -105,8 +105,8 @@ int do_proc_softirqs(int update_every, usec_t dt) {
         irr->id = procfile_lineword(ff, l, 0);
         if(unlikely(!irr->id || !irr->id[0])) continue;
 
-        int idlen = strlen(irr->id);
-        if(unlikely(irr->id[idlen - 1] == ':'))
+        size_t idlen = strlen(irr->id);
+        if(unlikely(idlen && irr->id[idlen - 1] == ':'))
             irr->id[idlen - 1] = '\0';
 
         int c;

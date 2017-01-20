@@ -118,7 +118,7 @@ static inline int arl_check(ARL_BASE *base, const char *keyword, const char *val
     uint32_t hash = simple_hash(keyword);
 
     // it should be the first entry (pointed by base->next_keyword)
-    if(likely(hash == e->hash && !strcmp(keyword, e->name))) {
+    if(likely(hash == e->hash && !strsame(keyword, e->name))) {
         // it is
 
 #ifdef NETDATA_INTERNAL_CHECKS

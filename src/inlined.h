@@ -77,6 +77,12 @@ static inline unsigned long long str2ull(const char *s) {
     return n;
 }
 
+static inline int strsame(register const char *a, register const char *b) {
+    if(unlikely(a == b)) return 0;
+    while(*a && *a == *b) { a++; b++; }
+    return *a - *b;
+}
+
 static inline int read_single_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
 

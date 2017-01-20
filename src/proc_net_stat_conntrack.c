@@ -61,12 +61,12 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         if(unlikely(!ff))
             return 0; // we return 0, so that we will retry to open it next time
 
-        uint32_t lines = procfile_lines(ff), l;
+        size_t lines = procfile_lines(ff), l;
 
         for(l = 1; l < lines ;l++) {
-            uint32_t words = procfile_linewords(ff, l);
+            size_t words = procfile_linewords(ff, l);
             if(unlikely(words < 17)) {
-                if(unlikely(words)) error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %u.", words);
+                if(unlikely(words)) error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %zu.", words);
                 continue;
             }
 
