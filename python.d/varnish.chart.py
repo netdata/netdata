@@ -60,9 +60,11 @@ CHARTS = {'backend_health':
                        ['s0.g_bytes', 'allocated', 'absolute', -1, 1048576]],
               'options': [None, 'Memory usage', 'megabytes', 'Memory usage', 'varnish.memory_usage', 'stacked']},
           'session': 
-             {'lines': [['sess_conn', 'conn', 'incremental', 1, 1],
-                       ['client_req', 'requests', 'incremental', 1, 1],
-                       ['sess_dropped', 'dropped', 'incremental', 1, 1]],
+             {'lines': [['sess_conn', 'sess_conn', 'incremental', 1, 1],
+                       ['client_req', 'client_requests', 'incremental', 1, 1],
+                       ['client_conn', 'client_conn', 'incremental', 1, 1],
+                       ['client_drop', 'client_drop', 'incremental', 1, 1],
+                       ['sess_dropped', 'sess_dropped', 'incremental', 1, 1]],
               'options': [None, 'Sessions', 'units', 'Client metrics', 'varnish.session', 'line']},
           'threads': 
              {'lines': [['threads', None, 'absolute', 1, 1],
@@ -88,7 +90,7 @@ class Service(SimpleService):
                          if is_executable(''.join([directory, 'varnishstat']), X_OK)][0]
         except IndexError:
             self.varnish = False
-        self.rgx_all = compile(r'([A-Z]+\.)([\d\w_.]+)\s+(\d+)')
+        self.rgx_all = compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')
         # Could be
         # VBE.boot.super_backend.pipe_hdrbyte (new)
         # or
@@ -114,7 +116,7 @@ class Service(SimpleService):
         # 2. Output is parsable (list is not empty after regex findall)
         is_parsable = self.rgx_all.findall(reply)
         if not is_parsable:
-            self.error('Cant parse output (only varnish version 4+ supported)')
+            self.error('Cant parse output...')
             return False
 
         # We need to find the right regex for backend parse
@@ -187,7 +189,8 @@ class Service(SimpleService):
         # 3.3 Problems summary chart
         for elem in ['backend_busy', 'backend_unhealthy', 'esi_errors', 'esi_warnings', 'losthdr', 'sess_drop',
                      'sess_fail', 'sess_pipe_overflow', 'threads_destroyed', 'threads_failed', 'threads_limited', 'thread_queue_len']:
-            to_netdata[''.join([elem, '_b'])] = to_netdata.get(elem, 0)
+            if to_netdata.get(elem) is not None:
+                to_netdata[''.join([elem, '_b'])] = to_netdata.get(elem)
 
         # Ready steady go!
         return to_netdata
@@ -207,7 +210,8 @@ class Service(SimpleService):
         #self.order.extend(extra_charts)
 
         # Create static charts
-        self.definitions = {chart: values for chart, values in CHARTS.items() if chart in self.order}
+        #self.definitions = {chart: values for chart, values in CHARTS.items() if chart in self.order}
+        self.definitions = CHARTS
  
         # Create dynamic backend charts
         if self.backend_list:
