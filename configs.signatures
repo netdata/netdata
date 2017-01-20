@@ -178,6 +178,7 @@ declare -A configs_signatures=(
   ['75a9c4b0b1c73956df55585eb0619f6c']='charts.d/ap.conf'
   ['769aa4cdcdc3d78d0328d1f9e4edcdf9']='python.d/mysql.conf'
   ['777f4da70f461ef675bde07fb3644312']='python.d/redis.conf'
+  ['777f55a95c5c25cf6176fece1ebbf4b8']='apps_groups.conf'
   ['7808ba2ca26bd0642270740cf6a8ee59']='charts.d/mem_apps.conf'
   ['7830066c46a7e5f9682b8d3f4566b4e5']='python.d/cpufreq.conf'
   ['78bb08809dffcb62e9bc493840f9c039']='python.d/squid.conf'
