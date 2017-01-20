@@ -1,5 +1,4 @@
 #include "common.h"
-#include "adaptive_resortable_list.h"
 
 int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
