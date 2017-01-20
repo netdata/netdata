@@ -160,7 +160,7 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
     static int cleanup_every = 999;
 
     if(unlikely(cleanup_every > 0)) {
-        cleanup_every = (int) config_get_number("plugin:tc", "cleanup unused classes every", 60);
+        cleanup_every = (int) config_get_number("plugin:tc", "cleanup unused classes every", 120);
         if(cleanup_every < 0) cleanup_every = -cleanup_every;
     }
 
