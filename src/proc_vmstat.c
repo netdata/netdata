@@ -31,22 +31,34 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", 1);
         do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_ONDEMAND_ONDEMAND);
 
+
         arl_base = arl_create(NULL, 60);
-        arl_expect(arl_base, "numa_foreign", &numa_foreign);
-        arl_expect(arl_base, "numa_hint_faults_local", &numa_hint_faults_local);
-        arl_expect(arl_base, "numa_hint_faults", &numa_hint_faults);
-        arl_expect(arl_base, "numa_huge_pte_updates", &numa_huge_pte_updates);
-        arl_expect(arl_base, "numa_interleave", &numa_interleave);
-        arl_expect(arl_base, "numa_local", &numa_local);
-        arl_expect(arl_base, "numa_other", &numa_other);
-        arl_expect(arl_base, "numa_pages_migrated", &numa_pages_migrated);
-        arl_expect(arl_base, "numa_pte_updates", &numa_pte_updates);
         arl_expect(arl_base, "pgfault", &pgfault);
         arl_expect(arl_base, "pgmajfault", &pgmajfault);
         arl_expect(arl_base, "pgpgin", &pgpgin);
         arl_expect(arl_base, "pgpgout", &pgpgout);
         arl_expect(arl_base, "pswpin", &pswpin);
         arl_expect(arl_base, "pswpout", &pswpout);
+
+        if(do_numa == CONFIG_ONDEMAND_YES || (do_numa == CONFIG_ONDEMAND_ONDEMAND && get_numa_node_count() >= 2)) {
+            arl_expect(arl_base, "numa_foreign", &numa_foreign);
+            arl_expect(arl_base, "numa_hint_faults_local", &numa_hint_faults_local);
+            arl_expect(arl_base, "numa_hint_faults", &numa_hint_faults);
+            arl_expect(arl_base, "numa_huge_pte_updates", &numa_huge_pte_updates);
+            arl_expect(arl_base, "numa_interleave", &numa_interleave);
+            arl_expect(arl_base, "numa_local", &numa_local);
+            arl_expect(arl_base, "numa_other", &numa_other);
+            arl_expect(arl_base, "numa_pages_migrated", &numa_pages_migrated);
+            arl_expect(arl_base, "numa_pte_updates", &numa_pte_updates);
+        }
+        else {
+            // Do not expect numa metrics when they are not needed.
+            // By not adding them, the ARL will stop processing the file
+            // when all the expected metrics are collected.
+            // Also ARL will not parse their values.
+            has_numa = 0;
+            do_numa = CONFIG_ONDEMAND_NO;
+        }
     }
 
     if(unlikely(!ff)) {
@@ -69,12 +81,9 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             continue;
         }
 
-        char *name = procfile_lineword(ff, l, 0);
-        char *value = procfile_lineword(ff, l, 1);
-        if(unlikely(!name || !*name || !value || !*value)) continue;
-
-        if(unlikely(arl_check(arl_base, name, value)))
-            break;
+        if(unlikely(arl_check(arl_base,
+                procfile_lineword(ff, l, 0),
+                procfile_lineword(ff, l, 1)))) break;
     }
 
     // --------------------------------------------------------------------
@@ -137,11 +146,9 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     // check it only once. We check whether the node count is >= 2 because
     // single-node systems have uninteresting statistics (since all accesses
     // are local).
-    if(unlikely(has_numa == -1)) {
-        has_numa = (get_numa_node_count() >= 2 &&
-                    (numa_local || numa_foreign || numa_interleave || numa_other || numa_pte_updates ||
-                     numa_huge_pte_updates || numa_hint_faults || numa_hint_faults_local || numa_pages_migrated)) ? 1 : 0;
-    }
+    if(unlikely(has_numa == -1))
+        has_numa = (numa_local || numa_foreign || numa_interleave || numa_other || numa_pte_updates ||
+                     numa_huge_pte_updates || numa_hint_faults || numa_hint_faults_local || numa_pages_migrated) ? 1 : 0;
 
     if(do_numa == CONFIG_ONDEMAND_YES || (do_numa == CONFIG_ONDEMAND_ONDEMAND && has_numa)) {
         do_numa = CONFIG_ONDEMAND_YES;
