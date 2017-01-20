@@ -44,7 +44,7 @@ struct tc_class {
 
     char name_updated;
     char updated;   // updated bytes
-    int seen;       // seen in the tc list (even without bytes)
+    int  unupdated; // the number of times, this has been found un-updated
 
     struct tc_class *next;
     struct tc_class *prev;
@@ -144,7 +144,7 @@ static inline void tc_class_free(struct tc_device *n, struct tc_class *c) {
     if(c->next) c->next->prev = c->prev;
     if(c->prev) c->prev->next = c->next;
 
-    debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', seen=%d", n->id, c->id, c->parentid?c->parentid:"", c->leafid?c->leafid:"", c->seen);
+    debug(D_TC_LOOP, "Removing from device '%s' class '%s', parentid '%s', leafid '%s', unused=%d", n->id, c->id, c->parentid?c->parentid:"", c->leafid?c->leafid:"", c->unupdated);
 
     if(unlikely(tc_class_index_del(n, c) != c))
         error("plugin_tc: INTERNAL ERROR: attempt remove class '%s' from device '%s': removed a different calls", c->id, n->id);
@@ -169,7 +169,7 @@ static inline void tc_device_classes_cleanup(struct tc_device *d) {
 
     struct tc_class *c = d->classes;
     while(c) {
-        if(unlikely(cleanup_every > 0 && c->seen >= cleanup_every)) {
+        if(unlikely(cleanup_every && c->unupdated >= cleanup_every)) {
             struct tc_class *nc = c->next;
             tc_class_free(d, c);
             c = nc;
@@ -204,6 +204,11 @@ static inline void tc_device_commit(struct tc_device *d) {
     for(c = d->classes ; c ; c = c->next) {
         c->isleaf = 1;
         c->hasparent = 0;
+
+        if(unlikely(!c->updated))
+            c->unupdated++;
+        else
+            c->unupdated = 0;
     }
 
     // mark the classes as leafs and parents
@@ -257,22 +262,22 @@ static inline void tc_device_commit(struct tc_device *d) {
     if(unlikely(d->enabled == (char)-1)) {
         char var_name[CONFIG_MAX_NAME + 1];
         snprintfz(var_name, CONFIG_MAX_NAME, "qos for %s", d->id);
-        d->enabled         = config_get_boolean_ondemand("plugin:tc", var_name, enable_new_interfaces);
+        d->enabled         = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_new_interfaces);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "traffic chart for %s", d->id);
-        d->enabled_bytes   = config_get_boolean_ondemand("plugin:tc", var_name, enable_bytes);
+        d->enabled_bytes   = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_bytes);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "packets chart for %s", d->id);
-        d->enabled_packets = config_get_boolean_ondemand("plugin:tc", var_name, enable_packets);
+        d->enabled_packets = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_packets);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "dropped packets chart for %s", d->id);
-        d->enabled_dropped = config_get_boolean_ondemand("plugin:tc", var_name, enable_dropped);
+        d->enabled_dropped = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_dropped);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "tokens chart for %s", d->id);
-        d->enabled_tokens = config_get_boolean_ondemand("plugin:tc", var_name, enable_tokens);
+        d->enabled_tokens = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_tokens);
 
         snprintfz(var_name, CONFIG_MAX_NAME, "ctokens chart for %s", d->id);
-        d->enabled_ctokens = config_get_boolean_ondemand("plugin:tc", var_name, enable_ctokens);
+        d->enabled_ctokens = (char)config_get_boolean_ondemand("plugin:tc", var_name, enable_ctokens);
     }
 
     debug(D_TC_LOOP, "TC: evaluating TC device '%s'. enabled = %d/%d (bytes: %d/%d, packets: %d/%d, dropped: %d/%d, tokens: %d/%d, ctokens: %d/%d), classes = %d (bytes = %llu, packets = %llu, dropped = %llu, tokens = %llu, ctokens = %llu).",
@@ -322,8 +327,6 @@ static inline void tc_device_commit(struct tc_device *d) {
                 if(unlikely(!c->updated)) continue;
 
                 if(c->isleaf && c->hasparent) {
-                    c->seen++;
-
                     if(unlikely(!c->rd_bytes)) {
                         c->rd_bytes = rrddim_find(d->st_bytes, c->id);
                         if(unlikely(!c->rd_bytes)) {
@@ -665,9 +668,6 @@ static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, char 
         if(unlikely(tc_class_index_add(n, c) != c))
             error("plugin_tc: INTERNAL ERROR: attempt index class '%s' on device '%s': already exists", c->id, n->id);
     }
-
-    c->seen = 1;
-
     return(c);
 }
 
