@@ -693,6 +693,7 @@ run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name 
 NETDATA_ADDED_TO_DOCKER=0
 NETDATA_ADDED_TO_NGINX=0
 NETDATA_ADDED_TO_VARNISH=0
+NETDATA_ADDED_TO_HAPROXY=0
 if [ ${UID} -eq 0 ]
     then
     portable_add_group netdata
@@ -700,6 +701,7 @@ if [ ${UID} -eq 0 ]
     portable_add_user_to_group docker netdata && NETDATA_ADDED_TO_DOCKER=1
     portable_add_user_to_group nginx  netdata && NETDATA_ADDED_TO_NGINX=1
     portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
+    portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
 
     if [ -d /etc/logrotate.d -a ! -f /etc/logrotate.d/netdata ]
         then
@@ -1353,6 +1355,16 @@ if [ $? -eq 0 -a "${NETDATA_ADDED_TO_VARNISH}" = "1" ]
     echo "by running:"
     echo "   gpasswd -d netdata varnish"
 fi
+
+getent group haproxy > /dev/null
+if [ $? -eq 0 -a "${NETDATA_ADDED_TO_HAPROXY}" = "1" ]
+    then
+    echo
+    echo "You may also want to remove the netdata user from the haproxy group"
+    echo "by running:"
+    echo "   gpasswd -d netdata haproxy"
+fi
+
 
 UNINSTALL
 chmod 750 netdata-uninstaller.sh

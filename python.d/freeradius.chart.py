@@ -101,8 +101,8 @@ class Service(SimpleService):
         :return: str
         """
         try:
-            process_echo = Popen(self.sub_echo,  stdout=PIPE, shell=False)
-            process_rad = Popen(self.sub_radclient, stdin=process_echo.stdout, stdout=PIPE,  shell=False)
+            process_echo = Popen(self.sub_echo, stdout=PIPE, stderr=PIPE, shell=False)
+            process_rad = Popen(self.sub_radclient, stdin=process_echo.stdout, stdout=PIPE, stderr=PIPE, shell=False)
             process_echo.stdout.close()
             raw_result = process_rad.communicate()[0]
         except Exception:
