@@ -1,9 +1,18 @@
 #ifndef NETDATA_PLUGINS_D_H
 #define NETDATA_PLUGINS_D_H 1
 
+/**
+ * @file plugins_d.h
+ * @brief Thread maintains external plugins.
+ */
+
+/// File suffix a plugin must have
 #define PLUGINSD_FILE_SUFFIX ".plugin"
+/// Length of `PLUGINSD_FILE_SUFFIX`          
 #define PLUGINSD_FILE_SUFFIX_LEN strlen(PLUGINSD_FILE_SUFFIX)
+/// Max length of command starting a plugin.
 #define PLUGINSD_CMD_MAX (FILENAME_MAX*2)
+/// Maximum line of a line.
 #define PLUGINSD_LINE_MAX 1024
 
 /** List of plugin daemons */
@@ -32,8 +41,15 @@ struct plugind {
     struct plugind *next;               ///< the next daemon in the list
 };
 
+/// Global struct plugind
 extern struct plugind *pluginsd_root;
 
+/**
+ * Main method of thread pluginsd.
+ *
+ * @param ptr to struct netdata_static_thread
+ * @return NULL
+ */
 extern void *pluginsd_main(void *ptr);
 
 #endif /* NETDATA_PLUGINS_D_H */
