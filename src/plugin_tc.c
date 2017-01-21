@@ -92,7 +92,7 @@ struct tc_device *tc_device_root = NULL;
 static int tc_device_compare(void* a, void* b) {
     if(((struct tc_device *)a)->hash < ((struct tc_device *)b)->hash) return -1;
     else if(((struct tc_device *)a)->hash > ((struct tc_device *)b)->hash) return 1;
-    else return strsame(((struct tc_device *)a)->id, ((struct tc_device *)b)->id);
+    else return strcmp(((struct tc_device *)a)->id, ((struct tc_device *)b)->id);
 }
 
 avl_tree tc_device_root_index = {
@@ -118,7 +118,7 @@ static inline struct tc_device *tc_device_index_find(const char *id, uint32_t ha
 static int tc_class_compare(void* a, void* b) {
     if(((struct tc_class *)a)->hash < ((struct tc_class *)b)->hash) return -1;
     else if(((struct tc_class *)a)->hash > ((struct tc_class *)b)->hash) return 1;
-    else return strsame(((struct tc_class *)a)->id, ((struct tc_class *)b)->id);
+    else return strcmp(((struct tc_class *)a)->id, ((struct tc_class *)b)->id);
 }
 
 #define tc_class_index_add(st, rd) (struct tc_class *)avl_insert(&((st)->classes_index), (avl *)(rd))
@@ -221,8 +221,8 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(c == x)) continue;
 
             if(x->parentid && (
-                (               c->hash      == x->parent_hash && strsame(c->id,     x->parentid) == 0) ||
-                (c->leafid   && c->leaf_hash == x->parent_hash && strsame(c->leafid, x->parentid) == 0))) {
+                (               c->hash      == x->parent_hash && strcmp(c->id,     x->parentid) == 0) ||
+                (c->leafid   && c->leaf_hash == x->parent_hash && strcmp(c->leafid, x->parentid) == 0))) {
                 // debug(D_TC_LOOP, "TC: In device '%s', class '%s' (leafid: '%s') has as leaf class '%s' (parentid: '%s').", d->name?d->name:d->id, c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->name?x->name:x->id, x->parentid?x->parentid:x->id);
                 c->isleaf = 0;
                 x->hasparent = 1;
@@ -314,7 +314,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 debug(D_TC_LOOP, "TC: Updating chart for device '%s'", d->name?d->name:d->id);
                 rrdset_next(d->st_bytes);
 
-                if(unlikely(d->name_updated && d->name && strsame(d->id, d->name) != 0)) {
+                if(unlikely(d->name_updated && d->name && strcmp(d->id, d->name) != 0)) {
                     rrdset_set_name(d->st_bytes, d->name);
                     d->name_updated = 0;
                 }
@@ -341,7 +341,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     rrddim_set_by_pointer(d->st_bytes, c->rd_bytes, c->bytes);
 
                     // if it has a name, different to the id
-                    if(unlikely(c->name_updated && c->name && strsame(c->id, c->name) != 0)) {
+                    if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
                         // update the rrd dimension with the new name
                         debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_bytes->id, c->rd_bytes->id, c->name);
                         rrddim_set_name(d->st_bytes, c->rd_bytes, c->name);
@@ -395,7 +395,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     rrddim_set_by_pointer(d->st_packets, c->rd_packets, c->packets);
 
                     // if it has a name, different to the id
-                    if(unlikely(c->name_updated && c->name && strsame(c->id, c->name) != 0)) {
+                    if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
                         // update the rrd dimension with the new name
                         debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_packets->id, c->rd_packets->id, c->name);
                         rrddim_set_name(d->st_packets, c->rd_packets, c->name);
@@ -449,7 +449,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     rrddim_set_by_pointer(d->st_dropped, c->rd_dropped, c->dropped);
 
                     // if it has a name, different to the id
-                    if(unlikely(c->name_updated && c->name && strsame(c->id, c->name) != 0)) {
+                    if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
                         // update the rrd dimension with the new name
                         debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_dropped->id, c->rd_dropped->id, c->name);
                         rrddim_set_name(d->st_dropped, c->rd_dropped, c->name);
@@ -503,7 +503,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     rrddim_set_by_pointer(d->st_tokens, c->rd_tokens, c->tokens);
 
                     // if it has a name, different to the id
-                    if(unlikely(c->name_updated && c->name && strsame(c->id, c->name) != 0)) {
+                    if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
                         // update the rrd dimension with the new name
                         debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_tokens->id, c->rd_tokens->id, c->name);
                         rrddim_set_name(d->st_tokens, c->rd_tokens, c->name);
@@ -557,7 +557,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                     rrddim_set_by_pointer(d->st_ctokens, c->rd_ctokens, c->ctokens);
 
                     // if it has a name, different to the id
-                    if(unlikely(c->name_updated && c->name && strsame(c->id, c->name) != 0)) {
+                    if(unlikely(c->name_updated && c->name && strcmp(c->id, c->name) != 0)) {
                         // update the rrd dimension with the new name
                         debug(D_TC_LOOP, "TC: Setting chart '%s', dimension '%s' name to '%s'", d->st_ctokens->id, c->rd_ctokens->id, c->name);
                         rrddim_set_name(d->st_ctokens, c->rd_ctokens, c->name);
@@ -578,7 +578,7 @@ static inline void tc_device_set_class_name(struct tc_device *d, char *id, char 
         freez(c->name);
         c->name = NULL;
 
-        if(likely(name && *name && strsame(c->id, name) != 0)) {
+        if(likely(name && *name && strcmp(c->id, name) != 0)) {
             debug(D_TC_LOOP, "TC: Setting device '%s', class '%s' name to '%s'", d->id, id, name);
             c->name = strdupz(name);
             c->name_updated = 1;
@@ -590,7 +590,7 @@ static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
     freez(d->name);
     d->name = NULL;
 
-    if(likely(name && *name && strsame(d->id, name) != 0)) {
+    if(likely(name && *name && strcmp(d->id, name) != 0)) {
         debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", d->id, name);
         d->name = strdupz(name);
         d->name_updated = 1;
@@ -601,7 +601,7 @@ static inline void tc_device_set_device_family(struct tc_device *d, char *family
     freez(d->family);
     d->family = NULL;
 
-    if(likely(family && *family && strsame(d->id, family) != 0)) {
+    if(likely(family && *family && strcmp(d->id, family) != 0)) {
         debug(D_TC_LOOP, "TC: Setting device '%s' family to '%s'", d->id, family);
         d->family = strdupz(family);
         d->family_updated = 1;
@@ -815,17 +815,17 @@ void *tc_main(void *ptr) {
 
             first_hash = simple_hash(words[0]);
 
-            if(unlikely(device && first_hash == CLASS_HASH && strsame(words[0], "class") == 0)) {
+            if(unlikely(device && first_hash == CLASS_HASH && strcmp(words[0], "class") == 0)) {
                 // debug(D_TC_LOOP, "CLASS line on class id='%s', parent='%s', parentid='%s', leaf='%s', leafid='%s'", words[2], words[3], words[4], words[5], words[6]);
 
                 // words[1] : class type
                 // words[2] : N:XX
                 // words[3] : parent or root
-                if(likely(words[1] && words[2] && words[3] && (strsame(words[3], "parent") == 0 || strsame(words[3], "root") == 0))) {
+                if(likely(words[1] && words[2] && words[3] && (strcmp(words[3], "parent") == 0 || strcmp(words[3], "root") == 0))) {
                     //char *type     = words[1];  // the class: htb, fq_codel, etc
 
                     // we are only interested for HTB classes
-                    //if(strsame(type, "htb") != 0) continue;
+                    //if(strcmp(type, "htb") != 0) continue;
 
                     char *id       = words[2];  // the class major:minor
                     char *parent   = words[3];  // 'parent' or 'root'
@@ -833,11 +833,11 @@ void *tc_main(void *ptr) {
                     char *leaf     = words[5];  // 'leaf'
                     char *leafid   = words[6];  // leafid
 
-                    if(strsame(parent, "root") == 0) {
+                    if(strcmp(parent, "root") == 0) {
                         parentid = NULL;
                         leafid = NULL;
                     }
-                    else if(!leaf || strsame(leaf, "leaf") != 0)
+                    else if(!leaf || strcmp(leaf, "leaf") != 0)
                         leafid = NULL;
 
                     char leafbuf[20 + 1] = "";
@@ -854,7 +854,7 @@ void *tc_main(void *ptr) {
                     class = NULL;
                 }
             }
-            else if(unlikely(first_hash == END_HASH && strsame(words[0], "END") == 0)) {
+            else if(unlikely(first_hash == END_HASH && strcmp(words[0], "END") == 0)) {
                 // debug(D_TC_LOOP, "END line");
 
                 if(likely(device)) {
@@ -871,7 +871,7 @@ void *tc_main(void *ptr) {
                 device = NULL;
                 class = NULL;
             }
-            else if(unlikely(first_hash == BEGIN_HASH && strsame(words[0], "BEGIN") == 0)) {
+            else if(unlikely(first_hash == BEGIN_HASH && strcmp(words[0], "BEGIN") == 0)) {
                 // debug(D_TC_LOOP, "BEGIN line on device '%s'", words[1]);
 
                 if(likely(words[1] && *words[1])) {
@@ -884,7 +884,7 @@ void *tc_main(void *ptr) {
 
                 class = NULL;
             }
-            else if(unlikely(device && class && first_hash == SENT_HASH && strsame(words[0], "Sent") == 0)) {
+            else if(unlikely(device && class && first_hash == SENT_HASH && strcmp(words[0], "Sent") == 0)) {
                 // debug(D_TC_LOOP, "SENT line '%s'", words[1]);
                 if(likely(words[1] && *words[1])) {
                     class->bytes = str2ull(words[1]);
@@ -906,7 +906,7 @@ void *tc_main(void *ptr) {
                 if(likely(words[10] && *words[10]))
                     class->requeues = str2ull(words[8]);
             }
-            else if(unlikely(device && class && class->updated && first_hash == LENDED_HASH && strsame(words[0], "lended:") == 0)) {
+            else if(unlikely(device && class && class->updated && first_hash == LENDED_HASH && strcmp(words[0], "lended:") == 0)) {
                 // debug(D_TC_LOOP, "LENDED line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     class->lended = str2ull(words[1]);
@@ -917,7 +917,7 @@ void *tc_main(void *ptr) {
                 if(likely(words[5] && *words[5]))
                     class->giants = str2ull(words[5]);
             }
-            else if(unlikely(device && class && class->updated && first_hash == TOKENS_HASH && strsame(words[0], "tokens:") == 0)) {
+            else if(unlikely(device && class && class->updated && first_hash == TOKENS_HASH && strcmp(words[0], "tokens:") == 0)) {
                 // debug(D_TC_LOOP, "TOKENS line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     class->tokens = str2ull(words[1]);
@@ -925,24 +925,24 @@ void *tc_main(void *ptr) {
                 if(likely(words[3] && *words[3]))
                     class->ctokens = str2ull(words[3]);
             }
-            else if(unlikely(device && first_hash == SETDEVICENAME_HASH && strsame(words[0], "SETDEVICENAME") == 0)) {
+            else if(unlikely(device && first_hash == SETDEVICENAME_HASH && strcmp(words[0], "SETDEVICENAME") == 0)) {
                 // debug(D_TC_LOOP, "SETDEVICENAME line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     tc_device_set_device_name(device, words[1]);
             }
-            else if(unlikely(device && first_hash == SETDEVICEGROUP_HASH && strsame(words[0], "SETDEVICEGROUP") == 0)) {
+            else if(unlikely(device && first_hash == SETDEVICEGROUP_HASH && strcmp(words[0], "SETDEVICEGROUP") == 0)) {
                 // debug(D_TC_LOOP, "SETDEVICEGROUP line '%s'", words[1]);
                 if(likely(words[1] && *words[1]))
                     tc_device_set_device_family(device, words[1]);
             }
-            else if(unlikely(device && first_hash == SETCLASSNAME_HASH && strsame(words[0], "SETCLASSNAME") == 0)) {
+            else if(unlikely(device && first_hash == SETCLASSNAME_HASH && strcmp(words[0], "SETCLASSNAME") == 0)) {
                 // debug(D_TC_LOOP, "SETCLASSNAME line '%s' '%s'", words[1], words[2]);
                 char *id    = words[1];
                 char *path  = words[2];
                 if(likely(id && *id && path && *path))
                     tc_device_set_class_name(device, id, path);
             }
-            else if(unlikely(first_hash == WORKTIME_HASH && strsame(words[0], "WORKTIME") == 0)) {
+            else if(unlikely(first_hash == WORKTIME_HASH && strcmp(words[0], "WORKTIME") == 0)) {
                 // debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
                 getrusage(RUSAGE_THREAD, &thread);
 
@@ -970,7 +970,7 @@ void *tc_main(void *ptr) {
 
             }
 #ifdef DETACH_PLUGINS_FROM_NETDATA
-            else if(unlikely(first_hash == MYPID_HASH && (strsame(words[0], "MYPID") == 0))) {
+            else if(unlikely(first_hash == MYPID_HASH && (strcmp(words[0], "MYPID") == 0))) {
                 // debug(D_TC_LOOP, "MYPID line '%s'", words[1]);
                 char *id = words[1];
                 pid_t pid = atol(id);

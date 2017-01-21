@@ -424,10 +424,10 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
             char *s = procfile_lineword(ff, i, 0);
             uint32_t hash = simple_hash(s);
 
-            if(unlikely(hash == user_hash && !strsame(s, "user")))
+            if(unlikely(hash == user_hash && !strcmp(s, "user")))
                 cp->user = str2ull(procfile_lineword(ff, i, 1));
 
-            else if(unlikely(hash == system_hash && !strsame(s, "system")))
+            else if(unlikely(hash == system_hash && !strcmp(s, "system")))
                 cp->system = str2ull(procfile_lineword(ff, i, 1));
         }
 
@@ -534,20 +534,20 @@ static inline void cgroup_read_blkio(struct blkio *io) {
             char *s = procfile_lineword(ff, i, 1);
             uint32_t hash = simple_hash(s);
 
-            if(unlikely(hash == Read_hash && !strsame(s, "Read")))
+            if(unlikely(hash == Read_hash && !strcmp(s, "Read")))
                 io->Read += str2ull(procfile_lineword(ff, i, 2));
 
-            else if(unlikely(hash == Write_hash && !strsame(s, "Write")))
+            else if(unlikely(hash == Write_hash && !strcmp(s, "Write")))
                 io->Write += str2ull(procfile_lineword(ff, i, 2));
 
 /*
-            else if(unlikely(hash == Sync_hash && !strsame(s, "Sync")))
+            else if(unlikely(hash == Sync_hash && !strcmp(s, "Sync")))
                 io->Sync += str2ull(procfile_lineword(ff, i, 2));
 
-            else if(unlikely(hash == Async_hash && !strsame(s, "Async")))
+            else if(unlikely(hash == Async_hash && !strcmp(s, "Async")))
                 io->Async += str2ull(procfile_lineword(ff, i, 2));
 
-            else if(unlikely(hash == Total_hash && !strsame(s, "Total")))
+            else if(unlikely(hash == Total_hash && !strcmp(s, "Total")))
                 io->Total += str2ull(procfile_lineword(ff, i, 2));
 */
         }
@@ -846,7 +846,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
     if(cg->enabled) {
         struct cgroup *t;
         for (t = cgroup_root; t; t = t->next) {
-            if (t != cg && t->enabled && t->hash_chart == cg->hash_chart && !strsame(t->chart_id, cg->chart_id)) {
+            if (t != cg && t->enabled && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
                 if (!strncmp(t->chart_id, "/system.slice/", 14) && !strncmp(cg->chart_id, "/init.scope/system.slice/", 25)) {
                     error("Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
                           cg->chart_id, t->id, cg->id, t->id);
@@ -914,7 +914,7 @@ static inline struct cgroup *cgroup_find(const char *id) {
 
     struct cgroup *cg;
     for(cg = cgroup_root; cg ; cg = cg->next) {
-        if(hash == cg->hash && strsame(id, cg->id) == 0)
+        if(hash == cg->hash && strcmp(id, cg->id) == 0)
             break;
     }
 
@@ -1034,7 +1034,7 @@ static inline void cleanup_all_cgroups() {
             {
                 struct cgroup *t;
                 for(t = cgroup_root; t ; t = t->next) {
-                    if(t != cg && t->available && !t->enabled && t->options & CGROUP_OPTIONS_DISABLED_DUPLICATE && t->hash_chart == cg->hash_chart && !strsame(t->chart_id, cg->chart_id)) {
+                    if(t != cg && t->available && !t->enabled && t->options & CGROUP_OPTIONS_DISABLED_DUPLICATE && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
                         debug(D_CGROUP, "Enabling duplicate of cgroup '%s' with id '%s', because the original with id '%s' stopped.", t->chart_id, t->id, cg->id);
                         t->enabled = 1;
                         t->options &= ~CGROUP_OPTIONS_DISABLED_DUPLICATE;

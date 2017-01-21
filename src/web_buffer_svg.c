@@ -369,25 +369,25 @@ cleanup:
 }
 
 static inline const char *fix_units(const char *units) {
-    if(!units || !*units || !strsame(units, "empty") || !strsame(units, "null")) return "";
-    if(!strsame(units, "percentage") || !strsame(units, "percent") || !strsame(units, "pcent")) return "%";
+    if(!units || !*units || !strcmp(units, "empty") || !strcmp(units, "null")) return "";
+    if(!strcmp(units, "percentage") || !strcmp(units, "percent") || !strcmp(units, "pcent")) return "%";
     return units;
 }
 
 static inline const char *color_map(const char *color) {
     // colors from:
     // https://github.com/badges/shields/blob/master/colorscheme.json
-         if(!strsame(color, "brightgreen")) return "#4c1";
-    else if(!strsame(color, "green"))       return "#97CA00";
-    else if(!strsame(color, "yellow"))      return "#dfb317";
-    else if(!strsame(color, "yellowgreen")) return "#a4a61d";
-    else if(!strsame(color, "orange"))      return "#fe7d37";
-    else if(!strsame(color, "red"))         return "#e05d44";
-    else if(!strsame(color, "blue"))        return "#007ec6";
-    else if(!strsame(color, "grey"))        return "#555";
-    else if(!strsame(color, "gray"))        return "#555";
-    else if(!strsame(color, "lightgrey"))   return "#9f9f9f";
-    else if(!strsame(color, "lightgray"))   return "#9f9f9f";
+         if(!strcmp(color, "brightgreen")) return "#4c1";
+    else if(!strcmp(color, "green"))       return "#97CA00";
+    else if(!strcmp(color, "yellow"))      return "#dfb317";
+    else if(!strcmp(color, "yellowgreen")) return "#a4a61d";
+    else if(!strcmp(color, "orange"))      return "#fe7d37";
+    else if(!strcmp(color, "red"))         return "#e05d44";
+    else if(!strcmp(color, "blue"))        return "#007ec6";
+    else if(!strcmp(color, "grey"))        return "#555";
+    else if(!strcmp(color, "gray"))        return "#555";
+    else if(!strcmp(color, "lightgrey"))   return "#9f9f9f";
+    else if(!strcmp(color, "lightgray"))   return "#9f9f9f";
     return color;
 }
 
@@ -466,7 +466,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
             *dv = '\0';
 
             if(value_is_null) {
-                if(!*value_buffer || !strsame(value_buffer, "null"))
+                if(!*value_buffer || !strcmp(value_buffer, "null"))
                     break;
             }
             else {
@@ -525,7 +525,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
     if(unlikely(isalnum(*units)))
         separator = " ";
 
-    if(unlikely(!strsame(units, "seconds"))) {
+    if(unlikely(!strcmp(units, "seconds"))) {
         size_t s = (size_t)value;
         size_t d = s / 86400;
         s = s % 86400;
@@ -542,7 +542,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
             snprintfz(value_string, VALUE_STRING_SIZE, "%02zu:%02zu:%02zu", h, m, s);
     }
 
-    else if(unlikely(!strsame(units, "minutes"))) {
+    else if(unlikely(!strcmp(units, "minutes"))) {
         size_t m = (size_t)value;
         size_t d = m / (60 * 24);
         m = m % (60 * 24);
@@ -556,7 +556,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
             snprintfz(value_string, VALUE_STRING_SIZE, "%zuh %zum", h, m);
     }
 
-    else if(unlikely(!strsame(units, "hours"))) {
+    else if(unlikely(!strcmp(units, "hours"))) {
         size_t h = (size_t)value;
         size_t d = h / 24;
         h = h % 24;

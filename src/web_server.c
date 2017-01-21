@@ -256,7 +256,7 @@ static inline int bind_to_one(const char *definition, int default_port, int list
         *e = '\0';
     }
 
-    if(!*ip || *ip == '*' || !strsame(ip, "any") || !strsame(ip, "all"))
+    if(!*ip || *ip == '*' || !strcmp(ip, "any") || !strcmp(ip, "all"))
         ip = NULL;
     if(!*port)
         port = buffer2;

@@ -97,7 +97,6 @@ void *pluginsd_worker_thread(void *arg)
 #endif
 
     char *words[MAX_WORDS] = { NULL };
-    uint32_t SET_HASH = simple_hash("SET");
     uint32_t BEGIN_HASH = simple_hash("BEGIN");
     uint32_t END_HASH = simple_hash("END");
     uint32_t FLUSH_HASH = simple_hash("FLUSH");
@@ -141,9 +140,7 @@ void *pluginsd_worker_thread(void *arg)
 
             // debug(D_PLUGINSD, "PLUGINSD: words 0='%s' 1='%s' 2='%s' 3='%s' 4='%s' 5='%s' 6='%s' 7='%s' 8='%s' 9='%s'", words[0], words[1], words[2], words[3], words[4], words[5], words[6], words[7], words[8], words[9]);
 
-            hash = simple_hash(s);
-
-            if(likely(hash == SET_HASH && !strsame(s, "SET"))) {
+            if(likely(!simple_hash_strcmp(s, "SET", &hash))) {
                 char *dimension = words[1];
                 char *value = words[2];
 
@@ -167,7 +164,7 @@ void *pluginsd_worker_thread(void *arg)
 
                 if(value) rrddim_set(st, dimension, strtoll(value, NULL, 0));
             }
-            else if(likely(hash == BEGIN_HASH && !strsame(s, "BEGIN"))) {
+            else if(likely(hash == BEGIN_HASH && !strcmp(s, "BEGIN"))) {
                 char *id = words[1];
                 char *microseconds_txt = words[2];
 
@@ -193,7 +190,7 @@ void *pluginsd_worker_thread(void *arg)
                     else rrdset_next(st);
                 }
             }
-            else if(likely(hash == END_HASH && !strsame(s, "END"))) {
+            else if(likely(hash == END_HASH && !strcmp(s, "END"))) {
                 if(unlikely(!st)) {
                     error("PLUGINSD: '%s' is requesting an END, without a BEGIN. Disabling it.", cd->fullfilename);
                     cd->enabled = 0;
@@ -208,15 +205,15 @@ void *pluginsd_worker_thread(void *arg)
 
                 count++;
             }
-            else if(likely(hash == FLUSH_HASH && !strsame(s, "FLUSH"))) {
+            else if(likely(hash == FLUSH_HASH && !strcmp(s, "FLUSH"))) {
                 debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
                 st = NULL;
             }
-            else if(likely(hash == CHART_HASH && !strsame(s, "CHART"))) {
+            else if(likely(hash == CHART_HASH && !strcmp(s, "CHART"))) {
                 int noname = 0;
                 st = NULL;
 
-                if((words[1]) != NULL && (words[2]) != NULL && strsame(words[1], words[2]) == 0)
+                if((words[1]) != NULL && (words[2]) != NULL && strcmp(words[1], words[2]) == 0)
                     noname = 1;
 
                 char *type = words[1];
@@ -272,7 +269,7 @@ void *pluginsd_worker_thread(void *arg)
                 }
                 else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
             }
-            else if(likely(hash == DIMENSION_HASH && !strsame(s, "DIMENSION"))) {
+            else if(likely(hash == DIMENSION_HASH && !strcmp(s, "DIMENSION"))) {
                 char *id = words[1];
                 char *name = words[2];
                 char *algorithm = words[3];
@@ -326,21 +323,21 @@ void *pluginsd_worker_thread(void *arg)
                 }
                 else if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
             }
-            else if(unlikely(hash == DISABLE_HASH && !strsame(s, "DISABLE"))) {
+            else if(unlikely(hash == DISABLE_HASH && !strcmp(s, "DISABLE"))) {
                 info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
                 cd->enabled = 0;
                 killpid(cd->pid, SIGTERM);
                 break;
             }
 #ifdef DETACH_PLUGINS_FROM_NETDATA
-            else if(likely(hash == MYPID_HASH && !strsame(s, "MYPID"))) {
+            else if(likely(hash == MYPID_HASH && !strcmp(s, "MYPID"))) {
                 char *pid_s = words[1];
                 pid_t pid = strtod(pid_s, NULL, 0);
 
                 if(likely(pid)) cd->pid = pid;
                 debug(D_PLUGINSD, "PLUGINSD: %s is on pid %d", cd->id, cd->pid);
             }
-            else if(likely(hash == STOPPING_WAKE_ME_UP_PLEASE_HASH && !strsame(s, "STOPPING_WAKE_ME_UP_PLEASE"))) {
+            else if(likely(hash == STOPPING_WAKE_ME_UP_PLEASE_HASH && !strcmp(s, "STOPPING_WAKE_ME_UP_PLEASE"))) {
                 error("PLUGINSD: '%s' (pid %d) called STOPPING_WAKE_ME_UP_PLEASE.", cd->fullfilename, cd->pid);
 
                 now_realtime_timeval(&now);
@@ -472,11 +469,11 @@ void *pluginsd_main(void *ptr) {
 
             debug(D_PLUGINSD, "PLUGINSD: Examining file '%s'", file->d_name);
 
-            if(unlikely(strsame(file->d_name, ".") == 0 || strsame(file->d_name, "..") == 0)) continue;
+            if(unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0)) continue;
 
             int len = (int) strlen(file->d_name);
             if(unlikely(len <= (int)PLUGINSD_FILE_SUFFIX_LEN)) continue;
-            if(unlikely(strsame(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0)) {
+            if(unlikely(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0)) {
                 debug(D_PLUGINSD, "PLUGINSD: File '%s' does not end in '%s'.", file->d_name, PLUGINSD_FILE_SUFFIX);
                 continue;
             }
@@ -492,7 +489,7 @@ void *pluginsd_main(void *ptr) {
 
             // check if it runs already
             for(cd = pluginsd_root ; cd ; cd = cd->next)
-                if(unlikely(strsame(cd->filename, file->d_name) == 0)) break;
+                if(unlikely(strcmp(cd->filename, file->d_name) == 0)) break;
 
             if(likely(cd && !cd->obsolete)) {
                 debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is already running", cd->filename);

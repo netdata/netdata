@@ -158,7 +158,7 @@ int registry_request_access_json(struct web_client *w, char *person_guid, char *
         return 200;
     }
 
-    if(unlikely(person_guid[0] && !strsame(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
+    if(unlikely(person_guid[0] && !strcmp(person_guid, REGISTRY_VERIFY_COOKIES_GUID)))
         person_guid[0] = '\0';
 
     // ------------------------------------------------------------------------

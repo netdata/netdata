@@ -11,35 +11,35 @@
     (strchr (Fs_name, ':') != NULL               \
      || ((Fs_name)[0] == '/'                     \
          && (Fs_name)[1] == '/'                  \
-         && (strsame (Fs_type, "smbfs") == 0     \
-             || strsame (Fs_type, "cifs") == 0)) \
-     || (strsame("-hosts", Fs_name) == 0))
+         && (strcmp (Fs_type, "smbfs") == 0     \
+             || strcmp (Fs_type, "cifs") == 0)) \
+     || (strcmp("-hosts", Fs_name) == 0))
 #endif
 
 #define ME_DUMMY_0(Fs_name, Fs_type)             \
-  (strsame (Fs_type, "autofs") == 0              \
-   || strsame (Fs_type, "proc") == 0             \
-   || strsame (Fs_type, "subfs") == 0            \
+  (strcmp (Fs_type, "autofs") == 0              \
+   || strcmp (Fs_type, "proc") == 0             \
+   || strcmp (Fs_type, "subfs") == 0            \
    /* for Linux 2.6/3.x */                       \
-   || strsame (Fs_type, "debugfs") == 0          \
-   || strsame (Fs_type, "devpts") == 0           \
-   || strsame (Fs_type, "fusectl") == 0          \
-   || strsame (Fs_type, "mqueue") == 0           \
-   || strsame (Fs_type, "rpc_pipefs") == 0       \
-   || strsame (Fs_type, "sysfs") == 0            \
+   || strcmp (Fs_type, "debugfs") == 0          \
+   || strcmp (Fs_type, "devpts") == 0           \
+   || strcmp (Fs_type, "fusectl") == 0          \
+   || strcmp (Fs_type, "mqueue") == 0           \
+   || strcmp (Fs_type, "rpc_pipefs") == 0       \
+   || strcmp (Fs_type, "sysfs") == 0            \
    /* FreeBSD, Linux 2.4 */                      \
-   || strsame (Fs_type, "devfs") == 0            \
+   || strcmp (Fs_type, "devfs") == 0            \
    /* for NetBSD 3.0 */                          \
-   || strsame (Fs_type, "kernfs") == 0           \
+   || strcmp (Fs_type, "kernfs") == 0           \
    /* for Irix 6.5 */                            \
-   || strsame (Fs_type, "ignore") == 0)
+   || strcmp (Fs_type, "ignore") == 0)
 
 /* Historically, we have marked as "dummy" any file system of type "none",
    but now that programs like du need to know about bind-mounted directories,
    we grant an exception to any with "bind" in its list of mount options.
    I.e., those are *not* dummy entries.  */
 # define ME_DUMMY(Fs_name, Fs_type)		\
-  (ME_DUMMY_0 (Fs_name, Fs_type) || strsame (Fs_type, "none") == 0)
+  (ME_DUMMY_0 (Fs_name, Fs_type) || strcmp (Fs_type, "none") == 0)
 
 // ----------------------------------------------------------------------------
 
@@ -66,8 +66,8 @@ struct mountinfo *mountinfo_find_by_filesystem_mount_source(struct mountinfo *ro
                 && mi->mount_source
                 && mi->filesystem_hash == filesystem_hash
                 && mi->mount_source_hash == mount_source_hash
-                && !strsame(mi->filesystem, filesystem)
-                && !strsame(mi->mount_source, mount_source)))
+                && !strcmp(mi->filesystem, filesystem)
+                && !strcmp(mi->mount_source, mount_source)))
             return mi;
 
     return NULL;
@@ -83,7 +83,7 @@ struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *ro
         if(unlikely(mi->filesystem
                 && mi->super_options
                 && mi->filesystem_hash == filesystem_hash
-                && !strsame(mi->filesystem, filesystem))) {
+                && !strcmp(mi->filesystem, filesystem))) {
 
             // super_options is a comma separated list
             char *s = mi->super_options, *e;
@@ -163,7 +163,7 @@ static inline int is_read_only(const char *s) {
     size_t len = strlen(s);
     if(len < 2) return 0;
     if(len == 2) {
-        if(!strsame(s, "ro")) return 1;
+        if(!strcmp(s, "ro")) return 1;
         return 0;
     }
     if(!strncmp(s, "ro,", 3)) return 1;
@@ -376,7 +376,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
                 if(unlikely(bind)) {
                     struct mountinfo *mi;
                     for(mi = root; mi ; mi = mi->next) {
-                        if(unlikely(strsame(mnt->mnt_dir, mi->mount_point) == 0)) {
+                        if(unlikely(strcmp(mnt->mnt_dir, mi->mount_point) == 0)) {
                             fprintf(stderr, "Mount point '%s' is BIND\n", mi->mount_point);
                             mi->flags |= MOUNTINFO_IS_BIND;
                             break;

@@ -77,7 +77,7 @@ static struct netdev *get_netdev(const char *name) {
 
     // search it, from the last position to the end
     for(d = last ; d ; d = d->next) {
-        if(unlikely(hash == d->hash && !strsame(name, d->name))) {
+        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
             last = d->next;
             return d;
         }
@@ -85,7 +85,7 @@ static struct netdev *get_netdev(const char *name) {
 
     // search it from the beginning to the last position we used
     for(d = netdev_root ; d != last ; d = d->next) {
-        if(unlikely(hash == d->hash && !strsame(name, d->name))) {
+        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
             last = d->next;
             return d;
         }
