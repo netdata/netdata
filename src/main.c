@@ -257,7 +257,7 @@ void help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2017, Costa Tsaousis <costa@tsaousis.gr>\n"
+            " Copyright (C) 2016-2017, Costa Tsaousis <costa@tsaousis.gr>\n"
             " Released under GNU Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
