@@ -25,26 +25,64 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static procfile *ff = NULL;
 
     ARL_BASE *arl_tcpext = NULL;
+    ARL_BASE *arl_ipext = NULL;
 
-    // Reordering
+    // --------------------------------------------------------------------
+    // IPv4
+
+    // IPv4 bandwidth
+    static unsigned long long ipext_InOctets = 0;
+    static unsigned long long ipext_OutOctets = 0;
+
+    // IPv4 input errors
+    static unsigned long long ipext_InNoRoutes = 0;
+    static unsigned long long ipext_InTruncatedPkts = 0;
+    static unsigned long long ipext_InCsumErrors = 0;
+
+    // IPv4 multicast bandwidth
+    static unsigned long long ipext_InMcastOctets = 0;
+    static unsigned long long ipext_OutMcastOctets = 0;
+
+    // IPv4 multicast packets
+    static unsigned long long ipext_InMcastPkts = 0;
+    static unsigned long long ipext_OutMcastPkts = 0;
+
+    // IPv4 broadcast bandwidth
+    static unsigned long long ipext_InBcastOctets = 0;
+    static unsigned long long ipext_OutBcastOctets = 0;
+
+    // IPv4 broadcast packets
+    static unsigned long long ipext_InBcastPkts = 0;
+    static unsigned long long ipext_OutBcastPkts = 0;
+
+    // IPv4 ECN
+    static unsigned long long ipext_InNoECTPkts = 0;
+    static unsigned long long ipext_InECT1Pkts = 0;
+    static unsigned long long ipext_InECT0Pkts = 0;
+    static unsigned long long ipext_InCEPkts = 0;
+
+    // --------------------------------------------------------------------
+    // IPv4 TCP
+
+    // IPv4 TCP Reordering
     static unsigned long long tcpext_TCPRenoReorder = 0;
     static unsigned long long tcpext_TCPFACKReorder = 0;
     static unsigned long long tcpext_TCPSACKReorder = 0;
     static unsigned long long tcpext_TCPTSReorder = 0;
 
-    // SYN Cookies
+    // IPv4 TCP SYN Cookies
     static unsigned long long tcpext_SyncookiesSent = 0;
     static unsigned long long tcpext_SyncookiesRecv = 0;
     static unsigned long long tcpext_SyncookiesFailed = 0;
 
-    // Out Of Order Queue
+    // IPv4 TCP Out Of Order Queue
     // http://www.spinics.net/lists/netdev/msg204696.html
     static unsigned long long tcpext_TCPOFOQueue = 0; // Number of packets queued in OFO queue
     static unsigned long long tcpext_TCPOFODrop = 0;  // Number of packets meant to be queued in OFO but dropped because socket rcvbuf limit hit.
     static unsigned long long tcpext_TCPOFOMerge = 0; // Number of packets in OFO that were merged with other packets.
     static unsigned long long tcpext_OfoPruned = 0;   // packets dropped from out-of-order queue because of socket buffer overrun
 
-    // connection resets
+    // IPv4 TCP connection resets
     // https://github.com/ecki/net-tools/blob/bd8bceaed2311651710331a7f8990c3e31be9840/statistics.c
     static unsigned long long tcpext_TCPAbortOnData = 0;    // connections reset due to unexpected data
     static unsigned long long tcpext_TCPAbortOnClose = 0;   // connections reset due to early user close
@@ -53,28 +91,13 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static unsigned long long tcpext_TCPAbortOnLinger = 0;  // connections aborted after user close in linger timeout
     static unsigned long long tcpext_TCPAbortFailed = 0;    // times unable to send RST due to no memory
 
+    // IPv4 TCP memory pressures
     static unsigned long long tcpext_TCPMemoryPressures = 0;
 
-    ARL_BASE *arl_ipext = NULL;
-    static unsigned long long ipext_InNoRoutes = 0;
-    static unsigned long long ipext_InTruncatedPkts = 0;
-    static unsigned long long ipext_InMcastPkts = 0;
-    static unsigned long long ipext_OutMcastPkts = 0;
-    static unsigned long long ipext_InBcastPkts = 0;
-    static unsigned long long ipext_OutBcastPkts = 0;
-    static unsigned long long ipext_InOctets = 0;
-    static unsigned long long ipext_OutOctets = 0;
-    static unsigned long long ipext_InMcastOctets = 0;
-    static unsigned long long ipext_OutMcastOctets = 0;
-    static unsigned long long ipext_InBcastOctets = 0;
-    static unsigned long long ipext_OutBcastOctets = 0;
-    static unsigned long long ipext_InCsumErrors = 0;
-    static unsigned long long ipext_InNoECTPkts = 0;
-    static unsigned long long ipext_InECT1Pkts = 0;
-    static unsigned long long ipext_InECT0Pkts = 0;
-    static unsigned long long ipext_InCEPkts = 0;
-
     if(unlikely(!arl_ipext)) {
+        hash_ipext = simple_hash("IpExt");
+        hash_tcpext = simple_hash("TcpExt");
+
         do_bandwidth = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "bandwidth", CONFIG_ONDEMAND_ONDEMAND);
         do_inerrors  = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "input errors", CONFIG_ONDEMAND_ONDEMAND);
         do_mcast     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "multicast bandwidth", CONFIG_ONDEMAND_ONDEMAND);
@@ -89,42 +112,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         do_tcpext_connaborts = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP connection aborts", CONFIG_ONDEMAND_ONDEMAND);
         do_tcpext_memory     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP memory pressures", CONFIG_ONDEMAND_ONDEMAND);
 
+        arl_ipext  = arl_create(NULL, 60);
         arl_tcpext = arl_create(NULL, 60);
 
-        if(do_tcpext_reorder != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "TCPFACKReorder", &tcpext_TCPFACKReorder);
-            arl_expect(arl_tcpext, "TCPSACKReorder", &tcpext_TCPSACKReorder);
-            arl_expect(arl_tcpext, "TCPRenoReorder", &tcpext_TCPRenoReorder);
-            arl_expect(arl_tcpext, "TCPTSReorder",   &tcpext_TCPTSReorder);
-        }
-
-        if(do_tcpext_syscookies != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "SyncookiesSent",   &tcpext_SyncookiesSent);
-            arl_expect(arl_tcpext, "SyncookiesRecv",   &tcpext_SyncookiesRecv);
-            arl_expect(arl_tcpext, "SyncookiesFailed", &tcpext_SyncookiesFailed);
-        }
-
-        if(do_tcpext_ofo != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "TCPOFOQueue", &tcpext_TCPOFOQueue);
-            arl_expect(arl_tcpext, "TCPOFODrop",  &tcpext_TCPOFODrop);
-            arl_expect(arl_tcpext, "TCPOFOMerge", &tcpext_TCPOFOMerge);
-            arl_expect(arl_tcpext, "OfoPruned",   &tcpext_OfoPruned);
-        }
-
-        if(do_tcpext_connaborts != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "TCPAbortOnData",    &tcpext_TCPAbortOnData);
-            arl_expect(arl_tcpext, "TCPAbortOnClose",   &tcpext_TCPAbortOnClose);
-            arl_expect(arl_tcpext, "TCPAbortOnMemory",  &tcpext_TCPAbortOnMemory);
-            arl_expect(arl_tcpext, "TCPAbortOnTimeout", &tcpext_TCPAbortOnTimeout);
-            arl_expect(arl_tcpext, "TCPAbortOnLinger",  &tcpext_TCPAbortOnLinger);
-            arl_expect(arl_tcpext, "TCPAbortFailed",    &tcpext_TCPAbortFailed);
-        }
-
-        if(do_tcpext_memory != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "TCPMemoryPressures", &tcpext_TCPMemoryPressures);
-        }
-
-        arl_ipext = arl_create(NULL, 60);
+        // --------------------------------------------------------------------
+        // IPv4
 
         if(do_bandwidth != CONFIG_ONDEMAND_NO) {
             arl_expect(arl_ipext, "InOctets",  &ipext_InOctets);
@@ -162,6 +154,42 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             arl_expect(arl_ipext, "InECT1Pkts",  &ipext_InECT1Pkts);
             arl_expect(arl_ipext, "InECT0Pkts",  &ipext_InECT0Pkts);
             arl_expect(arl_ipext, "InCEPkts",    &ipext_InCEPkts);
+        }
+
+        // --------------------------------------------------------------------
+        // IPv4 TCP
+
+        if(do_tcpext_reorder != CONFIG_ONDEMAND_NO) {
+            arl_expect(arl_tcpext, "TCPFACKReorder", &tcpext_TCPFACKReorder);
+            arl_expect(arl_tcpext, "TCPSACKReorder", &tcpext_TCPSACKReorder);
+            arl_expect(arl_tcpext, "TCPRenoReorder", &tcpext_TCPRenoReorder);
+            arl_expect(arl_tcpext, "TCPTSReorder",   &tcpext_TCPTSReorder);
+        }
+
+        if(do_tcpext_syscookies != CONFIG_ONDEMAND_NO) {
+            arl_expect(arl_tcpext, "SyncookiesSent",   &tcpext_SyncookiesSent);
+            arl_expect(arl_tcpext, "SyncookiesRecv",   &tcpext_SyncookiesRecv);
+            arl_expect(arl_tcpext, "SyncookiesFailed", &tcpext_SyncookiesFailed);
+        }
+
+        if(do_tcpext_ofo != CONFIG_ONDEMAND_NO) {
+            arl_expect(arl_tcpext, "TCPOFOQueue", &tcpext_TCPOFOQueue);
+            arl_expect(arl_tcpext, "TCPOFODrop",  &tcpext_TCPOFODrop);
+            arl_expect(arl_tcpext, "TCPOFOMerge", &tcpext_TCPOFOMerge);
+            arl_expect(arl_tcpext, "OfoPruned",   &tcpext_OfoPruned);
+        }
+
+        if(do_tcpext_connaborts != CONFIG_ONDEMAND_NO) {
+            arl_expect(arl_tcpext, "TCPAbortOnData",    &tcpext_TCPAbortOnData);
+            arl_expect(arl_tcpext, "TCPAbortOnClose",   &tcpext_TCPAbortOnClose);
+            arl_expect(arl_tcpext, "TCPAbortOnMemory",  &tcpext_TCPAbortOnMemory);
+            arl_expect(arl_tcpext, "TCPAbortOnTimeout", &tcpext_TCPAbortOnTimeout);
+            arl_expect(arl_tcpext, "TCPAbortOnLinger",  &tcpext_TCPAbortOnLinger);
+            arl_expect(arl_tcpext, "TCPAbortFailed",    &tcpext_TCPAbortFailed);
+        }
+
+        if(do_tcpext_memory != CONFIG_ONDEMAND_NO) {
+            arl_expect(arl_tcpext, "TCPMemoryPressures", &tcpext_TCPMemoryPressures);
         }
     }
 
