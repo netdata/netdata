@@ -427,7 +427,6 @@ void *pluginsd_worker_thread(void *arg)
     info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
 
     cd->obsolete = 1;
-    cd->thread = (pthread_t)NULL;
     pthread_exit(NULL);
     return NULL;
 }

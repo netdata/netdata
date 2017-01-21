@@ -24,7 +24,6 @@ struct option_def {
  */
 extern struct option_def options[];
 
-
 struct netdata_static_thread {
     char *name;
 
