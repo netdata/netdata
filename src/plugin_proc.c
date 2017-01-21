@@ -1,17 +1,6 @@
 #include "common.h"
 
-static struct proc_module {
-    const char *name;
-    const char *dim;
-
-    int enabled;
-
-    int (*func)(int update_every, usec_t dt);
-    usec_t duration;
-
-    RRDDIM *rd;
-
-} proc_modules[] = {
+static struct proc_module proc_modules[] = {
 
         // system metrics
         { .name = "/proc/stat", .dim = "stat", .func = do_proc_stat },
