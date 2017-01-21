@@ -24,8 +24,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static uint32_t hash_ipext = 0, hash_tcpext = 0;
     static procfile *ff = NULL;
 
-    ARL_BASE *arl_tcpext = NULL;
-    ARL_BASE *arl_ipext = NULL;
+    static ARL_BASE *arl_tcpext = NULL;
+    static ARL_BASE *arl_ipext = NULL;
 
     // --------------------------------------------------------------------
     // IPv4
