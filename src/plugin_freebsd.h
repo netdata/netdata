@@ -1,12 +1,41 @@
 #ifndef NETDATA_PLUGIN_FREEBSD_H
 #define NETDATA_PLUGIN_FREEBSD_H 1
 
+/**
+ * @file plugin_freebsd.h
+ * @brief Thread to collect metrics of freebsd.
+ */
+
 #include <sys/sysctl.h>
 
+/**
+ * sysctlbyname() with error logging.
+ *
+ * @param name to query
+ * @param var to store result
+ * @return 0 on success. 1 on error.
+ */
 #define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
 
+/**
+ * Main method of freebsd thread.
+ *
+ * @param ptr to struct netdata_static_thread
+ * @return NULL
+ */
 void *freebsd_main(void *ptr);
 
+/**
+ * Data collector of freebsd.
+ *
+ * Function doing the data collection for freebsd.
+ * This is called by `freebsd_main` every `update_every` second.
+ * This function should push values to the round robin database.
+ *
+ * @param update_every intervall in seconds this is called.
+ * @param dt microseconds passed since the last call.
+ * @return 0 on success. 1 on error.
+ */
 extern int do_freebsd_sysctl(int update_every, usec_t dt);
 
 static inline int getsysctl(const char *name, void *ptr, size_t len)
