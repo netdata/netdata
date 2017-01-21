@@ -7,31 +7,31 @@
 /* A file system is "remote" if its Fs_name contains a ':'
    or if (it is of type (smbfs or cifs) and its Fs_name starts with '//')
    or Fs_name is equal to "-hosts" (used by autofs to mount remote fs).  */
-# define ME_REMOTE(Fs_name, Fs_type)             \
-    (strchr (Fs_name, ':') != NULL               \
-     || ((Fs_name)[0] == '/'                     \
-         && (Fs_name)[1] == '/'                  \
+# define ME_REMOTE(Fs_name, Fs_type)            \
+    (strchr (Fs_name, ':') != NULL              \
+     || ((Fs_name)[0] == '/'                    \
+         && (Fs_name)[1] == '/'                 \
          && (strcmp (Fs_type, "smbfs") == 0     \
              || strcmp (Fs_type, "cifs") == 0)) \
      || (strcmp("-hosts", Fs_name) == 0))
 #endif
 
-#define ME_DUMMY_0(Fs_name, Fs_type)             \
+#define ME_DUMMY_0(Fs_name, Fs_type)            \
   (strcmp (Fs_type, "autofs") == 0              \
    || strcmp (Fs_type, "proc") == 0             \
    || strcmp (Fs_type, "subfs") == 0            \
-   /* for Linux 2.6/3.x */                       \
+   /* for Linux 2.6/3.x */                      \
    || strcmp (Fs_type, "debugfs") == 0          \
    || strcmp (Fs_type, "devpts") == 0           \
    || strcmp (Fs_type, "fusectl") == 0          \
    || strcmp (Fs_type, "mqueue") == 0           \
    || strcmp (Fs_type, "rpc_pipefs") == 0       \
    || strcmp (Fs_type, "sysfs") == 0            \
-   /* FreeBSD, Linux 2.4 */                      \
+   /* FreeBSD, Linux 2.4 */                     \
    || strcmp (Fs_type, "devfs") == 0            \
-   /* for NetBSD 3.0 */                          \
+   /* for NetBSD 3.0 */                         \
    || strcmp (Fs_type, "kernfs") == 0           \
-   /* for Irix 6.5 */                            \
+   /* for Irix 6.5 */                           \
    || strcmp (Fs_type, "ignore") == 0)
 
 /* Historically, we have marked as "dummy" any file system of type "none",
