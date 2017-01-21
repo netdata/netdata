@@ -2127,11 +2127,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 if (mntbuf[i].f_flags == MNT_RDONLY ||
                         mntbuf[i].f_blocks == 0 ||
                         // taken from gnulib/mountlist.c and shortened to FreeBSD related fstypes
-                        strsame(mntbuf[i].f_fstypename, "autofs") == 0 ||
-                        strsame(mntbuf[i].f_fstypename, "procfs") == 0 ||
-                        strsame(mntbuf[i].f_fstypename, "subfs") == 0 ||
-                        strsame(mntbuf[i].f_fstypename, "devfs") == 0 ||
-                        strsame(mntbuf[i].f_fstypename, "none") == 0)
+                        strcmp(mntbuf[i].f_fstypename, "autofs") == 0 ||
+                        strcmp(mntbuf[i].f_fstypename, "procfs") == 0 ||
+                        strcmp(mntbuf[i].f_fstypename, "subfs") == 0 ||
+                        strcmp(mntbuf[i].f_fstypename, "devfs") == 0 ||
+                        strcmp(mntbuf[i].f_fstypename, "none") == 0)
                     continue;
 
                 // --------------------------------------------------------------------------
