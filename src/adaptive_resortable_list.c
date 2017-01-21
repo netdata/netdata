@@ -123,8 +123,10 @@ ARL_ENTRY *arl_expect(ARL_BASE *base, const char *keyword, void *dst) {
     return e;
 }
 
-int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, uint32_t hash, const char *value) {
+int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *value) {
     ARL_ENTRY *e;
+
+    uint32_t hash = simple_hash(s);
 
     // find if it already exists in the data
     for(e = base->head; e ; e = e->next)

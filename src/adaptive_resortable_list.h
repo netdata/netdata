@@ -103,7 +103,7 @@ extern void arl_free(ARL_BASE *arl_base);
 extern ARL_ENTRY *arl_expect(ARL_BASE *base, const char *keyword, void *dst);
 
 // an internal call to complete the check() call
-extern int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, uint32_t hash, const char *value);
+extern int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *value);
 
 // begin an ARL iteration
 extern void arl_begin(ARL_BASE *base);
@@ -115,10 +115,9 @@ extern void arl_begin(ARL_BASE *base);
 // it is defined in the header file in order to be inlined
 static inline int arl_check(ARL_BASE *base, const char *keyword, const char *value) {
     ARL_ENTRY *e = base->next_keyword;
-    uint32_t hash = simple_hash(keyword);
 
     // it should be the first entry (pointed by base->next_keyword)
-    if(likely(hash == e->hash && !strsame(keyword, e->name))) {
+    if(likely(!strsame(keyword, e->name))) {
         // it is
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -150,7 +149,7 @@ static inline int arl_check(ARL_BASE *base, const char *keyword, const char *val
 #endif
 
     // we read from source, a not-expected keyword
-    return arl_find_or_create_and_relink(base, keyword, hash, value);
+    return arl_find_or_create_and_relink(base, keyword, value);
 }
 
 #endif //NETDATA_ADAPTIVE_RESORTABLE_LIST_H
