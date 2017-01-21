@@ -28,6 +28,7 @@ dist_pythonconfig_DATA = \
     python.d/bind_rndc.conf \
     python.d/cpufreq.conf \
     python.d/dovecot.conf \
+    python.d/elasticsearch.conf \
     python.d/example.conf \
     python.d/exim.conf \
     python.d/fail2ban.conf \
@@ -60,6 +61,7 @@ dist_healthconfig_DATA = \
     health.d/bind_rndc.conf \
     health.d/cpu.conf \
     health.d/disks.conf \
+    health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/haproxy.conf \
     health.d/ipc.conf \
