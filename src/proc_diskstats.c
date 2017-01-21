@@ -91,7 +91,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
             struct dirent *dp;
             while( (dp = readdir(dirp)) ) {
                 // . and .. are also files in empty folders.
-                if(unlikely(strsame(dp->d_name, ".") == 0 || strsame(dp->d_name, "..") == 0)) {
+                if(unlikely(strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)) {
                     continue;
                 }
 

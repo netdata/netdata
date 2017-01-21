@@ -232,7 +232,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             }
 
             // check for a possible host missmatch
-            //if(strsame(pointers[1], host->hostname))
+            //if(strcmp(pointers[1], host->hostname))
             //    error("Health: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", line, filename, pointers[1], host->hostname);
 
             ae->unique_id               = unique_id;
@@ -453,7 +453,7 @@ static inline int rrdvar_fix_name(char *variable) {
 int rrdvar_compare(void* a, void* b) {
     if(((RRDVAR *)a)->hash < ((RRDVAR *)b)->hash) return -1;
     else if(((RRDVAR *)a)->hash > ((RRDVAR *)b)->hash) return 1;
-    else return strsame(((RRDVAR *)a)->name, ((RRDVAR *)b)->name);
+    else return strcmp(((RRDVAR *)a)->name, ((RRDVAR *)b)->name);
 }
 
 static inline RRDVAR *rrdvar_index_add(avl_tree_lock *tree, RRDVAR *rv) {
@@ -1100,8 +1100,8 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 }
 
 static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
-    if(     (rc->hash_chart == st->hash      && !strsame(rc->chart, st->id)) ||
-            (rc->hash_chart == st->hash_name && !strsame(rc->chart, st->name)))
+    if(     (rc->hash_chart == st->hash      && !strcmp(rc->chart, st->id)) ||
+            (rc->hash_chart == st->hash_name && !strcmp(rc->chart, st->name)))
         return 1;
 
     return 0;
@@ -1176,7 +1176,7 @@ RRDCALC *rrdcalc_find(RRDSET *st, const char *name) {
     uint32_t hash = simple_hash(name);
 
     for( rc = st->alarms; rc ; rc = rc->rrdset_next ) {
-        if(unlikely(rc->hash == hash && !strsame(rc->name, name)))
+        if(unlikely(rc->hash == hash && !strcmp(rc->name, name)))
             return rc;
     }
 
@@ -1196,7 +1196,7 @@ static inline int rrdcalc_exists(RRDHOST *host, const char *chart, const char *n
 
     // make sure it does not already exist
     for(rc = host->alarms; rc ; rc = rc->next) {
-        if (unlikely(rc->chart && rc->hash == hash_name && rc->hash_chart == hash_chart && !strsame(name, rc->name) && !strsame(chart, rc->chart))) {
+        if (unlikely(rc->chart && rc->hash == hash_name && rc->hash_chart == hash_chart && !strcmp(name, rc->name) && !strcmp(chart, rc->chart))) {
             debug(D_HEALTH, "Health alarm '%s.%s' already exists in host '%s'.", chart, name, host->hostname);
             error("Health alarm '%s.%s' already exists in host '%s'.", chart, name, host->hostname);
             return 1;
@@ -1214,7 +1214,7 @@ static inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, c
         // re-use old IDs, by looking them up in the alarm log
         ALARM_ENTRY *ae;
         for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-            if(unlikely(ae->hash_name == hash_name && ae->hash_chart == hash_chart && !strsame(name, ae->name) && !strsame(chart, ae->chart))) {
+            if(unlikely(ae->hash_name == hash_name && ae->hash_chart == hash_chart && !strcmp(name, ae->name) && !strcmp(chart, ae->chart))) {
                 if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
                 return ae->alarm_id;
             }
@@ -1400,7 +1400,7 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
     RRDCALCTEMPLATE *rt;
 
     for(rt = st->rrdhost->templates; rt ; rt = rt->next) {
-        if(rt->hash_context == st->hash_context && !strsame(rt->context, st->context)
+        if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
                 && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
             RRDCALC *rc = rrdcalc_create(st->rrdhost, rt, st->id);
             if(unlikely(!rc))
@@ -1540,7 +1540,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
 
     RRDCALCTEMPLATE *t, *last = NULL;
     for (t = host->templates; t ; last = t, t = t->next) {
-        if(unlikely(t->hash_name == rt->hash_name && !strsame(t->name, rt->name))) {
+        if(unlikely(t->hash_name == rt->hash_name && !strcmp(t->name, rt->name))) {
             error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
             return 0;
         }
@@ -1955,7 +1955,7 @@ int health_readfile(const char *path, const char *filename) {
         else if(rc) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 if(rc->chart) {
-                    if(strsame(rc->chart, value))
+                    if(strcmp(rc->chart, value))
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rc->name, key, rc->chart, value, value);
 
@@ -2019,7 +2019,7 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rc->exec) {
-                    if(strsame(rc->exec, value))
+                    if(strcmp(rc->exec, value))
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rc->name, key, rc->exec, value, value);
 
@@ -2029,7 +2029,7 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rc->recipient) {
-                    if(strsame(rc->recipient, value))
+                    if(strcmp(rc->recipient, value))
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rc->name, key, rc->recipient, value, value);
 
@@ -2039,7 +2039,7 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rc->units) {
-                    if(strsame(rc->units, value))
+                    if(strcmp(rc->units, value))
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rc->name, key, rc->units, value, value);
 
@@ -2050,7 +2050,7 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 if(rc->info) {
-                    if(strsame(rc->info, value))
+                    if(strcmp(rc->info, value))
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rc->name, key, rc->info, value, value);
 
@@ -2070,7 +2070,7 @@ int health_readfile(const char *path, const char *filename) {
         else if(rt) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 if(rt->context) {
-                    if(strsame(rt->context, value))
+                    if(strcmp(rt->context, value))
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rt->name, key, rt->context, value, value);
 
@@ -2140,7 +2140,7 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rt->exec) {
-                    if(strsame(rt->exec, value))
+                    if(strcmp(rt->exec, value))
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rt->name, key, rt->exec, value, value);
 
@@ -2150,7 +2150,7 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rt->recipient) {
-                    if(strsame(rt->recipient, value))
+                    if(strcmp(rt->recipient, value))
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rt->name, key, rt->recipient, value, value);
 
@@ -2160,7 +2160,7 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rt->units) {
-                    if(strsame(rt->units, value))
+                    if(strcmp(rt->units, value))
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rt->name, key, rt->units, value, value);
 
@@ -2171,7 +2171,7 @@ int health_readfile(const char *path, const char *filename) {
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 if(rt->info) {
-                    if(strsame(rt->info, value))
+                    if(strcmp(rt->info, value))
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                              line, path, filename, rt->name, key, rt->info, value, value);
 
@@ -2239,7 +2239,7 @@ void health_readdir(const char *path) {
         }
 
         else if((de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN) &&
-                len > 5 && !strsame(&de->d_name[len - 5], ".conf")) {
+                len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
             health_readfile(path, de->d_name);
         }
 

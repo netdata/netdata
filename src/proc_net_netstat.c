@@ -182,7 +182,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         char *key = procfile_lineword(ff, l, 0);
         uint32_t hash = simple_hash(key);
 
-        if(unlikely(hash == hash_ipext && strsame(key, "IpExt") == 0)) {
+        if(unlikely(hash == hash_ipext && strcmp(key, "IpExt") == 0)) {
             size_t h = l++;
 
             words = procfile_linewords(ff, l);
@@ -334,7 +334,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_tcpext && strsame(key, "TcpExt") == 0)) {
+        else if(unlikely(hash == hash_tcpext && strcmp(key, "TcpExt") == 0)) {
             size_t h = l++;
 
             words = procfile_linewords(ff, l);

@@ -73,7 +73,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             long priority;
             int isthistotal;
 
-            if(unlikely(strsame(id, "cpu")) == 0) {
+            if(unlikely(strcmp(id, "cpu")) == 0) {
                 title = "Total CPU utilization";
                 type = "system";
                 context = "system.cpu";
@@ -126,7 +126,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_intr && strsame(row_key, "intr") == 0)) {
+        else if(unlikely(hash == hash_intr && strcmp(row_key, "intr") == 0)) {
             unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
 
             // --------------------------------------------------------------------
@@ -145,7 +145,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_ctxt && strsame(row_key, "ctxt") == 0)) {
+        else if(unlikely(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0)) {
             unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
 
             // --------------------------------------------------------------------
@@ -163,13 +163,13 @@ int do_proc_stat(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_processes && !processes && strsame(row_key, "processes") == 0)) {
+        else if(unlikely(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0)) {
             processes = str2ull(procfile_lineword(ff, l, 1));
         }
-        else if(unlikely(hash == hash_procs_running && !running && strsame(row_key, "procs_running") == 0)) {
+        else if(unlikely(hash == hash_procs_running && !running && strcmp(row_key, "procs_running") == 0)) {
             running = str2ull(procfile_lineword(ff, l, 1));
         }
-        else if(unlikely(hash == hash_procs_blocked && !blocked && strsame(row_key, "procs_blocked") == 0)) {
+        else if(unlikely(hash == hash_procs_blocked && !blocked && strcmp(row_key, "procs_blocked") == 0)) {
             blocked = str2ull(procfile_lineword(ff, l, 1));
         }
     }

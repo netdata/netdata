@@ -165,7 +165,7 @@ static unsigned long long *netstat_columns_find(struct netstat_columns *nc, cons
     uint32_t i, hash = simple_hash(name);
 
     for(i = 0; nc[i].name ;i++)
-        if(unlikely(nc[i].hash == hash && !strsame(nc[i].name, name)))
+        if(unlikely(nc[i].hash == hash && !strcmp(nc[i].name, name)))
             return &nc[i].value;
 
     fatal("Cannot find key '%s' in /proc/net/snmp internal array.", name);
@@ -186,7 +186,7 @@ static void parse_line_pair(procfile *ff, struct netstat_columns *nc, size_t hea
         uint32_t hash = simple_hash(key);
 
         for(i = 0 ; nc[i].name ;i++) {
-            if(unlikely(hash == nc[i].hash && !strsame(key, nc[i].name))) {
+            if(unlikely(hash == nc[i].hash && !strcmp(key, nc[i].name))) {
                 nc[i].value = str2ull(procfile_lineword(ff, values_line, w));
                 break;
             }
@@ -372,10 +372,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
         char *key = procfile_lineword(ff, l, 0);
         uint32_t hash = simple_hash(key);
 
-        if(unlikely(hash == hash_ip && strsame(key, "Ip") == 0)) {
+        if(unlikely(hash == hash_ip && strcmp(key, "Ip") == 0)) {
             size_t h = l++;
 
-            if(strsame(procfile_lineword(ff, l, 0), "Ip") != 0) {
+            if(strcmp(procfile_lineword(ff, l, 0), "Ip") != 0) {
                 error("Cannot read Ip line from /proc/net/snmp.");
                 break;
             }
@@ -478,10 +478,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_icmp && strsame(key, "Icmp") == 0)) {
+        else if(unlikely(hash == hash_icmp && strcmp(key, "Icmp") == 0)) {
             size_t h = l++;
 
-            if(strsame(procfile_lineword(ff, l, 0), "Icmp") != 0) {
+            if(strcmp(procfile_lineword(ff, l, 0), "Icmp") != 0) {
                 error("Cannot read Icmp line from /proc/net/snmp.");
                 break;
             }
@@ -528,10 +528,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_icmpmsg && strsame(key, "IcmpMsg") == 0)) {
+        else if(unlikely(hash == hash_icmpmsg && strcmp(key, "IcmpMsg") == 0)) {
             size_t h = l++;
 
-            if(strsame(procfile_lineword(ff, l, 0), "IcmpMsg") != 0) {
+            if(strcmp(procfile_lineword(ff, l, 0), "IcmpMsg") != 0) {
                 error("Cannot read IcmpMsg line from /proc/net/snmp.");
                 break;
             }
@@ -558,10 +558,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_tcp && strsame(key, "Tcp") == 0)) {
+        else if(unlikely(hash == hash_tcp && strcmp(key, "Tcp") == 0)) {
             size_t h = l++;
 
-            if(strsame(procfile_lineword(ff, l, 0), "Tcp") != 0) {
+            if(strcmp(procfile_lineword(ff, l, 0), "Tcp") != 0) {
                 error("Cannot read Tcp line from /proc/net/snmp.");
                 break;
             }
@@ -651,10 +651,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_udp && strsame(key, "Udp") == 0)) {
+        else if(unlikely(hash == hash_udp && strcmp(key, "Udp") == 0)) {
             size_t h = l++;
 
-            if(strsame(procfile_lineword(ff, l, 0), "Udp") != 0) {
+            if(strcmp(procfile_lineword(ff, l, 0), "Udp") != 0) {
                 error("Cannot read Udp line from /proc/net/snmp.");
                 break;
             }
@@ -711,10 +711,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-        else if(unlikely(hash == hash_udplite && strsame(key, "UdpLite") == 0)) {
+        else if(unlikely(hash == hash_udplite && strcmp(key, "UdpLite") == 0)) {
             size_t h = l++;
 
-            if(strsame(procfile_lineword(ff, l, 0), "UdpLite") != 0) {
+            if(strcmp(procfile_lineword(ff, l, 0), "UdpLite") != 0) {
                 error("Cannot read UdpLite line from /proc/net/snmp.");
                 break;
             }

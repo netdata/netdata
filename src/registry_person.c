@@ -9,7 +9,7 @@ int person_url_compare(void *a, void *b) {
 
     if(hash1 < hash2) return -1;
     else if(hash1 > hash2) return 1;
-    else return strsame(((REGISTRY_PERSON_URL *)a)->url->url, ((REGISTRY_PERSON_URL *)b)->url->url);
+    else return strcmp(((REGISTRY_PERSON_URL *)a)->url->url, ((REGISTRY_PERSON_URL *)b)->url->url);
 }
 
 inline REGISTRY_PERSON_URL *registry_person_url_index_find(REGISTRY_PERSON *p, const char *url) {
@@ -242,7 +242,7 @@ REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MA
             pu->machine = m;
         }
 
-        if(strsame(pu->machine_name, name)) {
+        if(strcmp(pu->machine_name, name)) {
             // the name of the PERSON_URL has changed !
             pu = registry_person_url_reallocate(p, m, u, name, namelen, when, pu);
         }

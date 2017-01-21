@@ -218,7 +218,7 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
             name++;
         }
         for(target = apps_groups_root_target ; target ; target = target->next) {
-            if(!target->target && strsame(name, target->name) == 0)
+            if(!target->target && strcmp(name, target->name) == 0)
                 break;
         }
         if(unlikely(debug)) {
@@ -947,7 +947,7 @@ int file_descriptor_compare(void* a, void* b) {
         return 1;
 
     else
-        return strsame(((struct file_descriptor *)a)->name, ((struct file_descriptor *)b)->name);
+        return strcmp(((struct file_descriptor *)a)->name, ((struct file_descriptor *)b)->name);
 }
 
 int file_descriptor_iterator(avl *a) { if(a) {}; return 0; }
@@ -1122,11 +1122,11 @@ static inline int file_descriptor_find_or_add(const char *name)
     if(name[0] == '/') type = FILETYPE_FILE;
     else if(strncmp(name, "pipe:", 5) == 0) type = FILETYPE_PIPE;
     else if(strncmp(name, "socket:", 7) == 0) type = FILETYPE_SOCKET;
-    else if(strsame(name, "anon_inode:inotify") == 0 || strsame(name, "inotify") == 0) type = FILETYPE_INOTIFY;
-    else if(strsame(name, "anon_inode:[eventfd]") == 0) type = FILETYPE_EVENTFD;
-    else if(strsame(name, "anon_inode:[eventpoll]") == 0) type = FILETYPE_EVENTPOLL;
-    else if(strsame(name, "anon_inode:[timerfd]") == 0) type = FILETYPE_TIMERFD;
-    else if(strsame(name, "anon_inode:[signalfd]") == 0) type = FILETYPE_SIGNALFD;
+    else if(strcmp(name, "anon_inode:inotify") == 0 || strcmp(name, "inotify") == 0) type = FILETYPE_INOTIFY;
+    else if(strcmp(name, "anon_inode:[eventfd]") == 0) type = FILETYPE_EVENTFD;
+    else if(strcmp(name, "anon_inode:[eventpoll]") == 0) type = FILETYPE_EVENTPOLL;
+    else if(strcmp(name, "anon_inode:[timerfd]") == 0) type = FILETYPE_TIMERFD;
+    else if(strcmp(name, "anon_inode:[signalfd]") == 0) type = FILETYPE_SIGNALFD;
     else if(strncmp(name, "anon_inode:", 11) == 0) {
         if(unlikely(debug))
             fprintf(stderr, "apps.plugin: FIXME: unknown anonymous inode: %s\n", name);
@@ -1173,7 +1173,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
             p->fds[c] = -p->fds[c];
 
         while((de = readdir(fds))) {
-            if(strsame(de->d_name, ".") == 0 || strsame(de->d_name, "..") == 0)
+            if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
                 continue;
 
             // check if the fds array is small
@@ -1647,9 +1647,9 @@ static inline int collect_data_for_pid(pid_t pid) {
             // 2. the target has the prefix
             // 3. the target has the suffix
             // 4. the target is something inside cmdline
-            if( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strsame(w->compare, p->comm))
+            if( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
                    || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
-                   || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strsame(w->compare, &p->comm[pclen - w->comparelen]))
+                   || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
                    || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
                     ) {
                 if(w->target) p->target = w->target;
@@ -2684,58 +2684,58 @@ static void parse_args(int argc, char **argv)
             }
         }
 
-        if(strsame("version", argv[i]) == 0 || strsame("-v", argv[i]) == 0) {
+        if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0) {
             printf("apps.plugin %s\n", VERSION);
             exit(0);
         }
 
-        if(strsame("debug", argv[i]) == 0) {
+        if(strcmp("debug", argv[i]) == 0) {
             debug = 1;
             // debug_flags = 0xffffffff;
             continue;
         }
 
-        if(strsame("no-childs", argv[i]) == 0 || strsame("without-childs", argv[i]) == 0) {
+        if(strcmp("no-childs", argv[i]) == 0 || strcmp("without-childs", argv[i]) == 0) {
             include_exited_childs = 0;
             continue;
         }
 
-        if(strsame("with-childs", argv[i]) == 0) {
+        if(strcmp("with-childs", argv[i]) == 0) {
             include_exited_childs = 1;
             continue;
         }
 
-        if(strsame("with-guest", argv[i]) == 0) {
+        if(strcmp("with-guest", argv[i]) == 0) {
             enable_guest_charts = 1;
             continue;
         }
 
-        if(strsame("no-guest", argv[i]) == 0 || strsame("without-guest", argv[i]) == 0) {
+        if(strcmp("no-guest", argv[i]) == 0 || strcmp("without-guest", argv[i]) == 0) {
             enable_guest_charts = 0;
             continue;
         }
 
-        if(strsame("with-files", argv[i]) == 0) {
+        if(strcmp("with-files", argv[i]) == 0) {
             enable_file_charts = 1;
             continue;
         }
 
-        if(strsame("no-files", argv[i]) == 0 || strsame("without-files", argv[i]) == 0) {
+        if(strcmp("no-files", argv[i]) == 0 || strcmp("without-files", argv[i]) == 0) {
             enable_file_charts = 0;
             continue;
         }
 
-        if(strsame("no-users", argv[i]) == 0 || strsame("without-users", argv[i]) == 0) {
+        if(strcmp("no-users", argv[i]) == 0 || strcmp("without-users", argv[i]) == 0) {
             enable_users_charts = 0;
             continue;
         }
 
-        if(strsame("no-groups", argv[i]) == 0 || strsame("without-groups", argv[i]) == 0) {
+        if(strcmp("no-groups", argv[i]) == 0 || strcmp("without-groups", argv[i]) == 0) {
             enable_groups_charts = 0;
             continue;
         }
 
-        if(strsame("-h", argv[i]) == 0 || strsame("--help", argv[i]) == 0) {
+        if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "apps.plugin %s\n"
                     "(C) 2016 Costa Tsaousis"

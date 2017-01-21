@@ -27,6 +27,19 @@ static inline uint32_t simple_uhash(const char *name) {
     return hval;
 }
 
+static inline int simple_hash_strcmp(const char *name, const char *b, uint32_t *hash) {
+    unsigned char *s = (unsigned char *) name;
+    uint32_t hval = 0x811c9dc5;
+    int ret = 0;
+    while (*s) {
+        if(!ret) ret = *s - *b++;
+        hval *= 16777619;
+        hval ^= (uint32_t) *s++;
+    }
+    *hash = hval;
+    return ret;
+}
+
 static inline int str2i(const char *s) {
     int n = 0;
     char c, negative = (*s == '-');
@@ -77,14 +90,12 @@ static inline unsigned long long str2ull(const char *s) {
     return n;
 }
 
-#ifdef NETDATA_STRSAME
-static inline int strsame(const char *a, const char *b) {
+#ifdef NETDATA_STRCMP_OVERRIDE
+static inline int strcmp(const char *a, const char *b) {
     if(unlikely(a == b)) return 0;
     while(*a && *a == *b) { a++; b++; }
     return *a - *b;
 }
-#else
-#define strsame(a, b) strcmp(a, b)
 #endif // NETDATA_STRSAME
 
 static inline int read_single_number_file(const char *filename, unsigned long long *result) {
