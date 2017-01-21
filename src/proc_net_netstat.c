@@ -74,7 +74,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     static unsigned long long ipext_InECT0Pkts = 0;
     static unsigned long long ipext_InCEPkts = 0;
 
-    if(unlikely(do_bandwidth == -1)) {
+    if(unlikely(!arl_ipext)) {
         do_bandwidth = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "bandwidth", CONFIG_ONDEMAND_ONDEMAND);
         do_inerrors  = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "input errors", CONFIG_ONDEMAND_ONDEMAND);
         do_mcast     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "multicast bandwidth", CONFIG_ONDEMAND_ONDEMAND);
@@ -127,41 +127,41 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         arl_ipext = arl_create(NULL, 60);
 
         if(do_bandwidth != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "InOctets",  &ipext_InOctets);
-            arl_expect(arl_tcpext, "OutOctets", &ipext_OutOctets);
+            arl_expect(arl_ipext, "InOctets",  &ipext_InOctets);
+            arl_expect(arl_ipext, "OutOctets", &ipext_OutOctets);
         }
 
         if(do_inerrors != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "InNoRoutes",      &ipext_InNoRoutes);
-            arl_expect(arl_tcpext, "InTruncatedPkts", &ipext_InTruncatedPkts);
-            arl_expect(arl_tcpext, "InCsumErrors",    &ipext_InCsumErrors);
+            arl_expect(arl_ipext, "InNoRoutes",      &ipext_InNoRoutes);
+            arl_expect(arl_ipext, "InTruncatedPkts", &ipext_InTruncatedPkts);
+            arl_expect(arl_ipext, "InCsumErrors",    &ipext_InCsumErrors);
         }
 
         if(do_mcast != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "InMcastOctets", &ipext_InMcastOctets);
-            arl_expect(arl_tcpext, "OutMcastOctets", &ipext_OutMcastOctets);
+            arl_expect(arl_ipext, "InMcastOctets", &ipext_InMcastOctets);
+            arl_expect(arl_ipext, "OutMcastOctets", &ipext_OutMcastOctets);
         }
 
         if(do_mcast_p != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "InMcastPkts",  &ipext_InMcastPkts);
-            arl_expect(arl_tcpext, "OutMcastPkts", &ipext_OutMcastPkts);
+            arl_expect(arl_ipext, "InMcastPkts",  &ipext_InMcastPkts);
+            arl_expect(arl_ipext, "OutMcastPkts", &ipext_OutMcastPkts);
         }
 
         if(do_bcast != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "InBcastPkts",  &ipext_InBcastPkts);
-            arl_expect(arl_tcpext, "OutBcastPkts", &ipext_OutBcastPkts);
+            arl_expect(arl_ipext, "InBcastPkts",  &ipext_InBcastPkts);
+            arl_expect(arl_ipext, "OutBcastPkts", &ipext_OutBcastPkts);
         }
 
         if(do_bcast_p != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "InBcastOctets",  &ipext_InBcastOctets);
-            arl_expect(arl_tcpext, "OutBcastOctets", &ipext_OutBcastOctets);
+            arl_expect(arl_ipext, "InBcastOctets",  &ipext_InBcastOctets);
+            arl_expect(arl_ipext, "OutBcastOctets", &ipext_OutBcastOctets);
         }
 
         if(do_ecn != CONFIG_ONDEMAND_NO) {
-            arl_expect(arl_tcpext, "InNoECTPkts", &ipext_InNoECTPkts);
-            arl_expect(arl_tcpext, "InECT1Pkts",  &ipext_InECT1Pkts);
-            arl_expect(arl_tcpext, "InECT0Pkts",  &ipext_InECT0Pkts);
-            arl_expect(arl_tcpext, "InCEPkts",    &ipext_InCEPkts);
+            arl_expect(arl_ipext, "InNoECTPkts", &ipext_InNoECTPkts);
+            arl_expect(arl_ipext, "InECT1Pkts",  &ipext_InECT1Pkts);
+            arl_expect(arl_ipext, "InECT0Pkts",  &ipext_InECT0Pkts);
+            arl_expect(arl_ipext, "InCEPkts",    &ipext_InCEPkts);
         }
     }
 
