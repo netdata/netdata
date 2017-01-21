@@ -14,6 +14,7 @@ dist_python_SCRIPTS = \
     cpufreq.chart.py \
     cpuidle.chart.py \
     dovecot.chart.py \
+    elasticsearch.chart.py \
     example.chart.py \
     exim.chart.py \
     fail2ban.chart.py \
