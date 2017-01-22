@@ -19,6 +19,7 @@ dist_python_SCRIPTS = \
     exim.chart.py \
     fail2ban.chart.py \
     freeradius.chart.py \
+    gunicorn_log.chart.py \
     haproxy.chart.py \
     hddtemp.chart.py \
     ipfs.chart.py \
