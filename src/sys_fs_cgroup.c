@@ -594,7 +594,7 @@ static inline void cgroup_read_memory(struct memory *mem) {
         }
 
         if(unlikely(!mem->arl_base)) {
-            mem->arl_base = arl_create(NULL, 60);
+            mem->arl_base = arl_create("cgroup/memory", NULL, 60);
 
             arl_expect(mem->arl_base, "cache", &mem->cache);
             arl_expect(mem->arl_base, "rss", &mem->rss);

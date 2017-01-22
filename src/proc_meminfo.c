@@ -62,7 +62,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         do_kernel       = config_get_boolean("plugin:proc:/proc/meminfo", "kernel memory", 1);
         do_slab         = config_get_boolean("plugin:proc:/proc/meminfo", "slab memory", 1);
 
-        arl_base = arl_create(NULL, 60);
+        arl_base = arl_create("meminfo", NULL, 60);
         arl_expect(arl_base, "MemTotal", &MemTotal);
         arl_expect(arl_base, "MemFree", &MemFree);
         arl_expect(arl_base, "Buffers", &Buffers);

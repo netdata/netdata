@@ -56,6 +56,8 @@ typedef struct arl_entry {
 } ARL_ENTRY;
 
 typedef struct arl_base {
+    char *name;
+
     size_t iteration;   // incremented on each iteration (arl_begin())
     size_t found;       // the number of expected keywords found in this iteration
     size_t expected;    // the number of expected keywords
@@ -93,7 +95,7 @@ typedef struct arl_base {
 } ARL_BASE;
 
 // create a new ARL
-extern ARL_BASE *arl_create(void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks);
+extern ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks);
 
 // free an ARL
 extern void arl_free(ARL_BASE *arl_base);
@@ -115,6 +117,11 @@ extern void arl_begin(ARL_BASE *base);
 // it is defined in the header file in order to be inlined
 static inline int arl_check(ARL_BASE *base, const char *keyword, const char *value) {
     ARL_ENTRY *e = base->next_keyword;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely((base->fast + base->slow) % (base->expected + base->allocated) == 0 && (base->fast + base->slow) > (base->expected + base->allocated) * base->iteration))
+        info("ARL '%s': Did you forget to call arl_begin()?", base->name);
+#endif
 
     // it should be the first entry (pointed by base->next_keyword)
     if(likely(!strcmp(keyword, e->name))) {
