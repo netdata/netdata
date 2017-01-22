@@ -112,8 +112,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         do_tcpext_connaborts = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP connection aborts", CONFIG_ONDEMAND_ONDEMAND);
         do_tcpext_memory     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP memory pressures", CONFIG_ONDEMAND_ONDEMAND);
 
-        arl_ipext  = arl_create(NULL, 60);
-        arl_tcpext = arl_create(NULL, 60);
+        arl_ipext  = arl_create("netstat/ipext", NULL, 60);
+        arl_tcpext = arl_create("netstat/tcpext", NULL, 60);
 
         // --------------------------------------------------------------------
         // IPv4

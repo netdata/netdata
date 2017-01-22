@@ -12,8 +12,10 @@ static inline void arl_callback_str2ull(const char *name, uint32_t hash, const c
 }
 
 // create a new ARL
-ARL_BASE *arl_create(void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks) {
+ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks) {
     ARL_BASE *base = callocz(1, sizeof(ARL_BASE));
+
+    base->name = strdupz(name);
 
     if(!processor)
         base->processor = arl_callback_str2ull;
@@ -40,6 +42,8 @@ void arl_free(ARL_BASE *arl_base) {
         freez(e);
     }
 
+    freez(arl_base->name);
+
 #ifdef NETDATA_INTERNAL_CHECKS
     memset(arl_base, 0, sizeof(ARL_BASE));
 #endif
@@ -50,22 +54,37 @@ void arl_free(ARL_BASE *arl_base) {
 void arl_begin(ARL_BASE *base) {
     ARL_ENTRY *e;
 
-    /*
-    info("iteration %zu, expected %zu, wanted %zu, allocated %zu, fred %zu, relinkings %zu, found %zu, added %zu, fast %zu, slow %zu"
-         , base->iteration
-         , base->expected
-         , base->wanted
-         , base->allocated
-         , base->fred
-         , base->relinkings
-         , base->found
-         , base->added
-         , base->fast
-         , base->slow
-    );
-    for(e = base->head; e ; e = e->next) fprintf(stderr, "%s ", e->name);
-    fprintf(stderr, "\n");
-     */
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(likely(base->iteration > 10)) {
+        // do these checks after the ARL has been sorted
+
+        if(unlikely(base->relinkings > (base->expected + base->allocated)))
+            info("ARL '%s' has %zu relinkings with %zu expected and %zu allocated entries. Is the source changing so fast?"
+                 , base->name, base->relinkings, base->expected, base->allocated);
+
+        if(unlikely(base->slow > base->fast))
+            info("ARL '%s' has %zu fast searches and %zu slow searches. Is the source really changing so fast?"
+                 , base->name, base->fast, base->slow);
+
+        if(unlikely(base->iteration % 60 == 0)) {
+            info("ARL '%s' statistics: iteration %zu, expected %zu, wanted %zu, allocated %zu, fred %zu, relinkings %zu, found %zu, added %zu, fast %zu, slow %zu"
+                 , base->name
+                 , base->iteration
+                 , base->expected
+                 , base->wanted
+                 , base->allocated
+                 , base->fred
+                 , base->relinkings
+                 , base->found
+                 , base->added
+                 , base->fast
+                 , base->slow
+            );
+            // for(e = base->head; e; e = e->next) fprintf(stderr, "%s ", e->name);
+            // fprintf(stderr, "\n");
+        }
+    }
+#endif
 
     if(unlikely(base->added || base->iteration % base->rechecks) == 1) {
         base->added = 0;
@@ -140,6 +159,7 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
 
     if(e) {
         // found it in the keywords
+
         base->relinkings++;
 
         // run the processor for it
@@ -168,6 +188,11 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
         base->allocated++;
         base->added++;
     }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(base->iteration % 60 == 0 && e->flags & ARL_ENTRY_FLAG_FOUND))
+        info("ARL '%s': entry '%s' is already found. Did you forget to call arl_begin()?", base->name, s);
+#endif
 
     e->flags |= ARL_ENTRY_FLAG_FOUND;
 
