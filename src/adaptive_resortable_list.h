@@ -1,10 +1,10 @@
 #ifndef NETDATA_ADAPTIVE_RESORTABLE_LIST_H
 #define NETDATA_ADAPTIVE_RESORTABLE_LIST_H
 
-/*
- * ADAPTIVE RE-SORTABLE LIST
- * This structure allows netdata to read a file of NAME VALUE lines
- * in the fastest possible way.
+/**
+ * @file adaptive_resortable_list.h
+ * @brief This structure allows netdata to read a file of NAME VALUE lines in 
+ * the fastest possible way.
  *
  * It maintains a linked list of all NAME (keywords), sorted in the
  * same order as found in the source data file.
@@ -32,89 +32,143 @@
  * arl_create(), for each expected keyword found.
  * The default processor() expects dst to be an unsigned long long *.
  *
- * LIMITATIONS
+ * __LIMITATIONS__
  * DO NOT USE THIS IF THE A NAME/KEYWORD MAY APPEAR MORE THAN
  * ONCE IN THE SOURCE DATA SET.
  */
 
 #include "common.h"
 
-#define ARL_ENTRY_FLAG_FOUND    0x01    // the entry has been found in the source data
-#define ARL_ENTRY_FLAG_EXPECTED 0x02    // the entry is expected by the program
-#define ARL_ENTRY_FLAG_DYNAMIC  0x04    // the entry was dynamically allocated, from source data
+#define ARL_ENTRY_FLAG_FOUND    0x01    ///< the entry has been found in the source data
+#define ARL_ENTRY_FLAG_EXPECTED 0x02    ///< the entry is expected by the program
+#define ARL_ENTRY_FLAG_DYNAMIC  0x04    ///< the entry was dynamically allocated, from source data
 
+/** Double linked list of expected entries in an ARL */
 typedef struct arl_entry {
-    char *name;             // the keywords
-    uint32_t hash;          // the hash of the keyword
+    char *name;             ///< the keywords
+    uint32_t hash;          ///< the hash of the keyword
 
-    void *dst;              // the dst to pass to the processor
+    void *dst;              ///< the dst to pass to the processor
 
-    uint8_t flags;          // ARL_ENTRY_FLAG_*
+    uint8_t flags;          ///< ARL_ENTRY_FLAG_*
 
-    // double linked list for fast re-linkings
-    struct arl_entry *prev, *next;
+    struct arl_entry *prev; ///< previous item in double linked list.
+    struct arl_entry *next; ///< next item in double linked list.
 } ARL_ENTRY;
 
+/** ARL data structure */
 typedef struct arl_base {
-    char *name;
+    char *name;         ///< Name of the list. 
 
-    size_t iteration;   // incremented on each iteration (arl_begin())
-    size_t found;       // the number of expected keywords found in this iteration
-    size_t expected;    // the number of expected keywords
-    size_t wanted;      // the number of wanted keywords
-                        // i.e. the number of keywords found and expected
+    size_t iteration;   ///< incremented on each iteration (arl_begin())
+    size_t found;       ///< the number of expected keywords found in this iteration
+    size_t expected;    ///< the number of expected keywords
+    size_t wanted;      ///< the number of wanted keywords
+                        ///< i.e. the number of keywords found and expected
 
-    size_t relinkings;  // the number of relinkings we have made so far
+    size_t relinkings;  ///< the number of relinkings we have made so far
 
-    size_t allocated;   // the number of keywords allocated
-    size_t fred;        // the number of keywords cleaned up
+    size_t allocated;   ///< the number of keywords allocated
+    size_t fred;        ///< the number of keywords cleaned up
 
-    size_t rechecks;    // the number of iterations between re-checks of the
-                        // wanted number of keywords
-                        // this is only needed in cases where the source
-                        // is having less lines over time.
+    size_t rechecks;    ///< the number of iterations between re-checks of the
+                        ///< wanted number of keywords
+                        ///< this is only needed in cases where the source
+                        ///< is having less lines over time.
 
-    size_t added;       // it is non-zero if new keywords have been added
-                        // this is only needed to detect new lines have
-                        // been added to the file, over time.
+    size_t added;       ///< it is non-zero if new keywords have been added
+                        ///< this is only needed to detect new lines have
+                        ///< been added to the file, over time.
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    size_t fast;        // the number of times we have taken the fast path
-    size_t slow;        // the number of times we have taken the slow path
+    size_t fast;        ///< the number of times we have taken the fast path
+    size_t slow;        ///< the number of times we have taken the slow path
 #endif
 
-    // the processor to do the job
+    /**
+     * Callback to update `dst` with `value` if we found an expected name.
+     *
+     * @param name The matching keyword.
+     * @param hash of `name`
+     * @param value of `name` 
+     * @param dst to copy `value` into
+     */
     void (*processor)(const char *name, uint32_t hash, const char *value, void *dst);
 
-    // the linked list of the keywords
+    /// the linked list of the keywords
     ARL_ENTRY *head;
 
-    // since we keep the list of keywords sorted (as found in the source data)
-    // this is next keyword that we expect to find in the source data.
+    /// since we keep the list of keywords sorted (as found in the source data)
+    /// this is next keyword that we expect to find in the source data.
     ARL_ENTRY *next_keyword;
 } ARL_BASE;
 
-// create a new ARL
+/**
+ * Create a new ARL.
+ *
+ * If `processor` is `NULL` the default processor is used.
+ * It converts the value to an unsigned long long.
+ * \dontinclude adaptive_resortable_list.c
+ * \skip arl_callback_str2ull
+ * \until }
+ *
+ * @param name of the ARL
+ * @param processor Callback to process a match.
+ * @param rechecks The number of iterations between re-checks of the wanted number of keywords.
+ * @return the ARL. 
+ */
 extern ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks);
 
-// free an ARL
+/**
+ * Free an ARL
+ *
+ * @param arl_base allocated with arl_create()
+ */
 extern void arl_free(ARL_BASE *arl_base);
 
-// register an expected keyword to the ARL
-// together with its destination ( i.e. the output of the processor() )
+/**
+ * Register an expected keyword to the ARL together with its destination.
+ *
+ * The processor of AVL will write to `dst` if arl_check() matches `keyword`.
+ *
+ * @param base The ARL.
+ * @param keyword to register
+ * @param dst Destination.
+ * @return the registered ARL_ENTRY
+ */
 extern ARL_ENTRY *arl_expect(ARL_BASE *base, const char *keyword, void *dst);
 
-// an internal call to complete the check() call
-extern int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *value);
+/**
+ * Internal call to complete the check() call.
+ *
+ * Do not use this as a caller.
+ *
+ * @param base The ARL.
+ * @param s Keywoard of arl_check().
+ * @param value of arl_check()
+ * @return 1 if all expected keywords where found in this iteration. 0 if not.
+ */
+int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *value);
 
-// begin an ARL iteration
+/**
+ * Begin an iteration.
+ *
+ * @param base The ARL.
+ */
 extern void arl_begin(ARL_BASE *base);
 
-// check a keyword against the ARL
-// this is to be called for each keyword read from source data
-// s = the keyword, as collected
-// src = the src data to be passed to the processor
-// it is defined in the header file in order to be inlined
+/**
+ * Check a keyword against the ARL.
+ *
+ * This is to be called for each keyword read from source data
+ *
+ * It is defined in the header file in order to be inlined
+ *
+ * @param The ARL.
+ * @param keyword read from source
+ * @param value of `keyword`
+ * @return 1 if all expected keywords where found in this iteration. 0 if not.
+ */
 static inline int arl_check(ARL_BASE *base, const char *keyword, const char *value) {
     ARL_ENTRY *e = base->next_keyword;
 
