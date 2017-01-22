@@ -18,7 +18,7 @@ int check_storage_number(calculated_number n, int debug) {
     if(dcdiff < 0) dcdiff = -dcdiff;
 
     size_t len = print_calculated_number(buffer, d);
-    calculated_number p = strtold(buffer, NULL);
+    calculated_number p = str2l(buffer);
     calculated_number pdiff = n - p;
     calculated_number pcdiff = pdiff * 100.0 / n;
     if(pcdiff < 0) pcdiff = -pcdiff;

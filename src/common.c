@@ -1169,7 +1169,7 @@ pid_t get_system_pid_max(void) {
         return pid_max;
     }
 
-    pid_max = (pid_t)atoi(procfile_lineword(ff, 0, 0));
+    pid_max = (pid_t)str2i(procfile_lineword(ff, 0, 0));
     if(!pid_max) {
         procfile_close(ff);
         pid_max = 32768;
@@ -1194,3 +1194,18 @@ void get_system_HZ(void) {
 
     hz = (unsigned int) ticks;
 }
+
+/*
+// poor man cycle counting
+static unsigned long tsc;
+void begin_tsc(void) {
+    unsigned long a, d;
+    asm volatile ("cpuid\nrdtsc" : "=a" (a), "=d" (d) : "0" (0) : "ebx", "ecx");
+    tsc = ((unsigned long)d << 32) | (unsigned long)a;
+}
+unsigned long end_tsc(void) {
+    unsigned long a, d;
+    asm volatile ("rdtscp" : "=a" (a), "=d" (d) : : "ecx");
+    return (((unsigned long)d << 32) | (unsigned long)a) - tsc;
+}
+*/

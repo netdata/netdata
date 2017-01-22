@@ -53,88 +53,16 @@ static char *cgroups_rename_script = PLUGINS_DIR "/cgroup-name.sh";
 
 static uint32_t Read_hash = 0;
 static uint32_t Write_hash = 0;
-static uint32_t Sync_hash = 0;
-static uint32_t Async_hash = 0;
-static uint32_t Total_hash = 0;
 static uint32_t user_hash = 0;
 static uint32_t system_hash = 0;
-static uint32_t cache_hash = 0;
-static uint32_t rss_hash = 0;
-static uint32_t rss_huge_hash = 0;
-static uint32_t mapped_file_hash = 0;
-static uint32_t writeback_hash = 0;
-static uint32_t dirty_hash = 0;
-static uint32_t swap_hash = 0;
-static uint32_t pgpgin_hash = 0;
-static uint32_t pgpgout_hash = 0;
-static uint32_t pgfault_hash = 0;
-static uint32_t pgmajfault_hash = 0;
-static uint32_t inactive_anon_hash = 0;
-static uint32_t active_anon_hash = 0;
-static uint32_t inactive_file_hash = 0;
-static uint32_t active_file_hash = 0;
-static uint32_t unevictable_hash = 0;
-static uint32_t hierarchical_memory_limit_hash = 0;
-static uint32_t total_cache_hash = 0;
-static uint32_t total_rss_hash = 0;
-static uint32_t total_rss_huge_hash = 0;
-static uint32_t total_mapped_file_hash = 0;
-static uint32_t total_writeback_hash = 0;
-static uint32_t total_dirty_hash = 0;
-static uint32_t total_swap_hash = 0;
-static uint32_t total_pgpgin_hash = 0;
-static uint32_t total_pgpgout_hash = 0;
-static uint32_t total_pgfault_hash = 0;
-static uint32_t total_pgmajfault_hash = 0;
-static uint32_t total_inactive_anon_hash = 0;
-static uint32_t total_active_anon_hash = 0;
-static uint32_t total_inactive_file_hash = 0;
-static uint32_t total_active_file_hash = 0;
-static uint32_t total_unevictable_hash = 0;
 
 void read_cgroup_plugin_configuration() {
     system_page_size = sysconf(_SC_PAGESIZE);
 
     Read_hash = simple_hash("Read");
     Write_hash = simple_hash("Write");
-    Sync_hash = simple_hash("Sync");
-    Async_hash = simple_hash("Async");
-    Total_hash = simple_hash("Total");
     user_hash = simple_hash("user");
     system_hash = simple_hash("system");
-    cache_hash = simple_hash("cache");
-    rss_hash = simple_hash("rss");
-    rss_huge_hash = simple_hash("rss_huge");
-    mapped_file_hash = simple_hash("mapped_file");
-    writeback_hash = simple_hash("writeback");
-    dirty_hash = simple_hash("dirty");
-    swap_hash = simple_hash("swap");
-    pgpgin_hash = simple_hash("pgpgin");
-    pgpgout_hash = simple_hash("pgpgout");
-    pgfault_hash = simple_hash("pgfault");
-    pgmajfault_hash = simple_hash("pgmajfault");
-    inactive_anon_hash = simple_hash("inactive_anon");
-    active_anon_hash = simple_hash("active_anon");
-    inactive_file_hash = simple_hash("inactive_file");
-    active_file_hash = simple_hash("active_file");
-    unevictable_hash = simple_hash("unevictable");
-    hierarchical_memory_limit_hash = simple_hash("hierarchical_memory_limit");
-    total_cache_hash = simple_hash("total_cache");
-    total_rss_hash = simple_hash("total_rss");
-    total_rss_huge_hash = simple_hash("total_rss_huge");
-    total_mapped_file_hash = simple_hash("total_mapped_file");
-    total_writeback_hash = simple_hash("total_writeback");
-    total_dirty_hash = simple_hash("total_dirty");
-    total_swap_hash = simple_hash("total_swap");
-    total_pgpgin_hash = simple_hash("total_pgpgin");
-    total_pgpgout_hash = simple_hash("total_pgpgout");
-    total_pgfault_hash = simple_hash("total_pgfault");
-    total_pgmajfault_hash = simple_hash("total_pgmajfault");
-    total_inactive_anon_hash = simple_hash("total_inactive_anon");
-    total_active_anon_hash = simple_hash("total_active_anon");
-    total_inactive_file_hash = simple_hash("total_inactive_file");
-    total_active_file_hash = simple_hash("total_active_file");
-    total_unevictable_hash = simple_hash("total_unevictable");
 
     cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", rrd_update_every);
     if(cgroup_update_every < rrd_update_every)
@@ -295,6 +223,10 @@ struct blkio {
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt
 struct memory {
+    ARL_BASE *arl_base;
+    ARL_ENTRY *arl_dirty;
+    ARL_ENTRY *arl_swap;
+
     int updated_detailed;
     int updated_usage_in_bytes;
     int updated_msw_usage_in_bytes;
@@ -438,8 +370,6 @@ struct cgroup {
     RRDDIM *rd_mem_detailed_rss;
     RRDDIM *rd_mem_detailed_mapped;
     RRDDIM *rd_mem_detailed_writeback;
-    RRDDIM *rd_mem_detailed_dirty;
-    RRDDIM *rd_mem_detailed_swap;
     RRDDIM *rd_mem_detailed_pgpgin;
     RRDDIM *rd_mem_detailed_pgpgout;
     RRDDIM *rd_mem_detailed_pgfault;
@@ -494,15 +424,11 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
             char *s = procfile_lineword(ff, i, 0);
             uint32_t hash = simple_hash(s);
 
-            if(unlikely(hash == user_hash && !strcmp(s, "user"))) {
-                cp->user = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
+            if(unlikely(hash == user_hash && !strcmp(s, "user")))
+                cp->user = str2ull(procfile_lineword(ff, i, 1));
 
-            if(unlikely(hash == system_hash && !strcmp(s, "system"))) {
-                cp->system = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
+            else if(unlikely(hash == system_hash && !strcmp(s, "system")))
+                cp->system = str2ull(procfile_lineword(ff, i, 1));
         }
 
         cp->updated = 1;
@@ -529,7 +455,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
         }
 
         if(unlikely(procfile_lines(ff) < 1)) {
-            error("File '%s' should have 1+ lines but has %u.", ca->filename, procfile_lines(ff));
+            error("File '%s' should have 1+ lines but has %zu.", ca->filename, procfile_lines(ff));
             ca->updated = 0;
             return;
         }
@@ -555,7 +481,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 
         unsigned long long total = 0;
         for(i = 0; i < ca->cpus ;i++) {
-            unsigned long long n = strtoull(procfile_lineword(ff, 0, i), NULL, 10);
+            unsigned long long n = str2ull(procfile_lineword(ff, 0, i));
             ca->cpu_percpu[i] = n;
             total += n;
         }
@@ -608,31 +534,21 @@ static inline void cgroup_read_blkio(struct blkio *io) {
             char *s = procfile_lineword(ff, i, 1);
             uint32_t hash = simple_hash(s);
 
-            if(unlikely(hash == Read_hash && !strcmp(s, "Read"))) {
-                io->Read += strtoull(procfile_lineword(ff, i, 2), NULL, 10);
-                continue;
-            }
+            if(unlikely(hash == Read_hash && !strcmp(s, "Read")))
+                io->Read += str2ull(procfile_lineword(ff, i, 2));
 
-            if(unlikely(hash == Write_hash && !strcmp(s, "Write"))) {
-                io->Write += strtoull(procfile_lineword(ff, i, 2), NULL, 10);
-                continue;
-            }
+            else if(unlikely(hash == Write_hash && !strcmp(s, "Write")))
+                io->Write += str2ull(procfile_lineword(ff, i, 2));
 
 /*
-            if(hash == Sync_hash && !strcmp(s, "Sync")) {
-                io->Sync += strtoull(procfile_lineword(ff, i, 2), NULL, 10);
-                continue;
-            }
+            else if(unlikely(hash == Sync_hash && !strcmp(s, "Sync")))
+                io->Sync += str2ull(procfile_lineword(ff, i, 2));
 
-            if(hash == Async_hash && !strcmp(s, "Async")) {
-                io->Async += strtoull(procfile_lineword(ff, i, 2), NULL, 10);
-                continue;
-            }
+            else if(unlikely(hash == Async_hash && !strcmp(s, "Async")))
+                io->Async += str2ull(procfile_lineword(ff, i, 2));
 
-            if(hash == Total_hash && !strcmp(s, "Total")) {
-                io->Total += strtoull(procfile_lineword(ff, i, 2), NULL, 10);
-                continue;
-            }
+            else if(unlikely(hash == Total_hash && !strcmp(s, "Total")))
+                io->Total += str2ull(procfile_lineword(ff, i, 2));
 */
         }
 
@@ -677,179 +593,35 @@ static inline void cgroup_read_memory(struct memory *mem) {
             goto memory_next;
         }
 
-        for(i = 0; i < lines ; i++) {
-            char *s = procfile_lineword(ff, i, 0);
-            uint32_t hash = simple_hash(s);
+        if(unlikely(!mem->arl_base)) {
+            mem->arl_base = arl_create(NULL, 60);
 
-            if(unlikely(hash == cache_hash && !strcmp(s, "cache"))) {
-                mem->cache = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == rss_hash && !strcmp(s, "rss"))) {
-                mem->rss = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == rss_huge_hash && !strcmp(s, "rss_huge"))) {
-                mem->rss_huge = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == mapped_file_hash && !strcmp(s, "mapped_file"))) {
-                mem->mapped_file = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == writeback_hash && !strcmp(s, "writeback"))) {
-                mem->writeback = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == dirty_hash && !strcmp(s, "dirty"))) {
-                mem->dirty = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                mem->detailed_has_dirty = 1;
-                continue;
-            }
-
-            if(unlikely(hash == swap_hash && !strcmp(s, "swap"))) {
-                mem->swap = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                mem->detailed_has_swap = 1;
-                continue;
-            }
-
-            if(unlikely(hash == pgpgin_hash && !strcmp(s, "pgpgin"))) {
-                mem->pgpgin = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == pgpgout_hash && !strcmp(s, "pgpgout"))) {
-                mem->pgpgout = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == pgfault_hash && !strcmp(s, "pgfault"))) {
-                mem->pgfault = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == pgmajfault_hash && !strcmp(s, "pgmajfault"))) {
-                mem->pgmajfault = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-/*
-            if(unlikely(hash == inactive_anon_hash && !strcmp(s, "inactive_anon"))) {
-                mem->inactive_anon = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == active_anon_hash && !strcmp(s, "active_anon"))) {
-                mem->active_anon = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == inactive_file_hash && !strcmp(s, "inactive_file"))) {
-                mem->inactive_file = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == active_file_hash && !strcmp(s, "active_file"))) {
-                mem->active_file = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == unevictable_hash && !strcmp(s, "unevictable"))) {
-                mem->unevictable = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == hierarchical_memory_limit_hash && !strcmp(s, "hierarchical_memory_limit"))) {
-                mem->hierarchical_memory_limit = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_cache_hash && !strcmp(s, "total_cache"))) {
-                mem->total_cache = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_rss_hash && !strcmp(s, "total_rss"))) {
-                mem->total_rss = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_rss_huge_hash && !strcmp(s, "total_rss_huge"))) {
-                mem->total_rss_huge = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_mapped_file_hash && !strcmp(s, "total_mapped_file"))) {
-                mem->total_mapped_file = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_writeback_hash && !strcmp(s, "total_writeback"))) {
-                mem->total_writeback = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_dirty_hash && !strcmp(s, "total_dirty"))) {
-                mem->total_dirty = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_swap_hash && !strcmp(s, "total_swap"))) {
-                mem->total_swap = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_pgpgin_hash && !strcmp(s, "total_pgpgin"))) {
-                mem->total_pgpgin = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_pgpgout_hash && !strcmp(s, "total_pgpgout"))) {
-                mem->total_pgpgout = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_pgfault_hash && !strcmp(s, "total_pgfault"))) {
-                mem->total_pgfault = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_pgmajfault_hash && !strcmp(s, "total_pgmajfault"))) {
-                mem->total_pgmajfault = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_inactive_anon_hash && !strcmp(s, "total_inactive_anon"))) {
-                mem->total_inactive_anon = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_active_anon_hash && !strcmp(s, "total_active_anon"))) {
-                mem->total_active_anon = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_inactive_file_hash && !strcmp(s, "total_inactive_file"))) {
-                mem->total_inactive_file = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_active_file_hash && !strcmp(s, "total_active_file"))) {
-                mem->total_active_file = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-
-            if(unlikely(hash == total_unevictable_hash && !strcmp(s, "total_unevictable"))) {
-                mem->total_unevictable = strtoull(procfile_lineword(ff, i, 1), NULL, 10);
-                continue;
-            }
-*/
+            arl_expect(mem->arl_base, "cache", &mem->cache);
+            arl_expect(mem->arl_base, "rss", &mem->rss);
+            arl_expect(mem->arl_base, "rss_huge", &mem->rss_huge);
+            arl_expect(mem->arl_base, "mapped_file", &mem->mapped_file);
+            arl_expect(mem->arl_base, "writeback", &mem->writeback);
+            mem->arl_dirty = arl_expect(mem->arl_base, "dirty", &mem->dirty);
+            mem->arl_swap  = arl_expect(mem->arl_base, "swap", &mem->swap);
+            arl_expect(mem->arl_base, "pgpgin", &mem->pgpgin);
+            arl_expect(mem->arl_base, "pgpgout", &mem->pgpgout);
+            arl_expect(mem->arl_base, "pgfault", &mem->pgfault);
+            arl_expect(mem->arl_base, "pgmajfault", &mem->pgmajfault);
         }
+
+        arl_begin(mem->arl_base);
+
+        for(i = 0; i < lines ; i++) {
+            if(arl_check(mem->arl_base,
+                    procfile_lineword(ff, i, 0),
+                    procfile_lineword(ff, i, 1))) break;
+        }
+
+        if(unlikely(mem->arl_dirty->flags & ARL_ENTRY_FLAG_FOUND))
+            mem->detailed_has_dirty = 1;
+
+        if(unlikely(mem->arl_swap->flags & ARL_ENTRY_FLAG_FOUND))
+            mem->detailed_has_swap = 1;
 
         // fprintf(stderr, "READ: '%s', cache: %llu, rss: %llu, rss_huge: %llu, mapped_file: %llu, writeback: %llu, dirty: %llu, swap: %llu, pgpgin: %llu, pgpgout: %llu, pgfault: %llu, pgmajfault: %llu, inactive_anon: %llu, active_anon: %llu, inactive_file: %llu, active_file: %llu, unevictable: %llu, hierarchical_memory_limit: %llu, total_cache: %llu, total_rss: %llu, total_rss_huge: %llu, total_mapped_file: %llu, total_writeback: %llu, total_dirty: %llu, total_swap: %llu, total_pgpgin: %llu, total_pgpgout: %llu, total_pgfault: %llu, total_pgmajfault: %llu, total_inactive_anon: %llu, total_active_anon: %llu, total_inactive_file: %llu, total_active_file: %llu, total_unevictable: %llu\n", mem->filename, mem->cache, mem->rss, mem->rss_huge, mem->mapped_file, mem->writeback, mem->dirty, mem->swap, mem->pgpgin, mem->pgpgout, mem->pgfault, mem->pgmajfault, mem->inactive_anon, mem->active_anon, mem->inactive_file, mem->active_file, mem->unevictable, mem->hierarchical_memory_limit, mem->total_cache, mem->total_rss, mem->total_rss_huge, mem->total_mapped_file, mem->total_writeback, mem->total_dirty, mem->total_swap, mem->total_pgpgin, mem->total_pgpgout, mem->total_pgfault, mem->total_pgmajfault, mem->total_inactive_anon, mem->total_active_anon, mem->total_inactive_file, mem->total_active_file, mem->total_unevictable);
 
@@ -1110,6 +882,7 @@ static inline void cgroup_free(struct cgroup *cg) {
     freez(cg->cpuacct_stat.filename);
     freez(cg->cpuacct_usage.filename);
 
+    arl_free(cg->memory.arl_base);
     freez(cg->memory.filename_detailed);
     freez(cg->memory.filename_failcnt);
     freez(cg->memory.filename_usage_in_bytes);

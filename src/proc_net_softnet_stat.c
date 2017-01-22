@@ -1,6 +1,6 @@
 #include "common.h"
 
-static inline char *softnet_column_name(uint32_t column) {
+static inline char *softnet_column_name(size_t column) {
     switch(column) {
         // https://github.com/torvalds/linux/blob/a7fd20d1c476af4563e66865213474a2f9f473a4/net/core/net-procfs.c#L161-L166
         case 0: return "processed";
@@ -17,7 +17,8 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
 
     static procfile *ff = NULL;
     static int do_per_core = -1;
-    static uint32_t allocated_lines = 0, allocated_columns = 0, *data = NULL;
+    static size_t allocated_lines = 0, allocated_columns = 0;
+    static uint32_t *data = NULL;
 
     if(unlikely(do_per_core == -1)) do_per_core = config_get_boolean("plugin:proc:/proc/net/softnet_stat", "softnet_stat per core", 1);
 
@@ -31,11 +32,11 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
-    uint32_t words = procfile_linewords(ff, 0), w;
+    size_t lines = procfile_lines(ff), l;
+    size_t words = procfile_linewords(ff, 0), w;
 
     if(unlikely(!lines || !words)) {
-        error("Cannot read /proc/net/softnet_stat, %u lines and %u columns reported.", lines, words);
+        error("Cannot read /proc/net/softnet_stat, %zu lines and %zu columns reported.", lines, words);
         return 1;
     }
 
@@ -62,7 +63,7 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
 
         for(w = 0; w < words ; w++) {
             if(unlikely(softnet_column_name(w))) {
-                uint32_t t = strtoul(procfile_lineword(ff, l, w), NULL, 16);
+                uint32_t t = (uint32_t)strtoul(procfile_lineword(ff, l, w), NULL, 16);
                 data[w] += t;
                 data[((l + 1) * allocated_columns) + w] = t;
             }
@@ -94,12 +95,12 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
     if(do_per_core) {
         for(l = 0; l < lines ;l++) {
             char id[50+1];
-            snprintfz(id, 50, "cpu%u_softnet_stat", l);
+            snprintfz(id, 50, "cpu%zu_softnet_stat", l);
 
             st = rrdset_find_bytype("cpu", id);
             if(unlikely(!st)) {
                 char title[100+1];
-                snprintfz(title, 100, "CPU%u softnet_stat", l);
+                snprintfz(title, 100, "CPU%zu softnet_stat", l);
 
                 st = rrdset_create("cpu", id, NULL, "softnet_stat", NULL, title, "events/s", 4101 + l, update_every, RRDSET_TYPE_LINE);
                 for(w = 0; w < allocated_columns ;w++)

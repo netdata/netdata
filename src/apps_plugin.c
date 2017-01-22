@@ -13,6 +13,8 @@
 // etc.
 #define RATES_DETAIL 10000ULL
 
+#define MAX_SPARE_FDS 1
+
 int debug = 0;
 
 int update_every = 1;
@@ -86,7 +88,9 @@ struct target {
     unsigned long long io_storage_bytes_written;
     // unsigned long long io_cancelled_write_bytes;
 
-    int *fds;
+    int *target_fds;
+    int target_fds_size;
+
     unsigned long long openfiles;
     unsigned long long openpipes;
     unsigned long long opensockets;
@@ -490,8 +494,8 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
     }
 
     all_pids[pid] = callocz(sizeof(struct pid_stat), 1);
-    all_pids[pid]->fds = callocz(sizeof(int), 100);
-    all_pids[pid]->fds_size = 100;
+    all_pids[pid]->fds = callocz(sizeof(int), MAX_SPARE_FDS);
+    all_pids[pid]->fds_size = MAX_SPARE_FDS;
 
     if(root_of_pids) root_of_pids->prev = all_pids[pid];
     all_pids[pid]->next = root_of_pids;
@@ -609,85 +613,85 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     p->stat_collected_usec = now_realtime_usec();
     file_counter++;
 
-    // p->pid           = atol(procfile_lineword(ff, 0, 0+i));
+    // p->pid           = str2ul(procfile_lineword(ff, 0, 0+i));
 
     strncpyz(p->comm, procfile_lineword(ff, 0, 1), MAX_COMPARE_NAME);
 
     // p->state         = *(procfile_lineword(ff, 0, 2));
-    p->ppid             = (int32_t) atol(procfile_lineword(ff, 0, 3));
-    // p->pgrp          = atol(procfile_lineword(ff, 0, 4));
-    // p->session       = atol(procfile_lineword(ff, 0, 5));
-    // p->tty_nr        = atol(procfile_lineword(ff, 0, 6));
-    // p->tpgid         = atol(procfile_lineword(ff, 0, 7));
-    // p->flags         = strtoull(procfile_lineword(ff, 0, 8), NULL, 10);
+    p->ppid             = (int32_t)str2ul(procfile_lineword(ff, 0, 3));
+    // p->pgrp          = str2ul(procfile_lineword(ff, 0, 4));
+    // p->session       = str2ul(procfile_lineword(ff, 0, 5));
+    // p->tty_nr        = str2ul(procfile_lineword(ff, 0, 6));
+    // p->tpgid         = str2ul(procfile_lineword(ff, 0, 7));
+    // p->flags         = str2ull(procfile_lineword(ff, 0, 8));
 
     unsigned long long last;
 
     last = p->minflt_raw;
-    p->minflt_raw       = strtoull(procfile_lineword(ff, 0, 9), NULL, 10);
+    p->minflt_raw       = str2ull(procfile_lineword(ff, 0, 9));
     p->minflt = (p->minflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cminflt_raw;
-    p->cminflt_raw      = strtoull(procfile_lineword(ff, 0, 10), NULL, 10);
+    p->cminflt_raw      = str2ull(procfile_lineword(ff, 0, 10));
     p->cminflt = (p->cminflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->majflt_raw;
-    p->majflt_raw       = strtoull(procfile_lineword(ff, 0, 11), NULL, 10);
+    p->majflt_raw       = str2ull(procfile_lineword(ff, 0, 11));
     p->majflt = (p->majflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cmajflt_raw;
-    p->cmajflt_raw      = strtoull(procfile_lineword(ff, 0, 12), NULL, 10);
+    p->cmajflt_raw      = str2ull(procfile_lineword(ff, 0, 12));
     p->cmajflt = (p->cmajflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->utime_raw;
-    p->utime_raw        = strtoull(procfile_lineword(ff, 0, 13), NULL, 10);
+    p->utime_raw        = str2ull(procfile_lineword(ff, 0, 13));
     p->utime = (p->utime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->stime_raw;
-    p->stime_raw        = strtoull(procfile_lineword(ff, 0, 14), NULL, 10);
+    p->stime_raw        = str2ull(procfile_lineword(ff, 0, 14));
     p->stime = (p->stime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cutime_raw;
-    p->cutime_raw       = strtoull(procfile_lineword(ff, 0, 15), NULL, 10);
+    p->cutime_raw       = str2ull(procfile_lineword(ff, 0, 15));
     p->cutime = (p->cutime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cstime_raw;
-    p->cstime_raw       = strtoull(procfile_lineword(ff, 0, 16), NULL, 10);
+    p->cstime_raw       = str2ull(procfile_lineword(ff, 0, 16));
     p->cstime = (p->cstime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
-    // p->priority      = strtoull(procfile_lineword(ff, 0, 17), NULL, 10);
-    // p->nice          = strtoull(procfile_lineword(ff, 0, 18), NULL, 10);
-    p->num_threads      = (int32_t) atol(procfile_lineword(ff, 0, 19));
-    // p->itrealvalue   = strtoull(procfile_lineword(ff, 0, 20), NULL, 10);
-    // p->starttime     = strtoull(procfile_lineword(ff, 0, 21), NULL, 10);
-    // p->vsize         = strtoull(procfile_lineword(ff, 0, 22), NULL, 10);
-    // p->rss           = strtoull(procfile_lineword(ff, 0, 23), NULL, 10);
-    // p->rsslim        = strtoull(procfile_lineword(ff, 0, 24), NULL, 10);
-    // p->starcode      = strtoull(procfile_lineword(ff, 0, 25), NULL, 10);
-    // p->endcode       = strtoull(procfile_lineword(ff, 0, 26), NULL, 10);
-    // p->startstack    = strtoull(procfile_lineword(ff, 0, 27), NULL, 10);
-    // p->kstkesp       = strtoull(procfile_lineword(ff, 0, 28), NULL, 10);
-    // p->kstkeip       = strtoull(procfile_lineword(ff, 0, 29), NULL, 10);
-    // p->signal        = strtoull(procfile_lineword(ff, 0, 30), NULL, 10);
-    // p->blocked       = strtoull(procfile_lineword(ff, 0, 31), NULL, 10);
-    // p->sigignore     = strtoull(procfile_lineword(ff, 0, 32), NULL, 10);
-    // p->sigcatch      = strtoull(procfile_lineword(ff, 0, 33), NULL, 10);
-    // p->wchan         = strtoull(procfile_lineword(ff, 0, 34), NULL, 10);
-    // p->nswap         = strtoull(procfile_lineword(ff, 0, 35), NULL, 10);
-    // p->cnswap        = strtoull(procfile_lineword(ff, 0, 36), NULL, 10);
-    // p->exit_signal   = atol(procfile_lineword(ff, 0, 37));
-    // p->processor     = atol(procfile_lineword(ff, 0, 38));
-    // p->rt_priority   = strtoul(procfile_lineword(ff, 0, 39), NULL, 10);
-    // p->policy        = strtoul(procfile_lineword(ff, 0, 40), NULL, 10);
-    // p->delayacct_blkio_ticks = strtoull(procfile_lineword(ff, 0, 41), NULL, 10);
+    // p->priority      = str2ull(procfile_lineword(ff, 0, 17));
+    // p->nice          = str2ull(procfile_lineword(ff, 0, 18));
+    p->num_threads      = (int32_t)str2ul(procfile_lineword(ff, 0, 19));
+    // p->itrealvalue   = str2ull(procfile_lineword(ff, 0, 20));
+    // p->starttime     = str2ull(procfile_lineword(ff, 0, 21));
+    // p->vsize         = str2ull(procfile_lineword(ff, 0, 22));
+    // p->rss           = str2ull(procfile_lineword(ff, 0, 23));
+    // p->rsslim        = str2ull(procfile_lineword(ff, 0, 24));
+    // p->starcode      = str2ull(procfile_lineword(ff, 0, 25));
+    // p->endcode       = str2ull(procfile_lineword(ff, 0, 26));
+    // p->startstack    = str2ull(procfile_lineword(ff, 0, 27));
+    // p->kstkesp       = str2ull(procfile_lineword(ff, 0, 28));
+    // p->kstkeip       = str2ull(procfile_lineword(ff, 0, 29));
+    // p->signal        = str2ull(procfile_lineword(ff, 0, 30));
+    // p->blocked       = str2ull(procfile_lineword(ff, 0, 31));
+    // p->sigignore     = str2ull(procfile_lineword(ff, 0, 32));
+    // p->sigcatch      = str2ull(procfile_lineword(ff, 0, 33));
+    // p->wchan         = str2ull(procfile_lineword(ff, 0, 34));
+    // p->nswap         = str2ull(procfile_lineword(ff, 0, 35));
+    // p->cnswap        = str2ull(procfile_lineword(ff, 0, 36));
+    // p->exit_signal   = str2ul(procfile_lineword(ff, 0, 37));
+    // p->processor     = str2ul(procfile_lineword(ff, 0, 38));
+    // p->rt_priority   = str2ul(procfile_lineword(ff, 0, 39));
+    // p->policy        = str2ul(procfile_lineword(ff, 0, 40));
+    // p->delayacct_blkio_ticks = str2ull(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
         last = p->gtime_raw;
-        p->gtime_raw        = strtoull(procfile_lineword(ff, 0, 42), NULL, 10);
+        p->gtime_raw        = str2ull(procfile_lineword(ff, 0, 42));
         p->gtime = (p->gtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         last = p->cgtime_raw;
-        p->cgtime_raw       = strtoull(procfile_lineword(ff, 0, 43), NULL, 10);
+        p->cgtime_raw       = str2ull(procfile_lineword(ff, 0, 43));
         p->cgtime = (p->cgtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         if (show_guest_time || p->gtime || p->cgtime) {
@@ -748,13 +752,13 @@ static inline int read_proc_pid_statm(struct pid_stat *p) {
 
     file_counter++;
 
-    p->statm_size           = strtoull(procfile_lineword(ff, 0, 0), NULL, 10);
-    p->statm_resident       = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
-    p->statm_share          = strtoull(procfile_lineword(ff, 0, 2), NULL, 10);
-    // p->statm_text           = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
-    // p->statm_lib            = strtoull(procfile_lineword(ff, 0, 4), NULL, 10);
-    // p->statm_data           = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
-    // p->statm_dirty          = strtoull(procfile_lineword(ff, 0, 6), NULL, 10);
+    p->statm_size           = str2ull(procfile_lineword(ff, 0, 0));
+    p->statm_resident       = str2ull(procfile_lineword(ff, 0, 1));
+    p->statm_share          = str2ull(procfile_lineword(ff, 0, 2));
+    // p->statm_text           = str2ull(procfile_lineword(ff, 0, 3));
+    // p->statm_lib            = str2ull(procfile_lineword(ff, 0, 4));
+    // p->statm_data           = str2ull(procfile_lineword(ff, 0, 5));
+    // p->statm_dirty          = str2ull(procfile_lineword(ff, 0, 6));
 
     return 1;
 
@@ -793,31 +797,31 @@ static inline int read_proc_pid_io(struct pid_stat *p) {
     unsigned long long last;
 
     last = p->io_logical_bytes_read_raw;
-    p->io_logical_bytes_read_raw = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
+    p->io_logical_bytes_read_raw = str2ull(procfile_lineword(ff, 0, 1));
     p->io_logical_bytes_read = (p->io_logical_bytes_read_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_logical_bytes_written_raw;
-    p->io_logical_bytes_written_raw = strtoull(procfile_lineword(ff, 1, 1), NULL, 10);
+    p->io_logical_bytes_written_raw = str2ull(procfile_lineword(ff, 1, 1));
     p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     // last = p->io_read_calls_raw;
-    // p->io_read_calls_raw = strtoull(procfile_lineword(ff, 2, 1), NULL, 10);
+    // p->io_read_calls_raw = str2ull(procfile_lineword(ff, 2, 1));
     // p->io_read_calls = (p->io_read_calls_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     // last = p->io_write_calls_raw;
-    // p->io_write_calls_raw = strtoull(procfile_lineword(ff, 3, 1), NULL, 10);
+    // p->io_write_calls_raw = str2ull(procfile_lineword(ff, 3, 1));
     // p->io_write_calls = (p->io_write_calls_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_storage_bytes_read_raw;
-    p->io_storage_bytes_read_raw = strtoull(procfile_lineword(ff, 4, 1), NULL, 10);
+    p->io_storage_bytes_read_raw = str2ull(procfile_lineword(ff, 4, 1));
     p->io_storage_bytes_read = (p->io_storage_bytes_read_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_storage_bytes_written_raw;
-    p->io_storage_bytes_written_raw = strtoull(procfile_lineword(ff, 5, 1), NULL, 10);
+    p->io_storage_bytes_written_raw = str2ull(procfile_lineword(ff, 5, 1));
     p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     // last = p->io_cancelled_write_bytes_raw;
-    // p->io_cancelled_write_bytes_raw = strtoull(procfile_lineword(ff, 6, 1), NULL, 10);
+    // p->io_cancelled_write_bytes_raw = str2ull(procfile_lineword(ff, 6, 1));
     // p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     if(unlikely(global_iterations_counter == 1)) {
@@ -870,26 +874,26 @@ static inline int read_proc_stat() {
     unsigned long long last;
 
     last = utime_raw;
-    utime_raw = strtoull(procfile_lineword(ff, 0, 1), NULL, 10);
+    utime_raw = str2ull(procfile_lineword(ff, 0, 1));
     global_utime = (utime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     // nice time, on user time
     last = ntime_raw;
-    ntime_raw = strtoull(procfile_lineword(ff, 0, 2), NULL, 10);
+    ntime_raw = str2ull(procfile_lineword(ff, 0, 2));
     global_utime += (ntime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     last = stime_raw;
-    stime_raw = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
+    stime_raw = str2ull(procfile_lineword(ff, 0, 3));
     global_stime = (stime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     last = gtime_raw;
-    gtime_raw = strtoull(procfile_lineword(ff, 0, 10), NULL, 10);
+    gtime_raw = str2ull(procfile_lineword(ff, 0, 10));
     global_gtime = (gtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     if(enable_guest_charts) {
         // guest nice time, on guest time
         last = gntime_raw;
-        gntime_raw = strtoull(procfile_lineword(ff, 0, 11), NULL, 10);
+        gntime_raw = str2ull(procfile_lineword(ff, 0, 11));
         global_gtime += (gntime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
         // remove guest time from user time
@@ -1019,70 +1023,60 @@ static inline void file_descriptor_not_used(int id)
     else    error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)", id, all_files_size);
 }
 
-static inline int file_descriptor_find_or_add(const char *name)
-{
-    static int last_pos = 0;
-    uint32_t hash = simple_hash(name);
+static inline void all_files_grow() {
+    void *old = all_files;
+    int i;
 
+    // there is no empty slot
     if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %u\n", name, hash);
+        fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
 
-    struct file_descriptor *fd = file_descriptor_find(name, hash);
-    if(fd) {
-        // found
+    all_files = reallocz(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
+
+    // if the address changed, we have to rebuild the index
+    // since all pointers are now invalid
+
+    if(unlikely(old && old != (void *)all_files)) {
         if(unlikely(debug))
-            fprintf(stderr, "apps.plugin:   >> found on slot %d\n", fd->pos);
+            fprintf(stderr, "apps.plugin:   >> re-indexing.\n");
 
-        fd->count++;
-        return fd->pos;
-    }
-    // not found
-
-    // check we have enough memory to add it
-    if(!all_files || all_files_len == all_files_size) {
-        void *old = all_files;
-        int i;
-
-        // there is no empty slot
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
-
-        all_files = reallocz(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
-
-        // if the address changed, we have to rebuild the index
-        // since all pointers are now invalid
-        if(old && old != (void *)all_files) {
-            if(unlikely(debug))
-                fprintf(stderr, "apps.plugin:   >> re-indexing.\n");
-
-            all_files_index.root = NULL;
-            for(i = 0; i < all_files_size; i++) {
-                if(!all_files[i].count) continue;
-                if(unlikely(file_descriptor_add(&all_files[i]) != (void *)&all_files[i]))
-                    error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
-            }
-
-            if(unlikely(debug))
-                fprintf(stderr, "apps.plugin:   >> re-indexing done.\n");
+        all_files_index.root = NULL;
+        for(i = 0; i < all_files_size; i++) {
+            if(!all_files[i].count) continue;
+            if(unlikely(file_descriptor_add(&all_files[i]) != (void *)&all_files[i]))
+                error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
         }
 
-        for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
-            all_files[i].count = 0;
-            all_files[i].name = NULL;
+        if(unlikely(debug))
+            fprintf(stderr, "apps.plugin:   >> re-indexing done.\n");
+    }
+
+    // initialize the newly added entries
+
+    for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
+        all_files[i].count = 0;
+        all_files[i].name = NULL;
 #ifdef NETDATA_INTERNAL_CHECKS
-            all_files[i].magic = 0x00000000;
+        all_files[i].magic = 0x00000000;
 #endif /* NETDATA_INTERNAL_CHECKS */
-            all_files[i].pos = i;
-        }
-
-        if(!all_files_size) all_files_len = 1;
-        all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
+        all_files[i].pos = i;
     }
+
+    if(unlikely(!all_files_size)) all_files_len = 1;
+    all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
+}
+
+static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t hash, int type) {
+    // check we have enough memory to add it
+    if(!all_files || all_files_len == all_files_size)
+        all_files_grow();
 
     if(unlikely(debug))
         fprintf(stderr, "apps.plugin:   >> searching for empty slot.\n");
 
     // search for an empty slot
+
+    static int last_pos = 0;
     int i, c;
     for(i = 0, c = last_pos ; i < all_files_size ; i++, c++) {
         if(c >= all_files_size) c = 0;
@@ -1100,23 +1094,58 @@ static inline int file_descriptor_find_or_add(const char *name)
             if(unlikely(debug))
                 fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
 
-            if(all_files[c].name) freez((void *)all_files[c].name);
+            freez((void *)all_files[c].name);
             all_files[c].name = NULL;
             last_pos = c;
             break;
         }
     }
+
+    all_files_len++;
+
     if(i == all_files_size) {
         fatal("We should find an empty slot, but there isn't any");
         exit(1);
     }
+    // else we have an empty slot in 'c'
 
     if(unlikely(debug))
         fprintf(stderr, "apps.plugin:   >> updating slot %d.\n", c);
 
-    all_files_len++;
+    all_files[c].name = strdupz(name);
+    all_files[c].hash = hash;
+    all_files[c].type = type;
+    all_files[c].pos  = c;
+    all_files[c].count = 1;
+#ifdef NETDATA_INTERNAL_CHECKS
+    all_files[c].magic = 0x0BADCAFE;
+#endif /* NETDATA_INTERNAL_CHECKS */
+    if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
+        error("INTERNAL ERROR: duplicate indexing of fd.");
 
-    // else we have an empty slot in 'c'
+    if(unlikely(debug))
+        fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
+
+    return c;
+}
+
+static inline int file_descriptor_find_or_add(const char *name)
+{
+    uint32_t hash = simple_hash(name);
+
+    if(unlikely(debug))
+        fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %u\n", name, hash);
+
+    struct file_descriptor *fd = file_descriptor_find(name, hash);
+    if(fd) {
+        // found
+        if(unlikely(debug))
+            fprintf(stderr, "apps.plugin:   >> found on slot %d\n", fd->pos);
+
+        fd->count++;
+        return fd->pos;
+    }
+    // not found
 
     int type;
     if(name[0] == '/') type = FILETYPE_FILE;
@@ -1140,21 +1169,7 @@ static inline int file_descriptor_find_or_add(const char *name)
         type = FILETYPE_OTHER;
     }
 
-    all_files[c].name = strdupz(name);
-    all_files[c].hash = hash;
-    all_files[c].type = type;
-    all_files[c].pos  = c;
-    all_files[c].count = 1;
-#ifdef NETDATA_INTERNAL_CHECKS
-    all_files[c].magic = 0x0BADCAFE;
-#endif /* NETDATA_INTERNAL_CHECKS */
-    if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
-        error("INTERNAL ERROR: duplicate indexing of fd.");
-
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
-
-    return c;
+    return file_descriptor_set_on_empty_slot(name, hash, type);
 }
 
 static inline int read_pid_file_descriptors(struct pid_stat *p) {
@@ -1177,22 +1192,18 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
                 continue;
 
             // check if the fds array is small
-            int fdid = atoi(de->d_name);
+            int fdid = (int)str2l(de->d_name);
             if(fdid < 0) continue;
             if(fdid >= p->fds_size) {
                 // it is small, extend it
                 if(unlikely(debug))
-                    fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + 100);
+                    fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
 
-                p->fds = reallocz(p->fds, (fdid + 100) * sizeof(int));
-                if(!p->fds) {
-                    fatal("Cannot re-allocate fds for %s", p->comm);
-                    break;
-                }
+                p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
 
                 // and initialize it
-                for(c = p->fds_size ; c < (fdid + 100) ; c++) p->fds[c] = 0;
-                p->fds_size = fdid + 100;
+                for(c = p->fds_size ; c < (fdid + MAX_SPARE_FDS) ; c++) p->fds[c] = 0;
+                p->fds_size = fdid + MAX_SPARE_FDS;
             }
 
             if(p->fds[fdid] == 0) {
@@ -1914,9 +1925,6 @@ static long zero_all_targets(struct target *root) {
     for (w = root; w ; w = w->next) {
         count++;
 
-        if(w->fds) freez(w->fds);
-        w->fds = NULL;
-
         w->minflt = 0;
         w->majflt = 0;
         w->utime = 0;
@@ -1946,16 +1954,115 @@ static long zero_all_targets(struct target *root) {
         w->io_storage_bytes_read = 0;
         w->io_storage_bytes_written = 0;
         // w->io_cancelled_write_bytes = 0;
+
+        // zero file counters
+        if(w->target_fds) {
+            memset(w->target_fds, 0, sizeof(int) * w->target_fds_size);
+            w->openfiles = 0;
+            w->openpipes = 0;
+            w->opensockets = 0;
+            w->openinotifies = 0;
+            w->openeventfds = 0;
+            w->opentimerfds = 0;
+            w->opensignalfds = 0;
+            w->openeventpolls = 0;
+            w->openother = 0;
+        }
     }
 
     return count;
 }
 
+static inline void reallocate_target_fds(struct target *w) {
+    w->target_fds = reallocz(w->target_fds, sizeof(int) * all_files_size);
+    memset(&w->target_fds[w->target_fds_size], 0, sizeof(int) * (all_files_size - w->target_fds_size));
+    w->target_fds_size = all_files_size;
+}
+
+static inline void add_fd_on_target(int type, struct target *w) {
+    switch(type) {
+        case FILETYPE_FILE:
+            w->openfiles++;
+            break;
+
+        case FILETYPE_PIPE:
+            w->openpipes++;
+            break;
+
+        case FILETYPE_SOCKET:
+            w->opensockets++;
+            break;
+
+        case FILETYPE_INOTIFY:
+            w->openinotifies++;
+            break;
+
+        case FILETYPE_EVENTFD:
+            w->openeventfds++;
+            break;
+
+        case FILETYPE_TIMERFD:
+            w->opentimerfds++;
+            break;
+
+        case FILETYPE_SIGNALFD:
+            w->opensignalfds++;
+            break;
+
+        case FILETYPE_EVENTPOLL:
+            w->openeventpolls++;
+            break;
+
+        default:
+            w->openother++;
+            break;
+    }
+}
+
+static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
+    struct target *w = p->target, *u = p->user_target, *g = p->group_target;
+
+    if(unlikely(w && (!w->target_fds || w->target_fds_size < all_files_size)))
+        reallocate_target_fds(w);
+
+    if(unlikely(u && (!u->target_fds || u->target_fds_size < all_files_size)))
+        reallocate_target_fds(u);
+
+    if(unlikely(g && (!g->target_fds || g->target_fds_size < all_files_size)))
+        reallocate_target_fds(g);
+
+    int c, size = p->fds_size, *fds = p->fds;
+    for(c = 0; c < size ;c++) {
+        int fd = fds[c];
+
+        if(likely(fd <= 0 || fd >= all_files_size))
+            continue;
+
+        if(likely(w)) {
+            if(unlikely(!w->target_fds[fd]))
+                add_fd_on_target(all_files[fd].type, w);
+
+            w->target_fds[fd]++;
+        }
+
+        if(likely(u)) {
+            if(unlikely(!u->target_fds[fd]))
+                add_fd_on_target(all_files[fd].type, u);
+
+            u->target_fds[fd]++;
+        }
+
+        if(likely(g)) {
+            if(unlikely(!g->target_fds[fd]))
+                add_fd_on_target(all_files[fd].type, g);
+
+            g->target_fds[fd]++;
+        }
+    }
+}
+
 static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
     (void)o;
-
-    if(unlikely(!w->fds))
-        w->fds = callocz(sizeof(int), (size_t) all_files_size);
 
     if(likely(p->updated)) {
         w->cutime  += p->cutime;
@@ -1991,83 +2098,8 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
         w->processes++;
         w->num_threads += p->num_threads;
 
-        if(likely(w->fds)) {
-            int c;
-            for(c = 0; c < p->fds_size ;c++) {
-                if(p->fds[c] == 0) continue;
-
-                if(likely(p->fds[c] < all_files_size)) {
-                    if(w->fds) w->fds[p->fds[c]]++;
-                }
-                else
-                    error("Invalid fd number %d", p->fds[c]);
-            }
-        }
-
         if(unlikely(debug || w->debug))
             fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=%llu, stime=%llu, gtime=%llu, cutime=%llu, cstime=%llu, cgtime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-    }
-}
-
-static inline void count_targets_fds(struct target *root) {
-    int c;
-    struct target *w;
-
-    for (w = root; w ; w = w->next) {
-        if(!w->fds) continue;
-
-        w->openfiles = 0;
-        w->openpipes = 0;
-        w->opensockets = 0;
-        w->openinotifies = 0;
-        w->openeventfds = 0;
-        w->opentimerfds = 0;
-        w->opensignalfds = 0;
-        w->openeventpolls = 0;
-        w->openother = 0;
-
-        for(c = 1; c < all_files_size ;c++) {
-            if(w->fds[c] > 0)
-                switch(all_files[c].type) {
-                case FILETYPE_FILE:
-                    w->openfiles++;
-                    break;
-
-                case FILETYPE_PIPE:
-                    w->openpipes++;
-                    break;
-
-                case FILETYPE_SOCKET:
-                    w->opensockets++;
-                    break;
-
-                case FILETYPE_INOTIFY:
-                    w->openinotifies++;
-                    break;
-
-                case FILETYPE_EVENTFD:
-                    w->openeventfds++;
-                    break;
-
-                case FILETYPE_TIMERFD:
-                    w->opentimerfds++;
-                    break;
-
-                case FILETYPE_SIGNALFD:
-                    w->opensignalfds++;
-                    break;
-
-                case FILETYPE_EVENTPOLL:
-                    w->openeventpolls++;
-                    break;
-
-                default:
-                    w->openother++;
-            }
-        }
-
-        freez(w->fds);
-        w->fds = NULL;
     }
 }
 
@@ -2084,9 +2116,11 @@ static void calculate_netdata_statistics(void) {
 
     // concentrate everything on the apps_groups_targets
     for(p = root_of_pids; p ; p = p->next) {
+        if(!p->updated) continue;
 
         // --------------------------------------------------------------------
-        // apps_groups targets
+        // assign apps_groups target
+
         if(likely(p->target))
             aggregate_pid_on_target(p->target, p, NULL);
         else
@@ -2094,7 +2128,8 @@ static void calculate_netdata_statistics(void) {
 
 
         // --------------------------------------------------------------------
-        // user targets
+        // assign user target
+
         o = p->user_target;
         if(likely(p->user_target && p->user_target->uid == p->uid))
             w = p->user_target;
@@ -2112,7 +2147,8 @@ static void calculate_netdata_statistics(void) {
 
 
         // --------------------------------------------------------------------
-        // group targets
+        // assign group target
+
         o = p->group_target;
         if(likely(p->group_target && p->group_target->gid == p->gid))
             w = p->group_target;
@@ -2128,11 +2164,13 @@ static void calculate_netdata_statistics(void) {
         else
             error("pid %d %s was left without a group target!", p->pid, p->comm);
 
-    }
 
-    count_targets_fds(apps_groups_root_target);
-    count_targets_fds(users_root_target);
-    count_targets_fds(groups_root_target);
+        // --------------------------------------------------------------------
+        // aggregate all file descriptors
+
+        if(enable_file_charts)
+            aggregate_pid_fds_on_targets(p);
+    }
 
     cleanup_exited_pids();
 }
@@ -2677,7 +2715,7 @@ static void parse_args(int argc, char **argv)
 
     for(i = 1; i < argc; i++) {
         if(!freq) {
-            int n = atoi(argv[i]);
+            int n = (int)str2l(argv[i]);
             if(n > 0) {
                 freq = n;
                 continue;
@@ -2737,35 +2775,38 @@ static void parse_args(int argc, char **argv)
 
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
-                    "apps.plugin %s\n"
-                    "(C) 2016 Costa Tsaousis"
-                    "GPL v3+\n"
-                    "This program is a data collector plugin for netdata.\n"
                     "\n"
-                    "Valid command line options:\n"
+                    " netdata apps.plugin %s\n"
+                    " Copyright (C) 2016-2017 Costa Tsaousis <costa@tsaousis.gr>\n"
+                    " Released under GNU Public License v3 or later.\n"
+                    " All rights reserved.\n"
                     "\n"
-                    "SECONDS           set the data collection frequency\n"
+                    " This program is a data collector plugin for netdata.\n"
                     "\n"
-                    "debug             enable debugging (lot of output)\n"
+                    " Valid command line options:\n"
                     "\n"
-                    "with-childs\n"
-                    "without-childs    enable / disable aggregating exited\n"
-                    "                  children resources into parents\n"
-                    "                  (default is enabled)\n"
+                    " SECONDS           set the data collection frequency\n"
                     "\n"
-                    "with-guest\n"
-                    "without-guest     enable / disable reporting guest charts\n"
-                    "                  (default is disabled)\n"
+                    " debug             enable debugging (lot of output)\n"
                     "\n"
-                    "with-files\n"
-                    "without-files     enable / disable reporting files, sockets, pipes\n"
-                    "                  (default is enabled)\n"
+                    " with-childs\n"
+                    " without-childs    enable / disable aggregating exited\n"
+                    "                   children resources into parents\n"
+                    "                   (default is enabled)\n"
                     "\n"
-                    "NAME              read apps_NAME.conf instead of\n"
-                    "                  apps_groups.conf\n"
-                    "                  (default NAME=groups)\n"
+                    " with-guest\n"
+                    " without-guest     enable / disable reporting guest charts\n"
+                    "                   (default is disabled)\n"
                     "\n"
-                    "version           print program version and exit\n"
+                    " with-files\n"
+                    " without-files     enable / disable reporting files, sockets, pipes\n"
+                    "                   (default is enabled)\n"
+                    "\n"
+                    " NAME              read apps_NAME.conf instead of\n"
+                    "                   apps_groups.conf\n"
+                    "                   (default NAME=groups)\n"
+                    "\n"
+                    " version           print program version and exit\n"
                     "\n"
                     , VERSION
             );
@@ -2879,10 +2920,17 @@ int main(int argc, char **argv)
         usec_t now = now_realtime_usec();
         usec_t next = now - (now % step) + step;
 
+#ifdef NETDATA_PROFILING
+#warning "compiling for profiling"
+        static int profiling_count=0;
+        profiling_count++;
+        if(unlikely(profiling_count > 1000)) exit(0);
+#else
         while(now < next) {
             sleep_usec(next - now);
             now = now_realtime_usec();
         }
+#endif
 
         if(!collect_data_for_all_processes_from_proc()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");

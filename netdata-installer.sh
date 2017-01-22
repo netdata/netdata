@@ -22,7 +22,8 @@ processors=$(cat /proc/cpuinfo  | grep ^processor | wc -l)
 [ $(( processors )) -lt 1 ] && processors=1
 
 # you can set CFLAGS before running installer
-CFLAGS="${CFLAGS--O3}"
+CFLAGS="${CFLAGS--O2}"
+[ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
 
 # keep a log of this command
 printf "\n# " >>netdata-installer.log
@@ -112,7 +113,7 @@ Valid <installer options> are:
         Use this option to allow it continue
         without checking pkg-config.
 
-Netdata will by default be compiled with gcc optimization -O3
+Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
 
   CFLAGS="<gcc options>" ${ME} <installer options>

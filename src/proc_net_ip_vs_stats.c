@@ -1,7 +1,6 @@
 #include "common.h"
 
 #define RRD_TYPE_NET_IPVS           "ipvs"
-#define RRD_TYPE_NET_IPVS_LEN       strlen(RRD_TYPE_NET_IPVS)
 
 int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     static int do_bandwidth = -1, do_sockets = -1, do_packets = -1;

@@ -282,13 +282,13 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             ae->info = strdupz(pointers[20]);
             if(!*ae->info) { freez(ae->info); ae->info = NULL; }
 
-            ae->exec_code   = atoi(pointers[21]);
-            ae->new_status  = atoi(pointers[22]);
-            ae->old_status  = atoi(pointers[23]);
-            ae->delay       = atoi(pointers[24]);
+            ae->exec_code   = str2i(pointers[21]);
+            ae->new_status  = str2i(pointers[22]);
+            ae->old_status  = str2i(pointers[23]);
+            ae->delay       = str2i(pointers[24]);
 
-            ae->new_value   = strtold(pointers[25], NULL);
-            ae->old_value   = strtold(pointers[26], NULL);
+            ae->new_value   = str2l(pointers[25]);
+            ae->old_value   = str2l(pointers[26]);
 
             // add it to host if not already there
             if(unlikely(*pointers[0] == 'A')) {

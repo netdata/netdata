@@ -1,6 +1,6 @@
 # Netdata
 
-Copyright 2014-2016, Costa Tsaousis.
+Copyright 2016-2017, Costa Tsaousis.
 Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
 
 ---

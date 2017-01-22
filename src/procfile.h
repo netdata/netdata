@@ -30,8 +30,8 @@
 // An array of words
 
 typedef struct {
-    uint32_t len;   // used entries
-    uint32_t size;  // capacity
+    size_t len;     // used entries
+    size_t size;    // capacity
     char *words[];  // array of pointers
 } pfwords;
 
@@ -40,15 +40,15 @@ typedef struct {
 // An array of lines
 
 typedef struct {
-    uint32_t words;     // how many words this line has
-    uint32_t first;     // the id of the first word of this line
-                // in the words array
+    size_t words;   // how many words this line has
+    size_t first;   // the id of the first word of this line
+                    // in the words array
 } ffline;
 
 typedef struct {
-    uint32_t len;       // used entries
-    uint32_t size;      // capacity
-    ffline lines[];     // array of lines
+    size_t len;     // used entries
+    size_t size;    // capacity
+    ffline lines[]; // array of lines
 } pflines;
 
 
@@ -61,13 +61,13 @@ typedef struct {
 typedef struct {
     char filename[FILENAME_MAX + 1];
     uint32_t flags;
-    int fd;         // the file desriptor
-    size_t len;     // the bytes we have placed into data
-    size_t size;        // the bytes we have allocated for data
+    int fd;               // the file desriptor
+    size_t len;           // the bytes we have placed into data
+    size_t size;          // the bytes we have allocated for data
     pflines *lines;
     pfwords *words;
     char separators[256];
-    char data[];        // allocated buffer to keep file contents
+    char data[];          // allocated buffer to keep file contents
 } procfile;
 
 // close the proc file and free all related memory

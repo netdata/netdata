@@ -161,17 +161,19 @@ void kill_childs()
         pthread_cancel(w->thread);
         // it is detached
         // pthread_join(w->thread, NULL);
+
+        w->obsolete = 1;
     }
 
     int i;
     for (i = 0; static_threads[i].name != NULL ; i++) {
-        if(static_threads[i].enabled && static_threads[i].thread) {
+        if(static_threads[i].enabled) {
             info("Stopping %s thread", static_threads[i].name);
             pthread_cancel(*static_threads[i].thread);
             // it is detached
             // pthread_join(*static_threads[i].thread, NULL);
 
-            static_threads[i].thread = NULL;
+            static_threads[i].enabled = 0;
         }
     }
 
@@ -179,19 +181,15 @@ void kill_childs()
         info("Killing tc-qos-helper process %d", tc_child_pid);
         if(killpid(tc_child_pid, SIGTERM) != -1)
             waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
+
+        tc_child_pid = 0;
     }
-    tc_child_pid = 0;
 
     struct plugind *cd;
     for(cd = pluginsd_root ; cd ; cd = cd->next) {
         if(cd->enabled && !cd->obsolete) {
-            if(cd->thread != (pthread_t)NULL) {
-                info("Stopping %s plugin thread", cd->id);
-                pthread_cancel(cd->thread);
-                // they are detached
-                // pthread_join(cd->thread, NULL);
-                cd->thread = (pthread_t)NULL;
-            }
+            info("Stopping %s plugin thread", cd->id);
+            pthread_cancel(cd->thread);
 
             if(cd->pid) {
                 info("killing %s plugin child process pid %d", cd->id, cd->pid);
@@ -257,7 +255,7 @@ void help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2017, Costa Tsaousis <costa@tsaousis.gr>\n"
+            " Copyright (C) 2016-2017, Costa Tsaousis <costa@tsaousis.gr>\n"
             " Released under GNU Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
