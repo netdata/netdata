@@ -1722,7 +1722,7 @@ static int collect_data_for_all_processes_from_proc(void) {
         }
 
         if(include_exited_childs) {
-            qsort((void *)all_pids_sortlist, all_pids_count, sizeof(pid_t), compar_pid);
+            qsort((void *)all_pids_sortlist, (size_t)all_pids_count, sizeof(pid_t), compar_pid);
             for(slc = 0; slc < all_pids_count; slc++)
                 collect_data_for_pid(all_pids_sortlist[slc]);
         }
@@ -1974,13 +1974,32 @@ static long zero_all_targets(struct target *root) {
 }
 
 static inline void reallocate_target_fds(struct target *w) {
-    w->target_fds = reallocz(w->target_fds, sizeof(int) * all_files_size);
-    memset(&w->target_fds[w->target_fds_size], 0, sizeof(int) * (all_files_size - w->target_fds_size));
-    w->target_fds_size = all_files_size;
+    if(unlikely(!w))
+        return;
+
+    if(unlikely(!w->target_fds || w->target_fds_size < all_files_size)) {
+        w->target_fds = reallocz(w->target_fds, sizeof(int) * all_files_size);
+        memset(&w->target_fds[w->target_fds_size], 0, sizeof(int) * (all_files_size - w->target_fds_size));
+        w->target_fds_size = all_files_size;
+    }
 }
 
-static inline void add_fd_on_target(int type, struct target *w) {
-    switch(type) {
+static inline void aggregate_fd_on_target(int fd, struct target *w) {
+    if(unlikely(!w))
+        return;
+
+    if(unlikely(w->target_fds[fd])) {
+        // it is already aggregated
+        // just increase its usage counter
+        w->target_fds[fd]++;
+        return;
+    }
+
+    // increase its usage counter
+    // so that we will not add it again
+    w->target_fds[fd]++;
+
+    switch(all_files[fd].type) {
         case FILETYPE_FILE:
             w->openfiles++;
             break;
@@ -2020,16 +2039,17 @@ static inline void add_fd_on_target(int type, struct target *w) {
 }
 
 static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
+
+    if(unlikely(!p->updated)) {
+        // the process is not running
+        return;
+    }
+
     struct target *w = p->target, *u = p->user_target, *g = p->group_target;
 
-    if(unlikely(w && (!w->target_fds || w->target_fds_size < all_files_size)))
-        reallocate_target_fds(w);
-
-    if(unlikely(u && (!u->target_fds || u->target_fds_size < all_files_size)))
-        reallocate_target_fds(u);
-
-    if(unlikely(g && (!g->target_fds || g->target_fds_size < all_files_size)))
-        reallocate_target_fds(g);
+    reallocate_target_fds(w);
+    reallocate_target_fds(u);
+    reallocate_target_fds(g);
 
     int c, size = p->fds_size, *fds = p->fds;
     for(c = 0; c < size ;c++) {
@@ -2038,72 +2058,64 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         if(likely(fd <= 0 || fd >= all_files_size))
             continue;
 
-        if(likely(w)) {
-            if(unlikely(!w->target_fds[fd]))
-                add_fd_on_target(all_files[fd].type, w);
-
-            w->target_fds[fd]++;
-        }
-
-        if(likely(u)) {
-            if(unlikely(!u->target_fds[fd]))
-                add_fd_on_target(all_files[fd].type, u);
-
-            u->target_fds[fd]++;
-        }
-
-        if(likely(g)) {
-            if(unlikely(!g->target_fds[fd]))
-                add_fd_on_target(all_files[fd].type, g);
-
-            g->target_fds[fd]++;
-        }
+        aggregate_fd_on_target(all_files[fd].type, w);
+        aggregate_fd_on_target(all_files[fd].type, u);
+        aggregate_fd_on_target(all_files[fd].type, g);
     }
 }
 
 static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
     (void)o;
 
-    if(likely(p->updated)) {
-        w->cutime  += p->cutime;
-        w->cstime  += p->cstime;
-        w->cgtime  += p->cgtime;
-        w->cminflt += p->cminflt;
-        w->cmajflt += p->cmajflt;
-
-        w->utime  += p->utime;
-        w->stime  += p->stime;
-        w->gtime  += p->gtime;
-        w->minflt += p->minflt;
-        w->majflt += p->majflt;
-
-        // w->rss += p->rss;
-
-        w->statm_size += p->statm_size;
-        w->statm_resident += p->statm_resident;
-        w->statm_share += p->statm_share;
-        // w->statm_text += p->statm_text;
-        // w->statm_lib += p->statm_lib;
-        // w->statm_data += p->statm_data;
-        // w->statm_dirty += p->statm_dirty;
-
-        w->io_logical_bytes_read    += p->io_logical_bytes_read;
-        w->io_logical_bytes_written += p->io_logical_bytes_written;
-        // w->io_read_calls            += p->io_read_calls;
-        // w->io_write_calls           += p->io_write_calls;
-        w->io_storage_bytes_read    += p->io_storage_bytes_read;
-        w->io_storage_bytes_written += p->io_storage_bytes_written;
-        // w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
-
-        w->processes++;
-        w->num_threads += p->num_threads;
-
-        if(unlikely(debug || w->debug))
-            fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=%llu, stime=%llu, gtime=%llu, cutime=%llu, cstime=%llu, cgtime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+    if(unlikely(!p->updated)) {
+        // the process is not running
+        return;
     }
+
+    if(unlikely(!w)) {
+        error("pid %d %s was left without a target!", p->pid, p->comm);
+        return;
+    }
+
+    w->cutime  += p->cutime;
+    w->cstime  += p->cstime;
+    w->cgtime  += p->cgtime;
+    w->cminflt += p->cminflt;
+    w->cmajflt += p->cmajflt;
+
+    w->utime  += p->utime;
+    w->stime  += p->stime;
+    w->gtime  += p->gtime;
+    w->minflt += p->minflt;
+    w->majflt += p->majflt;
+
+    // w->rss += p->rss;
+
+    w->statm_size += p->statm_size;
+    w->statm_resident += p->statm_resident;
+    w->statm_share += p->statm_share;
+    // w->statm_text += p->statm_text;
+    // w->statm_lib += p->statm_lib;
+    // w->statm_data += p->statm_data;
+    // w->statm_dirty += p->statm_dirty;
+
+    w->io_logical_bytes_read    += p->io_logical_bytes_read;
+    w->io_logical_bytes_written += p->io_logical_bytes_written;
+    // w->io_read_calls            += p->io_read_calls;
+    // w->io_write_calls           += p->io_write_calls;
+    w->io_storage_bytes_read    += p->io_storage_bytes_read;
+    w->io_storage_bytes_written += p->io_storage_bytes_written;
+    // w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
+
+    w->processes++;
+    w->num_threads += p->num_threads;
+
+    if(unlikely(debug || w->debug))
+        fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=%llu, stime=%llu, gtime=%llu, cutime=%llu, cstime=%llu, cgtime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 }
 
 static void calculate_netdata_statistics(void) {
+
     apply_apps_groups_targets_inheritance();
 
     zero_all_targets(users_root_target);
@@ -2114,21 +2126,17 @@ static void calculate_netdata_statistics(void) {
     struct pid_stat *p = NULL;
     struct target *w = NULL, *o = NULL;
 
-    // concentrate everything on the apps_groups_targets
+    // concentrate everything on the targets
     for(p = root_of_pids; p ; p = p->next) {
-        if(!p->updated) continue;
 
         // --------------------------------------------------------------------
-        // assign apps_groups target
+        // apps_groups target
 
-        if(likely(p->target))
-            aggregate_pid_on_target(p->target, p, NULL);
-        else
-            error("pid %d %s was left without a target!", p->pid, p->comm);
+        aggregate_pid_on_target(p->target, p, NULL);
 
 
         // --------------------------------------------------------------------
-        // assign user target
+        // user target
 
         o = p->user_target;
         if(likely(p->user_target && p->user_target->uid == p->uid))
@@ -2140,14 +2148,11 @@ static void calculate_netdata_statistics(void) {
             w = p->user_target = get_users_target(p->uid);
         }
 
-        if(likely(w))
-            aggregate_pid_on_target(w, p, o);
-        else
-            error("pid %d %s was left without a user target!", p->pid, p->comm);
+        aggregate_pid_on_target(w, p, o);
 
 
         // --------------------------------------------------------------------
-        // assign group target
+        // user group target
 
         o = p->group_target;
         if(likely(p->group_target && p->group_target->gid == p->gid))
@@ -2159,10 +2164,7 @@ static void calculate_netdata_statistics(void) {
             w = p->group_target = get_groups_target(p->gid);
         }
 
-        if(likely(w))
-            aggregate_pid_on_target(w, p, o);
-        else
-            error("pid %d %s was left without a group target!", p->pid, p->comm);
+        aggregate_pid_on_target(w, p, o);
 
 
         // --------------------------------------------------------------------
@@ -2178,32 +2180,18 @@ static void calculate_netdata_statistics(void) {
 // ----------------------------------------------------------------------------
 // update chart dimensions
 
-BUFFER *output = NULL;
 int print_calculated_number(char *str, calculated_number value) { (void)str; (void)value; return 0; }
 
 static inline void send_BEGIN(const char *type, const char *id, unsigned long long usec) {
-    // fprintf(stdout, "BEGIN %s.%s %llu\n", type, id, usec);
-    buffer_strcat(output, "BEGIN ");
-    buffer_strcat(output, type);
-    buffer_strcat(output, ".");
-    buffer_strcat(output, id);
-    buffer_strcat(output, " ");
-    buffer_print_llu(output, usec);
-    buffer_strcat(output, "\n");
+    fprintf(stdout, "BEGIN %s.%s %llu\n", type, id, usec);
 }
 
 static inline void send_SET(const char *name, unsigned long long value) {
-    // fprintf(stdout, "SET %s = %llu\n", name, value);
-    buffer_strcat(output, "SET ");
-    buffer_strcat(output, name);
-    buffer_strcat(output, " = ");
-    buffer_print_llu(output, value);
-    buffer_strcat(output, "\n");
+    fprintf(stdout, "SET %s = %llu\n", name, value);
 }
 
 static inline void send_END(void) {
-    // fprintf(stdout, "END\n");
-    buffer_strcat(output, "END\n");
+    fprintf(stdout, "END\n");
 }
 
 double utime_fix_ratio = 1.0, stime_fix_ratio = 1.0, gtime_fix_ratio = 1.0, cutime_fix_ratio = 1.0, cstime_fix_ratio = 1.0, cgtime_fix_ratio = 1.0;
@@ -2243,7 +2231,7 @@ static usec_t send_resource_usage_to_netdata() {
         memmove(&me_last, &me, sizeof(struct rusage));
     }
 
-    buffer_sprintf(output,
+    fprintf(stdout,
         "BEGIN netdata.apps_cpu %llu\n"
         "SET user = %llu\n"
         "SET system = %llu\n"
@@ -2278,7 +2266,7 @@ static usec_t send_resource_usage_to_netdata() {
         );
 
     if(include_exited_childs)
-        buffer_sprintf(output,
+        fprintf(stdout,
             "BEGIN netdata.apps_children_fix %llu\n"
             "SET cutime = %llu\n"
             "SET cstime = %llu\n"
@@ -2594,112 +2582,112 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
     // we have something new to show
     // update the charts
-    buffer_sprintf(output, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
     }
 
-    buffer_sprintf(output, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
+            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
     }
 
-    buffer_sprintf(output, "CHART %s.vmem '' '%s Virtual Memory Size' 'MB' mem %s.vmem stacked 20004 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MB' mem %s.vmem stacked 20004 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
+            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
     }
 
-    buffer_sprintf(output, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20005 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20005 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    buffer_sprintf(output, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20004 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20004 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    buffer_sprintf(output, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
     }
 
-    buffer_sprintf(output, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
     }
 
     if(show_guest_time) {
-        buffer_sprintf(output, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
+        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
         for (w = root; w; w = w->next) {
             if(unlikely(w->exposed))
-                buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
+                fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, hz * RATES_DETAIL / 100LLU);
         }
     }
 
-    buffer_sprintf(output, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
 
-    buffer_sprintf(output, "CHART %s.minor_faults '' '%s Minor Page Faults' 'page faults/s' mem %s.minor_faults stacked 20011 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.minor_faults '' '%s Minor Page Faults' 'page faults/s' mem %s.minor_faults stacked 20011 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
 
-    buffer_sprintf(output, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 
-    buffer_sprintf(output, "CHART %s.lwrites '' '%s I/O Logical Writes' 'kilobytes/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'kilobytes/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 
-    buffer_sprintf(output, "CHART %s.preads '' '%s Disk Reads' 'kilobytes/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'kilobytes/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 
-    buffer_sprintf(output, "CHART %s.pwrites '' '%s Disk Writes' 'kilobytes/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'kilobytes/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            buffer_sprintf(output, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 
     if(enable_file_charts) {
-        buffer_sprintf(output, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type,
+        fprintf(stdout, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type,
                        title, type, update_every);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
-                buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
+                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
 
-        buffer_sprintf(output, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n",
+        fprintf(stdout, "CHART %s.sockets '' '%s Open Sockets' 'open sockets' net %s.sockets stacked 20051 %d\n",
                        type, title, type, update_every);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
-                buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
+                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
 
-        buffer_sprintf(output, "CHART %s.pipes '' '%s Pipes' 'open pipes' processes %s.pipes stacked 20053 %d\n", type,
+        fprintf(stdout, "CHART %s.pipes '' '%s Pipes' 'open pipes' processes %s.pipes stacked 20053 %d\n", type,
                        title, type, update_every);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
-                buffer_sprintf(output, "DIMENSION %s '' absolute 1 1\n", w->name);
+                fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
         }
     }
 }
@@ -2882,8 +2870,7 @@ int main(int argc, char **argv)
     all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);
     all_pids = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
 
-    output = buffer_create(1024);
-    buffer_sprintf(output,
+    fprintf(stdout,
         "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
         "DIMENSION user '' incremental 1 1000\n"
         "DIMENSION system '' incremental 1 1000\n"
@@ -2903,7 +2890,7 @@ int main(int argc, char **argv)
         );
 
     if(include_exited_childs)
-        buffer_sprintf(output,
+        fprintf(stdout,
             "CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
             "DIMENSION cutime '' absolute 1 %2$llu\n"
             "DIMENSION cstime '' absolute 1 %2$llu\n"
@@ -2960,13 +2947,9 @@ int main(int argc, char **argv)
         if(likely(enable_groups_charts))
             send_collected_data_to_netdata(groups_root_target, "groups", dt);
 
+        fflush(stdout);
+
         show_guest_time_old = show_guest_time;
-
-        if(write(STDOUT_FILENO, buffer_tostring(output), buffer_strlen(output)) == -1)
-            fatal("Cannot send chart values to netdata.");
-
-        // fflush(stdout);
-        buffer_flush(output);
 
         if(unlikely(debug))
             fprintf(stderr, "apps.plugin: done Loop No %llu\n", global_iterations_counter);
