@@ -1,27 +1,32 @@
 #ifndef NETDATA_WEB_CLIENT_H
 #define NETDATA_WEB_CLIENT_H 1
 
-#define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
-extern int web_client_timeout;
+/**
+ * @file web_client.h
+ * @brief API of the web client.
+ */
+
+#define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60 ///< default timeout to disconnect idle web clients.
+extern int web_client_timeout;                               ///< seconds to disconnect timeouts.
 
 #ifdef NETDATA_WITH_ZLIB
-extern int web_enable_gzip,
-        web_gzip_level,
-        web_gzip_strategy;
+extern int web_enable_gzip;      ///< enable gzip compressed web traffic
+extern int web_gzip_level;       ///< gzip level to use
+extern int web_gzip_strategy;    ///< gzip strategy to use
 #endif /* NETDATA_WITH_ZLIB */
 
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
 
-#define WEB_CLIENT_MODE_NORMAL      0
-#define WEB_CLIENT_MODE_FILECOPY    1
-#define WEB_CLIENT_MODE_OPTIONS     2
+#define WEB_CLIENT_MODE_NORMAL      0 ///< Standard web client mode.
+#define WEB_CLIENT_MODE_FILECOPY    1 ///< Deliver a static file to the web client
+#define WEB_CLIENT_MODE_OPTIONS     2 ///< HTTP OPTIONS request. Used in CORS.
 
-#define URL_MAX 8192
-#define ZLIB_CHUNK  16384
-#define HTTP_RESPONSE_HEADER_SIZE 4096
-#define COOKIE_MAX 1024
-#define ORIGIN_MAX 1024
+#define URL_MAX 8192                   ///< Maximum URL length
+#define ZLIB_CHUNK  16384              ///< zlib chunk size
+#define HTTP_RESPONSE_HEADER_SIZE 4096 ///< http response header size
+#define COOKIE_MAX 1024                ///< maximum cookie size
+#define ORIGIN_MAX 1024                ///< maximum origin size
 
 /** Web client response message. */
 struct response {
@@ -95,24 +100,112 @@ struct web_client {
     struct web_client *next; ///< next intem in list
 };
 
+/**
+ * Test if web client is dead.
+ *
+ * @param w Web client to test.
+ * @return boolean
+ */
 #define WEB_CLIENT_IS_DEAD(w) (w)->dead=1
 
+/** Doubly linked list of web clients */
 extern struct web_client *web_clients;
 
+/** 
+ * Get the real user id of the web file owner.
+ *
+ * @return user id
+ */
 extern uid_t web_files_uid(void);
+/** 
+ * Get the real group id of the web file owner.
+ *
+ * @return user id
+ */
 extern uid_t web_files_gid(void);
 
+/**
+ * Create a new web client
+ *
+ * @param listener File descriptor.
+ * @return the web client
+ */
 extern struct web_client *web_client_create(int listener);
+/**
+ * Free web client created with web_client_create().
+ *
+ * @param w The web client.
+ * @return the next web client in the list.
+ */
 extern struct web_client *web_client_free(struct web_client *w);
+/**
+ * Perform a send operation.
+ *
+ * @param w Web client.
+ * @return bytes sent.
+ */
 extern ssize_t web_client_send(struct web_client *w);
+/**
+ * Perform a receive operation.
+ *
+ * @param w Web client.
+ * @return bytes received.
+ */
 extern ssize_t web_client_receive(struct web_client *w);
+/**
+ * Process a query.
+ *
+ * @param w Web client.
+ */
 extern void web_client_process(struct web_client *w);
+/**
+ * Reset a web client.
+ *
+ * @param w Web client.
+ */
 extern void web_client_reset(struct web_client *w);
 
+/**
+ * The thread of a single client.
+ *
+ * 1. waits for input and output, using async I/O
+ * 2. it processes HTTP requests
+ * 3. it generates HTTP responses
+ * 4. it copies data from input to output if mode is FILECOPY
+ *
+ * @param ptr struct web_client
+ */
 extern void *web_client_main(void *ptr);
 
+/**
+ * Get data group for name.
+ *
+ * If not found, return `def`
+ *
+ * @param name of data group
+ * @param def Default.
+ * @return GROUP_*
+ *
+ * @see rrd2json.h
+ */
 extern int web_client_api_request_v1_data_group(char *name, int def);
+/**
+ * Get data group name for group.
+ *
+ * @param group GROUP_
+ * @return a string representing `group`
+ *
+ * @see rrd2json.h
+ */
 extern const char *group_method2string(int group);
 
+/**
+ * Convert option into string and store it in buffer.
+ *
+ * @param wb BUFFER to write to.
+ * @param options RRDR_OPTION_*
+ *
+ * @see rrd2json.h
+ */
 extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
 #endif
