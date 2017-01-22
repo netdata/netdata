@@ -31,7 +31,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_ONDEMAND_ONDEMAND);
 
 
-        arl_base = arl_create(NULL, 60);
+        arl_base = arl_create("vmstat", NULL, 60);
         arl_expect(arl_base, "pgfault", &pgfault);
         arl_expect(arl_base, "pgmajfault", &pgmajfault);
         arl_expect(arl_base, "pgpgin", &pgpgin);

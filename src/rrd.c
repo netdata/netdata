@@ -650,7 +650,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 {
     RRDDIM *rd = rrddim_find(st, id);
     if(rd) {
-        error("Cannot create rrd dimension '%s/%s', it already exists.", st->id, name);
+        debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
         return rd;
     }
 
