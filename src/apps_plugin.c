@@ -13,6 +13,8 @@
 // etc.
 #define RATES_DETAIL 10000ULL
 
+#define MAX_SPARE_FDS 10
+
 int debug = 0;
 
 int update_every = 1;
@@ -86,7 +88,9 @@ struct target {
     unsigned long long io_storage_bytes_written;
     // unsigned long long io_cancelled_write_bytes;
 
-    int *fds;
+    int *target_fds;
+    int target_fds_size;
+
     unsigned long long openfiles;
     unsigned long long openpipes;
     unsigned long long opensockets;
@@ -490,8 +494,8 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
     }
 
     all_pids[pid] = callocz(sizeof(struct pid_stat), 1);
-    all_pids[pid]->fds = callocz(sizeof(int), 100);
-    all_pids[pid]->fds_size = 100;
+    all_pids[pid]->fds = callocz(sizeof(int), MAX_SPARE_FDS);
+    all_pids[pid]->fds_size = MAX_SPARE_FDS;
 
     if(root_of_pids) root_of_pids->prev = all_pids[pid];
     all_pids[pid]->next = root_of_pids;
@@ -1182,17 +1186,17 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
             if(fdid >= p->fds_size) {
                 // it is small, extend it
                 if(unlikely(debug))
-                    fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + 100);
+                    fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
 
-                p->fds = reallocz(p->fds, (fdid + 100) * sizeof(int));
+                p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
                 if(!p->fds) {
                     fatal("Cannot re-allocate fds for %s", p->comm);
                     break;
                 }
 
                 // and initialize it
-                for(c = p->fds_size ; c < (fdid + 100) ; c++) p->fds[c] = 0;
-                p->fds_size = fdid + 100;
+                for(c = p->fds_size ; c < (fdid + MAX_SPARE_FDS) ; c++) p->fds[c] = 0;
+                p->fds_size = fdid + MAX_SPARE_FDS;
             }
 
             if(p->fds[fdid] == 0) {
@@ -1914,9 +1918,6 @@ static long zero_all_targets(struct target *root) {
     for (w = root; w ; w = w->next) {
         count++;
 
-        if(w->fds) freez(w->fds);
-        w->fds = NULL;
-
         w->minflt = 0;
         w->majflt = 0;
         w->utime = 0;
@@ -1946,89 +1947,44 @@ static long zero_all_targets(struct target *root) {
         w->io_storage_bytes_read = 0;
         w->io_storage_bytes_written = 0;
         // w->io_cancelled_write_bytes = 0;
+
+        // zero file counters
+        if(w->target_fds) {
+            memset(w->target_fds, 0, sizeof(int) * w->target_fds_size);
+            w->openfiles = 0;
+            w->openpipes = 0;
+            w->opensockets = 0;
+            w->openinotifies = 0;
+            w->openeventfds = 0;
+            w->opentimerfds = 0;
+            w->opensignalfds = 0;
+            w->openeventpolls = 0;
+            w->openother = 0;
+        }
     }
 
     return count;
 }
 
-static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
-    (void)o;
-
-    if(unlikely(!w->fds))
-        w->fds = callocz(sizeof(int), (size_t) all_files_size);
-
-    if(likely(p->updated)) {
-        w->cutime  += p->cutime;
-        w->cstime  += p->cstime;
-        w->cgtime  += p->cgtime;
-        w->cminflt += p->cminflt;
-        w->cmajflt += p->cmajflt;
-
-        w->utime  += p->utime;
-        w->stime  += p->stime;
-        w->gtime  += p->gtime;
-        w->minflt += p->minflt;
-        w->majflt += p->majflt;
-
-        // w->rss += p->rss;
-
-        w->statm_size += p->statm_size;
-        w->statm_resident += p->statm_resident;
-        w->statm_share += p->statm_share;
-        // w->statm_text += p->statm_text;
-        // w->statm_lib += p->statm_lib;
-        // w->statm_data += p->statm_data;
-        // w->statm_dirty += p->statm_dirty;
-
-        w->io_logical_bytes_read    += p->io_logical_bytes_read;
-        w->io_logical_bytes_written += p->io_logical_bytes_written;
-        // w->io_read_calls            += p->io_read_calls;
-        // w->io_write_calls           += p->io_write_calls;
-        w->io_storage_bytes_read    += p->io_storage_bytes_read;
-        w->io_storage_bytes_written += p->io_storage_bytes_written;
-        // w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
-
-        w->processes++;
-        w->num_threads += p->num_threads;
-
-        if(likely(w->fds)) {
-            int c;
-            for(c = 0; c < p->fds_size ;c++) {
-                if(p->fds[c] == 0) continue;
-
-                if(likely(p->fds[c] < all_files_size)) {
-                    if(w->fds) w->fds[p->fds[c]]++;
-                }
-                else
-                    error("Invalid fd number %d", p->fds[c]);
-            }
-        }
-
-        if(unlikely(debug || w->debug))
-            fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=%llu, stime=%llu, gtime=%llu, cutime=%llu, cstime=%llu, cgtime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-    }
+static inline void reallocate_target_fds(struct target *w) {
+    w->target_fds = reallocz(w->target_fds, sizeof(int) * all_files_size);
+    memset(&w->target_fds[w->target_fds_size], 0, sizeof(int) * (all_files_size - w->target_fds_size));
+    w->target_fds_size = all_files_size;
 }
 
-static inline void count_targets_fds(struct target *root) {
-    int c;
-    struct target *w;
+static inline void aggregate_pid_fds_on_target(struct target *w, struct pid_stat *p) {
+    if(unlikely(!w->target_fds || w->target_fds_size < all_files_size))
+        reallocate_target_fds(w);
 
-    for (w = root; w ; w = w->next) {
-        if(!w->fds) continue;
+    int c, size = p->fds_size, *fds = p->fds;
+    for(c = 0; c < size ;c++) {
+        int fd = fds[c];
 
-        w->openfiles = 0;
-        w->openpipes = 0;
-        w->opensockets = 0;
-        w->openinotifies = 0;
-        w->openeventfds = 0;
-        w->opentimerfds = 0;
-        w->opensignalfds = 0;
-        w->openeventpolls = 0;
-        w->openother = 0;
+        if(likely(fd <= 0 || fd >= all_files_size))
+            continue;
 
-        for(c = 1; c < all_files_size ;c++) {
-            if(w->fds[c] > 0)
-                switch(all_files[c].type) {
+        if(unlikely(!w->target_fds[fd])) {
+            switch(all_files[fd].type) {
                 case FILETYPE_FILE:
                     w->openfiles++;
                     break;
@@ -2065,9 +2021,51 @@ static inline void count_targets_fds(struct target *root) {
                     w->openother++;
             }
         }
+        w->target_fds[fd]++;
+    }
+}
 
-        freez(w->fds);
-        w->fds = NULL;
+static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
+    (void)o;
+
+    if(likely(p->updated)) {
+        w->cutime  += p->cutime;
+        w->cstime  += p->cstime;
+        w->cgtime  += p->cgtime;
+        w->cminflt += p->cminflt;
+        w->cmajflt += p->cmajflt;
+
+        w->utime  += p->utime;
+        w->stime  += p->stime;
+        w->gtime  += p->gtime;
+        w->minflt += p->minflt;
+        w->majflt += p->majflt;
+
+        // w->rss += p->rss;
+
+        w->statm_size += p->statm_size;
+        w->statm_resident += p->statm_resident;
+        w->statm_share += p->statm_share;
+        // w->statm_text += p->statm_text;
+        // w->statm_lib += p->statm_lib;
+        // w->statm_data += p->statm_data;
+        // w->statm_dirty += p->statm_dirty;
+
+        w->io_logical_bytes_read    += p->io_logical_bytes_read;
+        w->io_logical_bytes_written += p->io_logical_bytes_written;
+        // w->io_read_calls            += p->io_read_calls;
+        // w->io_write_calls           += p->io_write_calls;
+        w->io_storage_bytes_read    += p->io_storage_bytes_read;
+        w->io_storage_bytes_written += p->io_storage_bytes_written;
+        // w->io_cancelled_write_bytes += p->io_cancelled_write_bytes;
+
+        w->processes++;
+        w->num_threads += p->num_threads;
+
+        aggregate_pid_fds_on_target(w, p);
+
+        if(unlikely(debug || w->debug))
+            fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=%llu, stime=%llu, gtime=%llu, cutime=%llu, cstime=%llu, cgtime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
     }
 }
 
@@ -2129,10 +2127,6 @@ static void calculate_netdata_statistics(void) {
             error("pid %d %s was left without a group target!", p->pid, p->comm);
 
     }
-
-    count_targets_fds(apps_groups_root_target);
-    count_targets_fds(users_root_target);
-    count_targets_fds(groups_root_target);
 
     cleanup_exited_pids();
 }
@@ -2882,10 +2876,17 @@ int main(int argc, char **argv)
         usec_t now = now_realtime_usec();
         usec_t next = now - (now % step) + step;
 
+#ifdef NETDATA_PROFILING
+#warning "compiling for profiling"
+        static int profiling_count=0;
+        profiling_count++;
+        if(unlikely(profiling_count > 1000)) exit(0);
+#else
         while(now < next) {
             sleep_usec(next - now);
             now = now_realtime_usec();
         }
+#endif
 
         if(!collect_data_for_all_processes_from_proc()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
