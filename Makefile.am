@@ -18,6 +18,13 @@ MAINTAINERCLEANFILES= \
 
 EXTRA_DIST = \
 	.gitignore \
+	.codeclimate.yml \
+	.csslintrc \
+	.eslintignore \
+	.eslintrc \
+	.travis \
+	m4/ax_check_enable_debug.m4 \
+	m4/ax_c_statement_expressions.m4 \
 	autogen.sh \
 	README.md \
 	LICENSE.md \
