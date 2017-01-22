@@ -216,6 +216,11 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/%{name}/web
 
 %changelog
+* Sun Jan 22 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.5.0-1
+- FreeBSD, MacOS, FreeNAS
+- Backends support
+- dozens of new and improved plugins
+- dozens of new and improved alarms and notification methods
 * Tue Oct 4 2016 Costa Tsaousis <costa@tsaousis.gr> - 1.4.0-1
 - the fastest netdata ever (with a better look too)!
 - improved IoT and containers support!

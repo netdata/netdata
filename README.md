@@ -29,13 +29,16 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
 <a href="https://octoverse.github.com/" target="_blank"><img src="https://cloud.githubusercontent.com/assets/2662304/21743260/23ebe62c-d507-11e6-80c0-76b95f53e464.png"/></a>
 </p>
 
-`Oct 4th, 2016` - **[netdata v1.4.0 released!](https://github.com/firehol/netdata/releases)**
+`Jan 22nd, 2017` - **[netdata v1.5.0 released!](https://github.com/firehol/netdata/releases)**
 
- - the **fastest** netdata ever (with a better look too)
- - improved **IoT** and **containers** support
- - **alarms** improved in almost every way
- - new plugins: softnet netdev, extended TCP metrics, UDPLite, NFS v2, v3 client (server was there already), NFS v4 server & client, APCUPSd, RetroShare
- - improved plugins: mysql, cgroups, hddtemp, sensors, phpfm, tc (QoS)
+ - netdata now runs on **FreeBSD** and **MacOS**
+ - netdata now supports **Graphite**, **OpenTSDB**, **Prometheus** and compatible backends
+ - netdata now monitors **SystemD Services**
+ - new plugins: fping, postgres, varnish, elasticsearch, haproxy, freeradius, mdstat, ISC dhcpd, fail2ban, openvpn, NUMA memory, CPU Idle States, gunicorn, ECC memory errors, IPC semaphores, uptime
+ - improved plugins: netfilter conntrack, mysql/mariadb, ipfs, cpufreq, hddtemp, sensors, nginx, nginx_log, phpfpm, redis, dovecot, containers and cgroups, disk space, apps.plugin, tc (QoS) and almost all internal plugins (memory, IPv4 and IPv6, network interfaces, QoS, etc)
+ - dozens of new and improved alarms (including performance monitoring alarms for mysql)
+ - new alarm notifications: messagebird.com, pagerduty.com, pushbullet.com, twilio.com, hipchat, kafka
+ - dozens more improvements and performance optimizations
 
 ---
 

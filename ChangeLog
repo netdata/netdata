@@ -1,3 +1,133 @@
+netdata (1.5.0) - 2016-01-22
+
+ * yet another release that makes netdata the fastest
+   netdata ever!
+
+ * netdata runs on FreeBSD, FreeNAS and MacOS !
+
+   Vladimir Kobal (@vlvkobal) has done a magnificent work
+   porting netdata to FreeBSD and MacOS.
+
+   Everyhing works: cpu, memory, disks performance, disks space,
+   network interfaces, interrupts, IPv4 metrics, IPv6 metrics
+   processes, context switches, softnet, IPC queues,
+   IPC semaphores, IPC shared memory, uptime, etc. Wow!
+
+ * netdata supports data archiving to backend databases:
+
+    - Graphite
+    - OpenTSDB
+    - Prometheus
+
+   and of course all the compatible ones
+   (KairosDB, InfluxDB, Blueflood, etc)
+
+ * new plugins:
+
+   Ilya Mashchenko (@l2isbad) has created most of the python
+   data collection plugins in this release !
+
+    - Systemd Services (using cgroups!)
+    - FPing (yes, network latency in netdata!)
+    - postgres databases            @facetoe, @moumoul
+    - Vanish disk cache (v3 and v4) @l2isbad
+    - ElasticSearch                 @l2isbad
+    - HAproxy                       @l2isbad
+    - FreeRadius                    @l2isbad, @lgz
+    - mdstat (RAID)                 @l2isbad
+    - ISC bind (via rndc)           @l2isbad
+    - ISC dhcpd                     @l2isbad, @lgz
+    - Fail2Ban                      @l2isbad
+    - OpenVPN status log            @l2isbad, @lgz
+    - NUMA memory                   @tycho
+    - CPU Idle                      @tycho
+    - gunicorn log                  @deltaskelta
+    - ECC memory hardware errors
+    - IPC semaphores
+    - uptime plugin (with a nice badge too)
+
+ * improved plugins:
+
+    - netfilter conntrack
+    - mysql (replication)           @l2isbad
+    - ipfs                          @pjz
+    - cpufreq                       @tycho
+    - hddtemp                       @l2isbad
+    - sensors                       @l2isbad
+    - nginx                         @leolovenet
+    - nginx_log                     @paulfantom
+    - phpfpm                        @leolovenet
+    - redis                         @leolovenet
+    - dovecot                       @justohall
+    - cgroups
+    - disk space
+    - apps.plugin
+    - /proc/interrupts              @rlefevre
+    - /proc/softirqs                @rlefevre
+    - /proc/vmstat       (system memory charts)
+    - /proc/net/snmp6    (IPv6 charts)
+    - /proc/self/meminfo (system memory charts)
+    - /proc/net/dev      (network interfaces)
+    - tc                 (linux QoS)
+
+ * new/improved alarms:
+
+    - MySQL / MariaDB alarms (incl. replication)
+    - IPFS alarms
+    - HAproxy alarms
+    - UDP buffer alarms
+    - TCP AttemptFails
+    - ECC memory alarms
+    - netfilter connections alarms
+    - SNMP
+
+ * new alarm notifications:
+
+    - messagebird.com               @tech-no-logical
+    - pagerduty.com                 @jimcooley
+    - pushbullet.com                @tperalta82
+    - twilio.com                    @shadycuz
+    - HipChat
+    - kafka
+
+ * shell integration
+
+   - shell scripts can now query netdata easily!
+
+ * dashboard improvements:
+   - dashboard is now faster on firefox, safari, opera, edge
+     (edge is still the slowest)
+   - dashboard now has a little bigger fonts
+   - SHIFT + mouse wheel to zoom charts, works on all browsers
+   - perfect-scrollbar on the dashboard
+   - dashboard 4K resolution fixes
+   - dashboard compatibility fixes for embedding charts in
+     third party web sites
+   - charts on custom dashboards can have common min/max
+     even if they come from different netdata servers
+   - alarm log is now saved and loaded back so that
+     the alarm history is available at the dashboard
+
+ * other improvements:
+   - python.d.plugin has received way to many improvements
+     from many contributors!
+   - charts.d.plugin can now be forked to support
+     multiple independent instances
+   - registry has been re-factored to lower its memory
+     requirements (required for the public registry)
+   - simple patterns in cgroups, disks and alarms
+   - netdata-installer.sh can now correctly install
+     netdata in containers
+   - supplied logrotate script compatibility fixes
+   - spec cleanup                  @breed808
+   - clocks and timers reworked    @rlefevre
+
+ netdata has received a lot more improvements from many more
+ contributors!
+
+ Thank you all guys!
+ 
+ 
 netdata (1.4.0) - 2016-10-04
 
  At a glance:
