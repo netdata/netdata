@@ -33,6 +33,7 @@ dist_pythonconfig_DATA = \
     python.d/exim.conf \
     python.d/fail2ban.conf \
     python.d/freeradius.conf \
+    python.d/gunicorn_log.conf \
     python.d/haproxy.conf \
     python.d/hddtemp.conf \
     python.d/ipfs.conf \
@@ -65,6 +66,8 @@ dist_healthconfig_DATA = \
     health.d/entropy.conf \
     health.d/haproxy.conf \
     health.d/ipc.conf \
+    health.d/ipfs.conf \
+    health.d/isc_dhcpd.conf \
     health.d/mdstat.conf \
     health.d/memcached.conf \
     health.d/memory.conf \
