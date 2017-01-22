@@ -96,7 +96,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .rd_inodes_reserved = NULL
         };
 
-        dictionary_set(mount_points, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
+        m = dictionary_set(mount_points, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
     else {
         do_space = m->do_space;
