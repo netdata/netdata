@@ -149,7 +149,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
         do_icmp_types       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp types", CONFIG_ONDEMAND_ONDEMAND);
         do_ect              = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ect", CONFIG_ONDEMAND_ONDEMAND);
 
-        arl_base = arl_create(NULL, 60);
+        arl_base = arl_create("snmp6", NULL, 60);
         arl_expect(arl_base, "Ip6InReceives", &Ip6InReceives);
         arl_expect(arl_base, "Ip6InHdrErrors", &Ip6InHdrErrors);
         arl_expect(arl_base, "Ip6InTooBigErrors", &Ip6InTooBigErrors);
