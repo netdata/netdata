@@ -124,7 +124,7 @@ get_configure_ac_rpmrel() {
 }
 
 get_spec_version() {
-  get_staged_file "$1".spec.in
+  get_staged_file -o "$1".spec.in
   test -f $MYTMP/files/"$1".spec.in || return 0 # Spec file is optional
   sed -n -e '1,/^%changelog/d' -e '/^*/{s/.*- \([0-9].*\)/\1/p;q}' "$1".spec.in
 }
@@ -254,10 +254,6 @@ check_versions() {
     then
       echo "Version in configure.ac ($confver) differs from ChangeLog ($clogver)"
       status=1
-    elif [ "$(git tag -l v$confver)" ]
-    then
-      echo "Tag v$confver already exists"
-      status=1
     fi
 
     if [ "$specver" ]
@@ -270,24 +266,33 @@ check_versions() {
       fi
     fi
 
-    if [ "$(git config user.signingkey)" = "" ]
+    if [ ! "$TRAVIS_TAG" ]
     then
-      echo "You need to set up a PGP signing key e.g.:"
-      echo "   gpg --list-keys"
-      echo "and"
-      echo "   git config user.signingkey SHORTID"
-      echo "or"
-      echo "   git config --global user.signingkey SHORTID"
-      status=1
-    fi
+      if [ "$(git tag -l v$confver)" ]
+      then
+        echo "Tag v$confver already exists"
+        status=1
+      fi
 
-    git status -s | grep "^?" > $MYTMP/needclean
-    if [ -s $MYTMP/needclean ]
-    then
-      echo "The following files must be dealt with before commit:"
-      cat $MYTMP/needclean
-      echo "e.g. add them to .gitignore or remove with 'git clean -fdx'"
-      status=1
+      if [ "$(git config user.signingkey)" = "" ]
+      then
+        echo "You need to set up a PGP signing key e.g.:"
+        echo "   gpg --list-keys"
+        echo "and"
+        echo "   git config user.signingkey SHORTID"
+        echo "or"
+        echo "   git config --global user.signingkey SHORTID"
+        status=1
+      fi
+
+      git status -s | grep "^?" > $MYTMP/needclean
+      if [ -s $MYTMP/needclean ]
+      then
+        echo "The following files must be dealt with before commit:"
+        cat $MYTMP/needclean
+        echo "e.g. add them to .gitignore or remove with 'git clean -fdx'"
+        status=1
+      fi
     fi
   fi
 
