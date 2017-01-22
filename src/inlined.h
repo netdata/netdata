@@ -3,18 +3,42 @@
 
 #include "common.h"
 
+/**
+ * @file inlined.h
+ * @brief Common methods the compiler should inline.
+ *
+ * This is done for faster execution
+ */
+
 #ifdef KERNEL_32BIT
 typedef uint32_t kernel_uint_t;
 #define str2kernel_uint_t(string) str2uint32_t(string)
 #define KERNEL_UINT_FORMAT "%u"
 #else
-typedef uint64_t kernel_uint_t;
+typedef uint64_t kernel_uint_t; ///< uint32_t or uint64_t dependent on the system.
+/**
+ * Convert a string to an `kernel_unit_t`.
+ *
+ * This does no error handling.
+ * Only use this for strings representing integers (`-?[0-9]+`) and fit into an int.
+ *
+ * @param string to convert.
+ * @return `kernel_uint_t` representation of `s` 
+ */
 #define str2kernel_uint_t(string) str2uint64_t(string)
-#define KERNEL_UINT_FORMAT "%" PRIu64
+#define KERNEL_UINT_FORMAT "%" PRIu64 ///< Formatter string of `kernel_uint_t`.
 #endif
 
+/**
+ * Convert a string to an pid_t.
+ *
+ * This does no error handling.
+ * Only use this for strings representing integers (`-?[0-9]+`) and fit into an int.
+ *
+ * @param string to convert.
+ * @return pid_t representation of `s` 
+ */
 #define str2pid_t(string) str2uint32_t(string)
-
 
 // for faster execution, allow the compiler to inline
 // these functions that are called thousands of times per second
@@ -61,6 +85,25 @@ static inline uint32_t simple_uhash(const char *name) {
     return hval;
 }
 
+/**
+ * Calculate simple_hash() of `name` and compare `name` to `b`
+ *
+ * This can be used to enhance performance.
+ * Instaed of
+ * ```{c}
+ * hash = simple_hash(string);
+ * if(hash == myhash && strcmp(string, "mystring") == 0) ...
+ * ```
+ * one might call
+ * ```{c}
+ * if(simple_hash_strcmp(string, "mystring", &hash) == 0) 
+ * ```
+ *
+ * @param name String to generate hash for.
+ * @param b String to compare `name` for.
+ * @param hash Pointer to store the hash.
+ * @return an integer greater than, equal to, or less than 0, according `name` is greater than, equal to, or less than `b`.
+ */
 static inline int simple_hash_strcmp(const char *name, const char *b, uint32_t *hash) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hval = 0x811c9dc5;
@@ -74,6 +117,15 @@ static inline int simple_hash_strcmp(const char *name, const char *b, uint32_t *
     return ret;
 }
 
+/**
+ * Convert a string to an int.
+ *
+ * This does no error handling.
+ * Only use this for strings representing integers (`-?[0-9]+`) and fit into an int.
+ *
+ * @param s String to convert.
+ * @return int representation of `s` 
+ */
 static inline int str2i(const char *s) {
     int n = 0;
     char c, negative = (*s == '-');
@@ -89,6 +141,15 @@ static inline int str2i(const char *s) {
     return n;
 }
 
+/**
+ * Convert a string to a long.
+ *
+ * This does no error handling.
+ * Only use this for strings representing integers (`-?[0-9]+`) and fit into an long.
+ *
+ * @param s String to convert.
+ * @return long representation of `s` 
+ */
 static inline long str2l(const char *s) {
     long n = 0;
     char c, negative = (*s == '-');
@@ -104,6 +165,17 @@ static inline long str2l(const char *s) {
     return n;
 }
 
+/**
+ * Convert a string to a uint32_t.
+ *
+ * This does no error handling.
+ * Only use this for strings representing positive numbers (`[0-9]+`) and fit into an unsigned long.
+ *
+ * If you are not shure if your system supports this use `str2kernel_unit_t()`
+ *
+ * @param s String to convert.
+ * @return uint32_t representation of `s` 
+ */
 static inline uint32_t str2uint32_t(const char *s) {
     uint32_t n = 0;
     char c;
@@ -114,6 +186,17 @@ static inline uint32_t str2uint32_t(const char *s) {
     return n;
 }
 
+/**
+ * Convert a string to a uint64_t.
+ *
+ * This does no error handling.
+ * Only use this for strings representing positive numbers (`[0-9]+`) and fit into an unsigned long.
+ *
+ * If you are not shure if your system supports this use `str2kernel_unit_t()`
+ *
+ * @param s String to convert.
+ * @return uint64_t representation of `s` 
+ */
 static inline uint64_t str2uint64_t(const char *s) {
     uint64_t n = 0;
     char c;
@@ -124,6 +207,15 @@ static inline uint64_t str2uint64_t(const char *s) {
     return n;
 }
 
+/**
+ * Convert a string to a unsigned long.
+ *
+ * This does no error handling.
+ * Only use this for strings representing positive numbers (`[0-9]+`) and fit into an unsigned long.
+ *
+ * @param s String to convert.
+ * @return unsigned long representation of `s` 
+ */
 static inline unsigned long str2ul(const char *s) {
     unsigned long n = 0;
     char c;
@@ -134,6 +226,15 @@ static inline unsigned long str2ul(const char *s) {
     return n;
 }
 
+/**
+ * Convert a string to a unsigned long long.
+ *
+ * This does no error handling.
+ * Only use this for strings representing positive numbers (`[0-9]+`) and fit into an unsigned long long.
+ *
+ * @param s String to convert.
+ * @return unsigned long long representation of `s` 
+ */
 static inline unsigned long long str2ull(const char *s) {
     unsigned long long n = 0;
     char c;
@@ -151,6 +252,15 @@ static inline unsigned long long str2ull(const char *s) {
 #define strcmp(a, b) strsame(a, b)
 #endif // NETDATA_STRCMP_OVERRIDE
 
+/**
+ * Alternative `strcmp()` implementation.
+ *
+ * @see man 3 strcmp
+ *
+ * @param a string
+ * @param b string
+ * @return an integer greater than, equal to, or less than 0, according `a` is greater than, equal to, or less than `b`.
+ */
 static inline int strsame(const char *a, const char *b) {
     if(unlikely(a == b)) return 0;
     while(*a && *a == *b) { a++; b++; }
