@@ -239,7 +239,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     if(do_proc4ops == -1) do_proc4ops = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v4 operations", 1);
 
     // if they are enabled, reset them to 1
-    // later we do them =2 to avoid doing strcmp for all lines
+    // later we do them =2 to avoid doing strcmp() for all lines
     if(do_rc) do_rc = 1;
     if(do_fh) do_fh = 1;
     if(do_io) do_io = 1;
@@ -252,7 +252,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     if(do_proc4) do_proc4 = 1;
     if(do_proc4ops) do_proc4ops = 1;
 
-    uint32_t lines = procfile_lines(ff), l;
+    size_t lines = procfile_lines(ff), l;
 
     char *type;
     unsigned long long rc_hits = 0, rc_misses = 0, rc_nocache = 0;
@@ -264,20 +264,20 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     unsigned long long rpc_calls = 0, rpc_bad_format = 0, rpc_bad_auth = 0, rpc_bad_client = 0;
 
     for(l = 0; l < lines ;l++) {
-        uint32_t words = procfile_linewords(ff, l);
+        size_t words = procfile_linewords(ff, l);
         if(!words) continue;
 
         type = procfile_lineword(ff, l, 0);
 
         if(do_rc == 1 && strcmp(type, "rc") == 0) {
             if(words < 4) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 4);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
                 continue;
             }
 
-            rc_hits = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
-            rc_misses = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
-            rc_nocache = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
+            rc_hits = str2ull(procfile_lineword(ff, l, 1));
+            rc_misses = str2ull(procfile_lineword(ff, l, 2));
+            rc_nocache = str2ull(procfile_lineword(ff, l, 3));
 
             unsigned long long sum = rc_hits + rc_misses + rc_nocache;
             if(sum == 0ULL) do_rc = -1;
@@ -285,15 +285,15 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_fh == 1 && strcmp(type, "fh") == 0) {
             if(words < 6) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 6);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
-            fh_stale = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
-            fh_total_lookups = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
-            fh_anonymous_lookups = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
-            fh_dir_not_in_dcache = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
-            fh_non_dir_not_in_dcache = strtoull(procfile_lineword(ff, l, 5), NULL, 10);
+            fh_stale = str2ull(procfile_lineword(ff, l, 1));
+            fh_total_lookups = str2ull(procfile_lineword(ff, l, 2));
+            fh_anonymous_lookups = str2ull(procfile_lineword(ff, l, 3));
+            fh_dir_not_in_dcache = str2ull(procfile_lineword(ff, l, 4));
+            fh_non_dir_not_in_dcache = str2ull(procfile_lineword(ff, l, 5));
 
             unsigned long long sum = fh_stale + fh_total_lookups + fh_anonymous_lookups + fh_dir_not_in_dcache + fh_non_dir_not_in_dcache;
             if(sum == 0ULL) do_fh = -1;
@@ -301,12 +301,12 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_io == 1 && strcmp(type, "io") == 0) {
             if(words < 3) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 3);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 3);
                 continue;
             }
 
-            io_read = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
-            io_write = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
+            io_read = str2ull(procfile_lineword(ff, l, 1));
+            io_write = str2ull(procfile_lineword(ff, l, 2));
 
             unsigned long long sum = io_read + io_write;
             if(sum == 0ULL) do_io = -1;
@@ -314,12 +314,12 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_th == 1 && strcmp(type, "th") == 0) {
             if(words < 13) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 13);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
 
-            th_threads = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
-            th_fullcnt = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
+            th_threads = str2ull(procfile_lineword(ff, l, 1));
+            th_fullcnt = str2ull(procfile_lineword(ff, l, 2));
             th_hist10 = (unsigned long long)(atof(procfile_lineword(ff, l, 3)) * 1000.0);
             th_hist20 = (unsigned long long)(atof(procfile_lineword(ff, l, 4)) * 1000.0);
             th_hist30 = (unsigned long long)(atof(procfile_lineword(ff, l, 5)) * 1000.0);
@@ -345,22 +345,22 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_ra == 1 && strcmp(type, "ra") == 0) {
             if(words < 13) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 13);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
 
-            ra_size = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
-            ra_hist10 = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
-            ra_hist20 = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
-            ra_hist30 = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
-            ra_hist40 = strtoull(procfile_lineword(ff, l, 5), NULL, 10);
-            ra_hist50 = strtoull(procfile_lineword(ff, l, 6), NULL, 10);
-            ra_hist60 = strtoull(procfile_lineword(ff, l, 7), NULL, 10);
-            ra_hist70 = strtoull(procfile_lineword(ff, l, 8), NULL, 10);
-            ra_hist80 = strtoull(procfile_lineword(ff, l, 9), NULL, 10);
-            ra_hist90 = strtoull(procfile_lineword(ff, l, 10), NULL, 10);
-            ra_hist100 = strtoull(procfile_lineword(ff, l, 11), NULL, 10);
-            ra_none = strtoull(procfile_lineword(ff, l, 12), NULL, 10);
+            ra_size = str2ull(procfile_lineword(ff, l, 1));
+            ra_hist10 = str2ull(procfile_lineword(ff, l, 2));
+            ra_hist20 = str2ull(procfile_lineword(ff, l, 3));
+            ra_hist30 = str2ull(procfile_lineword(ff, l, 4));
+            ra_hist40 = str2ull(procfile_lineword(ff, l, 5));
+            ra_hist50 = str2ull(procfile_lineword(ff, l, 6));
+            ra_hist60 = str2ull(procfile_lineword(ff, l, 7));
+            ra_hist70 = str2ull(procfile_lineword(ff, l, 8));
+            ra_hist80 = str2ull(procfile_lineword(ff, l, 9));
+            ra_hist90 = str2ull(procfile_lineword(ff, l, 10));
+            ra_hist100 = str2ull(procfile_lineword(ff, l, 11));
+            ra_none = str2ull(procfile_lineword(ff, l, 12));
 
             unsigned long long sum = ra_hist10 + ra_hist20 + ra_hist30 + ra_hist40 + ra_hist50 + ra_hist60 + ra_hist70 + ra_hist80 + ra_hist90 + ra_hist100 + ra_none;
             if(sum == 0ULL) {
@@ -374,14 +374,14 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_net == 1 && strcmp(type, "net") == 0) {
             if(words < 5) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 5);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 5);
                 continue;
             }
 
-            net_count = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
-            net_udp_count = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
-            net_tcp_count = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
-            net_tcp_connections = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
+            net_count = str2ull(procfile_lineword(ff, l, 1));
+            net_udp_count = str2ull(procfile_lineword(ff, l, 2));
+            net_tcp_count = str2ull(procfile_lineword(ff, l, 3));
+            net_tcp_connections = str2ull(procfile_lineword(ff, l, 4));
 
             unsigned long long sum = net_count + net_udp_count + net_tcp_count + net_tcp_connections;
             if(sum == 0ULL) do_net = -1;
@@ -389,14 +389,14 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
             if(words < 6) {
-                error("%s line of /proc/net/rpc/nfsd has %u words, expected %d", type, words, 6);
+                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
-            rpc_calls = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
-            rpc_bad_format = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
-            rpc_bad_auth = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
-            rpc_bad_client = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
+            rpc_calls = str2ull(procfile_lineword(ff, l, 1));
+            rpc_bad_format = str2ull(procfile_lineword(ff, l, 2));
+            rpc_bad_auth = str2ull(procfile_lineword(ff, l, 3));
+            rpc_bad_client = str2ull(procfile_lineword(ff, l, 4));
 
             unsigned long long sum = rpc_calls + rpc_bad_format + rpc_bad_auth + rpc_bad_client;
             if(sum == 0ULL) do_rpc = -1;
@@ -409,7 +409,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfsd_proc2_values[i].name[0] ; i++, j++) {
-                nfsd_proc2_values[i].value = strtoull(procfile_lineword(ff, l, j), NULL, 10);
+                nfsd_proc2_values[i].value = str2ull(procfile_lineword(ff, l, j));
                 nfsd_proc2_values[i].present = 1;
                 sum += nfsd_proc2_values[i].value;
             }
@@ -430,7 +430,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfsd_proc3_values[i].name[0] ; i++, j++) {
-                nfsd_proc3_values[i].value = strtoull(procfile_lineword(ff, l, j), NULL, 10);
+                nfsd_proc3_values[i].value = str2ull(procfile_lineword(ff, l, j));
                 nfsd_proc3_values[i].present = 1;
                 sum += nfsd_proc3_values[i].value;
             }
@@ -451,7 +451,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfsd_proc4_values[i].name[0] ; i++, j++) {
-                nfsd_proc4_values[i].value = strtoull(procfile_lineword(ff, l, j), NULL, 10);
+                nfsd_proc4_values[i].value = str2ull(procfile_lineword(ff, l, j));
                 nfsd_proc4_values[i].present = 1;
                 sum += nfsd_proc4_values[i].value;
             }
@@ -472,7 +472,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfsd4_ops_values[i].name[0] ; i++, j++) {
-                nfsd4_ops_values[i].value = strtoull(procfile_lineword(ff, l, j), NULL, 10);
+                nfsd4_ops_values[i].value = str2ull(procfile_lineword(ff, l, j));
                 nfsd4_ops_values[i].present = 1;
                 sum += nfsd4_ops_values[i].value;
             }

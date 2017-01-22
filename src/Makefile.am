@@ -30,6 +30,7 @@ endif
 
 netdata_SOURCES = \
 	appconfig.c appconfig.h \
+	adaptive_resortable_list.c adaptive_resortable_list.h \
 	avl.c avl.h \
 	backends.c backends.h \
 	clocks.c clocks.h \

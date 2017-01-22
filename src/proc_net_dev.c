@@ -143,7 +143,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
+    size_t lines = procfile_lines(ff), l;
     for(l = 2; l < lines ;l++) {
         // require 17 words on each line
         if(unlikely(procfile_linewords(ff, l) < 17)) continue;
@@ -180,23 +180,23 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if(unlikely(!d->enabled))
             continue;
 
-        d->rbytes      = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
-        d->rpackets    = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
-        d->rerrors     = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
-        d->rdrops      = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
-        d->rfifo       = strtoull(procfile_lineword(ff, l, 5), NULL, 10);
-        d->rframe      = strtoull(procfile_lineword(ff, l, 6), NULL, 10);
-        d->rcompressed = strtoull(procfile_lineword(ff, l, 7), NULL, 10);
-        d->rmulticast  = strtoull(procfile_lineword(ff, l, 8), NULL, 10);
+        d->rbytes      = str2ull(procfile_lineword(ff, l, 1));
+        d->rpackets    = str2ull(procfile_lineword(ff, l, 2));
+        d->rerrors     = str2ull(procfile_lineword(ff, l, 3));
+        d->rdrops      = str2ull(procfile_lineword(ff, l, 4));
+        d->rfifo       = str2ull(procfile_lineword(ff, l, 5));
+        d->rframe      = str2ull(procfile_lineword(ff, l, 6));
+        d->rcompressed = str2ull(procfile_lineword(ff, l, 7));
+        d->rmulticast  = str2ull(procfile_lineword(ff, l, 8));
 
-        d->tbytes      = strtoull(procfile_lineword(ff, l, 9), NULL, 10);
-        d->tpackets    = strtoull(procfile_lineword(ff, l, 10), NULL, 10);
-        d->terrors     = strtoull(procfile_lineword(ff, l, 11), NULL, 10);
-        d->tdrops      = strtoull(procfile_lineword(ff, l, 12), NULL, 10);
-        d->tfifo       = strtoull(procfile_lineword(ff, l, 13), NULL, 10);
-        d->tcollisions = strtoull(procfile_lineword(ff, l, 14), NULL, 10);
-        d->tcarrier    = strtoull(procfile_lineword(ff, l, 15), NULL, 10);
-        d->tcompressed = strtoull(procfile_lineword(ff, l, 16), NULL, 10);
+        d->tbytes      = str2ull(procfile_lineword(ff, l, 9));
+        d->tpackets    = str2ull(procfile_lineword(ff, l, 10));
+        d->terrors     = str2ull(procfile_lineword(ff, l, 11));
+        d->tdrops      = str2ull(procfile_lineword(ff, l, 12));
+        d->tfifo       = str2ull(procfile_lineword(ff, l, 13));
+        d->tcollisions = str2ull(procfile_lineword(ff, l, 14));
+        d->tcarrier    = str2ull(procfile_lineword(ff, l, 15));
+        d->tcompressed = str2ull(procfile_lineword(ff, l, 16));
 
         // --------------------------------------------------------------------
 

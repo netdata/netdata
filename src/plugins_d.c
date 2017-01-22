@@ -97,7 +97,6 @@ void *pluginsd_worker_thread(void *arg)
 #endif
 
     char *words[MAX_WORDS] = { NULL };
-    uint32_t SET_HASH = simple_hash("SET");
     uint32_t BEGIN_HASH = simple_hash("BEGIN");
     uint32_t END_HASH = simple_hash("END");
     uint32_t FLUSH_HASH = simple_hash("FLUSH");
@@ -141,9 +140,7 @@ void *pluginsd_worker_thread(void *arg)
 
             // debug(D_PLUGINSD, "PLUGINSD: words 0='%s' 1='%s' 2='%s' 3='%s' 4='%s' 5='%s' 6='%s' 7='%s' 8='%s' 9='%s'", words[0], words[1], words[2], words[3], words[4], words[5], words[6], words[7], words[8], words[9]);
 
-            hash = simple_hash(s);
-
-            if(likely(hash == SET_HASH && !strcmp(s, "SET"))) {
+            if(likely(!simple_hash_strcmp(s, "SET", &hash))) {
                 char *dimension = words[1];
                 char *value = words[2];
 
@@ -188,7 +185,7 @@ void *pluginsd_worker_thread(void *arg)
 
                 if(likely(st->counter_done)) {
                     usec_t microseconds = 0;
-                    if(microseconds_txt && *microseconds_txt) microseconds = strtoull(microseconds_txt, NULL, 10);
+                    if(microseconds_txt && *microseconds_txt) microseconds = str2ull(microseconds_txt);
                     if(microseconds) rrdset_next_usec(st, microseconds);
                     else rrdset_next(st);
                 }
@@ -242,10 +239,10 @@ void *pluginsd_worker_thread(void *arg)
                 }
 
                 int priority = 1000;
-                if(likely(priority_s)) priority = atoi(priority_s);
+                if(likely(priority_s)) priority = str2i(priority_s);
 
                 int update_every = cd->update_every;
-                if(likely(update_every_s)) update_every = atoi(update_every_s);
+                if(likely(update_every_s)) update_every = str2i(update_every_s);
                 if(unlikely(!update_every)) update_every = cd->update_every;
 
                 int chart_type = RRDSET_TYPE_LINE;
@@ -430,7 +427,6 @@ void *pluginsd_worker_thread(void *arg)
     info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
 
     cd->obsolete = 1;
-    cd->thread = (pthread_t)NULL;
     pthread_exit(NULL);
     return NULL;
 }

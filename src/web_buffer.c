@@ -113,6 +113,8 @@ void buffer_print_llu(BUFFER *wb, unsigned long long uvalue)
 
 void buffer_strcat(BUFFER *wb, const char *txt)
 {
+    // buffer_sprintf(wb, "%s", txt);
+
     if(unlikely(!txt || !*txt)) return;
 
     buffer_need_bytes(wb, 1);

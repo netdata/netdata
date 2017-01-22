@@ -39,7 +39,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
     // synproxy gives its values per CPU
     for(l = 1; l < lines ;l++) {
-        int words = procfile_linewords(ff, l);
+        size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 6))
             continue;
 

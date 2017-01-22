@@ -32,8 +32,8 @@ int do_proc_stat(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
-    uint32_t words;
+    size_t lines = procfile_lines(ff), l;
+    size_t words;
 
     unsigned long long processes = 0, running = 0 , blocked = 0;
     RRDSET *st;
@@ -46,7 +46,7 @@ int do_proc_stat(int update_every, usec_t dt) {
         if(likely(row_key[0] == 'c' && row_key[1] == 'p' && row_key[2] == 'u')) {
             words = procfile_linewords(ff, l);
             if(unlikely(words < 9)) {
-                error("Cannot read /proc/stat cpu line. Expected 9 params, read %u.", words);
+                error("Cannot read /proc/stat cpu line. Expected 9 params, read %zu.", words);
                 continue;
             }
 
@@ -54,19 +54,19 @@ int do_proc_stat(int update_every, usec_t dt) {
             unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0, guest = 0, guest_nice = 0;
 
             id          = row_key;
-            user        = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
-            nice        = strtoull(procfile_lineword(ff, l, 2), NULL, 10);
-            system      = strtoull(procfile_lineword(ff, l, 3), NULL, 10);
-            idle        = strtoull(procfile_lineword(ff, l, 4), NULL, 10);
-            iowait      = strtoull(procfile_lineword(ff, l, 5), NULL, 10);
-            irq         = strtoull(procfile_lineword(ff, l, 6), NULL, 10);
-            softirq     = strtoull(procfile_lineword(ff, l, 7), NULL, 10);
-            steal       = strtoull(procfile_lineword(ff, l, 8), NULL, 10);
+            user        = str2ull(procfile_lineword(ff, l, 1));
+            nice        = str2ull(procfile_lineword(ff, l, 2));
+            system      = str2ull(procfile_lineword(ff, l, 3));
+            idle        = str2ull(procfile_lineword(ff, l, 4));
+            iowait      = str2ull(procfile_lineword(ff, l, 5));
+            irq         = str2ull(procfile_lineword(ff, l, 6));
+            softirq     = str2ull(procfile_lineword(ff, l, 7));
+            steal       = str2ull(procfile_lineword(ff, l, 8));
 
-            guest       = strtoull(procfile_lineword(ff, l, 9), NULL, 10);
+            guest       = str2ull(procfile_lineword(ff, l, 9));
             user -= guest;
 
-            guest_nice  = strtoull(procfile_lineword(ff, l, 10), NULL, 10);
+            guest_nice  = str2ull(procfile_lineword(ff, l, 10));
             nice -= guest_nice;
 
             char *title, *type, *context, *family;
@@ -127,7 +127,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
         }
         else if(unlikely(hash == hash_intr && strcmp(row_key, "intr") == 0)) {
-            unsigned long long value = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
+            unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
 
             // --------------------------------------------------------------------
 
@@ -146,7 +146,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
         }
         else if(unlikely(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0)) {
-            unsigned long long value = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
+            unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
 
             // --------------------------------------------------------------------
 
@@ -164,13 +164,13 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
         }
         else if(unlikely(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0)) {
-            processes = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
+            processes = str2ull(procfile_lineword(ff, l, 1));
         }
         else if(unlikely(hash == hash_procs_running && !running && strcmp(row_key, "procs_running") == 0)) {
-            running = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
+            running = str2ull(procfile_lineword(ff, l, 1));
         }
         else if(unlikely(hash == hash_procs_blocked && !blocked && strcmp(row_key, "procs_blocked") == 0)) {
-            blocked = strtoull(procfile_lineword(ff, l, 1), NULL, 10);
+            blocked = str2ull(procfile_lineword(ff, l, 1));
         }
     }
 

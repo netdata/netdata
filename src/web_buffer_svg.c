@@ -290,7 +290,7 @@ static inline int verdana11_width(char *s) {
     *d = '\0';
     w -= VERDANA_KERNING;
     w += VERDANA_PADDING;
-    return ceil(w);
+    return (int)ceil(w);
 }
 
 static inline size_t escape_xmlz(char *dst, const char *src, size_t len) {
@@ -470,7 +470,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
                     break;
             }
             else {
-                calculated_number v = strtold(value_buffer, NULL);
+                calculated_number v = str2l(value_buffer);
 
                      if(comparison == '<' && value < v) break;
                 else if(comparison == '(' && value <= v) break;

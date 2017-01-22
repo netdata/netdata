@@ -40,9 +40,9 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     double load5 = strtod(procfile_lineword(ff, 0, 1), NULL);
     double load15 = strtod(procfile_lineword(ff, 0, 2), NULL);
 
-    //unsigned long long running_processes  = strtoull(procfile_lineword(ff, 0, 3), NULL, 10);
-    unsigned long long active_processes     = strtoull(procfile_lineword(ff, 0, 4), NULL, 10);
-    //unsigned long long next_pid           = strtoull(procfile_lineword(ff, 0, 5), NULL, 10);
+    //unsigned long long running_processes  = str2ull(procfile_lineword(ff, 0, 3));
+    unsigned long long active_processes     = str2ull(procfile_lineword(ff, 0, 4));
+    //unsigned long long next_pid           = str2ull(procfile_lineword(ff, 0, 5));
 
 
     // --------------------------------------------------------------------

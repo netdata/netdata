@@ -1,9 +1,6 @@
 #include "common.h"
 
 #define RRD_TYPE_NET_SNMP           "ipv4"
-#define RRD_TYPE_NET_SNMP_LEN       strlen(RRD_TYPE_NET_SNMP)
-
-#define NETSTAT_PRESENT 0x00000001
 
 struct netstat_columns {
     char *name;
@@ -174,13 +171,13 @@ static unsigned long long *netstat_columns_find(struct netstat_columns *nc, cons
     fatal("Cannot find key '%s' in /proc/net/snmp internal array.", name);
 }
 
-static void parse_line_pair(procfile *ff, struct netstat_columns *nc, uint32_t header_line, uint32_t values_line) {
-    uint32_t hwords = procfile_linewords(ff, header_line);
-    uint32_t vwords = procfile_linewords(ff, values_line);
-    uint32_t w, i;
+static void parse_line_pair(procfile *ff, struct netstat_columns *nc, size_t header_line, size_t values_line) {
+    size_t hwords = procfile_linewords(ff, header_line);
+    size_t vwords = procfile_linewords(ff, values_line);
+    size_t w, i;
 
     if(unlikely(vwords > hwords)) {
-        error("File /proc/net/snmp on header line %u has %u words, but on value line %u has %u words.", header_line, hwords, values_line, vwords);
+        error("File /proc/net/snmp on header line %zu has %zu words, but on value line %zu has %zu words.", header_line, hwords, values_line, vwords);
         vwords = hwords;
     }
 
@@ -190,7 +187,7 @@ static void parse_line_pair(procfile *ff, struct netstat_columns *nc, uint32_t h
 
         for(i = 0 ; nc[i].name ;i++) {
             if(unlikely(hash == nc[i].hash && !strcmp(key, nc[i].name))) {
-                nc[i].value = strtoull(procfile_lineword(ff, values_line, w), NULL, 10);
+                nc[i].value = str2ull(procfile_lineword(ff, values_line, w));
                 break;
             }
         }
@@ -366,8 +363,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    uint32_t lines = procfile_lines(ff), l;
-    uint32_t words;
+    size_t lines = procfile_lines(ff), l;
+    size_t words;
 
     RRDSET *st;
 
@@ -376,7 +373,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
         uint32_t hash = simple_hash(key);
 
         if(unlikely(hash == hash_ip && strcmp(key, "Ip") == 0)) {
-            uint32_t h = l++;
+            size_t h = l++;
 
             if(strcmp(procfile_lineword(ff, l, 0), "Ip") != 0) {
                 error("Cannot read Ip line from /proc/net/snmp.");
@@ -385,7 +382,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             words = procfile_linewords(ff, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp Ip line. Expected 3+ params, read %u.", words);
+                error("Cannot read /proc/net/snmp Ip line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 
@@ -482,7 +479,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             }
         }
         else if(unlikely(hash == hash_icmp && strcmp(key, "Icmp") == 0)) {
-            uint32_t h = l++;
+            size_t h = l++;
 
             if(strcmp(procfile_lineword(ff, l, 0), "Icmp") != 0) {
                 error("Cannot read Icmp line from /proc/net/snmp.");
@@ -491,7 +488,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             words = procfile_linewords(ff, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp Icmp line. Expected 3+ params, read %u.", words);
+                error("Cannot read /proc/net/snmp Icmp line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 
@@ -532,7 +529,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             }
         }
         else if(unlikely(hash == hash_icmpmsg && strcmp(key, "IcmpMsg") == 0)) {
-            uint32_t h = l++;
+            size_t h = l++;
 
             if(strcmp(procfile_lineword(ff, l, 0), "IcmpMsg") != 0) {
                 error("Cannot read IcmpMsg line from /proc/net/snmp.");
@@ -562,7 +559,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             }
         }
         else if(unlikely(hash == hash_tcp && strcmp(key, "Tcp") == 0)) {
-            uint32_t h = l++;
+            size_t h = l++;
 
             if(strcmp(procfile_lineword(ff, l, 0), "Tcp") != 0) {
                 error("Cannot read Tcp line from /proc/net/snmp.");
@@ -571,7 +568,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             words = procfile_linewords(ff, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp Tcp line. Expected 3+ params, read %u.", words);
+                error("Cannot read /proc/net/snmp Tcp line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 
@@ -655,7 +652,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             }
         }
         else if(unlikely(hash == hash_udp && strcmp(key, "Udp") == 0)) {
-            uint32_t h = l++;
+            size_t h = l++;
 
             if(strcmp(procfile_lineword(ff, l, 0), "Udp") != 0) {
                 error("Cannot read Udp line from /proc/net/snmp.");
@@ -664,7 +661,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             words = procfile_linewords(ff, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp Udp line. Expected 3+ params, read %u.", words);
+                error("Cannot read /proc/net/snmp Udp line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 
@@ -715,7 +712,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             }
         }
         else if(unlikely(hash == hash_udplite && strcmp(key, "UdpLite") == 0)) {
-            uint32_t h = l++;
+            size_t h = l++;
 
             if(strcmp(procfile_lineword(ff, l, 0), "UdpLite") != 0) {
                 error("Cannot read UdpLite line from /proc/net/snmp.");
@@ -724,7 +721,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             words = procfile_linewords(ff, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp UdpLite line. Expected 3+ params, read %u.", words);
+                error("Cannot read /proc/net/snmp UdpLite line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 

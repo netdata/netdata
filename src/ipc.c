@@ -81,10 +81,10 @@ static inline int ipc_sem_get_limits(struct ipc_limits *lim) {
 
     if(procfile_lines(ff) >= 1 && procfile_linewords(ff, 0) >= 4) {
         lim->semvmx = SEMVMX;
-        lim->semmsl = atoi(procfile_lineword(ff, 0, 0));
-        lim->semmns = atoi(procfile_lineword(ff, 0, 1));
-        lim->semopm = atoi(procfile_lineword(ff, 0, 2));
-        lim->semmni = atoi(procfile_lineword(ff, 0, 3));
+        lim->semmsl = str2i(procfile_lineword(ff, 0, 0));
+        lim->semmns = str2i(procfile_lineword(ff, 0, 1));
+        lim->semopm = str2i(procfile_lineword(ff, 0, 2));
+        lim->semmni = str2i(procfile_lineword(ff, 0, 3));
         return 0;
     }
     else {
