@@ -91,7 +91,11 @@ static inline unsigned long long str2ull(const char *s) {
 }
 
 #ifdef NETDATA_STRCMP_OVERRIDE
-static inline int strcmp(const char *a, const char *b) {
+#ifdef strcmp
+#undef strcmp
+#endif
+#define strcmp(a, b) strsame(a, b)
+static inline int strsame(const char *a, const char *b) {
     if(unlikely(a == b)) return 0;
     while(*a && *a == *b) { a++; b++; }
     return *a - *b;
