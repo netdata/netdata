@@ -25,6 +25,18 @@ static inline void mountinfo_reload(int force) {
 struct mount_point_metadata {
     int do_space;
     int do_inodes;
+
+    size_t collected; // the number of times this has been collected
+
+    RRDSET *st_space;
+    RRDDIM *rd_space_used;
+    RRDDIM *rd_space_avail;
+    RRDDIM *rd_space_reserved;
+
+    RRDSET *st_inodes;
+    RRDDIM *rd_inodes_used;
+    RRDDIM *rd_inodes_avail;
+    RRDDIM *rd_inodes_reserved;
 };
 
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
@@ -69,10 +81,22 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         struct mount_point_metadata mp = {
                 .do_space = do_space,
-                .do_inodes = do_inodes
+                .do_inodes = do_inodes,
+
+                .collected = 0,
+
+                .st_space = NULL,
+                .rd_space_avail = NULL,
+                .rd_space_used = NULL,
+                .rd_space_reserved = NULL,
+
+                .st_inodes = NULL,
+                .rd_inodes_avail = NULL,
+                .rd_inodes_used = NULL,
+                .rd_inodes_reserved = NULL
         };
 
-        dictionary_set(mount_points, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
+        m = dictionary_set(mount_points, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
     else {
         do_space = m->do_space;
@@ -82,13 +106,16 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(unlikely(do_space == CONFIG_ONDEMAND_NO && do_inodes == CONFIG_ONDEMAND_NO))
         return;
 
+    if(unlikely(mi->flags & MOUNTINFO_READONLY && !m->collected))
+        return;
+
     struct statvfs buff_statvfs;
     if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
         error("Failed statvfs() for '%s' (disk '%s')", mi->mount_point, disk);
         return;
     }
 
-    // taken from get_fs_usage() found in coreutils
+    // logic found at get_fs_usage() in coreutils
     unsigned long bsize = (buff_statvfs.f_frsize) ? buff_statvfs.f_frsize : buff_statvfs.f_bsize;
 
     fsblkcnt_t bavail         = buff_statvfs.f_bavail;
@@ -121,47 +148,64 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     // --------------------------------------------------------------------------
 
-    RRDSET *st;
+    int rendered = 0;
 
     if(do_space == CONFIG_ONDEMAND_YES || (do_space == CONFIG_ONDEMAND_ONDEMAND && (bavail || breserved_root || bused))) {
-        st = rrdset_find_bytype("disk_space", disk);
-        if(unlikely(!st)) {
-            char title[4096 + 1];
-            snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mi->mount_source);
-            st = rrdset_create("disk_space", disk, NULL, family, "disk.space", title, "GB", 2023, update_every, RRDSET_TYPE_STACKED);
+        if(unlikely(!m->st_space)) {
+            m->do_space = CONFIG_ONDEMAND_YES;
+            m->st_space = rrdset_find_bytype("disk_space", disk);
+            if(unlikely(!m->st_space)) {
+                char title[4096 + 1];
+                snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mi->mount_source);
+                m->st_space = rrdset_create("disk_space", disk, NULL, family, "disk.space", title, "GB", 2023, update_every, RRDSET_TYPE_STACKED);
+            }
 
-            rrddim_add(st, "avail", NULL, bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "used" , NULL, bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "reserved_for_root", "reserved for root", bsize, 1024*1024*1024, RRDDIM_ABSOLUTE);
+            m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, bsize, 1024 * 1024 * 1024, RRDDIM_ABSOLUTE);
+            m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, bsize, 1024 * 1024 * 1024, RRDDIM_ABSOLUTE);
+            m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root", bsize, 1024 * 1024 * 1024, RRDDIM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else
+            rrdset_next(m->st_space);
 
-        rrddim_set(st, "avail", (collected_number)bavail);
-        rrddim_set(st, "used", (collected_number)bused);
-        rrddim_set(st, "reserved_for_root", (collected_number)breserved_root);
-        rrdset_done(st);
+        rrddim_set_by_pointer(m->st_space, m->rd_space_avail,    (collected_number)bavail);
+        rrddim_set_by_pointer(m->st_space, m->rd_space_used,     (collected_number)bused);
+        rrddim_set_by_pointer(m->st_space, m->rd_space_reserved, (collected_number)breserved_root);
+        rrdset_done(m->st_space);
+
+        rendered++;
     }
 
     // --------------------------------------------------------------------------
 
     if(do_inodes == CONFIG_ONDEMAND_YES || (do_inodes == CONFIG_ONDEMAND_ONDEMAND && (favail || freserved_root || fused))) {
-        st = rrdset_find_bytype("disk_inodes", disk);
-        if(unlikely(!st)) {
-            char title[4096 + 1];
-            snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mi->mount_source);
-            st = rrdset_create("disk_inodes", disk, NULL, family, "disk.inodes", title, "Inodes", 2024, update_every, RRDSET_TYPE_STACKED);
+        if(unlikely(!m->st_inodes)) {
+            m->do_inodes = CONFIG_ONDEMAND_YES;
+            m->st_inodes = rrdset_find_bytype("disk_inodes", disk);
+            if(unlikely(!m->st_inodes)) {
+                char title[4096 + 1];
+                snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mi->mount_source);
+                m->st_inodes = rrdset_create("disk_inodes", disk, NULL, family, "disk.inodes", title, "Inodes", 2024, update_every, RRDSET_TYPE_STACKED);
+            }
 
-            rrddim_add(st, "avail", NULL, 1, 1, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "used" , NULL, 1, 1, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRDDIM_ABSOLUTE);
+            m->rd_inodes_avail    = rrddim_add(m->st_inodes, "avail", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            m->rd_inodes_used     = rrddim_add(m->st_inodes, "used", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            m->rd_inodes_reserved = rrddim_add(m->st_inodes, "reserved_for_root", "reserved for root", 1, 1, RRDDIM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else
+            rrdset_next(m->st_inodes);
 
-        rrddim_set(st, "avail", (collected_number)favail);
-        rrddim_set(st, "used", (collected_number)fused);
-        rrddim_set(st, "reserved_for_root", (collected_number)freserved_root);
-        rrdset_done(st);
+        rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_avail,    (collected_number)favail);
+        rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_used,     (collected_number)fused);
+        rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_reserved, (collected_number)freserved_root);
+        rrdset_done(m->st_inodes);
+
+        rendered++;
     }
+
+    // --------------------------------------------------------------------------
+
+    if(likely(rendered))
+        m->collected++;
 }
 
 void *proc_diskspace_main(void *ptr) {
@@ -185,8 +229,6 @@ void *proc_diskspace_main(void *ptr) {
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 
-    RRDSET *stcpu_thread = NULL, *st_duration = NULL;
-    RRDDIM *rd_user = NULL, *rd_system = NULL, *rd_duration = NULL;
     struct rusage thread;
 
     usec_t last = 0, dt = 0;
@@ -219,9 +261,7 @@ void *proc_diskspace_main(void *ptr) {
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
 
-            if(unlikely(mi->flags &
-                        (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND | MOUNTINFO_IS_SAME_DEV | MOUNTINFO_NO_STAT |
-                         MOUNTINFO_NO_SIZE | MOUNTINFO_READONLY)))
+            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND | MOUNTINFO_IS_SAME_DEV | MOUNTINFO_NO_STAT | MOUNTINFO_NO_SIZE)))
                 continue;
 
             do_disk_space_stats(mi, update_every);
@@ -231,6 +271,9 @@ void *proc_diskspace_main(void *ptr) {
         if(unlikely(netdata_exit)) break;
 
         if(vdo_cpu_netdata) {
+            static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
+            static RRDDIM *rd_user = NULL, *rd_system = NULL, *rd_duration = NULL;
+
             // ----------------------------------------------------------------
 
             getrusage(RUSAGE_THREAD, &thread);
@@ -241,7 +284,7 @@ void *proc_diskspace_main(void *ptr) {
                                                  , "NetData Disk Space Plugin CPU usage", "milliseconds/s", 132020
                                                  , update_every, RRDSET_TYPE_STACKED);
 
-                rd_user = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+                rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRDDIM_INCREMENTAL);
                 rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
             }
             else
