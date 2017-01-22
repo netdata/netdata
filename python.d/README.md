@@ -303,6 +303,67 @@ If no configuration is given, module will attempt to connect to dovecot using un
 
 ---
 
+# elasticsearch
+
+Module monitor elasticsearch performance and health metrics
+
+It produces:
+
+1. **Search performance** charts:
+ * Number of queries, fetches
+ * Time spent on queries, fetches
+ * Query and fetch latency
+
+2. **Indexing performance** charts:
+ * Number of documents indexed, index refreshes, flushes
+ * Time spent on indexing, refreshing, flushing
+ * Indexing and flushing latency
+
+3. **Memory usage and garbace collection** charts:
+ * JVM heap currently in use, commited
+ * Count of garbage collections
+ * Time spent on garbage collections
+
+4. **Host metrics** charts:
+ * Available file descriptors in percent 
+ * Opened HTTP connections
+ * Cluster communication transport metrics
+
+5. **Queues and rejections** charts:
+ * Number of queued/rejected threads in thread pool
+
+6. **Fielddata cache** charts:
+ * Fielddata cache size
+ * Fielddata evictions and circuit breaker tripped count
+
+7. **Cluster health API** charts:
+ * Cluster status
+ * Nodes and tasks statistics
+ * Shards statistics
+
+8. **Cluster stats API** charts:
+ * Nodes statistics
+ * Query cache statistics
+ * Docs statistics
+ * Store statistics
+ * Indices and shards statistics
+
+### configuration
+
+Sample:
+
+```yaml
+local:
+  host               :  'ipaddress'   # Server ip address or hostname
+  port               : 'password'     # Port on which elasticsearch listed
+  cluster_health     :  True/False    # Calls to cluster health elasticsearch API. Enabled by default.
+  cluster_stats      :  True/False    # Calls to cluster stats elasticsearch API. Enabled by default.
+```
+
+If no configuration is given, module will fail to run.
+
+---
+
 # exim
 
 Simple module executing `exim -bpc` to grab exim queue. 
@@ -1024,3 +1085,69 @@ Without configuration, module attempts to connect to `http://localhost:8080/mana
 So it will probably fail.
 
 --- 
+
+# varnish cache
+
+Module uses the `varnishstat` command to provide varnish cache statistics.
+
+It produces:
+
+1. **Client metrics**
+ * session accepted
+ * session dropped
+ * good client requests received
+
+2. **All history hit rate ratio**
+ * cache hits in percent
+ * cache miss in percent
+ * cache hits for pass percent
+
+3. **Curent poll hit rate ratio**
+ * cache hits in percent
+ * cache miss in percent
+ * cache hits for pass percent
+
+4. **Thread-related metrics** (only for varnish version 4+)
+ * total number of threads
+ * threads created
+ * threads creation failed
+ * threads hit max
+ * length os session queue
+ * sessions queued for thread
+
+5. **Backend health**
+ * backend conn. success
+ * backend conn. not attempted
+ * backend conn. too many
+ * backend conn. failures
+ * backend conn. reuses
+ * backend conn. recycles
+ * backend conn. retry
+ * backend requests made
+
+6. **Memory usage**
+ * memory available in megabytes
+ * memory allocated in megabytes
+
+7. **Problems summary**
+ * session dropped
+ * session accept failures
+ * session pipe overflow
+ * backend conn. not attempted
+ * fetch failed (all causes)
+ * backend conn. too many
+ * threads hit max
+ * threads destroyed
+ * length of session queue
+ * HTTP header overflows
+ * ESI parse errors
+ * ESI parse warnings
+
+8. **Uptime**
+ * varnish instance uptime in seconds
+
+### configuration
+
+No configuration is needed.
+
+---
