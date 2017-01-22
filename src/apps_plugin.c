@@ -2058,9 +2058,9 @@ static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
         if(likely(fd <= 0 || fd >= all_files_size))
             continue;
 
-        aggregate_fd_on_target(all_files[fd].type, w);
-        aggregate_fd_on_target(all_files[fd].type, u);
-        aggregate_fd_on_target(all_files[fd].type, g);
+        aggregate_fd_on_target(fd, w);
+        aggregate_fd_on_target(fd, u);
+        aggregate_fd_on_target(fd, g);
     }
 }
 
