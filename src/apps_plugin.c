@@ -13,7 +13,7 @@
 // etc.
 #define RATES_DETAIL 10000ULL
 
-#define MAX_SPARE_FDS 10
+#define MAX_SPARE_FDS 1
 
 int debug = 0;
 
@@ -1023,70 +1023,60 @@ static inline void file_descriptor_not_used(int id)
     else    error("Request to decrease counter of fd %d, which is outside the array size (1 to %d)", id, all_files_size);
 }
 
-static inline int file_descriptor_find_or_add(const char *name)
-{
-    static int last_pos = 0;
-    uint32_t hash = simple_hash(name);
+static inline void all_files_grow() {
+    void *old = all_files;
+    int i;
 
+    // there is no empty slot
     if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %u\n", name, hash);
+        fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
 
-    struct file_descriptor *fd = file_descriptor_find(name, hash);
-    if(fd) {
-        // found
+    all_files = reallocz(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
+
+    // if the address changed, we have to rebuild the index
+    // since all pointers are now invalid
+
+    if(unlikely(old && old != (void *)all_files)) {
         if(unlikely(debug))
-            fprintf(stderr, "apps.plugin:   >> found on slot %d\n", fd->pos);
+            fprintf(stderr, "apps.plugin:   >> re-indexing.\n");
 
-        fd->count++;
-        return fd->pos;
-    }
-    // not found
-
-    // check we have enough memory to add it
-    if(!all_files || all_files_len == all_files_size) {
-        void *old = all_files;
-        int i;
-
-        // there is no empty slot
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin: extending fd array to %d entries\n", all_files_size + FILE_DESCRIPTORS_INCREASE_STEP);
-
-        all_files = reallocz(all_files, (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP) * sizeof(struct file_descriptor));
-
-        // if the address changed, we have to rebuild the index
-        // since all pointers are now invalid
-        if(old && old != (void *)all_files) {
-            if(unlikely(debug))
-                fprintf(stderr, "apps.plugin:   >> re-indexing.\n");
-
-            all_files_index.root = NULL;
-            for(i = 0; i < all_files_size; i++) {
-                if(!all_files[i].count) continue;
-                if(unlikely(file_descriptor_add(&all_files[i]) != (void *)&all_files[i]))
-                    error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
-            }
-
-            if(unlikely(debug))
-                fprintf(stderr, "apps.plugin:   >> re-indexing done.\n");
+        all_files_index.root = NULL;
+        for(i = 0; i < all_files_size; i++) {
+            if(!all_files[i].count) continue;
+            if(unlikely(file_descriptor_add(&all_files[i]) != (void *)&all_files[i]))
+                error("INTERNAL ERROR: duplicate indexing of fd during realloc.");
         }
 
-        for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
-            all_files[i].count = 0;
-            all_files[i].name = NULL;
+        if(unlikely(debug))
+            fprintf(stderr, "apps.plugin:   >> re-indexing done.\n");
+    }
+
+    // initialize the newly added entries
+
+    for(i = all_files_size; i < (all_files_size + FILE_DESCRIPTORS_INCREASE_STEP); i++) {
+        all_files[i].count = 0;
+        all_files[i].name = NULL;
 #ifdef NETDATA_INTERNAL_CHECKS
-            all_files[i].magic = 0x00000000;
+        all_files[i].magic = 0x00000000;
 #endif /* NETDATA_INTERNAL_CHECKS */
-            all_files[i].pos = i;
-        }
-
-        if(!all_files_size) all_files_len = 1;
-        all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
+        all_files[i].pos = i;
     }
+
+    if(unlikely(!all_files_size)) all_files_len = 1;
+    all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
+}
+
+static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t hash, int type) {
+    // check we have enough memory to add it
+    if(!all_files || all_files_len == all_files_size)
+        all_files_grow();
 
     if(unlikely(debug))
         fprintf(stderr, "apps.plugin:   >> searching for empty slot.\n");
 
     // search for an empty slot
+
+    static int last_pos = 0;
     int i, c;
     for(i = 0, c = last_pos ; i < all_files_size ; i++, c++) {
         if(c >= all_files_size) c = 0;
@@ -1104,23 +1094,58 @@ static inline int file_descriptor_find_or_add(const char *name)
             if(unlikely(debug))
                 fprintf(stderr, "apps.plugin:   >> %s fd position %d for %s (last name: %s)\n", all_files[c].name?"re-using":"using", c, name, all_files[c].name);
 
-            if(all_files[c].name) freez((void *)all_files[c].name);
+            freez((void *)all_files[c].name);
             all_files[c].name = NULL;
             last_pos = c;
             break;
         }
     }
+
+    all_files_len++;
+
     if(i == all_files_size) {
         fatal("We should find an empty slot, but there isn't any");
         exit(1);
     }
+    // else we have an empty slot in 'c'
 
     if(unlikely(debug))
         fprintf(stderr, "apps.plugin:   >> updating slot %d.\n", c);
 
-    all_files_len++;
+    all_files[c].name = strdupz(name);
+    all_files[c].hash = hash;
+    all_files[c].type = type;
+    all_files[c].pos  = c;
+    all_files[c].count = 1;
+#ifdef NETDATA_INTERNAL_CHECKS
+    all_files[c].magic = 0x0BADCAFE;
+#endif /* NETDATA_INTERNAL_CHECKS */
+    if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
+        error("INTERNAL ERROR: duplicate indexing of fd.");
 
-    // else we have an empty slot in 'c'
+    if(unlikely(debug))
+        fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
+
+    return c;
+}
+
+static inline int file_descriptor_find_or_add(const char *name)
+{
+    uint32_t hash = simple_hash(name);
+
+    if(unlikely(debug))
+        fprintf(stderr, "apps.plugin: adding or finding name '%s' with hash %u\n", name, hash);
+
+    struct file_descriptor *fd = file_descriptor_find(name, hash);
+    if(fd) {
+        // found
+        if(unlikely(debug))
+            fprintf(stderr, "apps.plugin:   >> found on slot %d\n", fd->pos);
+
+        fd->count++;
+        return fd->pos;
+    }
+    // not found
 
     int type;
     if(name[0] == '/') type = FILETYPE_FILE;
@@ -1144,21 +1169,7 @@ static inline int file_descriptor_find_or_add(const char *name)
         type = FILETYPE_OTHER;
     }
 
-    all_files[c].name = strdupz(name);
-    all_files[c].hash = hash;
-    all_files[c].type = type;
-    all_files[c].pos  = c;
-    all_files[c].count = 1;
-#ifdef NETDATA_INTERNAL_CHECKS
-    all_files[c].magic = 0x0BADCAFE;
-#endif /* NETDATA_INTERNAL_CHECKS */
-    if(unlikely(file_descriptor_add(&all_files[c]) != (void *)&all_files[c]))
-        error("INTERNAL ERROR: duplicate indexing of fd.");
-
-    if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: using fd position %d (name: %s)\n", c, all_files[c].name);
-
-    return c;
+    return file_descriptor_set_on_empty_slot(name, hash, type);
 }
 
 static inline int read_pid_file_descriptors(struct pid_stat *p) {
@@ -1189,10 +1200,6 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
                     fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
 
                 p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
-                if(!p->fds) {
-                    fatal("Cannot re-allocate fds for %s", p->comm);
-                    break;
-                }
 
                 // and initialize it
                 for(c = p->fds_size ; c < (fdid + MAX_SPARE_FDS) ; c++) p->fds[c] = 0;
@@ -1972,9 +1979,57 @@ static inline void reallocate_target_fds(struct target *w) {
     w->target_fds_size = all_files_size;
 }
 
-static inline void aggregate_pid_fds_on_target(struct target *w, struct pid_stat *p) {
-    if(unlikely(!w->target_fds || w->target_fds_size < all_files_size))
+static inline void add_fd_on_target(int type, struct target *w) {
+    switch(type) {
+        case FILETYPE_FILE:
+            w->openfiles++;
+            break;
+
+        case FILETYPE_PIPE:
+            w->openpipes++;
+            break;
+
+        case FILETYPE_SOCKET:
+            w->opensockets++;
+            break;
+
+        case FILETYPE_INOTIFY:
+            w->openinotifies++;
+            break;
+
+        case FILETYPE_EVENTFD:
+            w->openeventfds++;
+            break;
+
+        case FILETYPE_TIMERFD:
+            w->opentimerfds++;
+            break;
+
+        case FILETYPE_SIGNALFD:
+            w->opensignalfds++;
+            break;
+
+        case FILETYPE_EVENTPOLL:
+            w->openeventpolls++;
+            break;
+
+        default:
+            w->openother++;
+            break;
+    }
+}
+
+static inline void aggregate_pid_fds_on_targets(struct pid_stat *p) {
+    struct target *w = p->target, *u = p->user_target, *g = p->group_target;
+
+    if(unlikely(w && (!w->target_fds || w->target_fds_size < all_files_size)))
         reallocate_target_fds(w);
+
+    if(unlikely(u && (!u->target_fds || u->target_fds_size < all_files_size)))
+        reallocate_target_fds(u);
+
+    if(unlikely(g && (!g->target_fds || g->target_fds_size < all_files_size)))
+        reallocate_target_fds(g);
 
     int c, size = p->fds_size, *fds = p->fds;
     for(c = 0; c < size ;c++) {
@@ -1983,45 +2038,26 @@ static inline void aggregate_pid_fds_on_target(struct target *w, struct pid_stat
         if(likely(fd <= 0 || fd >= all_files_size))
             continue;
 
-        if(unlikely(!w->target_fds[fd])) {
-            switch(all_files[fd].type) {
-                case FILETYPE_FILE:
-                    w->openfiles++;
-                    break;
+        if(likely(w)) {
+            if(unlikely(!w->target_fds[fd]))
+                add_fd_on_target(all_files[fd].type, w);
 
-                case FILETYPE_PIPE:
-                    w->openpipes++;
-                    break;
-
-                case FILETYPE_SOCKET:
-                    w->opensockets++;
-                    break;
-
-                case FILETYPE_INOTIFY:
-                    w->openinotifies++;
-                    break;
-
-                case FILETYPE_EVENTFD:
-                    w->openeventfds++;
-                    break;
-
-                case FILETYPE_TIMERFD:
-                    w->opentimerfds++;
-                    break;
-
-                case FILETYPE_SIGNALFD:
-                    w->opensignalfds++;
-                    break;
-
-                case FILETYPE_EVENTPOLL:
-                    w->openeventpolls++;
-                    break;
-
-                default:
-                    w->openother++;
-            }
+            w->target_fds[fd]++;
         }
-        w->target_fds[fd]++;
+
+        if(likely(u)) {
+            if(unlikely(!u->target_fds[fd]))
+                add_fd_on_target(all_files[fd].type, u);
+
+            u->target_fds[fd]++;
+        }
+
+        if(likely(g)) {
+            if(unlikely(!g->target_fds[fd]))
+                add_fd_on_target(all_files[fd].type, g);
+
+            g->target_fds[fd]++;
+        }
     }
 }
 
@@ -2062,8 +2098,6 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
         w->processes++;
         w->num_threads += p->num_threads;
 
-        aggregate_pid_fds_on_target(w, p);
-
         if(unlikely(debug || w->debug))
             fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=%llu, stime=%llu, gtime=%llu, cutime=%llu, cstime=%llu, cgtime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
     }
@@ -2082,9 +2116,11 @@ static void calculate_netdata_statistics(void) {
 
     // concentrate everything on the apps_groups_targets
     for(p = root_of_pids; p ; p = p->next) {
+        if(!p->updated) continue;
 
         // --------------------------------------------------------------------
-        // apps_groups targets
+        // assign apps_groups target
+
         if(likely(p->target))
             aggregate_pid_on_target(p->target, p, NULL);
         else
@@ -2092,7 +2128,8 @@ static void calculate_netdata_statistics(void) {
 
 
         // --------------------------------------------------------------------
-        // user targets
+        // assign user target
+
         o = p->user_target;
         if(likely(p->user_target && p->user_target->uid == p->uid))
             w = p->user_target;
@@ -2110,7 +2147,8 @@ static void calculate_netdata_statistics(void) {
 
 
         // --------------------------------------------------------------------
-        // group targets
+        // assign group target
+
         o = p->group_target;
         if(likely(p->group_target && p->group_target->gid == p->gid))
             w = p->group_target;
@@ -2126,6 +2164,12 @@ static void calculate_netdata_statistics(void) {
         else
             error("pid %d %s was left without a group target!", p->pid, p->comm);
 
+
+        // --------------------------------------------------------------------
+        // aggregate all file descriptors
+
+        if(enable_file_charts)
+            aggregate_pid_fds_on_targets(p);
     }
 
     cleanup_exited_pids();
