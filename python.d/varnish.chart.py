@@ -39,6 +39,7 @@ CHARTS = {'backend_health':
                        ['esi_errors_b', None, 'incremental', 1, 1],
                        ['esi_warnings_b', None, 'incremental', 1, 1],
                        ['sess_fail_b', None, 'incremental', 1, 1],
+                       ['sc_pipe_overflow_b', None, 'incremental', 1, 1],
                        ['sess_pipe_overflow_b', None, 'incremental', 1, 1]],
               'options': [None, 'Misbehavior', 'problems', 'Problems summary', 'varnish.bad', 'line']},
           'expunge':
@@ -187,7 +188,7 @@ class Service(SimpleService):
         self.cache_prev = [to_netdata.get('cache_hit', 0), to_netdata.get('cache_miss', 0), to_netdata.get('cache_hitpass', 0)]
 
         # 3.3 Problems summary chart
-        for elem in ['backend_busy', 'backend_unhealthy', 'esi_errors', 'esi_warnings', 'losthdr', 'sess_drop',
+        for elem in ['backend_busy', 'backend_unhealthy', 'esi_errors', 'esi_warnings', 'losthdr', 'sess_drop', 'sc_pipe_overflow',
                      'sess_fail', 'sess_pipe_overflow', 'threads_destroyed', 'threads_failed', 'threads_limited', 'thread_queue_len']:
             if to_netdata.get(elem) is not None:
                 to_netdata[''.join([elem, '_b'])] = to_netdata.get(elem)
