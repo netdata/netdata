@@ -15,6 +15,25 @@ size_t procfile_max_lines = PFLINES_INCREASE_STEP;
 size_t procfile_max_words = PFWORDS_INCREASE_STEP;
 size_t procfile_max_allocation = PROCFILE_INCREMENT_BUFFER;
 
+
+// ----------------------------------------------------------------------------
+
+char *procfile_filename(procfile *ff) {
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, "/proc/self/fd/%d", ff->fd);
+
+    ssize_t l = readlink(buffer, ff->filename, FILENAME_MAX);
+    if(unlikely(l == -1))
+        snprintfz(ff->filename, FILENAME_MAX, "unknown filename for fd %d", ff->fd);
+    else
+        ff->filename[l] = '\0';
+
+    // on non-linux systems, something like this will be needed
+    // fcntl(ff->fd, F_GETPATH, ff->filename)
+
+    return ff->filename;
+}
+
 // ----------------------------------------------------------------------------
 // An array of words
 
@@ -114,7 +133,7 @@ static inline void pflines_free(pflines *fl) {
 #define PF_CHAR_IS_CLOSE        'C'
 
 void procfile_close(procfile *ff) {
-    debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", ff->filename);
+    debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", procfile_filename(ff));
 
     if(likely(ff->lines)) pflines_free(ff->lines);
     if(likely(ff->words)) pfwords_free(ff->words);
@@ -250,26 +269,24 @@ static inline void procfile_parser(procfile *ff) {
 }
 
 procfile *procfile_readall(procfile *ff) {
-    debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
+    // debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
 
-    ssize_t r = 1;
-    ff->len = 0;
-
-    while(likely(r > 0)) {
+    ff->len = 0;    // zero the used size
+    ssize_t r = 1;  // read at least once
+    while(r > 0) {
         ssize_t s = ff->len;
         ssize_t x = ff->size - s;
 
         if(unlikely(!x)) {
-            debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", ff->filename);
-
+            debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s'.", procfile_filename(ff));
             ff = reallocz(ff, sizeof(procfile) + ff->size + PROCFILE_INCREMENT_BUFFER);
             ff->size += PROCFILE_INCREMENT_BUFFER;
         }
 
-        debug(D_PROCFILE, "Reading file '%s', from position %ld with length %lu", ff->filename, s, ff->size - s);
+        debug(D_PROCFILE, "Reading file '%s', from position %ld with length %lu", procfile_filename(ff), s, ff->size - s);
         r = read(ff->fd, &ff->data[s], ff->size - s);
         if(unlikely(r == -1)) {
-            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot read from file '%s'", ff->filename);
+            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot read from file '%s'", procfile_filename(ff));
             procfile_close(ff);
             return NULL;
         }
@@ -277,9 +294,9 @@ procfile *procfile_readall(procfile *ff) {
         ff->len += r;
     }
 
-    debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
+    // debug(D_PROCFILE, "Rewinding file '%s'", ff->filename);
     if(unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
-        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot rewind on file '%s'.", ff->filename);
+        if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
         procfile_close(ff);
         return NULL;
     }
@@ -294,7 +311,7 @@ procfile *procfile_readall(procfile *ff) {
         if(unlikely(ff->words->len > procfile_max_words)) procfile_max_words = ff->words->len;
     }
 
-    debug(D_PROCFILE, "File '%s' updated.", ff->filename);
+    // debug(D_PROCFILE, "File '%s' updated.", ff->filename);
     return ff;
 }
 
@@ -379,7 +396,8 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 
     size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
     procfile *ff = mallocz(sizeof(procfile) + size);
-    strncpyz(ff->filename, filename, FILENAME_MAX);
+
+    //strncpyz(ff->filename, filename, FILENAME_MAX);
 
     ff->fd = fd;
     ff->size = size;
@@ -406,7 +424,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
         return NULL;
     }
 
-    strncpyz(ff->filename, filename, FILENAME_MAX);
+    //strncpyz(ff->filename, filename, FILENAME_MAX);
 
     ff->flags = flags;
 
@@ -423,7 +441,7 @@ void procfile_print(procfile *ff) {
     size_t lines = procfile_lines(ff), l;
     char *s;
 
-    debug(D_PROCFILE, "File '%s' with %zu lines and %zu words", ff->filename, ff->lines->len, ff->words->len);
+    debug(D_PROCFILE, "File '%s' with %zu lines and %zu words", procfile_filename(ff), ff->lines->len, ff->words->len);
 
     for(l = 0; likely(l < lines) ;l++) {
         size_t words = procfile_linewords(ff, l);

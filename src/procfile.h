@@ -59,7 +59,8 @@ typedef struct {
 #define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001
 
 typedef struct {
-    char filename[FILENAME_MAX + 1];
+    char filename[FILENAME_MAX + 1]; // not populated until profile_filename() is called
+
     uint32_t flags;
     int fd;               // the file desriptor
     size_t len;           // the bytes we have placed into data
@@ -88,6 +89,8 @@ extern void procfile_print(procfile *ff);
 
 extern void procfile_set_quotes(procfile *ff, const char *quotes);
 extern void procfile_set_open_close(procfile *ff, const char *open, const char *close);
+
+extern char *procfile_filename(procfile *ff);
 
 // ----------------------------------------------------------------------------
 
