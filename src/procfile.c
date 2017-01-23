@@ -19,6 +19,8 @@ size_t procfile_max_allocation = PROCFILE_INCREMENT_BUFFER;
 // ----------------------------------------------------------------------------
 
 char *procfile_filename(procfile *ff) {
+    if(ff->filename[0]) return ff->filename;
+
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "/proc/self/fd/%d", ff->fd);
 
@@ -398,6 +400,7 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
     procfile *ff = mallocz(sizeof(procfile) + size);
 
     //strncpyz(ff->filename, filename, FILENAME_MAX);
+    ff->filename[0] = '\0';
 
     ff->fd = fd;
     ff->size = size;
@@ -425,6 +428,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
     }
 
     //strncpyz(ff->filename, filename, FILENAME_MAX);
+    ff->filename[0] = '\0';
 
     ff->flags = flags;
 
