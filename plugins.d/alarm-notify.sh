@@ -1056,7 +1056,7 @@ send_discord() {
             "channel": "#${channel}",
             "username": "netdata on ${host}",
             "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
-            "icon_url": "https://discordapp.com/assets/f78426a064bc9dd24847519259bc42af.png",
+            "icon_url": "${images_base_url}/images/seo-performance-128.png",
             "attachments": [
                 {
                     "color": "${color}",
