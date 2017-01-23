@@ -33,7 +33,7 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
 
  - netdata now runs on **FreeBSD** and **MacOS**
  - netdata now supports **Graphite**, **OpenTSDB**, **Prometheus** and compatible backends
- - netdata now monitors **SystemD Services**
+ - netdata now monitors **systemd Services**
  - new plugins: fping, postgres, varnish, elasticsearch, haproxy, freeradius, mdstat, ISC dhcpd, fail2ban, openvpn, NUMA memory, CPU Idle States, gunicorn, ECC memory errors, IPC semaphores, uptime
  - improved plugins: netfilter conntrack, mysql/mariadb, ipfs, cpufreq, hddtemp, sensors, nginx, nginx_log, phpfpm, redis, dovecot, containers and cgroups, disk space, apps.plugin, tc (QoS) and almost all internal plugins (memory, IPv4 and IPv6, network interfaces, QoS, etc)
  - dozens of new and improved alarms (including performance monitoring alarms for mysql)
