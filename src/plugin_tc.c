@@ -317,7 +317,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 d->st_bytes = rrdset_find_bytype(RRD_TYPE_TC, d->id);
                 if(unlikely(!d->st_bytes)) {
                     debug(D_TC_LOOP, "TC: Creating new chart for device '%s'", d->name?d->name:d->id);
-                    d->st_bytes = rrdset_create(RRD_TYPE_TC, d->id, d->name?d->name:d->id, d->family?d->family:d->id, RRD_TYPE_TC ".qos", "Class Usage", "kilobits/s", 7000, rrd_update_every, RRDSET_TYPE_STACKED);
+                    d->st_bytes = rrdset_create(RRD_TYPE_TC, d->id, d->name?d->name:d->id, d->family?d->family:d->id, RRD_TYPE_TC ".qos", "Class Usage", "kilobits/s", 7000, rrd_update_every, d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
                 }
             }
             else {
@@ -376,7 +376,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 d->st_packets = rrdset_find_bytype(RRD_TYPE_TC, id);
                 if(unlikely(!d->st_packets)) {
                     debug(D_TC_LOOP, "TC: Creating new _packets chart for device '%s'", d->name?d->name:d->id);
-                    d->st_packets = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_packets", "Class Packets", "packets/s", 7010, rrd_update_every, RRDSET_TYPE_STACKED);
+                    d->st_packets = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_packets", "Class Packets", "packets/s", 7010, rrd_update_every, d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
                 }
             }
             else {
@@ -430,7 +430,7 @@ static inline void tc_device_commit(struct tc_device *d) {
                 d->st_dropped = rrdset_find_bytype(RRD_TYPE_TC, id);
                 if(unlikely(!d->st_dropped)) {
                     debug(D_TC_LOOP, "TC: Creating new _dropped chart for device '%s'", d->name?d->name:d->id);
-                    d->st_dropped = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_dropped", "Class Dropped Packets", "packets/s", 7020, rrd_update_every, RRDSET_TYPE_STACKED);
+                    d->st_dropped = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_dropped", "Class Dropped Packets", "packets/s", 7020, rrd_update_every, d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
                 }
             }
             else {
