@@ -2,11 +2,8 @@
 # Description: tomcat netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-# Python version higher than 2.7 is needed to run this module.
-
 from base import UrlService
-import xml.etree.ElementTree as ET  # phone home...
-#from xml.parsers.expat import errors
+from re import compile
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -20,23 +17,23 @@ CHARTS = {
     'accesses': {
         'options': [None, "Requests", "requests/s", "statistics", "tomcat.accesses", "area"],
         'lines': [
-            ["accesses", None, 'incremental']
+            ["requestCount", 'accesses', 'incremental']
         ]},
     'volume': {
         'options': [None, "Volume", "KB/s", "volume", "tomcat.volume", "area"],
         'lines': [
-            ["volume", None, 'incremental', 1, 1024]
+            ["bytesSent", 'volume', 'incremental', 1, 1024]
         ]},
     'threads': {
         'options': [None, "Threads", "current threads", "statistics", "tomcat.threads", "line"],
         'lines': [
-            ["current", None, "absolute"],
-            ["busy", None, "absolute"]
+            ["currentThreadCount", 'current', "absolute"],
+            ["currentThreadsBusy", 'busy', "absolute"]
         ]},
     'jvm': {
         'options': [None, "JVM Free Memory", "MB", "statistics", "tomcat.jvm", "area"],
         'lines': [
-            ["jvm", None, "absolute", 1, 1048576]
+            ["free", None, "absolute", 1, 1048576]
         ]}
 }
 
@@ -44,68 +41,24 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        if len(self.url) == 0:
-            self.url = "http://localhost:8080/manager/status?XML=true"
+        self.url = self.configuration.get('url', "http://127.0.0.1:8080/manager/status?XML=true")
         self.order = ORDER
         self.definitions = CHARTS
-        self.port = 8080
+        self.regex = compile(r'([\w]+)=\\?[\'\"](\d+)\\?[\'\"]')
 
     def check(self):
-        if UrlService.check(self):
-            return True
-
-        # get port from url
-        self.port = 0
-        for i in self.url.split('/'):
-            try:
-                int(i[-1])
-                self.port = i.split(':')[-1]
-                break
-            except:
-                pass
-        if self.port == 0:
-            self.port = 80
-
-        test = self._get_data()
-        if test is None or len(test) == 0:
+        if not self.url.endswith('manager/status?XML=true'):
+            self.error('Bad url(%s). Must be http://<ip.address>:<port>/manager/status?XML=true' % self.url)
             return False
-        else:
-            return True
+
+        return UrlService.check(self)
 
     def _get_data(self):
         """
         Format data received from http request
         :return: dict
         """
-        try:
-            raw = self._get_raw_data()
-            try:
-                data = ET.fromstring(raw)
-            except ET.ParseError as e:
-                # if e.code == errors.codes[errors.XML_ERROR_JUNK_AFTER_DOC_ELEMENT]:
-                if e.code == 9:
-                    end = raw.find('</status>')
-                    end += 9
-                    raw = raw[:end]
-                    self.debug(raw)
-                    data = ET.fromstring(raw)
-                else:
-                    raise Exception(e)
-
-            memory = data.find('./jvm/memory')
-            threads = data.find("./connector[@name='\"http-bio-" + str(self.port) + "\"']/threadInfo")
-            requests = data.find("./connector[@name='\"http-bio-" + str(self.port) + "\"']/requestInfo")
-
-            return {'accesses': requests.attrib['requestCount'],
-                    'volume': requests.attrib['bytesSent'],
-                    'current': threads.attrib['currentThreadCount'],
-                    'busy': threads.attrib['currentThreadsBusy'],
-                    'jvm': memory.attrib['free']}
-        except (ValueError, AttributeError) as e:
-            self.debug(str(e))
-            return None
-        except SyntaxError as e:
-            self.error("Tomcat module needs python 2.7 at least. Stopping")
-            self.debug(str(e))
-        except Exception as e:
-            self.debug(str(e))
+        data = self._get_raw_data()
+        if data: data = dict(self.regex.findall(data))
+        
+        return data or None
