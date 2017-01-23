@@ -12,7 +12,7 @@ netdataDashboard.menu = {
     },
 
     'services': {
-        title: 'Systemd Services',
+        title: 'systemd Services',
         icon: '<i class="fa fa-cogs" aria-hidden="true"></i>',
         info: 'Resources utilization of systemd services.'
     },
