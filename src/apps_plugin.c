@@ -475,6 +475,8 @@ struct pid_stat {
     unsigned long long io_collected_usec;
     unsigned long long last_io_collected_usec;
 
+    char *fds_dirname;              // the full directory name in /proc/PID/fd
+
     char *stat_filename;
     char *statm_filename;
     char *io_filename;
@@ -522,11 +524,12 @@ static inline void del_pid_entry(pid_t pid) {
     if(all_pids[pid]->next) all_pids[pid]->next->prev = all_pids[pid]->prev;
     if(all_pids[pid]->prev) all_pids[pid]->prev->next = all_pids[pid]->next;
 
-    if(all_pids[pid]->fds) freez(all_pids[pid]->fds);
-    if(all_pids[pid]->stat_filename) freez(all_pids[pid]->stat_filename);
-    if(all_pids[pid]->statm_filename) freez(all_pids[pid]->statm_filename);
-    if(all_pids[pid]->io_filename) freez(all_pids[pid]->io_filename);
-    if(all_pids[pid]->cmdline_filename) freez(all_pids[pid]->cmdline_filename);
+    freez(all_pids[pid]->fds);
+    freez(all_pids[pid]->fds_dirname);
+    freez(all_pids[pid]->stat_filename);
+    freez(all_pids[pid]->statm_filename);
+    freez(all_pids[pid]->io_filename);
+    freez(all_pids[pid]->cmdline_filename);
     freez(all_pids[pid]);
 
     all_pids[pid] = NULL;
@@ -604,7 +607,8 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     if(unlikely(!ff)) goto cleanup;
 
     // if(set_quotes) procfile_set_quotes(ff, "()");
-    if(set_quotes) procfile_set_open_close(ff, "(", ")");
+    if(unlikely(set_quotes))
+        procfile_set_open_close(ff, "(", ")");
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
@@ -615,7 +619,8 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
 
     // p->pid           = str2ul(procfile_lineword(ff, 0, 0+i));
 
-    strncpyz(p->comm, procfile_lineword(ff, 0, 1), MAX_COMPARE_NAME);
+    if(unlikely(!p->comm[0]))
+        strncpyz(p->comm, procfile_lineword(ff, 0, 1), MAX_COMPARE_NAME);
 
     // p->state         = *(procfile_lineword(ff, 0, 2));
     p->ppid             = (int32_t)str2ul(procfile_lineword(ff, 0, 3));
@@ -1172,74 +1177,106 @@ static inline int file_descriptor_find_or_add(const char *name)
     return file_descriptor_set_on_empty_slot(name, hash, type);
 }
 
-static inline int read_pid_file_descriptors(struct pid_stat *p) {
-    char dirname[FILENAME_MAX+1];
-
-    snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", global_host_prefix, p->pid);
-    DIR *fds = opendir(dirname);
-    if(fds) {
-        int c;
-        struct dirent *de;
-        char fdname[FILENAME_MAX + 1];
-        char linkname[FILENAME_MAX + 1];
-
-        // make the array negative
-        for(c = 0 ; c < p->fds_size ; c++)
-            p->fds[c] = -p->fds[c];
-
-        while((de = readdir(fds))) {
-            if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
-                continue;
-
-            // check if the fds array is small
-            int fdid = (int)str2l(de->d_name);
-            if(fdid < 0) continue;
-            if(fdid >= p->fds_size) {
-                // it is small, extend it
-                if(unlikely(debug))
-                    fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
-
-                p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
-
-                // and initialize it
-                for(c = p->fds_size ; c < (fdid + MAX_SPARE_FDS) ; c++) p->fds[c] = 0;
-                p->fds_size = fdid + MAX_SPARE_FDS;
-            }
-
-            if(p->fds[fdid] == 0) {
-                // we don't know this fd, get it
-
-                sprintf(fdname, "%s/proc/%d/fd/%s", global_host_prefix, p->pid, de->d_name);
-                ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
-                if(l == -1) {
-                    if(debug || (p->target && p->target->debug)) {
-                        if(debug || (p->target && p->target->debug))
-                            error("Cannot read link %s", fdname);
-                    }
-                    continue;
-                }
-                linkname[l] = '\0';
-                file_counter++;
-
-                // if another process already has this, we will get
-                // the same id
-                p->fds[fdid] = file_descriptor_find_or_add(linkname);
-            }
-
-            // else make it positive again, we need it
-            // of course, the actual file may have changed, but we don't care so much
-            // FIXME: we could compare the inode as returned by readdir dirent structure
-            else p->fds[fdid] = -p->fds[fdid];
-        }
-        closedir(fds);
-
-        // remove all the negative file descriptors
-        for(c = 0 ; c < p->fds_size ; c++) if(p->fds[c] < 0) {
-            file_descriptor_not_used(-p->fds[c]);
-            p->fds[c] = 0;
-        }
+static inline void make_all_pid_fds_negative(struct pid_stat *p) {
+    int *fd = p->fds, *end = &p->fds[p->fds_size];
+    while(fd < end) {
+        *fd = -(*fd);
+        fd++;
     }
-    else return 0;
+}
+
+static inline void cleanup_negative_pid_fds(struct pid_stat *p) {
+    int *fd = p->fds, *end = &p->fds[p->fds_size];
+    while(fd < end) {
+        if(unlikely(*fd < 0)) {
+            file_descriptor_not_used(-(*fd));
+            *fd++ = 0;
+        }
+        else
+            fd++;
+    }
+}
+
+static inline void zero_pid_fds(struct pid_stat *p, int first, int size) {
+    int *fd = &p->fds[first], *end = &p->fds[first + size];
+    while(fd < end) *fd++ = 0;
+}
+
+static inline int read_pid_file_descriptors(struct pid_stat *p) {
+    if(unlikely(!p->fds_dirname)) {
+        char dirname[FILENAME_MAX+1];
+        snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", global_host_prefix, p->pid);
+        p->fds_dirname = strdupz(dirname);
+    }
+
+    DIR *fds = opendir(p->fds_dirname);
+    if(unlikely(!fds)) return 0;
+
+    struct dirent *de;
+    char fdname[FILENAME_MAX + 1];
+    char linkname[FILENAME_MAX + 1];
+
+    // we make all pid fds negative, so that
+    // we can detect unused file descriptors
+    // at the end, to free them
+    make_all_pid_fds_negative(p);
+
+    while((de = readdir(fds))) {
+        // we need only files with numeric names
+
+        if(unlikely(de->d_name[0] < '0' || de->d_name[0] > '9'))
+            continue;
+
+        // get its number
+        int fdid = (int)str2l(de->d_name);
+        if(unlikely(fdid < 0)) continue;
+
+        // check if the fds array is small
+        if(unlikely(fdid >= p->fds_size)) {
+            // it is small, extend it
+
+            if(unlikely(debug))
+                fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
+
+            p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
+
+            // and initialize it
+            zero_pid_fds(p, p->fds_size, (fdid + MAX_SPARE_FDS) - p->fds_size);
+            p->fds_size = fdid + MAX_SPARE_FDS;
+        }
+
+        if(unlikely(p->fds[fdid] == 0)) {
+            // we don't know this fd, get it
+
+            sprintf(fdname, "%s/proc/%d/fd/%s", global_host_prefix, p->pid, de->d_name);
+            ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
+            if(unlikely(l == -1)) {
+                if(debug || (p->target && p->target->debug)) {
+                    if(debug || (p->target && p->target->debug))
+                        error("Cannot read link %s", fdname);
+                }
+                continue;
+            }
+            else
+                linkname[l] = '\0';
+
+            file_counter++;
+
+            // if another process already has this, we will get
+            // the same id
+            p->fds[fdid] = file_descriptor_find_or_add(linkname);
+        }
+
+        // else make it positive again, we need it
+        // of course, the actual file may have changed, but we don't care so much
+        // FIXME: we could compare the inode as returned by readdir dirent structure
+
+        else
+            p->fds[fdid] = -p->fds[fdid];
+    }
+
+    closedir(fds);
+    cleanup_negative_pid_fds(p);
 
     return 1;
 }
@@ -1594,6 +1631,37 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
     return status;
 }
 
+static inline void assign_target_to_pid(struct pid_stat *p) {
+    uint32_t hash = simple_hash(p->comm);
+    size_t pclen  = strlen(p->comm);
+
+    struct target *w;
+    for(w = apps_groups_root_target; w ; w = w->next) {
+        // if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
+
+        // find it - 4 cases:
+        // 1. the target is not a pattern
+        // 2. the target has the prefix
+        // 3. the target has the suffix
+        // 4. the target is something inside cmdline
+
+        if(unlikely(( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
+            || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
+            || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
+            || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
+                ))) {
+
+            if(w->target) p->target = w->target;
+            else p->target = w;
+
+            if(debug || (p->target && p->target->debug))
+                fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
+
+            break;
+        }
+    }
+}
+
 static inline int collect_data_for_pid(pid_t pid) {
     if(unlikely(pid <= 0 || pid > pid_max)) {
         error("Invalid pid %d read (expected 1 to %d). Ignoring process.", pid, pid_max);
@@ -1646,32 +1714,7 @@ static inline int collect_data_for_pid(pid_t pid) {
         if(unlikely(debug))
             fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", pid, p->comm);
 
-        uint32_t hash = simple_hash(p->comm);
-        size_t pclen  = strlen(p->comm);
-
-        struct target *w;
-        for(w = apps_groups_root_target; w ; w = w->next) {
-            // if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
-
-            // find it - 4 cases:
-            // 1. the target is not a pattern
-            // 2. the target has the prefix
-            // 3. the target has the suffix
-            // 4. the target is something inside cmdline
-            if( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
-                   || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
-                   || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
-                   || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
-                    ) {
-                if(w->target) p->target = w->target;
-                else p->target = w;
-
-                if(debug || (p->target && p->target->debug))
-                    fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
-
-                break;
-            }
-        }
+        assign_target_to_pid(p);
     }
 
     // --------------------------------------------------------------------
