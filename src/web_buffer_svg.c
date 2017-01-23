@@ -502,6 +502,17 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 #define COLOR_STRING_SIZE 100
 
 void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int value_is_null, int precision) {
+    static uint32_t hash_seconds = 0, hash_seconds_ago = 0, hash_minutes = 0, hash_minutes_ago = 0, hash_hours = 0, hash_hours_ago = 0;
+
+    if(unlikely(!hash_seconds)) {
+        hash_seconds     = simple_hash("seconds");
+        hash_seconds_ago = simple_hash("seconds ago");
+        hash_minutes     = simple_hash("minutes");
+        hash_minutes_ago = simple_hash("minutes ago");
+        hash_hours       = simple_hash("hours");
+        hash_hours_ago   = simple_hash("hours ago");
+    }
+
     char      label_buffer[LABEL_STRING_SIZE + 1]
             , value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
@@ -525,7 +536,11 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
     if(unlikely(isalnum(*units)))
         separator = " ";
 
-    if(unlikely(!strcmp(units, "seconds"))) {
+    uint32_t hash_units = simple_hash(units);
+
+    if(unlikely((hash_units == hash_seconds && !strcmp(units, "seconds")) || (hash_units == hash_seconds_ago && !strcmp(units, "seconds ago")))) {
+        char *suffix = (hash_units == hash_seconds_ago)?" ago":"";
+
         size_t s = (size_t)value;
         size_t d = s / 86400;
         s = s % 86400;
@@ -537,12 +552,14 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         s = s % 60;
 
         if(d)
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zu %s %02zu:%02zu:%02zu", d, (d == 1)?"day":"days", h, m, s);
+            snprintfz(value_string, VALUE_STRING_SIZE, "%zu %s %02zu:%02zu:%02zu%s", d, (d == 1)?"day":"days", h, m, s, suffix);
         else
-            snprintfz(value_string, VALUE_STRING_SIZE, "%02zu:%02zu:%02zu", h, m, s);
+            snprintfz(value_string, VALUE_STRING_SIZE, "%02zu:%02zu:%02zu%s", h, m, s, suffix);
     }
 
-    else if(unlikely(!strcmp(units, "minutes"))) {
+    else if(unlikely((hash_units == hash_minutes && !strcmp(units, "minutes")) || (hash_units == hash_minutes_ago && !strcmp(units, "minutes ago")))) {
+        char *suffix = (hash_units == hash_minutes_ago)?" ago":"";
+
         size_t m = (size_t)value;
         size_t d = m / (60 * 24);
         m = m % (60 * 24);
@@ -551,20 +568,22 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         m = m % 60;
 
         if(d)
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zud %02zuh %02zum", d, h, m);
+            snprintfz(value_string, VALUE_STRING_SIZE, "%zud %02zuh %02zum%s", d, h, m, suffix);
         else
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zuh %zum", h, m);
+            snprintfz(value_string, VALUE_STRING_SIZE, "%zuh %zum%s", h, m, suffix);
     }
 
-    else if(unlikely(!strcmp(units, "hours"))) {
+    else if(unlikely((hash_units == hash_hours && !strcmp(units, "hours")) || (hash_units == hash_hours_ago && !strcmp(units, "hours ago")))) {
+        char *suffix = (hash_units == hash_hours_ago)?" ago":"";
+
         size_t h = (size_t)value;
         size_t d = h / 24;
         h = h % 24;
 
         if(d)
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zud %zuh", d, h);
+            snprintfz(value_string, VALUE_STRING_SIZE, "%zud %zuh%s", d, h, suffix);
         else
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zuh", h);
+            snprintfz(value_string, VALUE_STRING_SIZE, "%zuh%s", h, suffix);
     }
 
     else if(unlikely(value_is_null))
