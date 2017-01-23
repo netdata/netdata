@@ -27,7 +27,7 @@ netdata (1.5.0) - 2016-01-22
    Ilya Mashchenko (@l2isbad) has created most of the python
    data collection plugins in this release !
 
-    - Systemd Services (using cgroups!)
+    - systemd Services (using cgroups!)
     - FPing (yes, network latency in netdata!)
     - postgres databases            @facetoe, @moumoul
     - Vanish disk cache (v3 and v4) @l2isbad
