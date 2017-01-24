@@ -72,9 +72,9 @@ class Service(UrlService):
         """
         data = self._get_raw_data()
         if data:
-            jvm = self.regex_jvm.findall(data)
-            connector = self.regex_connector.findall(data)
-            data = dict(self.regex.findall(''.join([jvm[0] if jvm else '',
-                                                    connector[0] if connector else ''])))
+            jvm = self.regex_jvm.findall(data) or ['']
+            connector = self.regex_connector.findall(data) or ['']
+            data = dict(self.regex.findall(''.join([jvm[0], connector[0]])))
         
         return data or None
+
