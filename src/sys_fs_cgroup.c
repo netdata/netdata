@@ -145,6 +145,7 @@ void read_cgroup_plugin_configuration() {
 
     enabled_cgroup_patterns = simple_pattern_create(
             config_get("plugin:cgroups", "enable by default cgroups matching",
+                    " /system.slice/docker-*.scope "
                     " !*.mount "
                     " !*.partition "
                     " !*.scope "
