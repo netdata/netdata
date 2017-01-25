@@ -181,6 +181,7 @@ void read_cgroup_plugin_configuration() {
 
     enabled_cgroup_renames = simple_pattern_create(
             config_get("plugin:cgroups", "run script to rename cgroups matching",
+                    " /system.slice/docker-*.scope "
                     " !/ "
                     " !*.mount "
                     " !*.partition "
