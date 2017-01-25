@@ -46,8 +46,8 @@ struct netdata_static_thread static_threads[] = {
 #else
     {"proc",               "plugins",   "proc",       1, NULL, NULL, proc_main},
     {"diskspace",          "plugins",   "diskspace",  1, NULL, NULL, proc_diskspace_main},
-#endif /* __FreeBSD__, __APPLE__*/
     {"cgroups",            "plugins",   "cgroups",    1, NULL, NULL, cgroups_main},
+#endif /* __FreeBSD__, __APPLE__*/
     {"check",              "plugins",   "checks",     0, NULL, NULL, checks_main},
     {"backends",            NULL,       NULL,         1, NULL, NULL, backends_main},
     {"health",              NULL,       NULL,         1, NULL, NULL, health_main},
