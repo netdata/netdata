@@ -8,6 +8,7 @@ from copy import deepcopy
 import psycopg2
 from psycopg2 import extensions
 from psycopg2.extras import DictCursor
+from psycopg2 import OperationalError
 
 from base import SimpleService
 
@@ -193,7 +194,7 @@ class Service(SimpleService):
         self.table_stats = configuration.pop('table_stats', True)
         self.index_stats = configuration.pop('index_stats', True)
         self.configuration = configuration
-        self.connection = None
+        self.connection = False
         self.is_superuser = False
         self.data = {}
         self.databases = set()
@@ -207,9 +208,13 @@ class Service(SimpleService):
         params.update(self.configuration)
 
         if not self.connection:
-            self.connection = psycopg2.connect(**params)
-            self.connection.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-            self.connection.set_session(readonly=True)
+            try:
+                self.connection = psycopg2.connect(**params)
+                self.connection.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+                self.connection.set_session(readonly=True)
+            except OperationalError:
+                return False
+        return True
 
     def check(self):
         try:
@@ -291,13 +296,20 @@ class Service(SimpleService):
                 self.definitions[chart_name]['lines'].append([lock_id, label, 'absolute'])
 
     def _get_data(self):
-        self._connect()
-
-        cursor = self.connection.cursor(cursor_factory=DictCursor)
-        self.add_stats(cursor)
-
-        cursor.close()
-        return self.data
+        if self._connect():
+            cursor = self.connection.cursor(cursor_factory=DictCursor)
+            try:
+                self.add_stats(cursor)
+            except OperationalError:
+                if self.connection.closed == 2:
+                    self.connection = False
+                cursor.close()
+                return None
+            else:
+                cursor.close()
+                return self.data
+        else:
+            return None
 
     def add_stats(self, cursor):
         self.add_database_stats(cursor)
