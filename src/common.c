@@ -1155,30 +1155,25 @@ pid_t get_system_pid_max(void) {
         return pid_max;
     #else
 
+    static char read = 0;
+    if(unlikely(read)) return pid_max;
+    read = 1;
+
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", global_host_prefix);
-    procfile *ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
-    if(!ff) {
+
+    unsigned long long max = 0;
+    if(read_single_number_file(filename, &max) != 0) {
         error("Cannot open file '%s'. Assuming system supports %d pids.", filename, pid_max);
         return pid_max;
     }
 
-    ff = procfile_readall(ff);
-    if(!ff) {
-        error("Cannot read file '%s'. Assuming system supports %d pids.", filename, pid_max);
-        return pid_max;
-    }
-
-    pid_max = (pid_t)str2i(procfile_lineword(ff, 0, 0));
-    if(!pid_max) {
-        procfile_close(ff);
-        pid_max = 32768;
+    if(!max) {
         error("Cannot parse file '%s'. Assuming system supports %d pids.", filename, pid_max);
         return pid_max;
     }
 
-    procfile_close(ff);
-    debug(D_SYSTEM, "System supports %d pids.", pid_max);
+    pid_max = (pid_t) max;
     return pid_max;
 
     #endif /* __APPLE__ */

@@ -3,6 +3,19 @@
 
 #include "common.h"
 
+#ifdef KERNEL_32BIT
+typedef uint32_t kernel_uint_t;
+#define str2kernel_unit_t(string) str2uint32_t(string)
+#define KERNEL_UINT_FORMAT "%u"
+#else
+typedef uint64_t kernel_uint_t;
+#define str2kernel_unit_t(string) str2uint64_t(string)
+#define KERNEL_UINT_FORMAT "%lu"
+#endif
+
+#define str2pid_t(string) str2uint32_t(string)
+
+
 // for faster execution, allow the compiler to inline
 // these functions that are called thousands of times per second
 
@@ -67,6 +80,26 @@ static inline long str2l(const char *s) {
     if(unlikely(negative))
         return -n;
 
+    return n;
+}
+
+static inline uint32_t str2uint32_t(const char *s) {
+    uint32_t n = 0;
+    char c;
+    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+        n *= 10;
+        n += c - '0';
+    }
+    return n;
+}
+
+static inline uint64_t str2uint64_t(const char *s) {
+    uint64_t n = 0;
+    char c;
+    for(c = *s; c >= '0' && c <= '9' ; c = *(++s)) {
+        n *= 10;
+        n += c - '0';
+    }
     return n;
 }
 
