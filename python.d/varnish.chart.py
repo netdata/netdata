@@ -145,7 +145,7 @@ class Service(SimpleService):
         if not raw_data:
             return None
 
-        return raw_data
+        return raw_data.decode()
 
     def _get_data(self):
         """
