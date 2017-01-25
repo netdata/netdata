@@ -1,50 +1,114 @@
+
+/*
+ * netdata apps.plugin
+ * (C) Copyright 2016-2017 Costa Tsaousis <costa@tsaousis.gr>
+ * Released under GPL v3+
+ */
+
 #include "common.h"
+
+
+// ----------------------------------------------------------------------------
+// string lengths
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
 #define MAX_CMDLINE 1024
 
-// the rates we are going to send to netdata
-// will have this detail
-// a value of:
-// 1 will send just integer parts to netdata
-// 100 will send 2 decimal points
-// 1000 will send 3 decimal points
+
+// ----------------------------------------------------------------------------
+// the rates we are going to send to netdata will have this detail a value of:
+//  - 1 will send just integer parts to netdata
+//  - 100 will send 2 decimal points
+//  - 1000 will send 3 decimal points
 // etc.
 #define RATES_DETAIL 10000ULL
 
-#define MAX_SPARE_FDS 1
-
-int debug = 0;
-
-int update_every = 1;
-unsigned long long global_iterations_counter = 1;
-unsigned long long file_counter = 0;
-int proc_pid_cmdline_is_needed = 0;
-int include_exited_childs = 1;
-char *config_dir = CONFIG_DIR;
-
-pid_t *all_pids_sortlist = NULL;
-
-// will be automatically set to 1, if guest values are collected
-int show_guest_time = 0;
-int show_guest_time_old = 0;
-
-int enable_guest_charts = 0;
-int enable_file_charts = 1;
-int enable_users_charts = 1;
-int enable_groups_charts = 1;
 
 // ----------------------------------------------------------------------------
+// to avoid reallocating too frequently, we can increase the number of spare
+// file descriptors used by processes.
+// IMPORTANT:
+// having a lot of spares, increases the CPU utilization of the plugin.
+#define MAX_SPARE_FDS 1
 
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
+
+// ----------------------------------------------------------------------------
+// command line options
+
+static int
+        debug = 0,
+        update_every = 1,
+        enable_guest_charts = 0,
+        enable_file_charts = 1,
+        enable_users_charts = 1,
+        enable_groups_charts = 1,
+        include_exited_childs = 1;
+
+
+// will be changed to getenv(NETDATA_CONFIG_DIR) if it exists
+static char *config_dir = CONFIG_DIR;
+
+// ----------------------------------------------------------------------------
+// internal flags
+// handled in code (automatically set)
+
+static int
+        show_guest_time = 0,            // 1 when guest values are collected
+        show_guest_time_old = 0,
+        proc_pid_cmdline_is_needed = 0; // 1 when we need to read /proc/cmdline
+
+
+// ----------------------------------------------------------------------------
+// internal counters
+
+static size_t
+        global_iterations_counter = 1,
+        file_counter = 0;
+
+
+// ----------------------------------------------------------------------------
+// Normalization
+//
+// With normalization we lower the collected metrics by a factor to make them
+// match the total utilization of the system.
+// The discrepancy exists because apps.plugin needs some time to collect all
+// the metrics. This results in utilization that exceeds the total utilization
+// of the system.
+//
+// With normalization we align the per-process utilization, to the total of
+// the system. We first consume the exited children utilization and it the
+// collected values is above the total, we proportionally scale each reported
+// metric.
+
+// the total system time, as reported by /proc/stat
+static kernel_uint_t
+        global_utime = 0,
+        global_stime = 0,
+        global_gtime = 0;
+
+
+// the normalization ratios, as calculated by normalize_utilization()
+double  utime_fix_ratio = 1.0,
+        stime_fix_ratio = 1.0,
+        gtime_fix_ratio = 1.0,
+        minflt_fix_ratio = 1.0,
+        majflt_fix_ratio = 1.0,
+        cutime_fix_ratio = 1.0,
+        cstime_fix_ratio = 1.0,
+        cgtime_fix_ratio = 1.0,
+        cminflt_fix_ratio = 1.0,
+        cmajflt_fix_ratio = 1.0;
 
 
 // ----------------------------------------------------------------------------
 // target
-// target is the structure that process data are aggregated
+//
+// target is the structure that processes are aggregated to be reported
+// to netdata.
+//
+// - Each entry in /etc/apps_groups.conf creates a target.
+// - Each user and group used by a process in the system, creates a target.
 
 struct target {
     char compare[MAX_COMPARE_NAME + 1];
@@ -59,74 +123,280 @@ struct target {
     uid_t uid;
     gid_t gid;
 
-    unsigned long long minflt;
-    unsigned long long cminflt;
-    unsigned long long majflt;
-    unsigned long long cmajflt;
-    unsigned long long utime;
-    unsigned long long stime;
-    unsigned long long gtime;
-    unsigned long long cutime;
-    unsigned long long cstime;
-    unsigned long long cgtime;
-    unsigned long long num_threads;
-    // unsigned long long rss;
+    kernel_uint_t minflt;
+    kernel_uint_t cminflt;
+    kernel_uint_t majflt;
+    kernel_uint_t cmajflt;
+    kernel_uint_t utime;
+    kernel_uint_t stime;
+    kernel_uint_t gtime;
+    kernel_uint_t cutime;
+    kernel_uint_t cstime;
+    kernel_uint_t cgtime;
+    kernel_uint_t num_threads;
+    // kernel_uint_t rss;
 
-    unsigned long long statm_size;
-    unsigned long long statm_resident;
-    unsigned long long statm_share;
-    // unsigned long long statm_text;
-    // unsigned long long statm_lib;
-    // unsigned long long statm_data;
-    // unsigned long long statm_dirty;
+    kernel_uint_t statm_size;
+    kernel_uint_t statm_resident;
+    kernel_uint_t statm_share;
+    // kernel_uint_t statm_text;
+    // kernel_uint_t statm_lib;
+    // kernel_uint_t statm_data;
+    // kernel_uint_t statm_dirty;
 
-    unsigned long long io_logical_bytes_read;
-    unsigned long long io_logical_bytes_written;
-    // unsigned long long io_read_calls;
-    // unsigned long long io_write_calls;
-    unsigned long long io_storage_bytes_read;
-    unsigned long long io_storage_bytes_written;
-    // unsigned long long io_cancelled_write_bytes;
+    kernel_uint_t io_logical_bytes_read;
+    kernel_uint_t io_logical_bytes_written;
+    // kernel_uint_t io_read_calls;
+    // kernel_uint_t io_write_calls;
+    kernel_uint_t io_storage_bytes_read;
+    kernel_uint_t io_storage_bytes_written;
+    // kernel_uint_t io_cancelled_write_bytes;
 
     int *target_fds;
     int target_fds_size;
 
-    unsigned long long openfiles;
-    unsigned long long openpipes;
-    unsigned long long opensockets;
-    unsigned long long openinotifies;
-    unsigned long long openeventfds;
-    unsigned long long opentimerfds;
-    unsigned long long opensignalfds;
-    unsigned long long openeventpolls;
-    unsigned long long openother;
+    kernel_uint_t openfiles;
+    kernel_uint_t openpipes;
+    kernel_uint_t opensockets;
+    kernel_uint_t openinotifies;
+    kernel_uint_t openeventfds;
+    kernel_uint_t opentimerfds;
+    kernel_uint_t opensignalfds;
+    kernel_uint_t openeventpolls;
+    kernel_uint_t openother;
 
-    unsigned long processes;    // how many processes have been merged to this
-    int exposed;                // if set, we have sent this to netdata
-    int hidden;                 // if set, we set the hidden flag on the dimension
+    unsigned int processes; // how many processes have been merged to this
+    int exposed;            // if set, we have sent this to netdata
+    int hidden;             // if set, we set the hidden flag on the dimension
     int debug;
     int ends_with;
-    int starts_with;            // if set, the compare string matches only the
-                                // beginning of the command
+    int starts_with;        // if set, the compare string matches only the
+                            // beginning of the command
 
-    struct target *target;      // the one that will be reported to netdata
+    struct target *target;  // the one that will be reported to netdata
     struct target *next;
 };
 
+struct target
+        *apps_groups_default_target = NULL, // the default target
+        *apps_groups_root_target = NULL,    // apps_groups.conf defined
+        *users_root_target = NULL,          // users
+        *groups_root_target = NULL;         // user groups
+
+size_t
+        apps_groups_targets_count = 0;       // # of apps_groups.conf targets
+
+
+// ----------------------------------------------------------------------------
+// pid_stat
+//
+// structure to store data for each process running
+// see: man proc for the description of the fields
+
+struct pid_stat {
+    int32_t pid;
+    char comm[MAX_COMPARE_NAME + 1];
+    char cmdline[MAX_CMDLINE + 1];
+
+    uint32_t log_thrown;
+
+    // char state;
+    int32_t ppid;
+    // int32_t pgrp;
+    // int32_t session;
+    // int32_t tty_nr;
+    // int32_t tpgid;
+    // uint64_t flags;
+
+    // these are raw values collected
+    kernel_uint_t minflt_raw;
+    kernel_uint_t cminflt_raw;
+    kernel_uint_t majflt_raw;
+    kernel_uint_t cmajflt_raw;
+    kernel_uint_t utime_raw;
+    kernel_uint_t stime_raw;
+    kernel_uint_t gtime_raw; // guest_time
+    kernel_uint_t cutime_raw;
+    kernel_uint_t cstime_raw;
+    kernel_uint_t cgtime_raw; // cguest_time
+
+    // these are rates
+    kernel_uint_t minflt;
+    kernel_uint_t cminflt;
+    kernel_uint_t majflt;
+    kernel_uint_t cmajflt;
+    kernel_uint_t utime;
+    kernel_uint_t stime;
+    kernel_uint_t gtime;
+    kernel_uint_t cutime;
+    kernel_uint_t cstime;
+    kernel_uint_t cgtime;
+
+    // int64_t priority;
+    // int64_t nice;
+    int32_t num_threads;
+    // int64_t itrealvalue;
+    // kernel_uint_t starttime;
+    // kernel_uint_t vsize;
+    // kernel_uint_t rss;
+    // kernel_uint_t rsslim;
+    // kernel_uint_t starcode;
+    // kernel_uint_t endcode;
+    // kernel_uint_t startstack;
+    // kernel_uint_t kstkesp;
+    // kernel_uint_t kstkeip;
+    // uint64_t signal;
+    // uint64_t blocked;
+    // uint64_t sigignore;
+    // uint64_t sigcatch;
+    // uint64_t wchan;
+    // uint64_t nswap;
+    // uint64_t cnswap;
+    // int32_t exit_signal;
+    // int32_t processor;
+    // uint32_t rt_priority;
+    // uint32_t policy;
+    // kernel_uint_t delayacct_blkio_ticks;
+
+    uid_t uid;
+    gid_t gid;
+
+    kernel_uint_t statm_size;
+    kernel_uint_t statm_resident;
+    kernel_uint_t statm_share;
+    // kernel_uint_t statm_text;
+    // kernel_uint_t statm_lib;
+    // kernel_uint_t statm_data;
+    // kernel_uint_t statm_dirty;
+
+    kernel_uint_t io_logical_bytes_read_raw;
+    kernel_uint_t io_logical_bytes_written_raw;
+    // kernel_uint_t io_read_calls_raw;
+    // kernel_uint_t io_write_calls_raw;
+    kernel_uint_t io_storage_bytes_read_raw;
+    kernel_uint_t io_storage_bytes_written_raw;
+    // kernel_uint_t io_cancelled_write_bytes_raw;
+
+    kernel_uint_t io_logical_bytes_read;
+    kernel_uint_t io_logical_bytes_written;
+    // kernel_uint_t io_read_calls;
+    // kernel_uint_t io_write_calls;
+    kernel_uint_t io_storage_bytes_read;
+    kernel_uint_t io_storage_bytes_written;
+    // kernel_uint_t io_cancelled_write_bytes;
+
+    int *fds;                       // array of fds it uses
+    int fds_size;                   // the size of the fds array
+
+    int children_count;             // number of processes directly referencing this
+    char keep:1;                    // 1 when we need to keep this process in memory even after it exited
+    int keeploops;                  // increases by 1 every time keep is 1 and updated 0
+    char updated:1;                 // 1 when the process is currently running
+    char merged:1;                  // 1 when it has been merged to its parent
+    char new_entry:1;               // 1 when this is a new process, just saw for the first time
+    char read:1;                    // 1 when we have already read this process for this iteration
+
+    int sortlist;                   // higher numbers = top on the process tree
+                                    // each process gets a unique number
+
+    struct target *target;          // app_groups.conf targets
+    struct target *user_target;     // uid based targets
+    struct target *group_target;    // gid based targets
+
+    usec_t stat_collected_usec;
+    usec_t last_stat_collected_usec;
+
+    usec_t io_collected_usec;
+    usec_t last_io_collected_usec;
+
+    char *fds_dirname;              // the full directory name in /proc/PID/fd
+
+    char *stat_filename;
+    char *statm_filename;
+    char *io_filename;
+    char *cmdline_filename;
+
+    struct pid_stat *parent;
+    struct pid_stat *prev;
+    struct pid_stat *next;
+};
+
+// log each problem once per process
+// log flood protection flags (log_thrown)
+#define PID_LOG_IO      0x00000001
+#define PID_LOG_STATM   0x00000002
+#define PID_LOG_CMDLINE 0x00000004
+#define PID_LOG_FDS     0x00000008
+#define PID_LOG_STAT    0x00000010
+
+static struct pid_stat
+        *root_of_pids = NULL,   // global list of all processes running
+        **all_pids = NULL;      // to avoid allocations, we pre-allocate the
+                                // the entire pid space.
+
+static size_t
+        all_pids_count = 0;     // the number of processes running
+
+// Another pre-allocated list of all possible pids.
+// We need it to pids and assign them a unique sortlist id, so that we
+// read parents before children. This is needed to prevent a situation where
+// a child is found running, but until we read its parent, it has exited and
+// its parent has accumulated its resources.
+static pid_t
+        *all_pids_sortlist = NULL;
+
+
+// ----------------------------------------------------------------------------
+// file descriptor
+//
+// this is used to keep a global list of all open files of the system.
+// it is needed in order to calculate the unique files processes have open.
+
+#define FILE_DESCRIPTORS_INCREASE_STEP 100
+
+struct file_descriptor {
+    avl avl;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    uint32_t magic;
+#endif /* NETDATA_INTERNAL_CHECKS */
+
+    const char *name;
+    uint32_t hash;
+
+    char type;
+    int count;
+    int pos;
+} *all_files = NULL;
+
+static int
+        all_files_len = 0,
+        all_files_size = 0;
+
+// types for struct file_descriptor->type
+#define FILETYPE_OTHER      0
+#define FILETYPE_FILE       1
+#define FILETYPE_PIPE       2
+#define FILETYPE_SOCKET     3
+#define FILETYPE_INOTIFY    4
+#define FILETYPE_EVENTFD    5
+#define FILETYPE_EVENTPOLL  6
+#define FILETYPE_TIMERFD    7
+#define FILETYPE_SIGNALFD   8
+
+
+// ----------------------------------------------------------------------------
+// callback required by fatal()
+
+void netdata_cleanup_and_exit(int ret) {
+    exit(ret);
+}
 
 // ----------------------------------------------------------------------------
 // apps_groups.conf
 // aggregate all processes in groups, to have a limited number of dimensions
 
-struct target *apps_groups_root_target = NULL;
-struct target *apps_groups_default_target = NULL;
-long apps_groups_targets = 0;
-
-struct target *users_root_target = NULL;
-struct target *groups_root_target = NULL;
-
-static struct target *get_users_target(uid_t uid)
-{
+static struct target *get_users_target(uid_t uid) {
     struct target *w;
     for(w = users_root_target ; w ; w = w->next)
         if(w->uid == uid) return w;
@@ -221,10 +491,12 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
             if(*name == '-') thidden = 1;
             name++;
         }
-        for(target = apps_groups_root_target ; target ; target = target->next) {
+
+        for(target = apps_groups_root_target ; target != NULL ; target = target->next) {
             if(!target->target && strcmp(name, target->name) == 0)
                 break;
         }
+
         if(unlikely(debug)) {
             if(unlikely(target))
                 fprintf(stderr, "apps.plugin: REUSING TARGET NAME '%s' on ID '%s'\n", target->name, target->id);
@@ -302,10 +574,10 @@ static int read_apps_groups_conf(const char *file)
     if(!ff)
         return 1;
 
-    unsigned long line, lines = procfile_lines(ff);
+    size_t line, lines = procfile_lines(ff);
 
     for(line = 0; line < lines ;line++) {
-        unsigned long word, words = procfile_linewords(ff, line);
+        size_t word, words = procfile_linewords(ff, line);
         if(!words) continue;
 
         char *name = procfile_lineword(ff, line, 0);
@@ -351,146 +623,10 @@ static int read_apps_groups_conf(const char *file)
 
 
 // ----------------------------------------------------------------------------
-// data to store for each pid
-// see: man proc
-
-#define PID_LOG_IO      0x00000001
-#define PID_LOG_STATM   0x00000002
-#define PID_LOG_CMDLINE 0x00000004
-#define PID_LOG_FDS     0x00000008
-#define PID_LOG_STAT    0x00000010
-
-struct pid_stat {
-    int32_t pid;
-    char comm[MAX_COMPARE_NAME + 1];
-    char cmdline[MAX_CMDLINE + 1];
-
-    uint32_t log_thrown;
-
-    // char state;
-    int32_t ppid;
-    // int32_t pgrp;
-    // int32_t session;
-    // int32_t tty_nr;
-    // int32_t tpgid;
-    // uint64_t flags;
-
-    // these are raw values collected
-    unsigned long long minflt_raw;
-    unsigned long long cminflt_raw;
-    unsigned long long majflt_raw;
-    unsigned long long cmajflt_raw;
-    unsigned long long utime_raw;
-    unsigned long long stime_raw;
-    unsigned long long gtime_raw; // guest_time
-    unsigned long long cutime_raw;
-    unsigned long long cstime_raw;
-    unsigned long long cgtime_raw; // cguest_time
-
-    // these are rates
-    unsigned long long minflt;
-    unsigned long long cminflt;
-    unsigned long long majflt;
-    unsigned long long cmajflt;
-    unsigned long long utime;
-    unsigned long long stime;
-    unsigned long long gtime;
-    unsigned long long cutime;
-    unsigned long long cstime;
-    unsigned long long cgtime;
-
-    // int64_t priority;
-    // int64_t nice;
-    int32_t num_threads;
-    // int64_t itrealvalue;
-    // unsigned long long starttime;
-    // unsigned long long vsize;
-    // unsigned long long rss;
-    // unsigned long long rsslim;
-    // unsigned long long starcode;
-    // unsigned long long endcode;
-    // unsigned long long startstack;
-    // unsigned long long kstkesp;
-    // unsigned long long kstkeip;
-    // uint64_t signal;
-    // uint64_t blocked;
-    // uint64_t sigignore;
-    // uint64_t sigcatch;
-    // uint64_t wchan;
-    // uint64_t nswap;
-    // uint64_t cnswap;
-    // int32_t exit_signal;
-    // int32_t processor;
-    // uint32_t rt_priority;
-    // uint32_t policy;
-    // unsigned long long delayacct_blkio_ticks;
-
-    uid_t uid;
-    gid_t gid;
-
-    unsigned long long statm_size;
-    unsigned long long statm_resident;
-    unsigned long long statm_share;
-    // unsigned long long statm_text;
-    // unsigned long long statm_lib;
-    // unsigned long long statm_data;
-    // unsigned long long statm_dirty;
-
-    unsigned long long io_logical_bytes_read_raw;
-    unsigned long long io_logical_bytes_written_raw;
-    // unsigned long long io_read_calls_raw;
-    // unsigned long long io_write_calls_raw;
-    unsigned long long io_storage_bytes_read_raw;
-    unsigned long long io_storage_bytes_written_raw;
-    // unsigned long long io_cancelled_write_bytes_raw;
-
-    unsigned long long io_logical_bytes_read;
-    unsigned long long io_logical_bytes_written;
-    // unsigned long long io_read_calls;
-    // unsigned long long io_write_calls;
-    unsigned long long io_storage_bytes_read;
-    unsigned long long io_storage_bytes_written;
-    // unsigned long long io_cancelled_write_bytes;
-
-    int *fds;                       // array of fds it uses
-    int fds_size;                   // the size of the fds array
-
-    int children_count;             // number of processes directly referencing this
-    int keep;                       // 1 when we need to keep this process in memory even after it exited
-    int keeploops;                  // increases by 1 every time keep is 1 and updated 0
-    int updated;                    // 1 when the process is currently running
-    int merged;                     // 1 when it has been merged to its parent
-    int new_entry;                  // 1 when this is a new process, just saw for the first time
-    int read;                       // 1 when we have already read this process for this iteration
-    int sortlist;                   // higher numbers = top on the process tree
-                                    // each process gets a unique number
-
-    struct target *target;          // app_groups.conf targets
-    struct target *user_target;     // uid based targets
-    struct target *group_target;    // gid based targets
-
-    unsigned long long stat_collected_usec;
-    unsigned long long last_stat_collected_usec;
-
-    unsigned long long io_collected_usec;
-    unsigned long long last_io_collected_usec;
-
-    char *fds_dirname;              // the full directory name in /proc/PID/fd
-
-    char *stat_filename;
-    char *statm_filename;
-    char *io_filename;
-    char *cmdline_filename;
-
-    struct pid_stat *parent;
-    struct pid_stat *prev;
-    struct pid_stat *next;
-} *root_of_pids = NULL, **all_pids;
-
-long all_pids_count = 0;
+// struct pid_stat management
 
 static inline struct pid_stat *get_pid_entry(pid_t pid) {
-    if(all_pids[pid]) {
+    if(unlikely(all_pids[pid])) {
         all_pids[pid]->new_entry = 0;
         return all_pids[pid];
     }
@@ -499,7 +635,9 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
     all_pids[pid]->fds = callocz(sizeof(int), MAX_SPARE_FDS);
     all_pids[pid]->fds_size = MAX_SPARE_FDS;
 
-    if(root_of_pids) root_of_pids->prev = all_pids[pid];
+    if(likely(root_of_pids))
+        root_of_pids->prev = all_pids[pid];
+
     all_pids[pid]->next = root_of_pids;
     root_of_pids = all_pids[pid];
 
@@ -512,7 +650,7 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
 }
 
 static inline void del_pid_entry(pid_t pid) {
-    if(!all_pids[pid]) {
+    if(unlikely(!all_pids[pid])) {
         error("attempted to free pid %d that is not allocated.", pid);
         return;
     }
@@ -520,7 +658,9 @@ static inline void del_pid_entry(pid_t pid) {
     if(unlikely(debug))
         fprintf(stderr, "apps.plugin: process %d %s exited, deleting it.\n", pid, all_pids[pid]->comm);
 
-    if(root_of_pids == all_pids[pid]) root_of_pids = all_pids[pid]->next;
+    if(root_of_pids == all_pids[pid])
+        root_of_pids = all_pids[pid]->next;
+
     if(all_pids[pid]->next) all_pids[pid]->next->prev = all_pids[pid]->prev;
     if(all_pids[pid]->prev) all_pids[pid]->prev->next = all_pids[pid]->next;
 
@@ -617,86 +757,86 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     p->stat_collected_usec = now_realtime_usec();
     file_counter++;
 
-    // p->pid           = str2ul(procfile_lineword(ff, 0, 0+i));
+    // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0+i));
 
     if(unlikely(!p->comm[0]))
         strncpyz(p->comm, procfile_lineword(ff, 0, 1), MAX_COMPARE_NAME);
 
     // p->state         = *(procfile_lineword(ff, 0, 2));
-    p->ppid             = (int32_t)str2ul(procfile_lineword(ff, 0, 3));
+    p->ppid             = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
     // p->pgrp          = str2ul(procfile_lineword(ff, 0, 4));
     // p->session       = str2ul(procfile_lineword(ff, 0, 5));
     // p->tty_nr        = str2ul(procfile_lineword(ff, 0, 6));
     // p->tpgid         = str2ul(procfile_lineword(ff, 0, 7));
     // p->flags         = str2ull(procfile_lineword(ff, 0, 8));
 
-    unsigned long long last;
+    kernel_uint_t last;
 
     last = p->minflt_raw;
-    p->minflt_raw       = str2ull(procfile_lineword(ff, 0, 9));
+    p->minflt_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 9));
     p->minflt = (p->minflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cminflt_raw;
-    p->cminflt_raw      = str2ull(procfile_lineword(ff, 0, 10));
+    p->cminflt_raw      = str2kernel_unit_t(procfile_lineword(ff, 0, 10));
     p->cminflt = (p->cminflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->majflt_raw;
-    p->majflt_raw       = str2ull(procfile_lineword(ff, 0, 11));
+    p->majflt_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 11));
     p->majflt = (p->majflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cmajflt_raw;
-    p->cmajflt_raw      = str2ull(procfile_lineword(ff, 0, 12));
+    p->cmajflt_raw      = str2kernel_unit_t(procfile_lineword(ff, 0, 12));
     p->cmajflt = (p->cmajflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->utime_raw;
-    p->utime_raw        = str2ull(procfile_lineword(ff, 0, 13));
+    p->utime_raw        = str2kernel_unit_t(procfile_lineword(ff, 0, 13));
     p->utime = (p->utime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->stime_raw;
-    p->stime_raw        = str2ull(procfile_lineword(ff, 0, 14));
+    p->stime_raw        = str2kernel_unit_t(procfile_lineword(ff, 0, 14));
     p->stime = (p->stime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cutime_raw;
-    p->cutime_raw       = str2ull(procfile_lineword(ff, 0, 15));
+    p->cutime_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 15));
     p->cutime = (p->cutime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cstime_raw;
-    p->cstime_raw       = str2ull(procfile_lineword(ff, 0, 16));
+    p->cstime_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 16));
     p->cstime = (p->cstime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
-    // p->priority      = str2ull(procfile_lineword(ff, 0, 17));
-    // p->nice          = str2ull(procfile_lineword(ff, 0, 18));
-    p->num_threads      = (int32_t)str2ul(procfile_lineword(ff, 0, 19));
-    // p->itrealvalue   = str2ull(procfile_lineword(ff, 0, 20));
-    // p->starttime     = str2ull(procfile_lineword(ff, 0, 21));
-    // p->vsize         = str2ull(procfile_lineword(ff, 0, 22));
-    // p->rss           = str2ull(procfile_lineword(ff, 0, 23));
-    // p->rsslim        = str2ull(procfile_lineword(ff, 0, 24));
-    // p->starcode      = str2ull(procfile_lineword(ff, 0, 25));
-    // p->endcode       = str2ull(procfile_lineword(ff, 0, 26));
-    // p->startstack    = str2ull(procfile_lineword(ff, 0, 27));
-    // p->kstkesp       = str2ull(procfile_lineword(ff, 0, 28));
-    // p->kstkeip       = str2ull(procfile_lineword(ff, 0, 29));
-    // p->signal        = str2ull(procfile_lineword(ff, 0, 30));
-    // p->blocked       = str2ull(procfile_lineword(ff, 0, 31));
-    // p->sigignore     = str2ull(procfile_lineword(ff, 0, 32));
-    // p->sigcatch      = str2ull(procfile_lineword(ff, 0, 33));
-    // p->wchan         = str2ull(procfile_lineword(ff, 0, 34));
-    // p->nswap         = str2ull(procfile_lineword(ff, 0, 35));
-    // p->cnswap        = str2ull(procfile_lineword(ff, 0, 36));
-    // p->exit_signal   = str2ul(procfile_lineword(ff, 0, 37));
-    // p->processor     = str2ul(procfile_lineword(ff, 0, 38));
-    // p->rt_priority   = str2ul(procfile_lineword(ff, 0, 39));
-    // p->policy        = str2ul(procfile_lineword(ff, 0, 40));
-    // p->delayacct_blkio_ticks = str2ull(procfile_lineword(ff, 0, 41));
+    // p->priority      = str2kernel_unit_t(procfile_lineword(ff, 0, 17));
+    // p->nice          = str2kernel_unit_t(procfile_lineword(ff, 0, 18));
+    p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
+    // p->itrealvalue   = str2kernel_unit_t(procfile_lineword(ff, 0, 20));
+    // p->starttime     = str2kernel_unit_t(procfile_lineword(ff, 0, 21));
+    // p->vsize         = str2kernel_unit_t(procfile_lineword(ff, 0, 22));
+    // p->rss           = str2kernel_unit_t(procfile_lineword(ff, 0, 23));
+    // p->rsslim        = str2kernel_unit_t(procfile_lineword(ff, 0, 24));
+    // p->starcode      = str2kernel_unit_t(procfile_lineword(ff, 0, 25));
+    // p->endcode       = str2kernel_unit_t(procfile_lineword(ff, 0, 26));
+    // p->startstack    = str2kernel_unit_t(procfile_lineword(ff, 0, 27));
+    // p->kstkesp       = str2kernel_unit_t(procfile_lineword(ff, 0, 28));
+    // p->kstkeip       = str2kernel_unit_t(procfile_lineword(ff, 0, 29));
+    // p->signal        = str2kernel_unit_t(procfile_lineword(ff, 0, 30));
+    // p->blocked       = str2kernel_unit_t(procfile_lineword(ff, 0, 31));
+    // p->sigignore     = str2kernel_unit_t(procfile_lineword(ff, 0, 32));
+    // p->sigcatch      = str2kernel_unit_t(procfile_lineword(ff, 0, 33));
+    // p->wchan         = str2kernel_unit_t(procfile_lineword(ff, 0, 34));
+    // p->nswap         = str2kernel_unit_t(procfile_lineword(ff, 0, 35));
+    // p->cnswap        = str2kernel_unit_t(procfile_lineword(ff, 0, 36));
+    // p->exit_signal   = str2kernel_unit_t(procfile_lineword(ff, 0, 37));
+    // p->processor     = str2kernel_unit_t(procfile_lineword(ff, 0, 38));
+    // p->rt_priority   = str2kernel_unit_t(procfile_lineword(ff, 0, 39));
+    // p->policy        = str2kernel_unit_t(procfile_lineword(ff, 0, 40));
+    // p->delayacct_blkio_ticks = str2kernel_unit_t(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
         last = p->gtime_raw;
-        p->gtime_raw        = str2ull(procfile_lineword(ff, 0, 42));
+        p->gtime_raw        = str2kernel_unit_t(procfile_lineword(ff, 0, 42));
         p->gtime = (p->gtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         last = p->cgtime_raw;
-        p->cgtime_raw       = str2ull(procfile_lineword(ff, 0, 43));
+        p->cgtime_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 43));
         p->cgtime = (p->cgtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         if (show_guest_time || p->gtime || p->cgtime) {
@@ -707,7 +847,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     }
 
     if(unlikely(debug || (p->target && p->target->debug)))
-        fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=%llu, stime=%llu, cutime=%llu, cstime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu, threads=%d\n", global_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+        fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d\n", global_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
     if(unlikely(global_iterations_counter == 1)) {
         p->minflt           = 0;
@@ -799,7 +939,7 @@ static inline int read_proc_pid_io(struct pid_stat *p) {
     p->last_io_collected_usec = p->io_collected_usec;
     p->io_collected_usec = now_realtime_usec();
 
-    unsigned long long last;
+    kernel_uint_t last;
 
     last = p->io_logical_bytes_read_raw;
     p->io_logical_bytes_read_raw = str2ull(procfile_lineword(ff, 0, 1));
@@ -852,14 +992,10 @@ cleanup:
     return 0;
 }
 
-unsigned long long global_utime = 0;
-unsigned long long global_stime = 0;
-unsigned long long global_gtime = 0;
-
 static inline int read_proc_stat() {
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
-    static unsigned long long utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
+    static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
 
     if(unlikely(!ff)) {
@@ -876,7 +1012,7 @@ static inline int read_proc_stat() {
 
     file_counter++;
 
-    unsigned long long last;
+    kernel_uint_t last;
 
     last = utime_raw;
     utime_raw = str2ull(procfile_lineword(ff, 0, 1));
@@ -922,26 +1058,6 @@ cleanup:
 
 
 // ----------------------------------------------------------------------------
-// file descriptor
-// this is used to keep a global list of all open files of the system
-// it is needed in order to calculate the unique files processes have open
-
-#define FILE_DESCRIPTORS_INCREASE_STEP 100
-
-struct file_descriptor {
-    avl avl;
-#ifdef NETDATA_INTERNAL_CHECKS
-    uint32_t magic;
-#endif /* NETDATA_INTERNAL_CHECKS */
-    uint32_t hash;
-    const char *name;
-    int type;
-    int count;
-    int pos;
-} *all_files = NULL;
-
-int all_files_len = 0;
-int all_files_size = 0;
 
 int file_descriptor_compare(void* a, void* b) {
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -982,15 +1098,7 @@ static struct file_descriptor *file_descriptor_find(const char *name, uint32_t h
 #define file_descriptor_add(fd) avl_insert(&all_files_index, (avl *)(fd))
 #define file_descriptor_remove(fd) avl_remove(&all_files_index, (avl *)(fd))
 
-#define FILETYPE_OTHER 0
-#define FILETYPE_FILE 1
-#define FILETYPE_PIPE 2
-#define FILETYPE_SOCKET 3
-#define FILETYPE_INOTIFY 4
-#define FILETYPE_EVENTFD 5
-#define FILETYPE_EVENTPOLL 6
-#define FILETYPE_TIMERFD 7
-#define FILETYPE_SIGNALFD 8
+// ----------------------------------------------------------------------------
 
 static inline void file_descriptor_not_used(int id)
 {
@@ -1283,7 +1391,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
 
 // ----------------------------------------------------------------------------
 
-static inline int print_process_and_parents(struct pid_stat *p, unsigned long long time) {
+static inline int print_process_and_parents(struct pid_stat *p, usec_t time) {
     char *prefix = "\\_ ";
     int indent = 0;
 
@@ -1298,25 +1406,25 @@ static inline int print_process_and_parents(struct pid_stat *p, unsigned long lo
     for(i = 0; i < indent ;i++) buffer[i] = ' ';
     buffer[i] = '\0';
 
-    fprintf(stderr, "  %s %s%s (%d %s %lld"
+    fprintf(stderr, "  %s %s%s (%d %s %llu"
         , buffer
         , prefix
         , p->comm
         , p->pid
         , p->updated?"running":"exited"
-        , (long long)p->stat_collected_usec - (long long)time
+        , p->stat_collected_usec - time
         );
 
-    if(p->utime)   fprintf(stderr, " utime=%llu",   p->utime);
-    if(p->stime)   fprintf(stderr, " stime=%llu",   p->stime);
-    if(p->gtime)   fprintf(stderr, " gtime=%llu",   p->gtime);
-    if(p->cutime)  fprintf(stderr, " cutime=%llu",  p->cutime);
-    if(p->cstime)  fprintf(stderr, " cstime=%llu",  p->cstime);
-    if(p->cgtime)  fprintf(stderr, " cgtime=%llu",  p->cgtime);
-    if(p->minflt)  fprintf(stderr, " minflt=%llu",  p->minflt);
-    if(p->cminflt) fprintf(stderr, " cminflt=%llu", p->cminflt);
-    if(p->majflt)  fprintf(stderr, " majflt=%llu",  p->majflt);
-    if(p->cmajflt) fprintf(stderr, " cmajflt=%llu", p->cmajflt);
+    if(p->utime)   fprintf(stderr, " utime=" KERNEL_UINT_FORMAT,   p->utime);
+    if(p->stime)   fprintf(stderr, " stime=" KERNEL_UINT_FORMAT,   p->stime);
+    if(p->gtime)   fprintf(stderr, " gtime=" KERNEL_UINT_FORMAT,   p->gtime);
+    if(p->cutime)  fprintf(stderr, " cutime=" KERNEL_UINT_FORMAT,  p->cutime);
+    if(p->cstime)  fprintf(stderr, " cstime=" KERNEL_UINT_FORMAT,  p->cstime);
+    if(p->cgtime)  fprintf(stderr, " cgtime=" KERNEL_UINT_FORMAT,  p->cgtime);
+    if(p->minflt)  fprintf(stderr, " minflt=" KERNEL_UINT_FORMAT,  p->minflt);
+    if(p->cminflt) fprintf(stderr, " cminflt=" KERNEL_UINT_FORMAT, p->cminflt);
+    if(p->majflt)  fprintf(stderr, " majflt=" KERNEL_UINT_FORMAT,  p->majflt);
+    if(p->cmajflt) fprintf(stderr, " cmajflt=" KERNEL_UINT_FORMAT, p->cmajflt);
     fprintf(stderr, ")\n");
 
     return indent + 1;
@@ -1328,7 +1436,7 @@ static inline void print_process_tree(struct pid_stat *p, char *msg) {
     print_process_and_parents(p, p->stat_collected_usec);
 }
 
-static inline void find_lost_child_debug(struct pid_stat *pe, unsigned long long lost, int type) {
+static inline void find_lost_child_debug(struct pid_stat *pe, kernel_uint_t lost, int type) {
     int found = 0;
     struct pid_stat *p = NULL;
 
@@ -1338,35 +1446,35 @@ static inline void find_lost_child_debug(struct pid_stat *pe, unsigned long long
         switch(type) {
             case 1:
                 if(p->cminflt > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child minflt %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
                     found++;
                 }
                 break;
 
             case 2:
                 if(p->cmajflt > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child majflt %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
                     found++;
                 }
                 break;
 
             case 3:
                 if(p->cutime > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child utime %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
                     found++;
                 }
                 break;
 
             case 4:
                 if(p->cstime > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child stime %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
                     found++;
                 }
                 break;
 
             case 5:
                 if(p->cgtime > lost) {
-                    fprintf(stderr, " > process %d (%s) could use the lost exited child gtime %llu of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
+                    fprintf(stderr, " > process %d (%s) could use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n", p->pid, p->comm, lost, pe->pid, pe->comm);
                     found++;
                 }
                 break;
@@ -1376,30 +1484,30 @@ static inline void find_lost_child_debug(struct pid_stat *pe, unsigned long long
     if(!found) {
         switch(type) {
             case 1:
-                fprintf(stderr, " > cannot find any process to use the lost exited child minflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child minflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
 
             case 2:
-                fprintf(stderr, " > cannot find any process to use the lost exited child majflt %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child majflt " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
 
             case 3:
-                fprintf(stderr, " > cannot find any process to use the lost exited child utime %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child utime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
 
             case 4:
-                fprintf(stderr, " > cannot find any process to use the lost exited child stime %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child stime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
 
             case 5:
-                fprintf(stderr, " > cannot find any process to use the lost exited child gtime %llu of process %d (%s)\n", lost, pe->pid, pe->comm);
+                fprintf(stderr, " > cannot find any process to use the lost exited child gtime " KERNEL_UINT_FORMAT " of process %d (%s)\n", lost, pe->pid, pe->comm);
                 break;
         }
     }
 }
 
-static inline unsigned long long remove_exited_child_from_parent(unsigned long long *field, unsigned long long *pfield) {
-    unsigned long long absorbed = 0;
+static inline kernel_uint_t remove_exited_child_from_parent(kernel_uint_t *field, kernel_uint_t *pfield) {
+    kernel_uint_t absorbed = 0;
 
     if(*field > *pfield) {
         absorbed += *pfield;
@@ -1422,20 +1530,18 @@ static inline void process_exited_processes() {
         if(p->updated || !p->stat_collected_usec)
             continue;
 
-        struct pid_stat *pp = p->parent;
-
-        unsigned long long utime  = (p->utime_raw + p->cutime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        unsigned long long stime  = (p->stime_raw + p->cstime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        unsigned long long gtime  = (p->gtime_raw + p->cgtime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        unsigned long long minflt = (p->minflt_raw + p->cminflt_raw) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        unsigned long long majflt = (p->majflt_raw + p->cmajflt_raw) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t utime  = (p->utime_raw + p->cutime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t stime  = (p->stime_raw + p->cstime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t gtime  = (p->gtime_raw + p->cgtime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t minflt = (p->minflt_raw + p->cminflt_raw) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t majflt = (p->majflt_raw + p->cmajflt_raw) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         if(utime + stime + gtime + minflt + majflt == 0)
             continue;
 
         if(unlikely(debug)) {
             log_date(stderr);
-            fprintf(stderr, "Absorb %s (%d %s total resources: utime=%llu stime=%llu gtime=%llu minflt=%llu majflt=%llu)\n"
+            fprintf(stderr, "Absorb %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")\n"
                 , p->comm
                 , p->pid
                 , p->updated?"running":"exited"
@@ -1448,29 +1554,30 @@ static inline void process_exited_processes() {
             print_process_tree(p, "Searching parents");
         }
 
+        struct pid_stat *pp;
         for(pp = p->parent; pp ; pp = pp->parent) {
             if(!pp->updated) continue;
 
-            unsigned long long absorbed;
+            kernel_uint_t absorbed;
             absorbed = remove_exited_child_from_parent(&utime,  &pp->cutime);
             if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed %llu utime (remaining: %llu)\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, utime);
+                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " utime (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, utime);
 
             absorbed = remove_exited_child_from_parent(&stime,  &pp->cstime);
             if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed %llu stime (remaining: %llu)\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, stime);
+                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " stime (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, stime);
 
             absorbed = remove_exited_child_from_parent(&gtime,  &pp->cgtime);
             if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed %llu gtime (remaining: %llu)\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, gtime);
+                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " gtime (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, gtime);
 
             absorbed = remove_exited_child_from_parent(&minflt, &pp->cminflt);
             if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed %llu minflt (remaining: %llu)\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, minflt);
+                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " minflt (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, minflt);
 
             absorbed = remove_exited_child_from_parent(&majflt, &pp->cmajflt);
             if(unlikely(debug && absorbed))
-                fprintf(stderr, " > process %s (%d %s) absorbed %llu majflt (remaining: %llu)\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, majflt);
+                fprintf(stderr, " > process %s (%d %s) absorbed " KERNEL_UINT_FORMAT " majflt (remaining: " KERNEL_UINT_FORMAT ")\n", pp->comm, pp->pid, pp->updated?"running":"exited", absorbed, majflt);
         }
 
         if(unlikely(utime + stime + gtime + minflt + majflt > 0)) {
@@ -1485,7 +1592,7 @@ static inline void process_exited_processes() {
             p->keep = 1;
 
             if(unlikely(debug))
-                fprintf(stderr, " > remaining resources - KEEP - for another loop: %s (%d %s total resources: utime=%llu stime=%llu gtime=%llu minflt=%llu majflt=%llu)\n"
+                fprintf(stderr, " > remaining resources - KEEP - for another loop: %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")\n"
                     , p->comm
                     , p->pid
                     , p->updated?"running":"exited"
@@ -1550,7 +1657,7 @@ static inline void link_all_processes_to_their_parents(void) {
             pp->children_count++;
 
             if(unlikely(debug || (p->target && p->target->debug)))
-                fprintf(stderr, "apps.plugin: \tchild %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=%llu, stime=%llu, gtime=%llu, minflt=%llu, majflt=%llu, cutime=%llu, cstime=%llu, cgtime=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
+                fprintf(stderr, "apps.plugin: \tchild %d (%s, %s) on target '%s' has parent %d (%s, %s). Parent: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "\n", p->pid, p->comm, p->updated?"running":"exited", (p->target)?p->target->name:"UNSET", pp->pid, pp->comm, pp->updated?"running":"exited", pp->utime, pp->stime, pp->gtime, pp->minflt, pp->majflt, pp->cutime, pp->cstime, pp->cgtime, pp->cminflt, pp->cmajflt);
         }
         else {
             p->parent = NULL;
@@ -1737,19 +1844,13 @@ static inline int collect_data_for_pid(pid_t pid) {
     return 1;
 }
 
-static int collect_data_for_all_processes_from_proc(void) {
+static int collect_data_for_all_processes(void) {
     struct pid_stat *p = NULL;
 
     if(all_pids_count) {
-        // read parents before childs
-        // this is needed to prevent a situation where
-        // a child is found running, but until we read
-        // its parent, it has exited and its parent
-        // has accumulated its resources
-
-        long slc = 0;
+        size_t slc = 0;
         for(p = root_of_pids; p ; p = p->next) {
-            p->read             = 0;
+            p->read             = 0; // mark it as not read, so that collect_data_for_pid() will read it
             p->updated          = 0;
             p->new_entry        = 0;
             p->merged           = 0;
@@ -1760,12 +1861,22 @@ static int collect_data_for_all_processes_from_proc(void) {
         }
 
         if(unlikely(slc != all_pids_count)) {
-            error("Internal error: I was thinking I had %ld processes in my arrays, but it seems there are more.", all_pids_count);
+            error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are more.", all_pids_count);
             all_pids_count = slc;
         }
 
         if(include_exited_childs) {
+            // Read parents before childs
+            // This is needed to prevent a situation where
+            // a child is found running, but until we read
+            // its parent, it has exited and its parent
+            // has accumulated its resources.
+
             qsort((void *)all_pids_sortlist, (size_t)all_pids_count, sizeof(pid_t), compar_pid);
+
+            // we forward read all running processes
+            // collect_data_for_pid() is smart enough,
+            // not to read the same pid twice per iterations
             for(slc = 0; slc < all_pids_count; slc++)
                 collect_data_for_pid(all_pids_sortlist[slc]);
         }
@@ -1777,14 +1888,18 @@ static int collect_data_for_all_processes_from_proc(void) {
     DIR *dir = opendir(dirname);
     if(!dir) return 0;
 
-    struct dirent *file = NULL;
+    struct dirent *de = NULL;
 
-    while((file = readdir(dir))) {
-        char *endptr = file->d_name;
-        pid_t pid = (pid_t) strtoul(file->d_name, &endptr, 10);
+    while((de = readdir(dir))) {
+        char *endptr = de->d_name;
+
+        if(unlikely(de->d_type != DT_DIR || de->d_name[0] < '0' || de->d_name[0] > '9'))
+            continue;
+
+        pid_t pid = (pid_t) strtoul(de->d_name, &endptr, 10);
 
         // make sure we read a valid number
-        if(unlikely(endptr == file->d_name || *endptr != '\0'))
+        if(unlikely(endptr == de->d_name || *endptr != '\0'))
             continue;
 
         collect_data_for_pid(pid);
@@ -1794,14 +1909,17 @@ static int collect_data_for_all_processes_from_proc(void) {
     if(!all_pids_count)
         return 0;
 
+    // we need /proc/stat to normalize the cpu consumption of the exited childs
+    read_proc_stat();
+
+    // build the process tree
+    link_all_processes_to_their_parents();
+
     // normally this is done
     // however we may have processes exited while we collected values
     // so let's find the exited ones
     // we do this by collecting the ownership of process
     // if we manage to get the ownership, the process still runs
-
-    read_proc_stat();
-    link_all_processes_to_their_parents();
     process_exited_processes();
 
     return 1;
@@ -1829,8 +1947,6 @@ static void cleanup_exited_pids(void) {
 
     for(p = root_of_pids; p ;) {
         if(!p->updated && (!p->keep || p->keeploops > 0)) {
-//          fprintf(stderr, "\tEXITED %d %s [parent %d %s, target %s] utime=%llu, stime=%llu, gtime=%llu, cutime=%llu, cstime=%llu, cgtime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->pid, p->comm, p->parent->pid, p->parent->comm, p->target->name,  p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
-
             if(unlikely(debug && (p->keep || p->keeploops)))
                 fprintf(stderr, " > CLEANUP cannot keep exited process %d (%s) anymore - removing it.\n", p->pid, p->comm);
 
@@ -1961,9 +2077,9 @@ static void apply_apps_groups_targets_inheritance(void) {
         fprintf(stderr, "apps.plugin: apply_apps_groups_targets_inheritance() made %d loops on the process tree\n", loops);
 }
 
-static long zero_all_targets(struct target *root) {
+static size_t zero_all_targets(struct target *root) {
     struct target *w;
-    long count = 0;
+    size_t count = 0;
 
     for (w = root; w ; w = w->next) {
         count++;
@@ -2154,7 +2270,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->num_threads += p->num_threads;
 
     if(unlikely(debug || w->debug))
-        fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=%llu, stime=%llu, gtime=%llu, cutime=%llu, cstime=%llu, cgtime=%llu, minflt=%llu, majflt=%llu, cminflt=%llu, cmajflt=%llu\n", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+        fprintf(stderr, "apps.plugin: \taggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "\n", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 }
 
 static void calculate_netdata_statistics(void) {
@@ -2163,7 +2279,7 @@ static void calculate_netdata_statistics(void) {
 
     zero_all_targets(users_root_target);
     zero_all_targets(groups_root_target);
-    apps_groups_targets = zero_all_targets(apps_groups_root_target);
+    apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
     // this has to be done, before the cleanup
     struct pid_stat *p = NULL;
@@ -2225,20 +2341,17 @@ static void calculate_netdata_statistics(void) {
 
 int print_calculated_number(char *str, calculated_number value) { (void)str; (void)value; return 0; }
 
-static inline void send_BEGIN(const char *type, const char *id, unsigned long long usec) {
+static inline void send_BEGIN(const char *type, const char *id, usec_t usec) {
     fprintf(stdout, "BEGIN %s.%s %llu\n", type, id, usec);
 }
 
-static inline void send_SET(const char *name, unsigned long long value) {
-    fprintf(stdout, "SET %s = %llu\n", name, value);
+static inline void send_SET(const char *name, kernel_uint_t value) {
+    fprintf(stdout, "SET %s = " KERNEL_UINT_FORMAT "\n", name, value);
 }
 
 static inline void send_END(void) {
     fprintf(stdout, "END\n");
 }
-
-double utime_fix_ratio = 1.0, stime_fix_ratio = 1.0, gtime_fix_ratio = 1.0, cutime_fix_ratio = 1.0, cstime_fix_ratio = 1.0, cgtime_fix_ratio = 1.0;
-double minflt_fix_ratio = 1.0, majflt_fix_ratio = 1.0, cminflt_fix_ratio = 1.0, cmajflt_fix_ratio = 1.0;
 
 static usec_t send_resource_usage_to_netdata() {
     static struct timeval last = { 0, 0 };
@@ -2280,17 +2393,17 @@ static usec_t send_resource_usage_to_netdata() {
         "SET system = %llu\n"
         "END\n"
         "BEGIN netdata.apps_files %llu\n"
-        "SET files = %llu\n"
-        "SET pids = %ld\n"
+        "SET files = %zu\n"
+        "SET pids = %zu\n"
         "SET fds = %d\n"
-        "SET targets = %ld\n"
+        "SET targets = %zu\n"
         "END\n"
         "BEGIN netdata.apps_fix %llu\n"
-        "SET utime = %llu\n"
-        "SET stime = %llu\n"
-        "SET gtime = %llu\n"
-        "SET minflt = %llu\n"
-        "SET majflt = %llu\n"
+        "SET utime = %u\n"
+        "SET stime = %u\n"
+        "SET gtime = %u\n"
+        "SET minflt = %u\n"
+        "SET majflt = %u\n"
         "END\n"
         , usec
         , cpuuser
@@ -2299,48 +2412,48 @@ static usec_t send_resource_usage_to_netdata() {
         , file_counter
         , all_pids_count
         , all_files_len
-        , apps_groups_targets
+        , apps_groups_targets_count
         , usec
-        , (unsigned long long)(utime_fix_ratio   * 100 * RATES_DETAIL)
-        , (unsigned long long)(stime_fix_ratio   * 100 * RATES_DETAIL)
-        , (unsigned long long)(gtime_fix_ratio   * 100 * RATES_DETAIL)
-        , (unsigned long long)(minflt_fix_ratio  * 100 * RATES_DETAIL)
-        , (unsigned long long)(majflt_fix_ratio  * 100 * RATES_DETAIL)
+        , (unsigned int)(utime_fix_ratio   * 100 * RATES_DETAIL)
+        , (unsigned int)(stime_fix_ratio   * 100 * RATES_DETAIL)
+        , (unsigned int)(gtime_fix_ratio   * 100 * RATES_DETAIL)
+        , (unsigned int)(minflt_fix_ratio  * 100 * RATES_DETAIL)
+        , (unsigned int)(majflt_fix_ratio  * 100 * RATES_DETAIL)
         );
 
     if(include_exited_childs)
         fprintf(stdout,
             "BEGIN netdata.apps_children_fix %llu\n"
-            "SET cutime = %llu\n"
-            "SET cstime = %llu\n"
-            "SET cgtime = %llu\n"
-            "SET cminflt = %llu\n"
-            "SET cmajflt = %llu\n"
+            "SET cutime = %u\n"
+            "SET cstime = %u\n"
+            "SET cgtime = %u\n"
+            "SET cminflt = %u\n"
+            "SET cmajflt = %u\n"
             "END\n"
             , usec
-            , (unsigned long long)(cutime_fix_ratio  * 100 * RATES_DETAIL)
-            , (unsigned long long)(cstime_fix_ratio  * 100 * RATES_DETAIL)
-            , (unsigned long long)(cgtime_fix_ratio  * 100 * RATES_DETAIL)
-            , (unsigned long long)(cminflt_fix_ratio * 100 * RATES_DETAIL)
-            , (unsigned long long)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
+            , (unsigned int)(cutime_fix_ratio  * 100 * RATES_DETAIL)
+            , (unsigned int)(cstime_fix_ratio  * 100 * RATES_DETAIL)
+            , (unsigned int)(cgtime_fix_ratio  * 100 * RATES_DETAIL)
+            , (unsigned int)(cminflt_fix_ratio * 100 * RATES_DETAIL)
+            , (unsigned int)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
             );
 
     return usec;
 }
 
-static void normalize_data(struct target *root) {
+static void normalize_utilization(struct target *root) {
     struct target *w;
 
     // childs processing introduces spikes
     // here we try to eliminate them by disabling childs processing either for specific dimensions
     // or entirely. Of course, either way, we disable it just a single iteration.
 
-    unsigned long long max = processors * hz * RATES_DETAIL;
-    unsigned long long utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
+    kernel_uint_t max_time = processors * hz * RATES_DETAIL;
+    kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
-    if(global_utime > max) global_utime = max;
-    if(global_stime > max) global_stime = max;
-    if(global_gtime > max) global_gtime = max;
+    if(global_utime > max_time) global_utime = max_time;
+    if(global_stime > max_time) global_stime = max_time;
+    if(global_gtime > max_time) global_gtime = max_time;
 
     for(w = root; w ; w = w->next) {
         if(w->target || (!w->processes && !w->exposed)) continue;
@@ -2440,11 +2553,11 @@ static void normalize_data(struct target *root) {
 
     if(unlikely(debug)) {
         fprintf(stderr,
-            "SYSTEM: u=%llu s=%llu g=%llu "
-            "COLLECTED: u=%llu s=%llu g=%llu cu=%llu cs=%llu cg=%llu "
-            "DELTA: u=%lld s=%lld g=%lld "
+            "SYSTEM: u=" KERNEL_UINT_FORMAT " s=" KERNEL_UINT_FORMAT " g=" KERNEL_UINT_FORMAT " "
+            "COLLECTED: u=" KERNEL_UINT_FORMAT " s=" KERNEL_UINT_FORMAT " g=" KERNEL_UINT_FORMAT " cu=" KERNEL_UINT_FORMAT " cs=" KERNEL_UINT_FORMAT " cg=" KERNEL_UINT_FORMAT " "
+            "DELTA: u=" KERNEL_UINT_FORMAT " s=" KERNEL_UINT_FORMAT " g=" KERNEL_UINT_FORMAT " "
             "FIX: u=%0.2f s=%0.2f g=%0.2f cu=%0.2f cs=%0.2f cg=%0.2f "
-            "FINALLY: u=%llu s=%llu g=%llu cu=%llu cs=%llu cg=%llu "
+            "FINALLY: u=" KERNEL_UINT_FORMAT " s=" KERNEL_UINT_FORMAT " g=" KERNEL_UINT_FORMAT " cu=" KERNEL_UINT_FORMAT " cs=" KERNEL_UINT_FORMAT " cg=" KERNEL_UINT_FORMAT " "
             "\n"
             , global_utime
             , global_stime
@@ -2455,21 +2568,21 @@ static void normalize_data(struct target *root) {
             , cutime
             , cstime
             , cgtime
-            , (long long)utime + (long long)cutime - (long long)global_utime
-            , (long long)stime + (long long)cstime - (long long)global_stime
-            , (long long)gtime + (long long)cgtime - (long long)global_gtime
+            , utime + cutime - global_utime
+            , stime + cstime - global_stime
+            , gtime + cgtime - global_gtime
             , utime_fix_ratio
             , stime_fix_ratio
             , gtime_fix_ratio
             , cutime_fix_ratio
             , cstime_fix_ratio
             , cgtime_fix_ratio
-            , (unsigned long long)(utime * utime_fix_ratio)
-            , (unsigned long long)(stime * stime_fix_ratio)
-            , (unsigned long long)(gtime * gtime_fix_ratio)
-            , (unsigned long long)(cutime * cutime_fix_ratio)
-            , (unsigned long long)(cstime * cstime_fix_ratio)
-            , (unsigned long long)(cgtime * cgtime_fix_ratio)
+            , (kernel_uint_t)(utime * utime_fix_ratio)
+            , (kernel_uint_t)(stime * stime_fix_ratio)
+            , (kernel_uint_t)(gtime * gtime_fix_ratio)
+            , (kernel_uint_t)(cutime * cutime_fix_ratio)
+            , (kernel_uint_t)(cstime * cstime_fix_ratio)
+            , (kernel_uint_t)(cgtime * cgtime_fix_ratio)
             );
     }
 }
@@ -2480,21 +2593,21 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_BEGIN(type, "cpu", usec);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            send_SET(w->name, (unsigned long long)(w->utime * utime_fix_ratio) + (unsigned long long)(w->stime * stime_fix_ratio) + (unsigned long long)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cutime * cutime_fix_ratio) + (unsigned long long)(w->cstime * cstime_fix_ratio) + (unsigned long long)(w->cgtime * cgtime_fix_ratio)):0ULL));
+            send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (kernel_uint_t)(w->stime * stime_fix_ratio) + (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio) + (kernel_uint_t)(w->cstime * cstime_fix_ratio) + (kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "cpu_user", usec);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            send_SET(w->name, (unsigned long long)(w->utime * utime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cutime * cutime_fix_ratio)):0ULL));
+            send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "cpu_system", usec);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            send_SET(w->name, (unsigned long long)(w->stime * stime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cstime * cstime_fix_ratio)):0ULL));
+            send_SET(w->name, (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cstime * cstime_fix_ratio)):0ULL));
     }
     send_END();
 
@@ -2502,7 +2615,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_BEGIN(type, "cpu_guest", usec);
         for (w = root; w ; w = w->next) {
             if(unlikely(w->exposed))
-                send_SET(w->name, (unsigned long long)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cgtime * cgtime_fix_ratio)):0ULL));
+                send_SET(w->name, (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
         }
         send_END();
     }
@@ -2538,14 +2651,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_BEGIN(type, "minor_faults", usec);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            send_SET(w->name, (unsigned long long)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cminflt * cminflt_fix_ratio)):0ULL));
+            send_SET(w->name, (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "major_faults", usec);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            send_SET(w->name, (unsigned long long)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((unsigned long long)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
+            send_SET(w->name, (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
     }
     send_END();
 
@@ -2911,7 +3024,7 @@ int main(int argc, char **argv)
     parse_args(argc, argv);
 
     all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);
-    all_pids = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
+    all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
 
     fprintf(stdout,
         "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
@@ -2962,14 +3075,14 @@ int main(int argc, char **argv)
         }
 #endif
 
-        if(!collect_data_for_all_processes_from_proc()) {
+        if(!collect_data_for_all_processes()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
             exit(1);
         }
 
         calculate_netdata_statistics();
-        normalize_data(apps_groups_root_target);
+        normalize_utilization(apps_groups_root_target);
 
         usec_t dt = send_resource_usage_to_netdata();
 
@@ -2995,7 +3108,7 @@ int main(int argc, char **argv)
         show_guest_time_old = show_guest_time;
 
         if(unlikely(debug))
-            fprintf(stderr, "apps.plugin: done Loop No %llu\n", global_iterations_counter);
+            fprintf(stderr, "apps.plugin: done Loop No %zu\n", global_iterations_counter);
 
         time_t current_t = now_realtime_sec();
 
