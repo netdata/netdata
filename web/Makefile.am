@@ -91,18 +91,6 @@ dist_webimages_DATA = \
 	images/check-mark-2-128-green.png \
 	images/check-mark-2-multi-size-green.ico \
 	images/post.png \
-	images/seo-performance-16.png \
-	images/seo-performance-24.png \
-	images/seo-performance-32.png \
-	images/seo-performance-48.png \
-	images/seo-performance-64.png \
-	images/seo-performance-72.png \
-	images/seo-performance-114.png \
-	images/seo-performance-128.png \
-	images/seo-performance-256.png \
-	images/seo-performance-512.png \
-	images/seo-performance-multi-size.ico \
-	images/seo-performance-multi-size.icns \
 	$(NULL)
 
 
