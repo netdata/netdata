@@ -541,7 +541,7 @@ static void rrdr_dump(RRDR *r)
 }
 */
 
-void rrdr_disable_not_selected_dimensions(RRDR *r, const char *dims)
+void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char *dims)
 {
     char b[strlen(dims) + 1];
     char *o = b, *tok;
@@ -567,7 +567,8 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, const char *dims)
                 // since the user needs this dimension
                 // make it appear as NONZERO, to return it
                 // even if the dimension has only zeros
-                r->od[c] |= RRDR_NONZERO;
+                // unless option non_zero is set
+                if (!(options & RRDR_OPTION_NONZERO)) r->od[c] |= RRDR_NONZERO;
             }
         }
     }
@@ -1778,7 +1779,7 @@ int rrd2value(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensio
     options = rrdr_check_options(r, options, dimensions);
 
     if(dimensions)
-        rrdr_disable_not_selected_dimensions(r, dimensions);
+        rrdr_disable_not_selected_dimensions(r, options, dimensions);
 
     if(db_after)  *db_after  = r->after;
     if(db_before) *db_before = r->before;
@@ -1806,7 +1807,7 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
     options = rrdr_check_options(r, options, (dimensions)?buffer_tostring(dimensions):NULL);
 
     if(dimensions)
-        rrdr_disable_not_selected_dimensions(r, buffer_tostring(dimensions));
+        rrdr_disable_not_selected_dimensions(r, options, buffer_tostring(dimensions));
 
     if(latest_timestamp && rrdr_rows(r) > 0)
         *latest_timestamp = r->before;
