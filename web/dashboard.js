@@ -6075,7 +6075,7 @@ var NETDATA = window.NETDATA || {};
 
             var name = entry.name.replace(/_/g, ' ');
             var status = entry.status.toLowerCase();
-            var title = name + ' = ' + ((value === null)?'NaN':Math.floor(value)).toString() + ' ' + entry.units;
+            var title = name + ' = ' + entry.value_string.toString();
             var tag = entry.alarm_id;
             var icon = 'images/seo-performance-128.png';
             var interaction = false;
@@ -6104,7 +6104,7 @@ var NETDATA = window.NETDATA || {};
                         // console.log('alarm' + entry.unique_id + ' switch to CLEAR from ' + entry.old_status);
                         return;
                     }
-                    title = name + ' back to normal';
+                    title = name + ' back to normal (' + entry.value_string.toString() + ')';
                     icon = 'images/check-mark-2-128-green.png'
                     interaction = false;
                     break;

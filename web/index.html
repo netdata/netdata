@@ -1856,6 +1856,23 @@
                                 sortable: true
                             },
                             {
+                                field: 'value_string',
+                                title: 'Friendly Value',
+                                titleTooltip: 'The value of the alarm, that triggered this event',
+                                align: 'right',
+                                valign: 'middle',
+                                sortable: true
+                            },
+                            {
+                                field: 'old_value_string',
+                                title: 'Friendly Old Value',
+                                titleTooltip: 'The value of the alarm, just before this event',
+                                align: 'right',
+                                valign: 'middle',
+                                visible: false,
+                                sortable: true
+                            },
+                            {
                                 field: 'old_value',
                                 title: 'Old Value',
                                 titleTooltip: 'The value of the alarm, just before this event',
@@ -1876,6 +1893,7 @@
                                 },
                                 align: 'right',
                                 valign: 'middle',
+                                visible: false,
                                 sortable: true
                             },
                             {
@@ -1884,6 +1902,7 @@
                                 titleTooltip: 'The units of the value of the alarm',
                                 align: 'left',
                                 valign: 'middle',
+                                visible: false,
                                 sortable: true
                             },
                             {

@@ -308,6 +308,10 @@ typedef struct alarm_entry {
 
     calculated_number old_value;
     calculated_number new_value;
+
+    char *old_value_string;
+    char *new_value_string;
+
     int old_status;
     int new_status;
 
