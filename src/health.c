@@ -290,6 +290,10 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             ae->new_value   = str2l(pointers[25]);
             ae->old_value   = str2l(pointers[26]);
 
+            static char value_string[100 + 1];
+            ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
+            ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
+
             // add it to host if not already there
             if(unlikely(*pointers[0] == 'A')) {
                 ae->next = host->health_log.alarms;
@@ -391,6 +395,11 @@ static inline void health_alarm_log(RRDHOST *host,
     ae->when = when;
     ae->old_value = old_value;
     ae->new_value = new_value;
+
+    static char value_string[100 + 1];
+    ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
+    ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
+
     ae->old_status = old_status;
     ae->new_status = new_status;
     ae->duration = duration;
@@ -2331,7 +2340,9 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                            "\t\t\"delay\": %d,\n"
                            "\t\t\"delay_up_to_timestamp\": %lu,\n"
                            "\t\t\"updated_by_id\": %u,\n"
-                           "\t\t\"updates_id\": %u,\n",
+                           "\t\t\"updates_id\": %u,\n"
+                           "\t\t\"value_string\": \"%s\",\n"
+                           "\t\t\"old_value_string\": \"%s\",\n",
                    host->hostname,
                    ae->unique_id,
                    ae->alarm_id,
@@ -2357,7 +2368,9 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    ae->delay,
                    (unsigned long)ae->delay_up_to_timestamp,
                    ae->updated_by_id,
-                   ae->updates_id
+                   ae->updates_id,
+                   ae->new_value_string,
+                   ae->old_value_string
     );
 
     buffer_strcat(wb, "\t\t\"value\":");
@@ -2643,7 +2656,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *recipient = ae->recipient;
     if(!recipient) recipient = health.health_default_recipient;
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%u' '%u' '%s' '%s'",
               exec,
               recipient,
               host->hostname,
@@ -2656,8 +2669,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
               ae->family?ae->family:"NOFAMILY",
               rrdcalc_status2string(ae->new_status),
               rrdcalc_status2string(ae->old_status),
-              ae->new_value,
-              ae->old_value,
+              ae->new_value_string,
+              ae->old_value_string,
               ae->source?ae->source:"UNKNOWN",
               (uint32_t)ae->duration,
               (uint32_t)ae->non_clear_duration,
@@ -2754,6 +2767,8 @@ static inline void health_alarm_log_process(RRDHOST *host) {
         freez(ae->source);
         freez(ae->units);
         freez(ae->info);
+        freez(ae->old_value_string);
+        freez(ae->new_value_string);
         freez(ae);
 
         ae = t;

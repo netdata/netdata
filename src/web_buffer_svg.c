@@ -368,7 +368,64 @@ cleanup:
     return len - i;
 }
 
-static inline int fix_value_and_units(char *value_string, size_t value_string_len, calculated_number value, const char **units_ptr, int value_is_null) {
+static inline char *format_value_with_precision_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
+    if(unlikely(isnan(value) || isinf(value)))
+        value = 0.0;
+
+    char *separator = "";
+    if(unlikely(isalnum(*units)))
+        separator = " ";
+
+    if(precision < 0) {
+        int len, lstop = 0, trim_zeros = 1;
+
+        calculated_number abs = value;
+        if(isless(value, 0)) {
+            lstop = 1;
+            abs = -value;
+        }
+
+        if(isgreaterequal(abs, 1000)) {
+            len = snprintfz(value_string, value_string_len, "%0.0Lf", (long double) value);
+            trim_zeros = 0;
+        }
+        else if(isgreaterequal(abs, 100)) len = snprintfz(value_string, value_string_len, "%0.1Lf", (long double) value);
+        else if(isgreaterequal(abs, 1))   len = snprintfz(value_string, value_string_len, "%0.2Lf", (long double) value);
+        else if(isgreaterequal(abs, 0.1)) len = snprintfz(value_string, value_string_len, "%0.3Lf", (long double) value);
+        else                              len = snprintfz(value_string, value_string_len, "%0.4Lf", (long double) value);
+
+        if(unlikely(trim_zeros)) {
+            int l;
+            // remove trailing zeros from the decimal part
+            for(l = len - 1; l > lstop; l--) {
+                if(likely(value_string[l] == '0')) {
+                    value_string[l] = '\0';
+                    len--;
+                }
+
+                else if(unlikely(value_string[l] == '.')) {
+                    value_string[l] = '\0';
+                    len--;
+                    break;
+                }
+
+                else
+                    break;
+            }
+        }
+
+        if(unlikely(len <= 0)) len = 1;
+        snprintfz(&value_string[len], value_string_len - len, "%s%s", separator, units);
+    }
+    else {
+        if(precision > 50) precision = 50;
+        snprintfz(value_string, value_string_len, "%0.*Lf%s%s", precision, (long double) value, separator, units);
+    }
+
+    return value_string;
+}
+
+inline char *format_value_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
     static uint32_t
             hash_seconds = 0,
             hash_seconds_ago = 0,
@@ -404,7 +461,6 @@ static inline int fix_value_and_units(char *value_string, size_t value_string_le
         hash_pcent       = simple_hash("pcent");
     }
 
-    const char *units = (units_ptr)?*units_ptr:NULL;
     if(unlikely(!units)) units = "";
 
     uint32_t hash_units = simple_hash(units);
@@ -412,13 +468,11 @@ static inline int fix_value_and_units(char *value_string, size_t value_string_le
     if(unlikely((hash_units == hash_seconds && !strcmp(units, "seconds")) || (hash_units == hash_seconds_ago && !strcmp(units, "seconds ago")))) {
         if(value == 0.0) {
             snprintfz(value_string, value_string_len, "%s", "now");
-            units = "";
-            goto finish;
+            return value_string;
         }
         else if(isnan(value) || isinf(value)) {
             snprintfz(value_string, value_string_len, "%s", "never");
-            units = "";
-            goto finish;
+            return value_string;
         }
 
         const char *suffix = (hash_units == hash_seconds_ago)?" ago":"";
@@ -438,19 +492,17 @@ static inline int fix_value_and_units(char *value_string, size_t value_string_le
         else
             snprintfz(value_string, value_string_len, "%02zu:%02zu:%02zu%s", h, m, s, suffix);
 
-        units = "";
+        return value_string;
     }
 
     else if(unlikely((hash_units == hash_minutes && !strcmp(units, "minutes")) || (hash_units == hash_minutes_ago && !strcmp(units, "minutes ago")))) {
         if(value == 0.0) {
             snprintfz(value_string, value_string_len, "%s", "now");
-            units = "";
-            goto finish;
+            return value_string;
         }
         else if(isnan(value) || isinf(value)) {
             snprintfz(value_string, value_string_len, "%s", "never");
-            units = "";
-            goto finish;
+            return value_string;
         }
 
         const char *suffix = (hash_units == hash_minutes_ago)?" ago":"";
@@ -467,19 +519,17 @@ static inline int fix_value_and_units(char *value_string, size_t value_string_le
         else
             snprintfz(value_string, value_string_len, "%zuh %zum%s", h, m, suffix);
 
-        units = "";
+        return value_string;
     }
 
     else if(unlikely((hash_units == hash_hours && !strcmp(units, "hours")) || (hash_units == hash_hours_ago && !strcmp(units, "hours ago")))) {
         if(value == 0.0) {
             snprintfz(value_string, value_string_len, "%s", "now");
-            units = "";
-            goto finish;
+            return value_string;
         }
         else if(isnan(value) || isinf(value)) {
             snprintfz(value_string, value_string_len, "%s", "never");
-            units = "";
-            goto finish;
+            return value_string;
         }
 
         const char *suffix = (hash_units == hash_hours_ago)?" ago":"";
@@ -493,27 +543,27 @@ static inline int fix_value_and_units(char *value_string, size_t value_string_le
         else
             snprintfz(value_string, value_string_len, "%zuh%s", h, suffix);
 
-        units = "";
+        return value_string;
     }
 
     else if(unlikely(hash_units == hash_onoff && !strcmp(units, "on/off"))) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"on":"off");
-        units = "";
+        return value_string;
     }
 
     else if(unlikely(hash_units == hash_updown && !strcmp(units, "up/down"))) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"up":"down");
-        units = "";
+        return value_string;
     }
 
     else if(unlikely(hash_units == hash_okerror && !strcmp(units, "ok/error"))) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"error");
-        units = "";
+        return value_string;
     }
 
     else if(unlikely(hash_units == hash_okfailed && !strcmp(units, "ok/failed"))) {
         snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"failed");
-        units = "";
+        return value_string;
     }
 
     else if(unlikely(hash_units == hash_empty && !strcmp(units, "empty")))
@@ -531,16 +581,13 @@ static inline int fix_value_and_units(char *value_string, size_t value_string_le
     else if(unlikely(hash_units == hash_pcent && !strcmp(units, "pcent")))
         units = "%";
 
-    else if(unlikely(value_is_null)) {
-        strcpy(value_string, "-");
-        units = "";
-    }
-    else
-        return 0;
 
-finish:
-    if(units_ptr) *units_ptr = units;
-    return 1;
+    if(unlikely(isnan(value) || isinf(value))) {
+        strcpy(value_string, "-");
+        return value_string;
+    }
+
+    return format_value_with_precision_and_unit(value_string, value_string_len, value, units, precision);
 }
 
 static inline const char *color_map(const char *color) {
@@ -560,9 +607,12 @@ static inline const char *color_map(const char *color) {
     return color;
 }
 
-static inline void calc_colorz(const char *color, char *final, size_t len, calculated_number value, int value_is_null) {
-    if(isnan(value) || isinf(value))
+static inline void calc_colorz(const char *color, char *final, size_t len, calculated_number value) {
+    int value_is_null = 0;
+    if(isnan(value) || isinf(value)) {
         value = 0.0;
+        value_is_null = 1;
+    }
 
     char color_buffer[256 + 1] = "";
     char value_buffer[256 + 1] = "";
@@ -673,7 +723,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 // colors
 #define COLOR_STRING_SIZE 100
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int value_is_null, int precision) {
+void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision) {
     char      label_buffer[LABEL_STRING_SIZE + 1]
             , value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
@@ -688,66 +738,10 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         label_color = "#555";
 
     if(unlikely(!value_color || !*value_color))
-        value_color = (value_is_null)?"#999":"#4c1";
+        value_color = (isnan(value) || isinf(value))?"#999":"#4c1";
 
-    calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value, value_is_null);
-
-    if(!fix_value_and_units(value_string, VALUE_STRING_SIZE, value, &units, value_is_null)) {
-        // we have to print the value
-
-        if(isnan(value) || isinf(value))
-            value = 0.0;
-
-        char *separator = "";
-        if(unlikely(isalnum(*units)))
-            separator = " ";
-
-        if(precision < 0) {
-            int len, lstop = 0, trim_zeros = 1;
-
-            calculated_number abs = value;
-            if(isless(value, 0)) {
-                lstop = 1;
-                abs = -value;
-            }
-
-            if(isgreaterequal(abs, 1000)) {
-                len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.0Lf", (long double) value);
-                trim_zeros = 0;
-            }
-            else if(isgreaterequal(abs, 100)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.1Lf", (long double) value);
-            else if(isgreaterequal(abs, 1))   len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.2Lf", (long double) value);
-            else if(isgreaterequal(abs, 0.1)) len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.3Lf", (long double) value);
-            else                              len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.4Lf", (long double) value);
-
-            if(unlikely(trim_zeros)) {
-                int l;
-                // remove trailing zeros from the decimal part
-                for(l = len - 1; l > lstop; l--) {
-                    if(likely(value_string[l] == '0')) {
-                        value_string[l] = '\0';
-                        len--;
-                    }
-
-                    else if(unlikely(value_string[l] == '.')) {
-                        value_string[l] = '\0';
-                        len--;
-                        break;
-                    }
-
-                    else
-                        break;
-                }
-            }
-
-            if(len >= 0)
-                snprintfz(&value_string[len], VALUE_STRING_SIZE - len, "%s%s", separator, units);
-        }
-        else {
-            if(precision > 50) precision = 50;
-            snprintfz(value_string, VALUE_STRING_SIZE, "%0.*Lf%s%s", precision, (long double) value, separator, units);
-        }
-    }
+    calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
+    format_value_and_unit(value_string, VALUE_STRING_SIZE, value, units, precision);
 
     // we need to copy the label, since verdana11_width may write to it
     strncpyz(label_buffer, label, LABEL_STRING_SIZE);
