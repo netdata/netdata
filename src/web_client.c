@@ -982,9 +982,6 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
             );
 
     if(rc) {
-        calculated_number n = rc->value;
-        if(isnan(n) || isinf(n)) n = 0;
-
         if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
             w->response.data->expires = now_realtime_sec() + refresh;
@@ -1020,13 +1017,13 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         }
 
         buffer_svg(w->response.data,
-                   label,
-                   rc->value * multiply / divide,
-                   units,
-                   label_color,
-                   value_color,
-                   0,
-                   precision);
+                label,
+                (isnan(rc->value)||isinf(rc->value)) ? rc->value : rc->value * multiply / divide,
+                units,
+                label_color,
+                value_color,
+                0,
+                precision);
         ret = 200;
     }
     else {

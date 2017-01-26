@@ -64,6 +64,7 @@ dist_healthconfig_DATA = \
     health.d/disks.conf \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
+    health.d/fping.conf \
     health.d/haproxy.conf \
     health.d/ipc.conf \
     health.d/ipfs.conf \
