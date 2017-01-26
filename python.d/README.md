@@ -307,6 +307,12 @@ If no configuration is given, module will attempt to connect to dovecot using un
 
 Module monitor elasticsearch performance and health metrics
 
+**Requirements:**
+ * python `requests` package.
+
+You need to install it manually. (python-requests or python3-requests depending on the version of python).
+
+
 It produces:
 
 1. **Search performance** charts:
