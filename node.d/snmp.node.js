@@ -1,6 +1,7 @@
 'use strict';
-
+// netdata snmp module
 // This program will connect to one or more SNMP Agents
+//
 
 // example configuration in /etc/netdata/node.d/snmp.conf
 /*
@@ -26,13 +27,15 @@
                             "oid": ".1.3.6.1.2.1.2.2.1.10.1",
                             "algorithm": "incremental",
                             "multiplier": 8,
-                            "divisor": 1024
+                            "divisor": 1024,
+                            "offset": 0
                         },
                         "out": {
                             "oid": ".1.3.6.1.2.1.2.2.1.16.1",
                             "algorithm": "incremental",
                             "multiplier": -8,
-                            "divisor": 1024
+                            "divisor": 1024,
+                            "offset": 0
                         }
                     }
                 },
@@ -46,13 +49,15 @@
                             "oid": ".1.3.6.1.2.1.2.2.1.10.2",
                             "algorithm": "incremental",
                             "multiplier": 8,
-                            "divisor": 1024
+                            "divisor": 1024,
+                             "offset": 0
                         },
                         "out": {
                             "oid": ".1.3.6.1.2.1.2.2.1.16.2",
                             "algorithm": "incremental",
                             "multiplier": -8,
-                            "divisor": 1024
+                            "divisor": 1024,
+                            "offset": 0
                         }
                     }
                 }
@@ -89,13 +94,15 @@
                             "oid": ".1.3.6.1.2.1.2.2.1.10.",
                             "algorithm": "incremental",
                             "multiplier": 8,
-                            "divisor": 1024
+                            "divisor": 1024,
+                            "offset": 0
                         },
                         "out": {
                             "oid": ".1.3.6.1.2.1.2.2.1.16.",
                             "algorithm": "incremental",
                             "multiplier": -8,
-                            "divisor": 1024
+                            "divisor": 1024,
+                            "offset": 0
                         }
                     }
                 }
@@ -360,8 +367,12 @@ var snmp = {
                 for(var j = 0; j < dim_keys_len ; j++) {
                     var d = dim_keys[j];
 
-                    if (dimensions[d].value !== null)
-                        service.set(d, dimensions[d].value);
+                    if (dimensions[d].value !== null) {
+                        if(typeof dimensions[d].offset === 'number')
+                            service.set(d, dimensions[d].value + dimensions[d].offset);
+                        else
+                            service.set(d, dimensions[d].value);
+                    }
                 }
 
                 service.end();
