@@ -46,7 +46,7 @@ then
         echo >&2
         echo >&2 "# SENDING TEST ${x} ALARM TO ROLE: ${recipient}"
 
-        "${0}" "${recipient}" "$(hostname)" 1 1 "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" 100 90 "${0}" 1 $((0 + id)) "units" "this is a test alarm to verify notifications work"
+        "${0}" "${recipient}" "$(hostname)" 1 1 "${id}" "$(date +%s)" "test_alarm" "test.chart" "test.family" "${x}" "${last}" 100 90 "${0}" 1 $((0 + id)) "units" "this is a test alarm to verify notifications work" "new value" "old value"
         if [ $? -ne 0 ]
         then
             echo >&2 "# FAILED"
@@ -138,6 +138,8 @@ duration="${15}"   # the duration in seconds of the previous alarm state
 non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
 units="${17}"      # the units of the value
 info="${18}"       # a short description of the alarm
+value_string="${19}"        # friendly value (with units)
+old_value_string="${20}"    # friendly old value (with units)
 
 # -----------------------------------------------------------------------------
 # screen statuses we don't need to send a notification
@@ -747,13 +749,13 @@ send_pd() {
         then
         for PD_SERVICE_KEY in ${recipients}
         do
-            d="${status} ${name}=${value} ${units} - ${host}, ${family}"
+            d="${status} ${name} = ${value_string} - ${host}, ${family}"
             ${pd_send} -k ${PD_SERVICE_KEY} \
                        -t ${t} \
                        -d "${d}" \
                        -i ${alarm_id} \
                        -f 'info'="${info}" \
-                       -f 'value_w_units'="${value} ${units}" \
+                       -f 'value_w_units'="${value_string}" \
                        -f 'when'="${when}" \
                        -f 'duration'="${duration}" \
                        -f 'roles'="${roles}" \
@@ -1034,7 +1036,7 @@ status_message="status unknown"
 color="grey"
 
 # the alarm value
-alarm="${name//_/ } = ${value} ${units}"
+alarm="${name//_/ } = ${value_string}"
 
 # the image of the alarm
 image="${images_base_url}/images/seo-performance-128.png"
