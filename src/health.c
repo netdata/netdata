@@ -251,34 +251,34 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
             ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
 
-            if(unlikely(ae->name)) freez(ae->name);
+            freez(ae->name);
             ae->name = strdupz(pointers[13]);
             ae->hash_name = simple_hash(ae->name);
 
-            if(unlikely(ae->chart)) freez(ae->chart);
+            freez(ae->chart);
             ae->chart = strdupz(pointers[14]);
             ae->hash_chart = simple_hash(ae->chart);
 
-            if(unlikely(ae->family)) freez(ae->family);
+            freez(ae->family);
             ae->family = strdupz(pointers[15]);
 
-            if(unlikely(ae->exec)) freez(ae->exec);
+            freez(ae->exec);
             ae->exec = strdupz(pointers[16]);
             if(!*ae->exec) { freez(ae->exec); ae->exec = NULL; }
 
-            if(unlikely(ae->recipient)) freez(ae->recipient);
+            freez(ae->recipient);
             ae->recipient = strdupz(pointers[17]);
             if(!*ae->recipient) { freez(ae->recipient); ae->recipient = NULL; }
 
-            if(unlikely(ae->source)) freez(ae->source);
+            freez(ae->source);
             ae->source = strdupz(pointers[18]);
             if(!*ae->source) { freez(ae->source); ae->source = NULL; }
 
-            if(unlikely(ae->units)) freez(ae->units);
+            freez(ae->units);
             ae->units = strdupz(pointers[19]);
             if(!*ae->units) { freez(ae->units); ae->units = NULL; }
 
-            if(unlikely(ae->info)) freez(ae->info);
+            freez(ae->info);
             ae->info = strdupz(pointers[20]);
             if(!*ae->info) { freez(ae->info); ae->info = NULL; }
 
@@ -291,6 +291,8 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
             ae->old_value   = str2l(pointers[26]);
 
             static char value_string[100 + 1];
+            freez(ae->old_value_string);
+            freez(ae->new_value_string);
             ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
             ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
 
