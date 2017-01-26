@@ -1572,10 +1572,13 @@
                         + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><span style="font-family: monospace; color: #e05d44; font-weight: bold;">' + alarm.crit + '</span></td></tr>'):'');
 
                     if(full === true) {
-                            html += ((typeof alarm.lookup_after !== 'undefined')?('<tr><td width="10%" style="text-align:right">db&nbsp;lookup</td><td>' + alarm_lookup_explain(alarm, chart) + '</td></tr>'):'')
+                        var units = chart.units;
+                        if(units === '%') units = '&#37;';
+
+                        html += ((typeof alarm.lookup_after !== 'undefined')?('<tr><td width="10%" style="text-align:right">db&nbsp;lookup</td><td>' + alarm_lookup_explain(alarm, chart) + '</td></tr>'):'')
                             + ((typeof alarm.calc !== 'undefined')?('<tr><td width="10%" style="text-align:right">calculation</td><td><span style="font-family: monospace;">' + alarm.calc + '</span></td></tr>'):'')
-                            + ((chart.green !== null)?('<tr><td width="10%" style="text-align:right">green&nbsp;threshold</td><td><code>' + chart.green + ' ' + chart.units + '</code></td></tr>'):'')
-                            + ((chart.red !== null)?('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + chart.units + '</code></td></tr>'):'');
+                            + ((chart.green !== null)?('<tr><td width="10%" style="text-align:right">green&nbsp;threshold</td><td><code>' + chart.green + ' ' + units + '</code></td></tr>'):'')
+                            + ((chart.red !== null)?('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + units + '</code></td></tr>'):'');
                     }
 
                     var delay = '';
