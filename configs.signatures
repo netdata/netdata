@@ -222,6 +222,7 @@ declare -A configs_signatures=(
   ['8c1d41e2c88aeca78bc319ed74c8748c']='python.d/phpfpm.conf'
   ['8d0552371a7c9725a04196fa560813d1']='health.d/cpu.conf'
   ['8dc0bd0a70b5117454bd5f5b98f91c2c']='health.d/disks.conf'
+  ['8f4f925c1e97dd164007495ec5135ffc']='health.d/fping.conf'
   ['8fd472a854b0996327e8ed3562161182']='health_alarm_notify.conf'
   ['919911d13901d60a7580f5dfd7fc87bb']='health.d/ram.conf'
   ['91c757ef6be3abdb86906d9dbb9c217a']='fping.conf'
