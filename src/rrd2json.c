@@ -543,11 +543,13 @@ static void rrdr_dump(RRDR *r)
 
 void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char *dims)
 {
+    if(unlikely(!dims || !*dims)) return;
+
     char b[strlen(dims) + 1];
     char *o = b, *tok;
     strcpy(o, dims);
 
-    long c;
+    long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
     RRDDIM *d;
 
     // disable all of them
@@ -562,15 +564,37 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char 
         // find it and enable it
         for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
             if(unlikely((hash == d->hash && !strcmp(d->id, tok)) || !strcmp(d->name, tok))) {
-                r->od[c] &= ~RRDR_HIDDEN;
+                dims_selected++;
+
+                r->od[c] |= RRDR_OPTION_SELECTED;
+
+                // remove the hidden flag, if it is set
+                if(likely(r->od[c] & RRDR_HIDDEN))
+                    r->od[c] &= ~RRDR_HIDDEN;
 
                 // since the user needs this dimension
                 // make it appear as NONZERO, to return it
                 // even if the dimension has only zeros
                 // unless option non_zero is set
-                if (!(options & RRDR_OPTION_NONZERO)) r->od[c] |= RRDR_NONZERO;
+                if(likely(!(options & RRDR_OPTION_NONZERO)))
+                    r->od[c] |= RRDR_NONZERO;
+
+                // count the visible dimensions
+                if(likely(r->od[c] & RRDR_NONZERO))
+                    dims_not_hidden_not_zero++;
             }
         }
+    }
+
+    // check if all dimensions are hidden
+    if(unlikely(!dims_not_hidden_not_zero && dims_selected)) {
+        // there are a few selected dimensions
+        // but they are all zero
+        // enable the selected ones
+        // to avoid returning an empty chart
+        for(c = 0, d = r->st->dimensions; d ;c++, d = d->next)
+            if(unlikely(r->od[c] & RRDR_OPTION_SELECTED))
+                r->od[c] |= RRDR_NONZERO;
     }
 }
 
