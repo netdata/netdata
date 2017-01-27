@@ -16,6 +16,7 @@
 # Supported notification methods:
 #  - emails by @ktsaou
 #  - slack.com notifications by @ktsaou
+#  - discordapp.com notifications by @lowfive
 #  - pushover.net notifications by @ktsaou
 #  - pushbullet.com push notifications by Tiago Peralta @tperalta82 PR #1070
 #  - telegram.org notifications by @hashworks PR #1002
@@ -174,6 +175,7 @@ sendmail=
 
 # enable / disable features
 SEND_SLACK="YES"
+SEND_DISCORD="YES"
 SEND_PUSHOVER="YES"
 SEND_TWILIO="YES"
 SEND_HIPCHAT="YES"
@@ -188,6 +190,11 @@ SEND_PD="YES"
 SLACK_WEBHOOK_URL=
 DEFAULT_RECIPIENT_SLACK=
 declare -A role_recipients_slack=()
+
+# discord configs
+DISCORD_WEBHOOK_URL=
+DEFAULT_RECIPIENT_DISCORD=
+declare -A role_recipients_discord=()
 
 # pushover configs
 PUSHOVER_APP_TOKEN=
@@ -285,6 +292,7 @@ filter_recipient_by_criticality() {
 # find the recipients' addresses per method
 
 declare -A arr_slack=()
+declare -A arr_discord=()
 declare -A arr_pushover=()
 declare -A arr_pushbullet=()
 declare -A arr_twilio=()
@@ -365,6 +373,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 
+    # discord
+    a="${role_recipients_discord[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_DISCORD}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality discord "${r}" && arr_discord[${r/|*/}]="1"
+    done
+
     # pagerduty.com
     a="${role_recipients_pd[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_PD}"
@@ -377,6 +393,10 @@ done
 # build the list of slack recipients (channels)
 to_slack="${!arr_slack[*]}"
 [ -z "${to_slack}" ] && SEND_SLACK="NO"
+
+# build the list of discord recipients (channels)
+to_discord="${!arr_discord[*]}"
+[ -z "${to_discord}" ] && SEND_DISCORD="NO"
 
 # build the list of pushover recipients (user tokens)
 to_pushover="${!arr_pushover[*]}"
@@ -422,6 +442,9 @@ done
 # check slack
 [ -z "${SLACK_WEBHOOK_URL}" ] && SEND_SLACK="NO"
 
+# check discord
+[ -z "${DISCORD_WEBHOOK_URL}" ] && SEND_DISCORD="NO"
+
 # check pushover
 [ -z "${PUSHOVER_APP_TOKEN}" ] && SEND_PUSHOVER="NO"
 
@@ -461,6 +484,7 @@ fi
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
+        -o "${SEND_DISCORD}"       = "YES" \
         -o "${SEND_HIPCHAT}"     = "YES" \
         -o "${SEND_TWILIO}"      = "YES" \
         -o "${SEND_MESSAGEBIRD}" = "YES" \
@@ -478,6 +502,7 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+        SEND_DISCORD="NO"
         SEND_TWILIO="NO"
         SEND_HIPCHAT="NO"
         SEND_MESSAGEBIRD="NO"
@@ -497,6 +522,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
     -a "${SEND_TELEGRAM}"       != "YES" \
     -a "${SEND_SLACK}"          != "YES" \
+    -a "${SEND_DISCORD}"          != "YES" \
     -a "${SEND_TWILIO}"         != "YES" \
     -a "${SEND_HIPCHAT}"        != "YES" \
     -a "${SEND_MESSAGEBIRD}"    != "YES" \
@@ -1010,6 +1036,66 @@ EOF
     return 1
 }
 
+# -----------------------------------------------------------------------------
+# discord sender
+
+send_discord() {
+    local webhook="${1}/slack" channels="${2}" httpcode sent=0 channel color payload
+
+    [ "${SEND_DISCORD}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  color="warning" ;;
+        CRITICAL) color="danger" ;;
+        CLEAR)    color="good" ;;
+        *)        color="#777777" ;;
+    esac
+
+    for channel in ${channels}
+    do
+        payload="$(cat <<EOF
+        {
+            "channel": "#${channel}",
+            "username": "netdata on ${host}",
+            "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
+            "icon_url": "${images_base_url}/images/seo-performance-128.png",
+            "attachments": [
+                {
+                    "color": "${color}",
+                    "title": "${alarm}",
+                    "title_link": "${goto_url}",
+                    "text": "${info}",
+                    "fields": [
+                        {
+                            "title": "${chart}",
+                            "value": "${family}"
+                        }
+                    ],
+                    "thumb_url": "${image}",
+                    "footer_icon": "${images_base_url}/images/seo-performance-128.png",
+                    "footer": "${host}",
+                    "ts": ${when}
+                }
+            ]
+        }
+EOF
+        )"
+
+        httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode "payload=${payload}" "${webhook}")
+        if [ "${httpcode}" == "200" ]
+        then
+            info "sent discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
 
 # -----------------------------------------------------------------------------
 # prepare the content of the notification
@@ -1109,6 +1195,15 @@ raised_for_html=
 
 send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
+
+# -----------------------------------------------------------------------------
+# send the discord notification
+
+# discord aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_discord "${DISCORD_WEBHOOK_URL}" "${to_discord}"
+SENT_DISCORD=$?
 
 # -----------------------------------------------------------------------------
 # send the pushover notification
@@ -1303,6 +1398,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHOVER}     -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
+    -o ${SENT_DISCORD}      -eq 0 \
     -o ${SENT_TWILIO}       -eq 0 \
     -o ${SENT_HIPCHAT}      -eq 0 \
     -o ${SENT_MESSAGEBIRD}  -eq 0 \
@@ -1317,3 +1413,4 @@ fi
 
 # we did not send anything
 exit 1
+
