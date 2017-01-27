@@ -1562,6 +1562,13 @@
 
                 function alarm_to_html(alarm, full) {
                     var chart = options.data.charts[alarm.chart];
+                    if(typeof(chart) === 'undefined') {
+                        // this means the charts loaded are incomplete
+                        // probably netdata was restarted and more charts
+                        // are now available.
+                        return '';
+                    }
+
                     var has_alarm = ((typeof alarm.warn !== 'undefined' || typeof alarm.crit !== 'undefined')?true:false);
 
                     var role_href = ((has_alarm === true)?('<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fa fa-line-chart" aria-hidden="true"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="NETDATA.alarms.scrollToChart(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small>'):('&nbsp;'));
@@ -1572,10 +1579,13 @@
                         + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><span style="font-family: monospace; color: #e05d44; font-weight: bold;">' + alarm.crit + '</span></td></tr>'):'');
 
                     if(full === true) {
-                            html += ((typeof alarm.lookup_after !== 'undefined')?('<tr><td width="10%" style="text-align:right">db&nbsp;lookup</td><td>' + alarm_lookup_explain(alarm, chart) + '</td></tr>'):'')
+                        var units = chart.units;
+                        if(units === '%') units = '&#37;';
+
+                        html += ((typeof alarm.lookup_after !== 'undefined')?('<tr><td width="10%" style="text-align:right">db&nbsp;lookup</td><td>' + alarm_lookup_explain(alarm, chart) + '</td></tr>'):'')
                             + ((typeof alarm.calc !== 'undefined')?('<tr><td width="10%" style="text-align:right">calculation</td><td><span style="font-family: monospace;">' + alarm.calc + '</span></td></tr>'):'')
-                            + ((chart.green !== null)?('<tr><td width="10%" style="text-align:right">green&nbsp;threshold</td><td><code>' + chart.green + ' ' + chart.units + '</code></td></tr>'):'')
-                            + ((chart.red !== null)?('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + chart.units + '</code></td></tr>'):'');
+                            + ((chart.green !== null)?('<tr><td width="10%" style="text-align:right">green&nbsp;threshold</td><td><code>' + chart.green + ' ' + units + '</code></td></tr>'):'')
+                            + ((chart.red !== null)?('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + units + '</code></td></tr>'):'');
                     }
 
                     var delay = '';
@@ -1853,6 +1863,23 @@
                                 sortable: true
                             },
                             {
+                                field: 'value_string',
+                                title: 'Friendly Value',
+                                titleTooltip: 'The value of the alarm, that triggered this event',
+                                align: 'right',
+                                valign: 'middle',
+                                sortable: true
+                            },
+                            {
+                                field: 'old_value_string',
+                                title: 'Friendly Old Value',
+                                titleTooltip: 'The value of the alarm, just before this event',
+                                align: 'right',
+                                valign: 'middle',
+                                visible: false,
+                                sortable: true
+                            },
+                            {
                                 field: 'old_value',
                                 title: 'Old Value',
                                 titleTooltip: 'The value of the alarm, just before this event',
@@ -1873,6 +1900,7 @@
                                 },
                                 align: 'right',
                                 valign: 'middle',
+                                visible: false,
                                 sortable: true
                             },
                             {
@@ -1881,6 +1909,7 @@
                                 titleTooltip: 'The units of the value of the alarm',
                                 align: 'left',
                                 valign: 'middle',
+                                visible: false,
                                 sortable: true
                             },
                             {
@@ -3259,4 +3288,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170118-11"></script>
+<script type="text/javascript" src="dashboard.js?v20170127-1"></script>
