@@ -368,10 +368,226 @@ cleanup:
     return len - i;
 }
 
-static inline const char *fix_units(const char *units) {
-    if(!units || !*units || !strcmp(units, "empty") || !strcmp(units, "null")) return "";
-    if(!strcmp(units, "percentage") || !strcmp(units, "percent") || !strcmp(units, "pcent")) return "%";
-    return units;
+static inline char *format_value_with_precision_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
+    if(unlikely(isnan(value) || isinf(value)))
+        value = 0.0;
+
+    char *separator = "";
+    if(unlikely(isalnum(*units)))
+        separator = " ";
+
+    if(precision < 0) {
+        int len, lstop = 0, trim_zeros = 1;
+
+        calculated_number abs = value;
+        if(isless(value, 0)) {
+            lstop = 1;
+            abs = -value;
+        }
+
+        if(isgreaterequal(abs, 1000)) {
+            len = snprintfz(value_string, value_string_len, "%0.0Lf", (long double) value);
+            trim_zeros = 0;
+        }
+        else if(isgreaterequal(abs, 100)) len = snprintfz(value_string, value_string_len, "%0.1Lf", (long double) value);
+        else if(isgreaterequal(abs, 1))   len = snprintfz(value_string, value_string_len, "%0.2Lf", (long double) value);
+        else if(isgreaterequal(abs, 0.1)) len = snprintfz(value_string, value_string_len, "%0.3Lf", (long double) value);
+        else                              len = snprintfz(value_string, value_string_len, "%0.4Lf", (long double) value);
+
+        if(unlikely(trim_zeros)) {
+            int l;
+            // remove trailing zeros from the decimal part
+            for(l = len - 1; l > lstop; l--) {
+                if(likely(value_string[l] == '0')) {
+                    value_string[l] = '\0';
+                    len--;
+                }
+
+                else if(unlikely(value_string[l] == '.')) {
+                    value_string[l] = '\0';
+                    len--;
+                    break;
+                }
+
+                else
+                    break;
+            }
+        }
+
+        if(unlikely(len <= 0)) len = 1;
+        snprintfz(&value_string[len], value_string_len - len, "%s%s", separator, units);
+    }
+    else {
+        if(precision > 50) precision = 50;
+        snprintfz(value_string, value_string_len, "%0.*Lf%s%s", precision, (long double) value, separator, units);
+    }
+
+    return value_string;
+}
+
+inline char *format_value_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision) {
+    static uint32_t
+            hash_seconds = 0,
+            hash_seconds_ago = 0,
+            hash_minutes = 0,
+            hash_minutes_ago = 0,
+            hash_hours = 0,
+            hash_hours_ago = 0,
+            hash_onoff = 0,
+            hash_updown = 0,
+            hash_okerror = 0,
+            hash_okfailed = 0,
+            hash_empty = 0,
+            hash_null = 0,
+            hash_percentage = 0,
+            hash_percent = 0,
+            hash_pcent = 0;
+
+    if(unlikely(!hash_seconds)) {
+        hash_seconds     = simple_hash("seconds");
+        hash_seconds_ago = simple_hash("seconds ago");
+        hash_minutes     = simple_hash("minutes");
+        hash_minutes_ago = simple_hash("minutes ago");
+        hash_hours       = simple_hash("hours");
+        hash_hours_ago   = simple_hash("hours ago");
+        hash_onoff       = simple_hash("on/off");
+        hash_updown      = simple_hash("up/down");
+        hash_okerror     = simple_hash("ok/error");
+        hash_okfailed    = simple_hash("ok/failed");
+        hash_empty       = simple_hash("empty");
+        hash_null        = simple_hash("null");
+        hash_percentage  = simple_hash("percentage");
+        hash_percent     = simple_hash("percent");
+        hash_pcent       = simple_hash("pcent");
+    }
+
+    if(unlikely(!units)) units = "";
+
+    uint32_t hash_units = simple_hash(units);
+
+    if(unlikely((hash_units == hash_seconds && !strcmp(units, "seconds")) || (hash_units == hash_seconds_ago && !strcmp(units, "seconds ago")))) {
+        if(value == 0.0) {
+            snprintfz(value_string, value_string_len, "%s", "now");
+            return value_string;
+        }
+        else if(isnan(value) || isinf(value)) {
+            snprintfz(value_string, value_string_len, "%s", "never");
+            return value_string;
+        }
+
+        const char *suffix = (hash_units == hash_seconds_ago)?" ago":"";
+
+        size_t s = (size_t)value;
+        size_t d = s / 86400;
+        s = s % 86400;
+
+        size_t h = s / 3600;
+        s = s % 3600;
+
+        size_t m = s / 60;
+        s = s % 60;
+
+        if(d)
+            snprintfz(value_string, value_string_len, "%zu %s %02zu:%02zu:%02zu%s", d, (d == 1)?"day":"days", h, m, s, suffix);
+        else
+            snprintfz(value_string, value_string_len, "%02zu:%02zu:%02zu%s", h, m, s, suffix);
+
+        return value_string;
+    }
+
+    else if(unlikely((hash_units == hash_minutes && !strcmp(units, "minutes")) || (hash_units == hash_minutes_ago && !strcmp(units, "minutes ago")))) {
+        if(value == 0.0) {
+            snprintfz(value_string, value_string_len, "%s", "now");
+            return value_string;
+        }
+        else if(isnan(value) || isinf(value)) {
+            snprintfz(value_string, value_string_len, "%s", "never");
+            return value_string;
+        }
+
+        const char *suffix = (hash_units == hash_minutes_ago)?" ago":"";
+
+        size_t m = (size_t)value;
+        size_t d = m / (60 * 24);
+        m = m % (60 * 24);
+
+        size_t h = m / 60;
+        m = m % 60;
+
+        if(d)
+            snprintfz(value_string, value_string_len, "%zud %02zuh %02zum%s", d, h, m, suffix);
+        else
+            snprintfz(value_string, value_string_len, "%zuh %zum%s", h, m, suffix);
+
+        return value_string;
+    }
+
+    else if(unlikely((hash_units == hash_hours && !strcmp(units, "hours")) || (hash_units == hash_hours_ago && !strcmp(units, "hours ago")))) {
+        if(value == 0.0) {
+            snprintfz(value_string, value_string_len, "%s", "now");
+            return value_string;
+        }
+        else if(isnan(value) || isinf(value)) {
+            snprintfz(value_string, value_string_len, "%s", "never");
+            return value_string;
+        }
+
+        const char *suffix = (hash_units == hash_hours_ago)?" ago":"";
+
+        size_t h = (size_t)value;
+        size_t d = h / 24;
+        h = h % 24;
+
+        if(d)
+            snprintfz(value_string, value_string_len, "%zud %zuh%s", d, h, suffix);
+        else
+            snprintfz(value_string, value_string_len, "%zuh%s", h, suffix);
+
+        return value_string;
+    }
+
+    else if(unlikely(hash_units == hash_onoff && !strcmp(units, "on/off"))) {
+        snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"on":"off");
+        return value_string;
+    }
+
+    else if(unlikely(hash_units == hash_updown && !strcmp(units, "up/down"))) {
+        snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"up":"down");
+        return value_string;
+    }
+
+    else if(unlikely(hash_units == hash_okerror && !strcmp(units, "ok/error"))) {
+        snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"error");
+        return value_string;
+    }
+
+    else if(unlikely(hash_units == hash_okfailed && !strcmp(units, "ok/failed"))) {
+        snprintfz(value_string, value_string_len, "%s", (value != 0.0)?"ok":"failed");
+        return value_string;
+    }
+
+    else if(unlikely(hash_units == hash_empty && !strcmp(units, "empty")))
+        units = "";
+
+    else if(unlikely(hash_units == hash_null && !strcmp(units, "null")))
+        units = "";
+
+    else if(unlikely(hash_units == hash_percentage && !strcmp(units, "percentage")))
+        units = "%";
+
+    else if(unlikely(hash_units == hash_percent && !strcmp(units, "percent")))
+        units = "%";
+
+    else if(unlikely(hash_units == hash_pcent && !strcmp(units, "pcent")))
+        units = "%";
+
+
+    if(unlikely(isnan(value) || isinf(value))) {
+        strcpy(value_string, "-");
+        return value_string;
+    }
+
+    return format_value_with_precision_and_unit(value_string, value_string_len, value, units, precision);
 }
 
 static inline const char *color_map(const char *color) {
@@ -391,7 +607,13 @@ static inline const char *color_map(const char *color) {
     return color;
 }
 
-static inline void calc_colorz(const char *color, char *final, size_t len, calculated_number value, int value_is_null) {
+static inline void calc_colorz(const char *color, char *final, size_t len, calculated_number value) {
+    int value_is_null = 0;
+    if(isnan(value) || isinf(value)) {
+        value = 0.0;
+        value_is_null = 1;
+    }
+
     char color_buffer[256 + 1] = "";
     char value_buffer[256 + 1] = "";
     char comparison = '>';
@@ -501,18 +723,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 // colors
 #define COLOR_STRING_SIZE 100
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int value_is_null, int precision) {
-    static uint32_t hash_seconds = 0, hash_seconds_ago = 0, hash_minutes = 0, hash_minutes_ago = 0, hash_hours = 0, hash_hours_ago = 0;
-
-    if(unlikely(!hash_seconds)) {
-        hash_seconds     = simple_hash("seconds");
-        hash_seconds_ago = simple_hash("seconds ago");
-        hash_minutes     = simple_hash("minutes");
-        hash_minutes_ago = simple_hash("minutes ago");
-        hash_hours       = simple_hash("hours");
-        hash_hours_ago   = simple_hash("hours ago");
-    }
-
+void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision) {
     char      label_buffer[LABEL_STRING_SIZE + 1]
             , value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
@@ -527,110 +738,10 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         label_color = "#555";
 
     if(unlikely(!value_color || !*value_color))
-        value_color = (value_is_null)?"#999":"#4c1";
+        value_color = (isnan(value) || isinf(value))?"#999":"#4c1";
 
-    units = fix_units(units);
-    calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value, value_is_null);
-
-    char *separator = "";
-    if(unlikely(isalnum(*units)))
-        separator = " ";
-
-    uint32_t hash_units = simple_hash(units);
-
-    if(unlikely((hash_units == hash_seconds && !strcmp(units, "seconds")) || (hash_units == hash_seconds_ago && !strcmp(units, "seconds ago")))) {
-        char *suffix = (hash_units == hash_seconds_ago)?" ago":"";
-
-        size_t s = (size_t)value;
-        size_t d = s / 86400;
-        s = s % 86400;
-
-        size_t h = s / 3600;
-        s = s % 3600;
-
-        size_t m = s / 60;
-        s = s % 60;
-
-        if(d)
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zu %s %02zu:%02zu:%02zu%s", d, (d == 1)?"day":"days", h, m, s, suffix);
-        else
-            snprintfz(value_string, VALUE_STRING_SIZE, "%02zu:%02zu:%02zu%s", h, m, s, suffix);
-    }
-
-    else if(unlikely((hash_units == hash_minutes && !strcmp(units, "minutes")) || (hash_units == hash_minutes_ago && !strcmp(units, "minutes ago")))) {
-        char *suffix = (hash_units == hash_minutes_ago)?" ago":"";
-
-        size_t m = (size_t)value;
-        size_t d = m / (60 * 24);
-        m = m % (60 * 24);
-
-        size_t h = m / 60;
-        m = m % 60;
-
-        if(d)
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zud %02zuh %02zum%s", d, h, m, suffix);
-        else
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zuh %zum%s", h, m, suffix);
-    }
-
-    else if(unlikely((hash_units == hash_hours && !strcmp(units, "hours")) || (hash_units == hash_hours_ago && !strcmp(units, "hours ago")))) {
-        char *suffix = (hash_units == hash_hours_ago)?" ago":"";
-
-        size_t h = (size_t)value;
-        size_t d = h / 24;
-        h = h % 24;
-
-        if(d)
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zud %zuh%s", d, h, suffix);
-        else
-            snprintfz(value_string, VALUE_STRING_SIZE, "%zuh%s", h, suffix);
-    }
-
-    else if(unlikely(value_is_null))
-        strcpy(value_string, "-");
-
-    else if(precision < 0) {
-        int len, lstop = 0, trim_zeros = 1;
-
-        calculated_number abs = value;
-        if(isless(value, 0)) {
-            lstop = 1;
-            abs = -value;
-        }
-
-        if(isgreaterequal(abs, 1000))     { len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.0Lf", (long double)value); trim_zeros = 0; }
-        else if(isgreaterequal(abs, 100))   len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.1Lf", (long double)value);
-        else if(isgreaterequal(abs, 1))     len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.2Lf", (long double)value);
-        else if(isgreaterequal(abs, 0.1))   len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.3Lf", (long double)value);
-        else                                len = snprintfz(value_string, VALUE_STRING_SIZE, "%0.4Lf", (long double)value);
-
-        if(unlikely(trim_zeros)) {
-            int l;
-            // remove trailing zeros from the decimal part
-            for(l = len - 1; l > lstop ; l--) {
-                if(likely(value_string[l] == '0')) {
-                    value_string[l] = '\0';
-                    len--;
-                }
-
-                else if(unlikely(value_string[l] == '.')) {
-                    value_string[l] = '\0';
-                    len--;
-                    break;
-                }
-
-                else
-                    break;
-            }
-        }
-
-        if(len >= 0)
-            snprintfz(&value_string[len], VALUE_STRING_SIZE - len, "%s%s", separator, units);
-    }
-    else {
-        if(precision > 50) precision = 50;
-        snprintfz(value_string, VALUE_STRING_SIZE, "%0.*Lf%s%s", precision, (long double)value, separator, units);
-    }
+    calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
+    format_value_and_unit(value_string, VALUE_STRING_SIZE, value, units, precision);
 
     // we need to copy the label, since verdana11_width may write to it
     strncpyz(label_buffer, label, LABEL_STRING_SIZE);

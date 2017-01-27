@@ -119,13 +119,14 @@ typedef struct rrddimvar {
 #define RRDCALC_STATUS_WARNING        3
 #define RRDCALC_STATUS_CRITICAL       4
 
-#define RRDCALC_FLAG_DB_ERROR      0x00000001
-#define RRDCALC_FLAG_DB_NAN        0x00000002
-/* #define RRDCALC_FLAG_DB_STALE      0x00000004 */
-#define RRDCALC_FLAG_CALC_ERROR    0x00000008
-#define RRDCALC_FLAG_WARN_ERROR    0x00000010
-#define RRDCALC_FLAG_CRIT_ERROR    0x00000020
-#define RRDCALC_FLAG_RUNNABLE      0x00000040
+#define RRDCALC_FLAG_DB_ERROR              0x00000001
+#define RRDCALC_FLAG_DB_NAN                0x00000002
+/* #define RRDCALC_FLAG_DB_STALE           0x00000004 */
+#define RRDCALC_FLAG_CALC_ERROR            0x00000008
+#define RRDCALC_FLAG_WARN_ERROR            0x00000010
+#define RRDCALC_FLAG_CRIT_ERROR            0x00000020
+#define RRDCALC_FLAG_RUNNABLE              0x00000040
+#define RRDCALC_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
 
 typedef struct rrdcalc {
     uint32_t id;                    // the unique id of this alarm
@@ -274,11 +275,12 @@ typedef struct rrdcalctemplate {
 
 #define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after)
 
-#define HEALTH_ENTRY_FLAG_PROCESSED    0x00000001
-#define HEALTH_ENTRY_FLAG_UPDATED      0x00000002
-#define HEALTH_ENTRY_FLAG_EXEC_RUN     0x00000004
-#define HEALTH_ENTRY_FLAG_EXEC_FAILED  0x00000008
-#define HEALTH_ENTRY_FLAG_SAVED        0x10000000
+#define HEALTH_ENTRY_FLAG_PROCESSED             0x00000001
+#define HEALTH_ENTRY_FLAG_UPDATED               0x00000002
+#define HEALTH_ENTRY_FLAG_EXEC_RUN              0x00000004
+#define HEALTH_ENTRY_FLAG_EXEC_FAILED           0x00000008
+#define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
+#define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
 
 typedef struct alarm_entry {
     uint32_t unique_id;
@@ -308,6 +310,10 @@ typedef struct alarm_entry {
 
     calculated_number old_value;
     calculated_number new_value;
+
+    char *old_value_string;
+    char *new_value_string;
+
     int old_status;
     int new_status;
 

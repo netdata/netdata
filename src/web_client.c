@@ -896,7 +896,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
     if(!st) st = rrdset_find_byname(chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
-        buffer_svg(w->response.data, "chart not found", 0, "", NULL, NULL, 1, -1);
+        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1);
         ret = 200;
         goto cleanup;
     }
@@ -906,7 +906,7 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         rc = rrdcalc_find(st, alarm);
         if (!rc) {
             buffer_no_cacheable(w->response.data);
-            buffer_svg(w->response.data, "alarm not found", 0, "", NULL, NULL, 1, -1);
+            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1);
             ret = 200;
             goto cleanup;
         }
@@ -982,9 +982,6 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
             );
 
     if(rc) {
-        calculated_number n = rc->value;
-        if(isnan(n) || isinf(n)) n = 0;
-
         if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
             w->response.data->expires = now_realtime_sec() + refresh;
@@ -1020,19 +1017,18 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         }
 
         buffer_svg(w->response.data,
-                   label,
-                   rc->value * multiply / divide,
-                   units,
-                   label_color,
-                   value_color,
-                   0,
-                   precision);
+                label,
+                (isnan(rc->value)||isinf(rc->value)) ? rc->value : rc->value * multiply / divide,
+                units,
+                label_color,
+                value_color,
+                precision);
         ret = 200;
     }
     else {
         time_t latest_timestamp = 0;
         int value_is_null = 1;
-        calculated_number n = 0;
+        calculated_number n = NAN;
         ret = 500;
 
         // if the collected value is too old, don't calculate its value
@@ -1065,13 +1061,12 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
 
         // render the badge
         buffer_svg(w->response.data,
-                   label,
-                   n * multiply / divide,
-                   units,
-                   label_color,
-                   value_color,
-                   value_is_null,
-                   precision);
+                label,
+                (value_is_null)?NAN:(n * multiply / divide),
+                units,
+                label_color,
+                value_color,
+                precision);
     }
 
 cleanup:
