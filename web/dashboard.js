@@ -6104,6 +6104,10 @@ var NETDATA = window.NETDATA || {};
                         // console.log('alarm' + entry.unique_id + ' switch to CLEAR from ' + entry.old_status);
                         return;
                     }
+                    if(entry.no_clear_notification === true) {
+                        // console.log('alarm' + entry.unique_id + ' is CLEAR but has no_clear_notification flag');
+                        return;
+                    }
                     title = name + ' back to normal (' + entry.value_string.toString() + ')';
                     icon = 'images/check-mark-2-128-green.png'
                     interaction = false;
