@@ -1786,6 +1786,8 @@ static inline uint32_t health_parse_options(const char *s) {
 
             if(!strcasecmp(buf, "no-clear-notification") || !strcasecmp(buf, "no-clear"))
                 options |= RRDCALC_FLAG_NO_CLEAR_NOTIFICATION;
+            else
+                error("Ignoring unknown alarm option '%s'", buf);
         }
     }
 
@@ -2729,17 +2731,21 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     if(unlikely(ae->new_status < RRDCALC_STATUS_CLEAR)) {
         // do not send notifications for internal statuses
+        debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (internal statuses)", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
         goto done;
     }
 
-    if(unlikely(ae->new_status <= RRDCALC_STATUS_CLEAR && ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
+    if(unlikely(ae->new_status <= RRDCALC_STATUS_CLEAR && (ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
         // do not send notifications for disabled statuses
+        debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (it has no-clear-notification enabled)", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+        // mark it as run, so that we will send the same alarm if it happens again
         goto done;
     }
 
     // find the previous notification for the same alarm
     // which we have run the exec script
-    {
+    // exception: alarms with HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION set
+    if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
         uint32_t id = ae->alarm_id;
         ALARM_ENTRY *t;
         for(t = ae->next; t ; t = t->next) {
