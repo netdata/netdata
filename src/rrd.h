@@ -124,6 +124,7 @@ struct rrddim {
 
     // FIXME
     // we need the hash_name too!
+    // needed at rrdr_disable_not_selected_dimensions()
 
     uint32_t flags;
 
