@@ -552,6 +552,10 @@ int main(int argc, char **argv)
         if(!p) p = "/bin:/usr/bin";
         snprintfz(path, 1024, "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
         setenv("PATH", config_get("plugins", "PATH environment variable", path), 1);
+
+        p = getenv("PYTHONPATH");
+        if(!p) p = "";
+        setenv("PYTHONPATH", config_get("plugins", "PYTHONPATH environment variable", p), 1);
     }
 
     char *user = NULL;
