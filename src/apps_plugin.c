@@ -598,7 +598,7 @@ static int read_apps_groups_conf(const char *file)
             // add this target
             struct target *n = get_apps_groups_target(s, w, name);
             if(!n) {
-                error("Cannot create target '%s' (line %lu, word %lu)", s, line, word);
+                error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
             }
 
