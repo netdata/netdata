@@ -57,7 +57,6 @@
 #define RRDR_OPTION_LABEL_QUOTES    0x00000400 // in CSV output, wrap header labels in double quotes
 #define RRDR_OPTION_PERCENTAGE      0x00000800 // give values as percentage of total
 #define RRDR_OPTION_NOT_ALIGNED     0x00001000 // do not align charts for persistant timeframes
-#define RRDR_OPTION_SELECTED        0x00002000 // the dimension is selected by the caller: rrdr_disable_not_selected_dimensions()
 
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrd_stats_api_v1_charts(BUFFER *wb);
