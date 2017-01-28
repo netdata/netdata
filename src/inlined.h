@@ -10,7 +10,7 @@ typedef uint32_t kernel_uint_t;
 #else
 typedef uint64_t kernel_uint_t;
 #define str2kernel_unit_t(string) str2uint64_t(string)
-#define KERNEL_UINT_FORMAT "%lu"
+#define KERNEL_UINT_FORMAT "%" PRIu64
 #endif
 
 #define str2pid_t(string) str2uint32_t(string)
