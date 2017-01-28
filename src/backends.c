@@ -349,6 +349,10 @@ void *backends_main(void *ptr) {
         //fprintf(stderr, "\nBACKEND BEGIN:\n%s\nBACKEND END\n", buffer_tostring(b)); // FIXME
         //fprintf(stderr, "after = %lu, before = %lu\n", after, before);
 
+        // prepare for the next iteration
+        // to add incrementally data to buffer
+        after = before;
+
         // ------------------------------------------------------------------------
         // if we are connected, receive a response, without blocking
 
@@ -454,12 +458,6 @@ void *backends_main(void *ptr) {
                 close(sock);
                 sock = -1;
             }
-
-            // either the buffer is empty
-            // or is holding the data we couldn't send
-            // so, make sure the next iteration will continue
-            // from where we are now
-            after = before;
         }
         else {
             error("Failed to update database backend '%s'", destination);
