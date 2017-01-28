@@ -170,7 +170,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 }
 
 static inline int is_major_enabled(int major) {
-    static char *major_configs = NULL;
+    static int8_t *major_configs = NULL;
     static size_t major_size = 0;
 
     if(major < 0) return 1;
@@ -178,7 +178,7 @@ static inline int is_major_enabled(int major) {
     size_t wanted_size = (size_t)major + 1;
 
     if(major_size < wanted_size) {
-        major_configs = reallocz(major_configs, wanted_size);
+        major_configs = reallocz(major_configs, wanted_size * sizeof(int8_t));
 
         size_t i;
         for(i = major_size; i < wanted_size ; i++)
@@ -193,7 +193,7 @@ static inline int is_major_enabled(int major) {
         major_configs[major] = (char)config_get_boolean("plugin:proc:/proc/diskstats", buffer, 1);
     }
 
-    return major_configs[major];
+    return (int)major_configs[major];
 }
 
 int do_proc_diskstats(int update_every, usec_t dt) {

@@ -1042,8 +1042,10 @@ void rrdset_next_usec(RRDSET *st, usec_t microseconds)
     }
     else {
         // microseconds has the time since the last collection
+#ifdef NETDATA_INTERNAL_CHECKS
         usec_t now_usec = timeval_usec(&now);
         usec_t last_usec = timeval_usec(&st->last_collected_time);
+#endif
         usec_t since_last_usec = dt_usec(&now, &st->last_collected_time);
 
         // verify the microseconds given is good
