@@ -231,20 +231,13 @@ void *proc_diskspace_main(void *ptr) {
 
     struct rusage thread;
 
-    usec_t last = 0, dt = 0;
+    usec_t duration = 0;
     usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
     for(;;) {
-        usec_t now = now_monotonic_usec();
-        usec_t next = now - (now % step) + step;
-
-        dt = (last)?now - last:0;
-
-        while(now < next) {
-            sleep_usec(next - now);
-            now = now_monotonic_usec();
-        }
-
-        last = now;
+        duration = heartbeat_dt_usec(&hb);
+        usec_t hb_dt = heartbeat_next(&hb, step);
 
         if(unlikely(netdata_exit)) break;
 
@@ -307,7 +300,7 @@ void *proc_diskspace_main(void *ptr) {
             else
                 rrdset_next(st_duration);
 
-            rrddim_set_by_pointer(st_duration, rd_duration, dt);
+            rrddim_set_by_pointer(st_duration, rd_duration, duration);
             rrdset_done(st_duration);
 
             // ----------------------------------------------------------------

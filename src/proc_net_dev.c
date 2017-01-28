@@ -111,7 +111,6 @@ static struct netdev *get_netdev(const char *name) {
 
 int do_proc_net_dev(int update_every, usec_t dt) {
     (void)dt;
-
     static SIMPLE_PATTERN *disabled_list = NULL;
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1;
