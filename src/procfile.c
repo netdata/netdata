@@ -285,7 +285,7 @@ procfile *procfile_readall(procfile *ff) {
             ff->size += PROCFILE_INCREMENT_BUFFER;
         }
 
-        debug(D_PROCFILE, "Reading file '%s', from position %ld with length %zd", procfile_filename(ff), s, ff->size - s);
+        debug(D_PROCFILE, "Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         r = read(ff->fd, &ff->data[s], ff->size - s);
         if(unlikely(r == -1)) {
             if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot read from file '%s'", procfile_filename(ff));
