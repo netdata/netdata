@@ -110,7 +110,6 @@ show_tc_cls() {
         done </etc/iproute2/tc_cls
         return 0
     fi
-
     return 1
 }
 
@@ -145,6 +144,7 @@ show_tc() {
 
     # netdata can parse the output of tc
     ${tc} -s class show dev ${x}
+    ${tc} -s qdisc show dev ${x}
 
     # check FireQOS names for classes
     if [ ! -z "${fix_names}" ]
