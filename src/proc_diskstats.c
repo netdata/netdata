@@ -197,8 +197,6 @@ static inline int is_major_enabled(int major) {
 }
 
 int do_proc_diskstats(int update_every, usec_t dt) {
-    (void)dt;
-
     static procfile *ff = NULL;
     static int  global_enable_new_disks_detected_at_runtime = CONFIG_ONDEMAND_YES,
                 global_enable_performance_for_physical_disks = CONFIG_ONDEMAND_ONDEMAND,

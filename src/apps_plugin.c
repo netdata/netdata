@@ -754,7 +754,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     if(unlikely(!ff)) goto cleanup;
 
     p->last_stat_collected_usec = p->stat_collected_usec;
-    p->stat_collected_usec = now_realtime_usec();
+    p->stat_collected_usec = now_monotonic_usec();
     file_counter++;
 
     // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0+i));
@@ -937,7 +937,7 @@ static inline int read_proc_pid_io(struct pid_stat *p) {
     file_counter++;
 
     p->last_io_collected_usec = p->io_collected_usec;
-    p->io_collected_usec = now_realtime_usec();
+    p->io_collected_usec = now_monotonic_usec();
 
     kernel_uint_t last;
 
@@ -1008,7 +1008,7 @@ static inline int read_proc_stat() {
     if(unlikely(!ff)) goto cleanup;
 
     last_collected_usec = collected_usec;
-    collected_usec = now_realtime_usec();
+    collected_usec = now_monotonic_usec();
 
     file_counter++;
 
@@ -2365,7 +2365,7 @@ static usec_t send_resource_usage_to_netdata() {
     usec_t cpusyst;
 
     if(!last.tv_sec) {
-        now_realtime_timeval(&last);
+        now_monotonic_timeval(&last);
         getrusage(RUSAGE_SELF, &me_last);
 
         // the first time, give a zero to allow
@@ -2376,7 +2376,7 @@ static usec_t send_resource_usage_to_netdata() {
         cpusyst = 0;
     }
     else {
-        now_realtime_timeval(&now);
+        now_monotonic_timeval(&now);
         getrusage(RUSAGE_SELF, &me);
 
         usec = dt_usec(&now, &last);
@@ -3016,7 +3016,7 @@ int main(int argc, char **argv)
 
     procfile_adaptive_initial_allocation = 1;
 
-    time_t started_t = now_realtime_sec();
+    time_t started_t = now_monotonic_sec();
     get_system_HZ();
     get_system_pid_max();
     get_system_cpus();
@@ -3059,9 +3059,9 @@ int main(int argc, char **argv)
 
     usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
     for(;1; global_iterations_counter++) {
-        usec_t now = now_realtime_usec();
-        usec_t next = now - (now % step) + step;
 
 #ifdef NETDATA_PROFILING
 #warning "compiling for profiling"
@@ -3069,10 +3069,7 @@ int main(int argc, char **argv)
         profiling_count++;
         if(unlikely(profiling_count > 1000)) exit(0);
 #else
-        while(now < next) {
-            sleep_usec(next - now);
-            now = now_realtime_usec();
-        }
+        heartbeat_next(&hb, step);
 #endif
 
         if(!collect_data_for_all_processes()) {
@@ -3110,9 +3107,7 @@ int main(int argc, char **argv)
         if(unlikely(debug))
             fprintf(stderr, "apps.plugin: done Loop No %zu\n", global_iterations_counter);
 
-        time_t current_t = now_realtime_sec();
-
         // restart check (14400 seconds)
-        if(current_t - started_t > 14400) exit(0);
+        if(now_monotonic_sec() - started_t > 14400) exit(0);
     }
 }
