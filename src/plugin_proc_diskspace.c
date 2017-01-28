@@ -237,7 +237,7 @@ void *proc_diskspace_main(void *ptr) {
     heartbeat_init(&hb);
     for(;;) {
         duration = heartbeat_dt_usec(&hb);
-        usec_t hb_dt = heartbeat_next(&hb, step);
+        /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
         if(unlikely(netdata_exit)) break;
 
