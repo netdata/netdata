@@ -2305,7 +2305,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 
     } // max_loop
 
-    debug(D_RRD_STATS, "RRD_STATS_JSON: %s total %lu bytes", st->name, wb->len);
+    debug(D_RRD_STATS, "RRD_STATS_JSON: %s total %zu bytes", st->name, wb->len);
 
     pthread_rwlock_unlock(&st->rwlock);
     return last_timestamp;
