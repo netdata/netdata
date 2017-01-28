@@ -449,6 +449,7 @@ void rrd_stats_all_json(BUFFER *wb)
 #define RRDR_RESET      0x02 // the dimension contains / the value is reset
 #define RRDR_HIDDEN     0x04 // the dimension contains / the value is hidden
 #define RRDR_NONZERO    0x08 // the dimension contains / the value is non-zero
+#define RRDR_SELECTED   0x10 // the dimension is selected
 
 // RRDR result options
 #define RRDR_RESULT_OPTION_ABSOLUTE 0x00000001
@@ -564,13 +565,12 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char 
         // find it and enable it
         for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
             if(unlikely((hash == d->hash && !strcmp(d->id, tok)) || !strcmp(d->name, tok))) {
-                dims_selected++;
 
-                r->od[c] |= RRDR_OPTION_SELECTED;
-
-                // remove the hidden flag, if it is set
-                if(likely(r->od[c] & RRDR_HIDDEN))
+                if(likely(r->od[c] & RRDR_HIDDEN)) {
+                    r->od[c] |= RRDR_SELECTED;
                     r->od[c] &= ~RRDR_HIDDEN;
+                    dims_selected++;
+                }
 
                 // since the user needs this dimension
                 // make it appear as NONZERO, to return it
@@ -593,7 +593,7 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char 
         // enable the selected ones
         // to avoid returning an empty chart
         for(c = 0, d = r->st->dimensions; d ;c++, d = d->next)
-            if(unlikely(r->od[c] & RRDR_OPTION_SELECTED))
+            if(unlikely(r->od[c] & RRDR_SELECTED))
                 r->od[c] |= RRDR_NONZERO;
     }
 }
