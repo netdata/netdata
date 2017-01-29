@@ -63,6 +63,8 @@ fireqos_run_dir="/var/run/fireqos"
 qos_get_class_names_every=120
 qos_exit_every=3600
 
+tc_show="qdisc" # can also be "class"
+
 # check if we have a valid number for interval
 t=${1}
 update_every=$((t))
@@ -74,6 +76,16 @@ if [ -f "${config_dir}/tc-qos-helper.conf" ]
     then
     source "${config_dir}/tc-qos-helper.conf"
 fi
+
+case "${tc_show}" in
+    qdisc|class)
+        ;;
+
+    *)
+        error "tc_show variable can be either 'qdisc' or 'class' but is set to '${tc_show}'. Assuming it is 'qdisc'."
+        tc_show="qdisc"
+        ;;
+esac
 
 # default sleep function
 LOOPSLEEPMS_LASTWORK=0
@@ -94,10 +106,17 @@ tc_devices=
 fix_names=
 
 setclassname() {
-    echo "SETCLASSNAME $3 $2"
+    if [ "${tc_show}" = "qdisc" ]
+        then
+        echo "SETCLASSNAME $4 $2"
+    else
+        echo "SETCLASSNAME $3 $2"
+    fi
 }
 
 show_tc_cls() {
+    [ "${tc_show}" = "qdisc" ] && return 1
+
     local x="${1}"
 
     if [ -f /etc/iproute2/tc_cls ]
@@ -110,7 +129,6 @@ show_tc_cls() {
         done </etc/iproute2/tc_cls
         return 0
     fi
-
     return 1
 }
 
@@ -144,7 +162,7 @@ show_tc() {
     echo "BEGIN ${x}"
 
     # netdata can parse the output of tc
-    ${tc} -s class show dev ${x}
+    ${tc} -s ${tc_show} show dev ${x}
 
     # check FireQOS names for classes
     if [ ! -z "${fix_names}" ]
