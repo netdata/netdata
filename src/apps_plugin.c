@@ -354,6 +354,19 @@ static pid_t
 
 #define FILE_DESCRIPTORS_INCREASE_STEP 100
 
+// types for struct file_descriptor->type
+typedef enum fd_filetype {
+    FILETYPE_OTHER,
+    FILETYPE_FILE,
+    FILETYPE_PIPE,
+    FILETYPE_SOCKET,
+    FILETYPE_INOTIFY,
+    FILETYPE_EVENTFD,
+    FILETYPE_EVENTPOLL,
+    FILETYPE_TIMERFD,
+    FILETYPE_SIGNALFD
+} FD_FILETYPE;
+
 struct file_descriptor {
     avl avl;
 
@@ -364,7 +377,7 @@ struct file_descriptor {
     const char *name;
     uint32_t hash;
 
-    char type;
+    FD_FILETYPE type;
     int count;
     int pos;
 } *all_files = NULL;
@@ -372,18 +385,6 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
-
-// types for struct file_descriptor->type
-#define FILETYPE_OTHER      0
-#define FILETYPE_FILE       1
-#define FILETYPE_PIPE       2
-#define FILETYPE_SOCKET     3
-#define FILETYPE_INOTIFY    4
-#define FILETYPE_EVENTFD    5
-#define FILETYPE_EVENTPOLL  6
-#define FILETYPE_TIMERFD    7
-#define FILETYPE_SIGNALFD   8
-
 
 // ----------------------------------------------------------------------------
 // callback required by fatal()
@@ -1179,7 +1180,7 @@ static inline void all_files_grow() {
     all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
 }
 
-static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t hash, int type) {
+static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t hash, FD_FILETYPE type) {
     // check we have enough memory to add it
     if(!all_files || all_files_len == all_files_size)
         all_files_grow();
@@ -1260,7 +1261,7 @@ static inline int file_descriptor_find_or_add(const char *name)
     }
     // not found
 
-    int type;
+    FD_FILETYPE type;
     if(name[0] == '/') type = FILETYPE_FILE;
     else if(strncmp(name, "pipe:", 5) == 0) type = FILETYPE_PIPE;
     else if(strncmp(name, "socket:", 7) == 0) type = FILETYPE_SOCKET;
@@ -2191,7 +2192,7 @@ static inline void aggregate_fd_on_target(int fd, struct target *w) {
             w->openeventpolls++;
             break;
 
-        default:
+        case FILETYPE_OTHER:
             w->openother++;
             break;
     }
@@ -2385,6 +2386,42 @@ static usec_t send_resource_usage_to_netdata() {
 
         memmove(&last, &now, sizeof(struct timeval));
         memmove(&me_last, &me, sizeof(struct rusage));
+    }
+
+    static char created_charts = 0;
+    if(unlikely(!created_charts)) {
+        created_charts = 1;
+
+        fprintf(stdout
+                , "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
+                        "DIMENSION user '' incremental 1 1000\n"
+                        "DIMENSION system '' incremental 1 1000\n"
+                        "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
+                        "DIMENSION files '' incremental 1 1\n"
+                        "DIMENSION pids '' absolute 1 1\n"
+                        "DIMENSION fds '' absolute 1 1\n"
+                        "DIMENSION targets '' absolute 1 1\n"
+                        "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
+                        "DIMENSION utime '' absolute 1 %2$llu\n"
+                        "DIMENSION stime '' absolute 1 %2$llu\n"
+                        "DIMENSION gtime '' absolute 1 %2$llu\n"
+                        "DIMENSION minflt '' absolute 1 %2$llu\n"
+                        "DIMENSION majflt '' absolute 1 %2$llu\n"
+                , update_every
+                , RATES_DETAIL
+        );
+
+        if(include_exited_childs)
+            fprintf(stdout
+                    , "CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
+                            "DIMENSION cutime '' absolute 1 %2$llu\n"
+                            "DIMENSION cstime '' absolute 1 %2$llu\n"
+                            "DIMENSION cgtime '' absolute 1 %2$llu\n"
+                            "DIMENSION cminflt '' absolute 1 %2$llu\n"
+                            "DIMENSION cmajflt '' absolute 1 %2$llu\n"
+                    , update_every
+                    , RATES_DETAIL
+            );
     }
 
     fprintf(stdout,
@@ -2975,8 +3012,84 @@ static void parse_args(int argc, char **argv)
     }
 }
 
-int main(int argc, char **argv)
-{
+static int am_i_running_as_root() {
+    if(getuid() != 0) {
+        if(debug)
+            info("I am not running as root.");
+        return 0;
+    }
+
+    if(debug)
+        info("I am running as root.");
+
+    return 1;
+}
+
+#ifdef HAVE_CAPABILITY
+static int set_capabilities() {
+    if(!CAP_IS_SUPPORTED(CAP_DAC_READ_SEARCH)) {
+        error("This system does not support CAP_DAC_READ_SEARCH capability. Please setuid to root apps.plugin.");
+        return 0;
+    }
+    else if(debug)
+        info("System has CAP_DAC_READ_SEARCH capability.");
+
+    if(!CAP_IS_SUPPORTED(CAP_SYS_PTRACE)) {
+        error("This system does not support CAP_SYS_PTRACE capability. Please setuid to root apps.plugin.");
+        return 0;
+    }
+    else if(debug)
+        info("System has CAP_SYS_PTRACE capability.");
+
+    cap_t caps = cap_get_proc();
+    if(!caps) {
+        error("Cannot get current capabilities.");
+        return 0;
+    }
+    else if(debug)
+        info("Received my capabilities from the system.");
+
+    int ret = 1;
+
+    cap_flag_value_t cfv = CAP_CLEAR;
+    if(cap_get_flag(caps, CAP_DAC_READ_SEARCH, CAP_EFFECTIVE, &cfv) == -1) {
+        error("Cannot find if CAP_DAC_READ_SEARCH is effective.");
+        ret = 0;
+    }
+    else {
+        if(cfv != CAP_SET) {
+            error("apps.plugin should run with CAP_DAC_READ_SEARCH.");
+            ret = 0;
+        }
+        else if(debug)
+            info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
+    }
+
+    cfv = CAP_CLEAR;
+    if(cap_get_flag(caps, CAP_SYS_PTRACE, CAP_EFFECTIVE, &cfv) == -1) {
+        error("Cannot find if CAP_SYS_PTRACE is effective.");
+        ret = 0;
+    }
+    else {
+        if(cfv != CAP_SET) {
+            error("apps.plugin should run with CAP_SYS_PTRACE.");
+            ret = 0;
+        }
+        else if(debug)
+            info("apps.plugin runs with CAP_SYS_PTRACE.");
+    }
+
+    cap_free(caps);
+
+    return ret;
+}
+#else
+static int check_capabilities() {
+    return 0;
+}
+#endif
+
+int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
 
     // set the name for logging
@@ -3023,39 +3136,17 @@ int main(int argc, char **argv)
 
     parse_args(argc, argv);
 
+    if(!am_i_running_as_root())
+        if(!set_capabilities())
+            error("apps.plugin should either run as root or have special capabilities. "
+                          "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
+                          "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %1$s; "
+                          "To enable setuid to root run: sudo chown root %1$s; sudo chmod 4755 %1$s; "
+                  , argv[0]
+            );
+
     all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);
     all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
-
-    fprintf(stdout,
-        "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
-        "DIMENSION user '' incremental 1 1000\n"
-        "DIMENSION system '' incremental 1 1000\n"
-        "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
-        "DIMENSION files '' incremental 1 1\n"
-        "DIMENSION pids '' absolute 1 1\n"
-        "DIMENSION fds '' absolute 1 1\n"
-        "DIMENSION targets '' absolute 1 1\n"
-        "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
-        "DIMENSION utime '' absolute 1 %2$llu\n"
-        "DIMENSION stime '' absolute 1 %2$llu\n"
-        "DIMENSION gtime '' absolute 1 %2$llu\n"
-        "DIMENSION minflt '' absolute 1 %2$llu\n"
-        "DIMENSION majflt '' absolute 1 %2$llu\n"
-        , update_every
-        , RATES_DETAIL
-        );
-
-    if(include_exited_childs)
-        fprintf(stdout,
-            "CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
-            "DIMENSION cutime '' absolute 1 %2$llu\n"
-            "DIMENSION cstime '' absolute 1 %2$llu\n"
-            "DIMENSION cgtime '' absolute 1 %2$llu\n"
-            "DIMENSION cminflt '' absolute 1 %2$llu\n"
-            "DIMENSION cmajflt '' absolute 1 %2$llu\n"
-            , update_every
-            , RATES_DETAIL
-            );
 
     usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;

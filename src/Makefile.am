@@ -135,6 +135,11 @@ apps_plugin_SOURCES = \
 	web_buffer.c web_buffer.h \
 	$(NULL)
 
+apps_plugin_LDADD = \
+	$(OPTIONAL_MATH_LIBS) \
+	$(OPTIONAL_CAP_LIBS) \
+	$(NULL)
+
 install-data-hook:
 	if [ `id -u` == 0 ]; then \
 		chown root '$(DESTDIR)$(pluginsdir)/apps.plugin' && \
