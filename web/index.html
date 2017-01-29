@@ -1094,7 +1094,7 @@
 
                     // find a name for this device from fireqos info
                     // we strip '_(in|out)' or '(in|out)_'
-                    if(typeof options.submenu_names[chart.family] === 'undefined' || options.submenu_names[chart.family] === chart.family) {
+                    if(chart.context === 'tc.qos' && (typeof options.submenu_names[chart.family] === 'undefined' || options.submenu_names[chart.family] === chart.family)) {
                         var n = chart.name.split('.')[1];
                         if(n.endsWith('_in'))
                             options.submenu_names[chart.family] = n.slice(0, n.lastIndexOf('_in'));
@@ -1104,6 +1104,8 @@
                             options.submenu_names[chart.family] = n.slice(3, n.length);
                         else if(n.startsWith('out_'))
                             options.submenu_names[chart.family] = n.slice(4, n.length);
+                        else
+                            options.submenu_names[chart.family] = n;
                     }
 
                     // increase the priority of IFB devices
