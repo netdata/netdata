@@ -36,6 +36,7 @@ dist_python_SCRIPTS = \
     redis.chart.py \
     retroshare.chart.py \
     sensors.chart.py \
+    smart.chart.py \
     squid.chart.py \
     tomcat.chart.py \
     varnish.chart.py \

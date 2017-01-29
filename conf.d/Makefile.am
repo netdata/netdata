@@ -50,6 +50,7 @@ dist_pythonconfig_DATA = \
     python.d/redis.conf \
     python.d/retroshare.conf \
     python.d/sensors.conf \
+    python.d/smart.conf \
     python.d/squid.conf \
     python.d/tomcat.conf \
     python.d/varnish.conf \
