@@ -331,6 +331,7 @@ declare -A configs_signatures=(
   ['d8dc489e32f7114c6298fce94e86a8ef']='health.d/entropy.conf'
   ['d9036091e2232fc2b8bfa8c7484dea28']='apps_groups.conf'
   ['d9258e671d0d0b6498af1ce16ef030d2']='apps_groups.conf'
+  ['d9fa0290cdfe4153188bb52dd31191df']='apps_groups.conf'
   ['da29d2ab1ab7b8fda189960c840e5144']='health.d/swap.conf'
   ['dad303c5cca7a69345811a01a74f5892']='health.d/net.conf'
   ['dc0d2b96378f290eec3fcf98b89ad824']='python.d/cpufreq.conf'
