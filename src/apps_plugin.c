@@ -3135,23 +3135,26 @@ int main(int argc, char **argv) {
 
     parse_args(argc, argv);
 
-    if(!am_i_running_as_root())
-        if(!check_capabilities())
+    if(!am_i_running_as_root()) {
+        if(!check_capabilities()) {
+            uid_t uid = getuid(), euid = geteuid();
 #ifdef HAVE_CAPABILITY
-            error("apps.plugin should either run as root or have special capabilities. "
+            error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
                           "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
-                          "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %1$s; "
-                          "To enable setuid to root run: sudo chown root %1$s; sudo chmod 4755 %1$s; "
-                  , argv[0]
+                          "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
+                          "To enable setuid to root run: sudo chown root %s; sudo chmod 4755 %s; "
+                  , uid, euid, argv[0], argv[0], argv[0]
             );
 #else
-            error("apps.plugin should either run as root or have special capabilities. "
+            error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
                           "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
                           "Your system does not support capabilities. "
-                          "To enable setuid to root run: sudo chown root %1$s; sudo chmod 4755 %1$s; "
-                  , argv[0]
+                          "To enable setuid to root run: sudo chown root %s; sudo chmod 4755 %s; "
+                  , uid, euid, argv[0], argv[0]
             );
 #endif
+        }
+    }
 
     all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);
     all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
