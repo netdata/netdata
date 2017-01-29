@@ -267,13 +267,20 @@ static inline void tc_device_commit(struct tc_device *d) {
     for(c = d->classes; c; c = c->next) {
         if(unlikely(!c->updated)) continue;
 
+        //debug(D_TC_LOOP, "TC: In device '%s', %s '%s'  has leafid: '%s' and parentid '%s'.",
+        //    d->id,
+        //    c->isqdisc?"qdisc":"class",
+        //    c->id,
+        //    c->leafid?c->leafid:"NULL",
+        //    c->parentid?c->parentid:"NULL");
+
         // find if c is leaf or not
         for(x = d->classes; x; x = x->next) {
             if(unlikely(!x->updated || c == x || !x->parentid)) continue;
 
             if( (c->hash == x->parent_hash && strcmp(c->id, x->parentid) == 0) ||
                 (c->leafid && c->leaf_hash == x->parent_hash && strcmp(c->leafid, x->parentid) == 0)) {
-                // debug(D_TC_LOOP, "TC: In device '%s', class '%s' (leafid: '%s') has as leaf class '%s' (parentid: '%s').", d->name?d->name:d->id, c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->name?x->name:x->id, x->parentid?x->parentid:x->id);
+                // debug(D_TC_LOOP, "TC: In device '%s', %s '%s' (leafid: '%s') has as leaf %s '%s' (parentid: '%s').", d->name?d->name:d->id, c->isqdisc?"qdisc":"class", c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->isqdisc?"qdisc":"class", x->name?x->name:x->id, x->parentid?x->parentid:x->id);
                 c->isleaf = 0;
                 x->hasparent = 1;
             }
@@ -284,8 +291,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     /*
     if(unlikely(debug_flags & D_TC_LOOP)) {
         for(c = d->classes ; c ; c = c->next) {
-            if((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs) debug(D_TC_LOOP, "TC: Device '%s', class %s, OK", d->name, c->id);
-            else debug(D_TC_LOOP, "TC: Device '%s', class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name?d->name:d->id, c->id, c->isleaf, c->hasparent, c->parentid?c->parentid:"(unset)");
+            if((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs) debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", d->name, c->id);
+            else debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name?d->name:d->id, c->id, c->isleaf, c->hasparent, c->parentid?c->parentid:"(unset)");
         }
     }
     */
@@ -293,7 +300,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     for(c = d->classes ; c ; c = c->next) {
         if(unlikely(!c->updated)) continue;
 
-        // debug(D_TC_LOOP, "TC: Device '%s', class '%s', isLeaf=%d, HasParent=%d, Seen=%d", d->name?d->name:d->id, c->name?c->name:c->id, c->isleaf, c->hasparent, c->seen);
+        // debug(D_TC_LOOP, "TC: device '%s', %s '%s' isleaf=%d, hasparent=%d", d->id, (c->isqdisc)?"qdisc":"class", c->id, c->isleaf, c->hasparent);
 
         if(unlikely((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs)) {
             c->render = 1;
@@ -787,26 +794,45 @@ void *tc_main(void *ptr) {
             if(unlikely(device && ((first_hash == CLASS_HASH && strcmp(words[0], "class") == 0) ||  (first_hash == QDISC_HASH && strcmp(words[0], "qdisc") == 0)))) {
                 // debug(D_TC_LOOP, "CLASS line on class id='%s', parent='%s', parentid='%s', leaf='%s', leafid='%s'", words[2], words[3], words[4], words[5], words[6]);
 
-                // words[1] : class type
-                // words[2] : N:XX
-                // words[3] : parent or root
-                if(likely(words[1] && words[2] && words[3] && (strcmp(words[3], "parent") == 0 || strcmp(words[3], "root") == 0))) {
-                    //char *type     = words[1];  // the class: htb, fq_codel, etc
+                char *type     = words[1];  // the class/qdisc type: htb, fq_codel, etc
+                char *id       = words[2];  // the class/qdisc major:minor
+                char *parent   = words[3];  // the word 'parent' or 'root'
+                char *parentid = words[4];  // parentid
+                char *leaf     = words[5];  // the word 'leaf'
+                char *leafid   = words[6];  // leafid
 
-                    // we are only interested for HTB classes
-                    //if(strcmp(type, "htb") != 0) continue;
+                int parent_is_root = 0;
+                int parent_is_parent = 0;
+                if(likely(parent)) {
+                    parent_is_parent = !strcmp(parent, "parent");
 
-                    char *id       = words[2];  // the class major:minor
-                    char *parent   = words[3];  // 'parent' or 'root'
-                    char *parentid = words[4];  // the parent's id
-                    char *leaf     = words[5];  // 'leaf'
-                    char *leafid   = words[6];  // leafid
+                    if(!parent_is_parent)
+                        parent_is_root = !strcmp(parent, "root");
+                }
+
+                if(likely(type && id && (parent_is_root || parent_is_parent))) {
                     char qdisc = 0;
 
-                    if(first_hash == QDISC_HASH)
+                    if(first_hash == QDISC_HASH) {
                         qdisc = 1;
 
-                    if(strcmp(parent, "root") == 0) {
+                        if(!strcmp(type, "ingress")) {
+                            // we don't want to get the ingress qdisc
+                            // there should be an IFB interface for this
+
+                            class = NULL;
+                            continue;
+                        }
+
+                        if(parent_is_parent && parentid) {
+                            // eliminate the minor number from parentid
+                            char *s = parentid;
+                            while(*s && *s != ':') s++;
+                            if(*s == ':') s[1] = '\0';
+                        }
+                    }
+
+                    if(parent_is_root) {
                         parentid = NULL;
                         leafid = NULL;
                     }
