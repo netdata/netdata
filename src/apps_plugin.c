@@ -3026,7 +3026,7 @@ static int am_i_running_as_root() {
 }
 
 #ifdef HAVE_CAPABILITY
-static int set_capabilities() {
+static int check_capabilities() {
     if(!CAP_IS_SUPPORTED(CAP_DAC_READ_SEARCH)) {
         error("This system does not support CAP_DAC_READ_SEARCH capability. Please setuid to root apps.plugin.");
         return 0;
@@ -3137,7 +3137,7 @@ int main(int argc, char **argv) {
     parse_args(argc, argv);
 
     if(!am_i_running_as_root())
-        if(!set_capabilities())
+        if(!check_capabilities())
             error("apps.plugin should either run as root or have special capabilities. "
                           "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
                           "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %1$s; "
