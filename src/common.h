@@ -109,6 +109,10 @@
 #include <zlib.h>
 #endif
 
+#ifdef HAVE_CAPABILITY
+#include <sys/capability.h>
+#endif
+
 // ----------------------------------------------------------------------------
 // netdata common definitions
 

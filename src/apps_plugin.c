@@ -354,6 +354,19 @@ static pid_t
 
 #define FILE_DESCRIPTORS_INCREASE_STEP 100
 
+// types for struct file_descriptor->type
+typedef enum fd_filetype {
+    FILETYPE_OTHER,
+    FILETYPE_FILE,
+    FILETYPE_PIPE,
+    FILETYPE_SOCKET,
+    FILETYPE_INOTIFY,
+    FILETYPE_EVENTFD,
+    FILETYPE_EVENTPOLL,
+    FILETYPE_TIMERFD,
+    FILETYPE_SIGNALFD
+} FD_FILETYPE;
+
 struct file_descriptor {
     avl avl;
 
@@ -364,7 +377,7 @@ struct file_descriptor {
     const char *name;
     uint32_t hash;
 
-    char type;
+    FD_FILETYPE type;
     int count;
     int pos;
 } *all_files = NULL;
@@ -372,18 +385,6 @@ struct file_descriptor {
 static int
         all_files_len = 0,
         all_files_size = 0;
-
-// types for struct file_descriptor->type
-#define FILETYPE_OTHER      0
-#define FILETYPE_FILE       1
-#define FILETYPE_PIPE       2
-#define FILETYPE_SOCKET     3
-#define FILETYPE_INOTIFY    4
-#define FILETYPE_EVENTFD    5
-#define FILETYPE_EVENTPOLL  6
-#define FILETYPE_TIMERFD    7
-#define FILETYPE_SIGNALFD   8
-
 
 // ----------------------------------------------------------------------------
 // callback required by fatal()
@@ -764,79 +765,79 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
 
     // p->state         = *(procfile_lineword(ff, 0, 2));
     p->ppid             = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
-    // p->pgrp          = str2ul(procfile_lineword(ff, 0, 4));
-    // p->session       = str2ul(procfile_lineword(ff, 0, 5));
-    // p->tty_nr        = str2ul(procfile_lineword(ff, 0, 6));
-    // p->tpgid         = str2ul(procfile_lineword(ff, 0, 7));
-    // p->flags         = str2ull(procfile_lineword(ff, 0, 8));
+    // p->pgrp          = (int32_t)str2pid_t(procfile_lineword(ff, 0, 4));
+    // p->session       = (int32_t)str2pid_t(procfile_lineword(ff, 0, 5));
+    // p->tty_nr        = (int32_t)str2pid_t(procfile_lineword(ff, 0, 6));
+    // p->tpgid         = (int32_t)str2pid_t(procfile_lineword(ff, 0, 7));
+    // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
 
     kernel_uint_t last;
 
     last = p->minflt_raw;
-    p->minflt_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 9));
+    p->minflt_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 9));
     p->minflt = (p->minflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cminflt_raw;
-    p->cminflt_raw      = str2kernel_unit_t(procfile_lineword(ff, 0, 10));
+    p->cminflt_raw      = str2kernel_uint_t(procfile_lineword(ff, 0, 10));
     p->cminflt = (p->cminflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->majflt_raw;
-    p->majflt_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 11));
+    p->majflt_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 11));
     p->majflt = (p->majflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cmajflt_raw;
-    p->cmajflt_raw      = str2kernel_unit_t(procfile_lineword(ff, 0, 12));
+    p->cmajflt_raw      = str2kernel_uint_t(procfile_lineword(ff, 0, 12));
     p->cmajflt = (p->cmajflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->utime_raw;
-    p->utime_raw        = str2kernel_unit_t(procfile_lineword(ff, 0, 13));
+    p->utime_raw        = str2kernel_uint_t(procfile_lineword(ff, 0, 13));
     p->utime = (p->utime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->stime_raw;
-    p->stime_raw        = str2kernel_unit_t(procfile_lineword(ff, 0, 14));
+    p->stime_raw        = str2kernel_uint_t(procfile_lineword(ff, 0, 14));
     p->stime = (p->stime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cutime_raw;
-    p->cutime_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 15));
+    p->cutime_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 15));
     p->cutime = (p->cutime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
     last = p->cstime_raw;
-    p->cstime_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 16));
+    p->cstime_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 16));
     p->cstime = (p->cstime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
-    // p->priority      = str2kernel_unit_t(procfile_lineword(ff, 0, 17));
-    // p->nice          = str2kernel_unit_t(procfile_lineword(ff, 0, 18));
+    // p->priority      = str2kernel_uint_t(procfile_lineword(ff, 0, 17));
+    // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
-    // p->itrealvalue   = str2kernel_unit_t(procfile_lineword(ff, 0, 20));
-    // p->starttime     = str2kernel_unit_t(procfile_lineword(ff, 0, 21));
-    // p->vsize         = str2kernel_unit_t(procfile_lineword(ff, 0, 22));
-    // p->rss           = str2kernel_unit_t(procfile_lineword(ff, 0, 23));
-    // p->rsslim        = str2kernel_unit_t(procfile_lineword(ff, 0, 24));
-    // p->starcode      = str2kernel_unit_t(procfile_lineword(ff, 0, 25));
-    // p->endcode       = str2kernel_unit_t(procfile_lineword(ff, 0, 26));
-    // p->startstack    = str2kernel_unit_t(procfile_lineword(ff, 0, 27));
-    // p->kstkesp       = str2kernel_unit_t(procfile_lineword(ff, 0, 28));
-    // p->kstkeip       = str2kernel_unit_t(procfile_lineword(ff, 0, 29));
-    // p->signal        = str2kernel_unit_t(procfile_lineword(ff, 0, 30));
-    // p->blocked       = str2kernel_unit_t(procfile_lineword(ff, 0, 31));
-    // p->sigignore     = str2kernel_unit_t(procfile_lineword(ff, 0, 32));
-    // p->sigcatch      = str2kernel_unit_t(procfile_lineword(ff, 0, 33));
-    // p->wchan         = str2kernel_unit_t(procfile_lineword(ff, 0, 34));
-    // p->nswap         = str2kernel_unit_t(procfile_lineword(ff, 0, 35));
-    // p->cnswap        = str2kernel_unit_t(procfile_lineword(ff, 0, 36));
-    // p->exit_signal   = str2kernel_unit_t(procfile_lineword(ff, 0, 37));
-    // p->processor     = str2kernel_unit_t(procfile_lineword(ff, 0, 38));
-    // p->rt_priority   = str2kernel_unit_t(procfile_lineword(ff, 0, 39));
-    // p->policy        = str2kernel_unit_t(procfile_lineword(ff, 0, 40));
-    // p->delayacct_blkio_ticks = str2kernel_unit_t(procfile_lineword(ff, 0, 41));
+    // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
+    // p->starttime     = str2kernel_uint_t(procfile_lineword(ff, 0, 21));
+    // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
+    // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));
+    // p->rsslim        = str2kernel_uint_t(procfile_lineword(ff, 0, 24));
+    // p->starcode      = str2kernel_uint_t(procfile_lineword(ff, 0, 25));
+    // p->endcode       = str2kernel_uint_t(procfile_lineword(ff, 0, 26));
+    // p->startstack    = str2kernel_uint_t(procfile_lineword(ff, 0, 27));
+    // p->kstkesp       = str2kernel_uint_t(procfile_lineword(ff, 0, 28));
+    // p->kstkeip       = str2kernel_uint_t(procfile_lineword(ff, 0, 29));
+    // p->signal        = str2kernel_uint_t(procfile_lineword(ff, 0, 30));
+    // p->blocked       = str2kernel_uint_t(procfile_lineword(ff, 0, 31));
+    // p->sigignore     = str2kernel_uint_t(procfile_lineword(ff, 0, 32));
+    // p->sigcatch      = str2kernel_uint_t(procfile_lineword(ff, 0, 33));
+    // p->wchan         = str2kernel_uint_t(procfile_lineword(ff, 0, 34));
+    // p->nswap         = str2kernel_uint_t(procfile_lineword(ff, 0, 35));
+    // p->cnswap        = str2kernel_uint_t(procfile_lineword(ff, 0, 36));
+    // p->exit_signal   = str2kernel_uint_t(procfile_lineword(ff, 0, 37));
+    // p->processor     = str2kernel_uint_t(procfile_lineword(ff, 0, 38));
+    // p->rt_priority   = str2kernel_uint_t(procfile_lineword(ff, 0, 39));
+    // p->policy        = str2kernel_uint_t(procfile_lineword(ff, 0, 40));
+    // p->delayacct_blkio_ticks = str2kernel_uint_t(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
         last = p->gtime_raw;
-        p->gtime_raw        = str2kernel_unit_t(procfile_lineword(ff, 0, 42));
+        p->gtime_raw        = str2kernel_uint_t(procfile_lineword(ff, 0, 42));
         p->gtime = (p->gtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         last = p->cgtime_raw;
-        p->cgtime_raw       = str2kernel_unit_t(procfile_lineword(ff, 0, 43));
+        p->cgtime_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 43));
         p->cgtime = (p->cgtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         if (show_guest_time || p->gtime || p->cgtime) {
@@ -897,13 +898,13 @@ static inline int read_proc_pid_statm(struct pid_stat *p) {
 
     file_counter++;
 
-    p->statm_size           = str2ull(procfile_lineword(ff, 0, 0));
-    p->statm_resident       = str2ull(procfile_lineword(ff, 0, 1));
-    p->statm_share          = str2ull(procfile_lineword(ff, 0, 2));
-    // p->statm_text           = str2ull(procfile_lineword(ff, 0, 3));
-    // p->statm_lib            = str2ull(procfile_lineword(ff, 0, 4));
-    // p->statm_data           = str2ull(procfile_lineword(ff, 0, 5));
-    // p->statm_dirty          = str2ull(procfile_lineword(ff, 0, 6));
+    p->statm_size           = str2kernel_uint_t(procfile_lineword(ff, 0, 0));
+    p->statm_resident       = str2kernel_uint_t(procfile_lineword(ff, 0, 1));
+    p->statm_share          = str2kernel_uint_t(procfile_lineword(ff, 0, 2));
+    // p->statm_text           = str2kernel_uint_t(procfile_lineword(ff, 0, 3));
+    // p->statm_lib            = str2kernel_uint_t(procfile_lineword(ff, 0, 4));
+    // p->statm_data           = str2kernel_uint_t(procfile_lineword(ff, 0, 5));
+    // p->statm_dirty          = str2kernel_uint_t(procfile_lineword(ff, 0, 6));
 
     return 1;
 
@@ -942,31 +943,31 @@ static inline int read_proc_pid_io(struct pid_stat *p) {
     kernel_uint_t last;
 
     last = p->io_logical_bytes_read_raw;
-    p->io_logical_bytes_read_raw = str2ull(procfile_lineword(ff, 0, 1));
+    p->io_logical_bytes_read_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 1));
     p->io_logical_bytes_read = (p->io_logical_bytes_read_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_logical_bytes_written_raw;
-    p->io_logical_bytes_written_raw = str2ull(procfile_lineword(ff, 1, 1));
+    p->io_logical_bytes_written_raw = str2kernel_uint_t(procfile_lineword(ff, 1, 1));
     p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     // last = p->io_read_calls_raw;
-    // p->io_read_calls_raw = str2ull(procfile_lineword(ff, 2, 1));
+    // p->io_read_calls_raw = str2kernel_uint_t(procfile_lineword(ff, 2, 1));
     // p->io_read_calls = (p->io_read_calls_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     // last = p->io_write_calls_raw;
-    // p->io_write_calls_raw = str2ull(procfile_lineword(ff, 3, 1));
+    // p->io_write_calls_raw = str2kernel_uint_t(procfile_lineword(ff, 3, 1));
     // p->io_write_calls = (p->io_write_calls_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_storage_bytes_read_raw;
-    p->io_storage_bytes_read_raw = str2ull(procfile_lineword(ff, 4, 1));
+    p->io_storage_bytes_read_raw = str2kernel_uint_t(procfile_lineword(ff, 4, 1));
     p->io_storage_bytes_read = (p->io_storage_bytes_read_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     last = p->io_storage_bytes_written_raw;
-    p->io_storage_bytes_written_raw = str2ull(procfile_lineword(ff, 5, 1));
+    p->io_storage_bytes_written_raw = str2kernel_uint_t(procfile_lineword(ff, 5, 1));
     p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     // last = p->io_cancelled_write_bytes_raw;
-    // p->io_cancelled_write_bytes_raw = str2ull(procfile_lineword(ff, 6, 1));
+    // p->io_cancelled_write_bytes_raw = str2kernel_uint_t(procfile_lineword(ff, 6, 1));
     // p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
 
     if(unlikely(global_iterations_counter == 1)) {
@@ -1015,26 +1016,26 @@ static inline int read_proc_stat() {
     kernel_uint_t last;
 
     last = utime_raw;
-    utime_raw = str2ull(procfile_lineword(ff, 0, 1));
+    utime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 1));
     global_utime = (utime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     // nice time, on user time
     last = ntime_raw;
-    ntime_raw = str2ull(procfile_lineword(ff, 0, 2));
+    ntime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 2));
     global_utime += (ntime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     last = stime_raw;
-    stime_raw = str2ull(procfile_lineword(ff, 0, 3));
+    stime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 3));
     global_stime = (stime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     last = gtime_raw;
-    gtime_raw = str2ull(procfile_lineword(ff, 0, 10));
+    gtime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 10));
     global_gtime = (gtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
     if(enable_guest_charts) {
         // guest nice time, on guest time
         last = gntime_raw;
-        gntime_raw = str2ull(procfile_lineword(ff, 0, 11));
+        gntime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 11));
         global_gtime += (gntime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
 
         // remove guest time from user time
@@ -1179,7 +1180,7 @@ static inline void all_files_grow() {
     all_files_size += FILE_DESCRIPTORS_INCREASE_STEP;
 }
 
-static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t hash, int type) {
+static inline int file_descriptor_set_on_empty_slot(const char *name, uint32_t hash, FD_FILETYPE type) {
     // check we have enough memory to add it
     if(!all_files || all_files_len == all_files_size)
         all_files_grow();
@@ -1260,7 +1261,7 @@ static inline int file_descriptor_find_or_add(const char *name)
     }
     // not found
 
-    int type;
+    FD_FILETYPE type;
     if(name[0] == '/') type = FILETYPE_FILE;
     else if(strncmp(name, "pipe:", 5) == 0) type = FILETYPE_PIPE;
     else if(strncmp(name, "socket:", 7) == 0) type = FILETYPE_SOCKET;
@@ -2191,7 +2192,7 @@ static inline void aggregate_fd_on_target(int fd, struct target *w) {
             w->openeventpolls++;
             break;
 
-        default:
+        case FILETYPE_OTHER:
             w->openother++;
             break;
     }
@@ -2385,6 +2386,42 @@ static usec_t send_resource_usage_to_netdata() {
 
         memmove(&last, &now, sizeof(struct timeval));
         memmove(&me_last, &me, sizeof(struct rusage));
+    }
+
+    static char created_charts = 0;
+    if(unlikely(!created_charts)) {
+        created_charts = 1;
+
+        fprintf(stdout
+                , "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
+                        "DIMENSION user '' incremental 1 1000\n"
+                        "DIMENSION system '' incremental 1 1000\n"
+                        "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
+                        "DIMENSION files '' incremental 1 1\n"
+                        "DIMENSION pids '' absolute 1 1\n"
+                        "DIMENSION fds '' absolute 1 1\n"
+                        "DIMENSION targets '' absolute 1 1\n"
+                        "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
+                        "DIMENSION utime '' absolute 1 %2$llu\n"
+                        "DIMENSION stime '' absolute 1 %2$llu\n"
+                        "DIMENSION gtime '' absolute 1 %2$llu\n"
+                        "DIMENSION minflt '' absolute 1 %2$llu\n"
+                        "DIMENSION majflt '' absolute 1 %2$llu\n"
+                , update_every
+                , RATES_DETAIL
+        );
+
+        if(include_exited_childs)
+            fprintf(stdout
+                    , "CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
+                            "DIMENSION cutime '' absolute 1 %2$llu\n"
+                            "DIMENSION cstime '' absolute 1 %2$llu\n"
+                            "DIMENSION cgtime '' absolute 1 %2$llu\n"
+                            "DIMENSION cminflt '' absolute 1 %2$llu\n"
+                            "DIMENSION cmajflt '' absolute 1 %2$llu\n"
+                    , update_every
+                    , RATES_DETAIL
+            );
     }
 
     fprintf(stdout,
@@ -2975,8 +3012,83 @@ static void parse_args(int argc, char **argv)
     }
 }
 
-int main(int argc, char **argv)
-{
+static int am_i_running_as_root() {
+    uid_t uid = getuid(), euid = geteuid();
+
+    if(uid == 0 || euid == 0) {
+        if(debug) info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+        return 1;
+    }
+
+    if(debug) info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
+    return 0;
+}
+
+#ifdef HAVE_CAPABILITY
+static int check_capabilities() {
+    if(!CAP_IS_SUPPORTED(CAP_DAC_READ_SEARCH)) {
+        error("This system does not support CAP_DAC_READ_SEARCH capability. Please setuid to root apps.plugin.");
+        return 0;
+    }
+    else if(debug)
+        info("System has CAP_DAC_READ_SEARCH capability.");
+
+    if(!CAP_IS_SUPPORTED(CAP_SYS_PTRACE)) {
+        error("This system does not support CAP_SYS_PTRACE capability. Please setuid to root apps.plugin.");
+        return 0;
+    }
+    else if(debug)
+        info("System has CAP_SYS_PTRACE capability.");
+
+    cap_t caps = cap_get_proc();
+    if(!caps) {
+        error("Cannot get current capabilities.");
+        return 0;
+    }
+    else if(debug)
+        info("Received my capabilities from the system.");
+
+    int ret = 1;
+
+    cap_flag_value_t cfv = CAP_CLEAR;
+    if(cap_get_flag(caps, CAP_DAC_READ_SEARCH, CAP_EFFECTIVE, &cfv) == -1) {
+        error("Cannot find if CAP_DAC_READ_SEARCH is effective.");
+        ret = 0;
+    }
+    else {
+        if(cfv != CAP_SET) {
+            error("apps.plugin should run with CAP_DAC_READ_SEARCH.");
+            ret = 0;
+        }
+        else if(debug)
+            info("apps.plugin runs with CAP_DAC_READ_SEARCH.");
+    }
+
+    cfv = CAP_CLEAR;
+    if(cap_get_flag(caps, CAP_SYS_PTRACE, CAP_EFFECTIVE, &cfv) == -1) {
+        error("Cannot find if CAP_SYS_PTRACE is effective.");
+        ret = 0;
+    }
+    else {
+        if(cfv != CAP_SET) {
+            error("apps.plugin should run with CAP_SYS_PTRACE.");
+            ret = 0;
+        }
+        else if(debug)
+            info("apps.plugin runs with CAP_SYS_PTRACE.");
+    }
+
+    cap_free(caps);
+
+    return ret;
+}
+#else
+static int check_capabilities() {
+    return 0;
+}
+#endif
+
+int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
 
     // set the name for logging
@@ -3023,39 +3135,26 @@ int main(int argc, char **argv)
 
     parse_args(argc, argv);
 
+    if(!am_i_running_as_root())
+        if(!check_capabilities())
+#ifdef HAVE_CAPABILITY
+            error("apps.plugin should either run as root or have special capabilities. "
+                          "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
+                          "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %1$s; "
+                          "To enable setuid to root run: sudo chown root %1$s; sudo chmod 4755 %1$s; "
+                  , argv[0]
+            );
+#else
+            error("apps.plugin should either run as root or have special capabilities. "
+                          "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
+                          "Your system does not support capabilities. "
+                          "To enable setuid to root run: sudo chown root %1$s; sudo chmod 4755 %1$s; "
+                  , argv[0]
+            );
+#endif
+
     all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);
     all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
-
-    fprintf(stdout,
-        "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
-        "DIMENSION user '' incremental 1 1000\n"
-        "DIMENSION system '' incremental 1 1000\n"
-        "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
-        "DIMENSION files '' incremental 1 1\n"
-        "DIMENSION pids '' absolute 1 1\n"
-        "DIMENSION fds '' absolute 1 1\n"
-        "DIMENSION targets '' absolute 1 1\n"
-        "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
-        "DIMENSION utime '' absolute 1 %2$llu\n"
-        "DIMENSION stime '' absolute 1 %2$llu\n"
-        "DIMENSION gtime '' absolute 1 %2$llu\n"
-        "DIMENSION minflt '' absolute 1 %2$llu\n"
-        "DIMENSION majflt '' absolute 1 %2$llu\n"
-        , update_every
-        , RATES_DETAIL
-        );
-
-    if(include_exited_childs)
-        fprintf(stdout,
-            "CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
-            "DIMENSION cutime '' absolute 1 %2$llu\n"
-            "DIMENSION cstime '' absolute 1 %2$llu\n"
-            "DIMENSION cgtime '' absolute 1 %2$llu\n"
-            "DIMENSION cminflt '' absolute 1 %2$llu\n"
-            "DIMENSION cmajflt '' absolute 1 %2$llu\n"
-            , update_every
-            , RATES_DETAIL
-            );
 
     usec_t step = update_every * USEC_PER_SEC;
     global_iterations_counter = 1;
