@@ -3013,16 +3013,13 @@ static void parse_args(int argc, char **argv)
 }
 
 static int am_i_running_as_root() {
-    if(getuid() != 0) {
-        if(debug)
-            info("I am not running as root.");
-        return 0;
+    if(getuid() == 0 || geteuid() == 0) {
+        if(debug) info("I am running as root.");
+        return 1;
     }
 
-    if(debug)
-        info("I am running as root.");
-
-    return 1;
+    if(debug) info("I am not running as root.");
+    return 0;
 }
 
 #ifdef HAVE_CAPABILITY
