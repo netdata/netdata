@@ -3020,12 +3020,6 @@ static int am_i_running_as_root() {
         return 1;
     }
 
-    if(seteuid(0) == 0) {
-        euid = geteuid();
-        if(debug) info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
-        return 1;
-    }
-
     if(debug) info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
     return 0;
 }
