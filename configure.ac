@@ -266,6 +266,23 @@ if test "${SSE_CANDIDATE}" = "yes" -a "${enable_x86_sse}" = "yes"; then
     AX_CHECK_COMPILE_FLAG(${opt}, [CFLAGS="${CFLAGS} ${opt}"], [])
 fi
 
+# CUPS
+AC_CHECK_LIB(socket,socket,
+if test "$uname" != "IRIX"; then
+        LIBS="-lsocket $LIBS"
+else
+        echo "Not using -lsocket since you are running IRIX."
+fi)
+AC_CHECK_LIB(nsl,gethostbyaddr,
+if test "$uname" != "IRIX"; then
+        LIBS="-lnsl $LIBS"
+else
+        echo "Not using -lnsl since you are running IRIX."
+fi)
+
+AC_CHECK_LIB(cups,httpConnect)
+
+
 if test "${GCC}" = "yes"; then
     AC_DEFINE_UNQUOTED([likely(x)], [__builtin_expect(!!(x), 1)], [gcc branch optimization])
     AC_DEFINE_UNQUOTED([unlikely(x)], [__builtin_expect(!!(x), 0)], [gcc branch optimization])

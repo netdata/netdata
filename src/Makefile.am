@@ -77,6 +77,8 @@ netdata_SOURCES = \
 	main.h \
 	plugin_checks.c \
 	plugin_checks.h \
+	plugin_cups.c \
+	plugin_cups.h \
 	plugin_idlejitter.c \
 	plugin_idlejitter.h \
 	plugin_nfacct.c \
