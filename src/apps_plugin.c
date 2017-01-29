@@ -3013,12 +3013,14 @@ static void parse_args(int argc, char **argv)
 }
 
 static int am_i_running_as_root() {
-    if(getuid() == 0 || geteuid() == 0) {
-        if(debug) info("I am running as root.");
+    uid_t uid = getuid(), euid = geteuid();
+
+    if(uid == 0 || euid == 0) {
+        if(debug) info("I am running with escalated privileges, uid = %u, euid = %u.", uid, euid);
         return 1;
     }
 
-    if(debug) info("I am not running as root.");
+    if(debug) info("I am not running with escalated privileges, uid = %u, euid = %u.", uid, euid);
     return 0;
 }
 
