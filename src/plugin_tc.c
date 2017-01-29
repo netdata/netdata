@@ -230,17 +230,20 @@ static inline void tc_device_commit(struct tc_device *d) {
     int active_nodes = 0, updated_classes = 0, updated_qdiscs = 0;
 
     // prepare all classes
-    for(c = d->classes ; c ; c = c->next) {
-        c->render = 0;
+    // we set reasonable defaults for the rest of the code below
 
-        c->isleaf = 1;
-        c->hasparent = 0;
+    for(c = d->classes ; c ; c = c->next) {
+        c->render = 0;          // do not render this class
+
+        c->isleaf = 1;          // this is a leaf class
+        c->hasparent = 0;       // without a parent
 
         if(unlikely(!c->updated))
-            c->unupdated++;
+            c->unupdated++;     // increase its unupdated counter
         else {
-            c->unupdated = 0;
+            c->unupdated = 0;   // reset its unupdated counter
 
+            // count how many of each kind
             if(c->isqdisc)
                 updated_qdiscs++;
             else
@@ -256,6 +259,8 @@ static inline void tc_device_commit(struct tc_device *d) {
 
     if(unlikely(updated_classes && updated_qdiscs)) {
         error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", d->id, updated_classes, updated_qdiscs);
+
+        // set all classes to !updated
         for(c = d->classes ; c ; c = c->next)
             if(unlikely(!c->isqdisc && c->updated))
                 c->updated = 0;
@@ -264,6 +269,20 @@ static inline void tc_device_commit(struct tc_device *d) {
     }
 
     // mark the classes as leafs and parents
+    //
+    // TC is hierarchical:
+    //  - classes can have other classes in them
+    //  - the same is true for qdiscs (i.e. qdiscs have classes, that have other qdiscs)
+    //
+    // we need to present a chart with leaf nodes only, so that the sum
+    // of all dimensions of the chart, will be the total utilization
+    // of the interface.
+    //
+    // here we try to find the ones we need to report
+    // by default all nodes are marked with: isleaf = 1 (see above)
+    //
+    // so, here we remove the isleaf flag from nodes in the middle
+    // and we add the hasparent flag to leaf nodes we found their parent
     for(c = d->classes; c; c = c->next) {
         if(unlikely(!c->updated)) continue;
 
@@ -278,6 +297,10 @@ static inline void tc_device_commit(struct tc_device *d) {
         for(x = d->classes; x; x = x->next) {
             if(unlikely(!x->updated || c == x || !x->parentid)) continue;
 
+            // classes have both parentid and leafid
+            // qdiscs have only parentid
+            // the following works for both (it is an OR)
+
             if( (c->hash == x->parent_hash && strcmp(c->id, x->parentid) == 0) ||
                 (c->leafid && c->leaf_hash == x->parent_hash && strcmp(c->leafid, x->parentid) == 0)) {
                 // debug(D_TC_LOOP, "TC: In device '%s', %s '%s' (leafid: '%s') has as leaf %s '%s' (parentid: '%s').", d->name?d->name:d->id, c->isqdisc?"qdisc":"class", c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->isqdisc?"qdisc":"class", x->name?x->name:x->id, x->parentid?x->parentid:x->id);
@@ -286,16 +309,6 @@ static inline void tc_device_commit(struct tc_device *d) {
             }
         }
     }
-
-    // debugging only
-    /*
-    if(unlikely(debug_flags & D_TC_LOOP)) {
-        for(c = d->classes ; c ; c = c->next) {
-            if((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs) debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", d->name, c->id);
-            else debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, IGNORE (isleaf: %d, hasparent: %d, parent: %s)", d->name?d->name:d->id, c->id, c->isleaf, c->hasparent, c->parentid?c->parentid:"(unset)");
-        }
-    }
-    */
 
     for(c = d->classes ; c ; c = c->next) {
         if(unlikely(!c->updated)) continue;
@@ -318,6 +331,17 @@ static inline void tc_device_commit(struct tc_device *d) {
         //    debug(D_TC_LOOP, "TC: found root class/qdisc '%s'", root->id);
         //}
     }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    // dump all the list to see what we know
+
+    if(unlikely(debug_flags & D_TC_LOOP)) {
+        for(c = d->classes ; c ; c = c->next) {
+            if(c->render) debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, OK", d->name, c->id);
+            else debug(D_TC_LOOP, "TC: final nodes dump for '%s': class %s, IGNORE (updated: %d, isleaf: %d, hasparent: %d, parent: %s)", d->name?d->name:d->id, c->id, c->updated, c->isleaf, c->hasparent, c->parentid?c->parentid:"(unset)");
+        }
+    }
+#endif
 
     if(unlikely(!active_nodes)) {
         debug(D_TC_LOOP, "TC: Ignoring TC device '%s'. No useful classes/qdiscs.", d->name?d->name:d->id);
@@ -826,6 +850,9 @@ void *tc_main(void *ptr) {
 
                         if(parent_is_parent && parentid) {
                             // eliminate the minor number from parentid
+                            // why: parentid is the id of the parent class
+                            // but major: is also the id of the parent qdisc
+
                             char *s = parentid;
                             while(*s && *s != ':') s++;
                             if(*s == ':') s[1] = '\0';
