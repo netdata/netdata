@@ -189,7 +189,7 @@ int sched_setscheduler_idle(void) {
 #endif
 }
 
-int become_daemon(int dont_fork, const char *user)
+int become_daemon(int dont_fork, const char *user, int oom_score)
 {
     if(!dont_fork) {
         int i = fork();
@@ -239,7 +239,7 @@ int become_daemon(int dont_fork, const char *user)
     umask(0007);
 
     // adjust my Out-Of-Memory score
-    oom_score_adj(1000);
+    oom_score_adj(oom_score);
 
     // never become a problem
     if(sched_setscheduler_idle() != 0) {
