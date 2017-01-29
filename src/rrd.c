@@ -485,7 +485,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
     RRDSET *st = rrdset_find(fullid);
     if(st) {
-        error("Cannot create rrd stats for '%s', it already exists.", fullid);
+        debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
         return st;
     }
 
