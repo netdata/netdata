@@ -18,23 +18,23 @@ struct netdev {
     int do_events;
 
     // data collected
-    unsigned long long rbytes;
-    unsigned long long rpackets;
-    unsigned long long rerrors;
-    unsigned long long rdrops;
-    unsigned long long rfifo;
-    unsigned long long rframe;
-    unsigned long long rcompressed;
-    unsigned long long rmulticast;
+    kernel_uint_t rbytes;
+    kernel_uint_t rpackets;
+    kernel_uint_t rerrors;
+    kernel_uint_t rdrops;
+    kernel_uint_t rfifo;
+    kernel_uint_t rframe;
+    kernel_uint_t rcompressed;
+    kernel_uint_t rmulticast;
 
-    unsigned long long tbytes;
-    unsigned long long tpackets;
-    unsigned long long terrors;
-    unsigned long long tdrops;
-    unsigned long long tfifo;
-    unsigned long long tcollisions;
-    unsigned long long tcarrier;
-    unsigned long long tcompressed;
+    kernel_uint_t tbytes;
+    kernel_uint_t tpackets;
+    kernel_uint_t terrors;
+    kernel_uint_t tdrops;
+    kernel_uint_t tfifo;
+    kernel_uint_t tcollisions;
+    kernel_uint_t tcarrier;
+    kernel_uint_t tcompressed;
 
     // charts
     RRDSET *st_bandwidth;
@@ -167,35 +167,54 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(d->enabled == CONFIG_ONDEMAND_NO)
                 continue;
 
-            d->do_bandwidth = config_get_boolean_ondemand(var_name, "bandwidth", do_bandwidth);
-            d->do_packets = config_get_boolean_ondemand(var_name, "packets", do_packets);
-            d->do_errors = config_get_boolean_ondemand(var_name, "errors", do_errors);
-            d->do_drops = config_get_boolean_ondemand(var_name, "drops", do_drops);
-            d->do_fifo = config_get_boolean_ondemand(var_name, "fifo", do_fifo);
+            d->do_bandwidth  = config_get_boolean_ondemand(var_name, "bandwidth", do_bandwidth);
+            d->do_packets    = config_get_boolean_ondemand(var_name, "packets", do_packets);
+            d->do_errors     = config_get_boolean_ondemand(var_name, "errors", do_errors);
+            d->do_drops      = config_get_boolean_ondemand(var_name, "drops", do_drops);
+            d->do_fifo       = config_get_boolean_ondemand(var_name, "fifo", do_fifo);
             d->do_compressed = config_get_boolean_ondemand(var_name, "compressed", do_compressed);
-            d->do_events = config_get_boolean_ondemand(var_name, "events", do_events);
+            d->do_events     = config_get_boolean_ondemand(var_name, "events", do_events);
         }
 
         if(unlikely(!d->enabled))
             continue;
 
-        d->rbytes      = str2ull(procfile_lineword(ff, l, 1));
-        d->rpackets    = str2ull(procfile_lineword(ff, l, 2));
-        d->rerrors     = str2ull(procfile_lineword(ff, l, 3));
-        d->rdrops      = str2ull(procfile_lineword(ff, l, 4));
-        d->rfifo       = str2ull(procfile_lineword(ff, l, 5));
-        d->rframe      = str2ull(procfile_lineword(ff, l, 6));
-        d->rcompressed = str2ull(procfile_lineword(ff, l, 7));
-        d->rmulticast  = str2ull(procfile_lineword(ff, l, 8));
+        if(likely(d->do_bandwidth != CONFIG_ONDEMAND_NO)) {
+            d->rbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 1));
+            d->tbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 9));
+        }
 
-        d->tbytes      = str2ull(procfile_lineword(ff, l, 9));
-        d->tpackets    = str2ull(procfile_lineword(ff, l, 10));
-        d->terrors     = str2ull(procfile_lineword(ff, l, 11));
-        d->tdrops      = str2ull(procfile_lineword(ff, l, 12));
-        d->tfifo       = str2ull(procfile_lineword(ff, l, 13));
-        d->tcollisions = str2ull(procfile_lineword(ff, l, 14));
-        d->tcarrier    = str2ull(procfile_lineword(ff, l, 15));
-        d->tcompressed = str2ull(procfile_lineword(ff, l, 16));
+        if(likely(d->do_packets != CONFIG_ONDEMAND_NO)) {
+            d->rpackets    = str2kernel_uint_t(procfile_lineword(ff, l, 2));
+            d->rmulticast  = str2kernel_uint_t(procfile_lineword(ff, l, 8));
+            d->tpackets    = str2kernel_uint_t(procfile_lineword(ff, l, 10));
+        }
+
+        if(likely(d->do_errors != CONFIG_ONDEMAND_NO)) {
+            d->rerrors     = str2kernel_uint_t(procfile_lineword(ff, l, 3));
+            d->terrors     = str2kernel_uint_t(procfile_lineword(ff, l, 11));
+        }
+
+        if(likely(d->do_drops != CONFIG_ONDEMAND_NO)) {
+            d->rdrops      = str2kernel_uint_t(procfile_lineword(ff, l, 4));
+            d->tdrops      = str2kernel_uint_t(procfile_lineword(ff, l, 12));
+        }
+
+        if(likely(d->do_fifo != CONFIG_ONDEMAND_NO)) {
+            d->rfifo       = str2kernel_uint_t(procfile_lineword(ff, l, 5));
+            d->tfifo       = str2kernel_uint_t(procfile_lineword(ff, l, 13));
+        }
+
+        if(likely(d->do_compressed != CONFIG_ONDEMAND_NO)) {
+            d->rcompressed = str2kernel_uint_t(procfile_lineword(ff, l, 7));
+            d->tcompressed = str2kernel_uint_t(procfile_lineword(ff, l, 16));
+        }
+
+        if(likely(d->do_events != CONFIG_ONDEMAND_NO)) {
+            d->rframe      = str2kernel_uint_t(procfile_lineword(ff, l, 6));
+            d->tcollisions = str2kernel_uint_t(procfile_lineword(ff, l, 14));
+            d->tcarrier    = str2kernel_uint_t(procfile_lineword(ff, l, 15));
+        }
 
         // --------------------------------------------------------------------
 

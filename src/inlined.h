@@ -5,11 +5,11 @@
 
 #ifdef KERNEL_32BIT
 typedef uint32_t kernel_uint_t;
-#define str2kernel_unit_t(string) str2uint32_t(string)
+#define str2kernel_uint_t(string) str2uint32_t(string)
 #define KERNEL_UINT_FORMAT "%u"
 #else
 typedef uint64_t kernel_uint_t;
-#define str2kernel_unit_t(string) str2uint64_t(string)
+#define str2kernel_uint_t(string) str2uint64_t(string)
 #define KERNEL_UINT_FORMAT "%" PRIu64
 #endif
 
