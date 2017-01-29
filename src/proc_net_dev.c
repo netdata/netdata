@@ -180,40 +180,40 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             continue;
 
         if(likely(d->do_bandwidth != CONFIG_ONDEMAND_NO)) {
-            d->rbytes      = str2kernel_unit_t(procfile_lineword(ff, l, 1));
-            d->tbytes      = str2kernel_unit_t(procfile_lineword(ff, l, 9));
+            d->rbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 1));
+            d->tbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 9));
         }
 
         if(likely(d->do_packets != CONFIG_ONDEMAND_NO)) {
-            d->rpackets    = str2kernel_unit_t(procfile_lineword(ff, l, 2));
-            d->rmulticast  = str2kernel_unit_t(procfile_lineword(ff, l, 8));
-            d->tpackets    = str2kernel_unit_t(procfile_lineword(ff, l, 10));
+            d->rpackets    = str2kernel_uint_t(procfile_lineword(ff, l, 2));
+            d->rmulticast  = str2kernel_uint_t(procfile_lineword(ff, l, 8));
+            d->tpackets    = str2kernel_uint_t(procfile_lineword(ff, l, 10));
         }
 
         if(likely(d->do_errors != CONFIG_ONDEMAND_NO)) {
-            d->rerrors     = str2kernel_unit_t(procfile_lineword(ff, l, 3));
-            d->terrors     = str2kernel_unit_t(procfile_lineword(ff, l, 11));
+            d->rerrors     = str2kernel_uint_t(procfile_lineword(ff, l, 3));
+            d->terrors     = str2kernel_uint_t(procfile_lineword(ff, l, 11));
         }
 
         if(likely(d->do_drops != CONFIG_ONDEMAND_NO)) {
-            d->rdrops      = str2kernel_unit_t(procfile_lineword(ff, l, 4));
-            d->tdrops      = str2kernel_unit_t(procfile_lineword(ff, l, 12));
+            d->rdrops      = str2kernel_uint_t(procfile_lineword(ff, l, 4));
+            d->tdrops      = str2kernel_uint_t(procfile_lineword(ff, l, 12));
         }
 
         if(likely(d->do_fifo != CONFIG_ONDEMAND_NO)) {
-            d->rfifo       = str2kernel_unit_t(procfile_lineword(ff, l, 5));
-            d->tfifo       = str2kernel_unit_t(procfile_lineword(ff, l, 13));
+            d->rfifo       = str2kernel_uint_t(procfile_lineword(ff, l, 5));
+            d->tfifo       = str2kernel_uint_t(procfile_lineword(ff, l, 13));
         }
 
         if(likely(d->do_compressed != CONFIG_ONDEMAND_NO)) {
-            d->rcompressed = str2kernel_unit_t(procfile_lineword(ff, l, 7));
-            d->tcompressed = str2kernel_unit_t(procfile_lineword(ff, l, 16));
+            d->rcompressed = str2kernel_uint_t(procfile_lineword(ff, l, 7));
+            d->tcompressed = str2kernel_uint_t(procfile_lineword(ff, l, 16));
         }
 
         if(likely(d->do_events != CONFIG_ONDEMAND_NO)) {
-            d->rframe      = str2kernel_unit_t(procfile_lineword(ff, l, 6));
-            d->tcollisions = str2kernel_unit_t(procfile_lineword(ff, l, 14));
-            d->tcarrier    = str2kernel_unit_t(procfile_lineword(ff, l, 15));
+            d->rframe      = str2kernel_uint_t(procfile_lineword(ff, l, 6));
+            d->tcollisions = str2kernel_uint_t(procfile_lineword(ff, l, 14));
+            d->tcarrier    = str2kernel_uint_t(procfile_lineword(ff, l, 15));
         }
 
         // --------------------------------------------------------------------
