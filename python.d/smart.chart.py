@@ -3,15 +3,28 @@
 #
 
 from subprocess import Popen, PIPE
+import re
+import os
+import stat
+import msg
+
 from base import SimpleService
 
 # default module values (can be overridden per job in `config`)
 update_every = 5
 priority = 60000
 retries = 5
+command = None
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ["attr1", "attr4", "attr5", "attr7", "attr9", "attr12", "attr193", "attr194", "attr197", "attr198", "attr200"]
+
+SMARTCTL_PATHS = [
+    "/bin/smartctl",
+    "/sbin/smartctl",
+    "/usr/bin/smartctl",
+    "/usr/sbin/smartctl",
+]
 
 SMART_ATTRIBUTES = {
    "1": "Read Error Rate",
@@ -92,25 +105,18 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
-        self.disks = self._get_disks()
-
-        self.definitions = {}
-
-        for attrid, desc in SMART_ATTRIBUTES.items():
-            self.definitions["attr" + attrid] = {
-                "options": [None, desc, "value", desc, "smart.attr" + attrid, "line"],
-                "lines": self._get_disk_lines(attrid)
-            }
+        self.regex = re.compile(r'(\d+)[a-zA-Z-_\s]+0x.*?(?:Always|Offline)[\s-]+(\d+)')
+        self.command = None
 
     def _get_disks(self):
-        dList, lErr = Popen(['smartctl', '--scan-open'], stdout=PIPE, stderr=PIPE).communicate()
+        dList, lErr = Popen([self.command, '--scan-open'], stdout=PIPE, stderr=PIPE).communicate()
 
         ret = []
 
-        for line in dList.split(b'\n'):
-            deviceName = line.decode().split(' ')[0].replace('/dev/','')
+        for line in dList.decode(encoding='utf-8').split('\n'):
+            deviceName = line.split(' ')[0].replace('/dev/','')
 
-            if deviceName:
+            if deviceName and deviceName != "#":
                 ret.append(deviceName)
 
         return ret
@@ -125,30 +131,48 @@ class Service(SimpleService):
 
         return ret
 
-    def _get_raw_data_for_disk(self, disk):
-        ret = []
+    def _get_raw_data(self, disk):
+        try:
+            raw_out, raw_err = Popen([self.command, '-a', '/dev/' + disk], stdout=PIPE, stderr=PIPE).communicate()
+        except Exception:
+            return None
 
-        dDetails, dErr = Popen(['smartctl', '-a', '/dev/' + disk], stdout=PIPE, stderr=PIPE).communicate()
-
-        attributesSection = False
-
-        for line in dDetails.split(b'\n'):
-            if attributesSection:
-                if line:
-                    ret.append(line.decode().split())
-                else:
-                    break
-
-            if line.decode().startswith('ID#'):
-                attributesSection = True
-
-        return ret
+        return raw_out.decode(encoding='utf-8')
 
     def _get_data(self):
-        data = {}
+        ret = dict()
 
         for disk in self.disks:
-            for line in self._get_raw_data_for_disk(disk):
-                data[line[0] + "_" + disk] = line[9]
+            data = self._get_raw_data(disk)
+            if data:
+                ret.update({
+                    '_'.join([attrid, disk]): value for attrid, value in self.regex.findall(data)
+                })
 
-        return data
+        return ret or None
+
+    def check(self):
+        if not self.command:
+            for path in SMARTCTL_PATHS:
+                if os.path.isfile(path):
+                    self.command = path
+                    break
+
+        if not self.command:
+            self.error("Can't locate smartctl binary")
+            return False
+
+        if os.stat(self.command).st_mode & stat.S_ISUID == 0:
+            self.error("%s needs to have SUID set" % self.command)
+            return False
+
+        self.disks = self._get_disks()
+        self.definitions = {}
+
+        for attrid, desc in SMART_ATTRIBUTES.items():
+            self.definitions["attr" + attrid] = {
+                "options": [None, desc, "value", desc, "smart.attr" + attrid, "line"],
+                "lines": self._get_disk_lines(attrid)
+            }
+
+        return bool(self._get_data())
