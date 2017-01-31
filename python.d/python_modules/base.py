@@ -34,7 +34,7 @@ import msg
 
 try:
     PATH = os.getenv('PATH').split(':')
-except NameError:
+except AttributeError:
     PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'.split(':')
 
 
