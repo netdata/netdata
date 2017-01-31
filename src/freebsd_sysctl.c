@@ -826,7 +826,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         if (unlikely(GETSYSCTL("vm.stats.vm.v_active_count",    vmmeter_data.v_active_count) ||
                      GETSYSCTL("vm.stats.vm.v_inactive_count",  vmmeter_data.v_inactive_count) ||
                      GETSYSCTL("vm.stats.vm.v_wire_count",      vmmeter_data.v_wire_count) ||
+#if __FreeBSD_version < 1200016
                      GETSYSCTL("vm.stats.vm.v_cache_count",     vmmeter_data.v_cache_count) ||
+#endif
                      GETSYSCTL("vfs.bufspace",                  vfs_bufspace_count) ||
                      GETSYSCTL("vm.stats.vm.v_free_count",      vmmeter_data.v_free_count))) {
             do_ram = 0;
@@ -839,7 +841,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 rrddim_add(st, "active",    NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
                 rrddim_add(st, "inactive",  NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
                 rrddim_add(st, "wired",     NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
+#if __FreeBSD_version < 1200016
                 rrddim_add(st, "cache",     NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
+#endif
                 rrddim_add(st, "buffers",   NULL, 1, MEGA_FACTOR, RRDDIM_ABSOLUTE);
                 rrddim_add(st, "free",      NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
             }
@@ -848,7 +852,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             rrddim_set(st, "active",    vmmeter_data.v_active_count);
             rrddim_set(st, "inactive",  vmmeter_data.v_inactive_count);
             rrddim_set(st, "wired",     vmmeter_data.v_wire_count);
+#if __FreeBSD_version < 1200016
             rrddim_set(st, "cache",     vmmeter_data.v_cache_count);
+#endif
             rrddim_set(st, "buffers",   vfs_bufspace_count);
             rrddim_set(st, "free",      vmmeter_data.v_free_count);
             rrdset_done(st);
