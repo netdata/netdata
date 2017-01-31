@@ -50,18 +50,3 @@ void *freebsd_main(void *ptr) {
     pthread_exit(NULL);
     return NULL;
 }
-
-int getsysctl(const char *name, void *ptr, size_t len)
-{
-    size_t nlen = len;
-
-    if (unlikely(sysctlbyname(name, ptr, &nlen, NULL, 0) == -1)) {
-        error("FREEBSD: sysctl(%s...) failed: %s", name, strerror(errno));
-        return 1;
-    }
-    if (unlikely(nlen != len)) {
-        error("FREEBSD: sysctl(%s...) expected %lu, got %lu", name, (unsigned long)len, (unsigned long)nlen);
-        return 1;
-    }
-    return 0;
-}

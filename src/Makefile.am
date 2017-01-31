@@ -135,6 +135,12 @@ apps_plugin_SOURCES = \
 	web_buffer.c web_buffer.h \
 	$(NULL)
 
+if FREEBSD
+apps_plugin_SOURCES += \
+       plugin_freebsd.h \
+       $(NULL)
+endif
+
 apps_plugin_LDADD = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_CAP_LIBS) \
