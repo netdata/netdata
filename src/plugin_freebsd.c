@@ -11,12 +11,6 @@ void *freebsd_main(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    // disable (by default) various interface that are not needed
-    /*
-    config_get_boolean("plugin:proc:/proc/net/dev:lo", "enabled", 0);
-    config_get_boolean("plugin:proc:/proc/net/dev:fireqos_monitor", "enabled", 0);
-    */
-
     // when ZERO, attempt to do it
     int vdo_cpu_netdata             = !config_get_boolean("plugin:freebsd", "netdata server resources", 1);
     int vdo_freebsd_sysctl          = !config_get_boolean("plugin:freebsd", "sysctl", 1);
@@ -55,19 +49,4 @@ void *freebsd_main(void *ptr) {
     static_thread->enabled = 0;
     pthread_exit(NULL);
     return NULL;
-}
-
-int getsysctl(const char *name, void *ptr, size_t len)
-{
-    size_t nlen = len;
-
-    if (unlikely(sysctlbyname(name, ptr, &nlen, NULL, 0) == -1)) {
-        error("FREEBSD: sysctl(%s...) failed: %s", name, strerror(errno));
-        return 1;
-    }
-    if (unlikely(nlen != len)) {
-        error("FREEBSD: sysctl(%s...) expected %lu, got %lu", name, (unsigned long)len, (unsigned long)nlen);
-        return 1;
-    }
-    return 0;
 }
