@@ -3,7 +3,6 @@
 # Author: l2isbad
 
 from base import SimpleService
-from os.path import isfile
 from re import findall
 from subprocess import Popen, PIPE
 
@@ -11,7 +10,6 @@ from subprocess import Popen, PIPE
 priority = 60000
 retries = 60
 update_every = 15
-directories = ['/bin/', '/usr/bin/', '/sbin/', '/usr/sbin/']
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['authentication', 'accounting', 'proxy-auth', 'proxy-acct']
@@ -62,18 +60,14 @@ class Service(SimpleService):
         self.acct = self.configuration.get('acct', False)
         self.proxy_auth = self.configuration.get('proxy_auth', False)
         self.proxy_acct = self.configuration.get('proxy_acct', False)
-        try:
-            self.echo = [''.join([directory, 'echo']) for directory in directories if isfile(''.join([directory, 'echo']))][0]
-            self.radclient = [''.join([directory, 'radclient']) for directory in directories if isfile(''.join([directory, 'radclient']))][0]
-        except IndexError:
-            self.echo = []
-            self.radclient = []
+        self.echo = self.find_binary('echo')
+        self.radclient = self.find_binary('radclient')
         self.sub_echo = [self.echo, 'Message-Authenticator = 0x00, FreeRADIUS-Statistics-Type = 15, Response-Packet-Type = Access-Accept']
         self.sub_radclient = [self.radclient, '-r', '1', '-t', '1', ':'.join([self.host, self.port]), 'status', self.secret]
     
     def check(self):
         if not all([self.echo, self.radclient]):
-            self.error('Command radclient not found')
+            self.error('Can\'t locate \'radclient\' binary or binary is not executable by netdata')
             return False
         if self._get_raw_data():
             chart_choice = [True, bool(self.acct), bool(self.proxy_auth), bool(self.proxy_acct)]
