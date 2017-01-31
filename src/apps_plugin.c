@@ -3026,20 +3026,6 @@ static int am_i_running_as_root() {
 
 #ifdef HAVE_CAPABILITY
 static int check_capabilities() {
-    if(!CAP_IS_SUPPORTED(CAP_DAC_READ_SEARCH)) {
-        error("This system does not support CAP_DAC_READ_SEARCH capability. Please setuid to root apps.plugin.");
-        return 0;
-    }
-    else if(debug)
-        info("System has CAP_DAC_READ_SEARCH capability.");
-
-    if(!CAP_IS_SUPPORTED(CAP_SYS_PTRACE)) {
-        error("This system does not support CAP_SYS_PTRACE capability. Please setuid to root apps.plugin.");
-        return 0;
-    }
-    else if(debug)
-        info("System has CAP_SYS_PTRACE capability.");
-
     cap_t caps = cap_get_proc();
     if(!caps) {
         error("Cannot get current capabilities.");
