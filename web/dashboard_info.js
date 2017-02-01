@@ -412,16 +412,13 @@ netdataDashboard.context = {
         ]
     },
 
-    'mem.committed': {
-        colors: NETDATA.colors[3]
-    },
-    
     'mem.pgfaults': {
     	info: 'A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, called trap, raised by computer hardware when a running program accesses a memory page that is mapped into the virtual address space, but not actually loaded into main memory. If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a <b>minor</b> or soft page fault. A <b>major</b> page fault is generated when the system needs to load the memory page from disk or swap memory. These values are read from <code>/proc/vmstat</code>.'
     },
 
     'mem.committed': {
         info: 'Committed Memory, read from <code>/proc/meminfo</code>, is the sum of all memory which has been allocated by processes.'
+        colors: NETDATA.colors[3]
     },
 
     'mem.writeback': {
