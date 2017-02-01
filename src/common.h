@@ -221,7 +221,6 @@ extern void strreverse(char* begin, char* end);
 extern char *mystrsep(char **ptr, char *s);
 extern char *trim(char *s);
 
-extern char *strncpyz(char *dst, const char *src, size_t n);
 extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
 

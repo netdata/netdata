@@ -1060,17 +1060,6 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
     return s;
 }
 
-char *strncpyz(char *dst, const char *src, size_t n) {
-    char *p = dst;
-
-    while (*src && n--)
-        *dst++ = *src++;
-
-    *dst = '\0';
-
-    return p;
-}
-
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
     int size = vsnprintf(dst, n, fmt, args);
 
