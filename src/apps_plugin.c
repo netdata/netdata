@@ -293,7 +293,6 @@ struct pid_stat {
     int keeploops;                  // increases by 1 every time keep is 1 and updated 0
     char updated:1;                 // 1 when the process is currently running
     char merged:1;                  // 1 when it has been merged to its parent
-    char new_entry:1;               // 1 when this is a new process, just saw for the first time
     char read:1;                    // 1 when we have already read this process for this iteration
 
     int sortlist;                   // higher numbers = top on the process tree
@@ -627,54 +626,130 @@ static int read_apps_groups_conf(const char *file)
 // struct pid_stat management
 
 static inline struct pid_stat *get_pid_entry(pid_t pid) {
-    if(unlikely(all_pids[pid])) {
-        all_pids[pid]->new_entry = 0;
+    if(unlikely(all_pids[pid]))
         return all_pids[pid];
-    }
 
-    all_pids[pid] = callocz(sizeof(struct pid_stat), 1);
-    all_pids[pid]->fds = callocz(sizeof(int), MAX_SPARE_FDS);
-    all_pids[pid]->fds_size = MAX_SPARE_FDS;
+    struct pid_stat *p = callocz(sizeof(struct pid_stat), 1);
+    p->fds = callocz(sizeof(int), MAX_SPARE_FDS);
+    p->fds_size = MAX_SPARE_FDS;
 
     if(likely(root_of_pids))
-        root_of_pids->prev = all_pids[pid];
+        root_of_pids->prev = p;
 
-    all_pids[pid]->next = root_of_pids;
-    root_of_pids = all_pids[pid];
+    p->next = root_of_pids;
+    root_of_pids = p;
 
-    all_pids[pid]->pid = pid;
-    all_pids[pid]->new_entry = 1;
+    p->pid = pid;
 
+    all_pids[pid] = p;
     all_pids_count++;
 
-    return all_pids[pid];
+    return p;
 }
 
 static inline void del_pid_entry(pid_t pid) {
-    if(unlikely(!all_pids[pid])) {
+    struct pid_stat *p = all_pids[pid];
+
+    if(unlikely(!p)) {
         error("attempted to free pid %d that is not allocated.", pid);
         return;
     }
 
     if(unlikely(debug))
-        fprintf(stderr, "apps.plugin: process %d %s exited, deleting it.\n", pid, all_pids[pid]->comm);
+        fprintf(stderr, "apps.plugin: process %d %s exited, deleting it.\n", pid, p->comm);
 
-    if(root_of_pids == all_pids[pid])
-        root_of_pids = all_pids[pid]->next;
+    if(root_of_pids == p)
+        root_of_pids = p->next;
 
-    if(all_pids[pid]->next) all_pids[pid]->next->prev = all_pids[pid]->prev;
-    if(all_pids[pid]->prev) all_pids[pid]->prev->next = all_pids[pid]->next;
+    if(p->next) p->next->prev = p->prev;
+    if(p->prev) p->prev->next = p->next;
 
-    freez(all_pids[pid]->fds);
-    freez(all_pids[pid]->fds_dirname);
-    freez(all_pids[pid]->stat_filename);
-    freez(all_pids[pid]->statm_filename);
-    freez(all_pids[pid]->io_filename);
-    freez(all_pids[pid]->cmdline_filename);
-    freez(all_pids[pid]);
+    freez(p->fds);
+    freez(p->fds_dirname);
+    freez(p->stat_filename);
+    freez(p->statm_filename);
+    freez(p->io_filename);
+    freez(p->cmdline_filename);
+    freez(p);
 
     all_pids[pid] = NULL;
     all_pids_count--;
+}
+
+// ----------------------------------------------------------------------------
+
+static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
+    if(unlikely(!status)) {
+        // error("command failed log %u, errno %d", log, errno);
+
+        if(unlikely(debug || errno != ENOENT)) {
+            if(unlikely(debug || !(p->log_thrown & log))) {
+                p->log_thrown |= log;
+                switch(log) {
+                    case PID_LOG_IO:
+                        error("Cannot process %s/proc/%d/io (command '%s')", global_host_prefix, p->pid, p->comm);
+                        break;
+
+                    case PID_LOG_STATM:
+                        error("Cannot process %s/proc/%d/statm (command '%s')", global_host_prefix, p->pid, p->comm);
+                        break;
+
+                    case PID_LOG_CMDLINE:
+                        error("Cannot process %s/proc/%d/cmdline (command '%s')", global_host_prefix, p->pid, p->comm);
+                        break;
+
+                    case PID_LOG_FDS:
+                        error("Cannot process entries in %s/proc/%d/fd (command '%s')", global_host_prefix, p->pid, p->comm);
+                        break;
+
+                    case PID_LOG_STAT:
+                        break;
+
+                    default:
+                        error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
+                        break;
+                }
+            }
+        }
+        errno = 0;
+    }
+    else if(unlikely(p->log_thrown & log)) {
+        // error("unsetting log %u on pid %d", log, p->pid);
+        p->log_thrown &= ~log;
+    }
+
+    return status;
+}
+
+static inline void assign_target_to_pid(struct pid_stat *p) {
+    uint32_t hash = simple_hash(p->comm);
+    size_t pclen  = strlen(p->comm);
+
+    struct target *w;
+    for(w = apps_groups_root_target; w ; w = w->next) {
+        // if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
+
+        // find it - 4 cases:
+        // 1. the target is not a pattern
+        // 2. the target has the prefix
+        // 3. the target has the suffix
+        // 4. the target is something inside cmdline
+
+        if(unlikely(( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
+                      || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
+                      || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
+                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
+                    ))) {
+
+            if(w->target) p->target = w->target;
+            else p->target = w;
+
+            if(debug || (p->target && p->target->debug))
+                fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
+
+            break;
+        }
+    }
 }
 
 
@@ -758,11 +833,8 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     p->stat_collected_usec = now_monotonic_usec();
     file_counter++;
 
-    // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0+i));
-
-    if(unlikely(!p->comm[0]))
-        strncpyz(p->comm, procfile_lineword(ff, 0, 1), MAX_COMPARE_NAME);
-
+    // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0));
+    char *comm          = procfile_lineword(ff, 0, 1);
     // p->state         = *(procfile_lineword(ff, 0, 2));
     p->ppid             = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
     // p->pgrp          = (int32_t)str2pid_t(procfile_lineword(ff, 0, 4));
@@ -771,9 +843,24 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     // p->tpgid         = (int32_t)str2pid_t(procfile_lineword(ff, 0, 7));
     // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
 
-    kernel_uint_t last;
+    if(strcmp(p->comm, comm)) {
+        if(unlikely(debug)) {
+            if(p->comm[0])
+                fprintf(stderr, "apps.plugin: \tpid %d (%s) changed name to '%s'\n", p->pid, p->comm, comm);
+            else
+                fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", p->pid, p->comm);
+        }
 
-    last = p->minflt_raw;
+        strncpyz(p->comm, comm, MAX_COMPARE_NAME);
+
+        // /proc/<pid>/cmdline
+        if(likely(proc_pid_cmdline_is_needed))
+            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
+
+        assign_target_to_pid(p);
+    }
+
+    kernel_uint_t last = p->minflt_raw;
     p->minflt_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 9));
     p->minflt = (p->minflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
@@ -1262,20 +1349,25 @@ static inline int file_descriptor_find_or_add(const char *name)
     // not found
 
     FD_FILETYPE type;
-    if(name[0] == '/') type = FILETYPE_FILE;
-    else if(strncmp(name, "pipe:", 5) == 0) type = FILETYPE_PIPE;
-    else if(strncmp(name, "socket:", 7) == 0) type = FILETYPE_SOCKET;
-    else if(strcmp(name, "anon_inode:inotify") == 0 || strcmp(name, "inotify") == 0) type = FILETYPE_INOTIFY;
-    else if(strcmp(name, "anon_inode:[eventfd]") == 0) type = FILETYPE_EVENTFD;
-    else if(strcmp(name, "anon_inode:[eventpoll]") == 0) type = FILETYPE_EVENTPOLL;
-    else if(strcmp(name, "anon_inode:[timerfd]") == 0) type = FILETYPE_TIMERFD;
-    else if(strcmp(name, "anon_inode:[signalfd]") == 0) type = FILETYPE_SIGNALFD;
-    else if(strncmp(name, "anon_inode:", 11) == 0) {
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin: FIXME: unknown anonymous inode: %s\n", name);
+    if(likely(name[0] == '/')) type = FILETYPE_FILE;
+    else if(likely(strncmp(name, "pipe:", 5) == 0)) type = FILETYPE_PIPE;
+    else if(likely(strncmp(name, "socket:", 7) == 0)) type = FILETYPE_SOCKET;
+    else if(likely(strncmp(name, "anon_inode:", 11) == 0)) {
+        const char *t = &name[11];
 
-        type = FILETYPE_OTHER;
+             if(strcmp(t, "inotify") == 0) type = FILETYPE_INOTIFY;
+        else if(strcmp(t, "[eventfd]") == 0) type = FILETYPE_EVENTFD;
+        else if(strcmp(t, "[eventpoll]") == 0) type = FILETYPE_EVENTPOLL;
+        else if(strcmp(t, "[timerfd]") == 0) type = FILETYPE_TIMERFD;
+        else if(strcmp(t, "[signalfd]") == 0) type = FILETYPE_SIGNALFD;
+        else {
+            if(unlikely(debug))
+                fprintf(stderr, "apps.plugin: FIXME: unknown anonymous inode: %s\n", name);
+
+            type = FILETYPE_OTHER;
+        }
     }
+    else if(likely(strcmp(name, "inotify") == 0)) type = FILETYPE_INOTIFY;
     else {
         if(unlikely(debug))
             fprintf(stderr, "apps.plugin: FIXME: cannot understand linkname: %s\n", name);
@@ -1696,80 +1788,6 @@ static int compar_pid(const void *pid1, const void *pid2) {
         return 1;
 }
 
-static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
-    if(unlikely(!status)) {
-        // error("command failed log %u, errno %d", log, errno);
-
-        if(unlikely(debug || errno != ENOENT)) {
-            if(unlikely(debug || !(p->log_thrown & log))) {
-                p->log_thrown |= log;
-                switch(log) {
-                    case PID_LOG_IO:
-                        error("Cannot process %s/proc/%d/io (command '%s')", global_host_prefix, p->pid, p->comm);
-                        break;
-
-                    case PID_LOG_STATM:
-                        error("Cannot process %s/proc/%d/statm (command '%s')", global_host_prefix, p->pid, p->comm);
-                        break;
-
-                    case PID_LOG_CMDLINE:
-                        error("Cannot process %s/proc/%d/cmdline (command '%s')", global_host_prefix, p->pid, p->comm);
-                        break;
-
-                    case PID_LOG_FDS:
-                        error("Cannot process entries in %s/proc/%d/fd (command '%s')", global_host_prefix, p->pid, p->comm);
-                        break;
-
-                    case PID_LOG_STAT:
-                        break;
-
-                    default:
-                        error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
-                        break;
-                }
-            }
-        }
-        errno = 0;
-    }
-    else if(unlikely(p->log_thrown & log)) {
-        // error("unsetting log %u on pid %d", log, p->pid);
-        p->log_thrown &= ~log;
-    }
-
-    return status;
-}
-
-static inline void assign_target_to_pid(struct pid_stat *p) {
-    uint32_t hash = simple_hash(p->comm);
-    size_t pclen  = strlen(p->comm);
-
-    struct target *w;
-    for(w = apps_groups_root_target; w ; w = w->next) {
-        // if(debug || (p->target && p->target->debug)) fprintf(stderr, "apps.plugin: \t\tcomparing '%s' with '%s'\n", w->compare, p->comm);
-
-        // find it - 4 cases:
-        // 1. the target is not a pattern
-        // 2. the target has the prefix
-        // 3. the target has the suffix
-        // 4. the target is something inside cmdline
-
-        if(unlikely(( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
-            || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
-            || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
-            || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
-                ))) {
-
-            if(w->target) p->target = w->target;
-            else p->target = w;
-
-            if(debug || (p->target && p->target->debug))
-                fprintf(stderr, "apps.plugin: \t\t%s linked to target %s\n", p->comm, p->target->name);
-
-            break;
-        }
-    }
-}
-
 static inline int collect_data_for_pid(pid_t pid) {
     if(unlikely(pid <= 0 || pid > pid_max)) {
         error("Invalid pid %d read (expected 1 to %d). Ignoring process.", pid, pid_max);
@@ -1810,22 +1828,6 @@ static inline int collect_data_for_pid(pid_t pid) {
         return 0;
 
     // --------------------------------------------------------------------
-    // link it
-
-    // check if it is target
-    // we do this only once, the first time this pid is loaded
-    if(unlikely(p->new_entry)) {
-        // /proc/<pid>/cmdline
-        if(likely(proc_pid_cmdline_is_needed))
-            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
-
-        if(unlikely(debug))
-            fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", pid, p->comm);
-
-        assign_target_to_pid(p);
-    }
-
-    // --------------------------------------------------------------------
     // /proc/<pid>/fd
 
     if(enable_file_charts)
@@ -1853,7 +1855,6 @@ static int collect_data_for_all_processes(void) {
         for(p = root_of_pids; p ; p = p->next) {
             p->read             = 0; // mark it as not read, so that collect_data_for_pid() will read it
             p->updated          = 0;
-            p->new_entry        = 0;
             p->merged           = 0;
             p->children_count   = 0;
             p->parent           = NULL;
