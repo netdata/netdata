@@ -128,12 +128,24 @@ static inline unsigned long long str2ull(const char *s) {
 #undef strcmp
 #endif
 #define strcmp(a, b) strsame(a, b)
+#endif // NETDATA_STRCMP_OVERRIDE
+
 static inline int strsame(const char *a, const char *b) {
     if(unlikely(a == b)) return 0;
     while(*a && *a == *b) { a++; b++; }
     return *a - *b;
 }
-#endif // NETDATA_STRSAME
+
+static inline char *strncpyz(char *dst, const char *src, size_t n) {
+    char *p = dst;
+
+    while (*src && n--)
+        *dst++ = *src++;
+
+    *dst = '\0';
+
+    return p;
+}
 
 static inline int read_single_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
