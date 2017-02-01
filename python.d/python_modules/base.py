@@ -32,6 +32,11 @@ from subprocess import Popen, PIPE
 import threading
 import msg
 
+try:
+    PATH = os.getenv('PATH').split(':')
+except AttributeError:
+    PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'.split(':')
+
 
 # class BaseService(threading.Thread):
 class SimpleService(threading.Thread):
@@ -430,6 +435,18 @@ class SimpleService(threading.Thread):
             self.error("no charts to update")
 
         return updated
+
+    def find_binary(self, binary):
+        try:
+            if isinstance(binary, str):
+                binary = os.path.basename(binary)
+                return next(('/'.join([p, binary]) for p in PATH
+                            if os.path.isfile('/'.join([p, binary]))
+                            and os.access('/'.join([p, binary]), os.X_OK)))
+            else:
+                return None
+        except StopIteration:
+            return None
 
 
 class UrlService(SimpleService):

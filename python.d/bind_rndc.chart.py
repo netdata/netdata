@@ -4,7 +4,7 @@
 
 from base import SimpleService
 from re import compile, findall
-from os.path import getsize, isfile, split
+from os.path import getsize, split
 from os import access as is_accessible, R_OK
 from subprocess import Popen
 
@@ -12,7 +12,6 @@ priority = 60000
 retries = 60
 update_every = 30
 
-DIRECTORIES = ['/bin/', '/usr/bin/', '/sbin/', '/usr/sbin/']
 NMS = ['requests', 'responses', 'success', 'auth_answer', 'nonauth_answer', 'nxrrset', 'failure',
        'nxdomain', 'recursion', 'duplicate', 'rejections']
 QUERIES = ['RESERVED0', 'A', 'NS', 'CNAME', 'SOA', 'PTR', 'MX', 'TXT', 'X25', 'AAAA', 'SRV', 'NAPTR',
@@ -29,16 +28,12 @@ class Service(SimpleService):
         # 'Cache DB RRsets', 'Socket I/O Statistics']
         self.options = ['Name Server Statistics', 'Incoming Queries', 'Outgoing Queries']
         self.regex_options = [r'(%s(?= \+\+)) \+\+([^\+]+)' % option for option in self.options]
-        try:
-            self.rndc = [''.join([directory, 'rndc']) for directory in DIRECTORIES
-                         if isfile(''.join([directory, 'rndc']))][0]
-        except IndexError:
-            self.rndc = False
+        self.rndc = self.find_binary('rndc')
 
     def check(self):
         # We cant start without 'rndc' command
         if not self.rndc:
-            self.error('Command "rndc" not found')
+            self.error('Can\'t locate \'rndc\' binary or binary is not executable by netdata')
             return False
 
         # We cant start if stats file is not exist or not readable by netdata user
