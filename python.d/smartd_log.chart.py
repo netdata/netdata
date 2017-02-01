@@ -4,11 +4,11 @@
 
 from re import compile
 from os import listdir, access, R_OK
-from os.path import isfile, join, getsize, basename
+from os.path import isfile, join, getsize, basename, isdir
 try:
-            from queue import Queue
+    from queue import Queue
 except ImportError:
-            from Queue import Queue
+    from Queue import Queue
 from threading import Thread
 from base import SimpleService
 from collections import namedtuple
@@ -216,5 +216,6 @@ def find_disks_in_log_path(log_path):
     # 1. it is a file
     # 2. file name endswith with 'csv'
     # 3. file is readable
+    if not isdir(log_path): return None
     return [join(log_path, f) for f in listdir(log_path)
             if all([isfile(join(log_path, f)), f.endswith('.csv'), access(join(log_path, f), R_OK)])]
