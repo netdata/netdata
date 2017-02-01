@@ -848,7 +848,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
             if(p->comm[0])
                 fprintf(stderr, "apps.plugin: \tpid %d (%s) changed name to '%s'\n", p->pid, p->comm, comm);
             else
-                fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", p->pid, p->comm);
+                fprintf(stderr, "apps.plugin: \tJust added %d (%s)\n", p->pid, comm);
         }
 
         strncpyz(p->comm, comm, MAX_COMPARE_NAME);
