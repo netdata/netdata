@@ -52,7 +52,6 @@ void arl_free(ARL_BASE *arl_base) {
 }
 
 void arl_begin(ARL_BASE *base) {
-    ARL_ENTRY *e;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(likely(base->iteration > 10)) {
@@ -89,7 +88,8 @@ void arl_begin(ARL_BASE *base) {
     if(unlikely(base->added || base->iteration % base->rechecks) == 1) {
         base->added = 0;
         base->wanted = 0;
-        for(e = base->head; e ; e = e->next) {
+        ARL_ENTRY *e = base->head;
+        while(e) {
             if(e->flags & ARL_ENTRY_FLAG_FOUND) {
 
                 // remove the found flag
@@ -98,25 +98,48 @@ void arl_begin(ARL_BASE *base) {
                 // count it in wanted
                 if(e->flags & ARL_ENTRY_FLAG_EXPECTED)
                     base->wanted++;
+
             }
-            else if(e->flags & ARL_ENTRY_FLAG_DYNAMIC) {
+            else if(e->flags & ARL_ENTRY_FLAG_DYNAMIC && !(base->head == e && !e->next)) { // not last entry
                 // we can remove this entry
                 // it is not found, and it was created because
                 // it was found in the source file
+
+                // remember the next one
+                ARL_ENTRY *t = e->next;
+
+                // remove it from the list
                 if(e->next) e->next->prev = e->prev;
                 if(e->prev) e->prev->next = e->next;
                 if(base->head == e) base->head = e->next;
+
+                // free it
                 freez(e->name);
                 freez(e);
 
+                // count it
                 base->fred++;
+
+                // continue
+                e = t;
+                continue;
             }
+
+            e = e->next;
         }
+    }
+
+    if(unlikely(!base->head)) {
+        // hm... no nodes at all in the list #1700
+        // add a fake one to prevent a crash
+        // this is better than checking for the existence of nodes all the time
+        arl_expect(base, "a-really-not-existing-source-keyword", NULL);
     }
 
     base->iteration++;
     base->next_keyword = base->head;
     base->found = 0;
+
 }
 
 // register an expected keyword to the ARL
@@ -153,7 +176,7 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
             break;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(e == base->next_keyword))
+    if(unlikely(base->next_keyword && e == base->next_keyword))
         fatal("Internal Error: e == base->last");
 #endif
 

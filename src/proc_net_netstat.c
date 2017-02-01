@@ -206,6 +206,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     size_t lines = procfile_lines(ff), l;
     size_t words;
 
+    arl_begin(arl_ipext);
+    arl_begin(arl_tcpext);
+
     for(l = 0; l < lines ;l++) {
         char *key = procfile_lineword(ff, l, 0);
         uint32_t hash = simple_hash(key);
@@ -219,7 +222,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 continue;
             }
 
-            arl_begin(arl_ipext);
             parse_line_pair(ff, arl_ipext, h, l);
 
             RRDSET *st;
@@ -371,7 +373,6 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 continue;
             }
 
-            arl_begin(arl_tcpext);
             parse_line_pair(ff, arl_tcpext, h, l);
 
             RRDSET *st;
