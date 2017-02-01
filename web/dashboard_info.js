@@ -417,8 +417,8 @@ netdataDashboard.context = {
     },
 
     'mem.committed': {
+        colors: NETDATA.colors[3],
         info: 'Committed Memory, read from <code>/proc/meminfo</code>, is the sum of all memory which has been allocated by processes.'
-        colors: NETDATA.colors[3]
     },
 
     'mem.writeback': {
