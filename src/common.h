@@ -188,10 +188,13 @@
 #include "plugin_nfacct.h"
 
 #if defined(__FreeBSD__)
+#define NETDATA_OS_TYPE "freebsd"
 #include "plugin_freebsd.h"
 #elif defined(__APPLE__)
+#define NETDATA_OS_TYPE "macos"
 #include "plugin_macos.h"
 #else
+#define NETDATA_OS_TYPE "linux"
 #include "plugin_proc.h"
 #include "plugin_proc_diskspace.h"
 #endif /* __FreeBSD__, __APPLE__*/
@@ -270,6 +273,9 @@ extern pid_t get_system_pid_max(void);
 /* Number of ticks per second */
 extern unsigned int hz;
 extern void get_system_HZ(void);
+
+extern volatile sig_atomic_t netdata_exit;
+extern const char *os_type;
 
 
 /* fix for alpine linux */

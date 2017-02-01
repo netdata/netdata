@@ -1,3 +1,4 @@
+// Javascript file for providing dashboard information on Linux
 
 var netdataDashboard = window.netdataDashboard || {};
 

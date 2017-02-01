@@ -60,6 +60,7 @@
 
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrd_stats_api_v1_charts(BUFFER *wb);
+extern void rrd_stats_api_v1_info(BUFFER *wb);
 
 extern void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb);
 extern void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb);
