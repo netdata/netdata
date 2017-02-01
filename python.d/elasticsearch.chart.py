@@ -329,7 +329,7 @@ class Service(UrlService):
             to_netdata.update(update_key('docs', data['indices']['docs']))
             to_netdata.update(update_key('store', data['indices']['store']))
             to_netdata['indices_count'] = data['indices']['count']
-            to_netdata['shards_total'] = data['indices']['shards']['total']
+            to_netdata['shards_total'] = data['indices'].get('shards', {}).get('total')
 
             queue.put(to_netdata)
 
