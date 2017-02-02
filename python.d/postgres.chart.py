@@ -203,7 +203,7 @@ class Service(SimpleService):
         params = dict(user='postgres',
                       database=None,
                       password=None,
-                      host='localhost',
+                      host=None,
                       port=5432)
         params.update(self.configuration)
 
@@ -301,8 +301,7 @@ class Service(SimpleService):
             try:
                 self.add_stats(cursor)
             except OperationalError:
-                if self.connection.closed == 2:
-                    self.connection = False
+                self.connection = False
                 cursor.close()
                 return None
             else:
