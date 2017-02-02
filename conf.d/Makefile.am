@@ -51,6 +51,7 @@ dist_pythonconfig_DATA = \
     python.d/retroshare.conf \
     python.d/sensors.conf \
     python.d/squid.conf \
+    python.d/smartd_log.conf \
     python.d/tomcat.conf \
     python.d/varnish.conf \
     $(NULL)
