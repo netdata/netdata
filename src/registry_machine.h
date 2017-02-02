@@ -1,6 +1,11 @@
 #ifndef NETDATA_REGISTRY_MACHINE_H
 #define NETDATA_REGISTRY_MACHINE_H
 
+/**
+ * @file registry_machine.h
+ * @brief File containing definition and methods for machines in the registriy. 
+ */
+
 #include "registry_internals.h"
 
 // ----------------------------------------------------------------------------
@@ -16,7 +21,7 @@ struct registry_machine_url {
     uint32_t last_t;            ///< the last time we saw this
     uint32_t usages;            ///< how many times this has been accessed
 };
-typedef struct registry_machine_url REGISTRY_MACHINE_URL;
+typedef struct registry_machine_url REGISTRY_MACHINE_URL; ///< For each MACHINE-URL pair we keep this.
 
 /** A machine */
 struct registry_machine {
@@ -30,12 +35,48 @@ struct registry_machine {
     uint32_t last_t;            ///< the last time we saw this
     uint32_t usages;            ///< how many times this has been accessed
 };
-typedef struct registry_machine REGISTRY_MACHINE;
+typedef struct registry_machine REGISTRY_MACHINE; ///< A machine.
 
+/**
+ * Get REGISTRY_MACHINE for `machine_guid` from the registry.
+ *
+ * @param machine_guid to query for.
+ * @return REGISTRY_MACHINE or NULL
+ */
 extern REGISTRY_MACHINE *registry_machine_find(const char *machine_guid);
+/**
+ * Initialize new REGISTRY_MACHINE_URL for REGISTRY_MACHINE and REGISTRY_URL.
+ *
+ * @param m REGISTRY_MACHINE.
+ * @param u REGISTRY_URL.
+ * @param when Now.
+ * @return new REGISTRY_MACHINE_URL
+ */
 extern REGISTRY_MACHINE_URL *registry_machine_url_allocate(REGISTRY_MACHINE *m, REGISTRY_URL *u, time_t when);
+/**
+ * Initialize new REGISTRY_MACHINE for `machine_guid`.
+ *
+ * @param machine_guid ID of machine.
+ * @param when Now.
+ * @return new REGISTRY_MACHINE
+ */
 extern REGISTRY_MACHINE *registry_machine_allocate(const char *machine_guid, time_t when);
+/**
+ * Get REGISTRY_MACHINE from registry by `machine_guid`. If not present, create it.
+ *
+ * @param machine_guid ID of machine.
+ * @param when Now.
+ * @return REGISTRY_MACHINE
+ */
 extern REGISTRY_MACHINE *registry_machine_get(const char *machine_guid, time_t when);
+/**
+ * Link REGISTRY_MACHINE to REGISTRY_URL.
+ *
+ * @param m REGISTRY_MACHINE to link.
+ * @param u REGISTRY_URL to link to.
+ * @param when Now.
+ * @return new REGISTRY_MACHINE_URL
+ */
 extern REGISTRY_MACHINE_URL *registry_machine_link_to_url(REGISTRY_MACHINE *m, REGISTRY_URL *u, time_t when);
 
 #endif //NETDATA_REGISTRY_MACHINE_H
