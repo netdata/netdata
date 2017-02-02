@@ -203,7 +203,7 @@ class Service(SimpleService):
         params = dict(user='postgres',
                       database=None,
                       password=None,
-                      host='localhost',
+                      host=None,
                       port=5432)
         params.update(self.configuration)
 
@@ -218,7 +218,9 @@ class Service(SimpleService):
 
     def check(self):
         try:
-            self._connect()
+            if not self._connect():
+                self.error('Can\'t connect to %s' % str(self.configuration))
+                return False
             cursor = self.connection.cursor()
             self._discover_databases(cursor)
             self._check_if_superuser(cursor)
@@ -301,8 +303,7 @@ class Service(SimpleService):
             try:
                 self.add_stats(cursor)
             except OperationalError:
-                if self.connection.closed == 2:
-                    self.connection = False
+                self.connection = False
                 cursor.close()
                 return None
             else:
