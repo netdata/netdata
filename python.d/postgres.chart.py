@@ -218,7 +218,9 @@ class Service(SimpleService):
 
     def check(self):
         try:
-            self._connect()
+            if not self._connect():
+                self.error('Can\'t connect to %s' % str(self.configuration))
+                return False
             cursor = self.connection.cursor()
             self._discover_databases(cursor)
             self._check_if_superuser(cursor)
