@@ -37,6 +37,7 @@ dist_python_SCRIPTS = \
     retroshare.chart.py \
     sensors.chart.py \
     squid.chart.py \
+    smartd_log.chart.py \
     tomcat.chart.py \
     varnish.chart.py \
     python-modules-installer.sh \
