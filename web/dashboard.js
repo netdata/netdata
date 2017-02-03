@@ -363,6 +363,28 @@ var NETDATA = window.NETDATA || {};
         callback: {} // only used for resetting back to defaults
     };
 
+    NETDATA.localStorageTested = -1;
+    NETDATA.localStorageTest = function() {
+        if(NETDATA.localStorageTested !== -1)
+            return NETDATA.localStorageTested;
+
+        if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
+            var test = 'test';
+            try {
+                localStorage.setItem(test, test);
+                localStorage.removeItem(test);
+                NETDATA.localStorageTested = true;
+            }
+            catch (e) {
+                NETDATA.localStorageTested = false;
+            }
+        }
+        else
+            NETDATA.localStorageTested = false;
+
+        return NETDATA.localStorageTested;
+    };
+
     NETDATA.localStorageGet = function(key, def, callback) {
         var ret = def;
 
@@ -371,7 +393,7 @@ var NETDATA = window.NETDATA || {};
             NETDATA.localStorage.callback[key.toString()] = callback;
         }
 
-        if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
+        if(NETDATA.localStorageTest() === true) {
             try {
                 // console.log('localStorage: loading "' + key.toString() + '"');
                 ret = localStorage.getItem(key.toString());
@@ -413,7 +435,7 @@ var NETDATA = window.NETDATA || {};
             NETDATA.localStorage.callback[key.toString()] = callback;
         }
 
-        if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
+        if(NETDATA.localStorageTest() === true) {
             // console.log('localStorage: saving "' + key.toString() + '" with value "' + JSON.stringify(value) + '"');
             try {
                 localStorage.setItem(key.toString(), JSON.stringify(value));
