@@ -296,10 +296,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "load5", (collected_number) ((double)sysload.ldavg[1] / sysload.fscale * 1000));
                 rrddim_set(st, "load15", (collected_number) ((double)sysload.ldavg[2] / sysload.fscale * 1000));
                 rrdset_done(st);
+
+                next_loadavg_dt = st->update_every * USEC_PER_SEC;
             }
         }
-
-        next_loadavg_dt = st->update_every * USEC_PER_SEC;
     }
     else next_loadavg_dt -= dt;
 
