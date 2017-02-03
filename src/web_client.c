@@ -774,6 +774,30 @@ int web_client_api_request_v1_charts(struct web_client *w, char *url)
     return 200;
 }
 
+int web_client_api_request_v1_info(struct web_client *w, char *url)
+{
+    (void)url;
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    rrd_stats_api_v1_info(w->response.data);
+    return 200;
+}
+
+int web_client_api_request_v1_infojs(struct web_client *w, char *url)
+{
+    (void)url;
+
+    buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
+
+    buffer_strcat(w->response.data, "NETDATA_INFO = ");
+    rrd_stats_api_v1_info(w->response.data);
+    buffer_strcat(w->response.data, ";");
+
+    return 200;
+}
+
 int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
 {
     int format = ALLMETRICS_SHELL;
@@ -1415,7 +1439,17 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 }
 
 int web_client_api_request_v1(struct web_client *w, char *url) {
-    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0, hash_alarm_log = 0, hash_alarm_variables = 0, hash_raw = 0;
+    static uint32_t hash_data = 0
+        , hash_chart = 0
+        , hash_charts = 0
+        , hash_registry = 0
+        , hash_badge = 0
+        , hash_alarms = 0
+        , hash_alarm_log = 0
+        , hash_alarm_variables = 0
+        , hash_raw = 0
+        , hash_info = 0
+        , hash_infojs = 0;
 
     if(unlikely(hash_data == 0)) {
         hash_data = simple_hash("data");
@@ -1427,6 +1461,8 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
         hash_alarm_log = simple_hash("alarm_log");
         hash_alarm_variables = simple_hash("alarm_variables");
         hash_raw = simple_hash("allmetrics");
+        hash_info = simple_hash("info");
+        hash_infojs = simple_hash("info.js");
     }
 
     // get the command
@@ -1435,32 +1471,38 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
         debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
         uint32_t hash = simple_hash(tok);
 
-        if(hash == hash_data && !strcmp(tok, "data"))
+        if(likely(hash == hash_data && !strcmp(tok, "data")))
             return web_client_api_request_v1_data(w, url);
 
-        else if(hash == hash_chart && !strcmp(tok, "chart"))
-            return web_client_api_request_v1_chart(w, url);
-
-        else if(hash == hash_charts && !strcmp(tok, "charts"))
-            return web_client_api_request_v1_charts(w, url);
-
-        else if(hash == hash_registry && !strcmp(tok, "registry"))
-            return web_client_api_request_v1_registry(w, url);
-
-        else if(hash == hash_badge && !strcmp(tok, "badge.svg"))
+        else if(likely(hash == hash_badge && !strcmp(tok, "badge.svg")))
             return web_client_api_request_v1_badge(w, url);
 
-        else if(hash == hash_alarms && !strcmp(tok, "alarms"))
+        else if(likely(hash == hash_chart && !strcmp(tok, "chart")))
+            return web_client_api_request_v1_chart(w, url);
+
+        else if(likely(hash == hash_alarms && !strcmp(tok, "alarms")))
             return web_client_api_request_v1_alarms(w, url);
 
-        else if(hash == hash_alarm_log && !strcmp(tok, "alarm_log"))
+        else if(likely(hash == hash_alarm_log && !strcmp(tok, "alarm_log")))
             return web_client_api_request_v1_alarm_log(w, url);
 
-        else if(hash == hash_alarm_variables && !strcmp(tok, "alarm_variables"))
-            return web_client_api_request_v1_alarm_variables(w, url);
+        else if(likely(hash == hash_charts && !strcmp(tok, "charts")))
+            return web_client_api_request_v1_charts(w, url);
 
-        else if(hash == hash_raw && !strcmp(tok, "allmetrics"))
+        else if(likely(hash == hash_infojs && !strcmp(tok, "info.js")))
+            return web_client_api_request_v1_infojs(w, url);
+
+        else if(likely(hash == hash_info && !strcmp(tok, "info")))
+            return web_client_api_request_v1_info(w, url);
+
+        else if(likely(hash == hash_registry && !strcmp(tok, "registry")))
+            return web_client_api_request_v1_registry(w, url);
+
+        else if(likely(hash == hash_raw && !strcmp(tok, "allmetrics")))
             return web_client_api_request_v1_allmetrics(w, url);
+
+        else if(likely(hash == hash_alarm_variables && !strcmp(tok, "alarm_variables")))
+            return web_client_api_request_v1_alarm_variables(w, url);
 
         else {
             buffer_flush(w->response.data);

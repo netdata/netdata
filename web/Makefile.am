@@ -10,7 +10,6 @@ dist_web_DATA = \
 	demosites2.html \
 	dashboard.html \
 	dashboard.js \
-	dashboard_info.js \
 	dashboard.css \
 	dashboard.slate.css \
 	favicon.ico \
@@ -23,6 +22,13 @@ dist_web_DATA = \
 	sitemap.xml \
 	tv.html \
 	version.txt \
+	$(NULL)
+
+dashboardinfodir=$(webdir)/dashboard_info
+dist_dashboardinfo_DATA = \
+	dashboard_info/linux.js \
+	dashboard_info/freebsd.js \
+	dashboard_info/macos.js \
 	$(NULL)
 
 webolddir=$(webdir)/old

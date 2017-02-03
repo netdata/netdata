@@ -283,29 +283,31 @@ static inline void tc_device_commit(struct tc_device *d) {
     //
     // so, here we remove the isleaf flag from nodes in the middle
     // and we add the hasparent flag to leaf nodes we found their parent
-    for(c = d->classes; c; c = c->next) {
-        if(unlikely(!c->updated)) continue;
+    if(likely(!d->enabled_all_classes_qdiscs)) {
+        for(c = d->classes; c; c = c->next) {
+            if(unlikely(!c->updated)) continue;
 
-        //debug(D_TC_LOOP, "TC: In device '%s', %s '%s'  has leafid: '%s' and parentid '%s'.",
-        //    d->id,
-        //    c->isqdisc?"qdisc":"class",
-        //    c->id,
-        //    c->leafid?c->leafid:"NULL",
-        //    c->parentid?c->parentid:"NULL");
+            //debug(D_TC_LOOP, "TC: In device '%s', %s '%s'  has leafid: '%s' and parentid '%s'.",
+            //    d->id,
+            //    c->isqdisc?"qdisc":"class",
+            //    c->id,
+            //    c->leafid?c->leafid:"NULL",
+            //    c->parentid?c->parentid:"NULL");
 
-        // find if c is leaf or not
-        for(x = d->classes; x; x = x->next) {
-            if(unlikely(!x->updated || c == x || !x->parentid)) continue;
+            // find if c is leaf or not
+            for(x = d->classes; x; x = x->next) {
+                if(unlikely(!x->updated || c == x || !x->parentid)) continue;
 
-            // classes have both parentid and leafid
-            // qdiscs have only parentid
-            // the following works for both (it is an OR)
+                // classes have both parentid and leafid
+                // qdiscs have only parentid
+                // the following works for both (it is an OR)
 
-            if( (c->hash == x->parent_hash && strcmp(c->id, x->parentid) == 0) ||
-                (c->leafid && c->leaf_hash == x->parent_hash && strcmp(c->leafid, x->parentid) == 0)) {
-                // debug(D_TC_LOOP, "TC: In device '%s', %s '%s' (leafid: '%s') has as leaf %s '%s' (parentid: '%s').", d->name?d->name:d->id, c->isqdisc?"qdisc":"class", c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->isqdisc?"qdisc":"class", x->name?x->name:x->id, x->parentid?x->parentid:x->id);
-                c->isleaf = 0;
-                x->hasparent = 1;
+                if((c->hash == x->parent_hash && strcmp(c->id, x->parentid) == 0) ||
+                   (c->leafid && c->leaf_hash == x->parent_hash && strcmp(c->leafid, x->parentid) == 0)) {
+                    // debug(D_TC_LOOP, "TC: In device '%s', %s '%s' (leafid: '%s') has as leaf %s '%s' (parentid: '%s').", d->name?d->name:d->id, c->isqdisc?"qdisc":"class", c->name?c->name:c->id, c->leafid?c->leafid:c->id, x->isqdisc?"qdisc":"class", x->name?x->name:x->id, x->parentid?x->parentid:x->id);
+                    c->isleaf = 0;
+                    x->hasparent = 1;
+                }
             }
         }
     }

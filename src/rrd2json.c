@@ -85,10 +85,12 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
 
     buffer_sprintf(wb, "{\n"
            "\t\"hostname\": \"%s\""
+        ",\n\t\"os_type\": \"%s\""
         ",\n\t\"update_every\": %d"
         ",\n\t\"history\": %d"
         ",\n\t\"charts\": {"
         , localhost.hostname
+        , os_type
         , rrd_update_every
         , rrd_default_history_entries
         );
@@ -122,6 +124,22 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
                    , dimensions
                    , alarms
                    , memory
+    );
+}
+
+void rrd_stats_api_v1_info(BUFFER *wb)
+{
+    buffer_sprintf(wb, "{\n"
+                    "\t\"hostname\": \"%s\""
+                    ",\n\t\"os_type\": \"%s\""
+                    ",\n\t\"version\": \"" VERSION "\""
+                    ",\n\t\"update_every\": %d"
+                    ",\n\t\"history\": %d"
+                    "\n}"
+                   , localhost.hostname
+                   , os_type
+                   , rrd_update_every
+                   , rrd_default_history_entries
     );
 }
 

@@ -403,8 +403,21 @@
 
     </style>
 
+    <script type="text/javascript">
+        // default, in case it fails to be loaded
+        NETDATA_INFO = {
+            version: 'unknown',
+            os_type: 'linux'
+        }
+    </script>
+
+    <script type="text/javascript" src="api/v1/info.js"></script>
+
     <!-- check which theme to use -->
     <script type="text/javascript">
+        // --------------------------------------------------------------------
+        // these are used by dashboard.js
+
         // enable alarms checking and notifications
         var netdataShowAlarms = true;
 
@@ -2663,9 +2676,9 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'dashboard_info.js?v20170115-1',
+                url: NETDATA.serverDefault + 'dashboard_info/' + NETDATA_INFO.os_type.toString() + '.js?v20170201-1',
                 async: false,
-                isAlreadyLoaded: function() { return false; }
+                isAlreadyLoaded: function () { return false; }
             });
 
             if(isdemo()) {
