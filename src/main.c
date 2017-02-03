@@ -338,7 +338,6 @@ int main(int argc, char **argv)
     int i, check_config = 0;
     int config_loaded = 0;
     int dont_fork = 0;
-    int oom_score = 1000;
     size_t wanted_stacksize = 0, stacksize = 0;
     pthread_attr_t attr;
 
@@ -617,7 +616,6 @@ int main(int argc, char **argv)
         // --------------------------------------------------------------------
 
         rrd_memory_mode = rrd_memory_mode_id(config_get("global", "memory mode", rrd_memory_mode_name(rrd_memory_mode)));
-        oom_score = (int)config_get_number("global", "OOM score", oom_score);
 
         // --------------------------------------------------------------------
 
@@ -757,7 +755,7 @@ int main(int argc, char **argv)
 #endif /* NETDATA_INTERNAL_CHECKS */
 
     // fork, switch user, create pid file, set process priority
-    if(become_daemon(dont_fork, user, oom_score) == -1)
+    if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
 
     info("netdata started on pid %d.", getpid());
