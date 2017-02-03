@@ -211,11 +211,11 @@ struct sched_def {
 #endif
 
 #ifdef SCHED_RR
-        { "rr", SCHED_RR, 99, SCHED_FLAG_PRIORITY_CONFIGURABLE },
+        { "rr", SCHED_RR, 0, SCHED_FLAG_PRIORITY_CONFIGURABLE },
 #endif
 
 #ifdef SCHED_FIFO
-        { "fifo", SCHED_FIFO, 99, SCHED_FLAG_PRIORITY_CONFIGURABLE },
+        { "fifo", SCHED_FIFO, 0, SCHED_FLAG_PRIORITY_CONFIGURABLE },
 #endif
 
 #ifdef SCHED_BATCH
