@@ -116,7 +116,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         do_icmp6_types          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp types", CONFIG_ONDEMAND_ONDEMAND);
         do_space                = config_get_boolean("plugin:freebsd:sysctl", "space usage for all disks", 1);
         do_inodes               = config_get_boolean("plugin:freebsd:sysctl", "inodes usage for all disks", 1);
-        do_uptime               = config_get_boolean("plugin:macos:sysctl", "system uptime", 1);
+        do_uptime               = config_get_boolean("plugin:freebsd:sysctl", "system uptime", 1);
     }
 
     RRDSET *st;
