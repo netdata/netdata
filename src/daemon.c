@@ -215,11 +215,11 @@ struct sched_def {
 #endif
 
 #ifdef SCHED_FIFO
-        { "rr", SCHED_FIFO, 99, SCHED_FLAG_PRIORITY_CONFIGURABLE },
+        { "fifo", SCHED_FIFO, 99, SCHED_FLAG_PRIORITY_CONFIGURABLE },
 #endif
 
 #ifdef SCHED_BATCH
-        { "rr", SCHED_BATCH, 99, SCHED_FLAG_PRIORITY_CONFIGURABLE },
+        { "batch", SCHED_BATCH, 0, SCHED_FLAG_USE_NICE },
 #endif
 
         // do not change the scheduling priority
