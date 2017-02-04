@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+
+netdata_source_dir="$(pwd)"
+installer_dir="$(dirname "${0}")"
+
+if [ "${netdata_source_dir}" != "${installer_dir}" -a "${installer_dir}" != "." ]
+    then
+    echo >&2 "Warninng: you are currently in '${netdata_source_dir}' but the installer is in '${installer_dir}'."
+fi
+
 # reload the user profile
 [ -f /etc/profile ] && . /etc/profile
 
-export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+# make sure /etc/profile does not change our current directory
+cd "${netdata_source_dir}" || exit 1
 
 # fix PKG_CHECK_MODULES error
 if [ -d /usr/share/aclocal ]
@@ -18,7 +29,7 @@ umask 002
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
 
-processors=$(cat /proc/cpuinfo  | grep ^processor | wc -l)
+processors=$(grep ^processor </proc/cpuinfo | wc -l)
 [ $(( processors )) -lt 1 ] && processors=1
 
 # you can set CFLAGS before running installer
@@ -382,7 +393,7 @@ run() {
 
     printf >&2 "\n"
     printf >&2 ":-----------------------------------------------------------------------------\n"
-    printf >&2 "Running command:\n"
+    printf >&2 "Running command (in $(pwd)):\n"
     printf >&2 "\n"
     printf >&2 "%q " "${@}"
     printf >&2 "\n"
