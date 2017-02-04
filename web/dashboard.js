@@ -982,7 +982,7 @@ var NETDATA = window.NETDATA || {};
             //if(state.needsRecreation())
             //  return true;
 
-            return (!(state.tm.pan_and_zoom_seq === this.seq));
+            return (state.tm.pan_and_zoom_seq !== this.seq);
         }
     };
 
