@@ -233,7 +233,7 @@ var NETDATA = window.NETDATA || {};
         before: 0,                      // panning
         after: -600,                    // panning
         pixels_per_point: 1,            // the detail of the chart
-        fill_luminance: 0.8             // luminance of colors in solit areas
+        fill_luminance: 0.8             // luminance of colors in solid areas
     };
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -252,12 +252,12 @@ var NETDATA = window.NETDATA || {};
                                         // new elements we have to check.
 
         auto_refresher_fast_weight: 0,  // this is the current time in ms, spent
-                                        // rendering charts continiously.
+                                        // rendering charts continuously.
                                         // used with .current.fast_render_timeframe
 
         page_is_visible: true,          // when true, this page is visible
 
-        auto_refresher_stop_until: 0,   // timestamp in ms - used internaly, to stop the
+        auto_refresher_stop_until: 0,   // timestamp in ms - used internally, to stop the
                                         // auto-refresher for some time (when a chart is
                                         // performing pan or zoom, we need to stop refreshing
                                         // all other charts, to have the maximum speed for
@@ -281,7 +281,7 @@ var NETDATA = window.NETDATA || {};
 
             idle_between_charts: 100,   // ms - how much time to wait between chart updates
 
-            fast_render_timeframe: 200, // ms - render continously until this time of continious
+            fast_render_timeframe: 200, // ms - render continuously until this time of continuous
                                         // rendering has been reached
                                         // this setting is used to make it render e.g. 10
                                         // charts at once, sleep idle_between_charts time
@@ -295,8 +295,8 @@ var NETDATA = window.NETDATA || {};
             idle_lost_focus: 500,       // ms - when the window does not have focus, check
                                         // if focus has been regained, every this time
 
-            global_pan_sync_time: 1000, // ms - when you pan or zoon a chart, the background
-                                        // autorefreshing of charts is paused for this amount
+            global_pan_sync_time: 1000, // ms - when you pan or zoom a chart, the background
+                                        // auto-refreshing of charts is paused for this amount
                                         // of time
 
             sync_selection_delay: 1500, // ms - when you pan or zoom a chart, wait this amount
@@ -914,8 +914,8 @@ var NETDATA = window.NETDATA || {};
                                 // every time a chart is panned or zoomed
                                 // we set the timestamp here
                                 // then we use it as a sequence number
-                                // to find if other charts are syncronized
-                                // to this timerange
+                                // to find if other charts are synchronized
+                                // to this time-range
 
         master: null,           // the master chart (state), to which all others
                                 // are synchronized
@@ -1324,7 +1324,6 @@ var NETDATA = window.NETDATA || {};
         this.override_options = self.data('override-options') || null;  // override options to pass to netdata
 
         this.running = false;                       // boolean - true when the chart is being refreshed now
-        this.validated = false;                     // boolean - has the chart been validated?
         this.enabled = true;                        // boolean - is the chart enabled for refresh?
         this.paused = false;                        // boolean - is the chart paused for any reason?
         this.selected = false;                      // boolean - is the chart shown a selection?
@@ -1395,8 +1394,9 @@ var NETDATA = window.NETDATA || {};
         // find the element that needs to be updated
         var refresh_dt_element_name = self.data('dt-element-name') || null; // string - the element to print refresh_dt_ms
 
-        if(refresh_dt_element_name !== null)
+        if(refresh_dt_element_name !== null) {
             this.refresh_dt_element = document.getElementById(refresh_dt_element_name) || null;
+        }
         else
             this.refresh_dt_element = null;
 
@@ -2779,7 +2779,7 @@ var NETDATA = window.NETDATA || {};
                     placement: 'bottom',
                     title: 'Chart Legend',
                     delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
-                    content: 'You can click or tap on the values or the labels to select dimentions. By pressing SHIFT or CONTROL, you can enable or disable multiple dimensions.<br/><small>Help, can be disabled from the settings.</small>'
+                    content: 'You can click or tap on the values or the labels to select dimensions. By pressing SHIFT or CONTROL, you can enable or disable multiple dimensions.<br/><small>Help, can be disabled from the settings.</small>'
                 });
             }
             else {
@@ -3016,12 +3016,12 @@ var NETDATA = window.NETDATA || {};
 
             if(NETDATA.options.current.pan_and_zoom_data_padding === true && this.requested_padding !== null) {
                 if(this.view_after < this.data_after) {
-                    // console.log('adusting view_after from ' + this.view_after + ' to ' + this.data_after);
+                    // console.log('adjusting view_after from ' + this.view_after + ' to ' + this.data_after);
                     this.view_after = this.data_after;
                 }
 
                 if(this.view_before > this.data_before) {
-                    // console.log('adusting view_before from ' + this.view_before + ' to ' + this.data_before);
+                    // console.log('adjusting view_before from ' + this.view_before + ' to ' + this.data_before);
                     this.view_before = this.data_before;
                 }
             }
@@ -4371,7 +4371,7 @@ var NETDATA = window.NETDATA || {};
                 // the time it thinks is selected is wrong
                 // here we calculate the time t based on the row number selected
                 // which is ok
-                var t = state.data_after + row * state.data_update_every;
+                // var t = state.data_after + row * state.data_update_every;
                 // console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':(Math.abs(x-t)<=state.data_update_every)?'SIMILAR':'DIFFERENT') + ', rows in db: ' + state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before + ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' + state.data_update_every);
 
                 state.globalSelectionSync(x);
@@ -4497,7 +4497,7 @@ var NETDATA = window.NETDATA || {};
                         var xOffset = g.toDomCoords(g.xAxisRange()[0], null)[0];
                         var yar0 = g.yAxisRange(0);
 
-                        // This is calculating the pixel of the higest value. (Top pixel)
+                        // This is calculating the pixel of the highest value. (Top pixel)
                         var yOffset = g.toDomCoords(null, yar0[1])[1];
 
                         // x y w and h are relative to the corner of the drawing area,
@@ -4608,7 +4608,7 @@ var NETDATA = window.NETDATA || {};
                     Dygraph.defaultInteractionModel.touchstart(event, dygraph, context);
 
                     // we overwrite the touch directions at the end, to overwrite
-                    // the internal default of dygraphs
+                    // the internal default of dygraph
                     context.touchDirections = { x: true, y: false };
 
                     state.dygraph_last_touch_start = Date.now();
@@ -4637,7 +4637,7 @@ var NETDATA = window.NETDATA || {};
 
                     // if it didn't move, it is a selection
                     if(state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
-                        // internal api of dygraphs
+                        // internal api of dygraph
                         var pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
                         var t = Math.round(state.data_after + (state.data_before - state.data_after) * pct);
                         if(NETDATA.dygraphSetSelection(state, t) === true)
@@ -4693,7 +4693,7 @@ var NETDATA = window.NETDATA || {};
             state.__commonMax = self.data('common-max') || null;
         }
         else {
-            state.log('incompatible version of dygraphs detected');
+            state.log('incompatible version of Dygraph detected');
             state.__commonMin = null;
             state.__commonMax = null;
         }
@@ -4979,10 +4979,16 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.d3ChartUpdate = function(state, data) {
+        void(state);
+        void(data);
+
         return false;
     };
 
     NETDATA.d3ChartCreate = function(state, data) {
+        void(state);
+        void(data);
+
         return false;
     };
 
@@ -5177,10 +5183,11 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.easypiechartClearSelection = function(state) {
         if(typeof state.easyPieChartEvent !== 'undefined') {
-            if(state.easyPieChartEvent.timer !== null)
+            if(state.easyPieChartEvent.timer !== undefined) {
                 clearTimeout(state.easyPieChartEvent.timer);
+            }
 
-            state.easyPieChartEvent.timer = null;
+            state.easyPieChartEvent.timer = undefined;
         }
 
         if(state.isAutoRefreshable() === true && state.data !== null) {
@@ -5205,7 +5212,7 @@ var NETDATA = window.NETDATA || {};
 
         if(typeof state.easyPieChartEvent === 'undefined') {
             state.easyPieChartEvent = {
-                timer: null,
+                timer: undefined,
                 value: 0,
                 pcent: 0
             };
@@ -5220,11 +5227,11 @@ var NETDATA = window.NETDATA || {};
         state.easyPieChartEvent.pcent = pcent;
         state.easyPieChartLabel.innerText = state.legendFormatValue(value);
 
-        if(state.easyPieChartEvent.timer === null) {
+        if(state.easyPieChartEvent.timer === undefined) {
             state.easyPieChart_instance.disableAnimation();
 
             state.easyPieChartEvent.timer = setTimeout(function() {
-                state.easyPieChartEvent.timer = null;
+                state.easyPieChartEvent.timer = undefined;
                 state.easyPieChart_instance.update(state.easyPieChartEvent.pcent);
             }, NETDATA.options.current.charts_selection_animation_delay);
         }
@@ -5453,10 +5460,11 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.gaugeClearSelection = function(state) {
         if(typeof state.gaugeEvent !== 'undefined') {
-            if(state.gaugeEvent.timer !== null)
+            if(state.gaugeEvent.timer !== undefined) {
                 clearTimeout(state.gaugeEvent.timer);
+            }
 
-            state.gaugeEvent.timer = null;
+            state.gaugeEvent.timer = undefined;
         }
 
         if(state.isAutoRefreshable() === true && state.data !== null) {
@@ -5482,7 +5490,7 @@ var NETDATA = window.NETDATA || {};
 
         if(typeof state.gaugeEvent === 'undefined') {
             state.gaugeEvent = {
-                timer: null,
+                timer: undefined,
                 value: 0,
                 min: 0,
                 max: 0
@@ -5502,11 +5510,11 @@ var NETDATA = window.NETDATA || {};
         state.gaugeEvent.max = max;
         NETDATA.gaugeSetLabels(state, value, min, max);
 
-        if(state.gaugeEvent.timer === null) {
+        if(state.gaugeEvent.timer === undefined) {
             NETDATA.gaugeAnimation(state, false);
 
             state.gaugeEvent.timer = setTimeout(function() {
-                state.gaugeEvent.timer = null;
+                state.gaugeEvent.timer = undefined;
                 NETDATA.gaugeSet(state, state.gaugeEvent.value, state.gaugeEvent.min, state.gaugeEvent.max);
             }, NETDATA.options.current.charts_selection_animation_delay);
         }
@@ -5624,6 +5632,7 @@ var NETDATA = window.NETDATA || {};
                 delete options.percentColors;
         }
         else if(generateGradient === false && NETDATA.themes.current.gauge_gradient === true) {
+            //noinspection PointlessArithmeticExpressionJS
             options.percentColors = [
                 [0.0, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 0))],
                 [0.1, NETDATA.colorLuminance(startColor, (lum_d * 10) - (lum_d * 1))],
@@ -6096,7 +6105,7 @@ var NETDATA = window.NETDATA || {};
                         return;
                     }
                     title = name + ' back to normal (' + value_string.toString() + ')';
-                    icon = 'images/check-mark-2-128-green.png'
+                    icon = 'images/check-mark-2-128-green.png';
                     interaction = false;
                     break;
 
@@ -6112,7 +6121,7 @@ var NETDATA = window.NETDATA || {};
                     if(entry.old_status === 'WARNING')
                         status = 'escalated to ' + entry.status.toLowerCase();
                     
-                    icon = 'images/alert-128-red.png'
+                    icon = 'images/alert-128-red.png';
                     interaction = true;
                     break;
 
@@ -6354,12 +6363,12 @@ var NETDATA = window.NETDATA || {};
     // Registry of netdata hosts
 
     NETDATA.registry = {
-        server: null,       // the netdata registry server
-        person_guid: null,  // the unique ID of this browser / user
-        machine_guid: null, // the unique ID the netdata server that served dashboard.js
-        hostname: null,     // the hostname of the netdata server that served dashboard.js
-        machines: null,         // the user's other URLs
-        machines_array: null,   // the user's other URLs in an array
+        server: null,         // the netdata registry server
+        person_guid: null,    // the unique ID of this browser / user
+        machine_guid: null,   // the unique ID the netdata server that served dashboard.js
+        hostname: 'unknown',  // the hostname of the netdata server that served dashboard.js
+        machines: null,       // the user's other URLs
+        machines_array: null, // the user's other URLs in an array
         person_urls: null,
 
         parsePersonUrls: function(person_urls) {
@@ -6370,7 +6379,6 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.registry.machines = {};
                 NETDATA.registry.machines_array = [];
 
-                var now = Date.now();
                 var apu = person_urls;
                 var i = apu.length;
                 while(i--) {
@@ -6416,7 +6424,9 @@ var NETDATA = window.NETDATA || {};
                 if(data) {
                     NETDATA.registry.server = data.registry;
                     NETDATA.registry.machine_guid = data.machine_guid;
-                    NETDATA.registry.hostname = data.hostname;
+
+                    if(typeof data.hostname === 'string')
+                        NETDATA.registry.hostname = data.hostname;
 
                     NETDATA.registry.access(2, function (person_urls) {
                         NETDATA.registry.parsePersonUrls(person_urls);
