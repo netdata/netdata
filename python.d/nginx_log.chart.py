@@ -9,7 +9,7 @@ import bisect
 priority = 60000
 retries = 60
 
-ORDER = ['codes', 'bandwidth', 'unique']
+ORDER = ['codes', 'bandwidth', 'visitors']
 CHARTS = {
     'codes': {
         'options': [None, 'Status codes', 'requests/s', 'requests', 'nginx_log.codes', 'stacked'],
@@ -25,10 +25,11 @@ CHARTS = {
         'lines': [
             ['bandwidth', 'sent', 'incremental', 1, 1024]
         ]},
-    'unique': {
-        'options': [None, 'Unique visitors', 'number', 'unique visitors', 'nginx_log.uv', 'line'],
+    'visitors': {
+        'options': [None, 'Unique visitors', 'number', 'visitors', 'nginx_log.visitors', 'stacked'],
         'lines': [
-            ['unique', 'visitors', 'absolute', 1, 1]
+            ['unique_cur', 'current', 'incremental', 1, 1],
+            ['unique_tot', 'total', 'absolute', 1, 1]
         ]}
 }
 
@@ -40,7 +41,7 @@ class Service(LogService):
         self.definitions = CHARTS
         self.regex = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3}).*?((?<=\s)[1-5])\d\d (\d+)?')
         self.data = {str(k): 0 for k in range(1, 6)}
-        self.data.update({'bandwidth': 0, 'unique': 0})
+        self.data.update({'bandwidth': 0, 'unique_cur': 0, 'unique_tot': 0})
         self.unique = list()
 
     def _get_data(self):
@@ -58,12 +59,13 @@ class Service(LogService):
                 self.data[code] += 1
                 self.data['bandwidth'] += int(sent)
                 if self.contains(address):
-                    self.data['unique'] += 1
+                    self.data['unique_cur'] += 1
+                    self.data['unique_tot'] += 1
         return self.data
 
     def contains(self, address):
         index = bisect.bisect_left(self.unique, address)
-        if index < len(self.unique):
+        if index < self.data['unique_tot']:
             if self.unique[index] == address:
                 return False
             else:
