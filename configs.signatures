@@ -293,6 +293,7 @@ declare -A configs_signatures=(
   ['b8969be5b3ceb4a99477937119bd4323']='python.d.conf'
   ['b8b87574fd496a66ede884c5336493bd']='python.d/phpfpm.conf'
   ['b915126262d08aa9da81de539a58a3fb']='python.d/redis.conf'
+  ['ba11ea2d2f632b2de4b1224bcdc54f07']='python.d/smartd_log.conf'
   ['bb51112d01ff20053196a57632df8962']='apps_groups.conf'
   ['bba2f3886587f137ea08a6e63dd3d376']='python.d.conf'
   ['bda5517ea01640cfdfa0a27549619d6a']='health.d/memcached.conf'
