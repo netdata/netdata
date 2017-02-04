@@ -508,11 +508,33 @@
         // --------------------------------------------------------------------
         // check options that should be processed before loading netdata.js
 
+        var localStorageTested = -1;
+        function localStorageTest() {
+            if(localStorageTested !== -1)
+                return localStorageTested;
+
+            if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
+                var test = 'test';
+                try {
+                    localStorage.setItem(test, test);
+                    localStorage.removeItem(test);
+                    localStorageTested = true;
+                }
+                catch (e) {
+                    localStorageTested = false;
+                }
+            }
+            else
+                localStorageTested = false;
+
+            return localStorageTested;
+        }
+
         function loadLocalStorage(name) {
             var ret = null;
 
             try {
-                if(typeof Storage !== "undefined" && typeof localStorage === 'object')
+                if(localStorageTest() === true)
                     ret = localStorage.getItem(name);
             }
             catch(error) {
@@ -530,7 +552,7 @@
         function saveLocalStorage(name, value) {
             // console.log('saving: ' + name.toString() + ' = ' + value.toString());
             try {
-                if(typeof Storage !== "undefined" && typeof localStorage === 'object') {
+                if(localStorageTest() === true) {
                     localStorage.setItem(name, value.toString());
                     return true;
                 }
@@ -3290,4 +3312,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170127-1"></script>
+<script type="text/javascript" src="dashboard.js?v20170204-1"></script>
