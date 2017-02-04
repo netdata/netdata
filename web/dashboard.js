@@ -1850,7 +1850,9 @@ var NETDATA = window.NETDATA || {};
                 document.ontouchend =
                 this.element_legend_childs.resize_handler.onmouseup =
                 this.element_legend_childs.resize_handler.ontouchend =
-                    function() {
+                    function(e) {
+                        void(e);
+
                         // remove all the hooks
                         document.onmouseup =
                         document.onmousemove =
@@ -1925,7 +1927,7 @@ var NETDATA = window.NETDATA || {};
             if(NETDATA.options.current.sync_selection === false)
                 return false;
 
-            return (!(NETDATA.globalSelectionSync.dont_sync_before > Date.now()));
+            return (NETDATA.globalSelectionSync.dont_sync_before <= Date.now());
         };
 
         this.globalSelectionSyncIsMaster = function() {
@@ -2056,7 +2058,7 @@ var NETDATA = window.NETDATA || {};
         this.clearSelection = function() {
             if(this.selected === true) {
                 if(typeof this.library.clearSelection === 'function')
-                    this.selected = (!(this.library.clearSelection(this) === true));
+                    this.selected = (this.library.clearSelection(this) !== true);
                 else
                     this.selected = false;
 
@@ -4188,7 +4190,7 @@ var NETDATA = window.NETDATA || {};
         if(chart_type === 'stacked' && data.dimensions === 1) chart_type = 'area';
         chart_type = self.data('dygraph-type') || chart_type;
 
-        var smooth = (chart_type === 'line' && !NETDATA.chartLibraries.dygraph.isSparkline(state));
+        var smooth = (chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false);
         smooth = self.data('dygraph-smooth') || smooth;
 
         if(NETDATA.dygraph.smooth === false)
@@ -5940,7 +5942,7 @@ var NETDATA = window.NETDATA || {};
                 if(typeof $().emulateTransitionEnd === 'function')
                     return true;
                 else {
-                    return (typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap);
+                    return (typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap === true);
                 }
             }
         },
@@ -5954,7 +5956,7 @@ var NETDATA = window.NETDATA || {};
         {
             url: NETDATA.themes.current.bootstrap_css,
             isAlreadyLoaded: function() {
-                return (typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap);
+                return (typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap === true);
             }
         },
         {
@@ -6424,9 +6426,7 @@ var NETDATA = window.NETDATA || {};
                 if(data) {
                     NETDATA.registry.server = data.registry;
                     NETDATA.registry.machine_guid = data.machine_guid;
-
-                    if(typeof data.hostname === 'string')
-                        NETDATA.registry.hostname = data.hostname;
+                    NETDATA.registry.hostname = data.hostname;
 
                     NETDATA.registry.access(2, function (person_urls) {
                         NETDATA.registry.parsePersonUrls(person_urls);
