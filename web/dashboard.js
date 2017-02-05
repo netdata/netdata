@@ -2247,19 +2247,53 @@ var NETDATA = window.NETDATA || {};
             return ret;
         };
 
+        this.legendFormatValueChartDecimals = -1;
+        this.legendFormatValueDecimalsFromMinMax = function(min, max) {
+            var delta;
+
+            if(min === max)
+                delta = Math.abs(min);
+            else
+                delta = Math.abs(max - min);
+
+            if(delta > 1000)      this.legendFormatValueChartDecimals = 0;
+            else if(delta > 10  ) this.legendFormatValueChartDecimals = 1;
+            else if(delta > 1   ) this.legendFormatValueChartDecimals = 2;
+            else if(delta > 0.1 ) this.legendFormatValueChartDecimals = 3;
+            else                  this.legendFormatValueChartDecimals = 4;
+        };
+
         this.legendFormatValue = function(value) {
-            if(value === null || value === 'undefined') return '-';
-            if(typeof value !== 'number') return value;
+            if(typeof value !== 'number') return '-';
 
-            if(this.value_decimal_detail !== -1)
-                return (Math.round(value * this.value_decimal_detail) / this.value_decimal_detail).toLocaleString();
+            var dmin, dmax;
 
-            var abs = Math.abs(value);
-            if(abs >= 1000) return (Math.round(value)).toLocaleString();
-            if(abs >= 100 ) return (Math.round(value * 10) / 10).toLocaleString();
-            if(abs >= 1   ) return (Math.round(value * 100) / 100).toLocaleString();
-            if(abs >= 0.1 ) return (Math.round(value * 1000) / 1000).toLocaleString();
-            return (Math.round(value * 10000) / 10000).toLocaleString();
+            if(this.value_decimal_detail !== -1) {
+                dmin = dmax = this.value_decimal_detail;
+            }
+
+            if(this.legendFormatValueChartDecimals < 0) {
+                dmin = 0;
+                var abs = value;
+                if(abs > 1000)      dmax = 0;
+                else if(abs > 10 )  dmax = 1;
+                else if(abs > 1)    dmax = 2;
+                else if(abs > 0.1)  dmax = 3;
+                else                dmax = 4;
+            }
+            else {
+                dmin = dmax = this.legendFormatValueChartDecimals;
+            }
+
+            return value.toLocaleString(undefined, {
+                // style: 'decimal',
+                // minimumIntegerDigits: 1,
+                // minimumSignificantDigits: 1,
+                // maximumSignificantDigits: 1,
+                useGrouping: true,
+                minimumFractionDigits: dmin,
+                maximumFractionDigits: dmax
+            });
         };
 
         this.legendSetLabelValue = function(label, value) {
@@ -4212,6 +4246,12 @@ var NETDATA = window.NETDATA || {};
             dygraph.updateOptions(options);
         }
 
+        // decide the decimal points on the legend of the chart
+        state.legendFormatValueDecimalsFromMinMax(
+            state.dygraph_instance.axes_[0].extremeRange[0],
+            state.dygraph_instance.axes_[0].extremeRange[1]
+        );
+
         state.dygraph_last_rendered = Date.now();
         return true;
     };
@@ -4818,6 +4858,12 @@ var NETDATA = window.NETDATA || {};
             state.__commonMin = null;
             state.__commonMax = null;
         }
+
+        // decide the decimal points on the legend of the chart
+        state.legendFormatValueDecimalsFromMinMax(
+            state.dygraph_instance.axes_[0].extremeRange[0],
+            state.dygraph_instance.axes_[0].extremeRange[1]
+        );
 
         return true;
     };
