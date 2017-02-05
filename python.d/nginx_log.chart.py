@@ -39,7 +39,7 @@ CHARTS = {
     'clients': {
         'options': [None, 'Unique Client IPs', 'number', 'Client IPs', 'nginx_log.clients', 'stacked'],
         'lines': [
-            ['unique_cur', 'current_poll', 'incremental', 1, 1],
+            ['unique_cur', 'current_poll', 'absolute', 1, 1],
             ['foo', 'foo', 'absolute', 1, 1],
             ['unique_tot', 'all_time', 'absolute', 1, 1]
         ]}
@@ -54,11 +54,9 @@ class Service(LogService):
         self.log_path = self.configuration.get('path', '/var/log/nginx/access.log')
         self.regex = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3}).*?((?<= )[1-9])\d\d (\d+) (\d+)? ?([\d.]+)?')
         self.data = {str(k): 0 for k in range(6)}
-        self.data.update({'bytes_sent': 0, 'unique_cur': 0,
-                          'unique_tot': 0, 'resp_length': 0,
-                          'resp_time_min': 0, 'resp_time_avg': 0,
-                          'resp_time_max': 0, 'foo': 0})
-        self.unique = list()
+        self.data.update({'bytes_sent': 0, 'unique_tot': 0,
+                          'resp_length': 0, 'foo': 0})
+        self.unique_alltime = list()
 
     def check(self):
         if not access(self.log_path, R_OK):
@@ -95,8 +93,9 @@ class Service(LogService):
         if raw is None:
             return None
 
-        request_time = list()
+        request_time, unique_current = list(), list()
         request_counter = {'count': 0, 'sum': 0}
+        self.data.update({'resp_time_min' : 0, 'resp_time_avg': 0, 'resp_time_max': 0, 'unique_cur': 0})
 
         for line in raw:
             match = self.regex.findall(line)
@@ -114,9 +113,10 @@ class Service(LogService):
                     request_counter['count'] += 1
                     request_counter['sum'] += resp_time
                     
-                if self.contains(match_dict['address']):
-                    self.data['unique_cur'] += 1
+                if addr_not_in_pool(self.unique_alltime, match_dict['address'], self.data['unique_tot']):
                     self.data['unique_tot'] += 1
+                if addr_not_in_pool(unique_current, match_dict['address'], self.data['unique_cur']):
+                    self.data['unique_cur'] += 1
 
         if request_time:
             self.data['resp_time_min'] = request_time[0]
@@ -125,14 +125,15 @@ class Service(LogService):
 
         return self.data
 
-    def contains(self, address):
-        index = bisect.bisect_left(self.unique, address)
-        if index < self.data['unique_tot']:
-            if self.unique[index] == address:
-                return False
-            else:
-                bisect.insort_left(self.unique, address)
-                return True
+
+def addr_not_in_pool(pool, address, pool_size):
+    index = bisect.bisect_left(pool, address)
+    if index < pool_size:
+        if pool[index] == address:
+            return False
         else:
-            bisect.insort_left(self.unique, address)
+            bisect.insort_left(pool, address)
             return True
+    else:
+        bisect.insort_left(pool, address)
+        return True
