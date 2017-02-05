@@ -2329,33 +2329,44 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
+        this.legendSetDateLast = {
+            ms: 0,
+            date: undefined,
+            time: undefined
+        };
+
         this.legendSetDate = function(ms) {
             if(typeof ms !== 'number') {
                 this.legendShowUndefined();
                 return;
             }
 
-            var d = new Date(ms);
+            if(this.legendSetDateLast.ms !== ms) {
+                var d = new Date(ms);
+                this.legendSetDateLast.ms = ms;
+                this.legendSetDateLast.date = d.toLocaleDateString();
+                this.legendSetDateLast.time = d.toLocaleTimeString();
+            }
 
-            if(this.element_legend_childs.title_date)
-                this.__legendSetDateString(d.toLocaleDateString());
+            if(this.element_legend_childs.title_date !== null)
+                this.__legendSetDateString(this.legendSetDateLast.date);
 
-            if(this.element_legend_childs.title_time)
-                this.__legendSetTimeString(d.toLocaleTimeString());
+            if(this.element_legend_childs.title_time !== null)
+                this.__legendSetTimeString(this.legendSetDateLast.time);
 
-            if(this.element_legend_childs.title_units)
+            if(this.element_legend_childs.title_units !== null)
                 this.__legendSetUnitsString(this.units)
         };
 
         this.legendShowUndefined = function() {
-            if(this.element_legend_childs.title_date)
-                this.__legendSetDateString(' ');
+            if(this.element_legend_childs.title_date !== null)
+                this.__legendSetDateString(' haha ');
 
-            if(this.element_legend_childs.title_time)
+            if(this.element_legend_childs.title_time !== null)
                 this.__legendSetTimeString(this.chart.name);
 
-            if(this.element_legend_childs.title_units)
-                this.__legendSetUnitsString(' ');
+            if(this.element_legend_childs.title_units !== null)
+                this.__legendSetUnitsString(' haha2 ');
 
             if(this.data && this.element_legend_childs.series !== null) {
                 var labels = this.data.dimension_names;
@@ -2363,8 +2374,7 @@ var NETDATA = window.NETDATA || {};
                 while(i--) {
                     var label = labels[i];
 
-                    if(typeof label === 'undefined') continue;
-                    if(typeof this.element_legend_childs.series[label] === 'undefined') continue;
+                    if(typeof label === 'undefined' || typeof this.element_legend_childs.series[label] === 'undefined') continue;
                     this.legendSetLabelValue(label, null);
                 }
             }
@@ -2776,16 +2786,19 @@ var NETDATA = window.NETDATA || {};
 
                 this.element_legend_childs.title_date.className += " netdata-legend-title-date";
                 this.element_legend.appendChild(this.element_legend_childs.title_date);
+                this.__last_shown_legend_date = undefined;
 
                 this.element_legend.appendChild(document.createElement('br'));
 
                 this.element_legend_childs.title_time.className += " netdata-legend-title-time";
                 this.element_legend.appendChild(this.element_legend_childs.title_time);
+                this.__last_shown_legend_time = undefined;
 
                 this.element_legend.appendChild(document.createElement('br'));
 
                 this.element_legend_childs.title_units.className += " netdata-legend-title-units";
                 this.element_legend.appendChild(this.element_legend_childs.title_units);
+                this.__last_shown_legend_units = undefined;
 
                 this.element_legend.appendChild(document.createElement('br'));
 
