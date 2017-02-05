@@ -16,7 +16,7 @@ This builds LaTeX and HTML documentation into:
 - `doc/html/index.html`
 - `doc/netdata.pdf`
 
-For more advanced usage you can configure doxygen with `./configure`
+For more advanced usage you can configure doxygen with `./configure`.
 For example pdf generation can be disabled with `./configure --disable-doxygen-pdf`. 
 For a complete list run `./configure --help`.
 

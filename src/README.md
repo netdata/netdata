@@ -5,6 +5,8 @@ Netdata Server Code {#servercode}
 
 # Overview
 
+\todo This is like nothing. Extend or remove.
+
 - `appconfig.h`: The global API for the configuration.
 - `plugin_*`: Internal data collection plugins.
 - `proc_*`: Data collection of files in the proc file system.
