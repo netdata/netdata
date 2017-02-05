@@ -13,6 +13,8 @@ engines:
     checks:
       Similar code:
         enabled: false
+      Identical code:
+        enabled: false
   eslint:
     enabled: true
     checks:
@@ -27,6 +29,8 @@ engines:
       no-void:
         enabled: false
       no-alert:
+        enabled: false
+      no-undef-init:
         enabled: false
   fixme:
     enabled: false
