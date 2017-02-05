@@ -218,6 +218,30 @@ var NETDATA = window.NETDATA || {};
     if(netdataRegistry === false && typeof netdataRegistryCallback === 'function')
         netdataRegistry = true;
 
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // detect if this is probably a slow device
+
+    var isSlowDeviceResult = undefined;
+    var isSlowDevice = function() {
+        if(isSlowDeviceResult !== undefined)
+            return isSlowDeviceResult;
+
+        try {
+            var ua = navigator.userAgent.toLowerCase();
+
+            var iOS = /ipad|iphone|ipod/.test(ua) && !window.MSStream;
+            var android = /android/.test(ua) && !window.MSStream;
+            isSlowDeviceResult = (iOS === true || android === true);
+        }
+        catch (e) {
+            isSlowDeviceResult = false;
+        }
+
+        console.log('isSlowDevice(): ' + isSlowDeviceResult);
+        return isSlowDeviceResult;
+    };
+
     // ----------------------------------------------------------------------------------------------------------------
     // the defaults for all charts
 
@@ -271,7 +295,7 @@ var NETDATA = window.NETDATA || {};
         // the current profile
         // we may have many...
         current: {
-            pixels_per_point: 1,        // the minimum pixels per point for all charts
+            pixels_per_point: isSlowDevice()?5:1, // the minimum pixels per point for all charts
                                         // increase this to speed javascript up
                                         // each chart library has its own limit too
                                         // the max of this and the chart library is used
@@ -313,11 +337,11 @@ var NETDATA = window.NETDATA || {};
 
             update_only_visible: true,  // enable or disable visibility management
 
-            parallel_refresher: true,   // enable parallel refresh of charts
+            parallel_refresher: (isSlowDevice() === false), // enable parallel refresh of charts
 
             concurrent_refreshes: true, // when parallel_refresher is enabled, sync also the charts
 
-            destroy_on_hide: false,     // destroy charts when they are not visible
+            destroy_on_hide: (isSlowDevice() === true), // destroy charts when they are not visible
 
             show_help: netdataShowHelp, // when enabled the charts will show some help
             show_help_delay_show_ms: 500,
@@ -330,7 +354,7 @@ var NETDATA = window.NETDATA || {};
 
             double_click_speed: 500,    // ms - time between clicks / taps to detect double click/tap
 
-            smooth_plot: true,          // enable smooth plot, where possible
+            smooth_plot: (isSlowDevice() === false), // enable smooth plot, where possible
 
             charts_selection_animation_delay: 50, // delay to animate charts when syncing selection
 
@@ -4186,101 +4210,184 @@ var NETDATA = window.NETDATA || {};
 
         var self = $(state.element);
 
-        var chart_type = state.chart.chart_type;
+        var chart_type = self.data('dygraph-type') || state.chart.chart_type;
         if(chart_type === 'stacked' && data.dimensions === 1) chart_type = 'area';
-        chart_type = self.data('dygraph-type') || chart_type;
 
-        var smooth = (chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false);
-        smooth = self.data('dygraph-smooth') || smooth;
+        var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state) === true)?3:4;
 
-        if(NETDATA.dygraph.smooth === false)
-            smooth = false;
-
-        var strokeWidth = (chart_type === 'stacked')?0.1:((smooth)?1.5:0.7);
-        var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state))?3:4;
+        var smooth = (NETDATA.dygraph.smooth === true)
+            ?(self.data('dygraph-smooth') || (chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false))
+            :false;
 
         state.dygraph_options = {
-            colors: self.data('dygraph-colors') || state.chartColors(),
+            colors:                 self.data('dygraph-colors') || state.chartColors(),
 
             // leave a few pixels empty on the right of the chart
-            rightGap: self.data('dygraph-rightgap') || 5,
-            showRangeSelector: self.data('dygraph-showrangeselector') || false,
-            showRoller: self.data('dygraph-showroller') || false,
+            rightGap:               self.data('dygraph-rightgap')
+                                    || 5,
 
-            title: self.data('dygraph-title') || state.title,
-            titleHeight: self.data('dygraph-titleheight') || 19,
+            showRangeSelector:      self.data('dygraph-showrangeselector')
+                                    || false,
 
-            legend: self.data('dygraph-legend') || 'always', // we need this to get selection events
-            labels: data.result.labels,
-            labelsDiv: self.data('dygraph-labelsdiv') || state.element_legend_childs.hidden,
-            labelsDivStyles: self.data('dygraph-labelsdivstyles') || { 'fontSize':'1px' },
-            labelsDivWidth: self.data('dygraph-labelsdivwidth') || state.chartWidth() - 70,
-            labelsSeparateLines: self.data('dygraph-labelsseparatelines') || true,
-            labelsShowZeroValues: self.data('dygraph-labelsshowzerovalues') || true,
-            labelsKMB: false,
-            labelsKMG2: false,
-            showLabelsOnHighlight: self.data('dygraph-showlabelsonhighlight') || true,
-            hideOverlayOnMouseOut: self.data('dygraph-hideoverlayonmouseout') || true,
+            showRoller:             self.data('dygraph-showroller')
+                                    || false,
 
-            includeZero: self.data('dygraph-includezero') || (chart_type === 'stacked'),
-            xRangePad: self.data('dygraph-xrangepad') || 0,
-            yRangePad: self.data('dygraph-yrangepad') || 1,
+            title:                  self.data('dygraph-title')
+                                    || state.title,
 
-            valueRange: self.data('dygraph-valuerange') || [ null, null ],
+            titleHeight:            self.data('dygraph-titleheight')
+                                    || 19,
 
-            ylabel: state.units,
-            yLabelWidth: self.data('dygraph-ylabelwidth') || 12,
+            legend:                 self.data('dygraph-legend')
+                                    || 'always', // we need this to get selection events
 
-            // the function to plot the chart
-            plotter: null,
+            labels:                 data.result.labels,
 
-            // The width of the lines connecting data points. This can be used to increase the contrast or some graphs.
-            strokeWidth: self.data('dygraph-strokewidth') || strokeWidth,
-            strokePattern: self.data('dygraph-strokepattern') || undefined,
+            labelsDiv:              self.data('dygraph-labelsdiv')
+                                    || state.element_legend_childs.hidden,
 
-            // The size of the dot to draw on each point in pixels (see drawPoints). A dot is always drawn when a point is "isolated",
-            // i.e. there is a missing point on either side of it. This also controls the size of those dots.
-            drawPoints: self.data('dygraph-drawpoints') || false,
+            labelsDivStyles:        self.data('dygraph-labelsdivstyles')
+                                    || { 'fontSize':'1px' },
 
-            // Draw points at the edges of gaps in the data. This improves visibility of small data segments or other data irregularities.
-            drawGapEdgePoints: self.data('dygraph-drawgapedgepoints') || true,
+            labelsDivWidth:         self.data('dygraph-labelsdivwidth')
+                                    || state.chartWidth() - 70,
 
-            connectSeparatedPoints: self.data('dygraph-connectseparatedpoints') || false,
-            pointSize: self.data('dygraph-pointsize') || 1,
+            labelsSeparateLines:    self.data('dygraph-labelsseparatelines')
+                                    || true,
 
-            // enabling this makes the chart with little square lines
-            stepPlot: self.data('dygraph-stepplot') || false,
+            labelsShowZeroValues:   self.data('dygraph-labelsshowzerovalues')
+                                    || true,
 
-            // Draw a border around graph lines to make crossing lines more easily distinguishable. Useful for graphs with many lines.
-            strokeBorderColor: self.data('dygraph-strokebordercolor') || NETDATA.themes.current.background,
-            strokeBorderWidth: self.data('dygraph-strokeborderwidth') || (chart_type === 'stacked')?0.0:0.0,
+            labelsKMB:              false,
+            labelsKMG2:             false,
 
-            fillGraph: self.data('dygraph-fillgraph') || (chart_type === 'area' || chart_type === 'stacked'),
-            fillAlpha: self.data('dygraph-fillalpha') || ((chart_type === 'stacked')?NETDATA.options.current.color_fill_opacity_stacked:NETDATA.options.current.color_fill_opacity_area),
-            stackedGraph: self.data('dygraph-stackedgraph') || (chart_type === 'stacked'),
-            stackedGraphNaNFill: self.data('dygraph-stackedgraphnanfill') || 'none',
+            showLabelsOnHighlight:  self.data('dygraph-showlabelsonhighlight')
+                                    || true,
 
-            drawAxis: self.data('dygraph-drawaxis') || true,
-            axisLabelFontSize: self.data('dygraph-axislabelfontsize') || 10,
-            axisLineColor: self.data('dygraph-axislinecolor') || NETDATA.themes.current.axis,
-            axisLineWidth: self.data('dygraph-axislinewidth') || 1.0,
+            hideOverlayOnMouseOut:  self.data('dygraph-hideoverlayonmouseout')
+                                    || true,
 
-            drawGrid: self.data('dygraph-drawgrid') || true,
-            gridLinePattern: self.data('dygraph-gridlinepattern') || null,
-            gridLineWidth: self.data('dygraph-gridlinewidth') || 1.0,
-            gridLineColor: self.data('dygraph-gridlinecolor') || NETDATA.themes.current.grid,
+            includeZero:            self.data('dygraph-includezero')
+                                    || (chart_type === 'stacked'),
 
-            maxNumberWidth: self.data('dygraph-maxnumberwidth') || 8,
-            sigFigs: self.data('dygraph-sigfigs') || null,
-            digitsAfterDecimal: self.data('dygraph-digitsafterdecimal') || 2,
-            valueFormatter: self.data('dygraph-valueformatter') || function(x){ return x.toFixed(2); },
+            xRangePad:              self.data('dygraph-xrangepad')
+                                    || 0,
 
-            highlightCircleSize: self.data('dygraph-highlightcirclesize') || highlightCircleSize,
-            highlightSeriesOpts: self.data('dygraph-highlightseriesopts') || null, // TOO SLOW: { strokeWidth: 1.5 },
-            highlightSeriesBackgroundAlpha: self.data('dygraph-highlightseriesbackgroundalpha') || null, // TOO SLOW: (chart_type === 'stacked')?0.7:0.5,
+            yRangePad:              self.data('dygraph-yrangepad')
+                                    || 1,
 
-            pointClickCallback: self.data('dygraph-pointclickcallback') || undefined,
-            visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
+            valueRange:             self.data('dygraph-valuerange')
+                                    || [ null, null ],
+
+            ylabel:                 state.units,
+
+            yLabelWidth:            self.data('dygraph-ylabelwidth')
+                                    || 12,
+
+                                    // the function to plot the chart
+            plotter:                null,
+
+                                    // The width of the lines connecting data points.
+                                    // This can be used to increase the contrast or some graphs.
+            strokeWidth:            self.data('dygraph-strokewidth')
+                                    || ((chart_type === 'stacked')?0.1:((smooth === true)?1.5:0.7)),
+
+            strokePattern:          self.data('dygraph-strokepattern')
+                                    || undefined,
+
+                                    // The size of the dot to draw on each point in pixels (see drawPoints).
+                                    // A dot is always drawn when a point is "isolated",
+                                    // i.e. there is a missing point on either side of it.
+                                    // This also controls the size of those dots.
+            drawPoints:             self.data('dygraph-drawpoints')
+                                    || false,
+
+                                    // Draw points at the edges of gaps in the data.
+                                    // This improves visibility of small data segments or other data irregularities.
+            drawGapEdgePoints:      self.data('dygraph-drawgapedgepoints')
+                                    || true,
+
+            connectSeparatedPoints: self.data('dygraph-connectseparatedpoints')
+                                    || false,
+
+            pointSize:              self.data('dygraph-pointsize')
+                                    || 1,
+
+                                    // enabling this makes the chart with little square lines
+            stepPlot:               self.data('dygraph-stepplot')
+                                    || false,
+
+                                    // Draw a border around graph lines to make crossing lines more easily
+                                    // distinguishable. Useful for graphs with many lines.
+            strokeBorderColor:      self.data('dygraph-strokebordercolor')
+                                    || NETDATA.themes.current.background,
+
+            strokeBorderWidth:      self.data('dygraph-strokeborderwidth')
+                                    || (chart_type === 'stacked')?0.0:0.0,
+
+            fillGraph:              self.data('dygraph-fillgraph')
+                                    || (chart_type === 'area' || chart_type === 'stacked'),
+
+            fillAlpha:              self.data('dygraph-fillalpha')
+                                    || ((chart_type === 'stacked')
+                                        ?NETDATA.options.current.color_fill_opacity_stacked
+                                        :NETDATA.options.current.color_fill_opacity_area),
+
+            stackedGraph:           self.data('dygraph-stackedgraph')
+                                    || (chart_type === 'stacked'),
+
+            stackedGraphNaNFill:    self.data('dygraph-stackedgraphnanfill')
+                                    || 'none',
+
+            drawAxis:               self.data('dygraph-drawaxis')
+                                    || true,
+
+            axisLabelFontSize:      self.data('dygraph-axislabelfontsize')
+                                    || 10,
+
+            axisLineColor:          self.data('dygraph-axislinecolor')
+                                    || NETDATA.themes.current.axis,
+
+            axisLineWidth:          self.data('dygraph-axislinewidth')
+                                    || 1.0,
+
+            drawGrid:               self.data('dygraph-drawgrid')
+                                    || true,
+
+            gridLinePattern:        self.data('dygraph-gridlinepattern')
+                                    || null,
+
+            gridLineWidth:          self.data('dygraph-gridlinewidth')
+                                    || 1.0,
+
+            gridLineColor:          self.data('dygraph-gridlinecolor')
+                                    || NETDATA.themes.current.grid,
+
+            maxNumberWidth:         self.data('dygraph-maxnumberwidth')
+                                    || 8,
+
+            sigFigs:                self.data('dygraph-sigfigs')
+                                    || null,
+
+            digitsAfterDecimal:     self.data('dygraph-digitsafterdecimal')
+                                    || 2,
+
+            valueFormatter:         self.data('dygraph-valueformatter')
+                                    || function(x){ return x.toFixed(2); },
+
+            highlightCircleSize:    self.data('dygraph-highlightcirclesize')
+                                    || highlightCircleSize,
+
+            highlightSeriesOpts:    self.data('dygraph-highlightseriesopts')
+                                    || null, // TOO SLOW: { strokeWidth: 1.5 },
+
+            highlightSeriesBackgroundAlpha: self.data('dygraph-highlightseriesbackgroundalpha')
+                                    || null, // TOO SLOW: (chart_type === 'stacked')?0.7:0.5,
+
+            pointClickCallback:     self.data('dygraph-pointclickcallback')
+                                    || undefined,
+
+            visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
             axes: {
                 x: {
                     pixelsPerLabel: 50,
