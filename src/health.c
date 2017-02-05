@@ -2518,6 +2518,9 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after) {
 }
 
 static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
+    char value_string[100 + 1];
+    format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
+
     buffer_sprintf(wb,
            "\t\t\"%s.%s\": {\n"
                    "\t\t\t\"id\": %lu,\n"
@@ -2541,6 +2544,7 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
                    "\t\t\t\"delay_multiplier\": %f,\n"
                    "\t\t\t\"delay\": %d,\n"
                    "\t\t\t\"delay_up_to_timestamp\": %lu,\n"
+                   "\t\t\t\"value_string\": \"%s\",\n"
            , rc->chart, rc->name
            , (unsigned long)rc->id
            , rc->name
@@ -2563,6 +2567,7 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
            , rc->delay_multiplier
            , rc->delay_last
            , (unsigned long)rc->delay_up_to_timestamp
+           , value_string
     );
 
     if(unlikely(rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)) {
