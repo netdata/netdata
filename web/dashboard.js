@@ -130,7 +130,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.peity_js            = NETDATA.serverDefault + 'lib/jquery.peity-3.2.0.min.js';
     NETDATA.sparkline_js        = NETDATA.serverDefault + 'lib/jquery.sparkline-2.1.2.min.js';
     NETDATA.easypiechart_js     = NETDATA.serverDefault + 'lib/jquery.easypiechart-97b5824.min.js';
-    NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge-d5260c3.min.js';
+    NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge-1.3.1.min.js';
     NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined-dd74404.js';
     NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter-dd74404.js';
     NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-2.2.4-min.js';
@@ -5433,9 +5433,10 @@ var NETDATA = window.NETDATA || {};
         // is always between min and max
         var pcent = (value - min) * 100 / (max - min);
 
-        // these should never happen
-        if(pcent < 0) pcent = 0;
-        if(pcent > 100) pcent = 100;
+        // bug fix for gauge.js 1.3.1
+        // if the value is the absolute min or max, the chart is broken
+        if(pcent < 0.001) pcent = 0.001;
+        if(pcent > 99.999) pcent = 99.999;
 
         state.gauge_instance.set(pcent);
         // console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
@@ -5596,19 +5597,22 @@ var NETDATA = window.NETDATA || {};
 
         var options = {
             lines: 12,                  // The number of lines to draw
-            angle: 0.15,                // The length of each line
-            lineWidth: 0.44,            // 0.44 The line thickness
+            angle: 0.15,                // The span of the gauge arc
+            lineWidth: 0.50,            // The line thickness
+            radiusScale: 0.85,          // Relative radius
             pointer: {
                 length: 0.8,            // 0.9 The radius of the inner circle
                 strokeWidth: 0.035,     // The rotation offset
                 color: pointerColor     // Fill color
             },
+            limitMax: true,             // If false, the max value of the gauge will be updated if value surpass max
+            limitMin: true,             // If true, the min value of the gauge will be fixed unless you set it manually
             colorStart: startColor,     // Colors
             colorStop: stopColor,       // just experiment with them
             strokeColor: strokeColor,   // to see which ones work best for you
-            limitMax: true,
             generateGradient: (generateGradient === true),
-            gradientType: 0
+            gradientType: 0,
+            highDpiSupport: true        // High resolution support
         };
 
         if (generateGradient.constructor === Array) {
@@ -6067,7 +6071,7 @@ var NETDATA = window.NETDATA || {};
             if(NETDATA.alarms.current !== null) {
                 // get the current value_string
                 var t = NETDATA.alarms.current.alarms[entry.chart + '.' + entry.name];
-                if(typeof t !== 'undefined' && entry.status === t.status)
+                if(typeof t !== 'undefined' && entry.status === t.status && typeof t.value_string !== 'undefined')
                     value_string = t.value_string;
             }
 
