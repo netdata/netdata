@@ -1,16 +1,31 @@
 #ifndef NETDATA_HEALTH_H
 #define NETDATA_HEALTH_H
 
+/**
+ * @file health.h
+ * @brief API of health monitoring.
+ */
+
+/** boolean. Is health monitoring enabled */
 extern int health_enabled;
 
+/**
+ * Check if RRDVAR are equal.
+ *
+ * This only checks RRDVAR->name.
+ *
+ * @param a RRDVAR
+ * @param b RRDVAR
+ * @return 0 if `a` equals `b`. Else another integer.
+ */
 extern int rrdvar_compare(void *a, void *b);
 
-#define RRDVAR_TYPE_CALCULATED              1
-#define RRDVAR_TYPE_TIME_T                  2
-#define RRDVAR_TYPE_COLLECTED               3
-#define RRDVAR_TYPE_TOTAL                   4
-#define RRDVAR_TYPE_INT                     5
-#define RRDVAR_TYPE_CALCULATED_ALLOCATED    6
+#define RRDVAR_TYPE_CALCULATED              1 ///< A calculated value
+#define RRDVAR_TYPE_TIME_T                  2 ///< A time value
+#define RRDVAR_TYPE_COLLECTED               3 ///< A collected value
+#define RRDVAR_TYPE_TOTAL                   4 ///< Total value of a graph
+#define RRDVAR_TYPE_INT                     5 ///< A integer
+#define RRDVAR_TYPE_CALCULATED_ALLOCATED    6 ///< A calculated and allocated value
 
 
 /// \brief the variables as stored in the variables indexes.
@@ -114,22 +129,22 @@ typedef struct rrddimvar {
 // having as RRDSET.calculations the RRDCALC to be processed
 // next.
 
-#define RRDCALC_STATUS_REMOVED       -2
-#define RRDCALC_STATUS_UNDEFINED     -1
-#define RRDCALC_STATUS_UNINITIALIZED  0
-#define RRDCALC_STATUS_CLEAR          1
-#define RRDCALC_STATUS_RAISED         2
-#define RRDCALC_STATUS_WARNING        3
-#define RRDCALC_STATUS_CRITICAL       4
+#define RRDCALC_STATUS_REMOVED       -2 ///< Status is removed
+#define RRDCALC_STATUS_UNDEFINED     -1 ///< Status is undefined
+#define RRDCALC_STATUS_UNINITIALIZED  0 ///< Status is uninitialized
+#define RRDCALC_STATUS_CLEAR          1 ///< Status is clear 
+#define RRDCALC_STATUS_RAISED         2 ///< Status is raised
+#define RRDCALC_STATUS_WARNING        3 ///< Status is warning
+#define RRDCALC_STATUS_CRITICAL       4 ///< Status is critical
 
-#define RRDCALC_FLAG_DB_ERROR              0x00000001
-#define RRDCALC_FLAG_DB_NAN                0x00000002
+#define RRDCALC_FLAG_DB_ERROR              0x00000001 ///< Database eror occured
+#define RRDCALC_FLAG_DB_NAN                0x00000002 ///< Value from database is not a number
 /* #define RRDCALC_FLAG_DB_STALE           0x00000004 */
-#define RRDCALC_FLAG_CALC_ERROR            0x00000008
-#define RRDCALC_FLAG_WARN_ERROR            0x00000010
-#define RRDCALC_FLAG_CRIT_ERROR            0x00000020
-#define RRDCALC_FLAG_RUNNABLE              0x00000040
-#define RRDCALC_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
+#define RRDCALC_FLAG_CALC_ERROR            0x00000008 ///< Calulation error occured
+#define RRDCALC_FLAG_WARN_ERROR            0x00000010 ///< Error level warning occured
+#define RRDCALC_FLAG_CRIT_ERROR            0x00000020 ///< error level error occured
+#define RRDCALC_FLAG_RUNNABLE              0x00000040 ///< ktsaou: Your help needed.
+#define RRDCALC_FLAG_NO_CLEAR_NOTIFICATION 0x80000000 ///< ktsaou: Your help needed.
 
 /** One alarm */
 typedef struct rrdcalc {
@@ -224,7 +239,7 @@ typedef struct rrdcalc {
     struct rrdcalc *next; ///< next in the list
 } RRDCALC;
 
-#define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
+#define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after) ///< ktsaou: Your help needed
 
 /// RRDCALCTEMPLATE
 /// these are to be applied to charts found dynamically
@@ -280,14 +295,20 @@ typedef struct rrdcalctemplate {
     struct rrdcalctemplate *next; ///< next template in the list
 } RRDCALCTEMPLATE;
 
+/**
+ * Query if RRDCALCTEMPLATE `rt` has calculations.
+ *
+ * @param rt RRDCALCTEMPLATE to check.
+ * @return NULL if false.
+ */
 #define RRDCALCTEMPLATE_HAS_CALCULATION(rt) ((rt)->after)
 
-#define HEALTH_ENTRY_FLAG_PROCESSED             0x00000001
-#define HEALTH_ENTRY_FLAG_UPDATED               0x00000002
-#define HEALTH_ENTRY_FLAG_EXEC_RUN              0x00000004
-#define HEALTH_ENTRY_FLAG_EXEC_FAILED           0x00000008
-#define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
-#define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
+#define HEALTH_ENTRY_FLAG_PROCESSED             0x00000001 ///< Health entry Processed.
+#define HEALTH_ENTRY_FLAG_UPDATED               0x00000002 ///< Health entry Updated.
+#define HEALTH_ENTRY_FLAG_EXEC_RUN              0x00000004 ///< Health entry prcessing successful.
+#define HEALTH_ENTRY_FLAG_EXEC_FAILED           0x00000008 ///< Health entry processing failed.
+#define HEALTH_ENTRY_FLAG_SAVED                 0x10000000 ///< Health entry saved. 
+#define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000 ///< ktsaou: Your help needed.
 
 /** List of alarm_entry */
 typedef struct alarm_entry {
@@ -349,34 +370,164 @@ typedef struct alarm_log {
 
 #include "rrd.h"
 
+/**
+ * Rename all variables for RRDSET `st`.
+ *
+ * @param st RRDSET to rename variables for.
+ */
 extern void rrdsetvar_rename_all(RRDSET *st);
+/**
+ * Create a variable for RRDSET `st`.
+ *
+ * @param st RRDSET to create RRDSETVAR for.
+ * @param variable name.
+ * @param type RRDVAR_TYPE_*
+ * @param value ktsaou: Your help needed.
+ * @param options ktsaou: Your help needed.
+ * @return new RRDSETVAR
+ */
 extern RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options);
+/**
+ * Free an RRDSETVAR.
+ *
+ * @param rs RRDSETVAR to free.
+ */
 extern void rrdsetvar_free(RRDSETVAR *rs);
 
+/**
+ * Rename all variables for RRDDIM `rd`.
+ *
+ * @param rd RRDDIM to rename variables for.
+ */
 extern void rrddimvar_rename_all(RRDDIM *rd);
+/**
+ * Create a variable for RRDDIM `rd`.
+ *
+ * @param rd RRDDIM to create RRDDIMVAR for.
+ * @param type RRDVAR_TYPE_*
+ * @param prefix of variable name.
+ * @param suffix of variable name.
+ * @param value ktsaou: Your help needed.
+ * @param options ktsaou: Your help needed.
+ * @return new RRDDIMVAR
+ */
 extern RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char *suffix, void *value, uint32_t options);
+/**
+ * Free an RRDSDIMVAR.
+ *
+ * @param rs RRDDIMVAR to free.
+ */
 extern void rrddimvar_free(RRDDIMVAR *rs);
 
+/**
+ * ktsaou: Your help needed.
+ *
+ * @param st round robin database set.
+ */
 extern void rrdsetcalc_link_matching(RRDSET *st);
+/**
+ * ktsaou: Your help needed.
+ *
+ * @param rc health variable.
+ */
 extern void rrdsetcalc_unlink(RRDCALC *rc);
+/**
+ * ktsaou: Your help needed.
+ *
+ * @param st round robin database set.
+ */
 extern void rrdcalctemplate_link_matching(RRDSET *st);
+/**
+ * Find an RRDCALC.
+ *
+ * @param st round robin database set to search.
+ * @param name of variable.
+ * @return RRDCALC or NULL
+ */
 extern RRDCALC *rrdcalc_find(RRDSET *st, const char *name);
 
+/**
+ * Initialize health system.
+ */
 extern void health_init(void);
+/**
+ * Method run by the health thread.
+ *
+ * @param ptr to struct netdata_static_thread
+ */
 extern void *health_main(void *ptr);
 
+/**
+ * Reload health thread.
+ */
 extern void health_reload(void);
 
+/**
+ * ktsaou: Your help needed
+ *
+ * @param variable ktsaou: Your help needed.
+ * @param hash of variable
+ * @param rc RRDCALC
+ * @param result found value.
+ * @return ktsaou: Your help needed.
+ */
 extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result);
+/**
+ * Serialize alarms of RRDHOST to json.
+ *
+ * If all is false only print alarms with status RRDCALC_STATUS_WARNING or RRDCALC_STATUS_CRITICAL.
+ *
+ * @param host alarms to serialize
+ * @param wb Web buffer to write result to.
+ * @param all boolean.
+ */
 extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
+/**
+ * Serialize alarm log entries after to json.
+ *
+ * @param host alarm log to serialize
+ * @param wb Web buffer to write result to.
+ * @param after Only print log entries with `unique_id` greater than this.
+ */
 extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
 
+/**
+ * Serialize health variables of one chart to json.
+ *
+ * @param st RRDSET to serialize alarms for.
+ * @param buf Web buffert to write result to.
+ */
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 
+/**
+ * Allocate a custom health variable.
+ *
+ * @param host to bind health variable to.
+ * @param name of variable.
+ * @return new health variable.
+ */
 extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name);
+/**
+ * Free variable allocated with rrdvar_custom_host_variable_create().
+ *
+ * @param host of health variable.
+ * @param name of variable.
+ */
 extern void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name);
+/**
+ * Set number to custom health variable.
+ *
+ * @param rv health variable.
+ * @param value to set.
+ */
 extern void rrdvar_custom_host_variable_set(RRDVAR *rv, calculated_number value);
 
+/**
+ * Transform RRDCALC_STATUS_* to string.
+ *
+ * @param status RRDCALC_STATUS_*
+ * @return string representation for `status`
+ */
 extern const char *rrdcalc_status2string(int status);
 
 #endif //NETDATA_HEALTH_H
