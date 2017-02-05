@@ -2252,13 +2252,13 @@ var NETDATA = window.NETDATA || {};
             if(min === __legendFormatValueChartDecimalsLastMin && max === __legendFormatValueChartDecimalsLastMax)
                 return;
 
+            __legendFormatValueChartDecimalsLastMin = min;
+            __legendFormatValueChartDecimalsLastMax = max;
+
             if(this.value_decimal_detail !== -1) {
                 __legendFormatValueChartDecimals = this.value_decimal_detail;
             }
             else {
-                __legendFormatValueChartDecimalsLastMin = min;
-                __legendFormatValueChartDecimalsLastMax = max;
-
                 var delta;
 
                 if (min === max)
