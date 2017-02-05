@@ -3,13 +3,12 @@
 
 /**
  * @file adaptive_resortable_list.h
- * @brief This structure allows netdata to read a file of NAME VALUE lines in 
- * the fastest possible way.
+ * @brief Adaptive resortable linked list to read key value pairs.
  *
- * It maintains a linked list of all NAME (keywords), sorted in the
- * same order as found in the source data file.
- * The linked list is kept sorted at all times - the source file
- * may change at any time, the list will adapt.
+ * It maintains a linked list of all `name` (keywords), sorted in the
+ * same order as found in the source.
+ * The linked list is kept sorted at all times - the source order may change at
+ * any time, the list will adapt.
  *
  * The caller:
  *
@@ -32,57 +31,56 @@
  * arl_create(), for each expected keyword found.
  * The default processor() expects dst to be an unsigned long long *.
  *
- * __LIMITATIONS__
- * DO NOT USE THIS IF THE A NAME/KEYWORD MAY APPEAR MORE THAN
- * ONCE IN THE SOURCE DATA SET.
+ * __LIMITATIONS:__
+ * Do not use this if a keyword may apperar more than once in the source data set.
  */
 
 #include "common.h"
 
-#define ARL_ENTRY_FLAG_FOUND    0x01    ///< the entry has been found in the source data
-#define ARL_ENTRY_FLAG_EXPECTED 0x02    ///< the entry is expected by the program
-#define ARL_ENTRY_FLAG_DYNAMIC  0x04    ///< the entry was dynamically allocated, from source data
+#define ARL_ENTRY_FLAG_FOUND    0x01    ///< ARL entry has been found in the source.
+#define ARL_ENTRY_FLAG_EXPECTED 0x02    ///< ARL entry is expected by the program.
+#define ARL_ENTRY_FLAG_DYNAMIC  0x04    ///< ARL entry was dynamically allocated, from source data.
 
 /** Double linked list of expected entries in an ARL */
 typedef struct arl_entry {
-    char *name;             ///< the keywords
-    uint32_t hash;          ///< the hash of the keyword
+    char *name;             ///< Expected keyword.
+    uint32_t hash;          ///< Hash of `name`.
 
-    void *dst;              ///< the dst to pass to the processor
+    void *dst;              ///< `dst` to pass to processor()
 
     uint8_t flags;          ///< ARL_ENTRY_FLAG_*
 
-    struct arl_entry *prev; ///< previous item in double linked list.
-    struct arl_entry *next; ///< next item in double linked list.
+    struct arl_entry *prev; ///< Previous item.
+    struct arl_entry *next; ///< Next item.
 } ARL_ENTRY;
 
-/** ARL data structure */
+/** Adaptive resortable list. */
 typedef struct arl_base {
     char *name;         ///< Name of the list. 
 
-    size_t iteration;   ///< incremented on each iteration (arl_begin())
-    size_t found;       ///< the number of expected keywords found in this iteration
-    size_t expected;    ///< the number of expected keywords
-    size_t wanted;      ///< the number of wanted keywords
+    size_t iteration;   ///< Incremented on each iteration (arl_begin()).
+    size_t found;       ///< Number of expected keywords found in current iteration.
+    size_t expected;    ///< Number of expected keywords.
+    size_t wanted;      ///< Number of wanted keywords
                         ///< i.e. the number of keywords found and expected
 
-    size_t relinkings;  ///< the number of relinkings we have made so far
+    size_t relinkings;  ///< Number of relinkings made so far.
 
-    size_t allocated;   ///< the number of keywords allocated
-    size_t fred;        ///< the number of keywords cleaned up
+    size_t allocated;   ///< Number of keyword allocations made.
+    size_t fred;        ///< Number of keyword cleaneups made.
 
-    size_t rechecks;    ///< the number of iterations between re-checks of the
-                        ///< wanted number of keywords
-                        ///< this is only needed in cases where the source
+    size_t rechecks;    ///< Number of iterations between re-checks of the
+                        ///< wanted number of keywords.
+                        ///< This is only needed in cases where the source
                         ///< is having less lines over time.
 
-    size_t added;       ///< it is non-zero if new keywords have been added
-                        ///< this is only needed to detect new lines have
+    size_t added;       ///< Number of new keywords in current iteration.
+                        ///< This is only needed to detect new lines have
                         ///< been added to the file, over time.
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    size_t fast;        ///< the number of times we have taken the fast path
-    size_t slow;        ///< the number of times we have taken the slow path
+    size_t fast;        ///< Number of times we have taken the fast path.
+    size_t slow;        ///< Number of times we have taken the slow path.
 #endif
 
     /**
@@ -95,11 +93,10 @@ typedef struct arl_base {
      */
     void (*processor)(const char *name, uint32_t hash, const char *value, void *dst);
 
-    /// the linked list of the keywords
+    /// Linked list of the keywords
     ARL_ENTRY *head;
 
-    /// since we keep the list of keywords sorted (as found in the source data)
-    /// this is next keyword that we expect to find in the source data.
+    /// The next keyword we expect to find in the source data.
     ARL_ENTRY *next_keyword;
 } ARL_BASE;
 
@@ -111,6 +108,8 @@ typedef struct arl_base {
  * \dontinclude adaptive_resortable_list.c
  * \skip arl_callback_str2ull
  * \until }
+ *
+ * \todo How to choose a value for rechecks?
  *
  * @param name of the ARL
  * @param processor Callback to process a match.
@@ -160,9 +159,9 @@ extern void arl_begin(ARL_BASE *base);
 /**
  * Check a keyword against the ARL.
  *
- * This is to be called for each keyword read from source data
+ * This is to be called for each keyword read from source.
  *
- * It is defined in the header file in order to be inlined
+ * It is defined in the header file in order to be inlined.
  *
  * @param The ARL.
  * @param keyword read from source
