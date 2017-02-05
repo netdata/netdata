@@ -2247,8 +2247,16 @@ var NETDATA = window.NETDATA || {};
             return ret;
         };
 
-        this.legendFormatValueChartDecimals = -1;
+        var __legendFormatValueChartDecimalsLastMin = undefined;
+        var __legendFormatValueChartDecimalsLastMax = undefined;
+        var __legendFormatValueChartDecimals = -1;
         this.legendFormatValueDecimalsFromMinMax = function(min, max) {
+            if(min === __legendFormatValueChartDecimalsLastMin && max === __legendFormatValueChartDecimalsLastMax)
+                return;
+
+            __legendFormatValueChartDecimalsLastMin = min;
+            __legendFormatValueChartDecimalsLastMax = max;
+
             var delta;
 
             if(min === max)
@@ -2256,11 +2264,11 @@ var NETDATA = window.NETDATA || {};
             else
                 delta = Math.abs(max - min);
 
-            if(delta > 1000)      this.legendFormatValueChartDecimals = 0;
-            else if(delta > 10  ) this.legendFormatValueChartDecimals = 1;
-            else if(delta > 1   ) this.legendFormatValueChartDecimals = 2;
-            else if(delta > 0.1 ) this.legendFormatValueChartDecimals = 3;
-            else                  this.legendFormatValueChartDecimals = 4;
+            if(delta > 1000)      __legendFormatValueChartDecimals = 0;
+            else if(delta > 10  ) __legendFormatValueChartDecimals = 1;
+            else if(delta > 1   ) __legendFormatValueChartDecimals = 2;
+            else if(delta > 0.1 ) __legendFormatValueChartDecimals = 3;
+            else                  __legendFormatValueChartDecimals = 4;
         };
 
         this.legendFormatValue = function(value) {
@@ -2272,7 +2280,7 @@ var NETDATA = window.NETDATA || {};
                 dmin = dmax = this.value_decimal_detail;
             }
 
-            if(this.legendFormatValueChartDecimals < 0) {
+            if(__legendFormatValueChartDecimals < 0) {
                 dmin = 0;
                 var abs = value;
                 if(abs > 1000)      dmax = 0;
@@ -2282,7 +2290,7 @@ var NETDATA = window.NETDATA || {};
                 else                dmax = 4;
             }
             else {
-                dmin = dmax = this.legendFormatValueChartDecimals;
+                dmin = dmax = __legendFormatValueChartDecimals;
             }
 
             return value.toLocaleString(undefined, {
@@ -4425,7 +4433,7 @@ var NETDATA = window.NETDATA || {};
                                     || 2,
 
             valueFormatter:         self.data('dygraph-valueformatter')
-                                    || function(x){ return x.toFixed(2); },
+                                    || undefined,
 
             highlightCircleSize:    self.data('dygraph-highlightcirclesize')
                                     || highlightCircleSize,
@@ -4440,6 +4448,7 @@ var NETDATA = window.NETDATA || {};
                                     || undefined,
 
             visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
+
             axes: {
                 x: {
                     pixelsPerLabel: 50,
@@ -4447,25 +4456,19 @@ var NETDATA = window.NETDATA || {};
                     axisLabelFormatter: function (d, gran) {
                         void(gran);
                         return NETDATA.zeropad(d.getHours()) + ":" + NETDATA.zeropad(d.getMinutes()) + ":" + NETDATA.zeropad(d.getSeconds());
-                    },
-                    valueFormatter: function (ms) {
-                        void(ms);
-                        //var d = new Date(ms);
-                        //return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
-
-                        // no need to return anything here
-                        return ' ';
-
                     }
                 },
                 y: {
                     pixelsPerLabel: 15,
-                    valueFormatter: function (x) {
-                        // we format legends with the state object
-                        // no need to do anything here
-                        // return (Math.round(x*100) / 100).toLocaleString();
-                        // return state.legendFormatValue(x);
-                        return x;
+                    axisLabelFormatter: function (y) {
+
+                        // unfortunately, we have to call this every single time
+                        state.legendFormatValueDecimalsFromMinMax(
+                            this.axes_[0].extremeRange[0],
+                            this.axes_[0].extremeRange[1]
+                        );
+
+                        return state.legendFormatValue(y);
                     }
                 }
             },
