@@ -2247,19 +2247,61 @@ var NETDATA = window.NETDATA || {};
             return ret;
         };
 
+        var __legendFormatValueChartDecimalsLastMin = undefined;
+        var __legendFormatValueChartDecimalsLastMax = undefined;
+        var __legendFormatValueChartDecimals = -1;
+        this.legendFormatValueDecimalsFromMinMax = function(min, max) {
+            if(min === __legendFormatValueChartDecimalsLastMin && max === __legendFormatValueChartDecimalsLastMax)
+                return;
+
+            __legendFormatValueChartDecimalsLastMin = min;
+            __legendFormatValueChartDecimalsLastMax = max;
+
+            var delta;
+
+            if(min === max)
+                delta = Math.abs(min);
+            else
+                delta = Math.abs(max - min);
+
+            if(delta > 1000)      __legendFormatValueChartDecimals = 0;
+            else if(delta > 10  ) __legendFormatValueChartDecimals = 1;
+            else if(delta > 1   ) __legendFormatValueChartDecimals = 2;
+            else if(delta > 0.1 ) __legendFormatValueChartDecimals = 3;
+            else                  __legendFormatValueChartDecimals = 4;
+        };
+
         this.legendFormatValue = function(value) {
-            if(value === null || value === 'undefined') return '-';
-            if(typeof value !== 'number') return value;
+            if(typeof value !== 'number') return '-';
 
-            if(this.value_decimal_detail !== -1)
-                return (Math.round(value * this.value_decimal_detail) / this.value_decimal_detail).toLocaleString();
+            var dmin, dmax;
 
-            var abs = Math.abs(value);
-            if(abs >= 1000) return (Math.round(value)).toLocaleString();
-            if(abs >= 100 ) return (Math.round(value * 10) / 10).toLocaleString();
-            if(abs >= 1   ) return (Math.round(value * 100) / 100).toLocaleString();
-            if(abs >= 0.1 ) return (Math.round(value * 1000) / 1000).toLocaleString();
-            return (Math.round(value * 10000) / 10000).toLocaleString();
+            if(this.value_decimal_detail !== -1) {
+                dmin = dmax = this.value_decimal_detail;
+            }
+
+            if(__legendFormatValueChartDecimals < 0) {
+                dmin = 0;
+                var abs = value;
+                if(abs > 1000)      dmax = 0;
+                else if(abs > 10 )  dmax = 1;
+                else if(abs > 1)    dmax = 2;
+                else if(abs > 0.1)  dmax = 3;
+                else                dmax = 4;
+            }
+            else {
+                dmin = dmax = __legendFormatValueChartDecimals;
+            }
+
+            return value.toLocaleString(undefined, {
+                // style: 'decimal',
+                // minimumIntegerDigits: 1,
+                // minimumSignificantDigits: 1,
+                // maximumSignificantDigits: 1,
+                useGrouping: true,
+                minimumFractionDigits: dmin,
+                maximumFractionDigits: dmax
+            });
         };
 
         this.legendSetLabelValue = function(label, value) {
@@ -2329,32 +2371,43 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
+        this.legendSetDateLast = {
+            ms: 0,
+            date: undefined,
+            time: undefined
+        };
+
         this.legendSetDate = function(ms) {
             if(typeof ms !== 'number') {
                 this.legendShowUndefined();
                 return;
             }
 
-            var d = new Date(ms);
+            if(this.legendSetDateLast.ms !== ms) {
+                var d = new Date(ms);
+                this.legendSetDateLast.ms = ms;
+                this.legendSetDateLast.date = d.toLocaleDateString();
+                this.legendSetDateLast.time = d.toLocaleTimeString();
+            }
 
-            if(this.element_legend_childs.title_date)
-                this.__legendSetDateString(d.toLocaleDateString());
+            if(this.element_legend_childs.title_date !== null)
+                this.__legendSetDateString(this.legendSetDateLast.date);
 
-            if(this.element_legend_childs.title_time)
-                this.__legendSetTimeString(d.toLocaleTimeString());
+            if(this.element_legend_childs.title_time !== null)
+                this.__legendSetTimeString(this.legendSetDateLast.time);
 
-            if(this.element_legend_childs.title_units)
+            if(this.element_legend_childs.title_units !== null)
                 this.__legendSetUnitsString(this.units)
         };
 
         this.legendShowUndefined = function() {
-            if(this.element_legend_childs.title_date)
+            if(this.element_legend_childs.title_date !== null)
                 this.__legendSetDateString(' ');
 
-            if(this.element_legend_childs.title_time)
+            if(this.element_legend_childs.title_time !== null)
                 this.__legendSetTimeString(this.chart.name);
 
-            if(this.element_legend_childs.title_units)
+            if(this.element_legend_childs.title_units !== null)
                 this.__legendSetUnitsString(' ');
 
             if(this.data && this.element_legend_childs.series !== null) {
@@ -2363,8 +2416,7 @@ var NETDATA = window.NETDATA || {};
                 while(i--) {
                     var label = labels[i];
 
-                    if(typeof label === 'undefined') continue;
-                    if(typeof this.element_legend_childs.series[label] === 'undefined') continue;
+                    if(typeof label === 'undefined' || typeof this.element_legend_childs.series[label] === 'undefined') continue;
                     this.legendSetLabelValue(label, null);
                 }
             }
@@ -2776,16 +2828,19 @@ var NETDATA = window.NETDATA || {};
 
                 this.element_legend_childs.title_date.className += " netdata-legend-title-date";
                 this.element_legend.appendChild(this.element_legend_childs.title_date);
+                this.__last_shown_legend_date = undefined;
 
                 this.element_legend.appendChild(document.createElement('br'));
 
                 this.element_legend_childs.title_time.className += " netdata-legend-title-time";
                 this.element_legend.appendChild(this.element_legend_childs.title_time);
+                this.__last_shown_legend_time = undefined;
 
                 this.element_legend.appendChild(document.createElement('br'));
 
                 this.element_legend_childs.title_units.className += " netdata-legend-title-units";
                 this.element_legend.appendChild(this.element_legend_childs.title_units);
+                this.__last_shown_legend_units = undefined;
 
                 this.element_legend.appendChild(document.createElement('br'));
 
@@ -4199,6 +4254,12 @@ var NETDATA = window.NETDATA || {};
             dygraph.updateOptions(options);
         }
 
+        // decide the decimal points on the legend of the chart
+        state.legendFormatValueDecimalsFromMinMax(
+            state.dygraph_instance.axes_[0].extremeRange[0],
+            state.dygraph_instance.axes_[0].extremeRange[1]
+        );
+
         state.dygraph_last_rendered = Date.now();
         return true;
     };
@@ -4372,7 +4433,7 @@ var NETDATA = window.NETDATA || {};
                                     || 2,
 
             valueFormatter:         self.data('dygraph-valueformatter')
-                                    || function(x){ return x.toFixed(2); },
+                                    || undefined,
 
             highlightCircleSize:    self.data('dygraph-highlightcirclesize')
                                     || highlightCircleSize,
@@ -4387,6 +4448,7 @@ var NETDATA = window.NETDATA || {};
                                     || undefined,
 
             visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
+
             axes: {
                 x: {
                     pixelsPerLabel: 50,
@@ -4394,25 +4456,19 @@ var NETDATA = window.NETDATA || {};
                     axisLabelFormatter: function (d, gran) {
                         void(gran);
                         return NETDATA.zeropad(d.getHours()) + ":" + NETDATA.zeropad(d.getMinutes()) + ":" + NETDATA.zeropad(d.getSeconds());
-                    },
-                    valueFormatter: function (ms) {
-                        void(ms);
-                        //var d = new Date(ms);
-                        //return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
-
-                        // no need to return anything here
-                        return ' ';
-
                     }
                 },
                 y: {
                     pixelsPerLabel: 15,
-                    valueFormatter: function (x) {
-                        // we format legends with the state object
-                        // no need to do anything here
-                        // return (Math.round(x*100) / 100).toLocaleString();
-                        // return state.legendFormatValue(x);
-                        return x;
+                    axisLabelFormatter: function (y) {
+
+                        // unfortunately, we have to call this every single time
+                        state.legendFormatValueDecimalsFromMinMax(
+                            this.axes_[0].extremeRange[0],
+                            this.axes_[0].extremeRange[1]
+                        );
+
+                        return state.legendFormatValue(y);
                     }
                 }
             },
@@ -4805,6 +4861,12 @@ var NETDATA = window.NETDATA || {};
             state.__commonMin = null;
             state.__commonMax = null;
         }
+
+        // decide the decimal points on the legend of the chart
+        state.legendFormatValueDecimalsFromMinMax(
+            state.dygraph_instance.axes_[0].extremeRange[0],
+            state.dygraph_instance.axes_[0].extremeRange[1]
+        );
 
         return true;
     };
