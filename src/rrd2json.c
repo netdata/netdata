@@ -918,13 +918,13 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
     else {
         kq[0] = '"';
         sq[0] = '"';
-        if((options & RRDR_OPTION_SECONDS) || (options & RRDR_OPTION_MILLISECONDS)) {
-            dates = JSON_DATES_TIMESTAMP;
-            dates_with_new = 0;
-        }
-        else {
+        if(options & RRDR_OPTION_GOOGLE_JSON) {
             dates = JSON_DATES_JS;
             dates_with_new = 1;
+        }
+        else {
+            dates = JSON_DATES_TIMESTAMP;
+            dates_with_new = 0;
         }
         if( options & RRDR_OPTION_OBJECTSROWS )
             strcpy(pre_date, "      { ");
