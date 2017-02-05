@@ -2360,13 +2360,13 @@ var NETDATA = window.NETDATA || {};
 
         this.legendShowUndefined = function() {
             if(this.element_legend_childs.title_date !== null)
-                this.__legendSetDateString(' haha ');
+                this.__legendSetDateString(' ');
 
             if(this.element_legend_childs.title_time !== null)
                 this.__legendSetTimeString(this.chart.name);
 
             if(this.element_legend_childs.title_units !== null)
-                this.__legendSetUnitsString(' haha2 ');
+                this.__legendSetUnitsString(' ');
 
             if(this.data && this.element_legend_childs.series !== null) {
                 var labels = this.data.dimension_names;
