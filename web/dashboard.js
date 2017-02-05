@@ -238,7 +238,6 @@ var NETDATA = window.NETDATA || {};
             isSlowDeviceResult = false;
         }
 
-        console.log('isSlowDevice(): ' + isSlowDeviceResult);
         return isSlowDeviceResult;
     };
 
