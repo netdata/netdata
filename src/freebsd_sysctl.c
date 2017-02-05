@@ -42,6 +42,8 @@
 #define MEGA_FACTOR 1048576     // 1024 * 1024
 #define GIGA_FACTOR 1073741824  // 1024 * 1024 * 1024
 
+#define MAX_INT_DIGITS 10 // maximum number of digits for int
+
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
 
@@ -141,7 +143,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     // NEEDED BY: do_cpu_cores
     static long *pcpu_cp_time = NULL;
-    char cpuid[8]; // no more than 4 digits expected
+    char cpuid[MAX_INT_DIGITS + 1];
 
     // NEEDED BY: do_all_processes, do_processes
     struct vmtotal vmtotal_data;
@@ -161,7 +163,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     int numdevs;
     static void *devstat_data = NULL;
     struct devstat *dstat;
-    char disk[DEVSTAT_NAME_LEN + 10 + 1]; // 10 - maximum number of digits for int
+    char disk[DEVSTAT_NAME_LEN + MAX_INT_DIGITS + 1];
     struct cur_dstat {
         collected_number duration_read_ms;
         collected_number duration_write_ms;
@@ -412,40 +414,33 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 error("DISABLED: cpu.cpuXX");
             } else {
                 pcpu_cp_time = reallocz(pcpu_cp_time, sizeof(cp_time) * ncpus);
+                if (unlikely(getsysctl("kern.cp_times", pcpu_cp_time, sizeof(cp_time) * ncpus))) {
+                    do_cpu_cores = 0;
+                    error("DISABLED: cpu.cpuXX");
+                } else {
+                    for (i = 0; i < ncpus; i++) {
+                        snprintfz(cpuid, MAX_INT_DIGITS, "cpu%d", i);
+                        st = rrdset_find_bytype("cpu", cpuid);
+                        if (unlikely(!st)) {
+                            st = rrdset_create("cpu", cpuid, NULL, "utilization", "cpu.cpu", "Core utilization",
+                                               "percentage", 1000, update_every, RRDSET_TYPE_STACKED);
 
-                for (i = 0; i < ncpus; i++) {
-                    if (unlikely(getsysctl("kern.cp_times", pcpu_cp_time, sizeof(cp_time) * ncpus))) {
-                        do_cpu_cores = 0;
-                        error("DISABLED: cpu.cpuXX");
-                        break;
-                    }
-                    if (unlikely(ncpus > 9999)) {
-                        error("FREEBSD: There are more than 4 digits in cpu cores number");
-                        do_cpu_cores = 0;
-                        error("DISABLED: cpu.cpuXX");
-                        break;
-                    }
-                    snprintfz(cpuid, 8, "cpu%d", i);
+                            rrddim_add(st, "user", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "nice", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "system", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "interrupt", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "idle", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_hide(st, "idle");
+                        } else
+                            rrdset_next(st);
 
-                    st = rrdset_find_bytype("cpu", cpuid);
-                    if (unlikely(!st)) {
-                        st = rrdset_create("cpu", cpuid, NULL, "utilization", "cpu.cpu", "Core utilization", "percentage", 1000, update_every, RRDSET_TYPE_STACKED);
-
-                        rrddim_add(st, "user", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                        rrddim_add(st, "nice", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                        rrddim_add(st, "system", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                        rrddim_add(st, "interrupt", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                        rrddim_add(st, "idle", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                        rrddim_hide(st, "idle");
-                    }
-                    else rrdset_next(st);
-
-                    rrddim_set(st, "user", pcpu_cp_time[i * 5 + 0]);
-                    rrddim_set(st, "nice", pcpu_cp_time[i * 5 + 1]);
-                    rrddim_set(st, "system", pcpu_cp_time[i * 5 + 2]);
-                    rrddim_set(st, "interrupt", pcpu_cp_time[i * 5 + 3]);
-                    rrddim_set(st, "idle", pcpu_cp_time[i * 5 + 4]);
-                    rrdset_done(st);
+                        rrddim_set(st, "user", pcpu_cp_time[i * 5 + 0]);
+                        rrddim_set(st, "nice", pcpu_cp_time[i * 5 + 1]);
+                        rrddim_set(st, "system", pcpu_cp_time[i * 5 + 2]);
+                        rrddim_set(st, "interrupt", pcpu_cp_time[i * 5 + 3]);
+                        rrddim_set(st, "idle", pcpu_cp_time[i * 5 + 4]);
+                        rrdset_done(st);
+                }
                 }
             }
         }
@@ -1083,9 +1078,6 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
     if (likely(do_netisr || do_netisr_per_core)) {
         if (unlikely(GETSYSCTL("kern.smp.cpus", ncpus))) {
-            common_error = 1;
-        } else if (unlikely(ncpus > 9999)) {
-            error("FREEBSD: There are more than 4 digits in cpu cores number");
             common_error = 1;
         } else if (unlikely(sysctlbyname("net.isr.workstream", NULL, &netisr_workstream_size, NULL, 0) == -1)) {
             error("FREEBSD: sysctl(net.isr.workstream...) failed: %s", strerror(errno));
