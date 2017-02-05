@@ -1363,9 +1363,7 @@ var NETDATA = window.NETDATA || {};
         this.value_decimal_detail = -1;
         var d = self.data('decimal-digits');
         if(typeof d === 'number') {
-            this.value_decimal_detail = 1;
-            while(d-- > 0)
-                this.value_decimal_detail *= 10;
+            this.value_decimal_detail = d;
         }
 
         this.auto = {
@@ -2254,31 +2252,32 @@ var NETDATA = window.NETDATA || {};
             if(min === __legendFormatValueChartDecimalsLastMin && max === __legendFormatValueChartDecimalsLastMax)
                 return;
 
-            __legendFormatValueChartDecimalsLastMin = min;
-            __legendFormatValueChartDecimalsLastMax = max;
+            if(this.value_decimal_detail !== -1) {
+                __legendFormatValueChartDecimals = this.value_decimal_detail;
+            }
+            else {
+                __legendFormatValueChartDecimalsLastMin = min;
+                __legendFormatValueChartDecimalsLastMax = max;
 
-            var delta;
+                var delta;
 
-            if(min === max)
-                delta = Math.abs(min);
-            else
-                delta = Math.abs(max - min);
+                if (min === max)
+                    delta = Math.abs(min);
+                else
+                    delta = Math.abs(max - min);
 
-            if(delta > 1000)      __legendFormatValueChartDecimals = 0;
-            else if(delta > 10  ) __legendFormatValueChartDecimals = 1;
-            else if(delta > 1   ) __legendFormatValueChartDecimals = 2;
-            else if(delta > 0.1 ) __legendFormatValueChartDecimals = 3;
-            else                  __legendFormatValueChartDecimals = 4;
+                if (delta > 1000)     __legendFormatValueChartDecimals = 0;
+                else if (delta > 10)  __legendFormatValueChartDecimals = 1;
+                else if (delta > 1)   __legendFormatValueChartDecimals = 2;
+                else if (delta > 0.1) __legendFormatValueChartDecimals = 3;
+                else                  __legendFormatValueChartDecimals = 4;
+            }
         };
 
         this.legendFormatValue = function(value) {
             if(typeof value !== 'number') return '-';
 
             var dmin, dmax;
-
-            if(this.value_decimal_detail !== -1) {
-                dmin = dmax = this.value_decimal_detail;
-            }
 
             if(__legendFormatValueChartDecimals < 0) {
                 dmin = 0;
@@ -2291,6 +2290,10 @@ var NETDATA = window.NETDATA || {};
             }
             else {
                 dmin = dmax = __legendFormatValueChartDecimals;
+            }
+
+            if(this.value_decimal_detail !== -1) {
+                dmin = dmax = this.value_decimal_detail;
             }
 
             return value.toLocaleString(undefined, {
