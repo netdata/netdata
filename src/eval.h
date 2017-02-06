@@ -3,10 +3,12 @@
 
 /**
  * @file eval.h
- * @brief API to handle health expressions.
+ * @brief Expression handling.
+ *
+ * \todo How to use it?
  */ 
 
-#define EVAL_MAX_VARIABLE_NAME_LENGTH 300 ///< Maximum health variable name length
+#define EVAL_MAX_VARIABLE_NAME_LENGTH 300 ///< Maximum eval variable name length
 
 /** List of `struct rrdvar`*/
 typedef struct eval_variable {
