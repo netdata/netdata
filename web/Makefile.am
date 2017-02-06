@@ -115,6 +115,9 @@ dist_webdnt_DATA = \
 	.well-known/dnt/cookies \
 	$(NULL)
 
+dashboard_info.js:
+	sh "$(top_srcdir)/os-templates/generate-dashboard-info-js.sh" "$(host_os)"  > $@
+
 version.txt:
 	if test -d "$(top_srcdir)/.git"; then \
 		git --git-dir="$(top_srcdir)/.git" log -n 1 --format=%H; \
@@ -123,3 +126,4 @@ version.txt:
 	mv $@.tmp $@
 
 .PHONY: version.txt
+.PHONY: dashboard_info.js

@@ -151,18 +151,18 @@ get_git_config_signatures() {
 
     echo >configs.signatures.tmp
 
-    for x in $(find conf.d -name \*.conf)
+    for x in $(find conf.d -name \*.conf) $(find os-templates/conf.d -name \*.conf)
     do
-            x="${x/conf.d\//}"
-            echo "${x}"
-            for c in $(git log --follow "conf.d/${x}" | grep ^commit | cut -d ' ' -f 2)
+            n="$(basename "${x}")"
+            echo "${n}"
+            for c in $(git log --follow "${x}" | grep ^commit | cut -d ' ' -f 2)
             do
-                    git checkout ${c} "conf.d/${x}" || continue
-                    s="$(cat "conf.d/${x}" | md5sum | cut -d ' ' -f 1)"
-                    echo >>configs.signatures.tmp "${s}:${x}"
+                    git checkout ${c} "${x}" || continue
+                    s="$(cat "${x}" | md5sum | cut -d ' ' -f 1)"
+                    echo >>configs.signatures.tmp "${s}:${n}"
                     echo "    ${s}"
             done
-            git checkout HEAD "conf.d/${x}" || break
+            git checkout HEAD "${x}" || break
     done
 
     cat configs.signatures.tmp |\
