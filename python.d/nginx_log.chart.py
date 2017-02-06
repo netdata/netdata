@@ -115,7 +115,7 @@ class Service(LogService):
     def __init__(self, configuration=None, name=None):
         LogService.__init__(self, configuration=configuration, name=name)
         self.log_path = self.configuration.get('path', '/var/log/nginx/access.log')
-        self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
+        self.detailed_response_codes = self.configuration.get('detailed_response_codes', False)
         self.regex = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3}).*?((?<= )[1-9]\d{2}) (\d+) (\d+)? ?([\d.]+)?')
         # sorted list of unique IPs
         self.unique_alltime = list()
