@@ -5,9 +5,9 @@
 
 /**
  * @file inlined.h
- * @brief Common methods the compiler should inline.
+ * @brief Common functions the compiler should inline
  *
- * This is done for faster execution
+ * This is done for faster execution.
  */
 
 #ifdef KERNEL_32BIT
@@ -22,7 +22,7 @@ typedef uint64_t kernel_uint_t; ///< uint32_t or uint64_t dependent on the syste
  * This does no error handling.
  * Only use this for strings representing integers (`-?[0-9]+`) and fit into an int.
  *
- * @param string to convert.
+ * @param string to convert
  * @return `kernel_uint_t` representation of `s` 
  */
 #define str2kernel_uint_t(string) str2uint64_t(string)
@@ -35,7 +35,7 @@ typedef uint64_t kernel_uint_t; ///< uint32_t or uint64_t dependent on the syste
  * This does no error handling.
  * Only use this for strings representing integers (`-?[0-9]+`) and fit into an int.
  *
- * @param string to convert.
+ * @param string to convert
  * @return pid_t representation of `s` 
  */
 #define str2pid_t(string) str2uint32_t(string)
@@ -86,7 +86,7 @@ static inline uint32_t simple_uhash(const char *name) {
 }
 
 /**
- * Calculate simple_hash() of `name` and compare `name` to `b`
+ * Calculate simple_hash() of `name` and compare `name` to `b`.
  *
  * This can be used to enhance performance.
  * Instaed of
@@ -287,7 +287,7 @@ static inline char *strncpyz(char *dst, const char *src, size_t n) {
  *
  * @param filename File to read.
  * @param result Long to store the number in.
- * @return 0 on success, -1 if could not open file, -2 if could not read from file.
+ * @return 0 on success, -1 if could not open file, -2 if could not read from file
  */
 static inline int read_single_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
