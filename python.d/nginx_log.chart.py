@@ -57,6 +57,7 @@ class Service(LogService):
         LogService.__init__(self, configuration=configuration, name=name)
         self.log_path = self.configuration.get('path', '/var/log/nginx/access.log')
         self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
+        self.all_time = self.configuration.get('all_time', True)
         self.url_pattern = self.configuration.get('categories')
         self.regex = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3}).*?"[A-Z]+ (.*?)" ([1-9]\d{2}) (\d+) (\d+)? ?([\d.]+)?')
         # sorted list of unique IPs
@@ -66,7 +67,7 @@ class Service(LogService):
         self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0,
                      'resp_time_max': 0, 'resp_time_avg': 0, 'unique_cur': 0,
                      'unique_tot': 0, '2xx': 0, '5xx': 0, '3xx': 0, '4xx': 0,
-                     '1xx': 0, '0xx': 0, 'other_url': 0}
+                     '1xx': 0, '0xx': 0}
 
     def check(self):
         # Can't start if log path is not readable by netdata
@@ -108,6 +109,10 @@ class Service(LogService):
         # Remove 'request_time' chart if there is not 'reponse_time' in logs
         if parsed_line == '':
             self.order.remove('request_time')
+
+        # Remove 'request_time' if specified in the configuration
+        if not self.all_time:
+            self.order.remove('clients_all')
  
         # Add detailed_response_codes chart if specified in the configuration
         if self.detailed_response_codes:
@@ -125,6 +130,7 @@ class Service(LogService):
             for elem in self.url_pattern:
                 self.definitions['requests_per_url']['lines'].append([elem.description, elem.description, 'absolute'])
                 self.data.update({elem.description: 0})
+            self.data.update({'other_url': 0})
         else:
             self.order.remove('requests_per_url')
           
