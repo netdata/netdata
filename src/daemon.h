@@ -3,13 +3,13 @@
 
 /**
  * @file daemon.h
- * @brief API of the netdata deamon.
+ * @brief Netdata deamon functions.
  *
  * This should only be used from the main thread.
  */
 
 /**
- * A signal handler which tells netdata to stop.
+ * Signal handler which tells netdata to stop.
  *
  * Set `netdata_exit` to 1.
  *
@@ -17,29 +17,29 @@
  */
 extern void sig_handler_exit(int signo);
 /**
- * A signal handler which saves the round robin database to disk.
+ * Signal handler which saves the round robin database to disk.
  *
  * @param signo recieved
  */
 extern void sig_handler_save(int signo);
 /**
- * A signal handler which reopens all logfiles.
+ * Signal handler which reopens all logfiles.
  *
  * @param signo recieved
  */
 extern void sig_handler_logrotate(int signo);
 /**
- * A signal handler which reloads health status.
+ * Signal handler which reloads health status.
  *
  * @param signo recieved
  */
 extern void sig_handler_reload_health(int signo);
 
 /**
- * After this the proccess is owned by `username`
+ * After this the process is owned by `username`
  *
- * @param username which should own the proccess
- * @param pid_fd pidfile of the process
+ * @param username which should own the process
+ * @param pid_fd File descriptor to pidfile of the process.
  * @return 0 on success, -1 on error
  */
 extern int become_user(const char *username, int pid_fd);
@@ -51,7 +51,7 @@ extern int become_user(const char *username, int pid_fd);
  * After this the process is owned by `username`
  *
  * @param dont_fork boolean
- * @param user which should own the proccess
+ * @param user which should own the process
  * @return 0 on success, -1 on error
  */
 extern int become_daemon(int dont_fork, const char *user);
@@ -65,7 +65,7 @@ extern int become_daemon(int dont_fork, const char *user);
  */
 extern void netdata_cleanup_and_exit(int i);
 
-/** PID file of the process */
+/** Patho of the pidfile of the process */
 extern char pidfile[];
 
 #endif /* NETDATA_DAEMON_H */
