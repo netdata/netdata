@@ -3,15 +3,16 @@
 
 /**
  * @file backends.h
- * @brief This file holds the API to start the netdata backend thread.
+ * @brief Thread sending data to backends.
  */
  
 /** 
- * Thread for netdata backends.
+ * Main method of backend thread.
+ *
+ * This method sends data to backends.
  *
  * @param ptr to struct netdata_static_thread
- * @return NULL
  */
-void *backends_main(void *ptr);
+void *backends_main(struct netdata_static_thread *ptr);
 
 #endif /* NETDATA_BACKENDS_H */

@@ -127,7 +127,7 @@ static inline int process_opentsdb_response(BUFFER *b) {
     return 0;
 }
 
-void *backends_main(void *ptr) {
+void *backends_main(struct netdata_static_thread *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
