@@ -9,9 +9,9 @@
 /**
  * Data collector of ipc statistics
  *
- * @param update_every intervall in seconds this is called.
- * @param dt microseconds passed since the last call.
- * @return 0 on success. 1 on error.
+ * @param update_every Intervall in seconds this is called.
+ * @param dt Microseconds passed since the last call.
+ * @return 0 on success, 1 on error
  */
 extern int do_ipc(int update_every, usec_t dt);
 
