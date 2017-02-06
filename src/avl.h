@@ -4,7 +4,7 @@
 
 /**
  * @file avl.h
- * @brief This file holds the API fo AVL Trees.
+ * @brief AVL tree: A self-balancing binary search tree.
  * @author Costa Tsaousis
  *
  * There are two versions of every method. The ones with suffix `_lock` are thread save.
@@ -23,7 +23,7 @@
 */
 
 #ifndef AVL_MAX_HEIGHT
-#define AVL_MAX_HEIGHT 92 ///<  Maximum AVL tree height
+#define AVL_MAX_HEIGHT 92 ///<  Maximum AVL tree height.
 
 #endif
 
@@ -33,10 +33,10 @@
 // #define AVL_LOCK_WITH_MUTEX 1
 
 #ifdef AVL_LOCK_WITH_MUTEX
-/// Initializes avl_tree_lock->mutex
+/// Initializes avl_tree_lock->mutex.
 #define AVL_LOCK_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 #else /* AVL_LOCK_WITH_MUTEX */
-/// Initializes avl_tree_lock->rwlock
+/// Initializes avl_tree_lock->rwlock.
 #define AVL_LOCK_INITIALIZER PTHREAD_RWLOCK_INITIALIZER
 #endif /* AVL_LOCK_WITH_MUTEX */
 
@@ -47,27 +47,27 @@
 // ----------------------------------------------------------------------------
 // Data structures
 
-/** One element of the AVL tree. */
+/** AVL tree element. */
 typedef struct avl {
-    struct avl *avl_link[2];  ///< Subtrees
-    signed char avl_balance;  ///< Balance factor
+    struct avl *avl_link[2];  ///< Subtrees.
+    signed char avl_balance;  ///< Balance factor.
 } avl;
 
-/** An AVL tree */
+/** AVL tree. */
 typedef struct avl_tree {
-    avl *root; ///< root element
-    int (*compar)(void *a, void *b); ///< Sort function
+    avl *root; ///< Root element.
+    int (*compar)(void *a, void *b); ///< Sort function.
 } avl_tree;
 
-/** A synchronized AVL tree. */
+/** Synchronized AVL tree. */
 typedef struct avl_tree_lock {
-    avl_tree avl_tree; ///< An AVL tree
+    avl_tree avl_tree; ///< AVL tree.
 
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
-    pthread_mutex_t mutex;
+    pthread_mutex_t mutex; ///< Mutex to Synchronize.
 #else /* AVL_LOCK_WITH_MUTEX */
-    pthread_rwlock_t rwlock; ///< read write lock
+    pthread_rwlock_t rwlock; ///< Read write lock.
 #endif /* AVL_LOCK_WITH_MUTEX */
 #endif /* AVL_WITHOUT_PTHREADS */
 } avl_tree_lock;
@@ -82,8 +82,8 @@ typedef struct avl_tree_lock {
  * If an element equal (as returned by `t->compar()`) to `a` exits in the tree, `a` is not added.
  * `a` is linked directly to the tree, so it has to be properly allocated by the caller.
  *
- * @param t avl tree
- * @param a element to insert
+ * @param t Avl tree.
+ * @param a Element to insert.
  * @return `a` or an equal element
  */
 avl *avl_insert_lock(avl_tree_lock *t, avl *a) NEVERNULL WARNUNUSED;
@@ -94,8 +94,8 @@ avl *avl_insert_lock(avl_tree_lock *t, avl *a) NEVERNULL WARNUNUSED;
  * If an element equal (as returned by `t->compar()`) to `a` exits in the tree, `a` is not added.
  * `a` is linked directly to the tree, so it has to be properly allocated by the caller.
  *
- * @param t AVL tree
- * @param a element to insert
+ * @param t AVL tree.
+ * @param a Element to insert.
  * @return `a` or an equal element
  */
 avl *avl_insert(avl_tree *t, avl *a) NEVERNULL WARNUNUSED;
@@ -105,8 +105,8 @@ avl *avl_insert(avl_tree *t, avl *a) NEVERNULL WARNUNUSED;
  *
  * Remove an element equal (as returned by `t->compar()`) to `a` from the AVL tree `t`.
  *
- * @param t AVL tree
- * @param a element to remove
+ * @param t AVL tree.
+ * @param a Element to remove.
  * @return the removed element or NULL if not found
  */
 avl *avl_remove_lock(avl_tree_lock *t, avl *a) WARNUNUSED;
@@ -115,8 +115,8 @@ avl *avl_remove_lock(avl_tree_lock *t, avl *a) WARNUNUSED;
  *
  * Remove an element equal (as returned by `t->compar()`) to `a` from the AVL tree `t`.
  *
- * @param t AVL tree
- * @param a element to remove
+ * @param t AVL tree.
+ * @param a Element to remove.
  * @return the removed element or NULL if not found
  */
 avl *avl_remove(avl_tree *t, avl *a) WARNUNUSED;
@@ -126,8 +126,8 @@ avl *avl_remove(avl_tree *t, avl *a) WARNUNUSED;
  * 
  * Find a element equal (as returned by `t->compar()`) to `a` in AVL tree `t`.
  *
- * @param a element to find
- * @param t AVL tree
+ * @param a Element to find.
+ * @param t AVL tree.
  * @return found element or NULL
  */
 avl *avl_search_lock(avl_tree_lock *t, avl *a);
@@ -136,8 +136,8 @@ avl *avl_search_lock(avl_tree_lock *t, avl *a);
  * 
  * Find a element equal (as returned by `t->compar()`) to `a` in AVL tree `t`.
  *
- * @param a element to find
- * @param t AVL tree
+ * @param a Element to find.
+ * @param t AVL tree.
  * @return found element or NULL
  */
 avl *avl_search(avl_tree *t, avl *a);
@@ -145,15 +145,15 @@ avl *avl_search(avl_tree *t, avl *a);
 /**
  * Initialize a avl_tree_lock.
  *
- * @param t AVL tree
- * @param compar() Comparison function
+ * @param t AVL tree.
+ * @param compar() Comparison function.
  */
 void avl_init_lock(avl_tree_lock *t, int (*compar)(void *a, void *b));
 /**
  * Initialize a avl_tree_lock.
  *
- * @param t AVL tree
- * @param compar() Comparison function
+ * @param t AVL tree.
+ * @param compar() Comparison function.
  */
 void avl_init(avl_tree *t, int (*compar)(void *a, void *b));
 
@@ -180,7 +180,7 @@ void avl_init(avl_tree *t, int (*compar)(void *a, void *b));
  *
  * @param t Destination.
  * @param callback function called on each node
- * @param data second argument of `callback(entry, data)`
+ * @param data Second argument of `callback(entry, data)`.
  * @return `t` on success, negative number on failure.
  */
 int avl_traverse_lock(avl_tree_lock *t, int (*callback)(void *entry, void *data), void *data);
@@ -204,8 +204,8 @@ int avl_traverse_lock(avl_tree_lock *t, int (*callback)(void *entry, void *data)
  *
  * @param t Destination.
  * @param callback function called on each node
- * @param data second argument of `callback(entry, data)`
- * @return `t` on success, negative number on failure.
+ * @param data Second argument of `callback(entry, data)`.
+ * @return `t` on success, negative number on failure
  */
 int avl_traverse(avl_tree *t, int (*callback)(void *entry, void *data), void *data);
 
