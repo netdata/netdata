@@ -8,11 +8,9 @@
  * A dictionary maps names to values. `name` is a string which identifies the `value`. `value` can be any data.
  *
  * A dictionary is able to maintain statistics of then number of etries and insert, delte and get operations.
- *
- * \todo We should switch naming from `name` to `key`. We should have a `key` `value` pair in the Dictionary.
  */
 
-/** Statistics of a dictionary */
+/** Dictionary statistics */
 struct dictionary_stats {
     unsigned long long inserts;  ///< Number of inserts completed.
     unsigned long long deletes;  ///< Number of deletes completed.
@@ -20,7 +18,7 @@ struct dictionary_stats {
     unsigned long long entries;  ///< Number of entries.
 };
 
-/** Name value pair */
+/** Dictionary entry */
 typedef struct name_value {
     // this has to be first!
     avl avl;                ///< the index
@@ -32,7 +30,7 @@ typedef struct name_value {
     void *value; ///< value
 } NAME_VALUE;
 
-/** A dictionary */
+/** Dictionary */
 typedef struct dictionary {
     avl_tree values_index; ///< tree of values
 
@@ -42,8 +40,8 @@ typedef struct dictionary {
     pthread_rwlock_t *rwlock;       ///< Lock for synchronizing access to this. This may be NULL.
 } DICTIONARY;
 
-#define DICTIONARY_FLAG_DEFAULT                 0x00000000 ///< no specific meaning.
-#define DICTIONARY_FLAG_SINGLE_THREADED         0x00000001 ///< If set, do not use the avl `*_lock()` functions, but the plain ones. 
+#define DICTIONARY_FLAG_DEFAULT                 0x00000000 ///< No specific meaning.
+#define DICTIONARY_FLAG_SINGLE_THREADED         0x00000001 ///< If set, do not synchronize access to the dictionary. 
                                                            ///< This can lead to crashes if multiple threads are 
                                                            ///< adding, removing and reading the tree concurrently.
 #define DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE   0x00000002 ///< Only link the value. Do not clone it.
@@ -51,7 +49,7 @@ typedef struct dictionary {
 #define DICTIONARY_FLAG_WITH_STATISTICS         0x00000008 ///< Maintain statistics for this dictionary.
 
 /**
- * Initialize a dictionary.
+ * Create an empty dictionary.
  *
  * Options can be set with `flags`.
  *
@@ -75,12 +73,12 @@ extern void dictionary_destroy(DICTIONARY *dict);
  * @param dict The dictionary.
  * @param name to set
  * @param value to set
- * @param value_len Size of `value`
+ * @param value_len Size of `value` in bytes.
  * @return the inserted value
  */
 extern void *dictionary_set(DICTIONARY *dict, const char *name, void *value, size_t value_len);
 /**
- * Get the value of name in a dictionary
+ * Get the value of name in a dictionary.
  *
  * @param dict The dictionary.
  * @param name to find
