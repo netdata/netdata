@@ -7,12 +7,12 @@ import re
 import bisect
 from os import access, R_OK
 from os.path import getsize
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 priority = 60000
 retries = 60
 
-ORDER = ['response_codes', 'request_time', 'bandwidth', 'clients_cur', 'clients_all']
+ORDER = ['response_codes', 'request_time', 'requests_per_url', 'bandwidth', 'clients_cur', 'clients_all']
 CHARTS = {
     'response_codes': {
         'options': [None, 'Response Codes', 'requests/s', 'responses', 'nginx_log.response', 'stacked'],
@@ -49,74 +49,16 @@ CHARTS = {
         ]}
 }
 
-ALL_CODES = {
- '100': 'Continue',
- '101': 'Switching Protocols',
- '102': 'Processing',
- '200': 'OK',
- '201': 'Created',
- '202': 'Accepted',
- '204': 'No Content',
- '205': 'Reset Content',
- '206': 'Partial Content',
- '208': 'Already Reported',
- '226': 'IM Used',
- '300': 'Multiple Choices',
- '301': 'Moved Permanently',
- '302': 'Found',
- '303': 'See Other',
- '304': 'Not Modified',
- '305': 'Use Proxy',
- '307': 'Temporary Redirect',
- '308': 'Permanent Redirect',
- '400': 'Bad Request',
- '401': 'Unauthorized',
- '402': 'Payment Required',
- '403': 'Forbidden',
- '404': 'Not Found',
- '405': 'Method Not Allowed',
- '406': 'Not Acceptable',
- '407': 'Proxy Authentication Required',
- '408': 'Request Timeout',
- '409': 'Conflict',
- '410': 'Gone',
- '411': 'Length Required',
- '412': 'Precondition Failed',
- '413': 'Payload Too Large',
- '415': 'Unsupported Media Type',
- '416': 'Requested Range Not Satisfiable',
- '417': 'Expectation Failed',
- '421': 'Misdirected Request',
- '422': 'Unprocessable Entity',
- '423': 'Locked',
- '424': 'Failed Dependency',
- '426': 'Upgrade Required',
- '428': 'Precondition Required',
- '429': 'Too Many Requests',
- '431': 'Request Header Fields Too Large',
- '444': 'Connection Closed Without Response',
- '451': 'Unavailable For Legal Reasons',
- '499': 'Client Closed Request',
- '500': 'Internal Server Error',
- '501': 'Not Implemented',
- '502': 'Bad Gateway',
- '503': 'Service Unavailable',
- '504': 'Gateway Timeout',
- '505': 'HTTP Version Not Supported',
- '506': 'Variant Also Negotiates',
- '507': 'Insufficient Storage',
- '508': 'Loop Detected',
- '510': 'Not Extended',
- '511': 'Network Authentication Required',
- '599': 'Network Connect Timeout Error'}
+NAMED_URL_PATTERN = namedtuple('URL_PATTERN', ['description', 'pattern'])
 
 
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
         LogService.__init__(self, configuration=configuration, name=name)
         self.log_path = self.configuration.get('path', '/var/log/nginx/access.log')
-        self.detailed_response_codes = self.configuration.get('detailed_response_codes', False)
-        self.regex = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3}).*?((?<= )[1-9]\d{2}) (\d+) (\d+)? ?([\d.]+)?')
+        self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
+        self.url_pattern = self.configuration.get('categories')
+        self.regex = re.compile(r'(\d{1,3}(?:\.\d{1,3}){3}).*?"[A-Z]+ (.*?)" ([1-9]\d{2}) (\d+) (\d+)? ?([\d.]+)?')
         # sorted list of unique IPs
         self.unique_alltime = list()
         # all values that should not be zeroed every poll
@@ -124,7 +66,7 @@ class Service(LogService):
         self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0,
                      'resp_time_max': 0, 'resp_time_avg': 0, 'unique_cur': 0,
                      'unique_tot': 0, '2xx': 0, '5xx': 0, '3xx': 0, '4xx': 0,
-                     '1xx': 0, '0xx': 0}
+                     '1xx': 0, '0xx': 0, 'other_url': 0}
 
     def check(self):
         # Can't start if log path is not readable by netdata
@@ -153,14 +95,14 @@ class Service(LogService):
             return False
 
         # Pass 5th element from parsed line result (response time)
-        self.create_charts(parsed_line[0][4])
+        self.create_charts(parsed_line[0][5])
         return True
 
     def create_charts(self, parsed_line):
         # This thing needed for adding dynamic dimensions
         self.detailed_chart = 'CHART nginx_log_local.detailed_response_codes ""' \
                               ' "Response Codes" requests responses nginx_log.detailed stacked 14 1\n'
-        self.order = ORDER
+        self.order = ORDER[:]
         self.definitions = CHARTS
 
         # Remove 'request_time' chart if there is not 'reponse_time' in logs
@@ -174,6 +116,18 @@ class Service(LogService):
                                                                        'responses', 'nginx_log.detailed_resp', 'stacked'],
                                                            'lines': []}
 
+        # Add response per url chart if specified in the configuration
+        if self.url_pattern:
+            self.url_pattern = [NAMED_URL_PATTERN(description=k, pattern=re.compile(v)) for k, v in self.url_pattern.items()]
+            self.definitions['requests_per_url'] = {'options': [None, 'Requests Per Url', 'requests/s',
+                                                                       'requests', 'nginx_log.url_pattern', 'stacked'],
+                                                           'lines': [['other_url', 'other', 'absolute']]}
+            for elem in self.url_pattern:
+                self.definitions['requests_per_url']['lines'].append([elem.description, elem.description, 'absolute'])
+                self.data.update({elem.description: 0})
+        else:
+            self.order.remove('requests_per_url')
+          
     def add_new_dimension(self, code, line):
         # add new dimension to STORAGE dict. If code appear once we it will always be as current value or zero
         self.storage.update({code: 0})
@@ -201,7 +155,7 @@ class Service(LogService):
         for line in raw:
             match = self.regex.findall(line)
             if match:
-                match_dict = dict(zip(['address', 'code', 'sent', 'resp_length', 'resp_time'], match[0]))
+                match_dict = dict(zip(['address', 'url', 'code', 'sent', 'resp_length', 'resp_time'], match[0]))
                 try:
                     code = ''.join([match_dict['code'][0], 'xx'])
                     to_netdata[code] += 1
@@ -209,6 +163,7 @@ class Service(LogService):
                     to_netdata['0xx'] += 1
 
                 if self.detailed_response_codes: self._get_detailed_data(match_dict['code'], detailed_dict)
+                if self.url_pattern: self._get_url_pattern_data(match_dict['url'], detailed_dict)
                 
                 to_netdata['bytes_sent'] += int(match_dict['sent'])
                 
@@ -238,6 +193,15 @@ class Service(LogService):
         if code not in self.storage:
             self.add_new_dimension(code, [code, code, 'absolute'])
         detailed_dict[code] += 1
+
+    def _get_url_pattern_data(self, url, detailed_dict):
+        match = None
+        for elem in self.url_pattern:
+            if elem.pattern.search(url):
+                detailed_dict[elem.description] += 1
+                match = True
+                break
+        if not match: detailed_dict['other_url'] += 1
         
 
 def address_not_in_pool(pool, address, pool_size):
