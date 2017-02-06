@@ -7,9 +7,9 @@
 
 /**
  * @file common.h
- * @brief This file is holding common includes, defines and functions.
+ * @brief Common includes, defines and functions.
  *
- * Every netdata C program should include this file.
+ * Every other file should include this.
  */
 
 // ----------------------------------------------------------------------------
@@ -135,42 +135,42 @@
 #define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif // __GNUC__
 
-/// returns_nonnull function attribute
+/// `returns_nonnull` function attribute.
 #ifdef HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
 #define NEVERNULL __attribute__((returns_nonnull))
 #else
 #define NEVERNULL
 #endif
 
-/// malloc function attribute
+/// `malloc` function attribute.
 #ifdef HAVE_FUNC_ATTRIBUTE_MALLOC
 #define MALLOCLIKE __attribute__((malloc))
 #else
 #define MALLOCLIKE
 #endif
 
-/// format function attribute
+/// `format` function attribute.
 #ifdef HAVE_FUNC_ATTRIBUTE_FORMAT
 #define PRINTFLIKE(f, a) __attribute__ ((format(__printf__, f, a)))
 #else
 #define PRINTFLIKE(f, a)
 #endif
 
-/// noreturn function attribute
+/// `noreturn` function attribute.
 #ifdef HAVE_FUNC_ATTRIBUTE_NORETURN
 #define NORETURN __attribute__ ((noreturn))
 #else
 #define NORETURN
 #endif
 
-/// warn_unused_reslult function attribute
+/// `warn_unused_reslult` function attribute.
 #ifdef HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT
 #define WARNUNUSED __attribute__ ((warn_unused_result))
 #else
 #define WARNUNUSED
 #endif
 
-/// Absolute value
+/// Get absolute value.
 #ifdef abs
 #undef abs
 #endif
@@ -260,23 +260,23 @@ extern void netdata_fix_chart_name(char *s);
 /** 
  * Reverse character order of a string.
  *
- * @param begin first character of string
- * @param end last character of string
+ * @param begin First character of string.
+ * @param end Last character of string.
  */
 extern void strreverse(char* begin, char* end);
 /**
- * `strsep() badjusting delimiters`
+ * `strsep()` badjusting delimiters.
  *
- * `mystrsep` works like `strsep()` but it automatically skips adjusting delimiters
+ * `mystrsep()` works like `strsep()` but it automatically skips adjusting delimiters
  * (so if the delimiter is a space, it will will skip all spaces).
  *
  * @see man 3 strsep
  *
  * @author Costa Tsaousis
  *
- * @param ptr
- * @param s
- * @return test
+ * @param ptr Pointer to a string.
+ * @param s List of characters used as delimiter.
+ * @return the original value of `ptr`
  */
 extern char *mystrsep(char **ptr, char *s);
 /**
@@ -288,7 +288,7 @@ extern char *mystrsep(char **ptr, char *s);
  *
  * Lines starting with '#' after optional whitespace return NULL. They are treeted as comments.
  *
- * @param s string
+ * @param s Source string.
  * @return the trimmed string or NULL
  */
 extern char *trim(char *s);
@@ -301,10 +301,10 @@ extern char *trim(char *s);
  * 
  * @see man 3 printf
  *
- * @param dst string to write to.
- * @param n write at most n-1 characters to `dst`
- * @param *fmt format string
- * @param args arguments to parse into format string
+ * @param dst Destination.
+ * @param n Write at most n-1 characters to `dst`.
+ * @param *fmt Format string.
+ * @param args Arguments to parse into format string.
  * @return number of written characters without terminating '\0'
  */
 extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
@@ -316,9 +316,9 @@ extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
  * 
  * @see man 3 printf
  *
- * @param dst string to write to.
- * @param n write at most n-1 characters to `dst`
- * @param *fmt format string
+ * @param dst Destination.
+ * @param n Write at most n-1 characters to `dst`.
+ * @param *fmt Format string.
  * @return number of written characters without terminating '\0'
  */
 extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
@@ -361,9 +361,9 @@ extern char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
  *
  * @see man 3 malloc
  *
- * @param nmemb number of objects that are `size` bytes to allocate memory for
- * @param size number of bytes of one object
- * @return Pointer to allocated memory
+ * @param nmemb Number of objects that are `size` bytes to allocate memory for.
+ * @param size Number of bytes of one object.
+ * @return pointer to allocated memory
  */
 extern void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
 /**
@@ -376,7 +376,7 @@ extern void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
  * @see man 3 malloc
  *
  * @param size Number of bytes to allocate.
- * @return Pointer to allocated memory
+ * @return pointer to allocated memory
  */
 extern void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
 /**
@@ -420,14 +420,14 @@ extern void freez(void *ptr);
 extern void json_escape_string(char *dst, const char *src, size_t size);
 
 /**
- * Extended `nmap()``
+ * Extended `nmap()`.
  *
- * 1. it creates the file if does not exist (to the correct size).
- * 2. it truncates the file if it already exists and is bigger than expected.
+ * 1. it creates the file if does not exist (to the correct size)
+ * 2. it truncates the file if it already exists and is bigger than expected
  * 3. sets various memory management heuristics we know netdata memory databases use (like MADV_SEQUENTIAL)
- * 4. prevents this memory from being copied when netdata forks to execute its plugins.
- * 5. enables KSM for it.
- * 6. in memory mode ram, it loads the file into memory (in all other modes, loading it is on-demand by the kernel).
+ * 4. prevents this memory from being copied when netdata forks to execute its plugins
+ * 5. enables KSM for it
+ * 6. in memory mode ram, it loads the file into memory (in all other modes, loading it is on-demand by the kernel)
  *
  * @author Costa Tsaousis
  *
@@ -455,15 +455,13 @@ extern int savememory(const char *filename, void *mem, size_t size);
 /**
  * Check if `fd` is a valid open file descriptor.
  *
- * @param fd file descriptor
+ * @param fd File descriptor to check.
  * @return boolean
  */
 extern int fd_is_valid(int fd);
 
-extern int enable_ksm;
-
-extern char *global_host_prefix; ///< A configurable host prefix
-extern int enable_ksm; ///< boolean to enable Kernel Same-Page Merging
+extern char *global_host_prefix; ///< Configurable host prefix.
+extern int enable_ksm; ///< boolean to enable Kernel Same-Page Merging.
 
 /**
  * Get the calling thread's unique ID.
@@ -472,7 +470,7 @@ extern int enable_ksm; ///< boolean to enable Kernel Same-Page Merging
  *
  * @see man 3 pthread_threadid_np
  *
- * @return calling thread's unique ID
+ * @return the calling thread's unique ID
  */
 extern pid_t gettid(void);
 
@@ -495,7 +493,7 @@ extern int sleep_usec(usec_t usec);
  * @param buf_size Size of buffer in bytes.
  * @param fp Stream to read from.
  * @param len Length of written string.
- * @return `buf` on success, NULL on failure.
+ * @return `buf` on success, NULL on failure
  */
 extern char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
@@ -510,7 +508,7 @@ extern int processors; ///< Number of logical processors
  */
 extern long get_system_cpus(void);
 
-extern pid_t pid_max; ///< maximum supported prozess id's
+extern pid_t pid_max; ///< Maximum supported prozess id's.
 /**
  * Get maximum number of pids.
  *
@@ -518,7 +516,7 @@ extern pid_t pid_max; ///< maximum supported prozess id's
  * If the lookup fails try to guess.
  * This sets `pid_max`.
  *
- * @return Maximum number of pids.
+ * @return maximum number of pids
  */
 extern pid_t get_system_pid_max(void);
 
