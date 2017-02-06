@@ -12,40 +12,40 @@ from collections import defaultdict
 priority = 60000
 retries = 60
 
-ORDER = ['response_codes', 'request_time', 'bandwidth', 'clients']
+ORDER = ['response_codes', 'request_time', 'bandwidth', 'clients_cur', 'clients_all']
 CHARTS = {
     'response_codes': {
-        'options': [None, 'Response Codes', 'requests/s', 'Responses', 'nginx_log.response', 'stacked'],
+        'options': [None, 'Response Codes', 'requests/s', 'responses', 'nginx_log.response', 'stacked'],
         'lines': [
-            ['2', '2xx', 'absolute'],
-            ['5', '5xx', 'absolute'],
-            ['3', '3xx', 'absolute'],
-            ['4', '4xx', 'absolute'],
-            ['1', '1xx', 'absolute'],
-            ['6', '6xx', 'absolute'],
-            ['7', '7xx', 'absolute'],
-            ['8', '8xx', 'absolute'],
-            ['9', '9xx', 'absolute']
+            ['2xx', '2xx', 'absolute'],
+            ['5xx', '5xx', 'absolute'],
+            ['3xx', '3xx', 'absolute'],
+            ['4xx', '4xx', 'absolute'],
+            ['1xx', '1xx', 'absolute'],
+            ['0xx', 'other', 'absolute']
         ]},
     'bandwidth': {
-        'options': [None, 'Bandwidth', 'KB/s', 'Bandwidth', 'nginx_log.bw', 'stacked'],
+        'options': [None, 'Bandwidth', 'KB/s', 'bandwidth', 'nginx_log.bw', 'area'],
         'lines': [
-            ['bytes_sent', 'sent', 'absolute', 1, 1024],
-            ['resp_length', 'received', 'absolute', 1, 1024]
+            ['resp_length', 'received', 'absolute', 1, 1024],
+            ['bytes_sent', 'sent', 'absolute', -1, 1024]
         ]},
     'request_time': {
-        'options': [None, 'Processing Time', 'seconds', 'Requests', 'nginx_log.request', 'stacked'],
+        'options': [None, 'Processing Time', 'milliseconds', 'timings', 'nginx_log.request', 'area'],
         'lines': [
-            ['resp_time_min', 'min', 'absolute', 1, 1000],
-            ['resp_time_avg', 'avg', 'absolute', 1, 1000],
-            ['resp_time_max', 'max', 'absolute', 1, 1000]
+            ['resp_time_min', 'min', 'absolute', 1, 1],
+            ['resp_time_max', 'max', 'absolute', 1, 1],
+            ['resp_time_avg', 'avg', 'absolute', 1, 1]
         ]},
-    'clients': {
-        'options': [None, 'Unique Client IPs', 'number', 'Client IPs', 'nginx_log.clients', 'stacked'],
+    'clients_cur': {
+        'options': [None, 'Current Poll Unique Client IPs', 'number', 'unique clients', 'nginx_log.clients', 'line'],
         'lines': [
-            ['unique_cur', 'current_poll', 'absolute', 1, 1],
-            ['foo', 'foo', 'absolute', 1, 1],
-            ['unique_tot', 'all_time', 'absolute', 1, 1]
+            ['unique_cur', 'clients', 'absolute', 1, 1]
+        ]},
+    'clients_all': {
+        'options': [None, 'All Time Unique Client IPs', 'number', 'unique clients', 'nginx_log.clients', 'line'],
+        'lines': [
+            ['unique_tot', 'clients', 'absolute', 1, 1]
         ]}
 }
 
@@ -121,10 +121,10 @@ class Service(LogService):
         self.unique_alltime = list()
         # all values that should not be zeroed every poll
         self.storage = {'unique_tot': 0}
-        self.data = {str(k): 0 for k in range(1, 10)}
-        self.data.update({'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0,
-                          'resp_time_avg': 0, 'resp_time_max': 0, 'unique_cur': 0,
-                          'foo': 0, 'unique_tot': 0})
+        self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0,
+                     'resp_time_max': 0, 'resp_time_avg': 0, 'unique_cur': 0,
+                     'unique_tot': 0, '2xx': 0, '5xx': 0, '3xx': 0, '4xx': 0,
+                     '1xx': 0, '0xx': 0}
 
     def check(self):
         # Can't start if log path is not readable by netdata
@@ -159,7 +159,7 @@ class Service(LogService):
     def create_charts(self, parsed_line):
         # This thing needed for adding dynamic dimensions
         self.detailed_chart = 'CHART nginx_log_local.detailed_response_codes ""' \
-                              ' "Response Codes" requests Detailed nginx_log.detailed stacked 14 1\n'
+                              ' "Response Codes" requests responses nginx_log.detailed stacked 14 1\n'
         self.order = ORDER
         self.definitions = CHARTS
 
@@ -171,7 +171,7 @@ class Service(LogService):
         if self.detailed_response_codes:
             self.order.append('detailed_response_codes')
             self.definitions['detailed_response_codes'] = {'options': [None, 'Detailed Response Codes', 'requests/s',
-                                                                       'Detailed', 'nginx_log.detailed_resp', 'stacked'],
+                                                                       'responses', 'nginx_log.detailed_resp', 'stacked'],
                                                            'lines': []}
 
     def add_new_dimension(self, code, line):
@@ -202,7 +202,11 @@ class Service(LogService):
             match = self.regex.findall(line)
             if match:
                 match_dict = dict(zip(['address', 'code', 'sent', 'resp_length', 'resp_time'], match[0]))
-                to_netdata[match_dict['code'][0]] += 1
+                try:
+                    code = ''.join([match_dict['code'][0], 'xx'])
+                    to_netdata[code] += 1
+                except KeyError:
+                    to_netdata['0xx'] += 1
 
                 if self.detailed_response_codes: self._get_detailed_data(match_dict['code'], detailed_dict)
                 
