@@ -3,7 +3,7 @@
 
 /**
  * @file log.h
- * @brief Logging API
+ * @brief Logging
  *
  * This file holds the API used for logging.
  *
