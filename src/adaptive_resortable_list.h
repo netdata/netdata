@@ -163,7 +163,7 @@ extern void arl_begin(ARL_BASE *base);
  *
  * It is defined in the header file in order to be inlined.
  *
- * @param The ARL.
+ * @param base The ARL.
  * @param keyword read from source
  * @param value of `keyword`
  * @return 1 if all expected keywords where found in this iteration. 0 if not.
