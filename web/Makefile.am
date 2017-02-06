@@ -116,7 +116,7 @@ dist_webdnt_DATA = \
 	$(NULL)
 
 dashboard_info.js:
-	sh "$(top_srcdir)/os-templates/generate-dashboard-info-js.sh" "$(host_os)"  > $@
+	bash "$(top_srcdir)/os-templates/generate-dashboard-info-js.sh" "$(host_os)"  > $@
 
 version.txt:
 	if test -d "$(top_srcdir)/.git"; then \

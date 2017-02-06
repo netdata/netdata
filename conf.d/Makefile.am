@@ -116,7 +116,7 @@ dist_chartsconfig_DATA = \
 
 
 health.d/cpu.conf health.d/ram.conf health.d/swap.conf:
-	sh "$(top_srcdir)/os-templates/generate-conf.d.sh" "$@" "$(host_os)"  > $@
+	bash "$(top_srcdir)/os-templates/generate-conf.d.sh" "$@" "$(host_os)"  > $@
 
 .PHONY: health.d/cpu.conf health.d/ram.conf health.d/swap.conf
 
