@@ -51,7 +51,6 @@ deploy:
     file_glob: true
     file: "netdata*.tar.*"
     on:
-      condition: $CC = gcc
-      condition: $TRAVIS_OS_NAME = linux
+      condition: $CC = gcc && $TRAVIS_OS_NAME
       repo: firehol/netdata
       tags: true
