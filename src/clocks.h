@@ -3,7 +3,7 @@
 
 /**
  * @file clocks.h
- * @brief API to get system time.
+ * @brief Get system time.
  *
  * Three clocks are available.
  *
@@ -51,18 +51,18 @@
  */
 
 #ifndef HAVE_STRUCT_TIMESPEC
-/** Fallback struct timespec */
+/** Fallback struct timespec. */
 struct timespec {
-    time_t tv_sec;  ///< seconds
-    long   tv_nsec; ///< nanoseconds
+    time_t tv_sec;  ///< Seconds.
+    long   tv_nsec; ///< Nanoseconds.
 };
 #endif
 
 #ifndef HAVE_CLOCKID_T
-typedef int clockid_t; ///< Used for clock ID type in the clock and timer functions
+typedef int clockid_t; ///< Used for clock ID type in the clock and timer functions.
 #endif
 
-typedef unsigned long long usec_t; ///< microsecond
+typedef unsigned long long usec_t; ///< Microsecond.
 
 typedef usec_t heartbeat_t; ///< Data structure for use with heartbeat_* functions.
 
@@ -76,23 +76,23 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts);
 #endif
 
 #ifndef CLOCK_MONOTONIC
-/** Fallback to CLOCK_REALTIME if not available */
+/** Fallback to CLOCK_REALTIME if not available. */
 #define CLOCK_MONOTONIC CLOCK_REALTIME
 #endif
 
 #ifndef CLOCK_BOOTTIME
-/** Fallback to CLOCK_MONOTONIC if not available */
+/** Fallback to CLOCK_MONOTONIC if not available. */
 #define CLOCK_BOOTTIME  CLOCK_MONOTONIC
 #else
 #ifdef HAVE_CLOCK_GETTIME
-#define CLOCK_BOOTTIME_IS_AVAILABLE 1 ///< required for /proc/uptime
+#define CLOCK_BOOTTIME_IS_AVAILABLE 1 ///< Required for /proc/uptime.
 #endif
 #endif
 
-#define NSEC_PER_SEC    1000000000ULL ///< Number of nanoseconds per second
-#define NSEC_PER_MSEC   1000000ULL    ///< Number of nanoseconds per millisecond
-#define NSEC_PER_USEC   1000ULL       ///< Number of nanoseconds per microsecond 
-#define USEC_PER_SEC    1000000ULL    ///< Number of microseconds per second
+#define NSEC_PER_SEC    1000000000ULL ///< Number of nanoseconds per second.
+#define NSEC_PER_MSEC   1000000ULL    ///< Number of nanoseconds per millisecond.
+#define NSEC_PER_USEC   1000ULL       ///< Number of nanoseconds per microsecond.
+#define USEC_PER_SEC    1000000ULL    ///< Number of microseconds per second.
 
 #ifndef HAVE_CLOCK_GETTIME
 /**
@@ -102,13 +102,13 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts);
  * make systems without clock_gettime() support sensitive
  * to time jumps or hibernation/suspend side effects.
  *
- * errno is set by `gettimeofday()`
+ * errno is set by `gettimeofday()`.
  * 
  * @see man 2 gettimeofday
  *
  * @param clk_id Not used.
  * @param ts struct timespec to store time
- * @return 0 on succes, -1 else with errno set appropriately.
+ * @return 0 on succes, -1 on error with errno set appropriately
  */
 extern int clock_gettime(clockid_t clk_id, struct timespec *ts);
 #endif
@@ -120,12 +120,12 @@ extern int clock_gettime(clockid_t clk_id, struct timespec *ts);
  * - Hibernation/suspend time is included
  * - adjtime()/NTP adjustments affect this clock
  *
- * errno is set by `gettimeofday()`
+ * errno is set by `gettimeofday()`.
  * 
  * @see man 2 gettimeofday
  *
- * @param tv struct timeval gets updated
- * @return 0 on success, -1 else with errno set appropriately.
+ * @param tv struct timeval gets updated.
+ * @return 0 on success, -1 on error with errno set appropriately
  */
 extern int now_realtime_timeval(struct timeval *tv);
 
@@ -135,7 +135,7 @@ extern int now_realtime_timeval(struct timeval *tv);
  * - Hibernation/suspend time is included
  * - adjtime()/NTP adjustments affect this clock
  *
- * @return Time since EPOCH
+ * @return time since EPOCH
  */
 extern time_t now_realtime_sec(void);
 /**
@@ -144,7 +144,7 @@ extern time_t now_realtime_sec(void);
  * - Hibernation/suspend time is included
  * - adjtime()/NTP adjustments affect this clock
  *
- * @return Time since EPOCH
+ * @return time since EPOCH
  */
 extern usec_t now_realtime_usec(void);
 
@@ -236,8 +236,8 @@ extern usec_t timeval_usec(struct timeval *ts);
  * abs(now - old)
  * ~~~~~~~~~~~~~~
  *
- * @param now first struct timeval
- * @param old second struct timeval
+ * @param now First struct timeval.
+ * @param old Second struct timeval.
  * @return time in microseconds between `now` and `old`
  */
 extern usec_t dt_usec(struct timeval *now, struct timeval *old);
@@ -264,7 +264,7 @@ extern usec_t heartbeat_next(heartbeat_t *hb, usec_t tick);
  * Returns elapsed time in microseconds since last heartbeat.
  *
  * @param hb Heartbeat.
- * @return elapsed time in microseconds since last heartbeat.
+ * @return elapsed time in microseconds since last heartbeat
  */
 extern usec_t heartbeat_dt_usec(heartbeat_t *hb);
 
