@@ -5,28 +5,28 @@
  * @file appconfig.h
  * @brief Read and update configuration.
  *
- * Config options are identified by config section and config name. They contain a single value.
+ * Configuration options are identified by configuration section and configuration name. They contain a single value.
  *
- * Config options can be set from a file with load_config() or methods starting with `config_set`.
+ * Configuration options can be set from a file with load_config() or methods starting with `config_set`.
  *
  * To get options use the methods starting with `config_get`. They always allow you to set a default
- * value for the case the config option is was not set yet.
+ * value for the case the configuration option is was not set yet.
  */
 
 #define CONFIG_FILENAME "netdata.conf" ///< Default configuration filename.
 
-/// Limit the config option names lengths. This is not enforced by config.c functions
+/// Limit the configuration option names lengths. This is not enforced by config.c functions
 /// (they will strdup() all strings, no matter of their length)
 #define CONFIG_MAX_NAME 1024
-/// Limit the config option value lengths. This is not enforced by config.c functions
+/// Limit the configuration option value lengths. This is not enforced by config.c functions
 /// (they will strdup() all strings, no matter of their length)
 #define CONFIG_MAX_VALUE 2048
 
 /**
- * Load config file.
+ * Load configuration file.
  *
- * @param filename path to file containing config options
- * @param overwrite_used boolean: Overwrite already used config names.
+ * @param filename path to file containing configuration options
+ * @param overwrite_used boolean: Overwrite already used configuration names.
  * @return 1 on success. 0 on error
  */
 extern int load_config(char *filename, int overwrite_used);
