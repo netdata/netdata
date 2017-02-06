@@ -3,7 +3,7 @@
 
  /**
  * @file main.h
- * @brief This file holds the API of global netdata elements.
+ * @brief Global data structures and functions.
  */
 
 /**
@@ -59,8 +59,8 @@ extern void kill_childs(void);
  * Send the signal `signal` to process with pid `pid`.
  * Signals are specified in signal.h.
  * 
- * @param signal 
- * @param pid
+ * @param signal to send
+ * @param pid Destination.
  * @return 0 on success.
  */
 extern int killpid(pid_t pid, int signal);
