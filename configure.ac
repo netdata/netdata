@@ -59,11 +59,13 @@ darwin*)
 	LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
 	;;
 *)
+	build_target=linux
 	;;
 esac
 
 AM_CONDITIONAL([FREEBSD], [test x$build_target = xfreebsd])
 AM_CONDITIONAL([MACOS], [test x$build_target = xmacos])
+AM_CONDITIONAL([LINUX], [test x$build_target = xlinux])
 
 AC_ARG_ENABLE(
 	[plugin-nfacct],
