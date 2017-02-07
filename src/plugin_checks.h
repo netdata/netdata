@@ -7,7 +7,7 @@
  */
 
 /**
- * Main method of checks thread.
+ * Main function of checks thread.
  *
  * @param ptr to struct netdata_static_thread
  * @return NULL
