@@ -7,7 +7,7 @@
  */
 
 /**
- * Main method of IDLEJITTER thread.
+ * Main function of IDLEJITTER thread.
  *
  * @param ptr to struct netdata_static_thread
  * @return NULL
