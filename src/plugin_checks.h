@@ -3,7 +3,7 @@
 
 /**
  * @file plugin_checks.h
- * @brief Thread CHECK with some example charts.
+ * @brief Thread fills some example charts.
  */
 
 /**
