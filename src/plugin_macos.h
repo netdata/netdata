@@ -19,7 +19,7 @@ void *macos_main(void *ptr);
  *
  * @param name to query
  * @param var to store result
- * @return 0 on success. 1 on error.
+ * @return 0 on success, 1 on error
  */
 #define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
 
@@ -44,8 +44,8 @@ extern int getsysctl(const char *name, void *ptr, size_t len);
  * This is called by `freebsd_main` every `update_every` second.
  * This function should push values to the round robin database.
  *
- * @param update_every intervall in seconds this is called.
- * @param dt microseconds passed since the last call.
+ * @param update_every Intervall in seconds this is called.
+ * @param dt Microseconds passed since the last call.
  * @return 0 on success. 1 on error.
  */
 extern int do_macos_sysctl(int update_every, usec_t dt);
@@ -57,8 +57,8 @@ extern int do_macos_sysctl(int update_every, usec_t dt);
  * This is called by `freebsd_main` every `update_every` second.
  * This function should push values to the round robin database.
  *
- * @param update_every intervall in seconds this is called.
- * @param dt microseconds passed since the last call.
+ * @param update_every Intervall in seconds this is called.
+ * @param dt Microseconds passed since the last call.
  * @return 0 on success. 1 on error.
  */
 extern int do_macos_mach_smi(int update_every, usec_t dt);
@@ -68,8 +68,8 @@ extern int do_macos_mach_smi(int update_every, usec_t dt);
  * This is called by `freebsd_main` every `update_every` second.
  * This function should push values to the round robin database.
  *
- * @param update_every intervall in seconds this is called.
- * @param dt microseconds passed since the last call.
+ * @param update_every Intervall in seconds this is called.
+ * @param dt Microseconds passed since the last call.
  * @return 0 on success. 1 on error.
  */
 extern int do_macos_iokit(int update_every, usec_t dt);
