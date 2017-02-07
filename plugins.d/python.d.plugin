@@ -67,6 +67,26 @@ try:
 except ImportError:
     msg.fatal('Cannot find yaml library')
 
+try:
+    from collections import OrderedDict
+    ORDERED = True
+    DICT = OrderedDict
+    msg.info('YAML output is ordered')
+except ImportError:
+    ORDERED = False
+    DICT = dict
+    msg.info('YAML output is unordered')
+else:
+    def ordered_load(stream, Loader=yaml.Loader, object_pairs_hook=OrderedDict):
+        class OrderedLoader(Loader):
+            pass
+        def construct_mapping(loader, node):
+           loader.flatten_mapping(node)
+           return object_pairs_hook(loader.construct_pairs(node))
+        OrderedLoader.add_constructor(
+            yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+            construct_mapping)
+        return yaml.load(stream, OrderedLoader)
 
 class PythonCharts(object):
     """
@@ -235,7 +255,7 @@ class PythonCharts(object):
         # check if there are dict in config dict
         many_jobs = False
         for name in config:
-            if type(config[name]) is dict:
+            if isinstance(config[name], DICT):
                 many_jobs = True
                 break
 
@@ -420,7 +440,10 @@ def read_config(path):
     """
     try:
         with open(path, 'r') as stream:
-            config = yaml.load(stream)
+            if ORDERED:
+                config = ordered_load(stream, yaml.SafeLoader)
+            else:
+                config = yaml.load(stream)
     except (OSError, IOError):
         msg.error(str(path), "is not a valid configuration file")
         return None
