@@ -38,12 +38,12 @@ CHARTS = {
             ['resp_time_avg', 'avg', 'absolute', 1, 1]
         ]},
     'clients_cur': {
-        'options': [None, 'Current Poll Unique Client IPs', 'number', 'unique clients', 'nginx_log.clients', 'line'],
+        'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'unique clients', 'nginx_log.clients', 'line'],
         'lines': [
             ['unique_cur', 'clients', 'absolute', 1, 1]
         ]},
     'clients_all': {
-        'options': [None, 'All Time Unique Client IPs', 'number', 'unique clients', 'nginx_log.clients', 'line'],
+        'options': [None, 'All Time Unique Client IPs', 'unique ips', 'unique clients', 'nginx_log.clients', 'line'],
         'lines': [
             ['unique_tot', 'clients', 'absolute', 1, 1]
         ]}
