@@ -102,8 +102,10 @@ get_changelog_version() {
 get_configure_ac_version() {
   get_staged_file configure.ac
   local v=`sed -n \
-         -e '/define(\[VERSION_\(MINOR\|FIX\)/s/.*\[\([^[]*\)\].*/.\1/p' \
-         -e '/define(\[VERSION_\(MAJOR\|SUFFIX\)/s/.*\[\([^[]*\)\].*/\1/p' \
+         -e '/define(\[VERSION_MAJOR/s/.*\[\([^[]*\)\].*/\1/p' \
+         -e '/define(\[VERSION_MINOR/s/.*\[\([^[]*\)\].*/.\1/p' \
+         -e '/define(\[VERSION_FIX/s/.*\[\([^[]*\)\].*/.\1/p' \
+         -e '/define(\[VERSION_SUFFIX/s/.*\[\([^[]*\)\].*/\1/p' \
          $MYTMP/files/configure.ac | tr -d '\n'`
   if [ ! "$v" ]; then v="No version in configure.ac!"; fi
   echo "$v"
