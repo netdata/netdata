@@ -3,7 +3,7 @@
 
 /**
  * @file popen.h
- * @brief API to run an external command
+ * @brief Run external commands
  */
 
 #define PIPE_READ 0  ///< Read end file descriptor index in pipe file descripter array.
@@ -12,13 +12,13 @@
 /**
  * Execute `command` and return a file descriptor to the output.
  *
- * @param command Command line to execute.
+ * @param command line to execute
  * @param pidptr Pointer to store the pid of the executed program.
  * @return FILE to read output from 
  */
 extern FILE *mypopen(const char *command, pid_t *pidptr);
 /**
- * Exit command started with myopen()
+ * Exit command started with myopen().
  *
  * This returns
  * - The exit code of command if present
