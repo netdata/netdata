@@ -45,7 +45,7 @@ struct plugind {
 extern struct plugind *pluginsd_root;
 
 /**
- * Main method of thread pluginsd.
+ * Main function of thread pluginsd.
  *
  * @param ptr to struct netdata_static_thread
  * @return NULL
