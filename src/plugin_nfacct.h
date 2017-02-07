@@ -3,13 +3,13 @@
 
 /**
  * @file plugin_nfacct.h
- * @brief Thread to collect nfacct data.
+ * @brief Thread to collect nfacct metrics.
  */
 
 /**
  * Main method of the nfacct thread.
  *
- * This thread collects nfacct data.
+ * This thread collects nfacct metrics.
  *
  * @param ptr to struct netdata_static_thread
  * @return NULL
