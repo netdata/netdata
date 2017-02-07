@@ -63,7 +63,7 @@ extern void registry_free(void);
 /**
  * Register HTTP access request.
  *
- * Main method for registering an access.
+ * Main function for registering an access.
  *
  * @param w Requesting client.
  * @param person_guid of requesting person
