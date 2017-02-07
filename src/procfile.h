@@ -1,6 +1,6 @@
 /**
  * @file procfile.h
- * @brief Library for reading kernel files from /proc.
+ * @brief Reading kernel files from /proc.
  *
  * The idea is this:
  *
@@ -27,33 +27,33 @@
 #define NETDATA_PROCFILE_H 1
 
 // ----------------------------------------------------------------------------
-/// An array of words
+/// Array of words.
 typedef struct {
-    size_t len;     ///< used entries
-    size_t size;    ///< capacity
-    char *words[];  ///< array of pointers
+    size_t len;     ///< Used entries.
+    size_t size;    ///< Total entries.
+    char *words[];  ///< Array of strings.
 } pfwords;
 
 // ----------------------------------------------------------------------------
-/// An array of lines
+/// Metadata for one line.
 typedef struct {
-    size_t words;     ///< how many words this line has
-    size_t first;     ///< the id of the first word of this line
-                      ///< in the words array
+    size_t words;     ///< Number of words the line has
+    size_t first;     ///< The id of the first word of this line
+                      ///< in the words array.
 } ffline;
 
 /// Collection of lines
 typedef struct {
-    size_t len;       ///< used entries
-    size_t size;      ///< capacity
-    ffline lines[];   ///< array of lines
+    size_t len;       ///< Used entries.
+    size_t size;      ///< Total entries.
+    ffline lines[];   ///< Array of lines
 } pflines;
 
 // ----------------------------------------------------------------------------
 // The procfile
 
-#define PROCFILE_FLAG_DEFAULT 0x00000000             ///< default flag
-#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001 ///< do not fail/error on file io
+#define PROCFILE_FLAG_DEFAULT 0x00000000             ///< Default flag.
+#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001 ///< Do not fail/error on file io.
 
 /**
  * Constants used to classify a char in a procfile.
@@ -67,14 +67,14 @@ typedef enum procfile_separator {
     PF_CHAR_IS_CLOSE
 } PF_CHAR_TYPE;
 
-/** The procfile */
+/** Procfile */
 typedef struct {
-    char filename[FILENAME_MAX + 1]; ///< the filename
+    char filename[FILENAME_MAX + 1]; ///< Filename
     
     uint32_t flags;       ///< PROCFILE_FLAG_*
-    int fd;               ///< The file desriptor.
-    size_t len;           ///< The bytes we have placed into data.
-    size_t size;          ///< The bytes we have allocated for data.
+    int fd;               ///< File desriptor.
+    size_t len;           ///< Bytes we have placed into `data`.
+    size_t size;          ///< Bytes we have allocated for `data`.
     pflines *lines;       ///< Lines of the file.
     pfwords *words;       ///< Words of the file.
     char separators[256]; ///< Separator chars (procfile_separator).
@@ -104,7 +104,7 @@ extern procfile *procfile_readall(procfile *ff);
  * @param filename to open
  * @param separators used to seperate columns
  * @param flags PROCFILE_FLAG_*
- * @return the opend procfile. `NULL` on error.
+ * @return the opend procfile, `NULL` on error
  */
 extern procfile *procfile_open(const char *filename, const char *separators, uint32_t flags);
 
@@ -117,7 +117,7 @@ extern procfile *procfile_open(const char *filename, const char *separators, uin
  * @param filename to re-open
  * @param separators used to seperate columns or `NULL`
  * @param flags PROCFILE_FLAG_*
- * @return the opend procfile. `NULL` on error.
+ * @return the opend procfile, `NULL` on error
  */
 extern procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags);
 
@@ -142,8 +142,8 @@ extern void procfile_set_quotes(procfile *ff, const char *quotes);
  * So, if you set this to `(` and `)`, the tokenizer will assume everything in parenthesis as a single keyword.
  *
  * @param ff Proc file.
- * @param open start keyword mark
- * @param close end keyword mark
+ * @param open Start keyword mark.
+ * @param close End keyword mark.
  */
 extern void procfile_set_open_close(procfile *ff, const char *open, const char *close);
 
