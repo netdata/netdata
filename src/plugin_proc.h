@@ -3,12 +3,10 @@
 
 /**
  * @file plugin_proc.h
- * @brief The header file of all internal proc data collectors.
- *
- * This is the header file of the proc data collection thread.
+ * @brief Thread to collect linux proc filesystem metrics.
  *
  * __How to add a data collector__
- * \todo How to add a proc data collector.
+ * \todo Describe how to add a data collector.
  */
 
 #include "common.h"
@@ -38,7 +36,7 @@ struct proc_module {
 };
 
 /**
- * Function run by the proc plugin thread.
+ * Main function of the proc thread.
  *
  * This must only be startet once.
  *
