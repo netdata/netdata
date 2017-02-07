@@ -3,7 +3,7 @@
 
 /**
  * @file plugin_idlejitter.h
- * @brief Thread to collect IDLEJITTER data.
+ * @brief Thread to collect IDLEJITTER metrics.
  */
 
 /**
