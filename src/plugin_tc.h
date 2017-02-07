@@ -3,7 +3,7 @@
 
 /**
  * @file plugin_tc.h
- * @brief Thread to collect network tc classes data.
+ * @brief Thread to collect network tc classes metrics.
  */
 
 /// PID of tc child
