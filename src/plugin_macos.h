@@ -7,7 +7,7 @@
  */
 
 /**
- * Main method of macos thread.
+ * Main function of macos thread.
  *
  * @param ptr to struct netdata_static_thread
  * @return NULL
