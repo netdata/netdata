@@ -7,7 +7,7 @@
  */
  
 /** 
- * Main method of backend thread.
+ * Main function of backend thread.
  *
  * This method sends data to backends.
  *
