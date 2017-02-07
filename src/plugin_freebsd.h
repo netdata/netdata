@@ -18,7 +18,7 @@
 #define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
 
 /**
- * Main method of freebsd thread.
+ * Main function of freebsd thread.
  *
  * @param ptr to struct netdata_static_thread
  * @return NULL
