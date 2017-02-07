@@ -7,7 +7,7 @@
  */
 
 /**
- * Main method of the nfacct thread.
+ * Main function of the nfacct thread.
  *
  * This thread collects nfacct metrics.
  *
