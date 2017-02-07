@@ -2,6 +2,9 @@ dist: precise
 #
 # C includes autotools and make by default
 language: c
+os:
+  - linux
+  - osx
 compiler:
  - gcc
  - clang
@@ -19,6 +22,8 @@ addons:
 before_install:
  - eval "$(ssh-agent -s)"
  - ./.travis/decrypt-if-have-key decb6f6387c4
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gpg fakeroot ossp-uuid xz; fi
 #
 # Run
 before_script:
@@ -46,6 +51,6 @@ deploy:
     file_glob: true
     file: "netdata*.tar.*"
     on:
-      condition: $CC = gcc
+      condition: $CC = gcc && $TRAVIS_OS_NAME
       repo: firehol/netdata
       tags: true
