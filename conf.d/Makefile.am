@@ -57,11 +57,11 @@ dist_pythonconfig_DATA = \
     $(NULL)
 
 healthconfigdir=$(configdir)/health.d
+
 dist_healthconfig_DATA = \
     health.d/apache.conf \
     health.d/backend.conf \
     health.d/bind_rndc.conf \
-    health.d/cpu.conf \
     health.d/disks.conf \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
@@ -80,16 +80,22 @@ dist_healthconfig_DATA = \
     health.d/nginx.conf \
     health.d/postgres.conf \
     health.d/qos.conf \
-    health.d/ram.conf \
     health.d/redis.conf \
     health.d/retroshare.conf \
     health.d/softnet.conf \
     health.d/squid.conf \
-    health.d/swap.conf \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
     health.d/varnish.conf \
     $(NULL)
+
+if LINUX
+dist_healthconfig_DATA += \
+    health.d/cpu.conf \
+    health.d/ram.conf \
+    health.d/swap.conf \
+    $(NULL)
+endif LINUX
 
 chartsconfigdir=$(configdir)/charts.d
 dist_chartsconfig_DATA = \
