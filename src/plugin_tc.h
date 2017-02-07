@@ -9,7 +9,7 @@
 /// PID of tc child
 extern volatile pid_t tc_child_pid;
 /**
- * Main method of TC thread.
+ * Main function of TC thread.
  *
  * @param ptr to struct netdata_static_thread
  * @return NULL
