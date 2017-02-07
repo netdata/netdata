@@ -24,7 +24,7 @@
 extern int web_server_mode;
 
 /**
- * Main method of thread of the web server.
+ * Main function of thread of the web server.
  *
  * This starts a multi threaded web server.
  *
@@ -33,7 +33,7 @@ extern int web_server_mode;
  */
 extern void *socket_listen_main_multi_threaded(void *ptr);
 /**
- * Main method of thread of the web server.
+ * Main function of thread of the web server.
  *
  * This starts a single threaded web server.
  *
