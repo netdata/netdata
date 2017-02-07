@@ -12,7 +12,10 @@ define([VERSION_SUFFIX], [_master])
 dnl Set to "1" for a first RPM release of a new version
 PACKAGE_RPM_RELEASE="0.0.$(echo VERSION_SUFFIX | sed s/^_//)"
 
-AC_INIT([netdata], VERSION_NUMBER[]VERSION_SUFFIX)
+define([VERSION_STRING], m4_esyscmd_s(git describe 2> /dev/null))
+m4_ifval(VERSION_STRING, [], [define([VERSION_STRING], VERSION_NUMBER[]VERSION_SUFFIX)])
+
+AC_INIT([netdata], VERSION_STRING)
 
 AM_MAINTAINER_MODE([disable])
 if test x"$USE_MAINTAINER_MODE" = xyes; then
