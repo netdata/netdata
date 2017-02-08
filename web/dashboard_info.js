@@ -14,177 +14,177 @@ netdataDashboard.menu = {
     'services': {
         title: 'systemd Services',
         icon: '<i class="fa fa-cogs" aria-hidden="true"></i>',
-        info: 'Resources utilization of systemd services.'
+        info: 'Resources utilization of systemd services. netdata monitors all systemd services via cgroups (the resources accounting used by containers). '
     },
 
     'ap': {
         title: 'Access Points',
         icon: '<i class="fa fa-wifi" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for the access points (i.e. wireless interfaces in AP mode) found on the system.'
     },
 
     'tc': {
         title: 'Quality of Service',
         icon: '<i class="fa fa-globe" aria-hidden="true"></i>',
-        info: 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). Also, data collection may have a slight time difference compared to the interface (QoS data collection is implemented with a BASH script, so a shift in data collection of a few milliseconds should be justified).'
+        info: 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). QoS data collection may have a slight time difference compared to the interface (QoS data collection uses a BASH script, so a shift in data collection of a few milliseconds should be justified).'
     },
 
     'net': {
         title: 'Network Interfaces',
         icon: '<i class="fa fa-share-alt" aria-hidden="true"></i>',
-        info: 'Per network interface statistics collected from <code>/proc/net/dev</code>.'
+        info: 'Performance metrics for network interfaces.'
     },
 
     'ipv4': {
         title: 'IPv4 Networking',
         icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for the IPv4 stack of the system.'
     },
 
     'ipv6': {
         title: 'IPv6 Networking',
         icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for the IPv6 stack of the system.'
     },
 
     'ipvs': {
         title: 'IP Virtual Server',
         icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
-        info: undefined
+        info: '<a href="http://www.linuxvirtualserver.org/software/ipvs.html" target="_blank">IPVS (IP Virtual Server)</a> implements transport-layer load balancing inside the Linux kernel, so called Layer-4 switching. IPVS running on a host acts as a load balancer at the front of a cluster of real servers, it can direct requests for TCP/UDP based services to the real servers, and makes services of the real servers to appear as a virtual service on a single IP address.'
     },
 
     'netfilter': {
         title: 'Firewall (netfilter)',
         icon: '<i class="fa fa-shield" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics of the netfilter components.'
     },
 
     'cpu': {
         title: 'CPUs',
         icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Detailed information for each CPU of the system. A summary of the system for all CPUs can be found at the <a href="#menu_system">System Overview</a> section.'
     },
 
     'mem': {
         title: 'Memory',
         icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Detailed information about the memory management of the system.'
     },
 
     'disk': {
         title: 'Disks',
         icon: '<i class="fa fa-folder" aria-hidden="true"></i>',
-        info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by altering the relative settings in the netdata configuration file.'
+        info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by configuring the relative settings in the netdata configuration file.'
     },
 
     'sensors': {
         title: 'Sensors',
         icon: '<i class="fa fa-leaf" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Readings of the configured system sensors.'
     },
 
     'nfsd': {
         title: 'NFS Server',
         icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics of the Network File Server. NFS is a distributed file system protocol, allowing a user on a client computer to access files over a network, much like local storage is accessed. NFS, like many other protocols, builds on the Open Network Computing Remote Procedure Call (ONC RPC) system. The NFS is an open standard defined in Request for Comments (RFC).'
     },
 
     'nfs': {
         title: 'NFS Client',
         icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics of the NFS operations of this system, acting as an NFS client.'
     },
 
     'apps': {
         title: 'Applications',
         icon: '<i class="fa fa-heartbeat" aria-hidden="true"></i>',
-        info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
+        info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'users': {
         title: 'Users',
         icon: '<i class="fa fa-user" aria-hidden="true"></i>',
-        info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
+        info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics per user. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'groups': {
         title: 'User Groups',
         icon: '<i class="fa fa-users" aria-hidden="true"></i>',
-        info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through the entire <code>/proc</code> filesystem and aggregates statistics per user group. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
+        info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics per user group. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'netdata': {
         title: 'Netdata Monitoring',
         icon: '<i class="fa fa-bar-chart" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
     'example': {
         title: 'Example Charts',
-        info: undefined
+        info: 'Example charts, demonstrating the external plugin architecture.'
     },
 
     'cgroup': {
         title: '',
         icon: '<i class="fa fa-th" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Container resource utilization metrics. Netdata reads this information from <b>cgroups</b> (abbreviated from <b>control groups</b>), a Linux kernel feature that limits and accounts resource usage (CPU, memory, disk I/O, network, etc.) of a collection of processes. <b>cgroups</b> together with <b>namespaces</b> (that offer isolation between processes) provide what we usually call: <b>containers</b>.'
     },
 
     'cgqemu': {
         title: '',
         icon: '<i class="fa fa-th-large" aria-hidden="true"></i>',
-        info: undefined
+        info: 'QEMU virtual machine resource utilization metrics. QEMU (short for Quick Emulator) is a free and open-source hosted hypervisor that performs hardware virtualization.'
     },
 
     'fping': {
         title: 'fping',
         icon: '<i class="fa fa-exchange" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
     },
 
     'memcached': {
         title: 'memcached',
         icon: '<i class="fa fa-database" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for <b>memcached</b>. Memcached is a general-purpose distributed memory caching system. It is often used to speed up dynamic database-driven websites by caching data and objects in RAM to reduce the number of times an external data source (such as a database or API) must be read.'
     },
 
     'mysql': {
         title: 'MySQL',
         icon: '<i class="fa fa-database" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for <b>mysql</b>, the open-source relational database management system (RDBMS).'
     },
 
     'postgres': {
         title: 'Postgres',
         icon: '<i class="fa fa-database" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for <b>PostgresSQL</b>, the object-relational database (ORDBMS).'
     },
 
     'redis': {
         title: 'Redis',
         icon: '<i class="fa fa-database" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for <b>redis</b>. Redis (REmote DIctionary Server) is a software project that implements data structure servers. It is open-source, networked, in-memory, and stores keys with optional durability.'
     },
 
     'retroshare': {
         title: 'RetroShare',
         icon: '<i class="fa fa-share-alt" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for <b>RetroShare</b>. RetroShare is open source software for encrypted filesharing, serverless email, instant messaging, online chat, and BBS, based on a friend-to-friend network built on GNU Privacy Guard (GPG).'
     },
 
     'ipfs': {
         title: 'IPFS',
         icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for the InterPlanetary File System (IPFS), a content-addressable, peer-to-peer hypermedia distribution protocol.'
     },
 
     'phpfpm': {
         title: 'PHP-FPM',
         icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
-        info: undefined
+        info: 'Performance metrics for <b>PHP-FPM</b>, an alternative FastCGI implementation for PHP.'
     },
 
     'postfix': {
@@ -272,7 +272,7 @@ netdataDashboard.submenu = {
 
     'netfilter.conntrack': {
         title: 'Connection Tracker',
-        info: 'Netfilter Connection Tracker performance monitoring, read from <code>/proc/net/stat/nf_conntrack</code>. The connection tracker keeps track of all connections of the machine, inbound and outbound. It works by keeping a database with all open connections, tracking network and address translation and connection expectations.'
+        info: 'Netfilter Connection Tracker performance metrics. The connection tracker keeps track of all connections of the machine, inbound and outbound. It works by keeping a database with all open connections, tracking network and address translation and connection expectations.'
     },
 
     'netfilter.nfacct': {
@@ -282,17 +282,27 @@ netdataDashboard.submenu = {
 
     'netfilter.synproxy': {
         title: 'DDoS Protection',
-        info: 'DDoS Protection performance monitoring read from <code>/proc/net/stat/synproxy</code>. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> is a TCP SYN packets proxy. It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. It is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections. It can be used for any kind of TCP traffic (even encrypted), since it does not interfere with the content itself.'
+        info: 'DDoS protection performance metrics. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> is a TCP SYN packets proxy. It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. It is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections. It can be used for any kind of TCP traffic (even encrypted), since it does not interfere with the content itself.'
     },
 
     'system.softnet_stat': {
         title: 'softnet',
-        info: 'Statistics for CPUs SoftIRQs related to network receive work, read from <code>/proc/net/softnet_stat</code>. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.'
+        info: function(os) {
+            if(os === 'linux')
+                return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+            else
+                return 'Statistics for CPUs SoftIRQs related to network receive work.';
+        }
     },
 
     'cpu.softnet_stat': {
         title: 'softnet',
-        info: 'Statistics for per CPUs core SoftIRQs related to network receive work, read from <code>/proc/net/softnet_stat</code>. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.'
+        info: function(os) {
+            if(os === 'linux')
+                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+            else
+                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
+        }
     }
 };
 
@@ -308,60 +318,65 @@ netdataDashboard.submenu = {
 //
 netdataDashboard.context = {
     'system.cpu': {
-        info: 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.<br/>Keep an eye on <b>iowait</b> ' + sparkline('system.cpu', 'iowait', '%') + '. If it is constantly high, your disks are a bottleneck and they slow your system down.<br/>Another important metric worth monitoring, is <b>softirq</b> ' + sparkline('system.cpu', 'softirq', '%') + '. A constantly high percentage of softirq may indicate network driver issues.',
+        info: function(os) {
+            void(os);
+            return 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
+                + netdataDashboard.sparkline('<br/>Keep an eye on <b>iowait</b> ', 'system.cpu', 'iowait', '%', '. If it is constantly high, your disks are a bottleneck and they slow your system down.')
+                + netdataDashboard.sparkline('<br/>An important metric worth monitoring, is <b>softirq</b> ', 'system.cpu', 'softirq', '%', '. A constantly high percentage of softirq may indicate network driver issues.');
+        },
         valueRange: "[0, 100]"
     },
 
     'system.load': {
-        info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. Linux calculates this once every 5 seconds. Netdata reads them from <code>/proc/loadavg</code>. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
+        info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
         height: 0.7
     },
 
     'system.io': {
-        info: 'Total Disk I/O, for all disks, read from <code>/proc/vmstat</code>. You can get detailed information about each disk at the <a href="#menu_disk">Disks</a> section and per application Disk usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
+        info: 'Total Disk I/O, for all disks. You can get detailed information about each disk at the <a href="#menu_disk">Disks</a> section and per application Disk usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
     },
 
     'system.swapio': {
-        info: 'Total Swap I/O, read from <code>/proc/vmstat</code>. (netdata measures both <code>in</code> and <code>out</code>. If either of them is not shown in the chart, it is because it is zero - you can change the page settings to always render all the available dimensions on all charts).'
+        info: 'Total Swap I/O. (netdata measures both <code>in</code> and <code>out</code>. If either of them is not shown in the chart, it is because it is zero - you can change the page settings to always render all the available dimensions on all charts).'
     },
 
     'system.pgfaults': {
-        info: 'Total page faults, read from <code>/proc/vmstat</code>. <b>Major page faults</b> indicates that the system is using its swap. You can find which applications use the swap at the <a href="#menu_apps">Applications Monitoring</a> section.'
+        info: 'Total page faults. <b>Major page faults</b> indicates that the system is using its swap. You can find which applications use the swap at the <a href="#menu_apps">Applications Monitoring</a> section.'
     },
 
     'system.entropy': {
         colors: '#CC22AA',
-        info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, read from <code>/proc/sys/kernel/random/entropy_avail</code>, is like a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that are mainly used in cryptography. It is advised that the pool remains always <a href="https://blog.cloudflare.com/ensuring-randomness-with-linuxs-random-number-generator/" target="_blank">above 200</a>. If the pool of entropy gets empty, you risk your security to be predictable and you should install a user-space random numbers generating daemon, like <code>haveged</code> or <code>rng-tools</code> (i.e. <b>rngd</b>), to keep the pool in healthy levels.'
+        info: '<a href="https://en.wikipedia.org/wiki/Entropy_(computing)" target="_blank">Entropy</a>, is like a pool of random numbers (<a href="https://en.wikipedia.org/wiki//dev/random" target="_blank">/dev/random</a>) that are mainly used in cryptography. It is advised that the pool remains always <a href="https://blog.cloudflare.com/ensuring-randomness-with-linuxs-random-number-generator/" target="_blank">above 200</a>. If the pool of entropy gets empty, you risk your security to be predictable and you should install a user-space random numbers generating daemon, like <code>haveged</code> or <code>rng-tools</code> (i.e. <b>rngd</b>), to keep the pool in healthy levels.'
     },
 
     'system.forks': {
         colors: '#5555DD',
-        info: 'The number of new processes created per second, read from <code>/proc/stat</code>.'
+        info: 'Number of new processes created.'
     },
 
     'system.intr': {
         colors: '#DD5555',
-        info: 'Total number of CPU interrupts, read from <code>/proc/stat</code>. Check <code>system.interrupts</code> that gives more detail about each interrupt and also the <a href="#menu_cpu">CPUs</a> section where interrupts are analyzed per CPU core.'
+        info: 'Total number of CPU interrupts. Check <code>system.interrupts</code> that gives more detail about each interrupt and also the <a href="#menu_cpu">CPUs</a> section where interrupts are analyzed per CPU core.'
     },
 
     'system.interrupts': {
-        info: 'CPU interrupts in detail, read from <code>/proc/interrupts</code>. At the <a href="#menu_cpu">CPUs</a> section, interrupts are analyzed per CPU core.'
+        info: 'CPU interrupts in detail. At the <a href="#menu_cpu">CPUs</a> section, interrupts are analyzed per CPU core.'
     },
 
     'system.softirqs': {
-        info: 'CPU softirqs in detail, read from <code>/proc/softirqs</code>. At the <a href="#menu_cpu">CPUs</a> section, softirqs are analyzed per CPU core.'
+        info: 'CPU softirqs in detail. At the <a href="#menu_cpu">CPUs</a> section, softirqs are analyzed per CPU core.'
     },
 
     'system.processes': {
-        info: 'System processes, read from <code>/proc/stat</code>. <b>Running</b> are the processes in the CPU. <b>Blocked</b> are processes that are willing to enter the CPU, but they cannot, e.g. because they wait for disk activity.'
+        info: 'System processes. <b>Running</b> are the processes in the CPU. <b>Blocked</b> are processes that are willing to enter the CPU, but they cannot, e.g. because they wait for disk activity.'
     },
 
     'system.active_processes': {
-        info: 'All system processes, read from <code>/proc/loadavg</code>.'
+        info: 'All system processes.'
     },
 
     'system.ctxt': {
-        info: '<a href="https://en.wikipedia.org/wiki/Context_switch" target="_blank">Context Switches</a>, read from <code>/proc/stat</code>, is the switching of the CPU from one process, task or thread to another. If there are many processes or threads willing to execute and very few CPU cores available to handle them, the system is making more context switching to balance the CPU resources among them. The whole process is computationally intensive. The more the context switches, the slower the system gets.'
+        info: '<a href="https://en.wikipedia.org/wiki/Context_switch" target="_blank">Context Switches</a>, is the switching of the CPU from one process, task or thread to another. If there are many processes or threads willing to execute and very few CPU cores available to handle them, the system is making more context switching to balance the CPU resources among them. The whole process is computationally intensive. The more the context switches, the slower the system gets.'
     },
 
     'system.idlejitter': {
@@ -370,19 +385,19 @@ netdataDashboard.context = {
     },
 
     'system.ipv4': {
-        info: 'Total IPv4 Traffic, read from <code>/proc/net/netstat</code>.'
+        info: 'Total IPv4 Traffic.'
     },
 
     'system.ipv6': {
-        info: 'Total IPv6 Traffic, read from <code>/proc/net/snmp6</code>.'
+        info: 'Total IPv6 Traffic.'
     },
 
     'system.ram': {
-        info: 'System memory, read from <code>/proc/meminfo</code>.'
+        info: 'System memory usage.'
     },
 
     'system.swap': {
-        info: 'System swap memory, read from <code>/proc/meminfo</code>.'
+        info: 'System swap memory usage.'
     },
 
     // ------------------------------------------------------------------------
@@ -396,7 +411,8 @@ netdataDashboard.context = {
 
     'mem.ksm_ratios': {
         heads: [
-            function(id) {
+            function(os, id) {
+                void(os);
                 return  '<div data-netdata="' + id + '"'
                     + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
@@ -413,24 +429,24 @@ netdataDashboard.context = {
     },
 
     'mem.pgfaults': {
-    	info: 'A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, called trap, raised by computer hardware when a running program accesses a memory page that is mapped into the virtual address space, but not actually loaded into main memory. If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a <b>minor</b> or soft page fault. A <b>major</b> page fault is generated when the system needs to load the memory page from disk or swap memory. These values are read from <code>/proc/vmstat</code>.'
+    	info: 'A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, called trap, raised by computer hardware when a running program accesses a memory page that is mapped into the virtual address space, but not actually loaded into main memory. If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a <b>minor</b> or soft page fault. A <b>major</b> page fault is generated when the system needs to load the memory page from disk or swap memory.'
     },
 
     'mem.committed': {
         colors: NETDATA.colors[3],
-        info: 'Committed Memory, read from <code>/proc/meminfo</code>, is the sum of all memory which has been allocated by processes.'
+        info: 'Committed Memory, is the sum of all memory which has been allocated by processes.'
     },
 
     'mem.writeback': {
-        info: 'Read from <code>/proc/meminfo</code>, <b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
+        info: '<b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
     },
 
     'mem.kernel': {
-        info: 'Read from <code>/proc/meminfo</code>, This chart displays the total ammount of memory being used by the kernel. <b>Slab</b> is the amount of memory used by the kernel to cache data structures for its own use. <b>KernelStack</b> is the amount of memory allocated for each task done by the kernel. <b>PageTables</b> is the amount of memory decicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). <b>VmallocUsed</b> is the amount of memory being used as virtual address space.'
+        info: 'The total ammount of memory being used by the kernel. <b>Slab</b> is the amount of memory used by the kernel to cache data structures for its own use. <b>KernelStack</b> is the amount of memory allocated for each task done by the kernel. <b>PageTables</b> is the amount of memory decicated to the lowest level of page tables (A page table is used to turn a virtual address into a physical memory address). <b>VmallocUsed</b> is the amount of memory being used as virtual address space.'
     },
 
     'mem.slab': {
-        info: 'Read from <code>/proc/meminfo</code>, <b>reclaimable</b> is the amount of memory which the kernel can reuse. <b>unreclaimable</b> can not be reused even when the kernel is lacking memory.'
+        info: '<b>Reclaimable</b> is the amount of memory which the kernel can reuse. <b>Unreclaimable</b> can not be reused even when the kernel is lacking memory.'
     },
 
     // ------------------------------------------------------------------------
@@ -525,7 +541,9 @@ netdataDashboard.context = {
 
     'tc.qos': {
         heads: [
-            function(id) {
+            function(os, id) {
+                void(os);
+
                 if(id.match(/.*-ifb$/))
                     return netdataDashboard.gaugeChart('Inbound', '12%', '', '#5555AA');
                 else
@@ -568,12 +586,12 @@ netdataDashboard.context = {
         heads: [
             netdataDashboard.gaugeChart('Utilization', '12%', '', '#FF5588')
         ],
-        info: 'Disk Utilization measures the amount of time the disk was busy with something. This is not related to its performance. 100% means that the Linux kernel always had an outstanding operation on the disk. Keep in mind that depending on the underlying technology of the disk, 100% here may or may not be an indication of congestion.'
+        info: 'Disk Utilization measures the amount of time the disk was busy with something. This is not related to its performance. 100% means that the system always had an outstanding operation on the disk. Keep in mind that depending on the underlying technology of the disk, 100% here may or may not be an indication of congestion.'
     },
 
     'disk.backlog': {
         colors: '#0099CC',
-        info: 'Backlog is an indication of the duration of pending disk operations. On every I/O event the Linux kernel is multiplying the time spent doing I/O since the last update of this field with the number of pending operations. While not accurate, this metric can provide an indication of the expected completion time of the operations in progress.'
+        info: 'Backlog is an indication of the duration of pending disk operations. On every I/O event the system is multiplying the time spent doing I/O since the last update of this field with the number of pending operations. While not accurate, this metric can provide an indication of the expected completion time of the operations in progress.'
     },
 
     'disk.io': {
@@ -585,7 +603,7 @@ netdataDashboard.context = {
     },
 
     'disk.ops': {
-        info: 'Completed disk I/O operations. Keep in mind the number of operations requested might be higher, since the Linux kernel is able to merge adjacent to each other (see merged operations chart).'
+        info: 'Completed disk I/O operations. Keep in mind the number of operations requested might be higher, since the system is able to merge adjacent to each other (see merged operations chart).'
     },
 
     'disk.qops': {
@@ -598,7 +616,7 @@ netdataDashboard.context = {
     },
     'disk.mops': {
         height: 0.5,
-        info: 'The number of merged disk operations. The Linux kernel is able to merge adjacent I/O operations, for example two 4KB reads can become one 8KB read before given to disk.'
+        info: 'The number of merged disk operations. The system is able to merge adjacent I/O operations, for example two 4KB reads can become one 8KB read before given to disk.'
     },
     'disk.svctm': {
         height: 0.5,
@@ -689,7 +707,8 @@ netdataDashboard.context = {
 
     'apache.workers': {
         mainheads: [
-            function(id) {
+            function(os, id) {
+                void(os);
                 return  '<div data-netdata="' + id + '"'
                     + ' data-dimensions="busy"'
                     + ' data-append-options="percentage"'
@@ -761,7 +780,8 @@ netdataDashboard.context = {
     'retroshare.peers': {
         info: 'Number of (connected) RetroShare friends.',
         mainheads: [
-            function(id) {
+            function(os, id) {
+                void(os);
                 return  '<div data-netdata="' + id + '"'
                     + ' data-dimensions="peers_connected"'
                     + ' data-append-options="friends"'
