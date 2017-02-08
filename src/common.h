@@ -67,9 +67,9 @@
 #include <syslog.h>
 #include <sys/mman.h>
 
-#if !(defined(__FreeBSD__) || defined(__APPLE__))
+#ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
-#endif /* __FreeBSD__ || __APPLE__*/
+#endif
 
 #include <sys/resource.h>
 #include <sys/socket.h>
