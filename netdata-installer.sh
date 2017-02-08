@@ -29,7 +29,7 @@ umask 002
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
 
-processors=$(grep ^processor </proc/cpuinfo | wc -l)
+processors=$(grep ^processor </proc/cpuinfo 2>/dev/null | wc -l)
 [ $(( processors )) -lt 1 ] && processors=1
 
 # you can set CFLAGS before running installer
@@ -69,6 +69,7 @@ banner() {
     echo >&2
 }
 
+setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
 service="$(which service 2>/dev/null || command -v service 2>/dev/null)"
 systemctl="$(which systemctl 2>/dev/null || command -v systemctl 2>/dev/null)"
 service() {
@@ -853,8 +854,11 @@ if [ ${UID} -eq 0 ]
     setcap_ret=1
     if ! iscontainer
         then
-        run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-        setcap_ret=$?
+        if [ ! -z "${setcap}" ]
+            then
+            run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+            setcap_ret=$?
+        fi
 
         if [ ${setcap_ret} -eq 0 ]
             then
