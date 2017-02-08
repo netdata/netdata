@@ -12,6 +12,7 @@ char *global_host_prefix = "";
 int enable_ksm = 1;
 
 volatile sig_atomic_t netdata_exit = 0;
+const char *os_type = NETDATA_OS_TYPE;
 
 // ----------------------------------------------------------------------------
 // memory allocation functions that handle failures
