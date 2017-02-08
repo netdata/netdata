@@ -38,13 +38,13 @@ netdataDashboard.menu = {
     'ipv4': {
         title: 'IPv4 Networking',
         icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
-        info: 'Performance metrics for the IPv4 stack of the system.'
+        info: 'Metrics for the IPv4 stack of the system. <a href="https://en.wikipedia.org/wiki/IPv4" target="_blank">Internet Protocol version 4 (IPv4)</a> is the fourth version of the Internet Protocol (IP). It is one of the core protocols of standards-based internetworking methods in the Internet. IPv4 is a connectionless protocol for use on packet-switched networks. It operates on a best effort delivery model, in that it does not guarantee delivery, nor does it assure proper sequencing or avoidance of duplicate delivery. These aspects, including data integrity, are addressed by an upper layer transport protocol, such as the Transmission Control Protocol (TCP).'
     },
 
     'ipv6': {
         title: 'IPv6 Networking',
         icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
-        info: 'Performance metrics for the IPv6 stack of the system.'
+        info: 'Metrics for the IPv6 stack of the system. <a href="https://en.wikipedia.org/wiki/IPv6" target="_blank">Internet Protocol version 6 (IPv6)</a> is the most recent version of the Internet Protocol (IP), the communications protocol that provides an identification and location system for computers on networks and routes traffic across the Internet. IPv6 was developed by the Internet Engineering Task Force (IETF) to deal with the long-anticipated problem of IPv4 address exhaustion. IPv6 is intended to replace IPv4.'
     },
 
     'ipvs': {
@@ -393,11 +393,11 @@ netdataDashboard.context = {
     },
 
     'system.ram': {
-        info: 'System memory usage.'
+        info: 'System Random Access Memory (i.e. physical memory) usage.'
     },
 
     'system.swap': {
-        info: 'System swap memory usage.'
+        info: 'System swap memory usage. Swap space is used when the amount of physical memory (RAM) is full. When the system needs more memory resources and the RAM is full, inactive pages in memory are moved to the swap space (usually a disk, a disk partition or a file).'
     },
 
     // ------------------------------------------------------------------------
