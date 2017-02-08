@@ -571,9 +571,9 @@ int main(int argc, char **argv)
             if(setrlimit(RLIMIT_CORE, &rl) != 0)
                 error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
 
-#if !(defined(__FreeBSD__) || defined(__APPLE__))
+#ifdef HAVE_SYS_PRCTL_H
             prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
-#endif /* __FreeBSD__ || __APPLE__*/
+#endif
         }
 
         // --------------------------------------------------------------------
@@ -748,9 +748,9 @@ int main(int argc, char **argv)
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
             error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
-#if !(defined(__FreeBSD__) || defined(__APPLE__))
+#ifdef HAVE_SYS_PRCTL_H
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
-#endif /* __FreeBSD__ || __APPLE__*/
+#endif
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
 

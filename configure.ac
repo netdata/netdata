@@ -143,6 +143,7 @@ AC_CHECK_SIZEOF([void *])
 AC_CANONICAL_HOST
 AC_HEADER_MAJOR
 AC_HEADER_RESOLV
+AC_CHECK_HEADERS_ONCE([sys/prctl.h])
 
 AC_CHECK_LIB([cap], [cap_get_proc, cap_set_proc],
 	[AC_CHECK_HEADER(

@@ -3109,7 +3109,9 @@ int main(int argc, char **argv) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
         if(setrlimit(RLIMIT_CORE, &rl) != 0)
             info("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
+#ifdef HAVE_SYS_PRCTL_H
         prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+#endif
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
