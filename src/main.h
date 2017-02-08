@@ -1,8 +1,6 @@
 #ifndef NETDATA_MAIN_H
 #define NETDATA_MAIN_H 1
 
-extern volatile sig_atomic_t netdata_exit;
-
 /**
  * This struct contains information about command line options.
  */

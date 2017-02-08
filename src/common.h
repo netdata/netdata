@@ -189,11 +189,14 @@
 
 #if defined(__FreeBSD__)
 #include "plugin_freebsd.h"
+#define NETDATA_OS_TYPE "freebsd"
 #elif defined(__APPLE__)
 #include "plugin_macos.h"
+#define NETDATA_OS_TYPE "macos"
 #else
 #include "plugin_proc.h"
 #include "plugin_proc_diskspace.h"
+#define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
 
 #include "plugin_tc.h"
@@ -271,6 +274,8 @@ extern pid_t get_system_pid_max(void);
 extern unsigned int hz;
 extern void get_system_HZ(void);
 
+extern volatile sig_atomic_t netdata_exit;
+extern const char *os_type;
 
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD

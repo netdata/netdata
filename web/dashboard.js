@@ -2255,9 +2255,12 @@ var NETDATA = window.NETDATA || {};
             __legendFormatValueChartDecimalsLastMin = min;
             __legendFormatValueChartDecimalsLastMax = max;
 
-            if(this.value_decimal_detail !== -1) {
+            if(this.data !== null && this.data.min === this.data.max)
+                __legendFormatValueChartDecimals = -1;
+
+            else if(this.value_decimal_detail !== -1)
                 __legendFormatValueChartDecimals = this.value_decimal_detail;
-            }
+
             else {
                 var delta;
 
@@ -2269,7 +2272,7 @@ var NETDATA = window.NETDATA || {};
                 if (delta > 1000)     __legendFormatValueChartDecimals = 0;
                 else if (delta > 10)  __legendFormatValueChartDecimals = 1;
                 else if (delta > 1)   __legendFormatValueChartDecimals = 2;
-                else if (delta > 0.1) __legendFormatValueChartDecimals = 3;
+                else if (delta > 0.1) __legendFormatValueChartDecimals = 2;
                 else                  __legendFormatValueChartDecimals = 4;
             }
         };
@@ -2285,7 +2288,7 @@ var NETDATA = window.NETDATA || {};
                 if(abs > 1000)      dmax = 0;
                 else if(abs > 10 )  dmax = 1;
                 else if(abs > 1)    dmax = 2;
-                else if(abs > 0.1)  dmax = 3;
+                else if(abs > 0.1)  dmax = 2;
                 else                dmax = 4;
             }
             else {
@@ -4257,12 +4260,6 @@ var NETDATA = window.NETDATA || {};
             dygraph.updateOptions(options);
         }
 
-        // decide the decimal points on the legend of the chart
-        state.legendFormatValueDecimalsFromMinMax(
-            state.dygraph_instance.axes_[0].extremeRange[0],
-            state.dygraph_instance.axes_[0].extremeRange[1]
-        );
-
         state.dygraph_last_rendered = Date.now();
         return true;
     };
@@ -4864,12 +4861,6 @@ var NETDATA = window.NETDATA || {};
             state.__commonMin = null;
             state.__commonMax = null;
         }
-
-        // decide the decimal points on the legend of the chart
-        state.legendFormatValueDecimalsFromMinMax(
-            state.dygraph_instance.axes_[0].extremeRange[0],
-            state.dygraph_instance.axes_[0].extremeRange[1]
-        );
 
         return true;
     };

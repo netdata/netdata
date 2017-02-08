@@ -391,7 +391,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
         }
         else if(isgreaterequal(abs, 10))  len = snprintfz(value_string, value_string_len, "%0.1Lf", (long double) value);
         else if(isgreaterequal(abs, 1))   len = snprintfz(value_string, value_string_len, "%0.2Lf", (long double) value);
-        else if(isgreaterequal(abs, 0.1)) len = snprintfz(value_string, value_string_len, "%0.3Lf", (long double) value);
+        else if(isgreaterequal(abs, 0.1)) len = snprintfz(value_string, value_string_len, "%0.2Lf", (long double) value);
         else                              len = snprintfz(value_string, value_string_len, "%0.4Lf", (long double) value);
 
         if(unlikely(trim_zeros)) {
