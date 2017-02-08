@@ -287,12 +287,22 @@ netdataDashboard.submenu = {
 
     'system.softnet_stat': {
         title: 'softnet',
-        info: 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.'
+        info: function(os) {
+            if(os === 'linux')
+                return 'Statistics for CPUs SoftIRQs related to network receive work. Break down per CPU core can be found at <a href="#menu_cpu_submenu_softnet_stat">CPU / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+            else
+                return 'Statistics for CPUs SoftIRQs related to network receive work.';
+        }
     },
 
     'cpu.softnet_stat': {
         title: 'softnet',
-        info: 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.'
+        info: function(os) {
+            if(os === 'linux')
+                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>. <b>processed</b> states the number of packets processed, <b>dropped</b> is the number packets dropped because the network device backlog was full (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_max_backlog</code>), <b>squeezed</b> is the number of packets dropped because the network device budget ran out (to fix them on Linux use <code>sysctl</code> to increase <code>net.core.netdev_budget</code>). More information about identifying and troubleshooting network driver related issues can be found at <a href="https://access.redhat.com/sites/default/files/attachments/20150325_network_performance_tuning.pdf" target="_blank">Red Hat Enterprise Linux Network Performance Tuning Guide</a>.';
+            else
+                return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
+        }
     }
 };
 
@@ -308,7 +318,8 @@ netdataDashboard.submenu = {
 //
 netdataDashboard.context = {
     'system.cpu': {
-        info: function() {
+        info: function(os) {
+            void(os);
             return 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
                 + netdataDashboard.sparkline('<br/>Keep an eye on <b>iowait</b> ', 'system.cpu', 'iowait', '%', '. If it is constantly high, your disks are a bottleneck and they slow your system down.')
                 + netdataDashboard.sparkline('<br/>An important metric worth monitoring, is <b>softirq</b> ', 'system.cpu', 'softirq', '%', '. A constantly high percentage of softirq may indicate network driver issues.');
@@ -400,7 +411,8 @@ netdataDashboard.context = {
 
     'mem.ksm_ratios': {
         heads: [
-            function(id) {
+            function(os, id) {
+                void(os);
                 return  '<div data-netdata="' + id + '"'
                     + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
@@ -529,7 +541,9 @@ netdataDashboard.context = {
 
     'tc.qos': {
         heads: [
-            function(id) {
+            function(os, id) {
+                void(os);
+
                 if(id.match(/.*-ifb$/))
                     return netdataDashboard.gaugeChart('Inbound', '12%', '', '#5555AA');
                 else
@@ -693,7 +707,8 @@ netdataDashboard.context = {
 
     'apache.workers': {
         mainheads: [
-            function(id) {
+            function(os, id) {
+                void(os);
                 return  '<div data-netdata="' + id + '"'
                     + ' data-dimensions="busy"'
                     + ' data-append-options="percentage"'
@@ -765,7 +780,8 @@ netdataDashboard.context = {
     'retroshare.peers': {
         info: 'Number of (connected) RetroShare friends.',
         mainheads: [
-            function(id) {
+            function(os, id) {
+                void(os);
                 return  '<div data-netdata="' + id + '"'
                     + ' data-dimensions="peers_connected"'
                     + ' data-append-options="friends"'

@@ -941,6 +941,7 @@
 
         var netdataDashboard = {
             sparklines_registry: {},
+            os: 'unknown',
 
             menu: {},
             submenu: {},
@@ -1003,8 +1004,9 @@
                     if(typeof(x) === 'undefined')
                         return def;
 
-                    if(typeof(x) === 'function')
-                        return x();
+                    if(typeof(x) === 'function') {
+                        return x(netdataDashboard.os);
+                    }
 
                     return x;
                 }
@@ -1168,7 +1170,9 @@
 
         // ----------------------------------------------------------------------------
 
-        function headMain(charts, duration) {
+        function headMain(os, charts, duration) {
+            void(os);
+
             var head = '';
 
             if(typeof charts['system.swap'] !== 'undefined')
@@ -1289,7 +1293,7 @@
                 var hi = 0, hlen = hcharts.length;
                 while(hi < hlen) {
                     if(typeof hcharts[hi] === 'function')
-                        head += hcharts[hi](chart.id).replace('CHART_DURATION', duration.toString()).replace('CHART_UNIQUE_ID', chart.id);
+                        head += hcharts[hi](netdataDashboard.os, chart.id).replace('CHART_DURATION', duration.toString()).replace('CHART_UNIQUE_ID', chart.id);
                     else
                         head += hcharts[hi].replace('CHART_DURATION', duration.toString()).replace('CHART_UNIQUE_ID', chart.id);
                     hi++;
@@ -1306,7 +1310,7 @@
             var duration = Math.round(($(div).width() * pcent_width / 100 * data.update_every / 3) / 60) * 60;
             var html = '';
             var sidebar = '<ul class="nav dashboard-sidenav" data-spy="affix" id="sidebar_ul">';
-            var mainhead = headMain(data.charts, duration);
+            var mainhead = headMain(netdataDashboard.os, data.charts, duration);
 
             // sort the menus
             var main = sortObjectByPriority(menus);
@@ -2203,6 +2207,7 @@
                     if(data !== null) {
                         options.hostname = data.hostname;
                         options.data = data;
+                        netdataDashboard.os = data.os;
 
                         // update the dashboard hostname
                         document.getElementById('hostname').innerHTML = options.hostname;
@@ -2750,7 +2755,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'dashboard_info.js?v20170207-12',
+                url: NETDATA.serverDefault + 'dashboard_info.js?v20170208-6',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
@@ -3377,4 +3382,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170205-39"></script>
+<script type="text/javascript" src="dashboard.js?v20170208-6"></script>
