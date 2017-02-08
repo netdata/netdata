@@ -99,3 +99,8 @@ diagrams/*.atxt
 diagrams/plantuml.jar
 
 netdata.cppcheck
+
+/web/dashboard_info.js
+/conf.d/health.d/cpu.conf
+/conf.d/health.d/ram.conf
+/conf.d/health.d/swap.conf

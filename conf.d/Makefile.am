@@ -113,3 +113,10 @@ dist_chartsconfig_DATA = \
     charts.d/postfix.conf \
     charts.d/squid.conf \
     $(NULL)
+
+
+health.d/cpu.conf health.d/ram.conf health.d/swap.conf:
+	bash "$(top_srcdir)/os-templates/generate-conf.d.sh" "$@" "$(host_os)"  > $@
+
+.PHONY: health.d/cpu.conf health.d/ram.conf health.d/swap.conf
+

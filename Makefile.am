@@ -51,6 +51,20 @@ dist_noinst_DATA= \
 	configs.signatures \
 	Dockerfile \
 	netdata.spec \
+	os-templates/conf.d/linux/health.d/cpu.conf \
+	os-templates/conf.d/linux/health.d/ram.conf \
+	os-templates/conf.d/linux/health.d/swap.conf \
+	os-templates/web/dashboard_info_context_linux.js \
+	os-templates/web/dashboard_info_context_post.js \
+	os-templates/web/dashboard_info_context_pre.js \
+	os-templates/web/dashboard_info_footer.js \
+	os-templates/web/dashboard_info_header.js \
+	os-templates/web/dashboard_info_menu_linux.js \
+	os-templates/web/dashboard_info_menu_post.js \
+	os-templates/web/dashboard_info_menu_pre.js \
+	os-templates/web/dashboard_info_submenu_linux.js \
+	os-templates/web/dashboard_info_submenu_post.js \
+	os-templates/web/dashboard_info_submenu_pre.js \
 	$(NULL)
 
 # until integrated within build
@@ -60,4 +74,6 @@ dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
 	docker-build.sh \
 	netdata-installer.sh \
+	os-templates/generate-dashboard-info-js.sh \
+	os-templates/generate-conf.d.sh \
 	$(NULL)
