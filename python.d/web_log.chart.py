@@ -8,6 +8,11 @@ import bisect
 from os import access, R_OK
 from os.path import getsize
 from collections import defaultdict, namedtuple
+from copy import deepcopy
+try:
+    from itertools import zip_longest
+except ImportError:
+    from itertools import izip_longest as zip_longest
 
 priority = 60000
 retries = 60
@@ -67,15 +72,7 @@ class Service(LogService):
         self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
         self.all_time = self.configuration.get('all_time', True)
         self.url_pattern = self.configuration.get('categories')  # dict
-        # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
-        # 5. Bytes sent 6. Response length 7. Response process time
-        self.regex = re.compile(r'([\da-f.:]+)'
-                                r' -.*?"([A-Z]+)'
-                                r' (.*?)"'
-                                r' ([1-9]\d{2})'
-                                r' (\d+)'
-                                r' (\d+)?'
-                                r' ?([\d.]+)?')
+        self.regex = None
         # sorted list of unique IPs
         self.unique_all_time = list()
         # dict for values that should not be zeroed every poll
@@ -111,16 +108,58 @@ class Service(LogService):
             last_line = logs.readline().decode(encoding='utf-8')
 
         # Parse last line
-        parsed_line = self.regex.findall(last_line)
+        parsed_line, regex_name = self.find_regex(last_line)
         if not parsed_line:
             self.error('Can\'t parse output')
             return False
 
-        # parsed_line[0][6] - response process time
-        self.create_charts(parsed_line[0][6])
+        self.create_charts(parsed_line[0], regex_name)
+        if len(parsed_line[0]) == 5:
+            self.info('Not all data collected. You need to modify LogFormat.')
         return True
 
-    def create_charts(self, parsed_line):
+    def find_regex(self, last_line):
+        # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
+        # 5. Bytes sent 6. Response length 7. Response process time
+        default = re.compile(r'([\da-f.:]+)'
+                             r' -.*?"([A-Z]+)'
+                             r' (.*?)"'
+                             r' ([1-9]\d{2})'
+                             r' (\d+)')
+
+        apache_extended = re.compile(r'([\da-f.:]+)'
+                                    r' -.*?"([A-Z]+)'
+                                    r' (.*?)"'
+                                    r' ([1-9]\d{2})'
+                                    r' (\d+)'
+                                    r' (\d+)'
+                                    r' (\d+) ')
+
+        nginx_extended = re.compile(r'([\da-f.:]+)'
+                                    r' -.*?"([A-Z]+)'
+                                    r' (.*?)"'
+                                    r' ([1-9]\d{2})'
+                                    r' (\d+)'
+                                    r' (\d+)'
+                                    r' ([\d.]+) ')
+
+        regex_function = zip([apache_extended, nginx_extended, default],
+                             [lambda x: x, lambda x: x * 1000, lambda x: x],
+                             ['apache_extended', 'nginx_extended', 'default'])
+
+        for regex, function, name in regex_function:
+            if regex.search(last_line):
+                self.regex = regex
+                self.resp_time_func = function
+                regex_name = name
+                break
+
+        if self.regex:
+            return self.regex.findall(last_line), regex_name
+        else:
+            return None, None
+
+    def create_charts(self, parsed_line, regex_name):
         def find_job_name(override_name, name):
             add_to_name = override_name or name
             if add_to_name:
@@ -136,11 +175,15 @@ class Service(LogService):
                                  ' "" "HTTP Methods" requests/s requests' \
                                  ' web_log.http_method stacked 2 %s\n' % (job_name, self.update_every)
         self.order = ORDER[:]
-        self.definitions = CHARTS
+        self.definitions = deepcopy(CHARTS)
+        if 'apache' in regex_name:
+            self.definitions['response_time']['lines'][0][4] = 1000
+            self.definitions['response_time']['lines'][1][4] = 1000
+            self.definitions['response_time']['lines'][2][4] = 1000
 
         # Remove 'request_time' chart from ORDER if request_time not in logs
-        if parsed_line == '':
-            self.order.remove('request_time')
+        if len(parsed_line) < 7:
+            self.order.remove('response_time')
         # Remove 'clients_all' chart from ORDER if specified in the configuration
         if not self.all_time:
             self.order.remove('clients_all')
@@ -193,7 +236,7 @@ class Service(LogService):
         for line in raw:
             match = self.regex.findall(line)
             if match:
-                match_dict = dict(zip('address method url code sent resp_length resp_time'.split(), match[0]))
+                match_dict = dict(zip_longest('address method url code sent resp_length resp_time'.split(), match[0]))
                 try:
                     code = ''.join([match_dict['code'][0], 'xx'])
                     to_netdata[code] += 1
@@ -210,9 +253,9 @@ class Service(LogService):
 
                 to_netdata['bytes_sent'] += int(match_dict['sent'])
 
-                if match_dict['resp_length'] != '' and match_dict['resp_time'] != '':
+                if match_dict['resp_length'] and match_dict['resp_time']:
                     to_netdata['resp_length'] += int(match_dict['resp_length'])
-                    resp_time = float(match_dict['resp_time']) * 1000
+                    resp_time = self.resp_time_func(float(match_dict['resp_time']))
                     bisect.insort_left(request_time, resp_time)
                     request_counter['count'] += 1
                     request_counter['sum'] += resp_time
@@ -236,7 +279,6 @@ class Service(LogService):
             to_netdata['resp_time_min'] = request_time[0]
             to_netdata['resp_time_avg'] = float(request_counter['sum']) / request_counter['count']
             to_netdata['resp_time_max'] = request_time[-1]
-
         to_netdata.update(self.storage)
         to_netdata.update(default_dict)
         return to_netdata
