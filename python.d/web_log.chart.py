@@ -44,13 +44,13 @@ CHARTS = {
             ['resp_time_avg', 'avg', 'absolute', 1, 1]
         ]},
     'clients': {
-        'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'unique clients', 'web_log.clients', 'line'],
+        'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'unique clients', 'web_log.clients', 'stacked'],
         'lines': [
             ['unique_cur_ipv4', 'ipv4', 'absolute', 1, 1],
             ['unique_cur_ipv6', 'ipv6', 'absolute', 1, 1]
         ]},
     'clients_all': {
-        'options': [None, 'All Time Unique Client IPs', 'unique ips', 'unique clients', 'web_log.clients_all', 'line'],
+        'options': [None, 'All Time Unique Client IPs', 'unique ips', 'unique clients', 'web_log.clients_all', 'stacked'],
         'lines': [
             ['unique_tot_ipv4', 'ipv4', 'absolute', 1, 1],
             ['unique_tot_ipv6', 'ipv6', 'absolute', 1, 1]
@@ -67,7 +67,7 @@ NAMED_URL_PATTERN = namedtuple('URL_PATTERN', ['description', 'pattern'])
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
         LogService.__init__(self, configuration=configuration, name=name)
-        # Vars from module configuration file
+        # Variables from module configuration file
         self.log_path = self.configuration.get('path')
         self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
         self.all_time = self.configuration.get('all_time', True)
@@ -119,6 +119,14 @@ class Service(LogService):
         return True
 
     def find_regex(self, last_line):
+        """
+        :param last_line: str: literally last line from log file
+        :return: parsed line, regex name (the one that matches) OR None, None
+        It's sad but different web servers has different logs formats
+        We need to find appropriate regex for current log file
+        All logic is do a regex search through the string for all patterns
+        until we find something or fail.
+        """
         # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
         # 5. Bytes sent 6. Response length 7. Response process time
         default = re.compile(r'([\da-f.:]+)'
@@ -160,12 +168,30 @@ class Service(LogService):
             return None, None
 
     def create_charts(self, parsed_line, regex_name):
+        """
+        :param parsed_line: list: re.findall result.
+        :param regex_name: str: regex name from 'find_regex' method. Ex.: 'apache_extended', 'nginx_extended'
+        :return:
+        Create additional charts depending on the 'find_regex' result (parsed_line) and configuration file
+        1. 'time_response' chart is removed if there is no 'time_response' in logs.
+        2. We need to change divisor for 'response_time' chart for apache (time in microseconds in logs)
+        3. Other stuff is just remove/add chart depending on yes/no in conf
+        """
         def find_job_name(override_name, name):
+            """
+            :param override_name: str: 'name' var from configuration file
+            :param name: str: 'job_name' from configuration file
+            :return: str: new job name
+            We need this for dynamic charts. Actually same logic as in python.d.plugin.
+            """
             add_to_name = override_name or name
             if add_to_name:
                 return '_'.join(['web_log', add_to_name])
             else:
                 return 'web_log'
+
+        self.order = ORDER[:]
+        self.definitions = deepcopy(CHARTS)
 
         job_name = find_job_name(self.override_name, self.name)
         self.detailed_chart = 'CHART %s.detailed_response_codes ""' \
@@ -174,8 +200,7 @@ class Service(LogService):
         self.http_method_chart = 'CHART %s.http_method' \
                                  ' "" "HTTP Methods" requests/s requests' \
                                  ' web_log.http_method stacked 2 %s\n' % (job_name, self.update_every)
-        self.order = ORDER[:]
-        self.definitions = deepcopy(CHARTS)
+
         if 'apache' in regex_name:
             self.definitions['response_time']['lines'][0][4] = 1000
             self.definitions['response_time']['lines'][1][4] = 1000
@@ -208,6 +233,13 @@ class Service(LogService):
             self.order.remove('requests_per_url')
 
     def add_new_dimension(self, dimension, line_list, chart_string, key):
+        """
+        :param dimension: str: response status code. Ex.: '202', '499'
+        :param line_list: list: Ex.: ['202', '202', 'Absolute']
+        :param chart_string: Current string we need to pass to netdata to rebuild the chart
+        :param key: str: CHARTS dict key (chart name). Ex.: 'response_time'
+        :return: str: new chart string = previous + new dimensions
+        """
         self.storage.update({dimension: 0})
         # SET method check if dim in _dimensions
         self._dimensions.append(dimension)
@@ -221,7 +253,9 @@ class Service(LogService):
     def _get_data(self):
         """
         Parse new log lines
-        :return: dict
+        :return: dict OR None
+        None if _get_raw_data method fails.
+        In all other cases - dict.
         """
         raw = self._get_raw_data()
         if raw is None:
@@ -279,11 +313,18 @@ class Service(LogService):
             to_netdata['resp_time_min'] = request_time[0]
             to_netdata['resp_time_avg'] = float(request_counter['sum']) / request_counter['count']
             to_netdata['resp_time_max'] = request_time[-1]
+
         to_netdata.update(self.storage)
         to_netdata.update(default_dict)
         return to_netdata
 
     def _get_data_detailed_response_codes(self, code, default_dict):
+        """
+        :param code: str: CODE from parsed line. Ex.: '202, '499'
+        :param default_dict: defaultdict
+        :return:
+        Calls add_new_dimension method If the value is found for the first time
+        """
         if code not in self.storage:
             chart_string_copy = self.detailed_chart
             self.detailed_chart = self.add_new_dimension(code, [code, code, 'absolute'],
@@ -291,6 +332,12 @@ class Service(LogService):
         default_dict[code] += 1
 
     def _get_data_http_method(self, method, default_dict):
+        """
+        :param method: str: METHOD from parsed line. Ex.: 'GET', 'POST'
+        :param default_dict: defaultdict
+        :return:
+        Calls add_new_dimension method If the value is found for the first time
+        """
         if method not in self.storage:
             chart_string_copy = self.http_method_chart
             self.http_method_chart = self.add_new_dimension(method, [method, method, 'absolute'],
@@ -298,6 +345,13 @@ class Service(LogService):
         default_dict[method] += 1
 
     def _get_data_per_url(self, url, default_dict):
+        """
+        :param url: str: URL from parsed line
+        :param default_dict: defaultdict
+        :return:
+        Scan through string looking for the first location where patterns produce a match for all user
+        defined patterns
+        """
         match = None
         for elem in self.url_pattern:
             if elem.pattern.search(url):
@@ -309,6 +363,13 @@ class Service(LogService):
 
 
 def address_not_in_pool(pool, address, pool_size):
+    """
+    :param pool: list of ip addresses
+    :param address: ip address
+    :param pool_size: current size of pool
+    :return: True if address not pool and False address in pool
+    If address not in pool function add address to pool.
+    """
     index = bisect.bisect_left(pool, address)
     if index < pool_size:
         if pool[index] == address:
