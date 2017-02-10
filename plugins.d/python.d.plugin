@@ -500,7 +500,7 @@ def run():
     global DEBUG_FLAG, TRACE_FLAG, BASE_CONFIG
 
     # read configuration file
-    disabled = []
+    disabled = ['nginx_log', 'gunicorn_log']
     configfile = CONFIG_DIR + "python.d.conf"
     msg.PROGRAM = PROGRAM
     msg.info("reading configuration file:", configfile)
