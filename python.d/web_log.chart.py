@@ -268,9 +268,9 @@ class Service(LogService):
         default_dict = defaultdict(lambda: 0)
 
         for line in raw:
-            match = self.regex.findall(line)
+            match = self.regex.search(line)
             if match:
-                match_dict = dict(zip_longest('address method url code sent resp_length resp_time'.split(), match[0]))
+                match_dict = dict(zip_longest('address method url code sent resp_length resp_time'.split(), match.groups()))
                 try:
                     code = ''.join([match_dict['code'][0], 'xx'])
                     to_netdata[code] += 1
