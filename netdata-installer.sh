@@ -706,6 +706,7 @@ NETDATA_ADDED_TO_DOCKER=0
 NETDATA_ADDED_TO_NGINX=0
 NETDATA_ADDED_TO_VARNISH=0
 NETDATA_ADDED_TO_HAPROXY=0
+NETDATA_ADDED_TO_ADM=0
 if [ ${UID} -eq 0 ]
     then
     portable_add_group netdata
@@ -714,6 +715,7 @@ if [ ${UID} -eq 0 ]
     portable_add_user_to_group nginx  netdata && NETDATA_ADDED_TO_NGINX=1
     portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
     portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
+    portable_add_user_to_group adm  netdata && NETDATA_ADDED_TO_ADM=1
 
     if [ -d /etc/logrotate.d -a ! -f /etc/logrotate.d/netdata ]
         then
@@ -1375,6 +1377,15 @@ if [ $? -eq 0 -a "${NETDATA_ADDED_TO_HAPROXY}" = "1" ]
     echo "You may also want to remove the netdata user from the haproxy group"
     echo "by running:"
     echo "   gpasswd -d netdata haproxy"
+fi
+
+getent group adm > /dev/null
+if [ $? -eq 0 -a "${NETDATA_ADDED_TO_ADM}" = "1" ]
+    then
+    echo
+    echo "You may also want to remove the netdata user from the adm group"
+    echo "by running:"
+    echo "   gpasswd -d netdata adm"
 fi
 
 
