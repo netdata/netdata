@@ -17,7 +17,7 @@ except ImportError:
 priority = 60000
 retries = 60
 
-ORDER = ['response_codes', 'response_time', 'requests_per_url', 'http_method', 'bandwidth', 'clients', 'clients_all']
+ORDER = ['response_codes', 'response_time', 'requests_per_url', 'http_method', 'requests_per_ipproto', 'bandwidth', 'clients', 'clients_all']
 CHARTS = {
     'response_codes': {
         'options': [None, 'Response Codes', 'requests/s', 'responses', 'web_log.response_codes', 'stacked'],
@@ -58,6 +58,12 @@ CHARTS = {
     'http_method': {
         'options': [None, 'Requests Per HTTP Method', 'requests/s', 'requests', 'web_log.http_method', 'stacked'],
         'lines': [
+        ]},
+    'requests_per_ipproto': {
+        'options': [None, 'Requests Per IP Protocol', 'requests/s', 'requests', 'web_log.requests_per_ipproto', 'stacked'],
+        'lines': [
+            ['req_ipv4', 'ipv4', 'absolute', 1, 1],
+            ['req_ipv6', 'ipv6', 'absolute', 1, 1]
         ]}
 }
 
@@ -81,7 +87,7 @@ class Service(LogService):
         self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0,
                      'resp_time_max': 0, 'resp_time_avg': 0, 'unique_cur_ipv4': 0,
                      'unique_cur_ipv6': 0, '2xx': 0, '5xx': 0, '3xx': 0, '4xx': 0,
-                     '1xx': 0, '0xx': 0, 'unmatched': 0}
+                     '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0, 'req_ipv6': 0}
 
     def check(self):
         if not self.log_path:
@@ -293,19 +299,20 @@ class Service(LogService):
                     bisect.insort_left(request_time, resp_time)
                     request_counter['count'] += 1
                     request_counter['sum'] += resp_time
+                # requests per ip proto
+                if '.' in match_dict['address']:
+                    proto = 'ipv4'
+                    to_netdata['req_ipv4'] += 1
+                else:
+                    proto = 'ipv6'
+                    to_netdata['req_ipv6'] += 1
                 # unique clients ips
                 if address_not_in_pool(self.unique_all_time, match_dict['address'],
                                        self.storage['unique_tot_ipv4'] + self.storage['unique_tot_ipv6']):
-                    if '.' in match_dict['address']:
-                        self.storage['unique_tot_ipv4'] += 1
-                    else:
-                        self.storage['unique_tot_ipv6'] += 1
+                        self.storage['unique_tot_' + proto] += 1
                 if address_not_in_pool(unique_current, match_dict['address'],
                                        to_netdata['unique_cur_ipv4'] + to_netdata['unique_cur_ipv6']):
-                    if '.' in match_dict['address']:
-                        to_netdata['unique_cur_ipv4'] += 1
-                    else:
-                        to_netdata['unique_cur_ipv6'] += 1
+                        to_netdata['unique_cur_' + proto] += 1
             else:
                 to_netdata['unmatched'] += 1
         # timings
