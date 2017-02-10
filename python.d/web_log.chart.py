@@ -186,7 +186,7 @@ class Service(LogService):
             """
             add_to_name = override_name or name
             if add_to_name:
-                return '_'.join(['web_log', add_to_name])
+                return '_'.join(['web_log', re.sub('\s+', '_', add_to_name)])
             else:
                 return 'web_log'
 
