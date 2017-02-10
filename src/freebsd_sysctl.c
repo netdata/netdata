@@ -269,7 +269,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     } icmp6_total = {0, 0};
 
     // NEEDED BY: do_space, do_inodes
-    struct statfs *mntbuf;
+    static struct statfs *mntbuf;
     int mntsize;
     char mntonname[MNAMELEN + 1];
 
