@@ -54,6 +54,7 @@ dist_pythonconfig_DATA = \
     python.d/smartd_log.conf \
     python.d/tomcat.conf \
     python.d/varnish.conf \
+    python.d/web_log.conf \
     $(NULL)
 
 healthconfigdir=$(configdir)/health.d
