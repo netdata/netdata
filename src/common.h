@@ -277,6 +277,8 @@ extern void get_system_HZ(void);
 extern volatile sig_atomic_t netdata_exit;
 extern const char *os_type;
 
+extern const char *program_version;
+
 /* fix for alpine linux */
 #ifndef RUSAGE_THREAD
 #ifdef RUSAGE_CHILDREN
