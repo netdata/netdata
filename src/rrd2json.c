@@ -85,11 +85,13 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
 
     buffer_sprintf(wb, "{\n"
            "\t\"hostname\": \"%s\""
+        ",\n\t\"version\": \"%s\""
         ",\n\t\"os\": \"%s\""
         ",\n\t\"update_every\": %d"
         ",\n\t\"history\": %d"
         ",\n\t\"charts\": {"
         , localhost.hostname
+        , program_version
         , os_type
         , rrd_update_every
         , rrd_default_history_entries

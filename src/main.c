@@ -434,8 +434,7 @@ int main(int argc, char **argv)
                     config_set("global", "run as user", optarg);
                     break;
                 case 'v':
-                    // TODO: Outsource version to makefile which can compute version from git.
-                    printf("netdata %s\n", VERSION);
+                    printf("%s %s\n", program_name, program_version);
                     return 0;
                 case 'W':
                     {
