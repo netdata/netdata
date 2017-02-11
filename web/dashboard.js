@@ -3139,7 +3139,8 @@ var NETDATA = window.NETDATA || {};
                 if(this.debug === true)
                     this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
 
-                this.chart_created = false;
+                init();
+                return;
             }
 
             // check and update the legend
