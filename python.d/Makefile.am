@@ -19,7 +19,6 @@ dist_python_SCRIPTS = \
     exim.chart.py \
     fail2ban.chart.py \
     freeradius.chart.py \
-    gunicorn_log.chart.py \
     haproxy.chart.py \
     hddtemp.chart.py \
     ipfs.chart.py \
@@ -28,7 +27,6 @@ dist_python_SCRIPTS = \
     memcached.chart.py \
     mysql.chart.py \
     nginx.chart.py \
-    nginx_log.chart.py \
     ovpn_status_log.chart.py \
     phpfpm.chart.py \
     postfix.chart.py \
