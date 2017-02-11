@@ -76,9 +76,9 @@ extern int access_log_syslog; ///< boolean enables additional logging level _acc
 extern int error_log_syslog;  ///< boolean enables additional logging levels _info_, _error_ and fatal_ to syslog.
 extern int output_log_syslog; ///< boolean enables additional logging level _debug_ to syslog.
 
-extern time_t error_log_throttle_period;          ///< ktsaou: Your help needed.
-extern time_t error_log_throttle_period_backup;   ///< ktsaou: Your help needed.
-extern unsigned long error_log_errors_per_period; ///< ktsaou: Your help needed.
+extern time_t error_log_throttle_period;          ///< gives the time in seconds the log should be suspended
+extern time_t error_log_throttle_period_backup;   ///< is used to restore throttling in case netdata suspends this functionality and needs to resume it. Error throttling is suspended when saving the database (so, you will always see these errors)
+extern unsigned long error_log_errors_per_period; ///< is the threshold. If that many errors are logged, error logging is suspended for the end of the period.
 /**
  * ktsaou: Your help needed.
  *
