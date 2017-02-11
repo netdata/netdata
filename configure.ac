@@ -234,6 +234,8 @@ fi
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
+AC_DEFINE([GIT_DESC], ["]m4_esyscmd_s(git describe 2> /dev/null)["], [git describe, where available])
+
 AC_SUBST([varlibdir], ["\$(localstatedir)/lib/netdata"])
 AC_SUBST([registrydir], ["\$(localstatedir)/lib/netdata/registry"])
 AC_SUBST([cachedir], ["\$(localstatedir)/cache/netdata"])
