@@ -208,10 +208,10 @@ class Service(LogService):
 
         job_name = find_job_name(self.override_name, self.name)
         self.detailed_chart = 'CHART %s.detailed_response_codes ""' \
-                              ' "Response Codes" requests/s responses' \
+                              ' "Detailed Response Codes" requests/s responses' \
                               ' web_log.detailed_response_codes stacked 1 %s\n' % (job_name, self.update_every)
         self.http_method_chart = 'CHART %s.http_method' \
-                                 ' "" "Requests Per HTTP Method" requests/s requests' \
+                                 ' "" "Requests Per HTTP Method" requests/s "http methods"' \
                                  ' web_log.http_method stacked 2 %s\n' % (job_name, self.update_every)
 
         if regex_name == 'access_apache_ext':
