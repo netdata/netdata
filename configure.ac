@@ -7,12 +7,12 @@ define([VERSION_MAJOR], [1])
 define([VERSION_MINOR], [5])
 define([VERSION_FIX], [1])
 define([VERSION_NUMBER], VERSION_MAJOR[.]VERSION_MINOR[.]VERSION_FIX)
-define([VERSION_SUFFIX], [_master])
+define([VERSION_SUFFIX], [_prerelease])
 
 dnl Set to "1" for a first RPM release of a new version
 PACKAGE_RPM_RELEASE="0.0.$(echo VERSION_SUFFIX | sed s/^_//)"
 
-define([VERSION_STRING], m4_esyscmd_s(git describe 2> /dev/null))
+define([VERSION_STRING], m4_esyscmd_s(git describe 2>/dev/null | sed 's/^v//'))
 m4_ifval(VERSION_STRING, [], [define([VERSION_STRING], VERSION_NUMBER[]VERSION_SUFFIX)])
 
 AC_INIT([netdata], VERSION_STRING)
