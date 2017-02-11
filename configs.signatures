@@ -383,6 +383,7 @@ declare -A configs_signatures=(
   ['f5736e0b2945182cb659cb0713eff923']='apps_groups.conf'
   ['f66e5236ba1245bb2e5fd99191f114c6']='charts.d/hddtemp.conf'
   ['f6c6656f900ff52d159dca12d624016a']='python.d/postgres.conf'
+  ['f7401a6e7c7d4fe2e0e2be7f7f523275']='health.d/web_log.conf'
   ['f7a99e94231beda85c6254912d8d31c1']='python.d/tomcat.conf'
   ['f82924563e41d99cdae5431f0af69155']='python.d.conf'
   ['f8c30f22df92765e2c0fab3c8174e2fc']='health.d/memcached.conf'
