@@ -39,9 +39,9 @@ CHARTS = {
     'response_time': {
         'options': [None, 'Processing Time', 'milliseconds', 'timings', 'web_log.response_time', 'area'],
         'lines': [
-            ['resp_time_min', 'min', 'absolute', 1, 1],
-            ['resp_time_max', 'max', 'absolute', 1, 1],
-            ['resp_time_avg', 'avg', 'absolute', 1, 1]
+            ['resp_time_min', 'min', 'absolute', 1, 100],
+            ['resp_time_max', 'max', 'absolute', 1, 100],
+            ['resp_time_avg', 'avg', 'absolute', 1, 100]
         ]},
     'clients': {
         'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'clients', 'web_log.clients', 'stacked'],
@@ -170,7 +170,7 @@ class Service(LogService):
                                       r' ([\d.]+) ')
 
         regex_function = zip([access_apache_ext, access_nginx_ext, access_default],
-                             [lambda x: x, lambda x: x * 1000, lambda x: x],
+                             [lambda x: x, lambda x: x * 100000, lambda x: x],
                              ['access_apache_ext', 'access_nginx_ext', 'access_default'])
         regex_name = None
         for regex, function, name in regex_function:
@@ -215,9 +215,9 @@ class Service(LogService):
                                  ' web_log.http_method stacked 2 %s\n' % (job_name, self.update_every)
 
         if regex_name == 'access_apache_ext':
-            self.definitions['response_time']['lines'][0][4] = 1000
-            self.definitions['response_time']['lines'][1][4] = 1000
-            self.definitions['response_time']['lines'][2][4] = 1000
+            self.definitions['response_time']['lines'][0][4] = 100000
+            self.definitions['response_time']['lines'][1][4] = 100000
+            self.definitions['response_time']['lines'][2][4] = 100000
 
         # Remove 'request_time' chart from ORDER if request_time not in logs
         if regex_name == 'access_default':
@@ -303,7 +303,7 @@ class Service(LogService):
                 # request processing time and bandwidth received
                 if match_dict['resp_length'] and match_dict['resp_time']:
                     to_netdata['resp_length'] += int(match_dict['resp_length'])
-                    resp_time = self.resp_time_func(float(match_dict['resp_time']))
+                    resp_time = self.resp_time_func(float(match_dict['resp_time']) * 100)
                     bisect.insort_left(request_time, resp_time)
                     request_counter['count'] += 1
                     request_counter['sum'] += resp_time
@@ -322,7 +322,7 @@ class Service(LogService):
         # timings
         if request_time:
             to_netdata['resp_time_min'] = request_time[0]
-            to_netdata['resp_time_avg'] = float(request_counter['sum']) / request_counter['count']
+            to_netdata['resp_time_avg'] = float(request_counter['sum']) * 100 / request_counter['count']
             to_netdata['resp_time_max'] = request_time[-1]
 
         to_netdata.update(self.storage)
