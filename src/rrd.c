@@ -302,9 +302,9 @@ int rrd_memory_mode_id(const char *name)
 
 int rrddim_algorithm_id(const char *name)
 {
-    if(strcmp(name, RRDDIM_INCREMENTAL_NAME) == 0)          return RRDDIM_INCREMENTAL;
-    if(strcmp(name, RRDDIM_ABSOLUTE_NAME) == 0)             return RRDDIM_ABSOLUTE;
-    if(strcmp(name, RRDDIM_PCENT_OVER_ROW_TOTAL_NAME) == 0)         return RRDDIM_PCENT_OVER_ROW_TOTAL;
+    if(strcmp(name, RRDDIM_INCREMENTAL_NAME) == 0)              return RRDDIM_INCREMENTAL;
+    if(strcmp(name, RRDDIM_ABSOLUTE_NAME) == 0)                 return RRDDIM_ABSOLUTE;
+    if(strcmp(name, RRDDIM_PCENT_OVER_ROW_TOTAL_NAME) == 0)     return RRDDIM_PCENT_OVER_ROW_TOTAL;
     if(strcmp(name, RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME) == 0)    return RRDDIM_PCENT_OVER_DIFF_TOTAL;
     return RRDDIM_ABSOLUTE;
 }
@@ -692,11 +692,6 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
             error("File %s does not have the same divisor. Clearing it.", fullfilename);
             memset(rd, 0, size);
         }
-        else if(rd->algorithm != algorithm) {
-            errno = 0;
-            error("File %s does not have the same algorithm. Clearing it.", fullfilename);
-            memset(rd, 0, size);
-        }
         else if(rd->update_every != st->update_every) {
             errno = 0;
             error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
@@ -714,6 +709,9 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
             // rd = NULL;
             memset(rd, 0, size);
         }
+
+        if(rd->algorithm && rd->algorithm != algorithm)
+            error("File %s does not have the expected algorithm (expected %d '%s', found %d '%s'). Previous values may be wrong.", fullfilename, algorithm, rrddim_algorithm_name(algorithm), rd->algorithm, rrddim_algorithm_name(rd->algorithm));
     }
 
     if(rd) {
