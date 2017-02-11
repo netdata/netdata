@@ -1,0 +1,43 @@
+name: netdata
+version: master
+summary: Get control of your servers. Simple. Effective. Awesome
+description: |
+  netdata is a system for distributed real-time performance and health
+  monitoring. It provides unparalleled insights, in real-time, of everything
+  happening on the system it runs (including applications such as web and
+  database servers), using modern interactive web dashboards.
+
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: classic
+
+apps:
+  netdata:
+    command: netdata-wrapper -c $SNAP_USER_DATA/etc/netdata/netdata.conf
+
+parts:
+  netdata:
+    plugin: nil
+    source: .
+    build-packages:
+      - zlib1g-dev
+      - uuid-dev
+      - libmnl-dev
+      - gcc
+      - make
+      - git
+      - autoconf
+      - autoconf-archive
+      - autogen
+      - automake
+      - pkg-config
+      - curl
+    stage-packages:
+      - zlib1g
+      - libuuid1
+    install: |
+      ./netdata-installer.sh --dont-wait --install $SNAPCRAFT_PART_INSTALL
+      chmod -R o+r $SNAPCRAFT_PART_INSTALL/netdata/etc/netdata
+  wrapper:
+    plugin: dump
+    source: snap/
+    stage: [netdata-wrapper]
