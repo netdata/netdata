@@ -3,9 +3,14 @@
 
 /**
  * @file eval.h
- * @brief Expression handling.
+ * @brief Health expression handling.
  *
- * \todo How to use it?
+ * The infix expression parser
+ *
+ * @see https://github.com/firehol/netdata/wiki/health-configuration-reference#expressions
+ *
+ * Use expression_parse() to parse an expression string.
+ * To compute it's current value use expression_evaluate().
  */ 
 
 #define EVAL_MAX_VARIABLE_NAME_LENGTH 300 ///< Maximum eval variable name length
