@@ -135,7 +135,7 @@ then
   fi
 
   echo "Resetting suffix in configure.ac:"
-  sed -i -e 's/define(\[VERSION_SUFFIX\], \[.*])/define([VERSION_SUFFIX], [_master])/' configure.ac
+  sed -i -e 's/define(\[VERSION_SUFFIX\], \[.*])/define([VERSION_SUFFIX], [_rolling])/' configure.ac
   sed -i -e 's:^PACKAGE_RPM_RELEASE=.*:PACKAGE_RPM_RELEASE="0.0.$(echo VERSION_SUFFIX | sed s/^_//)":' configure.ac
 
   echo "Committing new configure.ac:"
