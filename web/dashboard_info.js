@@ -28,7 +28,7 @@ netdataDashboard.menu = {
     'tc': {
         title: 'Quality of Service',
         icon: '<i class="fa fa-globe" aria-hidden="true"></i>',
-        info: 'Netdata collects and visualizes tc class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). QoS data collection may have a slight time difference compared to the interface (QoS data collection uses a BASH script, so a shift in data collection of a few milliseconds should be justified).'
+        info: 'Netdata collects and visualizes <code>tc</code> class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). QoS data collection may have a slight time difference compared to the interface (QoS data collection uses a BASH script, so a shift in data collection of a few milliseconds should be justified).'
     },
 
     'net': {
@@ -222,7 +222,7 @@ netdataDashboard.menu = {
     'web_log': {
         title: undefined,
         icon: '<i class="fa fa-file-text-o" aria-hidden="true"></i>',
-        info: 'Information extracted from the web server log file. netdata <code>python.d/web_log</code> plugin incrementally parses web server log files to provide a real-time break down of key web server performance metrics. A special log file format is also supported (for <code>nginx</code> and <code>apache</code>) that allows netdata to extract timing information for the web server responses and bandwidth for both requests and responses. The <code>web_log</code> plugin can also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>). netdata provides also several alarms based on the information on these charts, such as <b>too many bad requests</b>, <b>too many redirects</b>, <b>too many internal errros</b>, <b>unreasonably slow responses</b>, <b>too many requests</b> and <b>too few requests</b>.'
+        info: 'Information extracted from a web server log file. <code>python.d/web_log</code> plugin incrementally parses the web server log file to provide, in real-time, a break down of key web server performance metrics. A special log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) allowing the plugin to extract timing information for the web server responses and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>). netdata attaches several alarms on these charts, such as <b>too many bad requests</b>, <b>too many redirects</b>, <b>too many internal errors</b>, <b>unreasonably slow responses</b>, <b>unreasonably many requests</b> (i.e. web attack) and <b>unreasonably few requests</b> (i.e. something is wrong).'
     },
 
     'named': {
@@ -955,7 +955,7 @@ netdataDashboard.context = {
     },
 
     'web_log.clients': {
-        info: 'Unique client IPs accessing the web server, within each data collection iteration. So, if data collection is <b>per second</b>, this chart shows <b>unique client IPs per second</b>.'
+        info: 'Unique client IPs accessing the web server, within each data collection iteration. If data collection is <b>per second</b>, this chart shows <b>unique client IPs per second</b>.'
     },
 
     'web_log.clients_all': {
