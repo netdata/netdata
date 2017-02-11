@@ -7,7 +7,7 @@ import re
 import bisect
 from os import access, R_OK
 from os.path import getsize
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from copy import deepcopy
 try:
     from itertools import zip_longest
@@ -17,37 +17,38 @@ except ImportError:
 priority = 60000
 retries = 60
 
-ORDER = ['response_codes', 'bandwidth', 'response_time', 'requests_per_url', 'http_method', 'requests_per_ipproto', 'clients', 'clients_all']
+ORDER = ['response_codes', 'bandwidth', 'response_time', 'requests_per_url', 'http_method', 'requests_per_ipproto',
+         'clients', 'clients_all']
 CHARTS = {
     'response_codes': {
         'options': [None, 'Response Codes', 'requests/s', 'responses', 'web_log.response_codes', 'stacked'],
         'lines': [
-            ['2xx', '2xx', 'absolute'],
-            ['5xx', '5xx', 'absolute'],
-            ['3xx', '3xx', 'absolute'],
-            ['4xx', '4xx', 'absolute'],
-            ['1xx', '1xx', 'absolute'],
-            ['0xx', 'other', 'absolute'],
-            ['unmatched', 'unmatched', 'absolute']
+            ['2xx', '2xx', 'incremental'],
+            ['5xx', '5xx', 'incremental'],
+            ['3xx', '3xx', 'incremental'],
+            ['4xx', '4xx', 'incremental'],
+            ['1xx', '1xx', 'incremental'],
+            ['0xx', 'other', 'incremental'],
+            ['unmatched', 'unmatched', 'incremental']
         ]},
     'bandwidth': {
         'options': [None, 'Bandwidth', 'KB/s', 'bandwidth', 'web_log.bandwidth', 'area'],
         'lines': [
-            ['resp_length', 'received', 'absolute', 1, 1024],
-            ['bytes_sent', 'sent', 'absolute', -1, 1024]
+            ['resp_length', 'received', 'incremental', 1, 1024],
+            ['bytes_sent', 'sent', 'incremental', -1, 1024]
         ]},
     'response_time': {
         'options': [None, 'Processing Time', 'milliseconds', 'timings', 'web_log.response_time', 'area'],
         'lines': [
-            ['resp_time_min', 'min', 'absolute', 1, 1000],
-            ['resp_time_max', 'max', 'absolute', 1, 1000],
-            ['resp_time_avg', 'avg', 'absolute', 1, 1000]
+            ['resp_time_min', 'min', 'incremental', 1, 1000],
+            ['resp_time_max', 'max', 'incremental', 1, 1000],
+            ['resp_time_avg', 'avg', 'incremental', 1, 1000]
         ]},
     'clients': {
         'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'clients', 'web_log.clients', 'stacked'],
         'lines': [
-            ['unique_cur_ipv4', 'ipv4', 'absolute', 1, 1],
-            ['unique_cur_ipv6', 'ipv6', 'absolute', 1, 1]
+            ['unique_cur_ipv4', 'ipv4', 'incremental', 1, 1],
+            ['unique_cur_ipv6', 'ipv6', 'incremental', 1, 1]
         ]},
     'clients_all': {
         'options': [None, 'All Time Unique Client IPs', 'unique ips', 'clients', 'web_log.clients_all', 'stacked'],
@@ -60,10 +61,11 @@ CHARTS = {
         'lines': [
         ]},
     'requests_per_ipproto': {
-        'options': [None, 'Requests Per IP Protocol', 'requests/s', 'ip protocols', 'web_log.requests_per_ipproto', 'stacked'],
+        'options': [None, 'Requests Per IP Protocol', 'requests/s', 'ip protocols', 'web_log.requests_per_ipproto',
+                    'stacked'],
         'lines': [
-            ['req_ipv4', 'ipv4', 'absolute', 1, 1],
-            ['req_ipv6', 'ipv6', 'absolute', 1, 1]
+            ['req_ipv4', 'ipv4', 'incremental', 1, 1],
+            ['req_ipv6', 'ipv6', 'incremental', 1, 1]
         ]}
 }
 
@@ -87,13 +89,12 @@ class Service(LogService):
         self.http_method_chart = None  # will be assigned in 'create_*_method' method.
         # sorted list of unique IPs
         self.unique_all_time = list()
-        # dict for values that should not be zeroed every poll
-        self.storage = {'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0}
-        # if there is no new logs this dict + self.storage returned to netdata
+        # if there is no new logs this dict  returned to netdata
         self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0,
                      'resp_time_max': 0, 'resp_time_avg': 0, 'unique_cur_ipv4': 0,
                      'unique_cur_ipv6': 0, '2xx': 0, '5xx': 0, '3xx': 0, '4xx': 0,
-                     '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0, 'req_ipv6': 0}
+                     '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0, 'req_ipv6': 0,
+                     'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0}
 
     def check(self):
         if not self.log_path:
@@ -187,8 +188,7 @@ class Service(LogService):
         :return:
         Create additional charts depending on the 'find_regex' result (parsed_line) and configuration file
         1. 'time_response' chart is removed if there is no 'time_response' in logs.
-        2. We need to change divisor for 'response_time' chart for apache (time in microseconds in logs)
-        3. Other stuff is just remove/add chart depending on yes/no in conf
+        2. Other stuff is just remove/add chart depending on yes/no in conf
         """
         def find_job_name(override_name, name):
             """
@@ -224,17 +224,20 @@ class Service(LogService):
         if self.detailed_response_codes:
             self.order.append('detailed_response_codes')
             self.definitions['detailed_response_codes'] = {'options': [None, 'Detailed Response Codes', 'requests/s',
-                                                                       'responses', 'web_log.detailed_response_codes', 'stacked'],
+                                                                       'responses', 'web_log.detailed_response_codes',
+                                                                       'stacked'],
                                                            'lines': []}
 
         # Add 'requests_per_url' chart if specified in the configuration
         if self.url_pattern:
-            self.url_pattern = [NAMED_URL_PATTERN(description=k, pattern=re.compile(v)) for k, v in self.url_pattern.items()]
+            self.url_pattern = [NAMED_URL_PATTERN(description=k, pattern=re.compile(v)) for k, v
+                                in self.url_pattern.items()]
             self.definitions['requests_per_url'] = {'options': [None, 'Requests Per Url', 'requests/s',
                                                                 'urls', 'web_log.requests_per_url', 'stacked'],
-                                                    'lines': [['other_url', 'other', 'absolute']]}
+                                                    'lines': [['other_url', 'other', 'incremental']]}
             for elem in self.url_pattern:
-                self.definitions['requests_per_url']['lines'].append([elem.description, elem.description, 'absolute'])
+                self.definitions['requests_per_url']['lines'].append([elem.description, elem.description,
+                                                                      'incremental'])
                 self.data.update({elem.description: 0})
             self.data.update({'other_url': 0})
         else:
@@ -243,7 +246,7 @@ class Service(LogService):
     def add_new_dimension(self, dimension, line_list, chart_string, key):
         """
         :param dimension: str: response status code. Ex.: '202', '499'
-        :param line_list: list: Ex.: ['202', '202', 'Absolute']
+        :param line_list: list: Ex.: ['202', '202', 'incremental']
         :param chart_string: Current string we need to pass to netdata to rebuild the chart
         :param key: str: CHARTS dict key (chart name). Ex.: 'response_time'
         :return: str: new chart string = previous + new dimensions
@@ -271,10 +274,7 @@ class Service(LogService):
 
         request_time, unique_current = list(), list()
         request_counter = {'count': 0, 'sum': 0}
-        to_netdata = dict()
-        to_netdata.update(self.data)
-        default_dict = defaultdict(lambda: 0)
-
+        ip_address_counter = {'unique_cur_ip': 0}
         for line in raw:
             match = self.regex.search(line)
             if match:
@@ -282,78 +282,72 @@ class Service(LogService):
                                               match.groups()))
                 try:
                     code = ''.join([match_dict['code'][0], 'xx'])
-                    to_netdata[code] += 1
+                    self.data[code] += 1
                 except KeyError:
-                    to_netdata['0xx'] += 1
+                    self.data['0xx'] += 1
                 # detailed response code
                 if self.detailed_response_codes:
-                    self._get_data_detailed_response_codes(match_dict['code'], default_dict)
+                    self._get_data_detailed_response_codes(match_dict['code'])
                 # requests per url
                 if self.url_pattern:
-                    self._get_data_per_url(match_dict['url'], default_dict)
+                    self._get_data_per_url(match_dict['url'])
                 # requests per http method
-                self._get_data_http_method(match_dict['method'], default_dict)
+                self._get_data_http_method(match_dict['method'])
                 # bandwidth sent
-                to_netdata['bytes_sent'] += int(match_dict['sent'])
+                self.data['bytes_sent'] += int(match_dict['sent'])
                 # request processing time and bandwidth received
                 if match_dict['resp_length'] and match_dict['resp_time']:
-                    to_netdata['resp_length'] += int(match_dict['resp_length'])
+                    self.data['resp_length'] += int(match_dict['resp_length'])
                     resp_time = self.resp_time_func(float(match_dict['resp_time']))
                     bisect.insort_left(request_time, resp_time)
                     request_counter['count'] += 1
                     request_counter['sum'] += resp_time
                 # requests per ip proto
                 proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
-                to_netdata['req_' + proto] += 1
+                self.data['req_' + proto] += 1
                 # unique clients ips
                 if address_not_in_pool(self.unique_all_time, match_dict['address'],
-                                       self.storage['unique_tot_ipv4'] + self.storage['unique_tot_ipv6']):
-                        self.storage['unique_tot_' + proto] += 1
-                if address_not_in_pool(unique_current, match_dict['address'],
-                                       to_netdata['unique_cur_ipv4'] + to_netdata['unique_cur_ipv6']):
-                        to_netdata['unique_cur_' + proto] += 1
+                                       self.data['unique_tot_ipv4'] + self.data['unique_tot_ipv6']):
+                        self.data['unique_tot_' + proto] += 1
+                if address_not_in_pool(unique_current, match_dict['address'], ip_address_counter['unique_cur_ip']):
+                        self.data['unique_cur_' + proto] += 1
+                        ip_address_counter['unique_cur_ip'] += 1
             else:
-                to_netdata['unmatched'] += 1
+                self.data['unmatched'] += 1
         # timings
         if request_time:
-            to_netdata['resp_time_min'] = request_time[0]
-            to_netdata['resp_time_avg'] = round(float(request_counter['sum']) / request_counter['count'])
-            to_netdata['resp_time_max'] = request_time[-1]
+            self.data['resp_time_min'] += int(request_time[0])
+            self.data['resp_time_avg'] += int(round(float(request_counter['sum']) / request_counter['count']))
+            self.data['resp_time_max'] += int(request_time[-1])
+        return self.data
 
-        to_netdata.update(self.storage)
-        to_netdata.update(default_dict)
-        return to_netdata
-
-    def _get_data_detailed_response_codes(self, code, default_dict):
+    def _get_data_detailed_response_codes(self, code):
         """
         :param code: str: CODE from parsed line. Ex.: '202, '499'
-        :param default_dict: defaultdict
         :return:
         Calls add_new_dimension method If the value is found for the first time
         """
         if code not in self.data:
             chart_string_copy = self.detailed_chart
-            self.detailed_chart = self.add_new_dimension(code, [code, code, 'absolute'],
+            self.detailed_chart = self.add_new_dimension(code, [code, code, 'incremental'],
                                                          chart_string_copy, 'detailed_response_codes')
-        default_dict[code] += 1
+        self.data[code] += 1
 
-    def _get_data_http_method(self, method, default_dict):
+    def _get_data_http_method(self, method):
         """
         :param method: str: METHOD from parsed line. Ex.: 'GET', 'POST'
-        :param default_dict: defaultdict
         :return:
         Calls add_new_dimension method If the value is found for the first time
         """
         if method not in self.data:
             chart_string_copy = self.http_method_chart
-            self.http_method_chart = self.add_new_dimension(method, [method, method, 'absolute'],
+            self.http_method_chart = self.add_new_dimension(method, [method, method, 'incremental'],
                                                             chart_string_copy, 'http_method')
-        default_dict[method] += 1
+        self.data[method] += 1
 
-    def _get_data_per_url(self, url, default_dict):
+    def _get_data_per_url(self, url):
         """
         :param url: str: URL from parsed line
-        :param default_dict: defaultdict
         :return:
         Scan through string looking for the first location where patterns produce a match for all user
         defined patterns
@@ -361,11 +355,11 @@ class Service(LogService):
         match = None
         for elem in self.url_pattern:
             if elem.pattern.search(url):
-                default_dict[elem.description] += 1
+                self.data[elem.description] += 1
                 match = True
                 break
         if not match:
-            default_dict['other_url'] += 1
+            self.data['other_url'] += 1
 
 
 def address_not_in_pool(pool, address, pool_size):
@@ -373,8 +367,7 @@ def address_not_in_pool(pool, address, pool_size):
     :param pool: list of ip addresses
     :param address: ip address
     :param pool_size: current size of pool
-    :return: True if address not pool and False address in pool
-    If address not in pool function add address to pool.
+    :return: True if address not in pool. False if address in pool
     """
     index = bisect.bisect_left(pool, address)
     if index < pool_size:
