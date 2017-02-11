@@ -78,7 +78,13 @@ class Service(LogService):
         self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
         self.all_time = self.configuration.get('all_time', True)
         self.url_pattern = self.configuration.get('categories')  # dict
-        self.regex = None
+        self.regex = None  # will be assigned in 'find_regex' method
+        self.resp_time_func = None  # will be assigned in 'find_regex' method
+        self._get_data = None  # will be assigned in 'check' method.
+        self.order = None  # will be assigned in 'create_*_method' method.
+        self.definitions = None  # will be assigned in 'create_*_method' method.
+        self.detailed_chart = None  # will be assigned in 'create_*_method' method.
+        self.http_method_chart = None  # will be assigned in 'create_*_method' method.
         # sorted list of unique IPs
         self.unique_all_time = list()
         # dict for values that should not be zeroed every poll
@@ -114,20 +120,26 @@ class Service(LogService):
             last_line = logs.readline().decode(encoding='utf-8')
 
         # Parse last line
-        parsed_line, regex_name = self.find_regex(last_line)
-        if not parsed_line:
-            self.error('Can\'t parse output')
+        regex_name = self.find_regex(last_line)
+        if not regex_name:
+            self.error('Can\'t parse %s' % self.log_path)
             return False
 
-        self.create_charts(parsed_line[0], regex_name)
-        if len(parsed_line[0]) == 5:
-            self.info('Not all data collected. You need to modify LogFormat.')
-        return True
+        if regex_name.startswith('access_'):
+            self.create_access_charts(regex_name)
+            if regex_name == 'access_default':
+                self.info('Not all data collected. You need to modify LogFormat.')
+            self._get_data = self._get_access_data
+            self.info('Used regex: %s' % regex_name)
+            return True
+        else:
+            # If it's not access_logs.. Not used at the moment
+            return False
 
     def find_regex(self, last_line):
         """
         :param last_line: str: literally last line from log file
-        :return: parsed line, regex name (the one that matches) OR None, None
+        :return: regex_name
         It's sad but different web servers has different logs formats
         We need to find appropriate regex for current log file
         All logic is do a regex search through the string for all patterns
@@ -135,47 +147,42 @@ class Service(LogService):
         """
         # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
         # 5. Bytes sent 6. Response length 7. Response process time
-        default = re.compile(r'([\da-f.:]+)'
-                             r' -.*?"([A-Z]+)'
-                             r' (.*?)"'
-                             r' ([1-9]\d{2})'
-                             r' (\d+)')
-
-        apache_extended = re.compile(r'([\da-f.:]+)'
+        access_default = re.compile(r'([\da-f.:]+)'
                                     r' -.*?"([A-Z]+)'
                                     r' (.*?)"'
                                     r' ([1-9]\d{2})'
-                                    r' (\d+)'
-                                    r' (\d+)'
-                                    r' (\d+) ')
+                                    r' (\d+)')
 
-        nginx_extended = re.compile(r'([\da-f.:]+)'
-                                    r' -.*?"([A-Z]+)'
-                                    r' (.*?)"'
-                                    r' ([1-9]\d{2})'
-                                    r' (\d+)'
-                                    r' (\d+)'
-                                    r' ([\d.]+) ')
+        access_apache_ext = re.compile(r'([\da-f.:]+)'
+                                       r' -.*?"([A-Z]+)'
+                                       r' (.*?)"'
+                                       r' ([1-9]\d{2})'
+                                       r' (\d+)'
+                                       r' (\d+)'
+                                       r' (\d+) ')
 
-        regex_function = zip([apache_extended, nginx_extended, default],
+        access_nginx_ext = re.compile(r'([\da-f.:]+)'
+                                      r' -.*?"([A-Z]+)'
+                                      r' (.*?)"'
+                                      r' ([1-9]\d{2})'
+                                      r' (\d+)'
+                                      r' (\d+)'
+                                      r' ([\d.]+) ')
+
+        regex_function = zip([access_apache_ext, access_nginx_ext, access_default],
                              [lambda x: x, lambda x: x * 1000, lambda x: x],
-                             ['apache_extended', 'nginx_extended', 'default'])
-
+                             ['access_apache_ext', 'access_nginx_ext', 'access_default'])
+        regex_name = None
         for regex, function, name in regex_function:
             if regex.search(last_line):
                 self.regex = regex
                 self.resp_time_func = function
                 regex_name = name
                 break
+        return regex_name
 
-        if self.regex:
-            return self.regex.findall(last_line), regex_name
-        else:
-            return None, None
-
-    def create_charts(self, parsed_line, regex_name):
+    def create_access_charts(self, regex_name):
         """
-        :param parsed_line: list: re.findall result.
         :param regex_name: str: regex name from 'find_regex' method. Ex.: 'apache_extended', 'nginx_extended'
         :return:
         Create additional charts depending on the 'find_regex' result (parsed_line) and configuration file
@@ -207,13 +214,13 @@ class Service(LogService):
                                  ' "" "HTTP Methods" requests/s requests' \
                                  ' web_log.http_method stacked 2 %s\n' % (job_name, self.update_every)
 
-        if 'apache' in regex_name:
+        if regex_name == 'access_apache_ext':
             self.definitions['response_time']['lines'][0][4] = 1000
             self.definitions['response_time']['lines'][1][4] = 1000
             self.definitions['response_time']['lines'][2][4] = 1000
 
         # Remove 'request_time' chart from ORDER if request_time not in logs
-        if len(parsed_line) < 7:
+        if regex_name == 'access_default':
             self.order.remove('response_time')
         # Remove 'clients_all' chart from ORDER if specified in the configuration
         if not self.all_time:
@@ -246,7 +253,7 @@ class Service(LogService):
         :param key: str: CHARTS dict key (chart name). Ex.: 'response_time'
         :return: str: new chart string = previous + new dimensions
         """
-        self.storage.update({dimension: 0})
+        self.data.update({dimension: 0})
         # SET method check if dim in _dimensions
         self._dimensions.append(dimension)
         # UPDATE method do SET only if dim in definitions
@@ -256,7 +263,7 @@ class Service(LogService):
         print(chart)
         return chart
 
-    def _get_data(self):
+    def _get_access_data(self):
         """
         Parse new log lines
         :return: dict OR None
@@ -276,7 +283,8 @@ class Service(LogService):
         for line in raw:
             match = self.regex.search(line)
             if match:
-                match_dict = dict(zip_longest('address method url code sent resp_length resp_time'.split(), match.groups()))
+                match_dict = dict(zip_longest('address method url code sent resp_length resp_time'.split(),
+                                              match.groups()))
                 try:
                     code = ''.join([match_dict['code'][0], 'xx'])
                     to_netdata[code] += 1
@@ -290,9 +298,9 @@ class Service(LogService):
                     self._get_data_per_url(match_dict['url'], default_dict)
                 # requests per http method
                 self._get_data_http_method(match_dict['method'], default_dict)
-
+                # bandwidth sent
                 to_netdata['bytes_sent'] += int(match_dict['sent'])
-
+                # request processing time and bandwidth received
                 if match_dict['resp_length'] and match_dict['resp_time']:
                     to_netdata['resp_length'] += int(match_dict['resp_length'])
                     resp_time = self.resp_time_func(float(match_dict['resp_time']))
@@ -300,12 +308,8 @@ class Service(LogService):
                     request_counter['count'] += 1
                     request_counter['sum'] += resp_time
                 # requests per ip proto
-                if '.' in match_dict['address']:
-                    proto = 'ipv4'
-                    to_netdata['req_ipv4'] += 1
-                else:
-                    proto = 'ipv6'
-                    to_netdata['req_ipv6'] += 1
+                proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
+                to_netdata['req_' + proto] += 1
                 # unique clients ips
                 if address_not_in_pool(self.unique_all_time, match_dict['address'],
                                        self.storage['unique_tot_ipv4'] + self.storage['unique_tot_ipv6']):
@@ -332,7 +336,7 @@ class Service(LogService):
         :return:
         Calls add_new_dimension method If the value is found for the first time
         """
-        if code not in self.storage:
+        if code not in self.data:
             chart_string_copy = self.detailed_chart
             self.detailed_chart = self.add_new_dimension(code, [code, code, 'absolute'],
                                                          chart_string_copy, 'detailed_response_codes')
@@ -345,7 +349,7 @@ class Service(LogService):
         :return:
         Calls add_new_dimension method If the value is found for the first time
         """
-        if method not in self.storage:
+        if method not in self.data:
             chart_string_copy = self.http_method_chart
             self.http_method_chart = self.add_new_dimension(method, [method, method, 'absolute'],
                                                             chart_string_copy, 'http_method')
