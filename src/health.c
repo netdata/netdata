@@ -1896,14 +1896,35 @@ static inline int health_parse_db_lookup(
     return 1;
 }
 
-static inline char *tabs2spaces(char *s) {
-    char *t = s;
-    while(*t) {
-        if(unlikely(*t == '\t')) *t = ' ';
-        t++;
+static inline char *trim_all_spaces(char *buffer) {
+    char *d = buffer, *s = buffer;
+
+    // skip spaces
+    while(isspace(*s)) s++;
+
+    while(*s) {
+        // copy the non-space part
+        while(*s && !isspace(*s)) *d++ = *s++;
+
+        // add a space if we have to
+        if(*s && isspace(*s)) {
+            *d++ = ' ';
+            s++;
+        }
+
+        // skip spaces
+        while(isspace(*s)) s++;
     }
 
-    return s;
+    *d = '\0';
+
+    if(d > buffer) {
+        d--;
+        if(isspace(*d)) *d = '\0';
+    }
+
+    if(!buffer[0]) return NULL;
+    return buffer;
 }
 
 static inline char *health_source_file(size_t line, const char *path, const char *filename) {
@@ -2003,8 +2024,8 @@ int health_readfile(const char *path, const char *filename) {
         s++;
 
         char *value = s;
-        key = trim(key);
-        value = trim(value);
+        key = trim_all_spaces(key);
+        value = trim_all_spaces(value);
 
         if(!key) {
             error("Health configuration has invalid line %zu of file '%s/%s'. Keyword is empty. Ignoring it.", line, path, filename);
@@ -2030,7 +2051,7 @@ int health_readfile(const char *path, const char *filename) {
 
             rc = callocz(1, sizeof(RRDCALC));
             rc->next_event_id = 1;
-            rc->name = tabs2spaces(strdupz(value));
+            rc->name = strdupz(value);
             rc->hash = simple_hash(rc->name);
             rc->source = health_source_file(line, path, filename);
             rc->green = NAN;
@@ -2053,7 +2074,7 @@ int health_readfile(const char *path, const char *filename) {
                 rrdcalctemplate_free(&localhost, rt);
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
-            rt->name = tabs2spaces(strdupz(value));
+            rt->name = strdupz(value);
             rt->hash_name = simple_hash(rt->name);
             rt->source = health_source_file(line, path, filename);
             rt->green = NAN;
@@ -2072,7 +2093,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->chart);
                 }
-                rc->chart = tabs2spaces(strdupz(value));
+                rc->chart = strdupz(value);
                 rc->hash_chart = simple_hash(rc->chart);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
@@ -2136,7 +2157,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->exec);
                 }
-                rc->exec = tabs2spaces(strdupz(value));
+                rc->exec = strdupz(value);
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rc->recipient) {
@@ -2146,7 +2167,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->recipient);
                 }
-                rc->recipient = tabs2spaces(strdupz(value));
+                rc->recipient = strdupz(value);
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rc->units) {
@@ -2156,7 +2177,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->units);
                 }
-                rc->units = tabs2spaces(strdupz(value));
+                rc->units = strdupz(value);
                 strip_quotes(rc->units);
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
@@ -2167,7 +2188,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rc->info);
                 }
-                rc->info = tabs2spaces(strdupz(value));
+                rc->info = strdupz(value);
                 strip_quotes(rc->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
@@ -2190,14 +2211,14 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->context);
                 }
-                rt->context = tabs2spaces(strdupz(value));
+                rt->context = strdupz(value);
                 rt->hash_context = simple_hash(rt->context);
             }
             else if(hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
                 freez(rt->family_match);
                 simple_pattern_free(rt->family_pattern);
 
-                rt->family_match = tabs2spaces(strdupz(value));
+                rt->family_match = strdupz(value);
                 rt->family_pattern = simple_pattern_create(rt->family_match, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
@@ -2260,7 +2281,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->exec);
                 }
-                rt->exec = tabs2spaces(strdupz(value));
+                rt->exec = strdupz(value);
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rt->recipient) {
@@ -2270,7 +2291,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->recipient);
                 }
-                rt->recipient = tabs2spaces(strdupz(value));
+                rt->recipient = strdupz(value);
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rt->units) {
@@ -2280,7 +2301,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->units);
                 }
-                rt->units = tabs2spaces(strdupz(value));
+                rt->units = strdupz(value);
                 strip_quotes(rt->units);
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
@@ -2291,7 +2312,7 @@ int health_readfile(const char *path, const char *filename) {
 
                     freez(rt->info);
                 }
-                rt->info = tabs2spaces(strdupz(value));
+                rt->info = strdupz(value);
                 strip_quotes(rt->info);
             }
             else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
