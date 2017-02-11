@@ -17,7 +17,7 @@ except ImportError:
 priority = 60000
 retries = 60
 
-ORDER = ['response_codes', 'response_time', 'requests_per_url', 'http_method', 'requests_per_ipproto', 'bandwidth', 'clients', 'clients_all']
+ORDER = ['response_codes', 'bandwidth', 'response_time', 'requests_per_url', 'http_method', 'requests_per_ipproto', 'clients', 'clients_all']
 CHARTS = {
     'response_codes': {
         'options': [None, 'Response Codes', 'requests/s', 'responses', 'web_log.response_codes', 'stacked'],
@@ -44,23 +44,23 @@ CHARTS = {
             ['resp_time_avg', 'avg', 'absolute', 1, 1]
         ]},
     'clients': {
-        'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'unique clients', 'web_log.clients', 'stacked'],
+        'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'clients', 'web_log.clients', 'stacked'],
         'lines': [
             ['unique_cur_ipv4', 'ipv4', 'absolute', 1, 1],
             ['unique_cur_ipv6', 'ipv6', 'absolute', 1, 1]
         ]},
     'clients_all': {
-        'options': [None, 'All Time Unique Client IPs', 'unique ips', 'unique clients', 'web_log.clients_all', 'stacked'],
+        'options': [None, 'All Time Unique Client IPs', 'unique ips', 'clients', 'web_log.clients_all', 'stacked'],
         'lines': [
             ['unique_tot_ipv4', 'ipv4', 'absolute', 1, 1],
             ['unique_tot_ipv6', 'ipv6', 'absolute', 1, 1]
         ]},
     'http_method': {
-        'options': [None, 'Requests Per HTTP Method', 'requests/s', 'requests', 'web_log.http_method', 'stacked'],
+        'options': [None, 'Requests Per HTTP Method', 'requests/s', 'http methods', 'web_log.http_method', 'stacked'],
         'lines': [
         ]},
     'requests_per_ipproto': {
-        'options': [None, 'Requests Per IP Protocol', 'requests/s', 'requests', 'web_log.requests_per_ipproto', 'stacked'],
+        'options': [None, 'Requests Per IP Protocol', 'requests/s', 'ip protocols', 'web_log.requests_per_ipproto', 'stacked'],
         'lines': [
             ['req_ipv4', 'ipv4', 'absolute', 1, 1],
             ['req_ipv6', 'ipv6', 'absolute', 1, 1]
@@ -229,14 +229,14 @@ class Service(LogService):
         if self.detailed_response_codes:
             self.order.append('detailed_response_codes')
             self.definitions['detailed_response_codes'] = {'options': [None, 'Detailed Response Codes', 'requests/s',
-                                                                       'responses', 'web_log.detailed_resp', 'stacked'],
+                                                                       'responses', 'web_log.detailed_response_codes', 'stacked'],
                                                            'lines': []}
 
         # Add 'requests_per_url' chart if specified in the configuration
         if self.url_pattern:
             self.url_pattern = [NAMED_URL_PATTERN(description=k, pattern=re.compile(v)) for k, v in self.url_pattern.items()]
             self.definitions['requests_per_url'] = {'options': [None, 'Requests Per Url', 'requests/s',
-                                                                'requests', 'web_log.url_pattern', 'stacked'],
+                                                                'urls', 'web_log.requests_per_url', 'stacked'],
                                                     'lines': [['other_url', 'other', 'absolute']]}
             for elem in self.url_pattern:
                 self.definitions['requests_per_url']['lines'].append([elem.description, elem.description, 'absolute'])

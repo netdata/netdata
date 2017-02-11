@@ -1,7 +1,9 @@
 
 var netdataDashboard = window.netdataDashboard || {};
 
-// menu
+// ----------------------------------------------------------------------------
+// menus
+
 // information about the main menus
 
 netdataDashboard.menu = {
@@ -217,6 +219,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'web_log': {
+        title: undefined,
+        icon: '<i class="fa fa-file-text-o" aria-hidden="true"></i>',
+        info: 'Information extracted from the web server log file. netdata <code>python.d/web_log</code> plugin incrementally parses web server log files to provide a real-time break down of key web server performance metrics. A special log file format is also supported (for <code>nginx</code> and <code>apache</code>) that allows netdata to extract timing information for the web server responses and bandwidth for both requests and responses. The <code>web_log</code> plugin can also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>). netdata provides also several alarms based on the information on these charts, such as <b>too many bad requests</b>, <b>too many redirects</b>, <b>too many internal errros</b>, <b>unreasonably slow responses</b>, <b>too many requests</b> and <b>too few requests</b>.'
+    },
+
     'named': {
         title: 'named',
         icon: '<i class="fa fa-tag" aria-hidden="true"></i>',
@@ -254,9 +262,31 @@ netdataDashboard.menu = {
     }
 };
 
-// submenu
+
+
+// ----------------------------------------------------------------------------
+// submenus
+
+// information to be shown, just below each submenu
+
 // information about the submenus
 netdataDashboard.submenu = {
+    'web_log.bandwidth': {
+        info: 'Bandwidth of requests (<code>received</code>) and responses (<code>sent</code>). <code>received</code> requires a special file format (without it, the web server log does not have this information). This chart may present unusual spikes, since the whole bandwidth will be accounted at the time the log line is saved by the web server, even if the time needed to serve it spans across a longer duration. We suggest to use QoS (e.g. <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a>) for accurate accounting of the web server bandwidth.'
+    },
+
+    'web_log.urls': {
+        info: 'Number of requests for each URL <code>category</code> (URL pattern) defined in <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>. This chart counts all requests matching the URL patterns defined, independently of the web server response codes (i.e. both successful and unsuccessful).'
+    },
+
+    'web_log.clients': {
+        info: 'Charts showing the number of unique client IPs, accessing the web server.'
+    },
+
+    'web_log.timings': {
+        info: 'Web server response timings - the time the web server needed to prepare and respond to requests. This requires a special log format and its meaning is web server specific. For most web servers this accounts the time from the reception of a complete request, to the dispatch of the last byte of the response. So, it includes the network delays of responses, but it does not include the network delays of requests.'
+    },
+
     'mem.ksm': {
         title: 'Memory Deduper',
         info: 'Kernel Same-page Merging (KSM) performance monitoring, read from several files in <code>/sys/kernel/mm/ksm/</code>. KSM is a memory-saving de-duplication feature in the Linux kernel (since version 2.6.32). The KSM daemon ksmd periodically scans those areas of user memory which have been registered with it, looking for pages of identical content which can be replaced by a single write-protected page (which is automatically copied if a process later wants to update its content). KSM was originally developed for use with KVM (where it was known as Kernel Shared Memory), to fit more virtual machines into physical memory, by sharing the data common between them.  But it can be useful to any application which generates many instances of the same data.'
@@ -306,7 +336,11 @@ netdataDashboard.submenu = {
     }
 };
 
+
+
+// ----------------------------------------------------------------------------
 // chart
+
 // information works on the context of a chart
 // Its purpose is to set:
 //
@@ -811,6 +845,96 @@ netdataDashboard.context = {
 
     'fping.packets': {
         height: 0.5
+    },
+
+    'web_log.response_codes': {
+        info: 'Break down of web server responses by response code type. <code>1xx</code> are informational responses, <code>2xx</code> are successful responses, <code>3xx</code> are redirects, <code>4xx</code> are bad requests, <code>5xx</code> are internal server errors, <code>other</code> are non-standard responses, <code>unmatched</code> counts the lines in the log file that are not matched by the plugin (please <a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">open a github issue</a> to help us fix it, if you have any unmatched lines).',
+
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="2xx"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Successful"'
+                    + ' data-units="requests"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' role="application"></div>';
+            },
+
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="3xx"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Redirects"'
+                    + ' data-units="requests"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' role="application"></div>';
+            },
+
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="4xx"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Bad Requests"'
+                    + ' data-units="requests"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' role="application"></div>';
+            },
+
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="5xx"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Server Errors"'
+                    + ' data-units="requests"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'web_log.detailed_response_codes': {
+        info: 'Number of responses for each response code.'
+    },
+
+    'web_log.requests_per_ipproto': {
+        info: 'Web server requests received per IP protocol version.'
+    },
+
+    'web_log.clients': {
+        info: 'Unique client IPs accessing the web server, within each data collection iteration. So, if data collection is <b>per second</b>, this chart shows <b>unique client IPs per second</b>.'
+    },
+
+    'web_log.clients_all': {
+        info: 'Unique client IPs accessing the web server since the last restart of netdata. This plugin keeps in memory all the unique IPs that have accessed the web server. On very busy web servers (several millions of unique IPs) you may want to disable this chart (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     }
 
 };

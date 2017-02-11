@@ -1046,6 +1046,7 @@
 
             submenuTitle: function(menu, submenu) {
                 var key = menu + '.' + submenu;
+                // console.log(key);
                 var title = this.anyAttribute(this.submenu, 'title', key, submenu).toString().replace(/_/g, ' ');
                 if(title.length > 28) {
                     var a = title.substring(0, 13);
@@ -1093,14 +1094,28 @@
 
         // enrich the data structure returned by netdata
         // to reflect our menu system and content
+        // FIXME: this is a shame - we should fix charts naming (issue #807)
         function enrichChartData(chart) {
-            var tmp = chart.type.split('_')[0];
+            var parts = chart.type.split('_');
+            var tmp = parts[0];
 
             switch(tmp) {
                 case 'ap':
                 case 'net':
                 case 'disk':
                     chart.menu = tmp;
+                    break;
+
+                case 'apache':
+                    chart.menu = chart.type;
+                    if(parts.length > 2 && parts[1] === 'cache')
+                        chart.menu_pattern = tmp + '_' + parts[1];
+                    break;
+
+                case 'bind':
+                    chart.menu = chart.type;
+                    if(parts.length > 2 && parts[1] === 'rndc')
+                        chart.menu_pattern = tmp + '_' + parts[1];
                     break;
 
                 case 'cgroup':
@@ -1111,9 +1126,27 @@
                         chart.menu_pattern = 'cgroup';
                     break;
 
-                case 'apache':
-                case 'exim':
+                case 'isc':
+                    chart.menu = chart.type;
+                    if(parts.length > 2 && parts[1] === 'dhcpd')
+                        chart.menu_pattern = tmp + '_' + parts[1];
+                    break;
+
+                case 'ovpn':
+                    chart.menu = chart.type;
+                    if(parts.length > 3 && parts[1] === 'status' && parts[2] === 'log')
+                        chart.menu_pattern = tmp + '_' + parts[1];
+                    break;
+
+                case 'smartd':
+                case 'web':
+                    chart.menu = chart.type;
+                    if(parts.length > 2 && parts[1] === 'log')
+                        chart.menu_pattern = tmp + '_' + parts[1];
+                    break;
+
                 case 'dovecot':
+                case 'exim':
                 case 'hddtemp':
                 case 'ipfs':
                 case 'memcached':
@@ -1397,48 +1430,59 @@
         function renderChartsAndMenu(data) {
             var menus = options.menus;
             var charts = data.charts;
+            var m, menu_key;
 
             for(var c in charts) {
                 if(!charts.hasOwnProperty(c)) continue;
 
-                enrichChartData(charts[c]);
+                var chart = charts[c];
+                enrichChartData(chart);
+                m = chart.menu;
 
                 // create the menu
-                if(typeof menus[charts[c].menu] === 'undefined') {
-                    menus[charts[c].menu] = {
-                        priority: charts[c].priority,
+                if(typeof menus[m] === 'undefined') {
+                    menus[m] = {
+                        menu_pattern: chart.menu_pattern,
+                        priority: chart.priority,
                         submenus: {},
-                        title: netdataDashboard.menuTitle(charts[c]),
-                        icon: netdataDashboard.menuIcon(charts[c]),
-                        info: netdataDashboard.menuInfo(charts[c]),
-                        height: netdataDashboard.menuHeight(charts[c]) * options.chartsHeight
+                        title: netdataDashboard.menuTitle(chart),
+                        icon: netdataDashboard.menuIcon(chart),
+                        info: netdataDashboard.menuInfo(chart),
+                        height: netdataDashboard.menuHeight(chart) * options.chartsHeight
                     };
                 }
+                else {
+                    if(typeof(menus[m].menu_pattern) === 'undefined')
+                        menus[m].menu_pattern = chart.menu_pattern;
 
-                if(charts[c].priority < menus[charts[c].menu].priority)
-                    menus[charts[c].menu].priority = charts[c].priority;
+                    if(chart.priority < menus[m].priority)
+                        menus[m].priority = chart.priority;
+                }
+
+                menu_key = (typeof(menus[m].menu_pattern) !== 'undefined')?menus[m].menu_pattern:m;
 
                 // create the submenu
-                if(typeof menus[charts[c].menu].submenus[charts[c].submenu] === 'undefined') {
-                    menus[charts[c].menu].submenus[charts[c].submenu] = {
-                        priority: charts[c].priority,
+                if(typeof menus[m].submenus[chart.submenu] === 'undefined') {
+                    menus[m].submenus[chart.submenu] = {
+                        priority: chart.priority,
                         charts: [],
                         title: null,
-                        info: netdataDashboard.submenuInfo(charts[c].menu, charts[c].submenu),
-                        height: netdataDashboard.submenuHeight(charts[c].menu, charts[c].submenu, menus[charts[c].menu].height)
+                        info: netdataDashboard.submenuInfo(menu_key, chart.submenu),
+                        height: netdataDashboard.submenuHeight(menu_key, chart.submenu, menus[m].height)
                     };
                 }
-
-                if(charts[c].priority < menus[charts[c].menu].submenus[charts[c].submenu].priority)
-                    menus[charts[c].menu].submenus[charts[c].submenu].priority = charts[c].priority;
+                else {
+                    if (chart.priority < menus[m].submenus[chart.submenu].priority)
+                        menus[m].submenus[chart.submenu].priority = chart.priority;
+                }
 
                 // index the chart in the menu/submenu
-                menus[charts[c].menu].submenus[charts[c].submenu].charts.push(charts[c]);
+                menus[m].submenus[chart.submenu].charts.push(chart);
             }
 
             // propagate the descriptive subname given to QoS
             // to all the other submenus with the same name
-            for(var m in menus) {
+            for(m in menus) {
                 if(!menus.hasOwnProperty(m)) continue;
 
                 for(var s in menus[m].submenus) {
@@ -1449,7 +1493,8 @@
                         menus[m].submenus[s].title = s + ' (' + options.submenu_names[s] + ')';
                     }
                     else {
-                        menus[m].submenus[s].title = netdataDashboard.submenuTitle(m, s);
+                        menu_key = (typeof(menus[m].menu_pattern) !== 'undefined')?menus[m].menu_pattern:m;
+                        menus[m].submenus[s].title = netdataDashboard.submenuTitle(menu_key, s);
                     }
                 }
             }
@@ -2755,7 +2800,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'dashboard_info.js?v20170208-8',
+                url: NETDATA.serverDefault + 'dashboard_info.js?v20170211-18',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
