@@ -28,13 +28,21 @@ extern void buffer_svg(BUFFER *wb, const char *label, calculated_number value, c
  *
  * If unit is one of `ok/error`, `ok/failed`, `up/down`, `on/off` we interpret value as boolean and print the representating name. I.e. `ok`
  *
- * \todo ktsaou: Your help needed - document precision
+ * If an number is printed set `precision` to the number of fractional digits the value should have.
+ * A negative number means auto:
+ *
+ * value    | digits
+ * -------- | --------
+ * `> 1000` | 0
+ * `> 10`   | 1
+ * `> 0.1`  | 2 
+ * `<= 0.1` | 4
  *
  * @param value_string to write to
- * @param value_string_len Length of `value_string`
+ * @param value_string_len Length of `value_string`.
  * @param value to format
  * @param units to format
- * @param precision to print value with
+ * @param precision Number of fractional digits.
  * @return the formatted string
  */
 extern char *format_value_and_unit(char *value_string, size_t value_string_len, calculated_number value, const char *units, int precision);
