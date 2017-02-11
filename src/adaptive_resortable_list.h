@@ -109,11 +109,13 @@ typedef struct arl_base {
  * \skip arl_callback_str2ull
  * \until }
  *
- * \todo How to choose a value for rechecks?
+ * Rechecks defines the number of iteration between computing the wanted number of keywords.
+ * We skip reading the whole file for `rechecks` iterations if an wanted keywoard was not found.
+ * So we may recognice not an added keywoard for `rechecks` iterations.  
  *
  * @param name of the ARL
  * @param processor Callback to process a match.
- * @param rechecks The number of iterations between re-checks of the wanted number of keywords.
+ * @param rechecks Number of iterations between re-checks of the wanted number of keywords.
  * @return the ARL. 
  */
 extern ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks);
