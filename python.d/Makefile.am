@@ -40,6 +40,7 @@ dist_python_SCRIPTS = \
     smartd_log.chart.py \
     tomcat.chart.py \
     varnish.chart.py \
+    web_log.chart.py \
     python-modules-installer.sh \
     $(NULL)
 
