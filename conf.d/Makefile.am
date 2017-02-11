@@ -33,7 +33,6 @@ dist_pythonconfig_DATA = \
     python.d/exim.conf \
     python.d/fail2ban.conf \
     python.d/freeradius.conf \
-    python.d/gunicorn_log.conf \
     python.d/haproxy.conf \
     python.d/hddtemp.conf \
     python.d/ipfs.conf \
@@ -42,7 +41,6 @@ dist_pythonconfig_DATA = \
     python.d/memcached.conf \
     python.d/mysql.conf \
     python.d/nginx.conf \
-    python.d/nginx_log.conf \
     python.d/ovpn_status_log.conf \
     python.d/phpfpm.conf \
     python.d/postfix.conf \
