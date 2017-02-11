@@ -78,6 +78,7 @@ dist_healthconfig_DATA = \
     health.d/retroshare.conf \
     health.d/squid.conf \
     health.d/varnish.conf \
+    health.d/web_log.conf \
     $(NULL)
 
 if LINUX
