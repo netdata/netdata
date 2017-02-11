@@ -857,7 +857,7 @@ netdataDashboard.context = {
                     + ' data-dimensions="2xx"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Successful"'
-                    + ' data-units="requests"'
+                    + ' data-units="requests/s"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
                     + ' data-before="0"'
@@ -865,6 +865,7 @@ netdataDashboard.context = {
                     + ' data-points="CHART_DURATION"'
                     + ' data-common-max="' + id + '"'
                     + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="0"'
                     + ' role="application"></div>';
             },
 
@@ -874,7 +875,7 @@ netdataDashboard.context = {
                     + ' data-dimensions="3xx"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Redirects"'
-                    + ' data-units="requests"'
+                    + ' data-units="requests/s"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
                     + ' data-before="0"'
@@ -882,6 +883,7 @@ netdataDashboard.context = {
                     + ' data-points="CHART_DURATION"'
                     + ' data-common-max="' + id + '"'
                     + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="0"'
                     + ' role="application"></div>';
             },
 
@@ -891,7 +893,7 @@ netdataDashboard.context = {
                     + ' data-dimensions="4xx"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Bad Requests"'
-                    + ' data-units="requests"'
+                    + ' data-units="requests/s"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
                     + ' data-before="0"'
@@ -899,6 +901,7 @@ netdataDashboard.context = {
                     + ' data-points="CHART_DURATION"'
                     + ' data-common-max="' + id + '"'
                     + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="0"'
                     + ' role="application"></div>';
             },
 
@@ -908,7 +911,7 @@ netdataDashboard.context = {
                     + ' data-dimensions="5xx"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Server Errors"'
-                    + ' data-units="requests"'
+                    + ' data-units="requests/s"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
                     + ' data-before="0"'
@@ -916,6 +919,7 @@ netdataDashboard.context = {
                     + ' data-points="CHART_DURATION"'
                     + ' data-common-max="' + id + '"'
                     + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="0"'
                     + ' role="application"></div>';
             }
         ]
@@ -928,7 +932,7 @@ netdataDashboard.context = {
                 return  '<div data-netdata="' + id + '"'
                     + ' data-dimensions="avg"'
                     + ' data-chart-library="gauge"'
-                    + ' data-title="Average Response"'
+                    + ' data-title="Average Response Time"'
                     + ' data-units="milliseconds"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
@@ -936,6 +940,7 @@ netdataDashboard.context = {
                     + ' data-after="-CHART_DURATION"'
                     + ' data-points="CHART_DURATION"'
                     + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
                     + ' role="application"></div>';
             }
         ]
