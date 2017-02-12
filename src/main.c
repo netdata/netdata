@@ -256,7 +256,7 @@ void help(int exitcode) {
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
             " Copyright (C) 2016-2017, Costa Tsaousis <costa@tsaousis.gr>\n"
-            " Released under GNU Public License v3 or later.\n"
+            " Released under GNU General Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
             " Home Page  : https://my-netdata.io\n"
