@@ -12,7 +12,8 @@ define([VERSION_SUFFIX], [_rolling])
 dnl Set to "1" for a first RPM release of a new version
 PACKAGE_RPM_RELEASE="0.0.$(echo VERSION_SUFFIX | sed s/^_//)"
 
-define([VERSION_STRING], m4_esyscmd_s(git describe 2>/dev/null | sed 's/^v//'))
+# We do not use m4_esyscmd_s to support older autoconf.
+define([VERSION_STRING], m4_esyscmd(git describe 2>/dev/null | sed 's/^v//' | tr -d '\n'))
 m4_ifval(VERSION_STRING, [], [define([VERSION_STRING], VERSION_NUMBER)])
 
 AC_INIT([netdata], VERSION_STRING[]VERSION_SUFFIX)
