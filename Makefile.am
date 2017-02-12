@@ -60,4 +60,5 @@ dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
 	docker-build.sh \
 	netdata-installer.sh \
+	installer/functions.sh \
 	$(NULL)

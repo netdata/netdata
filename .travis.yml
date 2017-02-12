@@ -33,9 +33,7 @@ before_script:
 script:
    # make release packages
  - fakeroot ./packaging/git-build
-   # default build
- - ./autogen.sh && ./configure && make -j4
-   # test installer
+   # test build and installer
  - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it
 #
 # Deploy as required
