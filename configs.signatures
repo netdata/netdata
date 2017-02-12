@@ -173,6 +173,7 @@ declare -A configs_signatures=(
   ['6a47af861ad3dd112124c37fbf09672b']='apps_groups.conf'
   ['6b39de5d85db45115db236347a6896d4']='health.d/named.conf'
   ['6b917300747e7e8314844237e2462261']='python.d/apache_cache.conf'
+  ['6bb278bd9e171c4cb5c0fe639231288b']='python.d/web_log.conf'
   ['6bf0de6e3b251b765b10a71d8c5c319d']='python.d/apache.conf'
   ['6c9f2f0abe49a6f1a69db052ebcef1bf']='python.d/elasticsearch.conf'
   ['6ca08ea2a238cad26578b8b85edae160']='health.d/udp_errors.conf'
