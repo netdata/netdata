@@ -332,8 +332,7 @@ static const char *verify_required_directory(const char *dir) {
     return dir;
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     char *hostname = "localhost";
     int i, check_config = 0;
     int config_loaded = 0;
@@ -506,6 +505,16 @@ int main(int argc, char **argv)
             }
         }
     }
+
+#ifdef _SC_OPEN_MAX
+    // close all open file descriptors, except the standard ones
+    // the caller may have left open files (lxc-attach has this issue)
+    {
+        int fd;
+        for(fd = (int) (sysconf(_SC_OPEN_MAX) - 1); fd > 2; fd--)
+            if(fd_is_valid(fd)) close(fd);
+    }
+#endif
 
     if(!config_loaded)
         load_config(NULL, 0);
