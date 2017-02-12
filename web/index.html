@@ -2317,12 +2317,14 @@
             })
             .done(function(data) {
                 data = data.replace(/(\r\n|\n|\r| |\t)/gm,"");
-                if(data.length !== 40) {
-                    var c = getNetdataCommitIdFromVersion();
-                    if(c === null) versionLog('Cannot find the git commit id of netdata.');
-                    callback(c);
+
+                var c = getNetdataCommitIdFromVersion();
+                if(c !== null && data.length === 40 && data.substring(0, 7) !== c) {
+                    versionLog('Installed files commit id and internal netdata git commit id do not match');
+                    data = c;
                 }
-                else {
+
+                if(data.length >= 7) {
                     versionLog('Installed git commit id of netdata is ' + data);
                     document.getElementById('netdataCommitId').innerHTML = data.substring(0, 7);
                     callback(data);
