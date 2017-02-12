@@ -126,9 +126,9 @@ class Service(LogService):
             self.error('Can\'t parse %s' % self.log_path)
             return False
 
-        if regex_name.startswith('access_'):
+        if regex_name.startswith('acs_'):
             self.create_access_charts(regex_name)
-            if regex_name == 'access_default':
+            if regex_name == 'acs_default':
                 self.info('Not all data collected. You need to modify LogFormat.')
             self._get_data = self._get_access_data
             self.info('Used regex: %s' % regex_name)
@@ -148,33 +148,56 @@ class Service(LogService):
         """
         # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
         # 5. Bytes sent 6. Response length 7. Response process time
-        access_default = re.compile(r'([\da-f.:]+)'
-                                    r' -.*?"([A-Z]+)'
-                                    r' (.*?)"'
-                                    r' ([1-9]\d{2})'
-                                    r' (\d+)')
+        acs_default = re.compile(r'([\da-f.:]+)'
+                                 r' -.*?"([A-Z]+)'
+                                 r' (.*?)"'
+                                 r' ([1-9]\d{2})'
+                                 r' (\d+|-)')
 
-        access_apache_ext = re.compile(r'([\da-f.:]+)'
-                                       r' -.*?"([A-Z]+)'
-                                       r' (.*?)"'
-                                       r' ([1-9]\d{2})'
-                                       r' (\d+)'
-                                       r' (\d+)'
-                                       r' (\d+) ')
+        acs_apache_ext_insert = re.compile(r'([\da-f.:]+)'
+                                           r' -.*?"([A-Z]+)'
+                                           r' (.*?)"'
+                                           r' ([1-9]\d{2})'
+                                           r' (\d+|-)'
+                                           r' (\d+)'
+                                           r' (\d+) ')
 
-        access_nginx_ext = re.compile(r'([\da-f.:]+)'
-                                      r' -.*?"([A-Z]+)'
-                                      r' (.*?)"'
-                                      r' ([1-9]\d{2})'
-                                      r' (\d+)'
-                                      r' (\d+)'
-                                      r' ([\d.]+) ')
+        acs_apache_ext_append = re.compile(r'([\da-f.:]+)'
+                                           r' -.*?"([A-Z]+)'
+                                           r' (.*?)"'
+                                           r' ([1-9]\d{2})'
+                                           r' (\d+|-)'
+                                           r' .*?'
+                                           r' (\d+)'
+                                           r' (\d+)'
+                                           r'(?: |$)')
 
-        regex_function = zip([access_apache_ext, access_nginx_ext, access_default],
-                             [lambda x: x, lambda x: x * 1000000, lambda x: x],
-                             ['access_apache_ext', 'access_nginx_ext', 'access_default'])
+        acs_nginx_ext_insert = re.compile(r'([\da-f.:]+)'
+                                          r' -.*?"([A-Z]+)'
+                                          r' (.*?)"'
+                                          r' ([1-9]\d{2})'
+                                          r' (\d+)'
+                                          r' (\d+)'
+                                          r' (\d\.\d+) ')
+
+        acs_nginx_ext_append = re.compile(r'([\da-f.:]+)'
+                                          r' -.*?"([A-Z]+)'
+                                          r' (.*?)"'
+                                          r' ([1-9]\d{2})'
+                                          r' (\d+)'
+                                          r' .*?'
+                                          r' (\d+)'
+                                          r' (\d\.\d+)')
+
+        r_regex = [acs_apache_ext_insert, acs_apache_ext_append, acs_nginx_ext_insert,
+                   acs_nginx_ext_append, acs_default]
+        r_function = [lambda x: x, lambda x: x, lambda x: x * 1000000, lambda x: x * 1000000, lambda x: x]
+        r_name = ['acs_apache_ext_insert', 'acs_apache_ext_append', 'acs_nginx_ext_insert',
+                  'acs_nginx_ext_append', 'acs_default']
+        regex_function_name = zip(r_regex, r_function, r_name)
+
         regex_name = None
-        for regex, function, name in regex_function:
+        for regex, function, name in regex_function_name:
             if regex.search(last_line):
                 self.regex = regex
                 self.resp_time_func = function
@@ -215,7 +238,7 @@ class Service(LogService):
                                  ' web_log.http_method stacked 2 %s\n' % (job_name, self.update_every)
 
         # Remove 'request_time' chart from ORDER if request_time not in logs
-        if regex_name == 'access_default':
+        if regex_name == 'acs_default':
             self.order.remove('response_time')
         # Remove 'clients_all' chart from ORDER if specified in the configuration
         if not self.all_time:
@@ -294,7 +317,7 @@ class Service(LogService):
                 # requests per http method
                 self._get_data_http_method(match_dict['method'])
                 # bandwidth sent
-                self.data['bytes_sent'] += int(match_dict['sent'])
+                self.data['bytes_sent'] += int(match_dict['sent'] if '-' not in match_dict['sent'] else 0)
                 # request processing time and bandwidth received
                 if match_dict['resp_length'] and match_dict['resp_time']:
                     self.data['resp_length'] += int(match_dict['resp_length'])
