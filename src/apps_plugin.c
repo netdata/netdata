@@ -2960,7 +2960,7 @@ static void parse_args(int argc, char **argv)
                     "\n"
                     " netdata apps.plugin %s\n"
                     " Copyright (C) 2016-2017 Costa Tsaousis <costa@tsaousis.gr>\n"
-                    " Released under GNU Public License v3 or later.\n"
+                    " Released under GNU General Public License v3 or later.\n"
                     " All rights reserved.\n"
                     "\n"
                     " This program is a data collector plugin for netdata.\n"
