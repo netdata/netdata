@@ -202,25 +202,32 @@ do
 done
 
 netdata_banner "real-time performance monitoring, done right!"
-cat <<BANNER
+cat <<BANNER1
 
   You are about to build and install netdata to your system.
 
   It will be installed at these locations:
 
-   - the daemon    at ${NETDATA_PREFIX}/usr/sbin/netdata
-   - config files  at ${NETDATA_PREFIX}/etc/netdata
-   - web files     at ${NETDATA_PREFIX}/usr/share/netdata
-   - plugins       at ${NETDATA_PREFIX}/usr/libexec/netdata
-   - cache files   at ${NETDATA_PREFIX}/var/cache/netdata
-   - db files      at ${NETDATA_PREFIX}/var/lib/netdata
-   - log files     at ${NETDATA_PREFIX}/var/log/netdata
-   - pid file      at ${NETDATA_PREFIX}/var/run
+   - the daemon     at ${TPUT_CYAN}${NETDATA_PREFIX}/usr/sbin/netdata${TPUT_RESET}
+   - config files   in ${TPUT_CYAN}${NETDATA_PREFIX}/etc/netdata${TPUT_RESET}
+   - web files      in ${TPUT_CYAN}${NETDATA_PREFIX}/usr/share/netdata${TPUT_RESET}
+   - plugins        in ${TPUT_CYAN}${NETDATA_PREFIX}/usr/libexec/netdata${TPUT_RESET}
+   - cache files    in ${TPUT_CYAN}${NETDATA_PREFIX}/var/cache/netdata${TPUT_RESET}
+   - db files       in ${TPUT_CYAN}${NETDATA_PREFIX}/var/lib/netdata${TPUT_RESET}
+   - log files      in ${TPUT_CYAN}${NETDATA_PREFIX}/var/log/netdata${TPUT_RESET}
+BANNER1
+
+[ "${UID}" -eq 0 ] && cat <<BANNER2
+   - pid file       at ${TPUT_CYAN}${NETDATA_PREFIX}/var/run/netdata.pid${TPUT_RESET}
+   - logrotate file at ${TPUT_CYAN}/etc/logrotate.d/netdata${TPUT_RESET}
+BANNER2
+
+cat <<BANNER3
 
   This installer allows you to change the installation path.
   Press Control-C and run the same command with --help for help.
 
-BANNER
+BANNER3
 
 if [ "${UID}" -ne 0 ]
     then
@@ -229,7 +236,7 @@ if [ "${UID}" -ne 0 ]
         netdata_banner "wrong command line options!"
         cat <<NONROOTNOPREFIX
   
-  Sorry! This will fail!
+  ${TPUT_RED}${TPUT_BOLD}Sorry! This will fail!${TPUT_RESET}
   
   You are attempting to install netdata as non-root, but you plan
   to install it in system paths.
@@ -253,7 +260,7 @@ NONROOTNOPREFIX
     else
         cat <<NONROOT
  
-  IMPORTANT:
+  ${TPUT_RED}${TPUT_BOLD}IMPORTANT${TPUT_RESET}:
   You are about to install netdata as a non-root user.
   Netdata will work, but a few data collection modules that
   require root access will fail.
@@ -261,7 +268,7 @@ NONROOTNOPREFIX
   If you installing netdata permanently on your system, run
   the installer like this:
   
-     sudo $0 ${@}
+     ${TPUT_YELLOW}${TPUT_BOLD}sudo $0 ${@}${TPUT_RESET}
 
 NONROOT
     fi
@@ -327,9 +334,9 @@ if [ ${DONOTWAIT} -eq 0 ]
     then
     if [ ! -z "${NETDATA_PREFIX}" ]
         then
-        eval "read >&2 -ep \$'\001${COLOR_BOLD}${COLOR_GREEN}\002Press ENTER to build and install netdata to \'\001${COLOR_CYAN}\002${NETDATA_PREFIX}\001${COLOR_YELLOW}\002\'\001${COLOR_RESET}\002 > ' -e -r REPLY"
+        eval "read >&2 -ep \$'\001${TPUT_BOLD}${TPUT_GREEN}\002Press ENTER to build and install netdata to \'\001${TPUT_CYAN}\002${NETDATA_PREFIX}\001${TPUT_YELLOW}\002\'\001${TPUT_RESET}\002 > ' -e -r REPLY"
     else
-        eval "read >&2 -ep \$'\001${COLOR_BOLD}${COLOR_GREEN}\002Press ENTER to build and install netdata to your system\001${COLOR_RESET}\002 > ' -e -r REPLY"
+        eval "read >&2 -ep \$'\001${TPUT_BOLD}${TPUT_GREEN}\002Press ENTER to build and install netdata to your system\001${TPUT_RESET}\002 > ' -e -r REPLY"
     fi
 fi
 
@@ -480,7 +487,8 @@ do
         if [ -z "${md5sum}" -o ! -x "${md5sum}" ]
             then
             # we don't have md5sum - keep it
-            cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+            echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
+            run cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
         else
             # find it relative filename
             f="${x/*\/etc\/netdata\//}"
@@ -499,15 +507,15 @@ do
                 if [ "${configs_signatures[${md5}]}" = "${f}" ]
                 then
                     # it is a stock version - don't keep it
-                    echo >&2 "File '${x}' is stock version."
+                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version."
                 else
                     # edited by user - keep it
-                    echo >&2 "File '${x}' has been edited by user."
-                    cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} has been edited by user${TPUT_RESET}. Keeping it."
+                    run cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
                 fi
             else
-                echo >&2 "File '${x}' cannot be check for custom edits."
-                cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}cannot be checked for custom edits${TPUT_RESET}. Keeping it."
+                run cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
             fi
         fi
 
@@ -525,14 +533,14 @@ run make install || exit 1
 
 
 # -----------------------------------------------------------------------------
-progress "Restore netdata configuration files"
+progress "Restore user edited netdata configuration files"
 
 for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
     if [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
         then
-        cp -p "${x}.installer_backup.${installer_backup_suffix}" "${x}"
-        rm -f "${x}.installer_backup.${installer_backup_suffix}"
+        run cp -p "${x}.installer_backup.${installer_backup_suffix}" "${x}" && \
+            run rm -f "${x}.installer_backup.${installer_backup_suffix}"
     fi
 done
 
@@ -560,8 +568,10 @@ if [ ${UID} -eq 0 ]
     portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
     portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
     portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
+    run_ok
+else
+    run_failed "The installer does not run as root."
 fi
-
 
 # -----------------------------------------------------------------------------
 progress "Install logrotate configuration for netdata"
@@ -858,7 +868,7 @@ stop_all_netdata() {
 
     myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
 
-    echo >&2 "Stopping a (possibly) running netdata..."
+    # echo >&2 "Stopping a (possibly) running netdata (namespace '${myns}')..."
 
     for p in $(cat "${NETDATA_RUN_DIR}/netdata.pid" 2>/dev/null) \
         $(cat /var/run/netdata.pid 2>/dev/null) \
@@ -974,15 +984,15 @@ progress "Check KSM (kernel memory deduper)"
 ksm_is_available_but_disabled() {
     cat <<KSM1
 
-Memory de-duplication instructions
+${TPUT_BOLD}Memory de-duplication instructions${TPUT_RESET}
 
 You have kernel memory de-duper (called Kernel Same-page Merging,
 or KSM) available, but it is not currently enabled.
 
 To enable it run:
 
-    $(printf "${COLOR_YELLOW}${COLOR_BOLD}echo 1 >/sys/kernel/mm/ksm/run${COLOR_RESET}")
-    $(printf "${COLOR_YELLOW}${COLOR_BOLD}echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs${COLOR_RESET}")
+    ${TPUT_YELLOW}${TPUT_BOLD}echo 1 >/sys/kernel/mm/ksm/run${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs${TPUT_RESET}
 
 If you enable it, you will save 40-60% of netdata memory.
 
@@ -992,7 +1002,7 @@ KSM1
 ksm_is_not_available() {
     cat <<KSM2
 
-Memory de-duplication not present in your kernel
+${TPUT_BOLD}Memory de-duplication not present in your kernel${TPUT_RESET}
 
 It seems you do not have kernel memory de-duper (called Kernel Same-page
 Merging, or KSM) available.
@@ -1021,7 +1031,7 @@ if [ ! -s web/version.txt ]
     then
     cat <<VERMSG
 
-Version update check warning
+${TPUT_BOLD}Version update check warning${TPUT_RESET}
 
 The way you downloaded netdata, we cannot find its version. This means the
 Update check on the dashboard, will not work.
@@ -1041,7 +1051,7 @@ if [ "${UID}" -ne 0 ]
     then
     cat <<SETUID_WARNING
 
-apps.plugin needs privileges
+${TPUT_BOLD}apps.plugin needs privileges${TPUT_RESET}
 
 Since you have installed netdata as a normal user, to have apps.plugin collect
 all the needed data, you have to give it the access rights it needs, by running
@@ -1049,14 +1059,14 @@ either of the following sets of commands:
 
 To run apps.plugin with escalated capabilities:
 
-    $(printf "${COLOR_YELLOW}${COLOR_BOLD}sudo chown root:${NETDATA_USER} \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${COLOR_RESET}")
-    $(printf "${COLOR_YELLOW}${COLOR_BOLD}sudo chmod 0750 \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${COLOR_RESET}")
-    $(printf "${COLOR_YELLOW}${COLOR_BOLD}sudo setcap cap_dac_read_search,cap_sys_ptrace+ep \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${COLOR_RESET}")
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root:${NETDATA_USER} \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 0750 \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo setcap cap_dac_read_search,cap_sys_ptrace+ep \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
 
 or, to run apps.plugin as root:
 
-    $(printf "${COLOR_YELLOW}${COLOR_BOLD}sudo chown root \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${COLOR_RESET}")
-    $(printf "${COLOR_YELLOW}${COLOR_BOLD}sudo chmod 4755 \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${COLOR_RESET}")
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 4755 \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
 
 apps.plugin is performing a hard-coded function of data collection for all
 running processes. It cannot be instructed from the netdata daemon to perform
@@ -1213,15 +1223,15 @@ http://this.machine.ip:${NETDATA_PORT}/
 
 To stop netdata, just kill it, with:
 
-  $(printf "${COLOR_YELLOW}${COLOR_BOLD}killall netdata${COLOR_RESET}")
+  ${TPUT_YELLOW}${TPUT_BOLD}killall netdata${TPUT_RESET}
 
 To start it, just run it:
 
-  $(printf "${COLOR_YELLOW}${COLOR_BOLD}${NETDATA_PREFIX}/usr/sbin/netdata${COLOR_RESET}")
+  ${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_PREFIX}/usr/sbin/netdata${TPUT_RESET}
 
 
 END
-echo >&2 -e "Uninstall script generated: ${COLOR_YELLOW}${COLOR_BOLD}./netdata-uninstaller.sh${COLOR_RESET}"
+echo >&2 "Uninstall script generated: ${TPUT_YELLOW}${TPUT_BOLD}./netdata-uninstaller.sh${TPUT_RESET}"
 
 if [ -d .git ]
     then
@@ -1337,7 +1347,7 @@ update && exit 0
 REINSTALL
     chmod 755 netdata-updater.sh.new
     mv -f netdata-updater.sh.new netdata-updater.sh
-    echo >&2 -e "Update script generated   : ${COLOR_YELLOW}${COLOR_BOLD}./netdata-updater.sh${COLOR_RESET}"
+    echo >&2 "Update script generated   : ${TPUT_YELLOW}${TPUT_BOLD}./netdata-updater.sh${TPUT_RESET}"
 elif [ -f "netdata-updater.sh" ]
     then
     rm "netdata-updater.sh"

@@ -20,43 +20,45 @@ setup_terminal() {
     # Is stderr on the terminal? If not, then fail
     test -t 2 || return 1
 
-    if [ ! -z "$TPUT_CMD" ]
+    if check_cmd tput
     then
-        if [ $[$($TPUT_CMD colors 2>/dev/null)] -ge 8 ]
+        if [ $(( $(tput colors 2>/dev/null) )) -ge 8 ]
         then
             # Enable colors
-            COLOR_RESET="\e[0m"
-            COLOR_BLACK="\e[30m"
-            COLOR_RED="\e[31m"
-            COLOR_GREEN="\e[32m"
-            COLOR_YELLOW="\e[33m"
-            COLOR_BLUE="\e[34m"
-            COLOR_PURPLE="\e[35m"
-            COLOR_CYAN="\e[36m"
-            COLOR_WHITE="\e[37m"
-            COLOR_BGBLACK="\e[40m"
-            COLOR_BGRED="\e[41m"
-            COLOR_BGGREEN="\e[42m"
-            COLOR_BGYELLOW="\e[43m"
-            COLOR_BGBLUE="\e[44m"
-            COLOR_BGPURPLE="\e[45m"
-            COLOR_BGCYAN="\e[46m"
-            COLOR_BGWHITE="\e[47m"
-            COLOR_BOLD="\e[1m"
-            COLOR_DIM="\e[2m"
-            COLOR_UNDERLINED="\e[4m"
-            COLOR_BLINK="\e[5m"
-            COLOR_INVERTED="\e[7m"
+            TPUT_RESET="$(tput sgr 0)"
+            TPUT_BLACK="$(tput setaf 0)"
+            TPUT_RED="$(tput setaf 1)"
+            TPUT_GREEN="$(tput setaf 2)"
+            TPUT_YELLOW="$(tput setaf 3)"
+            TPUT_BLUE="$(tput setaf 4)"
+            TPUT_PURPLE="$(tput setaf 5)"
+            TPUT_CYAN="$(tput setaf 6)"
+            TPUT_WHITE="$(tput setaf 7)"
+            TPUT_BGBLACK="$(tput setab 0)"
+            TPUT_BGRED="$(tput setab 1)"
+            TPUT_BGGREEN="$(tput setab 2)"
+            TPUT_BGYELLOW="$(tput setab 3)"
+            TPUT_BGBLUE="$(tput setab 4)"
+            TPUT_BGPURPLE="$(tput setab 5)"
+            TPUT_BGCYAN="$(tput setab 6)"
+            TPUT_BGWHITE="$(tput setab 7)"
+            TPUT_BOLD="$(tput bold)"
+            TPUT_DIM="$(tput dim)"
+            TPUT_UNDERLINED="$(tput smul)"
+            TPUT_BLINK="$(tput blink)"
+            TPUT_INVERTED="$(tput rev)"
+            TPUT_STANDOUT="$(tput smso)"
+            TPUT_BELL="$(tput bel)"
+            TPUT_CLEAR="$(tput clear)"
         fi
     fi
 
     return 0
 }
-TPUT_CMD="$(which_cmd tput)"
 setup_terminal
 
 progress() {
-    printf >&2 " --- ${COLOR_DIM}${COLOR_BOLD}${*}${COLOR_RESET} --- \n"
+    echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
 }
 
 # -----------------------------------------------------------------------------
@@ -67,7 +69,7 @@ netdata_banner() {
             l3="  |   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'   '-'  "  \
             l4="  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->" \
             sp="                                                                              " \
-            netdata="netdata" start end msg="${*}" chartcolor="${COLOR_DIM}"
+            netdata="netdata" start end msg="${*}" chartcolor="${TPUT_DIM}"
 
     [ ${#msg} -lt ${#netdata} ] && msg="${msg}${sp:0:$(( ${#netdata} - ${#msg}))}"
     [ ${#msg} -gt $(( ${#l2} - 20 )) ] && msg="${msg:0:$(( ${#l2} - 23 ))}..."
@@ -77,10 +79,10 @@ netdata_banner() {
     end=$(( ${start} + ${#msg} + 4 ))
 
     echo >&2
-    echo >&2 -e "${chartcolor}${l1}${COLOR_RESET}"
-    echo >&2 -e "${chartcolor}${l2:0:start}${sp:0:2}${COLOR_RESET}${COLOR_BOLD}${COLOR_GREEN}${netdata}${COLOR_RESET}${chartcolor}${sp:0:$((end - start - 2 - ${#netdata}))}${l2:end:$((${#l2} - end))}${COLOR_RESET}"
-    echo >&2 -e "${chartcolor}${l3:0:start}${sp:0:2}${COLOR_RESET}${COLOR_BOLD}${COLOR_CYAN}${msg}${COLOR_RESET}${chartcolor}${sp:0:2}${l3:end:$((${#l2} - end))}${COLOR_RESET}"
-    echo >&2 -e "${chartcolor}${l4}${COLOR_RESET}"
+    echo >&2 "${chartcolor}${l1}${TPUT_RESET}"
+    echo >&2 "${chartcolor}${l2:0:start}${sp:0:2}${TPUT_RESET}${TPUT_BOLD}${TPUT_GREEN}${netdata}${TPUT_RESET}${chartcolor}${sp:0:$((end - start - 2 - ${#netdata}))}${l2:end:$((${#l2} - end))}${TPUT_RESET}"
+    echo >&2 "${chartcolor}${l3:0:start}${sp:0:2}${TPUT_RESET}${TPUT_BOLD}${TPUT_CYAN}${msg}${TPUT_RESET}${chartcolor}${sp:0:2}${l3:end:$((${#l2} - end))}${TPUT_RESET}"
+    echo >&2 "${chartcolor}${l4}${TPUT_RESET}"
     echo >&2
 }
 
@@ -106,6 +108,14 @@ service() {
 
 # -----------------------------------------------------------------------------
 
+run_ok() {
+    printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+}
+
+run_failed() {
+    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+}
+
 run_logfile="/dev/null"
 run() {
     local user="${USER}" dir="$(basename "${PWD}")" info info_console
@@ -113,29 +123,29 @@ run() {
     if [ "${UID}" = "0" ]
         then
         info="[root ${dir}]# "
-        info_console="[${COLOR_DIM}${dir}${COLOR_RESET}]# "
+        info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
     else
         info="[${user} ${dir}]$ "
-        info_console="[${COLOR_DIM}${dir}${COLOR_RESET}]$ "
+        info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
     fi
 
     printf >> "${run_logfile}" "${info}"
     printf >> "${run_logfile}" "%q " "${@}"
     printf >> "${run_logfile}" " ... "
 
-    printf >&2 "${info_console}${COLOR_BOLD}${COLOR_YELLOW}"
+    printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
     printf >&2 "%q " "${@}"
-    printf >&2 "${COLOR_RESET}\n"
+    printf >&2 "${TPUT_RESET}\n"
 
     "${@}"
 
     local ret=$?
     if [ ${ret} -ne 0 ]
         then
-        printf >&2 "${COLOR_BGRED}${COLOR_WHITE}${COLOR_BOLD} FAILED ${COLOR_RESET}\n\n"
+        run_failed
         printf >> "${run_logfile}" "FAILED with exit code ${ret}\n"
     else
-        printf >&2 "${COLOR_BGGREEN}${COLOR_WHITE}${COLOR_BOLD} OK ${COLOR_RESET}\n\n"
+        run_ok
         printf >> "${run_logfile}" "OK\n"
     fi
 
@@ -146,7 +156,7 @@ portable_add_user() {
     local username="${1}"
 
     getent passwd "${username}" > /dev/null 2>&1
-    [ $? -eq 0 ] && return 0
+    [ $? -eq 0 ] && echo >&2 "User '${username}' already exists." && return 0
 
     echo >&2 "Adding ${username} user account ..."
 
@@ -179,7 +189,7 @@ portable_add_group() {
     local groupname="${1}"
 
     getent group "${groupname}" > /dev/null 2>&1
-    [ $? -eq 0 ] && return 0
+    [ $? -eq 0 ] && echo >&2 "Group '${groupname}' already exists." && return 0
 
     echo >&2 "Adding ${groupname} user group ..."
 
@@ -209,13 +219,14 @@ portable_add_user_to_group() {
     local groupname="${1}" username="${2}"
 
     getent group "${groupname}" > /dev/null 2>&1
-    [ $? -ne 0 ] && return 1
+    [ $? -ne 0 ] && echo >&2 "Group '${groupname}' does not exist." && return 1
 
     # find the user is already in the group
     local users=$(getent group "${groupname}" | cut -d ':' -f 4)
     if [[ ",${users}," =~ ,${username}, ]]
         then
         # username is already there
+        echo >&2 "User '${username}' is already in group '${groupname}'."
         return 0
     else
         # username is not in group
