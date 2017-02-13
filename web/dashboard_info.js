@@ -222,7 +222,7 @@ netdataDashboard.menu = {
     'web_log': {
         title: undefined,
         icon: '<i class="fa fa-file-text-o" aria-hidden="true"></i>',
-        info: 'Information extracted from a web server log file. <code>python.d/web_log</code> plugin incrementally parses the web server log file to provide, in real-time, a break down of key web server performance metrics. A special log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) allowing the plugin to extract timing information for the web server responses and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>). netdata attaches several alarms on these charts, such as <b>too many bad requests</b>, <b>too many redirects</b>, <b>too many internal errors</b>, <b>unreasonably slow responses</b>, <b>unreasonably many requests</b> (i.e. web attack) and <b>unreasonably few requests</b> (i.e. something is wrong).'
+        info: 'Information extracted from a web server log file. <code>web_log</code> plugin incrementally parses the web server log file to provide, in real-time, a break down of key web server performance metrics. An extended log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) offering timing information and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     },
 
     'named': {
@@ -272,11 +272,11 @@ netdataDashboard.menu = {
 // information about the submenus
 netdataDashboard.submenu = {
     'web_log.bandwidth': {
-        info: 'Bandwidth of requests (<code>received</code>) and responses (<code>sent</code>). <code>received</code> requires a special file format (without it, the web server log does not have this information). This chart may present unusual spikes, since the whole bandwidth will be accounted at the time the log line is saved by the web server, even if the time needed to serve it spans across a longer duration. We suggest to use QoS (e.g. <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a>) for accurate accounting of the web server bandwidth.'
+        info: 'Bandwidth of requests (<code>received</code>) and responses (<code>sent</code>). <code>received</code> requires an extended log format (without it, the web server log does not have this information). This chart may present unusual spikes, since the bandwidth is accounted at the time the log line is saved by the web server, even if the time needed to serve it spans across a longer duration. We suggest to use QoS (e.g. <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a>) for accurate accounting of the web server bandwidth.'
     },
 
     'web_log.urls': {
-        info: 'Number of requests for each URL <code>category</code> (URL pattern) defined in <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>. This chart counts all requests matching the URL patterns defined, independently of the web server response codes (i.e. both successful and unsuccessful).'
+        info: 'Number of requests for each <code>URL pattern</code> defined in <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>. This chart counts all requests matching the URL patterns defined, independently of the web server response codes (i.e. both successful and unsuccessful).'
     },
 
     'web_log.clients': {
@@ -284,7 +284,7 @@ netdataDashboard.submenu = {
     },
 
     'web_log.timings': {
-        info: 'Web server response timings - the time the web server needed to prepare and respond to requests. This requires a special log format and its meaning is web server specific. For most web servers this accounts the time from the reception of a complete request, to the dispatch of the last byte of the response. So, it includes the network delays of responses, but it does not include the network delays of requests.'
+        info: 'Web server response timings - the time the web server needed to prepare and respond to requests. This requires an extended log format and its meaning is web server specific. For most web servers this accounts the time from the reception of a complete request, to the dispatch of the last byte of the response. So, it includes the network delays of responses, but it does not include the network delays of requests.'
     },
 
     'mem.ksm': {
@@ -848,7 +848,7 @@ netdataDashboard.context = {
     },
 
     'web_log.response_statuses': {
-        info: 'Break down of web server responses by response type. <code>success</code> included all <code>1xx</code>, <code>2xx</code> and <code>304</code> (not modified) responses, <code>error</code> are all <code>5xx</code>responses, <code>redirect</code> are all <code>3xx</code> responses, except <code>304</code>, <code>bad</code> are all <code>4xx</code> responses, <code>other</code> are all the other responses.',
+        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b> and <b>304</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b>, <code>other</code> are all the other responses.',
         mainheads: [
             function(os, id) {
                 void(os);
@@ -925,7 +925,7 @@ netdataDashboard.context = {
     },
 
     'web_log.response_codes': {
-        info: 'Break down of web server responses by response code family. <code>1xx</code> are informational responses, <code>2xx</code> are successful responses, <code>3xx</code> are redirects (although they include <code>304</code> which means "not modified", <code>4xx</code> are bad requests, <code>5xx</code> are internal server errors, <code>other</code> are non-standard responses, <code>unmatched</code> counts the lines in the log file that are not matched by the plugin (please <a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">open a github issue</a> to help us fix it, if you have any unmatched lines).'
+        info: 'Web server responses by code family. According to the standards <code>1xx</code> are informational responses, <code>2xx</code> are successful responses, <code>3xx</code> are redirects (although they include <b>304</b> which is used as "<b>not modified</b>"), <code>4xx</code> are bad requests, <code>5xx</code> are internal server errors, <code>other</code> are non-standard responses, <code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
     },
 
     'web_log.response_time': {
@@ -950,7 +950,7 @@ netdataDashboard.context = {
     },
 
     'web_log.detailed_response_codes': {
-        info: 'Number of responses for each response code.'
+        info: 'Number of responses for each response code individually.'
     },
 
     'web_log.requests_per_ipproto': {
