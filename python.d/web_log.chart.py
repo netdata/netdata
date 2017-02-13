@@ -17,8 +17,8 @@ except ImportError:
 priority = 60000
 retries = 60
 
-ORDER = ['response_codes', 'bandwidth', 'response_time', 'requests_per_url', 'http_method', 'requests_per_ipproto',
-         'clients', 'clients_all']
+ORDER = ['response_statuses', 'response_codes', 'bandwidth', 'response_time', 'requests_per_url', 'http_method',
+         'requests_per_ipproto', 'clients', 'clients_all']
 CHARTS = {
     'response_codes': {
         'options': [None, 'Response Codes', 'requests/s', 'responses', 'web_log.response_codes', 'stacked'],
@@ -66,6 +66,16 @@ CHARTS = {
         'lines': [
             ['req_ipv4', 'ipv4', 'incremental', 1, 1],
             ['req_ipv6', 'ipv6', 'incremental', 1, 1]
+        ]},
+    'response_statuses': {
+        'options': [None, 'Response Statuses', 'requests/s', 'responses', 'web_log.response_statuses',
+                    'stacked'],
+        'lines': [
+            ['successful_requests', 'success', 'incremental', 1, 1],
+            ['server_errors', 'error', 'incremental', 1, 1],
+            ['redirects', 'redirect', 'incremental', 1, 1],
+            ['bad_requests', 'bad', 'incremental', 1, 1],
+            ['other_requests', 'other', 'incremental', 1, 1]
         ]}
 }
 
@@ -90,11 +100,11 @@ class Service(LogService):
         # sorted list of unique IPs
         self.unique_all_time = list()
         # if there is no new logs this dict  returned to netdata
-        self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0,
-                     'resp_time_max': 0, 'resp_time_avg': 0, 'unique_cur_ipv4': 0,
-                     'unique_cur_ipv6': 0, '2xx': 0, '5xx': 0, '3xx': 0, '4xx': 0,
-                     '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0, 'req_ipv6': 0,
-                     'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0}
+        self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0, 'resp_time_max': 0,
+                     'resp_time_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
+                     '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
+                     'req_ipv6': 0, 'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
+                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0}
 
     def check(self):
         if not self.log_path:
@@ -311,6 +321,8 @@ class Service(LogService):
                 # detailed response code
                 if self.detailed_response_codes:
                     self._get_data_detailed_response_codes(match_dict['code'])
+                # response statuses
+                self._get_data_statuses(match_dict['code'])
                 # requests per url
                 if self.url_pattern:
                     self._get_data_per_url(match_dict['url'])
@@ -337,6 +349,7 @@ class Service(LogService):
                         ip_address_counter['unique_cur_ip'] += 1
             else:
                 self.data['unmatched'] += 1
+
         # timings
         if request_time:
             self.data['resp_time_min'] += int(request_time[0])
@@ -383,6 +396,23 @@ class Service(LogService):
                 break
         if not match:
             self.data['other_url'] += 1
+
+    def _get_data_statuses(self, code):
+        """
+        :param code: str: response status code. Ex.: '202', '499'
+        :return:
+        """
+        code_class = code[0]
+        if code_class == '2' or code == '304' or code_class == '1':
+            self.data['successful_requests'] += 1
+        elif code_class == '3':
+            self.data['redirects'] += 1
+        elif code_class == '4':
+            self.data['bad_requests'] += 1
+        elif code_class == '5':
+            self.data['server_errors'] += 1
+        else:
+            self.data['other_requests'] += 1
 
 
 def address_not_in_pool(pool, address, pool_size):
