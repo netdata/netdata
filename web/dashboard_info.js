@@ -847,14 +847,13 @@ netdataDashboard.context = {
         height: 0.5
     },
 
-    'web_log.response_codes': {
-        info: 'Break down of web server responses by response code type. <code>1xx</code> are informational responses, <code>2xx</code> are successful responses, <code>3xx</code> are redirects, <code>4xx</code> are bad requests, <code>5xx</code> are internal server errors, <code>other</code> are non-standard responses, <code>unmatched</code> counts the lines in the log file that are not matched by the plugin (please <a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">open a github issue</a> to help us fix it, if you have any unmatched lines).',
-
+    'web_log.response_statuses': {
+        info: 'Break down of web server responses by response type. <code>success</code> included all <code>1xx</code>, <code>2xx</code> and <code>304</code> (not modified) responses, <code>error</code> are all <code>5xx</code>responses, <code>redirect</code> are all <code>3xx</code> responses, except <code>304</code>, <code>bad</code> are all <code>4xx</code> responses, <code>other</code> are all the other responses.',
         mainheads: [
             function(os, id) {
                 void(os);
                 return  '<div data-netdata="' + id + '"'
-                    + ' data-dimensions="2xx"'
+                    + ' data-dimensions="success"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Successful"'
                     + ' data-units="requests/s"'
@@ -872,7 +871,7 @@ netdataDashboard.context = {
             function(os, id) {
                 void(os);
                 return  '<div data-netdata="' + id + '"'
-                    + ' data-dimensions="3xx"'
+                    + ' data-dimensions="redirect"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Redirects"'
                     + ' data-units="requests/s"'
@@ -890,7 +889,7 @@ netdataDashboard.context = {
             function(os, id) {
                 void(os);
                 return  '<div data-netdata="' + id + '"'
-                    + ' data-dimensions="4xx"'
+                    + ' data-dimensions="bad"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Bad Requests"'
                     + ' data-units="requests/s"'
@@ -908,7 +907,7 @@ netdataDashboard.context = {
             function(os, id) {
                 void(os);
                 return  '<div data-netdata="' + id + '"'
-                    + ' data-dimensions="5xx"'
+                    + ' data-dimensions="error"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Server Errors"'
                     + ' data-units="requests/s"'
@@ -923,6 +922,10 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ]
+    },
+
+    'web_log.response_codes': {
+        info: 'Break down of web server responses by response code family. <code>1xx</code> are informational responses, <code>2xx</code> are successful responses, <code>3xx</code> are redirects (although they include <code>304</code> which means "not modified", <code>4xx</code> are bad requests, <code>5xx</code> are internal server errors, <code>other</code> are non-standard responses, <code>unmatched</code> counts the lines in the log file that are not matched by the plugin (please <a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">open a github issue</a> to help us fix it, if you have any unmatched lines).'
     },
 
     'web_log.response_time': {
