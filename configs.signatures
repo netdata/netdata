@@ -60,6 +60,7 @@ declare -A configs_signatures=(
   ['2827de41cf34a91b7a8e4d8724f59668']='health.d/net.conf'
   ['28df44a90e8ea4c6156314c03e88bf44']='health.d/softnet.conf'
   ['297160ae7ee01a547ed14f857b4f2c8d']='health.d/memcached.conf'
+  ['298504f331c55dff4055321ff3a7b5cc']='health.d/web_log.conf'
   ['29f97e10b92333790fbe0d2a3617b736']='health_alarm_notify.conf'
   ['2a0794fd43eadf30a51805bc9ba2c64d']='python.d/hddtemp.conf'
   ['2ad55a5d1e885cf142849a78d4b00401']='health.d/net.conf'
