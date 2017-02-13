@@ -71,10 +71,11 @@ CHARTS = {
         'options': [None, 'Response Statuses', 'requests/s', 'responses', 'web_log.response_statuses',
                     'stacked'],
         'lines': [
-            ['successful_requests', 'successful', 'incremental', 1, 1],
-            ['redirects', None, 'incremental', 1, 1],
+            ['successful_requests', 'success', 'incremental', 1, 1],
+            ['server_errors', 'error', 'incremental', 1, 1],
+            ['redirects', 'redirect', 'incremental', 1, 1],
             ['bad_requests', 'bad', 'incremental', 1, 1],
-            ['server_errors', None, 'incremental', 1, 1]
+            ['other_requests', 'other', 'incremental', 1, 1]
         ]}
 }
 
@@ -103,7 +104,7 @@ class Service(LogService):
                      'resp_time_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
                      '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
                      'req_ipv6': 0, 'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
-                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0}
+                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0}
 
     def check(self):
         if not self.log_path:
@@ -401,14 +402,17 @@ class Service(LogService):
         :param code: str: response status code. Ex.: '202', '499'
         :return:
         """
-        if code[0] == '2' or code == '304' or code[0] == '1':
+        code_class = code[0]
+        if code_class == '2' or code == '304' or code_class == '1':
             self.data['successful_requests'] += 1
-        elif code[0] == '3':
+        elif code_class == '3':
             self.data['redirects'] += 1
-        elif code[0] == '4':
+        elif code_class == '4':
             self.data['bad_requests'] += 1
-        elif code[0] == '5':
+        elif code_class == '5':
             self.data['server_errors'] += 1
+        else:
+            self.data['other_requests'] += 1
 
 
 def address_not_in_pool(pool, address, pool_size):
