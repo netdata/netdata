@@ -442,7 +442,6 @@ void *pluginsd_main(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    char *dir_name = netdata_configured_plugins_dir;
     int automatic_run = config_get_boolean("plugins", "enable running new plugins", 1);
     int scan_frequency = (int) config_get_number("plugins", "check for new plugins every", 60);
     DIR *dir = NULL;
@@ -457,9 +456,9 @@ void *pluginsd_main(void *ptr) {
     for(;;) {
         if(unlikely(netdata_exit)) break;
 
-        dir = opendir(dir_name);
+        dir = opendir(netdata_configured_plugins_dir);
         if(unlikely(!dir)) {
-            error("Cannot open directory '%s'.", dir_name);
+            error("Cannot open directory '%s'.", netdata_configured_plugins_dir);
             goto cleanup;
         }
 
@@ -503,7 +502,7 @@ void *pluginsd_main(void *ptr) {
                 snprintfz(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
 
                 strncpyz(cd->filename, file->d_name, FILENAME_MAX);
-                snprintfz(cd->fullfilename, FILENAME_MAX, "%s/%s", dir_name, cd->filename);
+                snprintfz(cd->fullfilename, FILENAME_MAX, "%s/%s", netdata_configured_plugins_dir, cd->filename);
 
                 cd->enabled = enabled;
                 cd->update_every = (int) config_get_number(cd->id, "update every", rrd_update_every);
