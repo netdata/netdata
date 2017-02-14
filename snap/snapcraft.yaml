@@ -35,7 +35,7 @@ parts:
       - zlib1g
       - libuuid1
     install: |
-      ./netdata-installer.sh --dont-wait --install $SNAPCRAFT_PART_INSTALL
+      ./netdata-installer.sh --dont-wait --dont-start-it --install $SNAPCRAFT_PART_INSTALL
       chmod -R o+r $SNAPCRAFT_PART_INSTALL/netdata/etc/netdata
   wrapper:
     plugin: dump
