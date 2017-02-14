@@ -782,7 +782,7 @@ void *tc_main(void *ptr) {
 #endif
     uint32_t first_hash;
 
-    snprintfz(buffer, TC_LINE_MAX, "%s/tc-qos-helper.sh", config_get("plugins", "plugins directory", PLUGINS_DIR));
+    snprintfz(buffer, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_plugins_dir);
     char *tc_script = config_get("plugin:tc", "script to run to get tc values", buffer);
     
     for(;1;) {

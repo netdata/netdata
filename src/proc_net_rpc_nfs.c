@@ -136,7 +136,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(!ff) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/net/rpc/nfs");
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/rpc/nfs");
         ff = procfile_open(config_get("plugin:proc:/proc/net/rpc/nfs", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
     if(!ff) return 1;
