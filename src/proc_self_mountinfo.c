@@ -175,10 +175,10 @@ static inline int is_read_only(const char *s) {
 // read the whole mountinfo into a linked list
 struct mountinfo *mountinfo_read(int do_statvfs) {
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", global_host_prefix);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", netdata_configured_host_prefix);
     procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
-        snprintfz(filename, FILENAME_MAX, "%s/proc/1/mountinfo", global_host_prefix);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/1/mountinfo", netdata_configured_host_prefix);
         ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return NULL;
     }

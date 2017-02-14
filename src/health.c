@@ -11,9 +11,9 @@ struct health_options {
 };
 
 static struct health_options health = {
-    .health_default_exec = PLUGINS_DIR "/alarm-notify.sh",
+    .health_default_exec = NULL,
     .health_default_recipient = "root",
-    .log_filename = VARLIB_DIR "/health/alarm_log.db",
+    .log_filename = NULL,
     .log_entries_written = 0,
     .log_fp = NULL
 };
@@ -2389,7 +2389,7 @@ void health_readdir(const char *path) {
 
 static inline char *health_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", config_get("global", "config directory", CONFIG_DIR));
+    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_config_dir);
     return config_get("health", "health configuration directory", buffer);
 }
 
@@ -2401,7 +2401,8 @@ void health_init(void) {
         return;
     }
 
-    char *pathname = config_get("health", "health db directory", VARLIB_DIR "/health");
+    char pathname[FILENAME_MAX + 1];
+    snprintfz(pathname, FILENAME_MAX, "%s/health", netdata_configured_varlib_dir);
     if(mkdir(pathname, 0770) == -1 && errno != EEXIST)
         fatal("Cannot create directory '%s'.", pathname);
 
@@ -2414,11 +2415,8 @@ void health_init(void) {
 
     char *path = health_config_dir();
 
-    {
-        char buffer[FILENAME_MAX + 1];
-        snprintfz(buffer, FILENAME_MAX, "%s/alarm-notify.sh", config_get("global", "plugins directory", PLUGINS_DIR));
-        health.health_default_exec = config_get("health", "script to execute on alarm", buffer);
-    }
+    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
+    health.health_default_exec = config_get("health", "script to execute on alarm", filename);
 
     long n = config_get_number("health", "in memory max health log entries", (long)localhost.health_log.max);
     if(n < 10) {

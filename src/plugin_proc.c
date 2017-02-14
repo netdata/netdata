@@ -157,7 +157,7 @@ int get_numa_node_count(void)
     numa_node_count = 0;
 
     char name[FILENAME_MAX + 1];
-    snprintfz(name, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/devices/system/node");
+    snprintfz(name, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/system/node");
     char *dirname = config_get("plugin:proc:/sys/devices/system/node", "directory to monitor", name);
 
     DIR *dir = opendir(dirname);

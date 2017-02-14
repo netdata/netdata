@@ -290,12 +290,7 @@ gid_t web_files_gid(void) {
 
 int mysendfile(struct web_client *w, char *filename)
 {
-    static char *web_dir = NULL;
-
-    // initialize our static data
-    if(unlikely(!web_dir)) web_dir = config_get("global", "web files directory", WEB_DIR);
-
-    debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, web_dir, filename);
+    debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
     // skip leading slashes
     while (*filename == '/') filename++;
@@ -324,7 +319,7 @@ int mysendfile(struct web_client *w, char *filename)
 
     // access the file
     char webfilename[FILENAME_MAX + 1];
-    snprintfz(webfilename, FILENAME_MAX, "%s/%s", web_dir, filename);
+    snprintfz(webfilename, FILENAME_MAX, "%s/%s", netdata_configured_web_dir, filename);
 
     // check if the file exists
     struct stat stat;

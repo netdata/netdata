@@ -442,7 +442,7 @@ void *pluginsd_main(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    char *dir_name = config_get("plugins", "plugins directory", PLUGINS_DIR);
+    char *dir_name = netdata_configured_plugins_dir;
     int automatic_run = config_get_boolean("plugins", "enable running new plugins", 1);
     int scan_frequency = (int) config_get_number("plugins", "check for new plugins every", 60);
     DIR *dir = NULL;
