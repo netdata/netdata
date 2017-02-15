@@ -880,15 +880,16 @@
             families_idx: {},
 
             chartsPerRow: 0,
-            chartsMinWidth: 1450,
+            // chartsMinWidth: 1450,
             chartsHeight: 180
         };
 
         function chartsPerRow(total) {
             if(options.chartsPerRow === 0) {
-                var width = Math.floor(total / options.chartsMinWidth);
-                if(width === 0) width = 1;
-                return width;
+                return 1;
+                //var width = Math.floor(total / options.chartsMinWidth);
+                //if(width === 0) width = 1;
+                //return width;
             }
             else return options.chartsPerRow;
         }
