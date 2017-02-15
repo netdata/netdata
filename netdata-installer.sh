@@ -84,7 +84,7 @@ Valid <installer options> are:
 
    --install /PATH/TO/INSTALL
 
-        If your give: --install /opt
+        If you give: --install /opt
         netdata will be installed in /opt/netdata
 
    --dont-start-it
