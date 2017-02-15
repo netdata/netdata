@@ -5,7 +5,8 @@
 #define TOO_BIG_REQUEST 16384
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
-int web_donotrack_comply = 0;
+int respect_web_browser_do_not_track_policy = 0;
+char *web_x_frame_options = NULL;
 
 #ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
@@ -1347,7 +1348,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
-    if(web_donotrack_comply && w->donottrack) {
+    if(respect_web_browser_do_not_track_policy && w->donottrack) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
         return 400;
@@ -1824,7 +1825,7 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
         if(strcasestr(v, "keep-alive"))
             w->keepalive = 1;
     }
-    else if(web_donotrack_comply && hash == hash_donottrack && !strcasecmp(s, "DNT")) {
+    else if(respect_web_browser_do_not_track_policy && hash == hash_donottrack && !strcasecmp(s, "DNT")) {
         if(*v == '0') w->donottrack = 0;
         else if(*v == '1') w->donottrack = 1;
     }
@@ -1926,6 +1927,148 @@ static inline int http_request_validate(struct web_client *w) {
     return -3;
 }
 
+static inline void web_client_send_http_header(struct web_client *w) {
+    if(unlikely(w->response.code != 200))
+        buffer_no_cacheable(w->response.data);
+
+    // set a proper expiration date, if not already set
+    if(unlikely(!w->response.data->expires)) {
+        if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
+            w->response.data->expires = w->tv_ready.tv_sec + rrd_update_every;
+        else
+            w->response.data->expires = w->tv_ready.tv_sec + 86400;
+    }
+
+    // prepare the HTTP response header
+    debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, w->response.code);
+
+    const char *content_type_string = web_content_type_to_string(w->response.data->contenttype);
+    const char *code_msg = web_response_code_to_string(w->response.code);
+
+    // prepare the last modified and expiration dates
+    char date[32], edate[32];
+    {
+        struct tm tmbuf, *tm;
+
+        tm = gmtime_r(&w->response.data->date, &tmbuf);
+        strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
+
+        tm = gmtime_r(&w->response.data->expires, &tmbuf);
+        strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
+    }
+
+    buffer_sprintf(w->response.header_output,
+            "HTTP/1.1 %d %s\r\n"
+                    "Connection: %s\r\n"
+                    "Server: NetData Embedded HTTP Server\r\n"
+                    "Access-Control-Allow-Origin: %s\r\n"
+                    "Access-Control-Allow-Credentials: true\r\n"
+                    "Content-Type: %s\r\n"
+                    "Date: %s\r\n"
+                   , w->response.code, code_msg
+                   , w->keepalive?"keep-alive":"close"
+                   , w->origin
+                   , content_type_string
+                   , date
+    );
+
+    if(unlikely(web_x_frame_options))
+        buffer_sprintf(w->response.header_output, "X-Frame-Options: %s\r\n", web_x_frame_options);
+
+    if(w->cookie1[0] || w->cookie2[0]) {
+        if(w->cookie1[0]) {
+            buffer_sprintf(w->response.header_output,
+                    "Set-Cookie: %s\r\n",
+                    w->cookie1);
+        }
+
+        if(w->cookie2[0]) {
+            buffer_sprintf(w->response.header_output,
+                    "Set-Cookie: %s\r\n",
+                    w->cookie2);
+        }
+
+        if(respect_web_browser_do_not_track_policy)
+            buffer_sprintf(w->response.header_output,
+                    "Tk: T;cookies\r\n");
+    }
+    else {
+        if(respect_web_browser_do_not_track_policy) {
+            if(w->tracking_required)
+                buffer_sprintf(w->response.header_output,
+                        "Tk: T;cookies\r\n");
+            else
+                buffer_sprintf(w->response.header_output,
+                        "Tk: N\r\n");
+        }
+    }
+
+    if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
+        buffer_strcat(w->response.header_output,
+                "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
+                        "Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie, pragma, cache-control\r\n"
+                        "Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
+        );
+    }
+    else {
+        buffer_sprintf(w->response.header_output,
+                "Cache-Control: %s\r\n"
+                        "Expires: %s\r\n",
+                (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache":"public",
+                edate);
+    }
+
+    // copy a possibly available custom header
+    if(unlikely(buffer_strlen(w->response.header)))
+        buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
+
+    // headers related to the transfer method
+    if(likely(w->response.zoutput)) {
+        buffer_strcat(w->response.header_output,
+                "Content-Encoding: gzip\r\n"
+                        "Transfer-Encoding: chunked\r\n"
+        );
+    }
+    else {
+        if(likely((w->response.data->len || w->response.rlen))) {
+            // we know the content length, put it
+            buffer_sprintf(w->response.header_output, "Content-Length: %zu\r\n", w->response.data->len? w->response.data->len: w->response.rlen);
+        }
+        else {
+            // we don't know the content length, disable keep-alive
+            w->keepalive = 0;
+        }
+    }
+
+    // end of HTTP header
+    buffer_strcat(w->response.header_output, "\r\n");
+
+    // sent the HTTP header
+    debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %zu: '%s'"
+          , w->id
+          , buffer_strlen(w->response.header_output)
+          , buffer_tostring(w->response.header_output)
+    );
+
+    web_client_crock_socket(w);
+
+    ssize_t bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0);
+    if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
+        if(bytes > 0)
+            w->stats_sent_bytes += bytes;
+
+        debug(D_WEB_CLIENT, "%llu: HTTP Header failed to be sent (I sent %zu bytes but the system sent %zd bytes). Closing web client."
+              , w->id
+              , buffer_strlen(w->response.header_output)
+              , bytes);
+
+        WEB_CLIENT_IS_DEAD(w);
+        return;
+    }
+    else
+        w->stats_sent_bytes += bytes;
+}
+
 void web_client_process(struct web_client *w) {
     static uint32_t
             hash_api = 0,
@@ -1959,7 +2102,6 @@ void web_client_process(struct web_client *w) {
     }
 
     int code = 500;
-    ssize_t bytes;
 
     int what_to_do = http_request_validate(w);
 
@@ -2160,142 +2302,7 @@ void web_client_process(struct web_client *w) {
     if(unlikely(!w->response.data->date))
         w->response.data->date = w->tv_ready.tv_sec;
 
-    if(unlikely(code != 200))
-        buffer_no_cacheable(w->response.data);
-
-    // set a proper expiration date, if not already set
-    if(unlikely(!w->response.data->expires)) {
-        if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->tv_ready.tv_sec + rrd_update_every;
-        else
-            w->response.data->expires = w->tv_ready.tv_sec + 86400;
-    }
-
-    // prepare the HTTP response header
-    debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, code);
-
-    const char *content_type_string = web_content_type_to_string(w->response.data->contenttype);
-    const char *code_msg = web_response_code_to_string(code);
-
-    // prepare the last modified and expiration dates
-    char date[32], edate[32];
-    {
-        struct tm tmbuf, *tm;
-
-        tm = gmtime_r(&w->response.data->date, &tmbuf);
-        strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %Z", tm);
-
-        tm = gmtime_r(&w->response.data->expires, &tmbuf);
-        strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
-    }
-
-    buffer_sprintf(w->response.header_output,
-        "HTTP/1.1 %d %s\r\n"
-        "Connection: %s\r\n"
-        "Server: NetData Embedded HTTP Server\r\n"
-        "Access-Control-Allow-Origin: %s\r\n"
-        "Access-Control-Allow-Credentials: true\r\n"
-        "Content-Type: %s\r\n"
-        "Date: %s\r\n"
-        , code, code_msg
-        , w->keepalive?"keep-alive":"close"
-        , w->origin
-        , content_type_string
-        , date
-        );
-
-    if(w->cookie1[0] || w->cookie2[0]) {
-        if(w->cookie1[0]) {
-            buffer_sprintf(w->response.header_output,
-               "Set-Cookie: %s\r\n",
-               w->cookie1);
-        }
-
-        if(w->cookie2[0]) {
-            buffer_sprintf(w->response.header_output,
-               "Set-Cookie: %s\r\n",
-               w->cookie2);
-        }
-
-        if(web_donotrack_comply)
-            buffer_sprintf(w->response.header_output,
-               "Tk: T;cookies\r\n");
-    }
-    else {
-        if(web_donotrack_comply) {
-            if(w->tracking_required)
-                buffer_sprintf(w->response.header_output,
-                   "Tk: T;cookies\r\n");
-            else
-                buffer_sprintf(w->response.header_output,
-                   "Tk: N\r\n");
-        }
-    }
-
-    if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
-        buffer_strcat(w->response.header_output,
-            "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
-            "Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie, pragma, cache-control\r\n"
-            "Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
-            );
-    }
-    else {
-        buffer_sprintf(w->response.header_output,
-            "Cache-Control: %s\r\n"
-            "Expires: %s\r\n",
-            (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache":"public",
-            edate);
-    }
-
-    // copy a possibly available custom header
-    if(unlikely(buffer_strlen(w->response.header)))
-        buffer_strcat(w->response.header_output, buffer_tostring(w->response.header));
-
-    // headers related to the transfer method
-    if(likely(w->response.zoutput)) {
-        buffer_strcat(w->response.header_output,
-            "Content-Encoding: gzip\r\n"
-            "Transfer-Encoding: chunked\r\n"
-            );
-    }
-    else {
-        if(likely((w->response.data->len || w->response.rlen))) {
-            // we know the content length, put it
-            buffer_sprintf(w->response.header_output, "Content-Length: %zu\r\n", w->response.data->len? w->response.data->len: w->response.rlen);
-        }
-        else {
-            // we don't know the content length, disable keep-alive
-            w->keepalive = 0;
-        }
-    }
-
-    // end of HTTP header
-    buffer_strcat(w->response.header_output, "\r\n");
-
-    // sent the HTTP header
-    debug(D_WEB_DATA, "%llu: Sending response HTTP header of size %zu: '%s'"
-            , w->id
-            , buffer_strlen(w->response.header_output)
-            , buffer_tostring(w->response.header_output)
-            );
-
-    web_client_crock_socket(w);
-
-    bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0);
-    if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
-        if(bytes > 0)
-            w->stats_sent_bytes += bytes;
-
-        debug(D_WEB_CLIENT, "%llu: HTTP Header failed to be sent (I sent %zu bytes but the system sent %zd bytes). Closing web client."
-            , w->id
-            , buffer_strlen(w->response.header_output)
-            , bytes);
-
-        WEB_CLIENT_IS_DEAD(w);
-        return;
-    }
-    else 
-        w->stats_sent_bytes += bytes;
+    web_client_send_http_header(w);
 
     // enable sending immediately if we have data
     if(w->response.data->len) w->wait_send = 1;
