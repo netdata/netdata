@@ -49,7 +49,7 @@ static SIMPLE_PATTERN *enabled_cgroup_paths = NULL;
 static SIMPLE_PATTERN *enabled_cgroup_renames = NULL;
 static SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 
-static char *cgroups_rename_script = PLUGINS_DIR "/cgroup-name.sh";
+static char *cgroups_rename_script = NULL;
 
 static uint32_t Read_hash = 0;
 static uint32_t Write_hash = 0;
@@ -105,7 +105,7 @@ void read_cgroup_plugin_configuration() {
         s = "/sys/fs/cgroup/cpuacct";
     }
     else s = mi->mount_point;
-    snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
     cgroup_cpuacct_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/cpuacct", filename);
 
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
@@ -115,7 +115,7 @@ void read_cgroup_plugin_configuration() {
         s = "/sys/fs/cgroup/blkio";
     }
     else s = mi->mount_point;
-    snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
     cgroup_blkio_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/blkio", filename);
 
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
@@ -125,7 +125,7 @@ void read_cgroup_plugin_configuration() {
         s = "/sys/fs/cgroup/memory";
     }
     else s = mi->mount_point;
-    snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
     cgroup_memory_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/memory", filename);
 
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
@@ -135,7 +135,7 @@ void read_cgroup_plugin_configuration() {
         s = "/sys/fs/cgroup/devices";
     }
     else s = mi->mount_point;
-    snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, s);
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, s);
     cgroup_devices_base = config_get("plugin:cgroups", "path to /sys/fs/cgroup/devices", filename);
 
     cgroup_root_max = (int)config_get_number("plugin:cgroups", "max cgroups to allow", cgroup_root_max);
@@ -177,7 +177,8 @@ void read_cgroup_plugin_configuration() {
                     " * "
             ), SIMPLE_PATTERN_EXACT);
 
-    cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", cgroups_rename_script);
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_plugins_dir);
+    cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", filename);
 
     enabled_cgroup_renames = simple_pattern_create(
             config_get("plugin:cgroups", "run script to rename cgroups matching",

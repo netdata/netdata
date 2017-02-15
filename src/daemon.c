@@ -84,8 +84,8 @@ int become_user(const char *username, int pid_fd)
     uid_t uid = pw->pw_uid;
     gid_t gid = pw->pw_gid;
 
-    create_needed_dir(CACHE_DIR, uid, gid);
-    create_needed_dir(VARLIB_DIR, uid, gid);
+    create_needed_dir(netdata_configured_cache_dir, uid, gid);
+    create_needed_dir(netdata_configured_varlib_dir, uid, gid);
 
     if(pidfile[0]) {
         if(chown(pidfile, uid, gid) == -1)
@@ -360,8 +360,8 @@ int become_daemon(int dont_fork, const char *user)
         else debug(D_SYSTEM, "Successfully became user '%s'.", user);
     }
     else {
-        create_needed_dir(CACHE_DIR, getuid(), getgid());
-        create_needed_dir(VARLIB_DIR, getuid(), getgid());
+        create_needed_dir(netdata_configured_cache_dir, getuid(), getgid());
+        create_needed_dir(netdata_configured_varlib_dir, getuid(), getgid());
     }
 
     if(pidfd != -1)

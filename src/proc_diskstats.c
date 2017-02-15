@@ -72,7 +72,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     // get the default path for finding info about the block device
     if(unlikely(!path_find_block_device[0])) {
-        snprintfz(buffer, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/dev/block/%lu:%lu/%s");
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
         snprintfz(path_find_block_device, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get block device infos", buffer));
     }
 
@@ -126,11 +126,11 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // find the disk sector size
 
     if(unlikely(!path_to_get_hw_sector_size[0])) {
-        snprintfz(buffer, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/block/%s/queue/hw_sector_size");
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/queue/hw_sector_size");
         snprintfz(path_to_get_hw_sector_size, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size", buffer));
     }
     if(unlikely(!path_to_get_hw_sector_size_partitions[0])) {
-        snprintfz(buffer, FILENAME_MAX, "%s%s", global_host_prefix, "/sys/dev/block/%lu:%lu/subsystem/%s/../queue/hw_sector_size");
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/subsystem/%s/../queue/hw_sector_size");
         snprintfz(path_to_get_hw_sector_size_partitions, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size for partitions", buffer));
     }
 
@@ -233,7 +233,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/diskstats");
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/diskstats");
         ff = procfile_open(config_get("plugin:proc:/proc/diskstats", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
     if(unlikely(!ff)) return 0;

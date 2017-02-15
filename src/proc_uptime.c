@@ -13,7 +13,7 @@ int do_proc_uptime(int update_every, usec_t dt) {
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s%s", global_host_prefix, "/proc/uptime");
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/uptime");
 
         ff = procfile_open(config_get("plugin:proc:/proc/uptime", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff))

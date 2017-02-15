@@ -217,6 +217,15 @@
 #include "inlined.h"
 #include "adaptive_resortable_list.h"
 
+extern char *netdata_configured_config_dir;
+extern char *netdata_configured_log_dir;
+extern char *netdata_configured_plugins_dir;
+extern char *netdata_configured_web_dir;
+extern char *netdata_configured_cache_dir;
+extern char *netdata_configured_varlib_dir;
+extern char *netdata_configured_home_dir;
+extern char *netdata_configured_host_prefix;
+
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);
 
@@ -255,7 +264,6 @@ extern int savememory(const char *filename, void *mem, size_t size);
 
 extern int fd_is_valid(int fd);
 
-extern char *global_host_prefix;
 extern int enable_ksm;
 
 extern pid_t gettid(void);
