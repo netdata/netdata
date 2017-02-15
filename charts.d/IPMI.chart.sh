@@ -28,16 +28,18 @@ IPMI_check() {
 
 IPMI_create() {
 
+	data=`sudo -n ipmi-sensors`
+
 	echo CHART IPMI.temp \'\' \"Temperature Sensors\" Celsius Temperature Temperature line 1000 $IPMI_update_every
-	sudo -n ipmi-sensors | awk -F '|' '{ if ($3 ~ "Temp"){ if ($4 !~ "N"){ gsub(" |\t",""); print "DIMENSION " $2}}}'
+	echo "$data" | awk -F '|' '{ if ($3 ~ "Temp"){ if ($4 !~ "N"){ gsub(" |\t",""); print "DIMENSION " $2}}}'
 	echo END
 
 	echo CHART IPMI.volt \'\' \"Voltage Sensors\" \"Volts * 100\" Voltage Voltage line 1000 $IPMI_update_every
-	sudo -n ipmi-sensors | awk -F '|' '{ if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t",""); print "DIMENSION " $2}}}'
+	echo "$data" | awk -F '|' '{ if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t",""); print "DIMENSION " $2}}}'
 	echo END
 
 	echo CHART IPMI.fan \'\' \"Fan Sensors\" RPM Fans Fans line 1000 $IPMI_update_every
-	sudo -n ipmi-sensors | awk -F '|' '{ if ($3 ~ "Fan"){ if ($4 !~ "N"){ gsub(" |\t",""); print "DIMENSION " $2}}}'
+	echo "$data" | awk -F '|' '{ if ($3 ~ "Fan"){ if ($4 !~ "N"){ gsub(" |\t",""); print "DIMENSION " $2}}}'
 	echo END
 	
 	return 0
@@ -45,16 +47,18 @@ IPMI_create() {
 
 IPMI_update() {
 
+	data=`sudo -n ipmi-sensors`
+
 	echo BEGIN IPMI.temp $1
-	sudo -n ipmi-sensors | awk -F '|' '{ if ($3 ~ "Temp"){ if ($4 !~ "N"){ gsub(" |\t",""); print "SET " $2 " = " $4}}}'
+	echo "$data" | awk -F '|' '{ if ($3 ~ "Temp"){ if ($4 !~ "N"){ gsub(" |\t",""); print "SET " $2 " = " $4}}}'
 	echo END
 
 	echo BEGIN IPMI.volt $1
-	sudo -n ipmi-sensors | awk -F '|' '{ if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t|\\.",""); print "SET " $2 " = " $4}}}'
+	echo "$data" | awk -F '|' '{ if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t|\\.",""); print "SET " $2 " = " $4}}}'
 	echo END
 
 	echo BEGIN IPMI.fan $1
-	sudo -n ipmi-sensors | awk -F '|' '{ if ($3 ~ "Fan"){ if ($4 !~ "N"){ gsub(" |\t",""); print "SET " $2 " = " $4}}}'
+	echo "$data" | awk -F '|' '{ if ($3 ~ "Fan"){ if ($4 !~ "N"){ gsub(" |\t",""); print "SET " $2 " = " $4}}}'
 	echo END
 	
 	return 0
