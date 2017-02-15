@@ -4,4 +4,4 @@ if [ ! -d "$SNAP_USER_DATA/etc" ]; then
   cp -R $SNAP/netdata/etc $SNAP_USER_DATA/
 fi
 
-exec "$SNAP/netdata/usr/sbin/netdata" "$@"
+exec "$SNAP/netdata/usr/sbin/netdata" -c $SNAP_USER_DATA/etc/netdata/netdata.conf "$@"
