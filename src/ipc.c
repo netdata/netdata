@@ -57,7 +57,7 @@ static inline int ipc_sem_get_limits(struct ipc_limits *lim) {
     static char filename[FILENAME_MAX + 1] = "";
 
     if(unlikely(!filename[0]))
-        snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/sem", global_host_prefix);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/sem", netdata_configured_host_prefix);
 
     if(unlikely(!ff)) {
         ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);

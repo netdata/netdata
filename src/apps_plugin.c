@@ -687,19 +687,19 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                 p->log_thrown |= log;
                 switch(log) {
                     case PID_LOG_IO:
-                        error("Cannot process %s/proc/%d/io (command '%s')", global_host_prefix, p->pid, p->comm);
+                        error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         break;
 
                     case PID_LOG_STATM:
-                        error("Cannot process %s/proc/%d/statm (command '%s')", global_host_prefix, p->pid, p->comm);
+                        error("Cannot process %s/proc/%d/statm (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         break;
 
                     case PID_LOG_CMDLINE:
-                        error("Cannot process %s/proc/%d/cmdline (command '%s')", global_host_prefix, p->pid, p->comm);
+                        error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         break;
 
                     case PID_LOG_FDS:
-                        error("Cannot process entries in %s/proc/%d/fd (command '%s')", global_host_prefix, p->pid, p->comm);
+                        error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         break;
 
                     case PID_LOG_STAT:
@@ -760,7 +760,7 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
 
     if(unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", global_host_prefix, p->pid);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
         p->cmdline_filename = strdupz(filename);
     }
 
@@ -813,7 +813,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
 
     if(unlikely(!p->stat_filename)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", global_host_prefix, p->pid);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", netdata_configured_host_prefix, p->pid);
         p->stat_filename = strdupz(filename);
     }
 
@@ -935,7 +935,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     }
 
     if(unlikely(debug || (p->target && p->target->debug)))
-        fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d\n", global_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+        fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d\n", netdata_configured_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
     if(unlikely(global_iterations_counter == 1)) {
         p->minflt           = 0;
@@ -973,7 +973,7 @@ static inline int read_proc_pid_statm(struct pid_stat *p) {
 
     if(unlikely(!p->statm_filename)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/statm", global_host_prefix, p->pid);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/statm", netdata_configured_host_prefix, p->pid);
         p->statm_filename = strdupz(filename);
     }
 
@@ -1011,7 +1011,7 @@ static inline int read_proc_pid_io(struct pid_stat *p) {
 
     if(unlikely(!p->io_filename)) {
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/io", global_host_prefix, p->pid);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/io", netdata_configured_host_prefix, p->pid);
         p->io_filename = strdupz(filename);
     }
 
@@ -1087,7 +1087,7 @@ static inline int read_proc_stat() {
     static usec_t collected_usec = 0, last_collected_usec = 0;
 
     if(unlikely(!ff)) {
-        snprintfz(filename, FILENAME_MAX, "%s/proc/stat", global_host_prefix);
+        snprintfz(filename, FILENAME_MAX, "%s/proc/stat", netdata_configured_host_prefix);
         ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) goto cleanup;
     }
@@ -1406,7 +1406,7 @@ static inline void zero_pid_fds(struct pid_stat *p, int first, int size) {
 static inline int read_pid_file_descriptors(struct pid_stat *p) {
     if(unlikely(!p->fds_dirname)) {
         char dirname[FILENAME_MAX+1];
-        snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", global_host_prefix, p->pid);
+        snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", netdata_configured_host_prefix, p->pid);
         p->fds_dirname = strdupz(dirname);
     }
 
@@ -1449,7 +1449,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
         if(unlikely(p->fds[fdid] == 0)) {
             // we don't know this fd, get it
 
-            sprintf(fdname, "%s/proc/%d/fd/%s", global_host_prefix, p->pid, de->d_name);
+            sprintf(fdname, "%s/proc/%d/fd/%s", netdata_configured_host_prefix, p->pid, de->d_name);
             ssize_t l = readlink(fdname, linkname, FILENAME_MAX);
             if(unlikely(l == -1)) {
                 if(debug || (p->target && p->target->debug)) {
@@ -1886,7 +1886,7 @@ static int collect_data_for_all_processes(void) {
 
     char dirname[FILENAME_MAX + 1];
 
-    snprintfz(dirname, FILENAME_MAX, "%s/proc", global_host_prefix);
+    snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
     DIR *dir = opendir(dirname);
     if(!dir) return 0;
 
@@ -3090,12 +3090,12 @@ int main(int argc, char **argv) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
-    global_host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(global_host_prefix == NULL) {
+    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(netdata_configured_host_prefix == NULL) {
         // info("NETDATA_HOST_PREFIX is not passed from netdata");
-        global_host_prefix = "";
+        netdata_configured_host_prefix = "";
     }
-    // else info("Found NETDATA_HOST_PREFIX='%s'", global_host_prefix);
+    // else info("Found NETDATA_HOST_PREFIX='%s'", netdata_configured_host_prefix);
 
     config_dir = getenv("NETDATA_CONFIG_DIR");
     if(config_dir == NULL) {

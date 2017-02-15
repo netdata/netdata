@@ -530,18 +530,26 @@ int main(int argc, char **argv) {
             mallopt(M_ARENA_MAX, 1);
 #endif
 
-        char *config_dir = config_get("global", "config directory", CONFIG_DIR);
-
         // prepare configuration environment variables for the plugins
-        setenv("NETDATA_CONFIG_DIR" , verify_required_directory(config_dir) , 1);
-        setenv("NETDATA_PLUGINS_DIR", verify_required_directory(config_get("global", "plugins directory"  , PLUGINS_DIR)), 1);
-        setenv("NETDATA_WEB_DIR"    , verify_required_directory(config_get("global", "web files directory", WEB_DIR))    , 1);
-        setenv("NETDATA_CACHE_DIR"  , verify_required_directory(config_get("global", "cache directory"    , CACHE_DIR))  , 1);
-        setenv("NETDATA_LIB_DIR"    , verify_required_directory(config_get("global", "lib directory"      , VARLIB_DIR)) , 1);
-        setenv("NETDATA_LOG_DIR"    , verify_required_directory(config_get("global", "log directory"      , LOG_DIR))    , 1);
 
-        setenv("NETDATA_HOST_PREFIX", config_get("global", "host access prefix" , "")         , 1);
-        setenv("HOME"               , config_get("global", "home directory"     , CACHE_DIR)  , 1);
+        netdata_configured_config_dir  = config_get("global", "config directory",    CONFIG_DIR);
+        netdata_configured_log_dir     = config_get("global", "log directory",       LOG_DIR);
+        netdata_configured_plugins_dir = config_get("global", "plugins directory",   PLUGINS_DIR);
+        netdata_configured_web_dir     = config_get("global", "web files directory", WEB_DIR);
+        netdata_configured_cache_dir   = config_get("global", "cache directory",     CACHE_DIR);
+        netdata_configured_varlib_dir  = config_get("global", "lib directory",       VARLIB_DIR);
+        netdata_configured_home_dir    = config_get("global", "home directory",      CACHE_DIR);
+
+        setenv("NETDATA_CONFIG_DIR" , verify_required_directory(netdata_configured_config_dir),  1);
+        setenv("NETDATA_PLUGINS_DIR", verify_required_directory(netdata_configured_plugins_dir), 1);
+        setenv("NETDATA_WEB_DIR"    , verify_required_directory(netdata_configured_web_dir),     1);
+        setenv("NETDATA_CACHE_DIR"  , verify_required_directory(netdata_configured_cache_dir),   1);
+        setenv("NETDATA_LIB_DIR"    , verify_required_directory(netdata_configured_varlib_dir),  1);
+        setenv("NETDATA_LOG_DIR"    , verify_required_directory(netdata_configured_log_dir),     1);
+        setenv("HOME"               , verify_required_directory(netdata_configured_home_dir),    1);
+
+        netdata_configured_host_prefix = config_get("global", "host access prefix", "");
+        setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
         // disable buffering for python plugins
         setenv("PYTHONUNBUFFERED", "1", 1);
@@ -553,8 +561,8 @@ int main(int argc, char **argv) {
         // work while we are cd into config_dir
         // to allow the plugins refer to their config
         // files using relative filenames
-        if(chdir(config_dir) == -1)
-            fatal("Cannot cd to '%s'", config_dir);
+        if(chdir(netdata_configured_config_dir) == -1)
+            fatal("Cannot cd to '%s'", netdata_configured_config_dir);
 
         char path[1024 + 1], *p = getenv("PATH");
         if(!p) p = "/bin:/usr/bin";
@@ -594,18 +602,23 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
 
-        global_host_prefix = config_get("global", "host access prefix", "");
-        setenv("NETDATA_HOST_PREFIX", global_host_prefix, 1);
-
         get_system_HZ();
         get_system_cpus();
         get_system_pid_max();
         
         // --------------------------------------------------------------------
 
-        stdout_filename    = config_get("global", "debug log",  LOG_DIR "/debug.log");
-        stderr_filename    = config_get("global", "error log",  LOG_DIR "/error.log");
-        stdaccess_filename = config_get("global", "access log", LOG_DIR "/access.log");
+        {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
+            stdout_filename    = config_get("global", "debug log",  filename);
+
+            snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
+            stderr_filename    = config_get("global", "error log",  filename);
+
+            snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
+            stdaccess_filename = config_get("global", "access log", filename);
+        }
 
         error_log_throttle_period_backup =
             error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);

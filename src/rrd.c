@@ -392,19 +392,11 @@ char *rrdset_cache_dir(const char *id)
 {
     char *ret = NULL;
 
-    static char *cache_dir = NULL;
-    if(!cache_dir) {
-        cache_dir = config_get("global", "cache directory", CACHE_DIR);
-        int r = mkdir(cache_dir, 0755);
-        if(r != 0 && errno != EEXIST)
-            error("Cannot create directory '%s'", cache_dir);
-    }
-
     char b[FILENAME_MAX + 1];
     char n[FILENAME_MAX + 1];
     rrdset_strncpyz_name(b, id, FILENAME_MAX);
 
-    snprintfz(n, FILENAME_MAX, "%s/%s", cache_dir, b);
+    snprintfz(n, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, b);
     ret = config_get(id, "cache directory", n);
 
     if(rrd_memory_mode == RRD_MEMORY_MODE_MAP || rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {

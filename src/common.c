@@ -8,7 +8,15 @@
 #    define MADV_DONTFORK INHERIT_NONE
 #endif /* __FreeBSD__ || __APPLE__*/
 
-char *global_host_prefix = "";
+char *netdata_configured_config_dir  = NULL;
+char *netdata_configured_log_dir     = NULL;
+char *netdata_configured_plugins_dir = NULL;
+char *netdata_configured_web_dir     = NULL;
+char *netdata_configured_cache_dir   = NULL;
+char *netdata_configured_varlib_dir  = NULL;
+char *netdata_configured_home_dir    = NULL;
+char *netdata_configured_host_prefix = NULL;
+
 int enable_ksm = 1;
 
 volatile sig_atomic_t netdata_exit = 0;
@@ -1115,7 +1123,7 @@ long get_system_cpus(void) {
     #else
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/stat", global_host_prefix);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/stat", netdata_configured_host_prefix);
 
     procfile *ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
     if(!ff) {
@@ -1172,7 +1180,7 @@ pid_t get_system_pid_max(void) {
     read = 1;
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", global_host_prefix);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", netdata_configured_host_prefix);
 
     unsigned long long max = 0;
     if(read_single_number_file(filename, &max) != 0) {
