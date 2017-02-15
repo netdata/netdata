@@ -9,10 +9,6 @@ from os import access, R_OK
 from os.path import getsize
 from collections import namedtuple
 from copy import deepcopy
-try:
-    from itertools import zip_longest
-except ImportError:
-    from itertools import izip_longest as zip_longest
 
 priority = 60000
 retries = 60
@@ -84,21 +80,26 @@ NAMED_URL_PATTERN = namedtuple('URL_PATTERN', ['description', 'pattern'])
 
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
+        """
+        :param configuration:
+        :param name:
+        # self._get_data = None  # will be assigned in 'check' method.
+        # self.order = None  # will be assigned in 'create_*_method' method.
+        # self.definitions = None  # will be assigned in 'create_*_method' method.
+        # self.detailed_chart = None  # will be assigned in 'create_*_method' method.
+        # self.http_method_chart = None  # will be assigned in 'create_*_method' method.
+        """
         LogService.__init__(self, configuration=configuration, name=name)
         # Variables from module configuration file
         self.log_path = self.configuration.get('path')
         self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
         self.all_time = self.configuration.get('all_time', True)
         self.url_pattern = self.configuration.get('categories')  # dict
-        self.regex = None  # will be assigned in 'find_regex' method
-        self.resp_time_func = None  # will be assigned in 'find_regex' method
-        self._get_data = None  # will be assigned in 'check' method.
-        self.order = None  # will be assigned in 'create_*_method' method.
-        self.definitions = None  # will be assigned in 'create_*_method' method.
-        self.detailed_chart = None  # will be assigned in 'create_*_method' method.
-        self.http_method_chart = None  # will be assigned in 'create_*_method' method.
-        # sorted list of unique IPs
-        self.unique_all_time = list()
+        self.custom_log_format = self.configuration.get('custom_log_format')  # dict
+        # Instance variables
+        self.unique_all_time = list()  # sorted list of unique IPs
+        self.regex = None  # will be assigned in 'find_regex' or 'find_regex_custom' method
+        self.resp_time_func = None  # will be assigned in 'find_regex' or 'find_regex_custom' method
         # if there is no new logs this dict  returned to netdata
         self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0, 'resp_time_max': 0,
                      'resp_time_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
@@ -139,97 +140,195 @@ class Service(LogService):
                 self.error(str(error))
                 return False
 
-        # Parse last line
-        regex_name = self.find_regex(last_line)
-        if not regex_name:
-            self.error('Unknown log format. Can\'t parse %s' % self.log_path)
+        # Custom_log_format is preferable
+        if self.custom_log_format:
+            match_dict, log_name, error = self.find_regex_custom(last_line)
+        else:
+            match_dict, log_name, error = self.find_regex(last_line)
+
+        if match_dict is None:
+            self.error(str(error))
             return False
 
-        if regex_name.startswith('acs_'):
-            self.create_access_charts(regex_name)
-            if regex_name == 'acs_default':
-                self.info('Not all data collected. You need to modify LogFormat.')
+        if not (self.regex and self.resp_time_func):
+            self.error('That can not happen, but it happened. "regex" or "resp_time_func" is None')
+
+        if log_name == 'web_access':
+            self.create_access_charts(match_dict)  # Create charts
             self._get_data = self._get_access_data
-            self.info('Used regex: %s' % regex_name)
+            self.info('Collected data: %s' % list(match_dict.keys()))
             return True
         else:
             # If it's not access_logs.. Not used at the moment
             return False
 
+    def find_regex_custom(self, last_line):
+        """
+        :param last_line: str: literally last line from log file
+        :return: tuple where:
+        [0]: dict or None:  match_dict or None
+        [1]: str or None: log_name or None
+        [2]: str: error description
+
+        We are here only if "custom_log_format" is in logs. We need to make sure:
+        1. "custom_log_format" is a dict
+        2. "pattern" in "custom_log_format" and pattern is <str> instance
+        3. if "time_multiplier" is in "custom_log_format" it must be <int> instance
+
+        If all parameters is ok we need to make sure:
+        1. Pattern search is success
+        2. Pattern search contains named subgroups (?P<subgroup_name>) (= "match_dict")
+
+        If pattern search is success we need to make sure:
+        1. All mandatory keys ['address', 'code', 'bytes_sent', 'method', 'url'] are in "match_dict"
+
+        If this is True we need to make sure:
+        1. All mandatory key values from "match_dict" have the correct format
+         ("code" is integer, "method" is uppercase word, etc)
+
+        If non mandatory keys in "match_dict" we need to make sure:
+        1. All non mandatory key values from match_dict ['resp_length', 'resp_time'] have the correct format
+         ("resp_length" is integer or "-", "resp_time" is integer or float)
+
+        """
+        try:
+            self.custom_log_format.keys()
+        except AttributeError:
+            return None, None, 'Custom log: "custom_log_format" is not a <dict>'
+
+        pattern = self.custom_log_format.get('pattern')
+        if not (pattern and isinstance(pattern, str)):
+            return None, None, 'Custom log: "pattern" option is not specified or type is not <str>'
+
+        resp_time_func = self.custom_log_format.get('time_multiplier') or 0
+
+        if not isinstance(resp_time_func, int):
+            return None, None, 'Custom log: "time_multiplier" is not an integer'
+
+        regex = re.compile(pattern)
+        match = regex.search(last_line)
+        if match:
+            match_dict = match.groupdict() or None
+        else:
+            return None, None, 'Custom log: pattern search FAILED'
+
+        if match_dict is None:
+            return None, None, 'Custom log: search OK but contains no named subgroups' \
+                               ' (you need to use ?P<subgroup_name>)'
+        else:
+            basic_values = {'address', 'method', 'url', 'code', 'bytes_sent'} - set(match_dict)
+
+            if basic_values:
+                return None, None, 'Custom log: search OK but some mandatory keys (%s) are missing' % list(basic_values)
+            else:
+                if not re.search(r'[\da-f.:]+', match_dict['address']):
+                    return None, None, 'Custom log: can\'t parse "address": %s' % match_dict['address']
+                if not re.search(r'[1-9]\d{2}', match_dict['code']):
+                    return None, None, 'Custom log: can\'t parse "code": %s' % match_dict['code']
+                if not re.search(r'[A-Z]+', match_dict['method']):
+                    return None, None, 'Custom log: can\'t parse "method": %s' % match_dict['method']
+                if not re.search(r'\d+|-', match_dict['bytes_sent']):
+                    return None, None, 'Custom log: can\'t parse "bytes_sent": %s' % match_dict['bytes_sent']
+
+            if 'resp_length' in match_dict:
+                if not re.search(r'\d+', match_dict.get('resp_length', '')):
+                    return None, None, 'Custom log: can\'t parse "resp_length": %s' % match_dict['resp_length']
+
+            if 'resp_time' in match_dict:
+                if not re.search(r'[\d.]+', match_dict.get('resp_length', '')):
+                    return None, None, 'Custom log: can\'t parse "resp_time": %s' % match_dict['resp_time']
+                else:
+                    if '.' in match_dict['resp_time']:
+                        self.resp_time_func = lambda time: time * (resp_time_func or 1000000)
+                    else:
+                        self.resp_time_func = lambda time: time * (resp_time_func or 1)
+
+            self.regex = regex
+            return match_dict, 'web_access', 'Custom log: we are fine'
+
     def find_regex(self, last_line):
         """
         :param last_line: str: literally last line from log file
-        :return: regex_name
-        It's sad but different web servers has different logs formats
-        We need to find appropriate regex for current log file
-        All logic is do a regex search through the string for all patterns
+        :return: tuple where:
+        [0]: dict or None:  match_dict or None
+        [1]: str or None: log_name or None
+        [2]: str: error description
+        We need to find appropriate pattern for current log file
+        All logic is do a regex search through the string for all predefined patterns
         until we find something or fail.
         """
         # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
         # 5. Bytes sent 6. Response length 7. Response process time
-        acs_default = re.compile(r'([\da-f.:]+)'
-                                 r' -.*?"([A-Z]+)'
-                                 r' (.*?)"'
-                                 r' ([1-9]\d{2})'
-                                 r' (\d+|-)')
+        acs_default = re.compile(r'(?P<address>[\da-f.:]+)'
+                                 r' -.*?"(?P<method>[A-Z]+)'
+                                 r' (?P<url>.*?)"'
+                                 r' (?P<code>[1-9]\d{2})'
+                                 r' (?P<bytes_sent>\d+|-)')
 
-        acs_apache_ext_insert = re.compile(r'([\da-f.:]+)'
-                                           r' -.*?"([A-Z]+)'
-                                           r' (.*?)"'
-                                           r' ([1-9]\d{2})'
-                                           r' (\d+|-)'
-                                           r' (\d+)'
-                                           r' (\d+) ')
+        acs_apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
+                                           r' -.*?"(?P<method>[A-Z]+)'
+                                           r' (?P<url>.*?)"'
+                                           r' (?P<code>[1-9]\d{2})'
+                                           r' (?P<bytes_sent>\d+|-)'
+                                           r' (?P<resp_length>\d+)'
+                                           r' (?P<resp_time>\d+) ')
 
-        acs_apache_ext_append = re.compile(r'([\da-f.:]+)'
-                                           r' -.*?"([A-Z]+)'
-                                           r' (.*?)"'
-                                           r' ([1-9]\d{2})'
-                                           r' (\d+|-)'
+        acs_apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
+                                           r' -.*?"(?P<method>[A-Z]+)'
+                                           r' (?P<url>.*?)"'
+                                           r' (?P<code>[1-9]\d{2})'
+                                           r' (?P<bytes_sent>\d+|-)'
                                            r' .*?'
-                                           r' (\d+)'
-                                           r' (\d+)'
+                                           r' (?P<resp_length>\d+)'
+                                           r' (?P<resp_time>\d+)'
                                            r'(?: |$)')
 
-        acs_nginx_ext_insert = re.compile(r'([\da-f.:]+)'
-                                          r' -.*?"([A-Z]+)'
-                                          r' (.*?)"'
-                                          r' ([1-9]\d{2})'
-                                          r' (\d+)'
-                                          r' (\d+)'
-                                          r' (\d\.\d+) ')
+        acs_nginx_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
+                                          r' -.*?"(?P<method>[A-Z]+)'
+                                          r' (?P<url>.*?)"'
+                                          r' (?P<code>[1-9]\d{2})'
+                                          r' (?P<bytes_sent>\d+)'
+                                          r' (?P<resp_length>\d+)'
+                                          r' (?P<resp_time>\d\.\d+) ')
 
-        acs_nginx_ext_append = re.compile(r'([\da-f.:]+)'
-                                          r' -.*?"([A-Z]+)'
-                                          r' (.*?)"'
-                                          r' ([1-9]\d{2})'
-                                          r' (\d+)'
+        acs_nginx_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
+                                          r' -.*?"(?P<method>[A-Z]+)'
+                                          r' (?P<url>.*?)"'
+                                          r' (?P<code>[1-9]\d{2})'
+                                          r' (?P<bytes_sent>\d+)'
                                           r' .*?'
-                                          r' (\d+)'
-                                          r' (\d\.\d+)')
+                                          r' (?P<resp_length>\d+)'
+                                          r' (?P<resp_time>\d\.\d+)')
+
+        def func_usec(time):
+            return time
+
+        def func_sec(time):
+            return time * 1000000
 
         r_regex = [acs_apache_ext_insert, acs_apache_ext_append, acs_nginx_ext_insert,
                    acs_nginx_ext_append, acs_default]
-        r_function = [lambda x: x, lambda x: x, lambda x: x * 1000000, lambda x: x * 1000000, lambda x: x]
-        r_name = ['acs_apache_ext_insert', 'acs_apache_ext_append', 'acs_nginx_ext_insert',
-                  'acs_nginx_ext_append', 'acs_default']
-        regex_function_name = zip(r_regex, r_function, r_name)
+        r_function = [func_usec, func_usec, func_sec, func_sec, func_usec]
+        regex_function = zip(r_regex, r_function)
 
-        regex_name = None
-        for regex, function, name in regex_function_name:
-            if regex.search(last_line):
+        match_dict = dict()
+        for regex, function in regex_function:
+            match = regex.search(last_line)
+            if match:
                 self.regex = regex
                 self.resp_time_func = function
-                regex_name = name
+                match_dict = match.groupdict()
                 break
-        return regex_name
 
-    def create_access_charts(self, regex_name):
+        return match_dict or None, 'web_access', 'Unknown log format. Plugin still can work for you.' \
+                                                 ' Read about the "custom_log_format" feature in the conf file'
+
+    def create_access_charts(self, match_dict):
         """
-        :param regex_name: str: regex name from 'find_regex' method. Ex.: 'apache_extended', 'nginx_extended'
+        :param match_dict: dict: regex.search.groupdict(). Ex. {'address': '127.0.0.1', 'code': '200', 'method': 'GET'}
         :return:
-        Create additional charts depending on the 'find_regex' result (parsed_line) and configuration file
-        1. 'time_response' chart is removed if there is no 'time_response' in logs.
+        Create additional charts depending on the 'match_dict' keys and configuration file options
+        1. 'time_response' chart is removed if there is no 'resp_time' in match_dict.
         2. Other stuff is just remove/add chart depending on yes/no in conf
         """
         def find_job_name(override_name, name):
@@ -256,8 +355,8 @@ class Service(LogService):
                                  ' "" "Requests Per HTTP Method" requests/s "http methods"' \
                                  ' web_log.http_method stacked 2 %s\n' % (job_name, self.update_every)
 
-        # Remove 'request_time' chart from ORDER if request_time not in logs
-        if regex_name == 'acs_default':
+        # Remove 'request_time' chart from ORDER if resp_time not in match_dict
+        if 'resp_time' not in match_dict:
             self.order.remove('response_time')
         # Remove 'clients_all' chart from ORDER if specified in the configuration
         if not self.all_time:
@@ -320,8 +419,7 @@ class Service(LogService):
         for line in raw:
             match = self.regex.search(line)
             if match:
-                match_dict = dict(zip_longest('address method url code sent resp_length resp_time'.split(),
-                                              match.groups()))
+                match_dict = match.groupdict()
                 try:
                     code = ''.join([match_dict['code'][0], 'xx'])
                     self.data[code] += 1
@@ -338,10 +436,11 @@ class Service(LogService):
                 # requests per http method
                 self._get_data_http_method(match_dict['method'])
                 # bandwidth sent
-                self.data['bytes_sent'] += int(match_dict['sent'] if '-' not in match_dict['sent'] else 0)
+                self.data['bytes_sent'] += int(match_dict['bytes_sent'] if '-' not in match_dict['bytes_sent'] else 0)
                 # request processing time and bandwidth received
-                if match_dict['resp_length'] and match_dict['resp_time']:
+                if 'resp_length' in match_dict:
                     self.data['resp_length'] += int(match_dict['resp_length'])
+                if 'resp_time' in match_dict:
                     resp_time = self.resp_time_func(float(match_dict['resp_time']))
                     bisect.insort_left(request_time, resp_time)
                     request_counter['count'] += 1
