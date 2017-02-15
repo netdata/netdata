@@ -5,8 +5,13 @@
 extern int web_client_timeout;
 
 #ifdef NETDATA_WITH_ZLIB
-extern int web_enable_gzip, web_gzip_level, web_gzip_strategy, web_donotrack_comply;
+extern int web_enable_gzip,
+        web_gzip_level,
+        web_gzip_strategy;
 #endif /* NETDATA_WITH_ZLIB */
+
+extern int respect_web_browser_do_not_track_policy;
+extern char *web_x_frame_options;
 
 #define WEB_CLIENT_MODE_NORMAL      0
 #define WEB_CLIENT_MODE_FILECOPY    1
