@@ -128,12 +128,21 @@ class Service(LogService):
                 logs.seek(-2, 1)
                 if logs.tell() == 0:
                     break
-            last_line = logs.readline().decode(encoding='utf-8')
+            last_line = logs.readline()
+
+        try:
+            last_line = last_line.decode()
+        except UnicodeDecodeError:
+            try:
+                last_line = last_line.decode(encoding='utf-8')
+            except (TypeError, UnicodeDecodeError) as error:
+                self.error(str(error))
+                return False
 
         # Parse last line
         regex_name = self.find_regex(last_line)
         if not regex_name:
-            self.error('Can\'t parse %s' % self.log_path)
+            self.error('Unknown log format. Can\'t parse %s' % self.log_path)
             return False
 
         if regex_name.startswith('acs_'):
