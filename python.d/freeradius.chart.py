@@ -72,7 +72,7 @@ class Service(SimpleService):
         if self._get_raw_data():
             chart_choice = [True, bool(self.acct), bool(self.proxy_auth), bool(self.proxy_acct)]
             self.order = [chart for chart, choice in zip(ORDER, chart_choice) if choice]
-            self.definitions = {k:v for k, v in CHARTS.items() if k in self.order}
+            self.definitions = dict([chart for chart in CHARTS.items() if chart[0] in self.order])
             self.info('Plugin was started succesfully')
             return True
         else:
@@ -86,7 +86,7 @@ class Service(SimpleService):
         :return: dict
         """
         result = self._get_raw_data()
-        return {k.lower():int(v) for k, v in findall(r'((?<=-)[AP][a-zA-Z-]+) = (\d+)', result)}
+        return dict([(elem[0].lower(), int(elem[1])) for elem in findall(r'((?<=-)[AP][a-zA-Z-]+) = (\d+)', result)])
         
     def _get_raw_data(self):
         """
