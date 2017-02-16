@@ -400,12 +400,12 @@ class Service(LogService):
         if self.url_pattern:
             self.definitions['requests_per_url'] = {'options': [None, 'Requests Per Url', 'requests/s',
                                                                 'urls', 'web_log.requests_per_url', 'stacked'],
-                                                    'lines': [['other_url', 'other', 'incremental']]}
+                                                    'lines': [['pur_other', 'other', 'incremental']]}
             for elem in self.url_pattern:
-                self.definitions['requests_per_url']['lines'].append([elem.description, elem.description,
+                self.definitions['requests_per_url']['lines'].append([elem.description, elem.description[4:],
                                                                       'incremental'])
                 self.data.update({elem.description: 0})
-            self.data.update({'other_url': 0})
+            self.data.update({'pur_other': 0})
         else:
             self.order.remove('requests_per_url')
 
@@ -529,7 +529,7 @@ class Service(LogService):
                 match = True
                 break
         if not match:
-            self.data['other_url'] += 1
+            self.data['pur_other'] += 1
 
     def _get_data_statuses(self, code):
         """
@@ -607,7 +607,7 @@ def check_req_per_url_pattern(url_pattern):
     for dimension, regex in url_pattern.items():
         valid_pattern = is_valid_pattern(regex)
         if isinstance(dimension, str) and valid_pattern:
-            result.append(NAMED_URL_PATTERN(description=dimension, pattern=valid_pattern))
+            result.append(NAMED_URL_PATTERN(description='_'.join(['pur', dimension]), pattern=valid_pattern))
 
     return result or None
 
