@@ -55,6 +55,7 @@ CHARTS = {
     'http_method': {
         'options': [None, 'Requests Per HTTP Method', 'requests/s', 'http methods', 'web_log.http_method', 'stacked'],
         'lines': [
+            ['GET', 'GET', 'incremental', 1, 1]
         ]},
     'requests_per_ipproto': {
         'options': [None, 'Requests Per IP Protocol', 'requests/s', 'ip protocols', 'web_log.requests_per_ipproto',
@@ -104,7 +105,7 @@ class Service(LogService):
                      'resp_time_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
                      '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
                      'req_ipv6': 0, 'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
-                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0}
+                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0, 'GET': 0}
 
     def check(self):
         """
@@ -374,7 +375,8 @@ class Service(LogService):
                               ' web_log.detailed_response_codes stacked 1 %s\n' % (job_name, self.update_every)
         self.http_method_chart = 'CHART %s.http_method' \
                                  ' "" "Requests Per HTTP Method" requests/s "http methods"' \
-                                 ' web_log.http_method stacked 2 %s\n' % (job_name, self.update_every)
+                                 ' web_log.http_method stacked 2 %s\n' \
+                                 'DIMENSION GET GET incremental\n' % (job_name, self.update_every)
 
         # Remove 'request_time' chart from ORDER if resp_time not in match_dict
         if 'resp_time' not in match_dict:
