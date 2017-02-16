@@ -24,7 +24,7 @@
 #  - kafka notifications by @ktsaou #1342
 #  - pagerduty.com notifications by Jim Cooley @jimcooley PR #1373
 #  - messagebird.com notifications by @tech_no_logical #1453
-#  - hipchart notifications by @ktsaou #1561
+#  - hipchat notifications by @ktsaou #1561
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -1284,17 +1284,9 @@ SENT_PD=$?
 # -----------------------------------------------------------------------------
 # send hipchat message
 
-send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" "
-<b>${alarm}</b> ${info_html}<br/>&nbsp;
-<small><b>${chart}</b><br/>Chart<br/>&nbsp;</small>
-<small><b>${family}</b><br/>Family<br/>&nbsp;</small>
-<small><b>${severity}</b><br/>Severity<br/>&nbsp;</small>
-<small><b>${date}${raised_for_html}</b><br/>Time<br/>&nbsp;</small>
-<a href=\"${goto_url}\">View Netdata</a><br/>&nbsp;
-<small><small>The source of this alarm is line ${src}</small></small>
-"
-
+send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" "<b>${alarm}</b> ${info_html}<br/>&nbsp;<br/><small><b>${chart}</b><br/>Chart<br/>&nbsp;</small><br/><small><b>${family}</b><br/>Family<br/>&nbsp;</small><br/><small><b>${severity}</b><br/>Severity<br/>&nbsp;</small><br/><small><b>${date}${raised_for_html}</b><br/>Time<br/>&nbsp;</small><br/><a href=\"${goto_url}\">View Netdata</a><br/>&nbsp;<br/><small><small>The source of this alarm is line ${src}</small></small>"
 SENT_HIPCHAT=$?
+
 
 # -----------------------------------------------------------------------------
 # send the email
