@@ -28,39 +28,44 @@ IPMI_check() {
 
 IPMI_create() {
 
-	data=`sudo -n ipmi-sensors`
-
-	echo CHART IPMI.temp \'\' \"Temperature Sensors\" Celsius Temperature Temperature line 1000 $IPMI_update_every
-	echo "$data" | awk -F '|' '{ if ($3 ~ "Temp"){ if ($4 !~ "N"){ gsub(" |\t",""); print "DIMENSION " $2}}}'
-	echo END
-
-	echo CHART IPMI.volt \'\' \"Voltage Sensors\" \"Volts * 100\" Voltage Voltage line 1000 $IPMI_update_every
-	echo "$data" | awk -F '|' '{ if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t",""); print "DIMENSION " $2}}}'
-	echo END
-
-	echo CHART IPMI.fan \'\' \"Fan Sensors\" RPM Fans Fans line 1000 $IPMI_update_every
-	echo "$data" | awk -F '|' '{ if ($3 ~ "Fan"){ if ($4 !~ "N"){ gsub(" |\t",""); print "DIMENSION " $2}}}'
-	echo END
+	sudo -n ipmi-sensors --comma-separated-output | awk -F ',' '
+BEGIN {
+	  temps="CHART IPMI.temp \"\" \"Temperature Sensors\" Celsius Temperature Temperature line 1000 '$IPMI_update_every'\n" ;
+	  volts="CHART IPMI.volt \"\" \"Voltage Sensors\" \"Volts * 100\" Voltage Voltage line 1000 '$IPMI_update_every'\n" ;
+	  fans="CHART IPMI.fan \"\" \"Fan Sensors\" RPM Fans Fans line 1000 '$IPMI_update_every'\n" ;
+}
+{
+	  { if ($3 ~ "Temp"){ if ($4 !~ "N"){ gsub(" |\t","" "_"); temps = temps"DIMENSION "$2"\n" }}} ; 
+	  { if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t","" "_"); volts = volts"DIMENSION "$2"\n" }}} ;
+	  { if ($3 ~ "Fan"){ if ($4 !~ "N"){ gsub(" |\t","" "_"); fans = fans"DIMENSION "$2"\n" }}} ;
+}
+END  {
+	   print temps"END\n"volts"END\n"fans"END";
+}
+'
 	
 	return 0
 }
 
 IPMI_update() {
 
-	data=`sudo -n ipmi-sensors`
+	sudo -n ipmi-sensors --comma-separated-output | awk -F ',' '
+BEGIN {
+	  temps="BEGIN IPMI.temp '$1'\n";
+	  volts="BEGIN IPMI.volt '$1'\n";
+	  fans="BEGIN IPMI.fan '$1'\n";
+}
+{
+	  { if ($3 ~ "Temp"){ if ($4 !~ "N"){ gsub(" |\t","" "_"); temps=temps"SET " $2 " = "$4"\n" }}};
+	  { if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t|\\.","" "_"); volts=volts"SET "$2" = "$4"\n" }}}
+	  { if ($3 ~ "Fan"){ if ($4 !~ "N"){ gsub(" |\t",""); fans=fans"SET "$2"="$4"\n"}}}
+}
+END {
+	print temps"END\n"volts"END\n"fans"END";
+}
+'
 
-	echo BEGIN IPMI.temp $1
-	echo "$data" | awk -F '|' '{ if ($3 ~ "Temp"){ if ($4 !~ "N"){ gsub(" |\t",""); print "SET " $2 " = " $4}}}'
-	echo END
 
-	echo BEGIN IPMI.volt $1
-	echo "$data" | awk -F '|' '{ if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t|\\.",""); print "SET " $2 " = " $4}}}'
-	echo END
-
-	echo BEGIN IPMI.fan $1
-	echo "$data" | awk -F '|' '{ if ($3 ~ "Fan"){ if ($4 !~ "N"){ gsub(" |\t",""); print "SET " $2 " = " $4}}}'
-	echo END
-	
 	return 0
 }
 
