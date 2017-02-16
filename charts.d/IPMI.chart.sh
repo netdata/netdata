@@ -57,7 +57,7 @@ BEGIN {
 }
 {
 	  { if ($3 ~ "Temp"){ if ($4 !~ "N"){ gsub(" |\t","" "_"); temps=temps"SET " $2 " = "$4"\n" }}};
-	  { if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t|\\.","" "_"); volts=volts"SET "$2" = "$4"\n" }}}
+	  { if ($3 ~ "Volt"){ if ($4 !~ "N"){ gsub(" |\t", "_"); gsub("\\.", ""); volts=volts"SET "$2" = "$4"\n" }}}
 	  { if ($3 ~ "Fan"){ if ($4 !~ "N"){ gsub(" |\t",""); fans=fans"SET "$2"="$4"\n"}}}
 }
 END {
