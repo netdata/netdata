@@ -233,44 +233,38 @@ class Service(LogService):
             find_regex_return(msg='Custom log: search OK but contains no named subgroups'
                                   ' (you need to use ?P<subgroup_name>)')
         else:
-            basic_values = {'address', 'method', 'url', 'code', 'bytes_sent'} - set(match_dict)
+            mandatory_dict = {'address': r'[\da-f.:]+',
+                              'code': r'[1-9]\d{2}',
+                              'method': r'[A-Z]+',
+                              'bytes_sent': r'\d+|-'}
+            optional_dict = {'resp_length': r'\d+',
+                             'resp_time': r'[\d.]+'}
 
-            if basic_values:
+            mandatory_values = set(mandatory_dict) - set(match_dict)
+            if mandatory_values:
                 return find_regex_return(msg='Custom log: search OK but some mandatory keys (%s) are missing'
-                                         % list(basic_values))
+                                         % list(mandatory_values))
             else:
-                if not re.search(r'[\da-f.:]+', match_dict['address']):
-                    return find_regex_return(msg='Custom log: can\'t parse "address": %s'
-                                                 % match_dict['address'])
-                if not re.search(r'[1-9]\d{2}', match_dict['code']):
-                    return find_regex_return(msg='Custom log: can\'t parse "code": %s'
-                                                 % match_dict['code'])
-                if not re.search(r'[A-Z]+', match_dict['method']):
-                    return find_regex_return(msg='Custom log: can\'t parse "method": %s'
-                                                 % match_dict['method'])
-                if not re.search(r'\d+|-', match_dict['bytes_sent']):
-                    return find_regex_return(msg='Custom log: can\'t parse "bytes_sent": %s'
-                                                 % match_dict['bytes_sent'])
+                for key in mandatory_dict:
+                    if not re.search(mandatory_dict[key], match_dict[key]):
+                        return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
+                                                     % (key, match_dict[key]))
 
-            if 'resp_length' in match_dict:
-                if not re.search(r'\d+', match_dict['resp_length']):
-                    return find_regex_return(msg='Custom log: can\'t parse "resp_length": %s'
-                                                 % match_dict['resp_length'])
+            optional_values = set(optional_dict) & set(match_dict)
+            for key in optional_values:
+                if not re.search(optional_dict[key], match_dict[key]):
+                    return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
+                                                 % (key, match_dict[key]))
 
-            if 'resp_time' in match_dict:
-                if not re.search(r'[\d.]+', match_dict['resp_length']):
-                    return find_regex_return(msg='Custom log: can\'t parse "resp_time": %s'
-                                                 % match_dict['resp_time'])
-                else:
-                    if '.' in match_dict['resp_time']:
-                        self.resp_time_func = lambda time: time * (resp_time_func or 1000000)
-                    else:
-                        self.resp_time_func = lambda time: time * (resp_time_func or 1)
+            dot_in_time = '.' in match_dict.get('resp_time', '')
+            if dot_in_time:
+                self.resp_time_func = lambda time: time * (resp_time_func or 1000000)
+            else:
+                self.resp_time_func = lambda time: time * (resp_time_func or 1)
 
             self.regex = regex
             return find_regex_return(match_dict=match_dict,
-                                     log_name='web_access',
-                                     msg='We are fine')
+                                     log_name='web_access')
 
     def find_regex(self, last_line):
         """
