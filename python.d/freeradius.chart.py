@@ -76,7 +76,7 @@ class Service(SimpleService):
             self.info('Plugin was started succesfully')
             return True
         else:
-            self.error('Request returned no data. Is server alive? Used options: host {}, port {}, secret {}'.format(self.host, self.port, self.secret))
+            self.error('Request returned no data. Is server alive? Used options: host {0}, port {1}, secret {2}'.format(self.host, self.port, self.secret))
             return False
         
 
