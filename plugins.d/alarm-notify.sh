@@ -1285,11 +1285,12 @@ SENT_PD=$?
 # send hipchat message
 
 send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" "\
-<b>${alarm}</b> ${info_html}<br/>&nbsp;\
-${host} <b>${severity}</b> on chart <b>${chart}</b><br/> (family <b>${family}</b><br/>)\
-Time <b>${date}${raised_for_html}</b><br/>\
-<a href=\\\"${goto_url}\\\">View Netdata</a>\
-(the source of this alarm is line ${src})\
+${host} ${status_message}<br/>\
+<b>${alarm}</b> ${info_html}<br/>\
+<b>${chart}</b> (family <b>${family}</b> )\
+<b>${date}${raised_for_html}</b><br/>\
+<a href=\\\"${goto_url}\\\">View netdata dashboard</a> \
+(source of alarm ${src})\
 "
 
 SENT_HIPCHAT=$?
