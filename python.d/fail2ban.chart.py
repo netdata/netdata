@@ -65,43 +65,17 @@ class Service(LogService):
         if not is_accessible(self.log_path, R_OK):
             self.error('Cannot access file %s' % self.log_path)
             return False
-        if not isdir(self.conf_dir):
-            self.conf_dir = None
 
-        # If "conf_dir" not specified (or not a dir) plugin will use "conf_path"
-        if not self.conf_dir:
-            if is_accessible(self.conf_path, R_OK):
-                with open(self.conf_path, 'rt') as jails_conf:
-                    jails_list = REGEX.findall(' '.join(jails_conf.read().split()))
-                self.jails_list = jails_list
-            else:
-                self.jails_list = list()
-                self.error('Cannot access jail configuration file %s.' % self.conf_path)
-        # If "conf_dir" is specified and "conf_dir" is dir plugin will use "conf_dir"
+        if self.conf_dir:
+            jails_list, error = parse_conf_dir(self.conf_dir)
         else:
-            dot_local = glob(self.conf_dir + '/*.local')  # *.local jail configurations files
-            dot_conf = glob(self.conf_dir + '/*.conf')  # *.conf jail configuration files
+            jails_list, error = parse_conf_path(self.conf_path)
 
-            if not any([dot_local, dot_conf]):
-                self.error('%s is empty or not readable' % self.conf_dir)
-            # According "man jail.conf" files could be *.local AND *.conf
-            # *.conf files parsed first. Changes in *.local overrides configuration in *.conf
-            if dot_conf:
-                dot_local.extend([conf for conf in dot_conf if conf[:-5] not in [local[:-6] for local in dot_local]])
-            # Make sure all files are readable
-            dot_local = [conf for conf in dot_local if is_accessible(conf, R_OK)]
-            if dot_local:
-                enabled_jails = list()
-                for jail_conf in dot_local:
-                    with open(jail_conf, 'rt') as conf:
-                        enabled_jails.extend(REGEX.findall(' '.join(conf.read().split())))
-                self.jails_list = list(set(enabled_jails))
-            else:
-                self.jails_list = list()
-                self.error('Files in %s not readable' % self.conf_dir)
+        if not jails_list:
+            self.error(error)
 
         # If for some reason parse failed we still can START with default jails_list.
-        self.jails_list = list(set(self.jails_list) - set(self.exclude)) or ['ssh']
+        self.jails_list = list(set(jails_list) - set(self.exclude)) or ['ssh']
         self.data = dict([(jail, 0) for jail in self.jails_list])
         self.create_dimensions()
         self.info('Plugin successfully started. Jails: %s' % self.jails_list)
@@ -113,3 +87,41 @@ class Service(LogService):
                             'lines': []}}
         for jail in self.jails_list:
             self.definitions['jails_group']['lines'].append([jail, jail, 'incremental'])
+
+
+def parse_conf_dir(conf_dir):
+    if not isdir(conf_dir):
+        return list(), '%s is not a directory' % conf_dir
+
+    jail_local = list(filter(lambda local: is_accessible(local, R_OK), glob(conf_dir + '/*.local')))
+    jail_conf = list(filter(lambda conf: is_accessible(conf, R_OK), glob(conf_dir + '/*.conf')))
+
+    if not (jail_local or jail_conf):
+        return list(), '%s is empty or not readable' % conf_dir
+
+    # According "man jail.conf" files could be *.local AND *.conf
+    # *.conf files parsed first. Changes in *.local overrides configuration in *.conf
+    if jail_conf:
+        jail_local.extend([conf for conf in jail_conf if conf[:-5] not in [local[:-6] for local in jail_local]])
+    jails_list = list()
+    for conf in jail_local:
+        with open(conf, 'rt') as f:
+            raw_data = f.read()
+
+        data = ' '.join(raw_data.split())
+        jails_list.extend(REGEX.findall(data))
+    jails_list = list(set(jails_list))
+
+    return jails_list, 'can\'t locate any jails in %s. Default jail is [\'ssh\']' % conf_dir
+
+
+def parse_conf_path(conf_path):
+    if not is_accessible(conf_path, R_OK):
+        return list(), '%s is not readable' % conf_path
+
+    with open(conf_path, 'rt') as jails_conf:
+        raw_data = jails_conf.read()
+
+    data = raw_data.split()
+    jails_list = REGEX.findall(' '.join(data))
+    return jails_list, 'can\'t locate any jails in %s. Default jail is  [\'ssh\']' % conf_path
