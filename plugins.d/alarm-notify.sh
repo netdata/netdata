@@ -1284,13 +1284,13 @@ SENT_PD=$?
 # -----------------------------------------------------------------------------
 # send hipchat message
 
-send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" "\
-${host} ${status_message}<br/>\
-<b>${alarm}</b> ${info_html}<br/>\
-<b>${chart}</b> (family <b>${family}</b>)\
-<b>${date}${raised_for_html}</b><br/>\
+send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" " \
+${host} ${status_message}<br/> \
+<b>${alarm}</b> ${info_html}<br/> \
+<b>${chart}</b> (family <b>${family}</b>)<br/> \
+<b>${date}${raised_for_html}</b><br/> \
 <a href=\\\"${goto_url}\\\">View netdata dashboard</a> \
-(source of alarm ${src})\
+(source of alarm ${src}) \
 "
 
 SENT_HIPCHAT=$?
