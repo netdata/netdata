@@ -24,7 +24,7 @@
 #  - kafka notifications by @ktsaou #1342
 #  - pagerduty.com notifications by Jim Cooley @jimcooley PR #1373
 #  - messagebird.com notifications by @tech_no_logical #1453
-#  - hipchart notifications by @ktsaou #1561
+#  - hipchat notifications by @ktsaou #1561
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -885,8 +885,8 @@ send_hipchat() {
                     -H "Authorization: Bearer ${authtoken}" \
                     -d "{\"color\": \"${color}\", \"from\": \"${netdata}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
                     "https://api.hipchat.com/v2/room/${room}/notification")
-
-            if [ "${httpcode}" == "200" ]
+ 
+            if [ "${httpcode}" == "204" ]
             then
                 info "sent HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
                 sent=$((sent + 1))
@@ -1284,14 +1284,13 @@ SENT_PD=$?
 # -----------------------------------------------------------------------------
 # send hipchat message
 
-send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" "
-<b>${alarm}</b> ${info_html}<br/>&nbsp;
-<small><b>${chart}</b><br/>Chart<br/>&nbsp;</small>
-<small><b>${family}</b><br/>Family<br/>&nbsp;</small>
-<small><b>${severity}</b><br/>Severity<br/>&nbsp;</small>
-<small><b>${date}${raised_for_html}</b><br/>Time<br/>&nbsp;</small>
-<a href=\"${goto_url}\">View Netdata</a><br/>&nbsp;
-<small><small>The source of this alarm is line ${src}</small></small>
+send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" " \
+${host} ${status_message}<br/> \
+<b>${alarm}</b> ${info_html}<br/> \
+<b>${chart}</b> (family <b>${family}</b>)<br/> \
+<b>${date}${raised_for_html}</b><br/> \
+<a href=\\\"${goto_url}\\\">View netdata dashboard</a> \
+(source of alarm ${src}) \
 "
 
 SENT_HIPCHAT=$?
