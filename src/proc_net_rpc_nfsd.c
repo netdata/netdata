@@ -492,7 +492,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_rc == 2) {
-        st = rrdset_find_bytype("nfsd", "readcache");
+        st = rrdset_find_bytype_localhost("nfsd", "readcache");
         if(!st) {
             st = rrdset_create("nfsd", "readcache", NULL, "cache", NULL, "NFS Server Read Cache", "reads/s", 5000, update_every, RRDSET_TYPE_STACKED);
 
@@ -511,7 +511,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_fh == 2) {
-        st = rrdset_find_bytype("nfsd", "filehandles");
+        st = rrdset_find_bytype_localhost("nfsd", "filehandles");
         if(!st) {
             st = rrdset_create("nfsd", "filehandles", NULL, "filehandles", NULL, "NFS Server File Handles", "handles/s", 5001, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
@@ -535,7 +535,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_io == 2) {
-        st = rrdset_find_bytype("nfsd", "io");
+        st = rrdset_find_bytype_localhost("nfsd", "io");
         if(!st) {
             st = rrdset_create("nfsd", "io", NULL, "io", NULL, "NFS Server I/O", "kilobytes/s", 5002, update_every, RRDSET_TYPE_AREA);
 
@@ -552,7 +552,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_th == 2) {
-        st = rrdset_find_bytype("nfsd", "threads");
+        st = rrdset_find_bytype_localhost("nfsd", "threads");
         if(!st) {
             st = rrdset_create("nfsd", "threads", NULL, "threads", NULL, "NFS Server Threads", "threads", 5003, update_every, RRDSET_TYPE_LINE);
 
@@ -563,7 +563,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         rrddim_set(st, "threads", th_threads);
         rrdset_done(st);
 
-        st = rrdset_find_bytype("nfsd", "threads_fullcnt");
+        st = rrdset_find_bytype_localhost("nfsd", "threads_fullcnt");
         if(!st) {
             st = rrdset_create("nfsd", "threads_fullcnt", NULL, "threads", NULL, "NFS Server Threads Full Count", "ops/s", 5004, update_every, RRDSET_TYPE_LINE);
 
@@ -574,7 +574,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         rrddim_set(st, "full_count", th_fullcnt);
         rrdset_done(st);
 
-        st = rrdset_find_bytype("nfsd", "threads_histogram");
+        st = rrdset_find_bytype_localhost("nfsd", "threads_histogram");
         if(!st) {
             st = rrdset_create("nfsd", "threads_histogram", NULL, "threads", NULL, "NFS Server Threads Usage Histogram", "percentage", 5005, update_every, RRDSET_TYPE_LINE);
 
@@ -607,7 +607,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_ra == 2) {
-        st = rrdset_find_bytype("nfsd", "readahead");
+        st = rrdset_find_bytype_localhost("nfsd", "readahead");
         if(!st) {
             st = rrdset_create("nfsd", "readahead", NULL, "readahead", NULL, "NFS Server Read Ahead Depth", "percentage", 5005, update_every, RRDSET_TYPE_STACKED);
 
@@ -645,7 +645,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_net == 2) {
-        st = rrdset_find_bytype("nfsd", "net");
+        st = rrdset_find_bytype_localhost("nfsd", "net");
         if(!st) {
             st = rrdset_create("nfsd", "net", NULL, "network", NULL, "NFS Server Network Statistics", "packets/s", 5007, update_every, RRDSET_TYPE_STACKED);
             st->isdetail = 1;
@@ -667,7 +667,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_rpc == 2) {
-        st = rrdset_find_bytype("nfsd", "rpc");
+        st = rrdset_find_bytype_localhost("nfsd", "rpc");
         if(!st) {
             st = rrdset_create("nfsd", "rpc", NULL, "rpc", NULL, "NFS Server Remote Procedure Calls Statistics", "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
@@ -691,7 +691,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc2 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfsd", "proc2");
+        st = rrdset_find_bytype_localhost("nfsd", "proc2");
         if(!st) {
             st = rrdset_create("nfsd", "proc2", NULL, "nfsv2rpc", NULL, "NFS v2 Server Remote Procedure Calls", "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
 
@@ -710,7 +710,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc3 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfsd", "proc3");
+        st = rrdset_find_bytype_localhost("nfsd", "proc3");
         if(!st) {
             st = rrdset_create("nfsd", "proc3", NULL, "nfsv3rpc", NULL, "NFS v3 Server Remote Procedure Calls", "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
 
@@ -729,7 +729,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc4 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfsd", "proc4");
+        st = rrdset_find_bytype_localhost("nfsd", "proc4");
         if(!st) {
             st = rrdset_create("nfsd", "proc4", NULL, "nfsv4rpc", NULL, "NFS v4 Server Remote Procedure Calls", "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
 
@@ -748,7 +748,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc4ops == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfsd", "proc4ops");
+        st = rrdset_find_bytype_localhost("nfsd", "proc4ops");
         if(!st) {
             st = rrdset_create("nfsd", "proc4ops", NULL, "nfsv2ops", NULL, "NFS v4 Server Operations", "operations/s", 5012, update_every, RRDSET_TYPE_STACKED);
 

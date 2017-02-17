@@ -323,7 +323,7 @@ void registry_statistics(void) {
 
     static RRDSET *sts = NULL, *stc = NULL, *stm = NULL;
 
-    if(!sts) sts = rrdset_find("netdata.registry_sessions");
+    if(!sts) sts = rrdset_find_localhost("netdata.registry_sessions");
     if(!sts) {
         sts = rrdset_create("netdata", "registry_sessions", NULL, "registry", NULL, "NetData Registry Sessions", "session", 131000, rrd_update_every, RRDSET_TYPE_LINE);
 
@@ -336,7 +336,7 @@ void registry_statistics(void) {
 
     // ------------------------------------------------------------------------
 
-    if(!stc) stc = rrdset_find("netdata.registry_entries");
+    if(!stc) stc = rrdset_find_localhost("netdata.registry_entries");
     if(!stc) {
         stc = rrdset_create("netdata", "registry_entries", NULL, "registry", NULL, "NetData Registry Entries", "entries", 131100, rrd_update_every, RRDSET_TYPE_LINE);
 
@@ -357,7 +357,7 @@ void registry_statistics(void) {
 
     // ------------------------------------------------------------------------
 
-    if(!stm) stm = rrdset_find("netdata.registry_mem");
+    if(!stm) stm = rrdset_find_localhost("netdata.registry_mem");
     if(!stm) {
         stm = rrdset_create("netdata", "registry_mem", NULL, "registry", NULL, "NetData Registry Memory", "KB", 131300, rrd_update_every, RRDSET_TYPE_STACKED);
 

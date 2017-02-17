@@ -40,7 +40,7 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_sockets) {
-        st = rrdset_find(RRD_TYPE_NET_IPVS ".sockets");
+        st = rrdset_find_localhost(RRD_TYPE_NET_IPVS ".sockets");
         if(!st) {
             st = rrdset_create(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS New Connections", "connections/s", 3101, update_every, RRDSET_TYPE_LINE);
 
@@ -55,7 +55,7 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_packets) {
-        st = rrdset_find(RRD_TYPE_NET_IPVS ".packets");
+        st = rrdset_find_localhost(RRD_TYPE_NET_IPVS ".packets");
         if(!st) {
             st = rrdset_create(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS Packets", "packets/s", 3102, update_every, RRDSET_TYPE_LINE);
 
@@ -72,7 +72,7 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_bandwidth) {
-        st = rrdset_find(RRD_TYPE_NET_IPVS ".net");
+        st = rrdset_find_localhost(RRD_TYPE_NET_IPVS ".net");
         if(!st) {
             st = rrdset_create(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS Bandwidth", "kilobits/s", 3100, update_every, RRDSET_TYPE_AREA);
 

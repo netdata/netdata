@@ -417,7 +417,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if(d->do_io == CONFIG_ONDEMAND_YES || (d->do_io == CONFIG_ONDEMAND_ONDEMAND && (readsectors || writesectors))) {
             d->do_io = CONFIG_ONDEMAND_YES;
 
-            st = rrdset_find_bytype(RRD_TYPE_DISK, disk);
+            st = rrdset_find_bytype_localhost(RRD_TYPE_DISK, disk);
             if(unlikely(!st)) {
                 st = rrdset_create(RRD_TYPE_DISK, disk, NULL, family, "disk.io", "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
 
@@ -436,7 +436,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if(d->do_ops == CONFIG_ONDEMAND_YES || (d->do_ops == CONFIG_ONDEMAND_ONDEMAND && (reads || writes))) {
             d->do_ops = CONFIG_ONDEMAND_YES;
 
-            st = rrdset_find_bytype("disk_ops", disk);
+            st = rrdset_find_bytype_localhost("disk_ops", disk);
             if(unlikely(!st)) {
                 st = rrdset_create("disk_ops", disk, NULL, family, "disk.ops", "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
@@ -456,7 +456,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if(d->do_qops == CONFIG_ONDEMAND_YES || (d->do_qops == CONFIG_ONDEMAND_ONDEMAND && queued_ios)) {
             d->do_qops = CONFIG_ONDEMAND_YES;
 
-            st = rrdset_find_bytype("disk_qops", disk);
+            st = rrdset_find_bytype_localhost("disk_qops", disk);
             if(unlikely(!st)) {
                 st = rrdset_create("disk_qops", disk, NULL, family, "disk.qops", "Disk Current I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
@@ -474,7 +474,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if(d->do_backlog == CONFIG_ONDEMAND_YES || (d->do_backlog == CONFIG_ONDEMAND_ONDEMAND && backlog_ms)) {
             d->do_backlog = CONFIG_ONDEMAND_YES;
 
-            st = rrdset_find_bytype("disk_backlog", disk);
+            st = rrdset_find_bytype_localhost("disk_backlog", disk);
             if(unlikely(!st)) {
                 st = rrdset_create("disk_backlog", disk, NULL, family, "disk.backlog", "Disk Backlog", "backlog (ms)", 2003, update_every, RRDSET_TYPE_AREA);
                 st->isdetail = 1;
@@ -492,7 +492,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if(d->do_util == CONFIG_ONDEMAND_YES || (d->do_util == CONFIG_ONDEMAND_ONDEMAND && busy_ms)) {
             d->do_util = CONFIG_ONDEMAND_YES;
 
-            st = rrdset_find_bytype("disk_util", disk);
+            st = rrdset_find_bytype_localhost("disk_util", disk);
             if(unlikely(!st)) {
                 st = rrdset_create("disk_util", disk, NULL, family, "disk.util", "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
                 st->isdetail = 1;
@@ -510,7 +510,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if(d->do_mops == CONFIG_ONDEMAND_YES || (d->do_mops == CONFIG_ONDEMAND_ONDEMAND && (mreads || mwrites))) {
             d->do_mops = CONFIG_ONDEMAND_YES;
 
-            st = rrdset_find_bytype("disk_mops", disk);
+            st = rrdset_find_bytype_localhost("disk_mops", disk);
             if(unlikely(!st)) {
                 st = rrdset_create("disk_mops", disk, NULL, family, "disk.mops", "Disk Merged Operations", "merged operations/s", 2021, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
@@ -530,7 +530,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if(d->do_iotime == CONFIG_ONDEMAND_YES || (d->do_iotime == CONFIG_ONDEMAND_ONDEMAND && (readms || writems))) {
             d->do_iotime = CONFIG_ONDEMAND_YES;
 
-            st = rrdset_find_bytype("disk_iotime", disk);
+            st = rrdset_find_bytype_localhost("disk_iotime", disk);
             if(unlikely(!st)) {
                 st = rrdset_create("disk_iotime", disk, NULL, family, "disk.iotime", "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
@@ -552,7 +552,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         if(likely(dt)) {
             if( (d->do_iotime == CONFIG_ONDEMAND_YES || (d->do_iotime == CONFIG_ONDEMAND_ONDEMAND && (readms || writems))) &&
                 (d->do_ops    == CONFIG_ONDEMAND_YES || (d->do_ops    == CONFIG_ONDEMAND_ONDEMAND && (reads || writes)))) {
-                st = rrdset_find_bytype("disk_await", disk);
+                st = rrdset_find_bytype_localhost("disk_await", disk);
                 if(unlikely(!st)) {
                     st = rrdset_create("disk_await", disk, NULL, family, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -569,7 +569,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             if( (d->do_io  == CONFIG_ONDEMAND_YES || (d->do_io  == CONFIG_ONDEMAND_ONDEMAND && (readsectors || writesectors))) &&
                 (d->do_ops == CONFIG_ONDEMAND_YES || (d->do_ops == CONFIG_ONDEMAND_ONDEMAND && (reads || writes)))) {
-                st = rrdset_find_bytype("disk_avgsz", disk);
+                st = rrdset_find_bytype_localhost("disk_avgsz", disk);
                 if(unlikely(!st)) {
                     st = rrdset_create("disk_avgsz", disk, NULL, family, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
                     st->isdetail = 1;
@@ -586,7 +586,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             if( (d->do_util == CONFIG_ONDEMAND_YES || (d->do_util == CONFIG_ONDEMAND_ONDEMAND && busy_ms)) &&
                 (d->do_ops  == CONFIG_ONDEMAND_YES || (d->do_ops  == CONFIG_ONDEMAND_ONDEMAND && (reads || writes)))) {
-                st = rrdset_find_bytype("disk_svctm", disk);
+                st = rrdset_find_bytype_localhost("disk_svctm", disk);
                 if(unlikely(!st)) {
                     st = rrdset_create("disk_svctm", disk, NULL, family, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;

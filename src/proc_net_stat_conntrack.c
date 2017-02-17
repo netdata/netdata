@@ -130,7 +130,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_sockets) {
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_sockets");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_sockets");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_sockets", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Connections", "active connections", 3000, update_every, RRDSET_TYPE_LINE);
 
@@ -145,7 +145,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_new) {
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_new");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_new");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_new", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker New Connections", "connections/s", 3001, update_every, RRDSET_TYPE_LINE);
 
@@ -164,7 +164,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_changes) {
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_changes");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_changes");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_changes", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Changes", "changes/s", 3002, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
@@ -184,7 +184,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_expect) {
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_expect");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_expect");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_expect", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Expectations", "expectations/s", 3003, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
@@ -204,7 +204,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_search) {
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_search");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_search");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_search", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Searches", "searches/s", 3010, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
@@ -224,7 +224,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_errors) {
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_errors");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_errors");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_errors", NULL, RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Errors", "events/s", 3005, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;

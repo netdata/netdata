@@ -315,6 +315,10 @@ struct rrdhost {
     ALARM_LOG health_log;
 
     RRDCALCTEMPLATE *templates;
+
+    uint32_t flags;
+
+    struct rrdhost *next;
 };
 typedef struct rrdhost RRDHOST;
 extern RRDHOST localhost;
@@ -359,9 +363,14 @@ extern RRDSET *rrdset_create(const char *type
 extern void rrdset_free_all(void);
 extern void rrdset_save_all(void);
 
-extern RRDSET *rrdset_find(const char *id);
-extern RRDSET *rrdset_find_bytype(const char *type, const char *id);
-extern RRDSET *rrdset_find_byname(const char *name);
+extern RRDSET *rrdset_find(RRDHOST *host, const char *id);
+#define rrdset_find_localhost(id) rrdset_find(&localhost, id)
+
+extern RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
+#define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(&localhost, type, id)
+
+extern RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
+#define rrdset_find_byname_localhost(name)  rrdset_find_byname(&localhost, name)
 
 extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
 extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);

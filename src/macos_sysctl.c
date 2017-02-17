@@ -215,7 +215,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 error("DISABLED: system.load");
             } else {
 
-                st = rrdset_find_bytype("system", "load");
+                st = rrdset_find_bytype_localhost("system", "load");
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE);
                     rrddim_add(st, "load1", NULL, 1, 1000, RRDDIM_ALGORITHM_ABSOLUTE);
@@ -242,7 +242,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             do_swap = 0;
             error("DISABLED: system.swap");
         } else {
-            st = rrdset_find("system.swap");
+            st = rrdset_find_localhost("system.swap");
             if (unlikely(!st)) {
                 st = rrdset_create("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
                 st->isdetail = 1;
@@ -291,7 +291,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                         iftot.ift_obytes += if2m->ifm_data.ifi_obytes;
                     }
                 }
-                st = rrdset_find("system.ipv4");
+                st = rrdset_find_localhost("system.ipv4");
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
 
@@ -328,7 +328,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.ecnpkts");
         } else {
             if (likely(do_tcp_packets)) {
-                st = rrdset_find("ipv4.tcppackets");
+                st = rrdset_find_localhost("ipv4.tcppackets");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcppackets", NULL, "tcp", NULL, "IPv4 TCP Packets",
                                        "packets/s",
@@ -347,7 +347,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_tcp_errors)) {
-                st = rrdset_find("ipv4.tcperrors");
+                st = rrdset_find_localhost("ipv4.tcperrors");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcperrors", NULL, "tcp", NULL, "IPv4 TCP Errors",
                                        "packets/s",
@@ -369,7 +369,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_tcp_handshake)) {
-                st = rrdset_find("ipv4.tcphandshake");
+                st = rrdset_find_localhost("ipv4.tcphandshake");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcphandshake", NULL, "tcp", NULL,
                                        "IPv4 TCP Handshake Issues",
@@ -394,7 +394,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             if (do_tcpext_connaborts == CONFIG_ONDEMAND_YES || (do_tcpext_connaborts == CONFIG_ONDEMAND_ONDEMAND && (tcpstat.tcps_rcvpackafterwin || tcpstat.tcps_rcvafterclose || tcpstat.tcps_rcvmemdrop || tcpstat.tcps_persistdrop))) {
                 do_tcpext_connaborts = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.tcpconnaborts");
+                st = rrdset_find_localhost("ipv4.tcpconnaborts");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts", "connections/s", 3010, update_every, RRDSET_TYPE_LINE);
 
@@ -416,7 +416,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             if (do_tcpext_ofo == CONFIG_ONDEMAND_YES || (do_tcpext_ofo == CONFIG_ONDEMAND_ONDEMAND && tcpstat.tcps_rcvoopack)) {
                 do_tcpext_ofo = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.tcpofo");
+                st = rrdset_find_localhost("ipv4.tcpofo");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpofo", NULL, "tcp", NULL, "TCP Out-Of-Order Queue", "packets/s", 3050, update_every, RRDSET_TYPE_LINE);
 
@@ -433,7 +433,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             if (do_tcpext_syscookies == CONFIG_ONDEMAND_YES || (do_tcpext_syscookies == CONFIG_ONDEMAND_ONDEMAND && (tcpstat.tcps_sc_sendcookie || tcpstat.tcps_sc_recvcookie || tcpstat.tcps_sc_zonefail))) {
                 do_tcpext_syscookies = CONFIG_ONDEMAND_YES;
 
-                st = rrdset_find("ipv4.tcpsyncookies");
+                st = rrdset_find_localhost("ipv4.tcpsyncookies");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpsyncookies", NULL, "tcp", NULL, "TCP SYN Cookies", "packets/s", 3100, update_every, RRDSET_TYPE_LINE);
 
@@ -453,7 +453,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             if (do_ecn == CONFIG_ONDEMAND_YES || (do_ecn == CONFIG_ONDEMAND_ONDEMAND && (tcpstat.tcps_ecn_recv_ce || tcpstat.tcps_ecn_not_supported))) {
                 do_ecn = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.ecnpkts");
+                st = rrdset_find_localhost("ipv4.ecnpkts");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics", "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -482,7 +482,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.udperrors");
         } else {
             if (likely(do_udp_packets)) {
-                st = rrdset_find("ipv4.udppackets");
+                st = rrdset_find_localhost("ipv4.udppackets");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "udppackets", NULL, "udp", NULL, "IPv4 UDP Packets",
                                        "packets/s", 2601, update_every, RRDSET_TYPE_LINE);
@@ -500,7 +500,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_udp_errors)) {
-                st = rrdset_find("ipv4.udperrors");
+                st = rrdset_find_localhost("ipv4.udperrors");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "udperrors", NULL, "udp", NULL, "IPv4 UDP Errors", "events/s",
                                        2701, update_every, RRDSET_TYPE_LINE);
@@ -543,7 +543,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_icmp_packets)) {
-                st = rrdset_find("ipv4.icmp");
+                st = rrdset_find_localhost("ipv4.icmp");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "icmp", NULL, "icmp", NULL, "IPv4 ICMP Packets", "packets/s",
                                        2602,
@@ -561,7 +561,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("ipv4.icmp_errors");
+                st = rrdset_find_localhost("ipv4.icmp_errors");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors",
                                        "packets/s",
@@ -583,7 +583,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_icmpmsg)) {
-                st = rrdset_find("ipv4.icmpmsg");
+                st = rrdset_find_localhost("ipv4.icmpmsg");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages",
                                        "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
@@ -620,7 +620,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.errors");
         } else {
             if (likely(do_ip_packets)) {
-                st = rrdset_find("ipv4.packets");
+                st = rrdset_find_localhost("ipv4.packets");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "packets", NULL, "packets", NULL, "IPv4 Packets", "packets/s",
                                        3000, update_every, RRDSET_TYPE_LINE);
@@ -642,7 +642,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsout)) {
-                st = rrdset_find("ipv4.fragsout");
+                st = rrdset_find_localhost("ipv4.fragsout");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "fragsout", NULL, "fragments", NULL, "IPv4 Fragments Sent",
                                        "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
@@ -663,7 +663,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsin)) {
-                st = rrdset_find("ipv4.fragsin");
+                st = rrdset_find_localhost("ipv4.fragsin");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "fragsin", NULL, "fragments", NULL,
                                        "IPv4 Fragments Reassembly",
@@ -685,7 +685,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_ip_errors)) {
-                st = rrdset_find("ipv4.errors");
+                st = rrdset_find_localhost("ipv4.errors");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "errors", NULL, "errors", NULL, "IPv4 Errors", "packets/s",
                                        3002,
@@ -731,7 +731,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                           (ip6stat.ip6s_localout || ip6stat.ip6s_total ||
                                                            ip6stat.ip6s_forward || ip6stat.ip6s_delivered))) {
                 do_ip6_packets = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.packets");
+                st = rrdset_find_localhost("ipv6.packets");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "packets", NULL, "packets", NULL, "IPv6 Packets", "packets/s", 3000,
                                        update_every, RRDSET_TYPE_LINE);
@@ -756,7 +756,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                            (ip6stat.ip6s_fragmented || ip6stat.ip6s_cantfrag ||
                                                             ip6stat.ip6s_ofragments))) {
                 do_ip6_fragsout = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.fragsout");
+                st = rrdset_find_localhost("ipv6.fragsout");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "fragsout", NULL, "fragments", NULL, "IPv6 Fragments Sent",
                                        "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
@@ -780,7 +780,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                           (ip6stat.ip6s_reassembled || ip6stat.ip6s_fragdropped ||
                                                            ip6stat.ip6s_fragtimeout || ip6stat.ip6s_fragments))) {
                 do_ip6_fragsin = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.fragsin");
+                st = rrdset_find_localhost("ipv6.fragsin");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "fragsin", NULL, "fragments", NULL, "IPv6 Fragments Reassembly",
                                        "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
@@ -813,7 +813,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     ip6stat.ip6s_cantforward ||
                     ip6stat.ip6s_noroute))) {
                 do_ip6_errors = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.errors");
+                st = rrdset_find_localhost("ipv6.errors");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "errors", NULL, "errors", NULL, "IPv6 Errors", "packets/s", 3002,
                                        update_every, RRDSET_TYPE_LINE);
@@ -860,7 +860,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             icmp6_total.msgs_in += icmp6stat.icp6s_badcode + icmp6stat.icp6s_badlen + icmp6stat.icp6s_checksum + icmp6stat.icp6s_tooshort;
             if (do_icmp6 == CONFIG_ONDEMAND_YES || (do_icmp6 == CONFIG_ONDEMAND_ONDEMAND && (icmp6_total.msgs_in || icmp6_total.msgs_out))) {
                 do_icmp6 = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmp");
+                st = rrdset_find_localhost("ipv6.icmp");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmp", NULL, "icmp", NULL, "IPv6 ICMP Messages",
                                        "messages/s", 10000, update_every, RRDSET_TYPE_LINE);
@@ -879,7 +879,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             if (do_icmp6_redir == CONFIG_ONDEMAND_YES || (do_icmp6_redir == CONFIG_ONDEMAND_ONDEMAND && (icmp6stat.icp6s_inhist[ND_REDIRECT] || icmp6stat.icp6s_outhist[ND_REDIRECT]))) {
                 do_icmp6_redir = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmpredir");
+                st = rrdset_find_localhost("ipv6.icmpredir");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmpredir", NULL, "icmp", NULL, "IPv6 ICMP Redirects",
                                        "redirects/s", 10050, update_every, RRDSET_TYPE_LINE);
@@ -909,7 +909,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                                             icmp6stat.icp6s_outhist[ICMP6_TIME_EXCEEDED] ||
                                                                             icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB]))) {
                 do_icmp6_errors = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmperrors");
+                st = rrdset_find_localhost("ipv6.icmperrors");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmperrors", NULL, "icmp", NULL, "IPv6 ICMP Errors", "errors/s", 10100, update_every, RRDSET_TYPE_LINE);
 
@@ -948,7 +948,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                                  icmp6stat.icp6s_inhist[ICMP6_ECHO_REPLY] ||
                                                                  icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY]))) {
                 do_icmp6_echos = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmpechos");
+                st = rrdset_find_localhost("ipv6.icmpechos");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmpechos", NULL, "icmp", NULL, "IPv6 ICMP Echo", "messages/s", 10200, update_every, RRDSET_TYPE_LINE);
 
@@ -974,7 +974,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                                     icmp6stat.icp6s_inhist[ND_ROUTER_ADVERT] ||
                                                                     icmp6stat.icp6s_outhist[ND_ROUTER_ADVERT]))) {
                 do_icmp6_router = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmprouter");
+                st = rrdset_find_localhost("ipv6.icmprouter");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmprouter", NULL, "icmp", NULL, "IPv6 Router Messages", "messages/s", 10400, update_every, RRDSET_TYPE_LINE);
 
@@ -1000,7 +1000,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                                     icmp6stat.icp6s_inhist[ND_NEIGHBOR_ADVERT] ||
                                                                     icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT]))) {
                 do_icmp6_neighbor = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmpneighbor");
+                st = rrdset_find_localhost("ipv6.icmpneighbor");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmpneighbor", NULL, "icmp", NULL, "IPv6 Neighbor Messages", "messages/s", 10500, update_every, RRDSET_TYPE_LINE);
 
@@ -1032,7 +1032,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                                                     icmp6stat.icp6s_outhist[135] ||
                                                                     icmp6stat.icp6s_outhist[136]))) {
                 do_icmp6_types = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmptypes");
+                st = rrdset_find_localhost("ipv6.icmptypes");
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmptypes", NULL, "icmp", NULL, "IPv6 ICMP Types",
                                        "messages/s", 10700, update_every, RRDSET_TYPE_LINE);
@@ -1073,7 +1073,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             error("DISABLED: system.uptime");
         } else {
             clock_gettime(CLOCK_REALTIME, &cur_time);
-            st = rrdset_find("system.uptime");
+            st = rrdset_find_localhost("system.uptime");
 
             if(unlikely(!st)) {
                 st = rrdset_create("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000, update_every, RRDSET_TYPE_LINE);

@@ -48,7 +48,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 error("DISABLED: system.cpu");
             } else {
 
-                st = rrdset_find_bytype("system", "cpu");
+                st = rrdset_find_bytype_localhost("system", "cpu");
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "cpu", NULL, "cpu", "system.cpu", "Total CPU utilization", "percentage", 100, update_every, RRDSET_TYPE_STACKED);
 
@@ -84,7 +84,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             error("DISABLED: mem.pgfaults");
         } else {
             if (likely(do_ram)) {
-                st = rrdset_find("system.ram");
+                st = rrdset_find_localhost("system.ram");
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
 
@@ -113,7 +113,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_swapio)) {
-                st = rrdset_find("system.swapio");
+                st = rrdset_find_localhost("system.swapio");
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
 
@@ -130,7 +130,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_pgfaults)) {
-                st = rrdset_find("mem.pgfaults");
+                st = rrdset_find_localhost("mem.pgfaults");
                 if (unlikely(!st)) {
                     st = rrdset_create("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;

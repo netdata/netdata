@@ -223,7 +223,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_bandwidth == CONFIG_ONDEMAND_YES) {
             if(unlikely(!d->st_bandwidth)) {
-                d->st_bandwidth = rrdset_find_bytype("net", d->name);
+                d->st_bandwidth = rrdset_find_bytype_localhost("net", d->name);
 
                 if(!d->st_bandwidth)
                     d->st_bandwidth = rrdset_create("net", d->name, NULL, d->name, "net.net", "Bandwidth", "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
@@ -245,7 +245,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_packets == CONFIG_ONDEMAND_YES) {
             if(unlikely(!d->st_packets)) {
-                d->st_packets = rrdset_find_bytype("net_packets", d->name);
+                d->st_packets = rrdset_find_bytype_localhost("net_packets", d->name);
 
                 if(!d->st_packets)
                     d->st_packets = rrdset_create("net_packets", d->name, NULL, d->name, "net.packets", "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
@@ -271,7 +271,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_errors == CONFIG_ONDEMAND_YES) {
             if(unlikely(!d->st_errors)) {
-                d->st_errors = rrdset_find_bytype("net_errors", d->name);
+                d->st_errors = rrdset_find_bytype_localhost("net_errors", d->name);
 
                 if(!d->st_errors)
                     d->st_errors = rrdset_create("net_errors", d->name, NULL, d->name, "net.errors", "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
@@ -295,7 +295,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_drops == CONFIG_ONDEMAND_YES) {
             if(unlikely(!d->st_drops)) {
-                d->st_drops = rrdset_find_bytype("net_drops", d->name);
+                d->st_drops = rrdset_find_bytype_localhost("net_drops", d->name);
 
                 if(!d->st_drops)
                     d->st_drops = rrdset_create("net_drops", d->name, NULL, d->name, "net.drops", "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
@@ -319,7 +319,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_fifo == CONFIG_ONDEMAND_YES) {
             if(unlikely(!d->st_fifo)) {
-                d->st_fifo = rrdset_find_bytype("net_fifo", d->name);
+                d->st_fifo = rrdset_find_bytype_localhost("net_fifo", d->name);
 
                 if(!d->st_fifo)
                     d->st_fifo = rrdset_create("net_fifo", d->name, NULL, d->name, "net.fifo", "Interface FIFO Buffer Errors", "errors", 7004, update_every, RRDSET_TYPE_LINE);
@@ -343,7 +343,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_compressed == CONFIG_ONDEMAND_YES) {
             if(unlikely(!d->st_compressed)) {
-                d->st_compressed = rrdset_find_bytype("net_compressed", d->name);
+                d->st_compressed = rrdset_find_bytype_localhost("net_compressed", d->name);
                 if(!d->st_compressed)
                     d->st_compressed = rrdset_create("net_compressed", d->name, NULL, d->name, "net.compressed", "Compressed Packets", "packets/s", 7005, update_every, RRDSET_TYPE_LINE);
 
@@ -366,7 +366,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_events == CONFIG_ONDEMAND_YES) {
             if(unlikely(!d->st_events)) {
-                d->st_events = rrdset_find_bytype("net_events", d->name);
+                d->st_events = rrdset_find_bytype_localhost("net_events", d->name);
                 if(!d->st_events)
                     d->st_events = rrdset_create("net_events", d->name, NULL, d->name, "net.events", "Network Interface Events", "events/s", 7006, update_every, RRDSET_TYPE_LINE);
 

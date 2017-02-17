@@ -60,7 +60,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     if((do_entries == CONFIG_ONDEMAND_ONDEMAND && events) || do_entries == CONFIG_ONDEMAND_YES) {
         do_entries = CONFIG_ONDEMAND_YES;
 
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_entries");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_entries");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_entries", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Entries Used", "entries", 3304, update_every, RRDSET_TYPE_LINE);
 
@@ -77,7 +77,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     if((do_syns == CONFIG_ONDEMAND_ONDEMAND && events) || do_syns == CONFIG_ONDEMAND_YES) {
         do_syns = CONFIG_ONDEMAND_YES;
 
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_syn_received");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_syn_received");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_syn_received", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY SYN Packets received", "SYN/s", 3301, update_every, RRDSET_TYPE_LINE);
 
@@ -94,7 +94,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     if((do_reopened == CONFIG_ONDEMAND_ONDEMAND && events) || do_reopened == CONFIG_ONDEMAND_YES) {
         do_reopened = CONFIG_ONDEMAND_YES;
 
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Connections Reopened", "connections/s", 3303, update_every, RRDSET_TYPE_LINE);
 
@@ -111,7 +111,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     if((do_cookies == CONFIG_ONDEMAND_ONDEMAND && events) || do_cookies == CONFIG_ONDEMAND_YES) {
         do_cookies = CONFIG_ONDEMAND_YES;
 
-        st = rrdset_find(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_cookies");
+        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_cookies");
         if(unlikely(!st)) {
             st = rrdset_create(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_cookies", NULL, RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY TCP Cookies", "cookies/s", 3302, update_every, RRDSET_TYPE_LINE);
 

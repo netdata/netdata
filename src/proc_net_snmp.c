@@ -392,7 +392,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_ip_packets) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".packets");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".packets");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "packets", NULL, "packets", NULL, "IPv4 Packets", "packets/s", 3000, update_every, RRDSET_TYPE_LINE);
 
@@ -413,7 +413,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_ip_fragsout) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".fragsout");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".fragsout");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "fragsout", NULL, "fragments", NULL, "IPv4 Fragments Sent", "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -433,7 +433,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_ip_fragsin) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".fragsin");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".fragsin");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "fragsin", NULL, "fragments", NULL, "IPv4 Fragments Reassembly", "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -453,7 +453,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_ip_errors) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".errors");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".errors");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "errors", NULL, "errors", NULL, "IPv4 Errors", "packets/s", 3002, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -497,7 +497,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_icmp_packets) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".icmp");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".icmp");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "icmp", NULL, "icmp", NULL, "IPv4 ICMP Packets", "packets/s", 2602, update_every, RRDSET_TYPE_LINE);
 
@@ -511,7 +511,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
                 rrdset_done(st);
 
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".icmp_errors");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".icmp_errors");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors", "packets/s", 2603, update_every, RRDSET_TYPE_LINE);
 
@@ -543,7 +543,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             if(do_icmpmsg) {
                 int i;
 
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".icmpmsg");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".icmpmsg");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages", "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
 
@@ -578,7 +578,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
             if(do_tcp_sockets) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".tcpsock");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".tcpsock");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "tcpsock", NULL, "tcp", NULL, "IPv4 TCP Connections", "active connections", 2500, update_every, RRDSET_TYPE_LINE);
 
@@ -593,7 +593,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_tcp_packets) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".tcppackets");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".tcppackets");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, "tcp", NULL, "IPv4 TCP Packets", "packets/s", 2600, update_every, RRDSET_TYPE_LINE);
 
@@ -610,7 +610,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_tcp_errors) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".tcperrors");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".tcperrors");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "tcperrors", NULL, "tcp", NULL, "IPv4 TCP Errors", "packets/s", 2700, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -630,7 +630,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_tcp_handshake) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".tcphandshake");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".tcphandshake");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "tcphandshake", NULL, "tcp", NULL, "IPv4 TCP Handshake Issues", "events/s", 2900, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -671,7 +671,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
             if(do_udp_packets) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".udppackets");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".udppackets");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, "udp", NULL, "IPv4 UDP Packets", "packets/s", 2601, update_every, RRDSET_TYPE_LINE);
 
@@ -688,7 +688,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_udp_errors) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".udperrors");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".udperrors");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "udperrors", NULL, "udp", NULL, "IPv4 UDP Errors", "events/s", 2701, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -730,7 +730,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(do_udplite_packets) {
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".udplite");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".udplite");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "udplite", NULL, "udplite", NULL, "IPv4 UDPLite Packets", "packets/s", 2603, update_every, RRDSET_TYPE_LINE);
 
@@ -743,7 +743,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 rrddim_set(st, "OutDatagrams", *udplite_OutDatagrams);
                 rrdset_done(st);
 
-                st = rrdset_find(RRD_TYPE_NET_SNMP ".udplite_errors");
+                st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".udplite_errors");
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "udplite_errors", NULL, "udplite", NULL, "IPv4 UDPLite Errors", "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
 

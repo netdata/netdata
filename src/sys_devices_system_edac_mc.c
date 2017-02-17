@@ -132,7 +132,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
         static RRDSET *ce_st = NULL;
 
         if(unlikely(!ce_st)) {
-            ce_st = rrdset_find("mem.ecc_ce");
+            ce_st = rrdset_find_localhost("mem.ecc_ce");
             if(unlikely(!ce_st))
                 ce_st = rrdset_create("mem", "ecc_ce", NULL, "ecc", NULL, "ECC Memory Correctable Errors", "errors",
                         6600, update_every, RRDSET_TYPE_LINE);
@@ -159,7 +159,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
         static RRDSET *ue_st = NULL;
 
         if(unlikely(!ue_st)) {
-            ue_st = rrdset_find("mem.ecc_ue");
+            ue_st = rrdset_find_localhost("mem.ecc_ue");
 
             if(unlikely(!ue_st))
                 ue_st = rrdset_create("mem", "ecc_ue", NULL, "ecc", NULL, "ECC Memory Uncorrectable Errors", "errors",
