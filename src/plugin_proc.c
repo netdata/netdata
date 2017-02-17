@@ -112,7 +112,7 @@ void *proc_main(void *ptr) {
             static RRDSET *st = NULL;
 
             if(unlikely(!st)) {
-                st = rrdset_find_bytype("netdata", "plugin_proc_modules");
+                st = rrdset_find_bytype_localhost("netdata", "plugin_proc_modules");
 
                 if(!st) {
                     st = rrdset_create("netdata", "plugin_proc_modules", NULL, "proc", NULL, "NetData Proc Plugin Modules Durations", "milliseconds/run", 132001, rrd_update_every, RRDSET_TYPE_STACKED);

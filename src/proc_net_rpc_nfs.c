@@ -269,7 +269,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_net == 2) {
-        st = rrdset_find_bytype("nfs", "net");
+        st = rrdset_find_bytype_localhost("nfs", "net");
         if(!st) {
             st = rrdset_create("nfs", "net", NULL, "network", NULL, "NFS Client Network", "operations/s", 5007, update_every, RRDSET_TYPE_STACKED);
             st->isdetail = 1;
@@ -291,7 +291,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_rpc == 2) {
-        st = rrdset_find_bytype("nfs", "rpc");
+        st = rrdset_find_bytype_localhost("nfs", "rpc");
         if(!st) {
             st = rrdset_create("nfs", "rpc", NULL, "rpc", NULL, "NFS Client Remote Procedure Calls Statistics", "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
@@ -312,7 +312,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(do_proc2 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfs", "proc2");
+        st = rrdset_find_bytype_localhost("nfs", "proc2");
         if(!st) {
             st = rrdset_create("nfs", "proc2", NULL, "nfsv2rpc", NULL, "NFS v2 Client Remote Procedure Calls", "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
 
@@ -331,7 +331,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(do_proc3 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfs", "proc3");
+        st = rrdset_find_bytype_localhost("nfs", "proc3");
         if(!st) {
             st = rrdset_create("nfs", "proc3", NULL, "nfsv3rpc", NULL, "NFS v3 Client Remote Procedure Calls", "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
 
@@ -350,7 +350,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(do_proc4 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfs", "proc4");
+        st = rrdset_find_bytype_localhost("nfs", "proc4");
         if(!st) {
             st = rrdset_create("nfs", "proc4", NULL, "nfsv4rpc", NULL, "NFS v4 Client Remote Procedure Calls", "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
 

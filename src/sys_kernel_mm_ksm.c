@@ -90,7 +90,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    st = rrdset_find("mem.ksm");
+    st = rrdset_find_localhost("mem.ksm");
     if(!st) {
         st = rrdset_create("mem", "ksm", NULL, "ksm", NULL, "Kernel Same Page Merging", "MB", 5000, update_every, RRDSET_TYPE_AREA);
 
@@ -109,7 +109,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     rrddim_set(st, "to_scan", pages_to_scan * page_size);
     rrdset_done(st);
 
-    st = rrdset_find("mem.ksm_savings");
+    st = rrdset_find_localhost("mem.ksm_savings");
     if(!st) {
         st = rrdset_create("mem", "ksm_savings", NULL, "ksm", NULL, "Kernel Same Page Merging Savings", "MB", 5001, update_every, RRDSET_TYPE_AREA);
 
@@ -122,7 +122,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     rrddim_set(st, "offered", offered * page_size);
     rrdset_done(st);
 
-    st = rrdset_find("mem.ksm_ratios");
+    st = rrdset_find_localhost("mem.ksm_ratios");
     if(!st) {
         st = rrdset_create("mem", "ksm_ratios", NULL, "ksm", NULL, "Kernel Same Page Merging Effectiveness", "percentage", 5002, update_every, RRDSET_TYPE_LINE);
 

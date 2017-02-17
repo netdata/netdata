@@ -153,7 +153,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(do_space == CONFIG_ONDEMAND_YES || (do_space == CONFIG_ONDEMAND_ONDEMAND && (bavail || breserved_root || bused))) {
         if(unlikely(!m->st_space)) {
             m->do_space = CONFIG_ONDEMAND_YES;
-            m->st_space = rrdset_find_bytype("disk_space", disk);
+            m->st_space = rrdset_find_bytype_localhost("disk_space", disk);
             if(unlikely(!m->st_space)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mi->mount_source);
@@ -180,7 +180,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(do_inodes == CONFIG_ONDEMAND_YES || (do_inodes == CONFIG_ONDEMAND_ONDEMAND && (favail || freserved_root || fused))) {
         if(unlikely(!m->st_inodes)) {
             m->do_inodes = CONFIG_ONDEMAND_YES;
-            m->st_inodes = rrdset_find_bytype("disk_inodes", disk);
+            m->st_inodes = rrdset_find_bytype_localhost("disk_inodes", disk);
             if(unlikely(!m->st_inodes)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mi->mount_source);
@@ -272,7 +272,7 @@ void *proc_diskspace_main(void *ptr) {
             getrusage(RUSAGE_THREAD, &thread);
 
             if(!stcpu_thread) {
-                stcpu_thread = rrdset_find("netdata.plugin_diskspace");
+                stcpu_thread = rrdset_find_localhost("netdata.plugin_diskspace");
                 if(!stcpu_thread) stcpu_thread = rrdset_create("netdata", "plugin_diskspace", NULL, "diskspace", NULL
                                                  , "NetData Disk Space Plugin CPU usage", "milliseconds/s", 132020
                                                  , update_every, RRDSET_TYPE_STACKED);
@@ -290,7 +290,7 @@ void *proc_diskspace_main(void *ptr) {
             // ----------------------------------------------------------------
 
             if(!st_duration) {
-                st_duration = rrdset_find("netdata.plugin_diskspace_dt");
+                st_duration = rrdset_find_localhost("netdata.plugin_diskspace_dt");
                 if(!st_duration) st_duration = rrdset_create("netdata", "plugin_diskspace_dt", NULL, "diskspace", NULL
                                                  , "NetData Disk Space Plugin Duration", "milliseconds/run", 132021
                                                  , update_every, RRDSET_TYPE_AREA);

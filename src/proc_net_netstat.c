@@ -230,7 +230,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_bandwidth == CONFIG_ONDEMAND_YES || (do_bandwidth == CONFIG_ONDEMAND_ONDEMAND && (ipext_InOctets || ipext_OutOctets))) {
                 do_bandwidth = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("system.ipv4");
+                st = rrdset_find_localhost("system.ipv4");
                 if(unlikely(!st)) {
                     st = rrdset_create("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
 
@@ -248,7 +248,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_inerrors == CONFIG_ONDEMAND_YES || (do_inerrors == CONFIG_ONDEMAND_ONDEMAND && (ipext_InNoRoutes || ipext_InTruncatedPkts))) {
                 do_inerrors = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.inerrors");
+                st = rrdset_find_localhost("ipv4.inerrors");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "inerrors", NULL, "errors", NULL, "IPv4 Input Errors", "packets/s", 4000, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -269,7 +269,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_mcast == CONFIG_ONDEMAND_YES || (do_mcast == CONFIG_ONDEMAND_ONDEMAND && (ipext_InMcastOctets || ipext_OutMcastOctets))) {
                 do_mcast = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.mcast");
+                st = rrdset_find_localhost("ipv4.mcast");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "mcast", NULL, "multicast", NULL, "IPv4 Multicast Bandwidth", "kilobits/s", 9000, update_every, RRDSET_TYPE_AREA);
                     st->isdetail = 1;
@@ -288,7 +288,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_bcast == CONFIG_ONDEMAND_YES || (do_bcast == CONFIG_ONDEMAND_ONDEMAND && (ipext_InBcastOctets || ipext_OutBcastOctets))) {
                 do_bcast = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.bcast");
+                st = rrdset_find_localhost("ipv4.bcast");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "bcast", NULL, "broadcast", NULL, "IPv4 Broadcast Bandwidth", "kilobits/s", 8000, update_every, RRDSET_TYPE_AREA);
                     st->isdetail = 1;
@@ -307,7 +307,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_mcast_p == CONFIG_ONDEMAND_YES || (do_mcast_p == CONFIG_ONDEMAND_ONDEMAND && (ipext_InMcastPkts || ipext_OutMcastPkts))) {
                 do_mcast_p = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.mcastpkts");
+                st = rrdset_find_localhost("ipv4.mcastpkts");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "mcastpkts", NULL, "multicast", NULL, "IPv4 Multicast Packets", "packets/s", 8600, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -326,7 +326,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_bcast_p == CONFIG_ONDEMAND_YES || (do_bcast_p == CONFIG_ONDEMAND_ONDEMAND && (ipext_InBcastPkts || ipext_OutBcastPkts))) {
                 do_bcast_p = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.bcastpkts");
+                st = rrdset_find_localhost("ipv4.bcastpkts");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "bcastpkts", NULL, "broadcast", NULL, "IPv4 Broadcast Packets", "packets/s", 8500, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -345,7 +345,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_ecn == CONFIG_ONDEMAND_YES || (do_ecn == CONFIG_ONDEMAND_ONDEMAND && (ipext_InCEPkts || ipext_InECT0Pkts || ipext_InECT1Pkts || ipext_InNoECTPkts))) {
                 do_ecn = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.ecnpkts");
+                st = rrdset_find_localhost("ipv4.ecnpkts");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics", "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -381,7 +381,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_tcpext_memory == CONFIG_ONDEMAND_YES || (do_tcpext_memory == CONFIG_ONDEMAND_ONDEMAND && (tcpext_TCPMemoryPressures))) {
                 do_tcpext_memory = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.tcpmemorypressures");
+                st = rrdset_find_localhost("ipv4.tcpmemorypressures");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpmemorypressures", NULL, "tcp", NULL, "TCP Memory Pressures", "events/s", 3000, update_every, RRDSET_TYPE_LINE);
 
@@ -397,7 +397,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_tcpext_connaborts == CONFIG_ONDEMAND_YES || (do_tcpext_connaborts == CONFIG_ONDEMAND_ONDEMAND && (tcpext_TCPAbortOnData || tcpext_TCPAbortOnClose || tcpext_TCPAbortOnMemory || tcpext_TCPAbortOnTimeout || tcpext_TCPAbortOnLinger || tcpext_TCPAbortFailed))) {
                 do_tcpext_connaborts = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.tcpconnaborts");
+                st = rrdset_find_localhost("ipv4.tcpconnaborts");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts", "connections/s", 3010, update_every, RRDSET_TYPE_LINE);
 
@@ -422,7 +422,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_tcpext_reorder == CONFIG_ONDEMAND_YES || (do_tcpext_reorder == CONFIG_ONDEMAND_ONDEMAND && (tcpext_TCPRenoReorder || tcpext_TCPFACKReorder || tcpext_TCPSACKReorder || tcpext_TCPTSReorder))) {
                 do_tcpext_reorder = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.tcpreorders");
+                st = rrdset_find_localhost("ipv4.tcpreorders");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpreorders", NULL, "tcp", NULL, "TCP Reordered Packets by Detection Method", "packets/s", 3020, update_every, RRDSET_TYPE_LINE);
 
@@ -444,7 +444,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_tcpext_ofo == CONFIG_ONDEMAND_YES || (do_tcpext_ofo == CONFIG_ONDEMAND_ONDEMAND && (tcpext_TCPOFOQueue || tcpext_TCPOFODrop || tcpext_TCPOFOMerge))) {
                 do_tcpext_ofo = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.tcpofo");
+                st = rrdset_find_localhost("ipv4.tcpofo");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpofo", NULL, "tcp", NULL, "TCP Out-Of-Order Queue", "packets/s", 3050, update_every, RRDSET_TYPE_LINE);
 
@@ -466,7 +466,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             if(do_tcpext_syscookies == CONFIG_ONDEMAND_YES || (do_tcpext_syscookies == CONFIG_ONDEMAND_ONDEMAND && (tcpext_SyncookiesSent || tcpext_SyncookiesRecv || tcpext_SyncookiesFailed))) {
                 do_tcpext_syscookies = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.tcpsyncookies");
+                st = rrdset_find_localhost("ipv4.tcpsyncookies");
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpsyncookies", NULL, "tcp", NULL, "TCP SYN Cookies", "packets/s", 3100, update_every, RRDSET_TYPE_LINE);
 

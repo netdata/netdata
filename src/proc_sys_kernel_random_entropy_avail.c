@@ -17,7 +17,7 @@ int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt) {
 
     unsigned long long entropy = str2ull(procfile_lineword(ff, 0, 0));
 
-    RRDSET *st = rrdset_find_bytype("system", "entropy");
+    RRDSET *st = rrdset_find_bytype_localhost("system", "entropy");
     if(unlikely(!st)) {
         st = rrdset_create("system", "entropy", NULL, "entropy", NULL, "Available Entropy", "entropy", 1000, update_every, RRDSET_TYPE_LINE);
         rrddim_add(st, "entropy", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);

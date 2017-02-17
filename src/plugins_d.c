@@ -175,7 +175,7 @@ void *pluginsd_worker_thread(void *arg)
                     break;
                 }
 
-                st = rrdset_find(id);
+                st = rrdset_find_localhost(id);
                 if(unlikely(!st)) {
                     error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist. Disabling it.", cd->fullfilename, id);
                     cd->enabled = 0;
@@ -252,7 +252,7 @@ void *pluginsd_worker_thread(void *arg)
                 if(unlikely(!family || !*family)) family = NULL;
                 if(unlikely(!context || !*context)) context = NULL;
 
-                st = rrdset_find_bytype(type, id);
+                st = rrdset_find_bytype_localhost(type, id);
                 if(unlikely(!st)) {
                     debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d"
                         , type, id

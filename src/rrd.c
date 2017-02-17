@@ -105,8 +105,8 @@ static RRDFAMILY *rrdfamily_index_find(RRDHOST *host, const char *id, uint32_t h
     return (RRDFAMILY *)avl_search_lock(&(host->rrdfamily_root_index), (avl *) &tmp);
 }
 
-RRDFAMILY *rrdfamily_create(const char *id) {
-    RRDFAMILY *rc = rrdfamily_index_find(&localhost, id, 0);
+RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {
+    RRDFAMILY *rc = rrdfamily_index_find(host, id, 0);
     if(!rc) {
         rc = callocz(1, sizeof(RRDFAMILY));
 
@@ -116,7 +116,7 @@ RRDFAMILY *rrdfamily_create(const char *id) {
         // initialize the variables index
         avl_init_lock(&rc->variables_root_index, rrdvar_compare);
 
-        RRDFAMILY *ret = rrdfamily_index_add(&localhost, rc);
+        RRDFAMILY *ret = rrdfamily_index_add(host, rc);
         if(ret != rc)
             fatal("RRDFAMILY: INTERNAL ERROR: Expected to INSERT RRDFAMILY '%s' into index, but inserted '%s'.", rc->family, (ret)?ret->family:"NONE");
     }
@@ -125,10 +125,10 @@ RRDFAMILY *rrdfamily_create(const char *id) {
     return rc;
 }
 
-void rrdfamily_free(RRDFAMILY *rc) {
+void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc) {
     rc->use_count--;
     if(!rc->use_count) {
-        RRDFAMILY *ret = rrdfamily_index_del(&localhost, rc);
+        RRDFAMILY *ret = rrdfamily_index_del(host, rc);
         if(ret != rc)
             fatal("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", rc->family, (ret)?ret->family:"NONE");
 
@@ -360,7 +360,7 @@ void rrdset_set_name(RRDSET *st, const char *name)
     rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
 
     if(st->name) {
-        rrdset_index_del_name(&localhost, st);
+        rrdset_index_del_name(st->rrdhost, st);
         st->name = config_set_default(st->id, "name", b);
         st->hash_name = simple_hash(st->name);
         rrdsetvar_rename_all(st);
@@ -376,7 +376,7 @@ void rrdset_set_name(RRDSET *st, const char *name)
         rrddimvar_rename_all(rd);
     pthread_rwlock_unlock(&st->rwlock);
 
-    if(unlikely(rrdset_index_add_name(&localhost, st) != st))
+    if(unlikely(rrdset_index_add_name(st->rrdhost, st) != st))
         error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", st->name);
 }
 
@@ -453,8 +453,9 @@ static inline void timeval_align(struct timeval *tv, int update_every) {
     tv->tv_usec = 500000;
 }
 
-RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *context, const char *title, const char *units, long priority, int update_every, int chart_type)
-{
+RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *context, const char *title, const char *units, long priority, int update_every, int chart_type) {
+    RRDHOST *host = &localhost;
+
     if(!type || !type[0]) {
         fatal("Cannot create rrd stats without a type.");
         return NULL;
@@ -470,7 +471,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
 
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
-    RRDSET *st = rrdset_find(fullid);
+    RRDSET *st = rrdset_find(host, fullid);
     if(st) {
         debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
         return st;
@@ -547,6 +548,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         st->mapped = RRD_MEMORY_MODE_RAM;
     }
 
+    st->rrdhost = host;
     st->memsize = size;
     st->entries = entries;
     st->update_every = update_every;
@@ -595,7 +597,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
     avl_init_lock(&st->variables_root_index, rrdvar_compare);
 
     pthread_rwlock_init(&st->rwlock, NULL);
-    rrdhost_rwlock(&localhost);
+    rrdhost_rwlock(host);
 
     if(name && *name) rrdset_set_name(st, name);
     else rrdset_set_name(st, id);
@@ -608,11 +610,10 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         st->title = config_get(st->id, "title", varvalue2);
     }
 
-    st->rrdfamily = rrdfamily_create(st->family);
-    st->rrdhost = &localhost;
+    st->rrdfamily = rrdfamily_create(host, st->family);
 
-    st->next = localhost.rrdset_root;
-    localhost.rrdset_root = st;
+    st->next = host->rrdset_root;
+    host->rrdset_root = st;
 
     if(health_enabled) {
         rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, 0);
@@ -622,13 +623,13 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
         rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, 0);
     }
 
-    if(unlikely(rrdset_index_add(&localhost, st) != st))
+    if(unlikely(rrdset_index_add(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempt to index duplicate chart '%s'", st->id);
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
 
-    rrdhost_unlock(&localhost);
+    rrdhost_unlock(host);
 
     return(st);
 }
@@ -869,7 +870,7 @@ void rrdset_free_all(void)
 
         st->rrdfamily->use_count--;
         if(!st->rrdfamily->use_count)
-            rrdfamily_free(st->rrdfamily);
+            rrdfamily_free(&localhost, st->rrdfamily);
 
         pthread_rwlock_unlock(&st->rwlock);
 
@@ -921,33 +922,28 @@ void rrdset_save_all(void) {
 }
 
 
-RRDSET *rrdset_find(const char *id)
-{
-    debug(D_RRD_CALLS, "rrdset_find() for chart %s", id);
-
-    RRDSET *st = rrdset_index_find(&localhost, id, 0);
+RRDSET *rrdset_find(RRDHOST *host, const char *id) {
+    debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, host->hostname);
+    RRDSET *st = rrdset_index_find(host, id, 0);
     return(st);
 }
 
-RRDSET *rrdset_find_bytype(const char *type, const char *id)
+RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id)
 {
-    debug(D_RRD_CALLS, "rrdset_find_bytype() for chart %s.%s", type, id);
+    debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, host->hostname);
 
     char buf[RRD_ID_LENGTH_MAX + 1];
-
     strncpyz(buf, type, RRD_ID_LENGTH_MAX - 1);
     strcat(buf, ".");
     int len = (int) strlen(buf);
     strncpyz(&buf[len], id, (size_t) (RRD_ID_LENGTH_MAX - len));
 
-    return(rrdset_find(buf));
+    return(rrdset_find(host, buf));
 }
 
-RRDSET *rrdset_find_byname(const char *name)
-{
-    debug(D_RRD_CALLS, "rrdset_find_byname() for chart %s", name);
-
-    RRDSET *st = rrdset_index_find_name(&localhost, name, 0);
+RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
+    debug(D_RRD_CALLS, "rrdset_find_byname() for chart '%s' in host '%s'", name, host->hostname);
+    RRDSET *st = rrdset_index_find_name(host, name, 0);
     return(st);
 }
 

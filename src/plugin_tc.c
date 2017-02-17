@@ -974,7 +974,7 @@ void *tc_main(void *ptr) {
                 // debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
                 getrusage(RUSAGE_THREAD, &thread);
 
-                if(unlikely(!stcpu)) stcpu = rrdset_find("netdata.plugin_tc_cpu");
+                if(unlikely(!stcpu)) stcpu = rrdset_find_localhost("netdata.plugin_tc_cpu");
                 if(unlikely(!stcpu)) {
                     stcpu = rrdset_create("netdata", "plugin_tc_cpu", NULL, "tc.helper", NULL, "NetData TC CPU usage", "milliseconds/s", 135000, rrd_update_every, RRDSET_TYPE_STACKED);
                     rrddim_add(stcpu, "user",  NULL,  1, 1000, RRDDIM_ALGORITHM_INCREMENTAL);
@@ -986,7 +986,7 @@ void *tc_main(void *ptr) {
                 rrddim_set(stcpu, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
                 rrdset_done(stcpu);
 
-                if(unlikely(!sttime)) stcpu = rrdset_find("netdata.plugin_tc_time");
+                if(unlikely(!sttime)) stcpu = rrdset_find_localhost("netdata.plugin_tc_time");
                 if(unlikely(!sttime)) {
                     sttime = rrdset_create("netdata", "plugin_tc_time", NULL, "tc.helper", NULL, "NetData TC script execution", "milliseconds/run", 135001, rrd_update_every, RRDSET_TYPE_AREA);
                     rrddim_add(sttime, "run_time",  "run time",  1, 1, RRDDIM_ALGORITHM_ABSOLUTE);

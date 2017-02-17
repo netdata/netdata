@@ -738,8 +738,8 @@ int web_client_api_request_single_chart(struct web_client *w, char *url, void ca
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(chart);
-    if(!st) st = rrdset_find_byname(chart);
+    RRDSET *st = rrdset_find_localhost(chart);
+    if(!st) st = rrdset_find_byname_localhost(chart);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
@@ -888,8 +888,8 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(chart);
-    if(!st) st = rrdset_find_byname(chart);
+    RRDSET *st = rrdset_find_localhost(chart);
+    if(!st) st = rrdset_find_byname_localhost(chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
         buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1);
@@ -1174,8 +1174,8 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(chart);
-    if(!st) st = rrdset_find_byname(chart);
+    RRDSET *st = rrdset_find_localhost(chart);
+    if(!st) st = rrdset_find_byname_localhost(chart);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
@@ -1517,8 +1517,8 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
     // do we have such a data set?
     if(*tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
-        st = rrdset_find_byname(tok);
-        if(!st) st = rrdset_find(tok);
+        st = rrdset_find_byname_localhost(tok);
+        if(!st) st = rrdset_find_localhost(tok);
     }
 
     if(!st) {
@@ -2173,8 +2173,8 @@ void web_client_process(struct web_client *w) {
                         debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
                         // do we have such a data set?
-                        RRDSET *st = rrdset_find_byname(tok);
-                        if(!st) st = rrdset_find(tok);
+                        RRDSET *st = rrdset_find_byname_localhost(tok);
+                        if(!st) st = rrdset_find_localhost(tok);
                         if(!st) {
                             // we don't have it
                             // try to send a file with that name
@@ -2239,8 +2239,8 @@ void web_client_process(struct web_client *w) {
                         debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
                         // do we have such a data set?
-                        RRDSET *st = rrdset_find_byname(tok);
-                        if(!st) st = rrdset_find(tok);
+                        RRDSET *st = rrdset_find_byname_localhost(tok);
+                        if(!st) st = rrdset_find_localhost(tok);
                         if(!st) {
                             code = 404;
                             buffer_strcat(w->response.data, "Chart is not found: ");

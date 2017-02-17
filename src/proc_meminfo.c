@@ -140,7 +140,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     unsigned long long MemUsed = MemTotal - MemFree - Cached - Buffers;
 
     if(do_ram) {
-        st = rrdset_find("system.ram");
+        st = rrdset_find_localhost("system.ram");
         if(!st) {
             st = rrdset_create("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
 
@@ -165,7 +165,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     if(SwapTotal || SwapUsed || SwapFree || do_swap == CONFIG_ONDEMAND_YES) {
         do_swap = CONFIG_ONDEMAND_YES;
 
-        st = rrdset_find("system.swap");
+        st = rrdset_find_localhost("system.swap");
         if(!st) {
             st = rrdset_create("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
             st->isdetail = 1;
@@ -185,7 +185,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     if(arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND && (do_hwcorrupt == CONFIG_ONDEMAND_YES || (do_hwcorrupt == CONFIG_ONDEMAND_ONDEMAND && HardwareCorrupted > 0))) {
         do_hwcorrupt = CONFIG_ONDEMAND_YES;
 
-        st = rrdset_find("mem.hwcorrupt");
+        st = rrdset_find_localhost("mem.hwcorrupt");
         if(!st) {
             st = rrdset_create("mem", "hwcorrupt", NULL, "ecc", NULL, "Hardware Corrupted ECC", "MB", 9000, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
@@ -201,7 +201,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_committed) {
-        st = rrdset_find("mem.committed");
+        st = rrdset_find_localhost("mem.committed");
         if(!st) {
             st = rrdset_create("mem", "committed", NULL, "system", NULL, "Committed (Allocated) Memory", "MB", 5000, update_every, RRDSET_TYPE_AREA);
             st->isdetail = 1;
@@ -217,7 +217,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_writeback) {
-        st = rrdset_find("mem.writeback");
+        st = rrdset_find_localhost("mem.writeback");
         if(!st) {
             st = rrdset_create("mem", "writeback", NULL, "kernel", NULL, "Writeback Memory", "MB", 4000, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
@@ -241,7 +241,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_kernel) {
-        st = rrdset_find("mem.kernel");
+        st = rrdset_find_localhost("mem.kernel");
         if(!st) {
             st = rrdset_create("mem", "kernel", NULL, "kernel", NULL, "Memory Used by Kernel", "MB", 6000, update_every, RRDSET_TYPE_STACKED);
             st->isdetail = 1;
@@ -263,7 +263,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_slab) {
-        st = rrdset_find("mem.slab");
+        st = rrdset_find_localhost("mem.slab");
         if(!st) {
             st = rrdset_create("mem", "slab", NULL, "slab", NULL, "Reclaimable Kernel Memory", "MB", 6500, update_every, RRDSET_TYPE_STACKED);
             st->isdetail = 1;

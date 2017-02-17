@@ -68,7 +68,7 @@ void *checks_main(void *ptr) {
         // --------------------------------------------------------------------
         // check chart 3
 
-        if(!apps_cpu) apps_cpu = rrdset_find("apps.cpu");
+        if(!apps_cpu) apps_cpu = rrdset_find_localhost("apps.cpu");
         if(check3->counter_done) rrdset_next_usec(check3, loop_usec);
         now_realtime_timeval(&loop);
         rrddim_set(check3, "caller", (long long) dt_usec(&loop, &check1->last_collected_time));

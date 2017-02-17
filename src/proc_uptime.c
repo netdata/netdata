@@ -39,7 +39,7 @@ int do_proc_uptime(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(unlikely(!st))
-        st = rrdset_find("system.uptime");
+        st = rrdset_find_localhost("system.uptime");
 
     if(unlikely(!st)) {
         st = rrdset_create("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000, update_every, RRDSET_TYPE_LINE);

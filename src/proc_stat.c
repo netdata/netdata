@@ -91,7 +91,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             }
 
             if(likely((isthistotal && do_cpu) || (!isthistotal && do_cpu_cores))) {
-                st = rrdset_find_bytype(type, id);
+                st = rrdset_find_bytype_localhost(type, id);
                 if(unlikely(!st)) {
                     st = rrdset_create(type, id, NULL, family, context, title, "percentage", priority, update_every, RRDSET_TYPE_STACKED);
 
@@ -132,7 +132,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(likely(do_interrupts)) {
-                st = rrdset_find_bytype("system", "intr");
+                st = rrdset_find_bytype_localhost("system", "intr");
                 if(unlikely(!st)) {
                     st = rrdset_create("system", "intr", NULL, "interrupts", NULL, "CPU Interrupts", "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
@@ -151,7 +151,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if(likely(do_context)) {
-                st = rrdset_find_bytype("system", "ctxt");
+                st = rrdset_find_bytype_localhost("system", "ctxt");
                 if(unlikely(!st)) {
                     st = rrdset_create("system", "ctxt", NULL, "processes", NULL, "CPU Context Switches", "context switches/s", 800, update_every, RRDSET_TYPE_LINE);
 
@@ -177,7 +177,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(likely(do_forks)) {
-        st = rrdset_find_bytype("system", "forks");
+        st = rrdset_find_bytype_localhost("system", "forks");
         if(unlikely(!st)) {
             st = rrdset_create("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s", 700, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
@@ -193,7 +193,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(likely(do_processes)) {
-        st = rrdset_find_bytype("system", "processes");
+        st = rrdset_find_bytype_localhost("system", "processes");
         if(unlikely(!st)) {
             st = rrdset_create("system", "processes", NULL, "processes", NULL, "System Processes", "processes", 600, update_every, RRDSET_TYPE_LINE);
 

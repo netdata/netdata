@@ -128,7 +128,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    st = rrdset_find_bytype("system", "softirqs");
+    st = rrdset_find_bytype_localhost("system", "softirqs");
     if(unlikely(!st)) st = rrdset_create("system", "softirqs", NULL, "softirqs", NULL, "System softirqs", "softirqs/s", 950, update_every, RRDSET_TYPE_STACKED);
     else rrdset_next(st);
 
@@ -163,7 +163,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
             char id[50+1];
             snprintfz(id, 50, "cpu%d_softirqs", c);
 
-            st = rrdset_find_bytype("cpu", id);
+            st = rrdset_find_bytype_localhost("cpu", id);
             if(unlikely(!st)) {
                 // find if everything is zero
                 unsigned long long core_sum = 0 ;
