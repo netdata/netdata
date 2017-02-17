@@ -316,9 +316,9 @@ void *pluginsd_worker_thread(void *arg)
                     rd = rrddim_add(st, id, name, multiplier, divisor, rrddim_algorithm_id(algorithm));
                     rd->flags = 0x00000000;
                     if(options && *options) {
-                        if(strstr(options, "hidden") != NULL) rd->flags |= RRDDIM_FLAG_HIDDEN;
-                        if(strstr(options, "noreset") != NULL) rd->flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
-                        if(strstr(options, "nooverflow") != NULL) rd->flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
+                        if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+                        if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+                        if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
                     }
                 }
                 else if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);

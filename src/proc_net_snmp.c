@@ -396,10 +396,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "packets", NULL, "packets", NULL, "IPv4 Packets", "packets/s", 3000, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InReceives",    "received",  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutRequests",   "sent",     -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InDelivers",    "delivered", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InReceives",    "received",  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutRequests",   "sent",     -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InDelivers",    "delivered", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -418,9 +418,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "fragsout", NULL, "fragments", NULL, "IPv4 Fragments Sent", "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "FragOKs",     "ok",      1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "FragFails",   "failed", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "FragCreates", "created", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "FragOKs",     "ok",      1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "FragFails",   "failed", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "FragCreates", "created", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -438,9 +438,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "fragsin", NULL, "fragments", NULL, "IPv4 Fragments Reassembly", "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "ReasmOKs",   "ok",      1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ReasmFails", "failed", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ReasmReqds", "all",     1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ReasmOKs",   "ok",      1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ReasmFails", "failed", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ReasmReqds", "all",     1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -458,14 +458,14 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "errors", NULL, "errors", NULL, "IPv4 Errors", "packets/s", 3002, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InDiscards",      NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDiscards",     NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDiscards",      NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDiscards",     NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InHdrErrors",     NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutNoRoutes",     NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InHdrErrors",     NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutNoRoutes",     NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InAddrErrors",    NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InUnknownProtos", NULL,  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InAddrErrors",    NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InUnknownProtos", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -501,8 +501,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "icmp", NULL, "icmp", NULL, "IPv4 ICMP Packets", "packets/s", 2602, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InMsgs",  "received",  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutMsgs", "sent",     -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InMsgs",  "received",  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutMsgs", "sent",     -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -515,9 +515,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors", "packets/s", 2603, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InErrors",     NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutErrors",    NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrors",     NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutErrors",    NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -548,7 +548,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages", "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
 
                     for(i = 0; icmpmsg_data[i].name ;i++)
-                        rrddim_add(st, icmpmsg_data[i].name, icmpmsg_data[i].label,  icmpmsg_data[i].multiplier, 1, RRDDIM_INCREMENTAL);
+                        rrddim_add(st, icmpmsg_data[i].name, icmpmsg_data[i].label,  icmpmsg_data[i].multiplier, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -582,7 +582,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "tcpsock", NULL, "tcp", NULL, "IPv4 TCP Connections", "active connections", 2500, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "CurrEstab", "connections", 1, 1, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "CurrEstab", "connections", 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -597,8 +597,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "tcppackets", NULL, "tcp", NULL, "IPv4 TCP Packets", "packets/s", 2600, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InSegs",  "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutSegs", "sent",    -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InSegs",  "received", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutSegs", "sent",    -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -615,9 +615,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "tcperrors", NULL, "tcp", NULL, "IPv4 TCP Errors", "packets/s", 2700, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InErrs",       NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "RetransSegs",  NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrs",       NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "RetransSegs",  NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -635,11 +635,11 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "tcphandshake", NULL, "tcp", NULL, "IPv4 TCP Handshake Issues", "events/s", 2900, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "EstabResets",  NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutRsts",      NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ActiveOpens",  NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "PassiveOpens", NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "AttemptFails", NULL,  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "EstabResets",  NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutRsts",      NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ActiveOpens",  NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "PassiveOpens", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "AttemptFails", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -675,8 +675,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "udppackets", NULL, "udp", NULL, "IPv4 UDP Packets", "packets/s", 2601, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InDatagrams",  "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDatagrams", "sent",    -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDatagrams",  "received", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDatagrams", "sent",    -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -693,12 +693,12 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "udperrors", NULL, "udp", NULL, "IPv4 UDP Errors", "events/s", 2701, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InErrors",     NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "NoPorts",      NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InErrors",     NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "NoPorts",      NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -734,8 +734,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "udplite", NULL, "udplite", NULL, "IPv4 UDPLite Packets", "packets/s", 2603, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InDatagrams",  "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDatagrams", "sent",    -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDatagrams",  "received", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDatagrams", "sent",    -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -747,12 +747,12 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                 if(!st) {
                     st = rrdset_create(RRD_TYPE_NET_SNMP, "udplite_errors", NULL, "udplite", NULL, "IPv4 UDPLite Errors", "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "NoPorts",      NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InErrors",     NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "NoPorts",      NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InErrors",     NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 

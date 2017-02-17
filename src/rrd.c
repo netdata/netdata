@@ -14,7 +14,7 @@ int rrd_delete_unupdated_dimensions = 0;
 
 int rrd_update_every = UPDATE_EVERY;
 int rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
-int rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
+RRD_MEMORY_MODE rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 
 static int rrdset_compare(void* a, void* b);
 static int rrdset_compare_name(void* a, void* b);
@@ -226,65 +226,56 @@ static int rrddim_compare(void* a, void* b) {
 #define rrddim_index_del(st,rd ) (RRDDIM *)avl_remove_lock(&((st)->dimensions_index), (avl *)(rd))
 
 static RRDDIM *rrddim_index_find(RRDSET *st, const char *id, uint32_t hash) {
-    RRDDIM tmp;
-    strncpyz(tmp.id, id, RRD_ID_LENGTH_MAX);
-    tmp.hash = (hash)?hash:simple_hash(tmp.id);
-
+    RRDDIM tmp = {
+            .id = id,
+            .hash = (hash)?hash:simple_hash(id)
+    };
     return (RRDDIM *)avl_search_lock(&(st->dimensions_index), (avl *) &tmp);
 }
 
 // ----------------------------------------------------------------------------
 // chart types
 
-int rrdset_type_id(const char *name)
-{
-    if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0)) return RRDSET_TYPE_AREA;
-    else if(unlikely(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0)) return RRDSET_TYPE_STACKED;
-    else if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0)) return RRDSET_TYPE_LINE;
-    return RRDSET_TYPE_LINE;
+inline RRDSET_TYPE rrdset_type_id(const char *name) {
+    if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0))
+        return RRDSET_TYPE_AREA;
+
+    else if(unlikely(strcmp(name, RRDSET_TYPE_STACKED_NAME) == 0))
+        return RRDSET_TYPE_STACKED;
+
+    else // if(unlikely(strcmp(name, RRDSET_TYPE_LINE_NAME) == 0))
+        return RRDSET_TYPE_LINE;
 }
 
-const char *rrdset_type_name(int chart_type)
-{
-    static char line[] = RRDSET_TYPE_LINE_NAME;
-    static char area[] = RRDSET_TYPE_AREA_NAME;
-    static char stacked[] = RRDSET_TYPE_STACKED_NAME;
-
+const char *rrdset_type_name(RRDSET_TYPE chart_type) {
     switch(chart_type) {
         case RRDSET_TYPE_LINE:
-            return line;
+        default:
+            return RRDSET_TYPE_LINE_NAME;
 
         case RRDSET_TYPE_AREA:
-            return area;
+            return RRDSET_TYPE_AREA_NAME;
 
         case RRDSET_TYPE_STACKED:
-            return stacked;
+            return RRDSET_TYPE_STACKED_NAME;
     }
-    return line;
 }
 
 // ----------------------------------------------------------------------------
 // load / save
 
-const char *rrd_memory_mode_name(int id)
-{
-    static const char ram[] = RRD_MEMORY_MODE_RAM_NAME;
-    static const char map[] = RRD_MEMORY_MODE_MAP_NAME;
-    static const char save[] = RRD_MEMORY_MODE_SAVE_NAME;
-
+inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
     switch(id) {
         case RRD_MEMORY_MODE_RAM:
-            return ram;
+            return RRD_MEMORY_MODE_RAM_NAME;
 
         case RRD_MEMORY_MODE_MAP:
-            return map;
+            return RRD_MEMORY_MODE_MAP_NAME;
 
         case RRD_MEMORY_MODE_SAVE:
         default:
-            return save;
+            return RRD_MEMORY_MODE_SAVE_NAME;
     }
-
-    return save;
 }
 
 int rrd_memory_mode_id(const char *name)
@@ -300,36 +291,40 @@ int rrd_memory_mode_id(const char *name)
 // ----------------------------------------------------------------------------
 // algorithms types
 
-int rrddim_algorithm_id(const char *name)
+RRDDIM_ALGORITHM rrddim_algorithm_id(const char *name)
 {
-    if(strcmp(name, RRDDIM_INCREMENTAL_NAME) == 0)              return RRDDIM_INCREMENTAL;
-    if(strcmp(name, RRDDIM_ABSOLUTE_NAME) == 0)                 return RRDDIM_ABSOLUTE;
-    if(strcmp(name, RRDDIM_PCENT_OVER_ROW_TOTAL_NAME) == 0)     return RRDDIM_PCENT_OVER_ROW_TOTAL;
-    if(strcmp(name, RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME) == 0)    return RRDDIM_PCENT_OVER_DIFF_TOTAL;
-    return RRDDIM_ABSOLUTE;
+    if(strcmp(name, RRDDIM_ALGORITHM_INCREMENTAL_NAME) == 0)
+        return RRDDIM_ALGORITHM_INCREMENTAL;
+
+    else if(strcmp(name, RRDDIM_ALGORITHM_ABSOLUTE_NAME) == 0)
+        return RRDDIM_ALGORITHM_ABSOLUTE;
+
+    else if(strcmp(name, RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME) == 0)
+        return RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL;
+
+    else if(strcmp(name, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME) == 0)
+        return RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL;
+
+    else
+        return RRDDIM_ALGORITHM_ABSOLUTE;
 }
 
-const char *rrddim_algorithm_name(int chart_type)
+const char *rrddim_algorithm_name(RRDDIM_ALGORITHM algorithm)
 {
-    static char absolute[] = RRDDIM_ABSOLUTE_NAME;
-    static char incremental[] = RRDDIM_INCREMENTAL_NAME;
-    static char percentage_of_absolute_row[] = RRDDIM_PCENT_OVER_ROW_TOTAL_NAME;
-    static char percentage_of_incremental_row[] = RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME;
+    switch(algorithm) {
+        case RRDDIM_ALGORITHM_ABSOLUTE:
+        default:
+            return RRDDIM_ALGORITHM_ABSOLUTE_NAME;
 
-    switch(chart_type) {
-        case RRDDIM_ABSOLUTE:
-            return absolute;
+        case RRDDIM_ALGORITHM_INCREMENTAL:
+            return RRDDIM_ALGORITHM_INCREMENTAL_NAME;
 
-        case RRDDIM_INCREMENTAL:
-            return incremental;
+        case RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL:
+            return RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME;
 
-        case RRDDIM_PCENT_OVER_ROW_TOTAL:
-            return percentage_of_absolute_row;
-
-        case RRDDIM_PCENT_OVER_DIFF_TOTAL:
-            return percentage_of_incremental_row;
+        case RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
+            return RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME;
     }
-    return absolute;
 }
 
 // ----------------------------------------------------------------------------
@@ -638,7 +633,7 @@ RRDSET *rrdset_create(const char *type, const char *id, const char *name, const 
     return(st);
 }
 
-RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier, long divisor, int algorithm)
+RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRDDIM_ALGORITHM algorithm)
 {
     RRDDIM *rd = rrddim_find(st, id);
     if(rd) {
@@ -657,79 +652,80 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
     rrdset_strncpyz_name(filename, id, FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    if(rrd_memory_mode != RRD_MEMORY_MODE_RAM)
-        rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 1);
+    if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
+        rd = (RRDDIM *) mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
+        if(rd) {
+            // we have a file mapped for rd
 
-    if(rd) {
-        struct timeval now;
-        now_realtime_timeval(&now);
+            rd->id = NULL;
+            rd->name = NULL;
+            rd->cache_filename = NULL;
+            rd->memory_mode = rrd_memory_mode;
+            rd->flags = 0x00000000;
+            rd->variables = NULL;
+            rd->next = NULL;
+            rd->rrdset = NULL;
+            memset(&rd->avl, 0, sizeof(avl));
 
-        if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
-            errno = 0;
-            info("Initializing file %s.", fullfilename);
-            memset(rd, 0, size);
-        }
-        else if(rd->memsize != size) {
-            errno = 0;
-            error("File %s does not have the desired size. Clearing it.", fullfilename);
-            memset(rd, 0, size);
-        }
-        else if(rd->multiplier != multiplier) {
-            errno = 0;
-            error("File %s does not have the same multiplier. Clearing it.", fullfilename);
-            memset(rd, 0, size);
-        }
-        else if(rd->divisor != divisor) {
-            errno = 0;
-            error("File %s does not have the same divisor. Clearing it.", fullfilename);
-            memset(rd, 0, size);
-        }
-        else if(rd->update_every != st->update_every) {
-            errno = 0;
-            error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
-            memset(rd, 0, size);
-        }
-        else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
-            errno = 0;
-            error("File %s is too old. Clearing it.", fullfilename);
-            memset(rd, 0, size);
-        }
-        else if(strcmp(rd->id, id) != 0) {
-            errno = 0;
-            error("File %s contents are not for dimension %s. Clearing it.", fullfilename, id);
-            // munmap(rd, size);
-            // rd = NULL;
-            memset(rd, 0, size);
-        }
+            struct timeval now;
+            now_realtime_timeval(&now);
 
-        if(rd->algorithm && rd->algorithm != algorithm)
-            error("File %s does not have the expected algorithm (expected %d '%s', found %d '%s'). Previous values may be wrong.", fullfilename, algorithm, rrddim_algorithm_name(algorithm), rd->algorithm, rrddim_algorithm_name(rd->algorithm));
+            if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
+                errno = 0;
+                info("Initializing file %s.", fullfilename);
+                memset(rd, 0, size);
+            }
+            else if(rd->memsize != size) {
+                errno = 0;
+                error("File %s does not have the desired size. Clearing it.", fullfilename);
+                memset(rd, 0, size);
+            }
+            else if(rd->multiplier != multiplier) {
+                errno = 0;
+                error("File %s does not have the same multiplier. Clearing it.", fullfilename);
+                memset(rd, 0, size);
+            }
+            else if(rd->divisor != divisor) {
+                errno = 0;
+                error("File %s does not have the same divisor. Clearing it.", fullfilename);
+                memset(rd, 0, size);
+            }
+            else if(rd->update_every != st->update_every) {
+                errno = 0;
+                error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
+                memset(rd, 0, size);
+            }
+            else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
+                errno = 0;
+                error("File %s is too old. Clearing it.", fullfilename);
+                memset(rd, 0, size);
+            }
+
+            if(rd->algorithm && rd->algorithm != algorithm)
+                error("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong."
+                      , fullfilename, algorithm, rrddim_algorithm_name(algorithm), rd->algorithm,
+                        rrddim_algorithm_name(rd->algorithm));
+        }
     }
 
-    if(rd) {
-        // we have a file mapped for rd
-        rd->mapped = rrd_memory_mode;
-        rd->flags = 0x00000000;
-        rd->variables = NULL;
-        rd->next = NULL;
-        rd->name = NULL;
-        memset(&rd->avl, 0, sizeof(avl));
-    }
-    else {
+    if(unlikely(!rd)) {
         // if we didn't manage to get a mmap'd dimension, just create one
-
         rd = callocz(1, size);
-        rd->mapped = RRD_MEMORY_MODE_RAM;
+        rd->memory_mode = RRD_MEMORY_MODE_RAM;
     }
+
     rd->memsize = size;
 
     strcpy(rd->magic, RRDDIMENSION_MAGIC);
-    strcpy(rd->cache_filename, fullfilename);
-    strncpyz(rd->id, id, RRD_ID_LENGTH_MAX);
+
+    rd->id = strdupz(id);
     rd->hash = simple_hash(rd->id);
+
+    rd->cache_filename = strdupz(fullfilename);
 
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
     rd->name = config_get(st->id, varname, (name && *name)?name:rd->id);
+    rd->hash_name = simple_hash(rd->name);
 
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
     rd->algorithm = rrddim_algorithm_id(config_get(st->id, varname, rrddim_algorithm_name(algorithm)));
@@ -746,7 +742,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
     // prevent incremental calculation spikes
     rd->counter = 0;
-    rd->updated = 0;
+    rrddim_flag_clear(rd, RRDDIM_FLAG_UPDATED);
     rd->calculated_value = 0;
     rd->last_calculated_value = 0;
     rd->collected_value = 0;
@@ -785,7 +781,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier
 
 void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
 {
-    if(unlikely(rd->name && !strcmp(rd->name, name)))
+    if(unlikely(!strcmp(rd->name, name)))
         return;
 
     debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);
@@ -793,6 +789,7 @@ void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name)
     char varname[CONFIG_MAX_NAME + 1];
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
     rd->name = config_set_default(st->id, varname, name);
+    rd->hash_name = simple_hash(rd->name);
 
     rrddimvar_rename_all(rd);
 }
@@ -821,20 +818,26 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         error("RRDDIM: INTERNAL ERROR: attempt to remove from index dimension '%s' on chart '%s', removed a different dimension.", rd->id, st->id);
 
     // free(rd->annotations);
-    if(rd->mapped == RRD_MEMORY_MODE_SAVE) {
-        debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
-        savememory(rd->cache_filename, rd, rd->memsize);
 
-        debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
-        munmap(rd, rd->memsize);
-    }
-    else if(rd->mapped == RRD_MEMORY_MODE_MAP) {
-        debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
-        munmap(rd, rd->memsize);
-    }
-    else {
-        debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
-        freez(rd);
+    switch(rd->memory_mode) {
+        case RRD_MEMORY_MODE_SAVE:
+            debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
+            savememory(rd->cache_filename, rd, rd->memsize);
+            // continue to map mode - no break;
+
+        case RRD_MEMORY_MODE_MAP:
+            debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
+            freez((void *)rd->id);
+            freez(rd->cache_filename);
+            munmap(rd, rd->memsize);
+            break;
+
+        case RRD_MEMORY_MODE_RAM:
+            debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
+            freez((void *)rd->id);
+            freez(rd->cache_filename);
+            freez(rd);
+            break;
     }
 }
 
@@ -905,7 +908,7 @@ void rrdset_save_all(void) {
         }
 
         for(rd = st->dimensions; rd ; rd = rd->next) {
-            if(likely(rd->mapped == RRD_MEMORY_MODE_SAVE)) {
+            if(likely(rd->memory_mode == RRD_MEMORY_MODE_SAVE)) {
                 debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
                 savememory(rd->cache_filename, rd, rd->memsize);
             }
@@ -965,12 +968,11 @@ int rrddim_hide(RRDSET *st, const char *id)
         return 1;
     }
 
-    rd->flags |= RRDDIM_FLAG_HIDDEN;
+    rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
     return 0;
 }
 
-int rrddim_unhide(RRDSET *st, const char *id)
-{
+int rrddim_unhide(RRDSET *st, const char *id) {
     debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", st->name, id);
 
     RRDDIM *rd = rrddim_find(st, id);
@@ -979,7 +981,7 @@ int rrddim_unhide(RRDSET *st, const char *id)
         return 1;
     }
 
-    if(rd->flags & RRDDIM_FLAG_HIDDEN) rd->flags ^= RRDDIM_FLAG_HIDDEN;
+    rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
     return 0;
 }
 
@@ -989,7 +991,7 @@ collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number 
 
     now_realtime_timeval(&rd->last_collected_time);
     rd->collected_value = value;
-    rd->updated = 1;
+    rrddim_flag_set(rd, RRDDIM_FLAG_UPDATED);
     rd->counter++;
 
     // fprintf(stderr, "%s.%s %llu " COLLECTED_NUMBER_FORMAT " dt %0.6f" " rate " CALCULATED_NUMBER_FORMAT "\n", st->name, rd->name, st->usec_since_last_update, value, (float)((double)st->usec_since_last_update / (double)1000000), (calculated_number)((value - rd->last_collected_value) * (calculated_number)rd->multiplier / (calculated_number)rd->divisor * 1000000.0 / (calculated_number)st->usec_since_last_update));
@@ -1194,7 +1196,8 @@ usec_t rrdset_done(RRDSET *st)
     int dimensions;
     st->collected_total = 0;
     for( rd = st->dimensions, dimensions = 0 ; rd ; rd = rd->next, dimensions++ )
-        if(likely(rd->updated)) st->collected_total += rd->collected_value;
+        if(likely(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED)))
+            st->collected_total += rd->collected_value;
 
     uint32_t storage_flags = SN_EXISTS;
 
@@ -1203,7 +1206,7 @@ usec_t rrdset_done(RRDSET *st)
     // at this stage we do not interpolate anything
     for( rd = st->dimensions ; rd ; rd = rd->next ) {
 
-        if(unlikely(!rd->updated)) {
+        if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED))) {
             rd->calculated_value = 0;
             continue;
         }
@@ -1221,7 +1224,7 @@ usec_t rrdset_done(RRDSET *st)
             );
 
         switch(rd->algorithm) {
-            case RRDDIM_ABSOLUTE:
+            case RRDDIM_ALGORITHM_ABSOLUTE:
                 rd->calculated_value = (calculated_number)rd->collected_value
                     * (calculated_number)rd->multiplier
                     / (calculated_number)rd->divisor;
@@ -1240,7 +1243,7 @@ usec_t rrdset_done(RRDSET *st)
                         );
                 break;
 
-            case RRDDIM_PCENT_OVER_ROW_TOTAL:
+            case RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL:
                 if(unlikely(!st->collected_total))
                     rd->calculated_value = 0;
                 else
@@ -1263,7 +1266,7 @@ usec_t rrdset_done(RRDSET *st)
                         );
                 break;
 
-            case RRDDIM_INCREMENTAL:
+            case RRDDIM_ALGORITHM_INCREMENTAL:
                 if(unlikely(rd->counter <= 1)) {
                     rd->calculated_value = 0;
                     continue;
@@ -1276,7 +1279,10 @@ usec_t rrdset_done(RRDSET *st)
                             , st->name, rd->name
                             , rd->last_collected_value
                             , rd->collected_value);
-                    if(!(rd->flags & RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)) storage_flags = SN_EXISTS_RESET;
+
+                    if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                        storage_flags = SN_EXISTS_RESET;
+
                     rd->last_collected_value = rd->collected_value;
                 }
 
@@ -1300,7 +1306,7 @@ usec_t rrdset_done(RRDSET *st)
                         );
                 break;
 
-            case RRDDIM_PCENT_OVER_DIFF_TOTAL:
+            case RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
                 if(unlikely(rd->counter <= 1)) {
                     rd->calculated_value = 0;
                     continue;
@@ -1313,7 +1319,10 @@ usec_t rrdset_done(RRDSET *st)
                     , st->name, rd->name
                     , rd->last_collected_value
                     , rd->collected_value);
-                    if(!(rd->flags & RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)) storage_flags = SN_EXISTS_RESET;
+
+                    if(!(rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                        storage_flags = SN_EXISTS_RESET;
+
                     rd->last_collected_value = rd->collected_value;
                 }
 
@@ -1399,7 +1408,7 @@ usec_t rrdset_done(RRDSET *st)
             calculated_number new_value;
 
             switch(rd->algorithm) {
-                case RRDDIM_INCREMENTAL:
+                case RRDDIM_ALGORITHM_INCREMENTAL:
                     new_value = (calculated_number)
                         (      rd->calculated_value
                             * (calculated_number)(next_store_ut - last_collect_ut)
@@ -1434,9 +1443,9 @@ usec_t rrdset_done(RRDSET *st)
                     }
                     break;
 
-                case RRDDIM_ABSOLUTE:
-                case RRDDIM_PCENT_OVER_ROW_TOTAL:
-                case RRDDIM_PCENT_OVER_DIFF_TOTAL:
+                case RRDDIM_ALGORITHM_ABSOLUTE:
+                case RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL:
+                case RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
                 default:
                     if(iterations == 1) {
                         // this is the last iteration
@@ -1478,7 +1487,7 @@ usec_t rrdset_done(RRDSET *st)
                 continue;
             }
 
-            if(likely(rd->updated && rd->counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
+            if(likely(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED) && rd->counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 rd->values[st->current_entry] = pack_storage_number(new_value, storage_flags );
                 rd->last_stored_value = new_value;
 
@@ -1540,13 +1549,14 @@ usec_t rrdset_done(RRDSET *st)
     st->last_collected_total  = st->collected_total;
 
     for( rd = st->dimensions; rd ; rd = rd->next ) {
-        if(unlikely(!rd->updated)) continue;
+        if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED)))
+            continue;
 
         if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", st->id, rd->name, rd->last_collected_value, rd->collected_value);
         rd->last_collected_value = rd->collected_value;
 
         switch(rd->algorithm) {
-            case RRDDIM_INCREMENTAL:
+            case RRDDIM_ALGORITHM_INCREMENTAL:
                 if(unlikely(!first_entry)) {
                     if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", st->id, rd->name, rd->last_calculated_value + rd->calculated_value, rd->calculated_value);
                     rd->last_calculated_value += rd->calculated_value;
@@ -1556,9 +1566,9 @@ usec_t rrdset_done(RRDSET *st)
                 }
                 break;
 
-            case RRDDIM_ABSOLUTE:
-            case RRDDIM_PCENT_OVER_ROW_TOTAL:
-            case RRDDIM_PCENT_OVER_DIFF_TOTAL:
+            case RRDDIM_ALGORITHM_ABSOLUTE:
+            case RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL:
+            case RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
                 if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", st->id, rd->name, rd->last_calculated_value, rd->calculated_value);
                 rd->last_calculated_value = rd->calculated_value;
                 break;
@@ -1566,7 +1576,7 @@ usec_t rrdset_done(RRDSET *st)
 
         rd->calculated_value = 0;
         rd->collected_value = 0;
-        rd->updated = 0;
+        rrddim_flag_clear(rd, RRDDIM_FLAG_UPDATED);
 
         if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: END "
             " last_collected_value = " COLLECTED_NUMBER_FORMAT

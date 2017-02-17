@@ -43,7 +43,7 @@ int do_proc_uptime(int update_every, usec_t dt) {
 
     if(unlikely(!st)) {
         st = rrdset_create("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000, update_every, RRDSET_TYPE_LINE);
-        rrddim_add(st, "uptime", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+        rrddim_add(st, "uptime", NULL, 1, 1000, RRDDIM_ALGORITHM_ABSOLUTE);
     }
     else rrdset_next(st);
 

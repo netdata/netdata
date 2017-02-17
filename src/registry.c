@@ -327,7 +327,7 @@ void registry_statistics(void) {
     if(!sts) {
         sts = rrdset_create("netdata", "registry_sessions", NULL, "registry", NULL, "NetData Registry Sessions", "session", 131000, rrd_update_every, RRDSET_TYPE_LINE);
 
-        rrddim_add(sts, "sessions",  NULL,  1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(sts, "sessions",  NULL,  1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
     }
     else rrdset_next(sts);
 
@@ -340,11 +340,11 @@ void registry_statistics(void) {
     if(!stc) {
         stc = rrdset_create("netdata", "registry_entries", NULL, "registry", NULL, "NetData Registry Entries", "entries", 131100, rrd_update_every, RRDSET_TYPE_LINE);
 
-        rrddim_add(stc, "persons",        NULL,  1, 1, RRDDIM_ABSOLUTE);
-        rrddim_add(stc, "machines",       NULL,  1, 1, RRDDIM_ABSOLUTE);
-        rrddim_add(stc, "urls",           NULL,  1, 1, RRDDIM_ABSOLUTE);
-        rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRDDIM_ABSOLUTE);
-        rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(stc, "persons",        NULL,  1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+        rrddim_add(stc, "machines",       NULL,  1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+        rrddim_add(stc, "urls",           NULL,  1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+        rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+        rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
     }
     else rrdset_next(stc);
 
@@ -361,11 +361,11 @@ void registry_statistics(void) {
     if(!stm) {
         stm = rrdset_create("netdata", "registry_mem", NULL, "registry", NULL, "NetData Registry Memory", "KB", 131300, rrd_update_every, RRDSET_TYPE_STACKED);
 
-        rrddim_add(stm, "persons",        NULL,  1, 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(stm, "machines",       NULL,  1, 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(stm, "urls",           NULL,  1, 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(stm, "persons_urls",   NULL,  1, 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRDDIM_ABSOLUTE);
+        rrddim_add(stm, "persons",        NULL,  1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+        rrddim_add(stm, "machines",       NULL,  1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+        rrddim_add(stm, "urls",           NULL,  1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+        rrddim_add(stm, "persons_urls",   NULL,  1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+        rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
     }
     else rrdset_next(stm);
 

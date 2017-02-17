@@ -194,13 +194,13 @@ int do_ipc(int update_every, usec_t dt) {
         semaphores = rrdset_find("system.ipc_semaphores");
         if(!semaphores) {
             semaphores = rrdset_create("system", "ipc_semaphores", NULL, "ipc semaphores", NULL, "IPC Semaphores", "semaphores", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-            rrddim_add(semaphores, "semaphores", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            rrddim_add(semaphores, "semaphores", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
         }
 
         arrays = rrdset_find("system.ipc_semaphore_arrays");
         if(!arrays) {
             arrays = rrdset_create("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-            rrddim_add(arrays, "arrays", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            rrddim_add(arrays, "arrays", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
         }
     }
 

@@ -121,7 +121,7 @@ void *proc_main(void *ptr) {
                         struct proc_module *pm = &proc_modules[i];
                         if(unlikely(!pm->enabled)) continue;
 
-                        pm->rd = rrddim_add(st, pm->dim, NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                        pm->rd = rrddim_add(st, pm->dim, NULL, 1, 1000, RRDDIM_ALGORITHM_ABSOLUTE);
                     }
                 }
             }

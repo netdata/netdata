@@ -234,8 +234,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
 
-                    rrddim_add(st, "InOctets", "received", 8, 1024, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutOctets", "sent", -8, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InOctets", "received", 8, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutOctets", "sent", -8, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -253,9 +253,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "inerrors", NULL, "errors", NULL, "IPv4 Input Errors", "packets/s", 4000, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InNoRoutes", "noroutes", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InTruncatedPkts", "truncated", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", "checksum", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InNoRoutes", "noroutes", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InTruncatedPkts", "truncated", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", "checksum", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -274,8 +274,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "mcast", NULL, "multicast", NULL, "IPv4 Multicast Bandwidth", "kilobits/s", 9000, update_every, RRDSET_TYPE_AREA);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InMcastOctets", "received", 8, 1024, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutMcastOctets", "sent", -8, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InMcastOctets", "received", 8, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutMcastOctets", "sent", -8, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -293,8 +293,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "bcast", NULL, "broadcast", NULL, "IPv4 Broadcast Bandwidth", "kilobits/s", 8000, update_every, RRDSET_TYPE_AREA);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InBcastOctets", "received", 8, 1024, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutBcastOctets", "sent", -8, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InBcastOctets", "received", 8, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutBcastOctets", "sent", -8, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -312,8 +312,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "mcastpkts", NULL, "multicast", NULL, "IPv4 Multicast Packets", "packets/s", 8600, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InMcastPkts", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutMcastPkts", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InMcastPkts", "received", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutMcastPkts", "sent", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -331,8 +331,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "bcastpkts", NULL, "broadcast", NULL, "IPv4 Broadcast Packets", "packets/s", 8500, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InBcastPkts", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutBcastPkts", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InBcastPkts", "received", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutBcastPkts", "sent", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -350,10 +350,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics", "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InECT0Pkts", "ECTP0", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InECT1Pkts", "ECTP1", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InECT0Pkts", "ECTP0", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InECT1Pkts", "ECTP1", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -385,7 +385,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpmemorypressures", NULL, "tcp", NULL, "TCP Memory Pressures", "events/s", 3000, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPMemoryPressures",   "pressures",  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPMemoryPressures",   "pressures",  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -401,12 +401,12 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts", "connections/s", 3010, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnClose",   "userclosed",  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnMemory",  "nomemory",    1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnLinger",  "linger",      1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortFailed",    "failed",     -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnClose",   "userclosed",  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnMemory",  "nomemory",    1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnLinger",  "linger",      1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortFailed",    "failed",     -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -426,10 +426,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpreorders", NULL, "tcp", NULL, "TCP Reordered Packets by Detection Method", "packets/s", 3020, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPTSReorder",   "timestamp",   1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPSACKReorder", "sack",        1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPFACKReorder", "fack",        1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPRenoReorder", "reno",        1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPTSReorder",   "timestamp",   1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPSACKReorder", "sack",        1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPFACKReorder", "fack",        1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPRenoReorder", "reno",        1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -448,10 +448,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpofo", NULL, "tcp", NULL, "TCP Out-Of-Order Queue", "packets/s", 3050, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPOFODrop",  "dropped", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPOFOMerge", "merged",   1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OfoPruned",   "pruned",  -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPOFODrop",  "dropped", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPOFOMerge", "merged",   1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OfoPruned",   "pruned",  -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -470,9 +470,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpsyncookies", NULL, "tcp", NULL, "TCP SYN Cookies", "packets/s", 3100, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 

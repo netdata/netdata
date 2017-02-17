@@ -218,9 +218,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 st = rrdset_find_bytype("system", "load");
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE);
-                    rrddim_add(st, "load1", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "load5", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "load15", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "load1", NULL, 1, 1000, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "load5", NULL, 1, 1000, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "load15", NULL, 1, 1000, RRDDIM_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -247,8 +247,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 st = rrdset_create("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
                 st->isdetail = 1;
 
-                rrddim_add(st, "free",    NULL, 1, 1048576, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "used",    NULL, 1, 1048576, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "free",    NULL, 1, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
+                rrddim_add(st, "used",    NULL, 1, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(st);
 
@@ -295,8 +295,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
 
-                    rrddim_add(st, "InOctets", "received", 8, 1024, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutOctets", "sent", -8, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InOctets", "received", 8, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutOctets", "sent", -8, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -334,8 +334,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        "packets/s",
                                        2600, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InSegs", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutSegs", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InSegs", "received", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutSegs", "sent", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -354,9 +354,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        2700, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InErrs", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "RetransSegs", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrs", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "RetransSegs", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -376,10 +376,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        "events/s", 2900, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "EstabResets", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ActiveOpens", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "PassiveOpens", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "AttemptFails", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "EstabResets", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ActiveOpens", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "PassiveOpens", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "AttemptFails", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -398,10 +398,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts", "connections/s", 3010, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnClose",   "userclosed",  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnMemory",  "nomemory",    1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnClose",   "userclosed",  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnMemory",  "nomemory",    1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -420,7 +420,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpofo", NULL, "tcp", NULL, "TCP Out-Of-Order Queue", "packets/s", 3050, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -437,9 +437,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv4", "tcpsyncookies", NULL, "tcp", NULL, "TCP SYN Cookies", "packets/s", 3100, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -458,8 +458,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics", "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -487,8 +487,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "udppackets", NULL, "udp", NULL, "IPv4 UDP Packets",
                                        "packets/s", 2601, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InDatagrams", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDatagrams", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDatagrams", "received", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDatagrams", "sent", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -506,11 +506,11 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        2701, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "NoPorts", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "NoPorts", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -549,8 +549,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        2602,
                                        update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InMsgs", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutMsgs", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InMsgs", "received", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutMsgs", "sent", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -567,9 +567,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        "packets/s",
                                        2603, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -588,10 +588,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages",
                                        "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InEchoReps", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InEchos", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InEchoReps", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InEchos", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -625,10 +625,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("ipv4", "packets", NULL, "packets", NULL, "IPv4 Packets", "packets/s",
                                        3000, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InReceives", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutRequests", "sent", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InDelivers", "delivered", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InReceives", "received", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutRequests", "sent", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InDelivers", "delivered", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -648,9 +648,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "FragOKs", "ok", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "FragFails", "failed", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "FragCreates", "created", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "FragOKs", "ok", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "FragFails", "failed", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "FragCreates", "created", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -670,9 +670,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "ReasmOKs", "ok", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ReasmFails", "failed", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ReasmReqds", "all", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ReasmOKs", "ok", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ReasmFails", "failed", -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ReasmReqds", "all", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -692,14 +692,14 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InUnknownProtos", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InUnknownProtos", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -736,10 +736,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("ipv6", "packets", NULL, "packets", NULL, "IPv6 Packets", "packets/s", 3000,
                                        update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "forwarded", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "delivers", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "forwarded", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "delivers", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -762,9 +762,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "failed", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "all", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "failed", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "all", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -786,10 +786,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "failed", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "timeout", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "all", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "failed", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "timeout", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "all", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -819,15 +819,15 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                                        update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InTruncatedPkts", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InNoRoutes", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InTruncatedPkts", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InNoRoutes", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -865,8 +865,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("ipv6", "icmp", NULL, "icmp", NULL, "IPv6 ICMP Messages",
                                        "messages/s", 10000, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -884,8 +884,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("ipv6", "icmpredir", NULL, "icmp", NULL, "IPv6 ICMP Redirects",
                                        "redirects/s", 10050, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -913,17 +913,17 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmperrors", NULL, "icmp", NULL, "IPv6 ICMP Errors", "errors/s", 10100, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InDestUnreachs", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InPktTooBigs", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InTimeExcds", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InParmProblems", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutTimeExcds", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InDestUnreachs", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InPktTooBigs", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InTimeExcds", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InParmProblems", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutTimeExcds", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -952,10 +952,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmpechos", NULL, "icmp", NULL, "IPv6 ICMP Echo", "messages/s", 10200, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InEchos", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InEchoReplies", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutEchoReplies", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InEchos", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InEchoReplies", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutEchoReplies", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -978,10 +978,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmprouter", NULL, "icmp", NULL, "IPv6 Router Messages", "messages/s", 10400, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InSolicits", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutSolicits", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InSolicits", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutSolicits", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1004,10 +1004,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("ipv6", "icmpneighbor", NULL, "icmp", NULL, "IPv6 Neighbor Messages", "messages/s", 10500, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InSolicits", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutSolicits", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InSolicits", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutSolicits", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1037,16 +1037,16 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     st = rrdset_create("ipv6", "icmptypes", NULL, "icmp", NULL, "IPv6 ICMP Types",
                                        "messages/s", 10700, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InType1", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InType128", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InType129", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InType136", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType1", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType128", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType129", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType133", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType135", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType143", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InType1", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InType128", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InType129", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InType136", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType1", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType128", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType129", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType133", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType135", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType143", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1077,7 +1077,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             if(unlikely(!st)) {
                 st = rrdset_create("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000, update_every, RRDSET_TYPE_LINE);
-                rrddim_add(st, "uptime", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "uptime", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(st);
 

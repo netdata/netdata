@@ -17,17 +17,17 @@ void *checks_main(void *ptr) {
     RRDSET *check1, *check2, *check3, *apps_cpu = NULL;
 
     check1 = rrdset_create("netdata", "check1", NULL, "netdata", NULL, "Caller gives microseconds", "a million !", 99999, rrd_update_every, RRDSET_TYPE_LINE);
-    rrddim_add(check1, "absolute", NULL, -1, 1, RRDDIM_ABSOLUTE);
-    rrddim_add(check1, "incremental", NULL, 1, 1, RRDDIM_INCREMENTAL);
+    rrddim_add(check1, "absolute", NULL, -1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+    rrddim_add(check1, "incremental", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
 
     check2 = rrdset_create("netdata", "check2", NULL, "netdata", NULL, "Netdata calcs microseconds", "a million !", 99999, rrd_update_every, RRDSET_TYPE_LINE);
-    rrddim_add(check2, "absolute", NULL, -1, 1, RRDDIM_ABSOLUTE);
-    rrddim_add(check2, "incremental", NULL, 1, 1, RRDDIM_INCREMENTAL);
+    rrddim_add(check2, "absolute", NULL, -1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+    rrddim_add(check2, "incremental", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
 
     check3 = rrdset_create("netdata", "checkdt", NULL, "netdata", NULL, "Clock difference", "microseconds diff", 99999, rrd_update_every, RRDSET_TYPE_LINE);
-    rrddim_add(check3, "caller", NULL, 1, 1, RRDDIM_ABSOLUTE);
-    rrddim_add(check3, "netdata", NULL, 1, 1, RRDDIM_ABSOLUTE);
-    rrddim_add(check3, "apps.plugin", NULL, 1, 1, RRDDIM_ABSOLUTE);
+    rrddim_add(check3, "caller", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+    rrddim_add(check3, "netdata", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+    rrddim_add(check3, "apps.plugin", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
 
     now_realtime_timeval(&last);
     while(1) {
