@@ -139,7 +139,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
             for(m = mc_root; m; m = m->next)
                 if(m->ce_count_filename)
-                    m->ce_rd = rrddim_add(ce_st, m->name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    m->ce_rd = rrddim_add(ce_st, m->name, NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
         }
         else
             rrdset_next(ce_st);
@@ -167,7 +167,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
             for(m = mc_root; m; m = m->next)
                 if(m->ue_count_filename)
-                    m->ue_rd = rrddim_add(ue_st, m->name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    m->ue_rd = rrddim_add(ue_st, m->name, NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
         }
         else
             rrdset_next(ue_st);

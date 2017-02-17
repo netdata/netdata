@@ -52,10 +52,10 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "cpu", NULL, "cpu", "system.cpu", "Total CPU utilization", "percentage", 100, update_every, RRDSET_TYPE_STACKED);
 
-                    rrddim_add(st, "user", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "nice", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "system", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "idle", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "user", NULL, 1, 1, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "nice", NULL, 1, 1, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "system", NULL, 1, 1, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "idle", NULL, 1, 1, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_hide(st, "idle");
                 }
                 else rrdset_next(st);
@@ -88,14 +88,14 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
 
-                    rrddim_add(st, "active",    NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "wired",     NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "throttled", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "compressor", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "inactive",  NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "purgeable", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "speculative", NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "free",      NULL, system_pagesize, 1048576, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "active",    NULL, system_pagesize, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "wired",     NULL, system_pagesize, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "throttled", NULL, system_pagesize, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "compressor", NULL, system_pagesize, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "inactive",  NULL, system_pagesize, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "purgeable", NULL, system_pagesize, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "speculative", NULL, system_pagesize, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "free",      NULL, system_pagesize, 1048576, RRDDIM_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -117,8 +117,8 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
 
-                    rrddim_add(st, "in",  NULL, system_pagesize, 1024, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "out", NULL, -system_pagesize, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "in",  NULL, system_pagesize, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "out", NULL, -system_pagesize, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -135,15 +135,15 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                     st = rrdset_create("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "memory",    NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "cow",       NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "pagein",    NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "pageout",   NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "compress",  NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "decompress", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "zero_fill", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "reactivate", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "purge",     NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "memory",    NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "cow",       NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "pagein",    NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "pageout",   NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "compress",  NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "decompress", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "zero_fill", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "reactivate", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "purge",     NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 

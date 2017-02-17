@@ -44,7 +44,7 @@ void rrd_stats_api_v1_chart_with_data(RRDSET *st, BUFFER *wb, size_t *dimensions
     size_t dimensions = 0;
     RRDDIM *rd;
     for(rd = st->dimensions; rd ; rd = rd->next) {
-        if(rd->flags & RRDDIM_FLAG_HIDDEN) continue;
+        if(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) continue;
 
         memory += rd->memsize;
 
@@ -176,8 +176,8 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
                     // buffer_sprintf(wb, "# HELP %s.%s %s\n", st->id, rd->id, st->units);
 
                     switch(rd->algorithm) {
-                        case RRDDIM_INCREMENTAL:
-                        case RRDDIM_PCENT_OVER_DIFF_TOTAL:
+                        case RRDDIM_ALGORITHM_INCREMENTAL:
+                        case RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
                             buffer_sprintf(wb, "# TYPE %s_%s counter\n", chart, dimension);
                             break;
 
@@ -256,7 +256,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
                     else {
                         if(rd->multiplier < 0 || rd->divisor < 0) n = -n;
                         n = roundl(n);
-                        if(!(rd->flags & RRDDIM_FLAG_HIDDEN)) total += n;
+                        if(!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) total += n;
                         buffer_sprintf(wb, "NETDATA_%s_%s=\"%0.0Lf\"      # %s\n", chart, dimension, n, st->units);
                     }
                 }
@@ -366,8 +366,8 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
             "\t\t\t\t\t\"entries\": %ld,\n"
             "\t\t\t\t\t\"isHidden\": %d,\n"
             "\t\t\t\t\t\"algorithm\": \"%s\",\n"
-            "\t\t\t\t\t\"multiplier\": %ld,\n"
-            "\t\t\t\t\t\"divisor\": %ld,\n"
+            "\t\t\t\t\t\"multiplier\": " COLLECTED_NUMBER_FORMAT ",\n"
+            "\t\t\t\t\t\"divisor\": " COLLECTED_NUMBER_FORMAT ",\n"
             "\t\t\t\t\t\"last_entry_t\": %ld,\n"
             "\t\t\t\t\t\"collected_value\": " COLLECTED_NUMBER_FORMAT ",\n"
             "\t\t\t\t\t\"calculated_value\": " CALCULATED_NUMBER_FORMAT ",\n"
@@ -378,7 +378,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
             , rd->id
             , rd->name
             , rd->entries
-            , (rd->flags & RRDDIM_FLAG_HIDDEN)?1:0
+            , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?1:0
             , rrddim_algorithm_name(rd->algorithm)
             , rd->multiplier
             , rd->divisor
@@ -546,8 +546,7 @@ static void rrdr_dump(RRDR *r)
 }
 */
 
-void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char *dims)
-{
+void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char *dims) {
     if(unlikely(!dims || !*dims)) return;
 
     char b[strlen(dims) + 1];
@@ -568,7 +567,7 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char 
 
         // find it and enable it
         for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
-            if(unlikely((hash == d->hash && !strcmp(d->id, tok)) || !strcmp(d->name, tok))) {
+            if(unlikely((hash == d->hash && !strcmp(d->id, tok)) || (hash == d->hash_name && !strcmp(d->name, tok)))) {
 
                 if(likely(r->od[c] & RRDR_HIDDEN)) {
                     r->od[c] |= RRDR_SELECTED;
@@ -1412,8 +1411,10 @@ static RRDR *rrdr_create(RRDSET *st, long n)
     // set the hidden flag on hidden dimensions
     int c;
     for(c = 0, rd = st->dimensions ; rd ; c++, rd = rd->next) {
-        if(unlikely(rd->flags & RRDDIM_FLAG_HIDDEN)) r->od[c] = RRDR_HIDDEN;
-        else r->od[c] = 0;
+        if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)))
+            r->od[c] = RRDR_HIDDEN;
+        else
+            r->od[c] = 0;
     }
 
     r->c = -1;
@@ -2092,7 +2093,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
     // initialize them
     for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
         group_values[c] = 0;
-        print_hidden[c] = (rd->flags & RRDDIM_FLAG_HIDDEN)?1:0;
+        print_hidden[c] = rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?1:0;
         found_non_zero[c] = 0;
         found_non_existing[c] = 0;
     }

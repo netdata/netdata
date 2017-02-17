@@ -9,14 +9,10 @@ extern int rrd_update_every;
 #define RRD_HISTORY_ENTRIES_MAX (86400*10)
 extern int rrd_default_history_entries;
 
-// time in seconds to delete unupdated dimensions
-// set to zero to disable this feature
-extern int rrd_delete_unupdated_dimensions;
+#define RRD_ID_LENGTH_MAX 200
 
-#define RRD_ID_LENGTH_MAX 400
-
-#define RRDSET_MAGIC        "NETDATA RRD SET FILE V018"
-#define RRDDIMENSION_MAGIC  "NETDATA RRD DIMENSION FILE V018"
+#define RRDSET_MAGIC        "NETDATA RRD SET FILE V019"
+#define RRDDIMENSION_MAGIC  "NETDATA RRD DIMENSION FILE V019"
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
@@ -24,59 +20,73 @@ typedef long long total_number;
 // ----------------------------------------------------------------------------
 // chart types
 
+typedef enum rrdset_type {
+    RRDSET_TYPE_LINE    = 0,
+    RRDSET_TYPE_AREA    = 1,
+    RRDSET_TYPE_STACKED = 2
+} RRDSET_TYPE;
+
 #define RRDSET_TYPE_LINE_NAME "line"
 #define RRDSET_TYPE_AREA_NAME "area"
 #define RRDSET_TYPE_STACKED_NAME "stacked"
 
-#define RRDSET_TYPE_LINE    0
-#define RRDSET_TYPE_AREA    1
-#define RRDSET_TYPE_STACKED 2
-
-int rrdset_type_id(const char *name);
-const char *rrdset_type_name(int chart_type);
+RRDSET_TYPE rrdset_type_id(const char *name);
+const char *rrdset_type_name(RRDSET_TYPE chart_type);
 
 
 // ----------------------------------------------------------------------------
 // memory mode
 
+typedef enum rrd_memory_mode {
+    RRD_MEMORY_MODE_RAM  = 0,
+    RRD_MEMORY_MODE_MAP  = 1,
+    RRD_MEMORY_MODE_SAVE = 2
+} RRD_MEMORY_MODE;
+
 #define RRD_MEMORY_MODE_RAM_NAME "ram"
 #define RRD_MEMORY_MODE_MAP_NAME "map"
 #define RRD_MEMORY_MODE_SAVE_NAME "save"
 
-#define RRD_MEMORY_MODE_RAM 0
-#define RRD_MEMORY_MODE_MAP 1
-#define RRD_MEMORY_MODE_SAVE 2
+RRD_MEMORY_MODE rrd_memory_mode;
 
-extern int rrd_memory_mode;
-
-extern const char *rrd_memory_mode_name(int id);
+extern const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
 extern int rrd_memory_mode_id(const char *name);
 
 
 // ----------------------------------------------------------------------------
 // algorithms types
 
-#define RRDDIM_ABSOLUTE_NAME                "absolute"
-#define RRDDIM_INCREMENTAL_NAME             "incremental"
-#define RRDDIM_PCENT_OVER_DIFF_TOTAL_NAME   "percentage-of-incremental-row"
-#define RRDDIM_PCENT_OVER_ROW_TOTAL_NAME    "percentage-of-absolute-row"
+typedef enum rrddim_algorithm {
+    RRDDIM_ALGORITHM_ABSOLUTE              = 0,
+    RRDDIM_ALGORITHM_INCREMENTAL           = 1,
+    RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL = 2,
+    RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL  = 3
+} RRDDIM_ALGORITHM;
 
-#define RRDDIM_ABSOLUTE                 0
-#define RRDDIM_INCREMENTAL              1
-#define RRDDIM_PCENT_OVER_DIFF_TOTAL    2
-#define RRDDIM_PCENT_OVER_ROW_TOTAL     3
+#define RRDDIM_ALGORITHM_ABSOLUTE_NAME                "absolute"
+#define RRDDIM_ALGORITHM_INCREMENTAL_NAME             "incremental"
+#define RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME   "percentage-of-incremental-row"
+#define RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME    "percentage-of-absolute-row"
 
-extern int rrddim_algorithm_id(const char *name);
-extern const char *rrddim_algorithm_name(int chart_type);
+extern RRDDIM_ALGORITHM rrddim_algorithm_id(const char *name);
+extern const char *rrddim_algorithm_name(RRDDIM_ALGORITHM algorithm);
 
 // ----------------------------------------------------------------------------
 // flags
 
-#define RRDDIM_FLAG_HIDDEN 0x00000001 // this dimension will not be offered to callers
-#define RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS 0x00000002 // do not offer RESET or OVERFLOW info to callers
+typedef enum rrddim_flags {
+    RRDDIM_FLAG_HIDDEN                          = 1 << 0,  // this dimension will not be offered to callers
+    RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = 1 << 1,  // do not offer RESET or OVERFLOW info to callers
+    RRDDIM_FLAG_UPDATED                         = 1 << 31  // the dimension has been updated since the last processing
+} RRDDIM_FLAGS;
+
+#define rrddim_flag_check(rd, flag) ((rd)->flags & flag)
+#define rrddim_flag_set(rd, flag)   (rd)->flags |= flag
+#define rrddim_flag_clear(rd, flag) (rd)->flags &= ~flag
+
 
 // ----------------------------------------------------------------------------
-// RRD CONTEXT
+// RRD FAMILY
 
 struct rrdfamily {
     avl avl;
@@ -90,8 +100,9 @@ struct rrdfamily {
 };
 typedef struct rrdfamily RRDFAMILY;
 
+
 // ----------------------------------------------------------------------------
-// RRD DIMENSION
+// RRD DIMENSION - this is a metric
 
 struct rrddim {
     // ------------------------------------------------------------------------
@@ -102,18 +113,20 @@ struct rrddim {
     // ------------------------------------------------------------------------
     // the dimension definition
 
-    char id[RRD_ID_LENGTH_MAX + 1];                 // the id of this dimension (for internal identification)
-
+    const char *id;                                 // the id of this dimension (for internal identification)
     const char *name;                               // the name of this dimension (as presented to user)
                                                     // this is a pointer to the config structure
                                                     // since the config always has a higher priority
                                                     // (the user overwrites the name of the charts)
+                                                    // DO NOT FREE THIS - IT IS ALLOCATED IN CONFIG
 
-    int algorithm;                                  // the algorithm that is applied to add new collected values
-    long multiplier;                                // the multiplier of the collected values
-    long divisor;                                   // the divider of the collected values
+    RRDDIM_ALGORITHM algorithm;                     // the algorithm that is applied to add new collected values
+    RRD_MEMORY_MODE memory_mode;                    // the memory mode for this dimension
 
-    int mapped;                                     // if set to non zero, this dimension is mapped to a file
+    collected_number multiplier;                    // the multiplier of the collected values
+    collected_number divisor;                       // the divider of the collected values
+
+    uint32_t flags;                                 // options and status options for the dimension
 
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
@@ -122,18 +135,11 @@ struct rrddim {
                                                     // instead of strcmp() every item in the binary index
                                                     // we first compare the hashes
 
-    // FIXME
-    // we need the hash_name too!
-    // needed at rrdr_disable_not_selected_dimensions()
+    uint32_t hash_name;                             // a simple hash of the name
 
-    uint32_t flags;
+    char *cache_filename;                           // the filename we load/save from/to this set
 
-    char cache_filename[FILENAME_MAX+1];            // the filename we load/save from/to this set
-
-    unsigned long counter;                          // the number of times we added values to this rrdim
-
-    int updated;                                    // set to 0 after each calculation, to 1 after each collected value
-                                                    // we use this to detect that a dimension is not updated
+    size_t counter;                                 // the number of times we added values to this rrdim
 
     struct timeval last_collected_time;             // when was this dimension last updated
                                                     // this is actual date time we updated the last_collected_value
@@ -164,7 +170,7 @@ struct rrddim {
 
     int update_every;                               // every how many seconds is this updated
 
-    unsigned long memsize;                          // the memory allocated for this dimension
+    size_t memsize;                                 // the memory allocated for this dimension
 
     char magic[sizeof(RRDDIMENSION_MAGIC) + 1];     // a string to be saved, used to identify our data file
 
@@ -179,7 +185,7 @@ typedef struct rrddim RRDDIM;
 
 
 // ----------------------------------------------------------------------------
-// RRDSET
+// RRDSET - this is a chart
 
 struct rrdset {
     // ------------------------------------------------------------------------
@@ -206,7 +212,7 @@ struct rrdset {
     char *context;                                  // the template of this data set
     uint32_t hash_context;
 
-    int chart_type;
+    RRDSET_TYPE chart_type;
 
     int update_every;                               // every how many seconds is this updated?
 
@@ -398,7 +404,7 @@ extern usec_t rrdset_done(RRDSET *st);
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
 
-extern RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, long multiplier, long divisor, int algorithm);
+extern RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRDDIM_ALGORITHM algorithm);
 
 extern void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
 extern void rrddim_free(RRDSET *st, RRDDIM *rd);

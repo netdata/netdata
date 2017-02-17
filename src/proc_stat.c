@@ -98,17 +98,17 @@ int do_proc_stat(int update_every, usec_t dt) {
                     long multiplier = 1;
                     long divisor = 1; // sysconf(_SC_CLK_TCK);
 
-                    rrddim_add(st, "guest_nice", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "guest", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "steal", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "softirq", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "irq", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "user", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "system", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "nice", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "iowait", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "guest_nice", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "guest", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "steal", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "softirq", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "irq", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "user", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "system", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "nice", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "iowait", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
 
-                    rrddim_add(st, "idle", NULL, multiplier, divisor, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "idle", NULL, multiplier, divisor, RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_hide(st, "idle");
                 }
                 else rrdset_next(st);
@@ -137,7 +137,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                     st = rrdset_create("system", "intr", NULL, "interrupts", NULL, "CPU Interrupts", "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "interrupts", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "interrupts", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -155,7 +155,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create("system", "ctxt", NULL, "processes", NULL, "CPU Context Switches", "context switches/s", 800, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "switches", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "switches", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -182,7 +182,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             st = rrdset_create("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s", 700, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
-            rrddim_add(st, "started", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "started", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -197,8 +197,8 @@ int do_proc_stat(int update_every, usec_t dt) {
         if(unlikely(!st)) {
             st = rrdset_create("system", "processes", NULL, "processes", NULL, "System Processes", "processes", 600, update_every, RRDSET_TYPE_LINE);
 
-            rrddim_add(st, "running", NULL, 1, 1, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "blocked", NULL, -1, 1, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "running", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "blocked", NULL, -1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
