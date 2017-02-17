@@ -20,9 +20,10 @@ retries = 60
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['search_perf_total', 'search_perf_time', 'search_latency', 'index_perf_total', 'index_perf_time',
          'index_latency', 'jvm_mem_heap', 'jvm_gc_count', 'jvm_gc_time', 'host_metrics_file_descriptors',
-         'host_metrics_http', 'host_metrics_transport', 'thread_pool_qr', 'fdata_cache', 'fdata_ev_tr',
-         'cluster_health_status', 'cluster_health_nodes', 'cluster_health_shards', 'cluster_stats_nodes',
-         'cluster_stats_query_cache', 'cluster_stats_docs', 'cluster_stats_store', 'cluster_stats_indices_shards']
+         'host_metrics_http', 'host_metrics_transport', 'thread_pool_qr_q', 'thread_pool_qr_r', 'fdata_cache',
+         'fdata_ev_tr', 'cluster_health_status', 'cluster_health_nodes', 'cluster_health_shards',
+         'cluster_stats_nodes', 'cluster_stats_query_cache', 'cluster_stats_docs', 'cluster_stats_store',
+         'cluster_stats_indices_shards']
 
 CHARTS = {
     'search_perf_total': {
@@ -88,18 +89,23 @@ CHARTS = {
             ['young_collection_time_in_millis', 'young', 'incremental'],
             ['old_collection_time_in_millis', 'old', 'incremental']
         ]},
-    'thread_pool_qr': {
-        'options': [None, 'Number of queued/rejected threads in thread pool', 'threads', 'queues and rejections',
-                    'es.qr', 'stacked'],
+    'thread_pool_qr_q': {
+        'options': [None, 'Number of queued threads in thread pool', 'queued threads', 'queues and rejections',
+                    'es.qr_queued', 'stacked'],
         'lines': [
-            ['bulk_queue', 'bulk_queue', 'absolute'],
-            ['index_queue', 'index_queue', 'absolute'],
-            ['search_queue', 'search_queue', 'absolute'],
-            ['merge_queue', 'merge_queue', 'absolute'],
-            ['bulk_rejected', 'bulk_rej', 'absolute'],
-            ['index_rejected', 'index_rej', 'absolute'],
-            ['search_rejected', 'search_rej', 'absolute'],
-            ['merge_rejected', 'merge_rej', 'absolute']
+            ['bulk_queue', 'bulk', 'absolute'],
+            ['index_queue', 'index', 'absolute'],
+            ['search_queue', 'search', 'absolute'],
+            ['merge_queue', 'merge', 'absolute']
+        ]},
+    'thread_pool_qr_r': {
+        'options': [None, 'Number of rejected threads in thread pool', 'rejected threads', 'queues and rejections',
+                    'es.qr_rejected', 'stacked'],
+        'lines': [
+            ['bulk_rejected', 'bulk', 'absolute'],
+            ['index_rejected', 'index', 'absolute'],
+            ['search_rejected', 'search', 'absolute'],
+            ['merge_rejected', 'merge', 'absolute']
         ]},
     'fdata_cache': {
         'options': [None, 'Fielddata cache size', 'MB', 'fielddata cache', 'es.fdata_cache', 'line'],
