@@ -300,7 +300,7 @@ class Service(UrlService):
         if not data:
             queue.put({})
         else:
-            data = data.json()
+            data = data.json() if '__call__' in dir(data.json) else data.json
 
             to_netdata = dict()
             to_netdata.update(update_key('health', data))
@@ -321,7 +321,7 @@ class Service(UrlService):
         if not data:
             queue.put({})
         else:
-            data = data.json()
+            data = data.json() if '__call__' in dir(data.json) else data.json
 
             to_netdata = dict()
             to_netdata.update(update_key('count', data['nodes']['count']))
@@ -344,7 +344,8 @@ class Service(UrlService):
         if not data:
             queue.put({})
         else:
-            data = data.json()
+            data = data.json() if '__call__' in dir(data.json) else data.json
+
             node = list(data['nodes'].keys())[0]
             to_netdata = dict()
             # Search performance metrics
