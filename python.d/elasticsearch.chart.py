@@ -26,7 +26,7 @@ ORDER = ['search_perf_total', 'search_perf_time', 'search_latency', 'index_perf_
 
 CHARTS = {
     'search_perf_total': {
-        'options': [None, 'Number of queries, fetches', 'queries', 'Search performance', 'es.search_query', 'stacked'],
+        'options': [None, 'Number of queries, fetches', 'queries', 'search performance', 'es.search_query', 'stacked'],
         'lines': [
             ['query_total', 'search_total', 'incremental'],
             ['fetch_total', 'fetch_total', 'incremental'],
@@ -34,20 +34,20 @@ CHARTS = {
             ['fetch_current', 'fetch_current', 'absolute']
         ]},
     'search_perf_time': {
-        'options': [None, 'Time spent on queries, fetches', 'seconds', 'Search performance', 'es.search_time', 'stacked'],
+        'options': [None, 'Time spent on queries, fetches', 'seconds', 'search performance', 'es.search_time', 'stacked'],
         'lines': [
             ['query_time_in_millis', 'query', 'incremental', 1, 1000],
             ['fetch_time_in_millis', 'fetch', 'incremental', 1, 1000]
         ]},
     'search_latency': {
-        'options': [None, 'Query and fetch latency', 'ms', 'Search performance', 'es.search_latency', 'stacked'],
+        'options': [None, 'Query and fetch latency', 'ms', 'search performance', 'es.search_latency', 'stacked'],
         'lines': [
             ['query_latency', 'query', 'absolute', 1, 1000],
             ['fetch_latency', 'fetch', 'absolute', 1, 1000]
         ]},
     'index_perf_total': {
         'options': [None, 'Number of documents indexed, index refreshes, flushes', 'documents/indexes',
-                    'Indexing performance', 'es.index_doc', 'stacked'],
+                    'indexing performance', 'es.index_doc', 'stacked'],
         'lines': [
             ['indexing_index_total', 'indexed', 'incremental'],
             ['refresh_total', 'refreshes', 'incremental'],
@@ -55,7 +55,7 @@ CHARTS = {
             ['indexing_index_current', 'indexed_current', 'absolute'],
         ]},
     'index_perf_time': {
-        'options': [None, 'Time spent on indexing, refreshing, flushing', 'seconds', 'Indexing performance',
+        'options': [None, 'Time spent on indexing, refreshing, flushing', 'seconds', 'indexing performance',
                     'es.search_time', 'stacked'],
         'lines': [
             ['indexing_index_time_in_millis', 'indexing', 'incremental', 1, 1000],
@@ -63,33 +63,33 @@ CHARTS = {
             ['flush_total_time_in_millis', 'flushing', 'incremental', 1, 1000]
         ]},
     'index_latency': {
-        'options': [None, 'Indexing and flushing latency', 'ms', 'Indexing performance',
+        'options': [None, 'Indexing and flushing latency', 'ms', 'indexing performance',
                     'es.index_latency', 'stacked'],
         'lines': [
             ['indexing_latency', 'indexing', 'absolute', 1, 1000],
             ['flushing_latency', 'flushing', 'absolute', 1, 1000]
         ]},
     'jvm_mem_heap': {
-        'options': [None, 'JVM heap currently in use/committed', 'percent/MB', 'Memory usage and gc',
+        'options': [None, 'JVM heap currently in use/committed', 'percent/MB', 'memory usage and gc',
                     'es.jvm_heap', 'area'],
         'lines': [
             ['jvm_heap_percent', 'inuse', 'absolute'],
             ['jvm_heap_commit', 'commit', 'absolute', -1, 1048576]
         ]},
     'jvm_gc_count': {
-        'options': [None, 'Count of garbage collections', 'counts', 'Memory usage and gc', 'es.gc_count', 'stacked'],
+        'options': [None, 'Count of garbage collections', 'counts', 'memory usage and gc', 'es.gc_count', 'stacked'],
         'lines': [
             ['young_collection_count', 'young', 'incremental'],
             ['old_collection_count', 'old', 'incremental']
         ]},
     'jvm_gc_time': {
-        'options': [None, 'Time spent on garbage collections', 'ms', 'Memory usage and gc', 'es.gc_time', 'stacked'],
+        'options': [None, 'Time spent on garbage collections', 'ms', 'memory usage and gc', 'es.gc_time', 'stacked'],
         'lines': [
             ['young_collection_time_in_millis', 'young', 'incremental'],
             ['old_collection_time_in_millis', 'old', 'incremental']
         ]},
     'thread_pool_qr': {
-        'options': [None, 'Number of queued/rejected threads in thread pool', 'threads', 'Queues and rejections',
+        'options': [None, 'Number of queued/rejected threads in thread pool', 'threads', 'queues and rejections',
                     'es.qr', 'stacked'],
         'lines': [
             ['bulk_queue', 'bulk_queue', 'absolute'],
@@ -102,19 +102,19 @@ CHARTS = {
             ['merge_rejected', 'merge_rej', 'absolute']
         ]},
     'fdata_cache': {
-        'options': [None, 'Fielddata cache size', 'MB', 'Fielddata cache', 'es.fdata_cache', 'line'],
+        'options': [None, 'Fielddata cache size', 'MB', 'fielddata cache', 'es.fdata_cache', 'line'],
         'lines': [
             ['index_fdata_mem', 'mem_size', 'absolute', 1, 1048576]
         ]},
     'fdata_ev_tr': {
         'options': [None, 'Fielddata evictions and circuit breaker tripped count', 'number of events',
-                    'Fielddata cache', 'es.fdata_ev_tr', 'line'],
+                    'fielddata cache', 'es.fdata_ev_tr', 'line'],
         'lines': [
             ['index_fdata_evic', 'evictions', 'incremental'],
             ['breakers_fdata_trip', 'tripped', 'incremental']
         ]},
     'cluster_health_nodes': {
-        'options': [None, 'Nodes and tasks statistics', 'units', 'Cluster health API',
+        'options': [None, 'Nodes and tasks statistics', 'units', 'cluster health API',
                     'es.cluster_health', 'stacked'],
         'lines': [
             ['health_number_of_nodes', 'nodes', 'absolute'],
@@ -123,7 +123,7 @@ CHARTS = {
             ['health_number_of_in_flight_fetch', 'inflight_fetch', 'absolute']
         ]},
     'cluster_health_status': {
-        'options': [None, 'Cluster status', 'status', 'Cluster health API',
+        'options': [None, 'Cluster status', 'status', 'cluster health API',
                     'es.cluster_health_status', 'area'],
         'lines': [
             ['status_green', 'green', 'absolute'],
@@ -134,7 +134,7 @@ CHARTS = {
             ['status_yellow', 'yellow', 'absolute']
         ]},
     'cluster_health_shards': {
-        'options': [None, 'Shards statistics', 'shards', 'Cluster health API',
+        'options': [None, 'Shards statistics', 'shards', 'cluster health API',
                     'es.cluster_health_sharts', 'stacked'],
         'lines': [
             ['health_active_shards', 'active_shards', 'absolute'],
@@ -145,7 +145,7 @@ CHARTS = {
             ['health_active_shards_percent_as_number', 'active_percent', 'absolute']
         ]},
     'cluster_stats_nodes': {
-        'options': [None, 'Nodes statistics', 'nodes', 'Cluster stats API',
+        'options': [None, 'Nodes statistics', 'nodes', 'cluster stats API',
                     'es.cluster_stats_nodes', 'stacked'],
         'lines': [
             ['count_data_only', 'data_only', 'absolute'],
@@ -155,46 +155,46 @@ CHARTS = {
             ['count_client', 'client', 'absolute']
         ]},
     'cluster_stats_query_cache': {
-        'options': [None, 'Query cache statistics', 'queries', 'Cluster stats API',
+        'options': [None, 'Query cache statistics', 'queries', 'cluster stats API',
                     'es.cluster_stats_query_cache', 'stacked'],
         'lines': [
             ['query_cache_hit_count', 'hit', 'incremental'],
             ['query_cache_miss_count', 'miss', 'incremental']
         ]},
     'cluster_stats_docs': {
-        'options': [None, 'Docs statistics', 'count', 'Cluster stats API',
+        'options': [None, 'Docs statistics', 'count', 'cluster stats API',
                     'es.cluster_stats_docs', 'line'],
         'lines': [
             ['docs_count', 'docs', 'absolute']
         ]},
     'cluster_stats_store': {
-        'options': [None, 'Store statistics', 'MB', 'Cluster stats API',
+        'options': [None, 'Store statistics', 'MB', 'cluster stats API',
                     'es.cluster_stats_store', 'line'],
         'lines': [
             ['store_size_in_bytes', 'size', 'absolute', 1, 1048567]
         ]},
     'cluster_stats_indices_shards': {
-        'options': [None, 'Indices and shards statistics', 'count', 'Cluster stats API',
+        'options': [None, 'Indices and shards statistics', 'count', 'cluster stats API',
                     'es.cluster_stats_ind_sha', 'stacked'],
         'lines': [
             ['indices_count', 'indices', 'absolute'],
             ['shards_total', 'shards', 'absolute']
         ]},
     'host_metrics_transport': {
-        'options': [None, 'Cluster communication transport metrics', 'kbit/s', 'Host metrics',
+        'options': [None, 'Cluster communication transport metrics', 'kbit/s', 'host metrics',
                     'es.host_metrics_transport', 'area'],
         'lines': [
             ['transport_rx_size_in_bytes', 'in', 'incremental', 8, 1000],
             ['transport_tx_size_in_bytes', 'out', 'incremental', -8, 1000]
         ]},
     'host_metrics_file_descriptors': {
-        'options': [None, 'Available file descriptors in percent', 'percent', 'Host metrics',
+        'options': [None, 'Available file descriptors in percent', 'percent', 'host metrics',
                     'es.host_metrics_descriptors', 'area'],
         'lines': [
             ['file_descriptors_used', 'used', 'absolute', 1, 10]
         ]},
     'host_metrics_http': {
-        'options': [None, 'Opened HTTP connections', 'connections', 'Host metrics',
+        'options': [None, 'Opened HTTP connections', 'connections', 'host metrics',
                     'es.host_metrics_http', 'line'],
         'lines': [
             ['http_current_open', 'opened', 'absolute', 1, 1]
@@ -399,4 +399,4 @@ class Service(UrlService):
 
 
 def update_key(string, dictionary):
-    return {'_'.join([string, k]): v for k, v in dictionary.items()}
+    return dict([('_'.join([string, elem[0]]), elem[1]) for elem in dictionary.items()])
