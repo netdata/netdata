@@ -297,6 +297,7 @@ struct rrdhost {
     avl avl;
 
     char *hostname;
+    char machine_guid[GUID_LEN + 1];
 
     RRDSET *rrdset_root;
     pthread_rwlock_t rrdset_root_rwlock;
