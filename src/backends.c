@@ -8,9 +8,8 @@ static inline calculated_number backend_calculate_value_from_stored_data(RRDSET 
     time_t first_t = rrdset_first_entry_t(st);
     time_t last_t = rrdset_last_entry_t(st);
 
-    if(unlikely(before - after < st->update_every && after != after - after % st->update_every))
-        // when st->update_every is bigger than the frequency we send data to backend
-        // skip the iterations that are not aligned to the database
+    if(unlikely(before < first_t || after > last_t))
+        // the chart has not been updated in the wanted timeframe
         return NAN;
 
     // align the time-frame
