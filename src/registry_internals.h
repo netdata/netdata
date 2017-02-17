@@ -14,8 +14,6 @@
 struct registry {
     int enabled;
 
-    char machine_guid[GUID_LEN + 1];
-
     // entries counters / statistics
     unsigned long long persons_count;
     unsigned long long machines_count;

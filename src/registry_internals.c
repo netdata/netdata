@@ -275,8 +275,8 @@ static inline int is_machine_guid_blacklisted(const char *guid) {
 }
 
 char *registry_get_this_machine_guid(void) {
-    if(likely(registry.machine_guid[0]))
-        return registry.machine_guid;
+    if(likely(localhost.machine_guid[0]))
+        return localhost.machine_guid;
 
     // read it from disk
     int fd = open(registry.machine_guid_filename, O_RDONLY);
@@ -286,38 +286,38 @@ char *registry_get_this_machine_guid(void) {
             error("Failed to read machine GUID from '%s'", registry.machine_guid_filename);
         else {
             buf[GUID_LEN] = '\0';
-            if(registry_regenerate_guid(buf, registry.machine_guid) == -1) {
+            if(registry_regenerate_guid(buf, localhost.machine_guid) == -1) {
                 error("Failed to validate machine GUID '%s' from '%s'. Ignoring it - this might mean this netdata will appear as duplicate in the registry.",
                         buf, registry.machine_guid_filename);
 
-                registry.machine_guid[0] = '\0';
+                localhost.machine_guid[0] = '\0';
             }
-            else if(is_machine_guid_blacklisted(registry.machine_guid))
-                registry.machine_guid[0] = '\0';
+            else if(is_machine_guid_blacklisted(localhost.machine_guid))
+                localhost.machine_guid[0] = '\0';
         }
         close(fd);
     }
 
     // generate a new one?
-    if(!registry.machine_guid[0]) {
+    if(!localhost.machine_guid[0]) {
         uuid_t uuid;
 
         uuid_generate_time(uuid);
-        uuid_unparse_lower(uuid, registry.machine_guid);
-        registry.machine_guid[GUID_LEN] = '\0';
+        uuid_unparse_lower(uuid, localhost.machine_guid);
+        localhost.machine_guid[GUID_LEN] = '\0';
 
         // save it
         fd = open(registry.machine_guid_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
         if(fd == -1)
             fatal("Cannot create unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
 
-        if(write(fd, registry.machine_guid, GUID_LEN) != GUID_LEN)
+        if(write(fd, localhost.machine_guid, GUID_LEN) != GUID_LEN)
             fatal("Cannot write the unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
 
         close(fd);
     }
 
-    setenv("NETDATA_REGISTRY_UNIQUE_ID", registry.machine_guid, 1);
+    setenv("NETDATA_REGISTRY_UNIQUE_ID", localhost.machine_guid, 1);
 
-    return registry.machine_guid;
+    return localhost.machine_guid;
 }
