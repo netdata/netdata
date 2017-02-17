@@ -87,20 +87,15 @@ class Service(LogService):
         # self._get_data = None  # will be assigned in 'check' method.
         # self.order = None  # will be assigned in 'create_*_method' method.
         # self.definitions = None  # will be assigned in 'create_*_method' method.
-        # self.detailed_chart = None  # will be assigned in 'create_*_method' method.
-        # self.http_method_chart = None  # will be assigned in 'create_*_method' method.
         """
         LogService.__init__(self, configuration=configuration, name=name)
         # Variables from module configuration file
+        self.type = self.configuration.get('type', 'web_access')
         self.log_path = self.configuration.get('path')
-        self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
-        self.all_time = self.configuration.get('all_time', True)
         self.url_pattern = self.configuration.get('categories')  # dict
         self.custom_log_format = self.configuration.get('custom_log_format')  # dict
         # Instance variables
-        self.unique_all_time = list()  # sorted list of unique IPs
         self.regex = None  # will be assigned in 'find_regex' or 'find_regex_custom' method
-        self.resp_time_func = None  # will be assigned in 'find_regex' or 'find_regex_custom' method
         self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0, 'resp_time_max': 0,
                      'resp_time_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
                      '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
@@ -111,13 +106,10 @@ class Service(LogService):
         """
         :return: bool
 
-        We need to make sure:
         1. "log_path" is specified in the module configuration file
         2. "log_path" must be readable by netdata user and must exist
         3. "log_path' must not be empty. We need at least 1 line to find appropriate pattern to parse
-        4. Plugin can work using predefined patterns (OK for nginx, apache default log format) or user defined
-         pattern. So we need to check if we can parse last line from log file with user pattern OR module patterns.
-        5. All patterns for per_url_request_counter feature are valid regex expressions
+        4. other checks depends on log "type"
         """
         if not self.log_path:
             self.error('log path is not specified')
@@ -149,42 +141,45 @@ class Service(LogService):
                 self.error(str(error))
                 return False
 
-        # Custom_log_format or predefined log format.
-        if self.custom_log_format:
-            match_dict, log_name, error = self.find_regex_custom(last_line)
+        if self.type == 'web_access':
+            self.unique_all_time = list()  # sorted list of unique IPs
+            self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
+            self.all_time = self.configuration.get('all_time', True)
+
+            # Custom_log_format or predefined log format.
+            if self.custom_log_format:
+                match_dict, error = self.find_regex_custom(last_line)
+            else:
+                match_dict, error = self.find_regex(last_line)
+
+            # "match_dict" is None if there are any problems
+            if match_dict is None:
+                self.error(str(error))
+                return False
+
+            # self.url_pattern check
+            if self.url_pattern:
+                self.url_pattern = check_req_per_url_pattern('rpu', self.url_pattern)
+
+            self.create_access_charts(match_dict)  # Create charts
+            self._get_data = self._get_access_data  # _get_data assignment
         else:
-            match_dict, log_name, error = self.find_regex(last_line)
-
-        # "match_dict" is None if there are any problems
-        if match_dict is None:
-            self.error(str(error))
+            self.error('Not implemented')
             return False
-
-        # self.url_pattern check
-        if self.url_pattern:
-            self.url_pattern = check_req_per_url_pattern(self.url_pattern)
 
         # Double check
-        if not (self.regex and self.resp_time_func):
-            self.error('That can not happen, but it happened. "regex" or "resp_time_func" is None')
+        if not self.regex:
+            self.error('That can not happen, but it happened. "regex" is None')
 
-        # All is ok. We are about to start.
-        if log_name == 'web_access':
-            self.create_access_charts(match_dict)  # Create charts
-            self._get_data = self._get_access_data
-            self.info('Collected data: %s' % list(match_dict.keys()))
-            return True
-        else:
-            # If it's not access_logs.. Not used at the moment
-            return False
+        self.info('Collected data: %s' % list(match_dict.keys()))
+        return True
 
     def find_regex_custom(self, last_line):
         """
         :param last_line: str: literally last line from log file
         :return: tuple where:
         [0]: dict or None:  match_dict or None
-        [1]: str or None: log_name or None
-        [2]: str: error description
+        [1]: str: error description
 
         We are here only if "custom_log_format" is in logs. We need to make sure:
         1. "custom_log_format" is a dict
@@ -264,16 +259,14 @@ class Service(LogService):
                 self.resp_time_func = lambda time: time * (resp_time_func or 1)
 
             self.regex = regex
-            return find_regex_return(match_dict=match_dict,
-                                     log_name='web_access')
+            return find_regex_return(match_dict=match_dict)
 
     def find_regex(self, last_line):
         """
         :param last_line: str: literally last line from log file
         :return: tuple where:
         [0]: dict or None:  match_dict or None
-        [1]: str or None: log_name or None
-        [2]: str: error description
+        [1]: str: error description
         We need to find appropriate pattern for current log file
         All logic is do a regex search through the string for all predefined patterns
         until we find something or fail.
@@ -342,7 +335,6 @@ class Service(LogService):
                 break
 
         return find_regex_return(match_dict=match_dict or None,
-                                 log_name='web_access',
                                  msg='Unknown log format. You need to use "custom_log_format" feature.')
 
     def create_access_charts(self, match_dict):
@@ -396,12 +388,12 @@ class Service(LogService):
         if self.url_pattern:
             self.definitions['requests_per_url'] = {'options': [None, 'Requests Per Url', 'requests/s',
                                                                 'urls', 'web_log.requests_per_url', 'stacked'],
-                                                    'lines': [['pur_other', 'other', 'incremental']]}
+                                                    'lines': [['rpu_other', 'other', 'incremental']]}
             for elem in self.url_pattern:
                 self.definitions['requests_per_url']['lines'].append([elem.description, elem.description[4:],
                                                                       'incremental'])
                 self.data.update({elem.description: 0})
-            self.data.update({'pur_other': 0})
+            self.data.update({'rpu_other': 0})
         else:
             self.order.remove('requests_per_url')
 
@@ -525,7 +517,7 @@ class Service(LogService):
                 match = True
                 break
         if not match:
-            self.data['pur_other'] += 1
+            self.data['rpu_other'] += 1
 
     def _get_data_statuses(self, code):
         """
@@ -564,18 +556,18 @@ def address_not_in_pool(pool, address, pool_size):
         return True
 
 
-def find_regex_return(match_dict=None, log_name=None, msg='Generic error message'):
+def find_regex_return(match_dict=None, msg='Generic error message'):
     """
     :param match_dict: dict: re.search.groupdict() or None
-    :param log_name: str: log name
     :param msg: str: error description
     :return: tuple:
     """
-    return match_dict, log_name, msg
+    return match_dict, msg
 
 
-def check_req_per_url_pattern(url_pattern):
+def check_req_per_url_pattern(string, url_pattern):
     """
+    :param string: str:
     :param url_pattern: dict: ex. {'dim1': 'pattern1>', 'dim2': '<pattern2>'}
     :return: list of named tuples or None:
      We need to make sure all patterns are valid regular expressions
@@ -603,7 +595,7 @@ def check_req_per_url_pattern(url_pattern):
     for dimension, regex in url_pattern.items():
         valid_pattern = is_valid_pattern(regex)
         if isinstance(dimension, str) and valid_pattern:
-            result.append(NAMED_URL_PATTERN(description='_'.join(['pur', dimension]), pattern=valid_pattern))
+            result.append(NAMED_URL_PATTERN(description='_'.join([string, dimension]), pattern=valid_pattern))
 
     return result or None
 
