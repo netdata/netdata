@@ -885,8 +885,8 @@ send_hipchat() {
                     -H "Authorization: Bearer ${authtoken}" \
                     -d "{\"color\": \"${color}\", \"from\": \"${netdata}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
                     "https://api.hipchat.com/v2/room/${room}/notification")
-
-            if [ "${httpcode}" == "200" ]
+ 
+            if [ "${httpcode}" == "204" ]
             then
                 info "sent HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
                 sent=$((sent + 1))
@@ -1286,12 +1286,10 @@ SENT_PD=$?
 
 send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" "\
 <b>${alarm}</b> ${info_html}<br/>&nbsp;\
-<small><b>${chart}</b><br/>Chart<br/>&nbsp;</small>\
-<small><b>${family}</b><br/>Family<br/>&nbsp;</small>\
-<small><b>${severity}</b><br/>Severity<br/>&nbsp;</small>\
-<small><b>${date}${raised_for_html}</b><br/>Time<br/>&nbsp;</small>\
-<a href=\\\"${goto_url}\\\">View Netdata</a><br/>&nbsp;\
-<small><small>The source of this alarm is line ${src}</small></small>\
+${host} <b>${severity}</b> on chart <b>${chart}</b><br/> (family <b>${family}</b><br/>)\
+Time <b>${date}${raised_for_html}</b><br/>\
+<a href=\\\"${goto_url}\\\">View Netdata</a>\
+(the source of this alarm is line ${src})\
 "
 
 SENT_HIPCHAT=$?
