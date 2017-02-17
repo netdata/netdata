@@ -93,6 +93,37 @@ static inline int format_dimension_stored_opentsdb_telnet(BUFFER *b, const char 
     return 0;
 }
 
+static inline int format_dimension_collected_json_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    (void)host;
+    (void)after;
+    (void)before;
+    (void)options;
+    buffer_sprintf(b, "{"
+        "\"prefix\":\"%s\","
+        "\"hostname\":\"%s\","
+        "\"id\":\"%s\","
+        "\"subid\":\"%s\","
+        "\"value\":" COLLECTED_NUMBER_FORMAT ","
+        "\"timestamp\": %u}\n", prefix, hostname, st->id, rd->id, rd->last_collected_value, (uint32_t)rd->last_collected_time.tv_sec);
+    return 1;
+}
+
+static inline int format_dimension_stored_json_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+    (void)host;
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
+    if(!isnan(value)) {
+        buffer_sprintf(b, "{"
+            "\"prefix\":\"%s\","
+            "\"hostname\":\"%s\","
+            "\"id\":\"%s\","
+            "\"subid\":\"%s\","
+            "\"value\":" CALCULATED_NUMBER_FORMAT ","
+            "\"timestamp\": %u}\n", prefix, hostname, st->id, rd->id, value, (uint32_t) before);
+        return 1;
+    }
+    return 0;
+}
+
 static inline int process_graphite_response(BUFFER *b) {
     char sample[1024];
     const char *s = buffer_tostring(b);
@@ -106,6 +137,23 @@ static inline int process_graphite_response(BUFFER *b) {
     *d = '\0';
 
     info("Received %zu bytes from graphite backend. Ignoring them. Sample: '%s'", buffer_strlen(b), sample);
+    buffer_flush(b);
+    return 0;
+}
+
+static inline int process_json_response(BUFFER *b) {
+    char sample[1024];
+    const char *s = buffer_tostring(b);
+    char *d = sample, *e = &sample[sizeof(sample) - 1];
+
+    for(; *s && d < e ;s++) {
+        char c = *s;
+        if(unlikely(!isprint(c))) c = ' ';
+        *d++ = c;
+    }
+    *d = '\0';
+
+    info("Received %zu bytes from json backend. Ignoring them. Sample: '%s'", buffer_strlen(b), sample);
     buffer_flush(b);
     return 0;
 }
@@ -199,6 +247,21 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_stored_opentsdb_telnet;
 
         backend_response_checker = process_opentsdb_response;
+    }
+    else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext"))
+    {
+        default_port = 5448;
+
+        if (options == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        {
+            backend_request_formatter = format_dimension_collected_json_plaintext;
+        }
+        else
+        {
+            backend_request_formatter = format_dimension_stored_json_plaintext;
+        }
+
+        backend_response_checker = process_json_response;
     }
     else {
         error("Unknown backend type '%s'", type);
