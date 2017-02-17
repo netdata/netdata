@@ -18,21 +18,25 @@ priority = 60000
 retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['search_perf_total', 'search_perf_time', 'search_latency', 'index_perf_total', 'index_perf_time',
-         'index_latency', 'jvm_mem_heap', 'jvm_gc_count', 'jvm_gc_time', 'host_metrics_file_descriptors',
-         'host_metrics_http', 'host_metrics_transport', 'thread_pool_qr_q', 'thread_pool_qr_r', 'fdata_cache',
-         'fdata_ev_tr', 'cluster_health_status', 'cluster_health_nodes', 'cluster_health_shards',
-         'cluster_stats_nodes', 'cluster_stats_query_cache', 'cluster_stats_docs', 'cluster_stats_store',
-         'cluster_stats_indices_shards']
+ORDER = ['search_perf_total', 'search_perf_current', 'search_perf_time', 'search_latency', 'index_perf_total',
+         'index_perf_current', 'index_perf_time', 'index_latency', 'jvm_mem_heap', 'jvm_gc_count',
+         'jvm_gc_time', 'host_metrics_file_descriptors', 'host_metrics_http', 'host_metrics_transport',
+         'thread_pool_qr_q', 'thread_pool_qr_r', 'fdata_cache', 'fdata_ev_tr', 'cluster_health_status',
+         'cluster_health_nodes', 'cluster_health_shards', 'cluster_stats_nodes', 'cluster_stats_query_cache',
+         'cluster_stats_docs', 'cluster_stats_store', 'cluster_stats_indices_shards']
 
 CHARTS = {
     'search_perf_total': {
-        'options': [None, 'Number of queries, fetches', 'queries', 'search performance', 'es.search_query', 'stacked'],
+        'options': [None, 'Total number of queries, fetches', 'number of', 'search performance', 'es.search_query_total', 'stacked'],
         'lines': [
-            ['query_total', 'search_total', 'incremental'],
-            ['fetch_total', 'fetch_total', 'incremental'],
-            ['query_current', 'search_current', 'absolute'],
-            ['fetch_current', 'fetch_current', 'absolute']
+            ['query_total', 'queries', 'incremental'],
+            ['fetch_total', 'fetches', 'incremental']
+        ]},
+    'search_perf_current': {
+        'options': [None, 'Number of queries, fetches in progress', 'number of', 'search performance', 'es.search_query_current', 'stacked'],
+        'lines': [
+            ['query_current', 'queries', 'absolute'],
+            ['fetch_current', 'fetches', 'absolute']
         ]},
     'search_perf_time': {
         'options': [None, 'Time spent on queries, fetches', 'seconds', 'search performance', 'es.search_time', 'stacked'],
@@ -47,13 +51,18 @@ CHARTS = {
             ['fetch_latency', 'fetch', 'absolute', 1, 1000]
         ]},
     'index_perf_total': {
-        'options': [None, 'Number of documents indexed, index refreshes, flushes', 'documents/indexes',
-                    'indexing performance', 'es.index_doc', 'stacked'],
+        'options': [None, 'Total number of documents indexed, index refreshes, index flushes to disk', 'number of',
+                    'indexing performance', 'es.index_performance_total', 'stacked'],
         'lines': [
             ['indexing_index_total', 'indexed', 'incremental'],
             ['refresh_total', 'refreshes', 'incremental'],
-            ['flush_total', 'flushes', 'incremental'],
-            ['indexing_index_current', 'indexed_current', 'absolute'],
+            ['flush_total', 'flushes', 'incremental']
+        ]},
+    'index_perf_current': {
+        'options': [None, 'Number of documents currently being indexed', 'currently indexed',
+                    'indexing performance', 'es.index_performance_current', 'stacked'],
+        'lines': [
+            ['indexing_index_current', 'documents', 'absolute']
         ]},
     'index_perf_time': {
         'options': [None, 'Time spent on indexing, refreshing, flushing', 'seconds', 'indexing performance',
