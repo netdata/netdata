@@ -936,7 +936,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find_localhost("system.ipc_semaphores");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_semaphores", NULL, "ipc semaphores", NULL, "IPC Semaphores", "semaphores", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost("system", "ipc_semaphores", NULL, "ipc semaphores", NULL, "IPC Semaphores", "semaphores", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
                     rrddim_add(st, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
@@ -948,7 +948,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find_localhost("system.ipc_semaphore_arrays");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
                     rrddim_add(st, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
@@ -984,7 +984,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find_localhost("system.ipc_shared_mem_segs");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_shared_mem_segs", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments", "segments", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost("system", "ipc_shared_mem_segs", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments", "segments", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
                     rrddim_add(st, "segments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
@@ -996,7 +996,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find_localhost("system.ipc_shared_mem_size");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_shared_mem_size", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments Size", "kilobytes", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost("system", "ipc_shared_mem_size", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments Size", "kilobytes", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
                     rrddim_add(st, "allocated", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
@@ -1036,7 +1036,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find_localhost("system.ipc_msq_queues");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 990, rrd_update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 990, localhost->rrd_update_every, RRDSET_TYPE_AREA);
                     rrddim_add(st, "queues", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
@@ -1048,7 +1048,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find_localhost("system.ipc_msq_messages");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_msq_messages", NULL, "ipc message queues", NULL, "Number of Messages in IPC Message Queues", "messages", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost("system", "ipc_msq_messages", NULL, "ipc message queues", NULL, "Number of Messages in IPC Message Queues", "messages", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
                     rrddim_add(st, "messages", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
@@ -1060,7 +1060,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 st = rrdset_find_localhost("system.ipc_msq_size");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_msq_size", NULL, "ipc message queues", NULL, "Size of IPC Message Queues", "bytes", 1100, rrd_update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("system", "ipc_msq_size", NULL, "ipc message queues", NULL, "Size of IPC Message Queues", "bytes", 1100, localhost->rrd_update_every, RRDSET_TYPE_LINE);
                     rrddim_add(st, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }

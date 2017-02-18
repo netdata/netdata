@@ -3,11 +3,12 @@
 
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
-extern int rrd_update_every;
 
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
 #define RRD_HISTORY_ENTRIES_MAX (86400*10)
-extern int rrd_default_history_entries;
+
+extern int default_localhost_rrd_update_every;
+extern int default_localhost_rrd_history_entries;
 
 #define RRD_ID_LENGTH_MAX 200
 
@@ -301,6 +302,9 @@ struct rrdhost {
 
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
     uint32_t hash_machine_guid;                     // the hash of the unique ID
+
+    int rrd_update_every;                           // the update frequency of the host
+    int rrd_history_entries;                        // the number of history entries for the host's charts
 
     int health_enabled;                             // 1 when this host has health enabled
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host

@@ -443,7 +443,7 @@ int main(int argc, char **argv) {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
                         if(strcmp(optarg, "unittest") == 0) {
-                            rrd_update_every = 1;
+                            default_localhost_rrd_update_every = 1;
                             if(run_all_mockup_tests()) exit(1);
                             if(unit_test_storage()) exit(1);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
@@ -654,28 +654,28 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
 
-        rrd_default_history_entries = (int) config_get_number("global", "history", RRD_DEFAULT_HISTORY_ENTRIES);
-        if(rrd_default_history_entries < 5 || rrd_default_history_entries > RRD_HISTORY_ENTRIES_MAX) {
-            error("Invalid history entries %d given. Defaulting to %d.", rrd_default_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
-            rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
+        default_localhost_rrd_history_entries = (int) config_get_number("global", "history", RRD_DEFAULT_HISTORY_ENTRIES);
+        if(default_localhost_rrd_history_entries < 5 || default_localhost_rrd_history_entries > RRD_HISTORY_ENTRIES_MAX) {
+            error("Invalid history entries %d given. Defaulting to %d.", default_localhost_rrd_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
+            default_localhost_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
         }
         else {
-            debug(D_OPTIONS, "save lines set to %d.", rrd_default_history_entries);
+            debug(D_OPTIONS, "save lines set to %d.", default_localhost_rrd_history_entries);
         }
 
         // --------------------------------------------------------------------
 
-        rrd_update_every = (int) config_get_number("global", "update every", UPDATE_EVERY);
-        if(rrd_update_every < 1 || rrd_update_every > 600) {
-            error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", rrd_update_every, UPDATE_EVERY_MAX);
-            rrd_update_every = UPDATE_EVERY;
+        default_localhost_rrd_update_every = (int) config_get_number("global", "update every", UPDATE_EVERY);
+        if(default_localhost_rrd_update_every < 1 || default_localhost_rrd_update_every > 600) {
+            error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_localhost_rrd_update_every, UPDATE_EVERY_MAX);
+            default_localhost_rrd_update_every = UPDATE_EVERY;
         }
-        else debug(D_OPTIONS, "update timer set to %d.", rrd_update_every);
+        else debug(D_OPTIONS, "update timer set to %d.", default_localhost_rrd_update_every);
 
         // let the plugins know the min update_every
         {
             char buf[16];
-            snprintfz(buf, 15, "%d", rrd_update_every);
+            snprintfz(buf, 15, "%d", default_localhost_rrd_update_every);
             setenv("NETDATA_UPDATE_EVERY", buf, 1);
         }
 

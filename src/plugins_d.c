@@ -370,8 +370,8 @@ void *pluginsd_worker_thread(void *arg) {
                     // second+ run
                     usec = dt_usec(&now, &last) - susec;
                     error("PLUGINSD: %s last loop took %llu usec (worked for %llu, sleeped for %llu).\n", cd->fullfilename, usec + susec, usec, susec);
-                    if(unlikely(usec < (rrd_update_every * USEC_PER_SEC / 2ULL))) susec = (rrd_update_every * USEC_PER_SEC) - usec;
-                    else susec = rrd_update_every * USEC_PER_SEC / 2ULL;
+                    if(unlikely(usec < (localhost->rrd_update_every * USEC_PER_SEC / 2ULL))) susec = (localhost->rrd_update_every * USEC_PER_SEC) - usec;
+                    else susec = localhost->rrd_update_every * USEC_PER_SEC / 2ULL;
                 }
 
                 error("PLUGINSD: %s sleeping for %llu. Will kill with SIGCONT pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
@@ -526,7 +526,7 @@ void *pluginsd_main(void *ptr) {
                 snprintfz(cd->fullfilename, FILENAME_MAX, "%s/%s", netdata_configured_plugins_dir, cd->filename);
 
                 cd->enabled = enabled;
-                cd->update_every = (int) config_get_number(cd->id, "update every", rrd_update_every);
+                cd->update_every = (int) config_get_number(cd->id, "update every", localhost->rrd_update_every);
                 cd->started_t = now_realtime_sec();
 
                 char *def = "";

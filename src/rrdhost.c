@@ -54,8 +54,10 @@ RRDHOST *rrdhost_create(const char *hostname, const char *guid) {
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
-    host->rrd_memory_mode = default_localhost_rrd_memory_mode;
-    host->health_enabled  = default_localhost_health_enabled;
+    host->rrd_update_every    = default_localhost_rrd_update_every;
+    host->rrd_history_entries = default_localhost_rrd_history_entries;
+    host->rrd_memory_mode     = default_localhost_rrd_memory_mode;
+    host->health_enabled      = default_localhost_health_enabled;
 
     pthread_rwlock_init(&(host->rrdset_root_rwlock), NULL);
 

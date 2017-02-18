@@ -11,23 +11,23 @@ void *checks_main(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    usec_t usec = 0, susec = rrd_update_every * USEC_PER_SEC, loop_usec = 0, total_susec = 0;
+    usec_t usec = 0, susec = localhost->rrd_update_every * USEC_PER_SEC, loop_usec = 0, total_susec = 0;
     struct timeval now, last, loop;
 
     RRDSET *check1, *check2, *check3, *apps_cpu = NULL;
 
     check1 = rrdset_create_localhost("netdata", "check1", NULL, "netdata", NULL, "Caller gives microseconds"
-                                     , "a million !", 99999, rrd_update_every, RRDSET_TYPE_LINE);
+                                     , "a million !", 99999, localhost->rrd_update_every, RRDSET_TYPE_LINE);
     rrddim_add(check1, "absolute", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(check1, "incremental", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     check2 = rrdset_create_localhost("netdata", "check2", NULL, "netdata", NULL, "Netdata calcs microseconds"
-                                     , "a million !", 99999, rrd_update_every, RRDSET_TYPE_LINE);
+                                     , "a million !", 99999, localhost->rrd_update_every, RRDSET_TYPE_LINE);
     rrddim_add(check2, "absolute", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(check2, "incremental", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     check3 = rrdset_create_localhost("netdata", "checkdt", NULL, "netdata", NULL, "Clock difference"
-                                     , "microseconds diff", 99999, rrd_update_every, RRDSET_TYPE_LINE);
+                                     , "microseconds diff", 99999, localhost->rrd_update_every, RRDSET_TYPE_LINE);
     rrddim_add(check3, "caller", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(check3, "netdata", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(check3, "apps.plugin", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -42,8 +42,8 @@ void *checks_main(void *ptr) {
         usec = loop_usec - susec;
         debug(D_PROCNETDEV_LOOP, "CHECK: last loop took %llu usec (worked for %llu, sleeped for %llu).", loop_usec, usec, susec);
 
-        if(usec < (rrd_update_every * USEC_PER_SEC / 2ULL)) susec = (rrd_update_every * USEC_PER_SEC) - usec;
-        else susec = rrd_update_every * USEC_PER_SEC / 2ULL;
+        if(usec < (localhost->rrd_update_every * USEC_PER_SEC / 2ULL)) susec = (localhost->rrd_update_every * USEC_PER_SEC) - usec;
+        else susec = localhost->rrd_update_every * USEC_PER_SEC / 2ULL;
 
         // --------------------------------------------------------------------
         // Calculate loop time
