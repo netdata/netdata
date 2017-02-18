@@ -147,7 +147,8 @@ int do_proc_interrupts(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     st = rrdset_find_bytype_localhost("system", "interrupts");
-    if(unlikely(!st)) st = rrdset_create("system", "interrupts", NULL, "interrupts", NULL, "System interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_STACKED);
+    if(unlikely(!st)) st = rrdset_create_localhost("system", "interrupts", NULL, "interrupts", NULL, "System interrupts"
+                                                   , "interrupts/s", 1000, update_every, RRDSET_TYPE_STACKED);
     else rrdset_next(st);
 
     for(l = 0; l < lines ;l++) {
@@ -185,7 +186,8 @@ int do_proc_interrupts(int update_every, usec_t dt) {
             if(unlikely(!st)) {
                 char title[100+1];
                 snprintfz(title, 100, "CPU%d Interrupts", c);
-                st = rrdset_create("cpu", id, NULL, "interrupts", "cpu.interrupts", title, "interrupts/s", 1100 + c, update_every, RRDSET_TYPE_STACKED);
+                st = rrdset_create_localhost("cpu", id, NULL, "interrupts", "cpu.interrupts", title, "interrupts/s",
+                        1100 + c, update_every, RRDSET_TYPE_STACKED);
             }
             else rrdset_next(st);
 

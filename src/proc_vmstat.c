@@ -92,7 +92,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
         static RRDSET *st_swapio = NULL;
         if(unlikely(!st_swapio)) {
-            st_swapio = rrdset_create("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
+            st_swapio = rrdset_create_localhost("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250
+                                                , update_every, RRDSET_TYPE_AREA);
 
             rrddim_add(st_swapio, "in",  NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st_swapio, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -109,7 +110,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     if(do_io) {
         static RRDSET *st_io = NULL;
         if(unlikely(!st_io)) {
-            st_io = rrdset_create("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150, update_every, RRDSET_TYPE_AREA);
+            st_io = rrdset_create_localhost("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150
+                                            , update_every, RRDSET_TYPE_AREA);
 
             rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -126,7 +128,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     if(do_pgfaults) {
         static RRDSET *st_pgfaults = NULL;
         if(unlikely(!st_pgfaults)) {
-            st_pgfaults = rrdset_create("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
+            st_pgfaults = rrdset_create_localhost("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults"
+                                                  , "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
             st_pgfaults->isdetail = 1;
 
             rrddim_add(st_pgfaults, "minor",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -154,7 +157,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
         static RRDSET *st_numa = NULL;
         if(unlikely(!st_numa)) {
-            st_numa = rrdset_create("mem", "numa", NULL, "numa", NULL, "NUMA events", "events/s", 800, update_every, RRDSET_TYPE_LINE);
+            st_numa = rrdset_create_localhost("mem", "numa", NULL, "numa", NULL, "NUMA events", "events/s", 800
+                                              , update_every, RRDSET_TYPE_LINE);
             st_numa->isdetail = 1;
 
             // These depend on CONFIG_NUMA in the kernel.

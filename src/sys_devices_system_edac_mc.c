@@ -134,8 +134,8 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
         if(unlikely(!ce_st)) {
             ce_st = rrdset_find_localhost("mem.ecc_ce");
             if(unlikely(!ce_st))
-                ce_st = rrdset_create("mem", "ecc_ce", NULL, "ecc", NULL, "ECC Memory Correctable Errors", "errors",
-                        6600, update_every, RRDSET_TYPE_LINE);
+                ce_st = rrdset_create_localhost("mem", "ecc_ce", NULL, "ecc", NULL, "ECC Memory Correctable Errors"
+                                                , "errors", 6600, update_every, RRDSET_TYPE_LINE);
 
             for(m = mc_root; m; m = m->next)
                 if(m->ce_count_filename)
@@ -162,8 +162,8 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
             ue_st = rrdset_find_localhost("mem.ecc_ue");
 
             if(unlikely(!ue_st))
-                ue_st = rrdset_create("mem", "ecc_ue", NULL, "ecc", NULL, "ECC Memory Uncorrectable Errors", "errors",
-                        6610, update_every, RRDSET_TYPE_LINE);
+                ue_st = rrdset_create_localhost("mem", "ecc_ue", NULL, "ecc", NULL, "ECC Memory Uncorrectable Errors"
+                                                , "errors", 6610, update_every, RRDSET_TYPE_LINE);
 
             for(m = mc_root; m; m = m->next)
                 if(m->ue_count_filename)

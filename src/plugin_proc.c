@@ -115,7 +115,9 @@ void *proc_main(void *ptr) {
                 st = rrdset_find_bytype_localhost("netdata", "plugin_proc_modules");
 
                 if(!st) {
-                    st = rrdset_create("netdata", "plugin_proc_modules", NULL, "proc", NULL, "NetData Proc Plugin Modules Durations", "milliseconds/run", 132001, rrd_update_every, RRDSET_TYPE_STACKED);
+                    st = rrdset_create_localhost("netdata", "plugin_proc_modules", NULL, "proc", NULL
+                                                 , "NetData Proc Plugin Modules Durations", "milliseconds/run", 132001
+                                                 , rrd_update_every, RRDSET_TYPE_STACKED);
 
                     for(i = 0 ; proc_modules[i].name ;i++) {
                         struct proc_module *pm = &proc_modules[i];

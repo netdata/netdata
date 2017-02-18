@@ -129,7 +129,8 @@ int do_proc_softirqs(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     st = rrdset_find_bytype_localhost("system", "softirqs");
-    if(unlikely(!st)) st = rrdset_create("system", "softirqs", NULL, "softirqs", NULL, "System softirqs", "softirqs/s", 950, update_every, RRDSET_TYPE_STACKED);
+    if(unlikely(!st)) st = rrdset_create_localhost("system", "softirqs", NULL, "softirqs", NULL, "System softirqs"
+                                                   , "softirqs/s", 950, update_every, RRDSET_TYPE_STACKED);
     else rrdset_next(st);
 
     for(l = 0; l < lines ;l++) {
@@ -176,7 +177,8 @@ int do_proc_softirqs(int update_every, usec_t dt) {
 
                 char title[100+1];
                 snprintfz(title, 100, "CPU%d softirqs", c);
-                st = rrdset_create("cpu", id, NULL, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c, update_every, RRDSET_TYPE_STACKED);
+                st = rrdset_create_localhost("cpu", id, NULL, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c
+                                             , update_every, RRDSET_TYPE_STACKED);
             }
             else rrdset_next(st);
 

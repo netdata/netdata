@@ -285,12 +285,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 error("DISABLED: system.load");
             } else {
 
-                st = rrdset_find_bytype("system", "load");
+                st = rrdset_find_bytype_localhost("system", "load");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE);
-                    rrddim_add(st, "load1", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "load5", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "load15", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                    st = rrdset_create_localhost("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE);
+                    rrddim_add(st, "load1", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "load5", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -318,10 +318,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         } else {
             if (likely(do_all_processes)) {
 
-                st = rrdset_find_bytype("system", "active_processes");
+                st = rrdset_find_bytype_localhost("system", "active_processes");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "active_processes", NULL, "processes", NULL, "System Active Processes", "processes", 750, update_every, RRDSET_TYPE_LINE);
-                    rrddim_add(st, "active", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                    st = rrdset_create_localhost("system", "active_processes", NULL, "processes", NULL, "System Active Processes", "processes", 750, update_every, RRDSET_TYPE_LINE);
+                    rrddim_add(st, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -333,12 +333,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
             if (likely(do_processes)) {
 
-                st = rrdset_find_bytype("system", "processes");
+                st = rrdset_find_bytype_localhost("system", "processes");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "processes", NULL, "processes", NULL, "System Processes", "processes", 600, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("system", "processes", NULL, "processes", NULL, "System Processes", "processes", 600, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "running", NULL, 1, 1, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "blocked", NULL, -1, 1, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -350,12 +350,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_committed)) {
-                st = rrdset_find("mem.committed");
+                st = rrdset_find_localhost("mem.committed");
                 if (unlikely(!st)) {
-                    st = rrdset_create("mem", "committed", NULL, "system", NULL, "Committed (Allocated) Memory", "MB", 5000, update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost("mem", "committed", NULL, "system", NULL, "Committed (Allocated) Memory", "MB", 5000, update_every, RRDSET_TYPE_AREA);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "Committed_AS", NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "Committed_AS", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -378,15 +378,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 error("DISABLED: system.cpu");
             } else {
 
-                st = rrdset_find_bytype("system", "cpu");
+                st = rrdset_find_bytype_localhost("system", "cpu");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "cpu", NULL, "cpu", "system.cpu", "Total CPU utilization", "percentage", 100, update_every, RRDSET_TYPE_STACKED);
+                    st = rrdset_create_localhost("system", "cpu", NULL, "cpu", "system.cpu", "Total CPU utilization", "percentage", 100, update_every, RRDSET_TYPE_STACKED);
 
-                    rrddim_add(st, "user", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "nice", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "system", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "interrupt", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "idle", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "interrupt", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_hide(st, "idle");
                 }
                 else rrdset_next(st);
@@ -420,16 +420,16 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 } else {
                     for (i = 0; i < ncpus; i++) {
                         snprintfz(cpuid, MAX_INT_DIGITS, "cpu%d", i);
-                        st = rrdset_find_bytype("cpu", cpuid);
+                        st = rrdset_find_bytype_localhost("cpu", cpuid);
                         if (unlikely(!st)) {
-                            st = rrdset_create("cpu", cpuid, NULL, "utilization", "cpu.cpu", "Core utilization",
+                            st = rrdset_create_localhost("cpu", cpuid, NULL, "utilization", "cpu.cpu", "Core utilization",
                                                "percentage", 1000, update_every, RRDSET_TYPE_STACKED);
 
-                            rrddim_add(st, "user", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                            rrddim_add(st, "nice", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                            rrddim_add(st, "system", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                            rrddim_add(st, "interrupt", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-                            rrddim_add(st, "idle", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "interrupt", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                             rrddim_hide(st, "idle");
                         } else
                             rrdset_next(st);
@@ -463,12 +463,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 for (i = 0; i < nintr; i++)
                     totalintr += intrcnt[i];
 
-                st = rrdset_find_bytype("system", "intr");
+                st = rrdset_find_bytype_localhost("system", "intr");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "intr", NULL, "interrupts", NULL, "Total Hardware Interrupts", "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("system", "intr", NULL, "interrupts", NULL, "Total Hardware Interrupts", "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "interrupts", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -483,9 +483,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                     do_interrupts = 0;
                     error("DISABLED: system.intr");
                 } else {
-                    st = rrdset_find_bytype("system", "interrupts");
+                    st = rrdset_find_bytype_localhost("system", "interrupts");
                     if (unlikely(!st))
-                        st = rrdset_create("system", "interrupts", NULL, "interrupts", NULL, "System interrupts", "interrupts/s",
+                        st = rrdset_create_localhost("system", "interrupts", NULL, "interrupts", NULL, "System interrupts", "interrupts/s",
                                            1000, update_every, RRDSET_TYPE_STACKED);
                     else
                         rrdset_next(st);
@@ -495,7 +495,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                         if (unlikely((intrcnt[i] != 0) && (*(char*)p != 0))) {
                             rd = rrddim_find(st, p);
                             if (unlikely(!rd))
-                                rd = rrddim_add(st, p, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                                rd = rrddim_add(st, p, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                             rrddim_set_by_pointer(st, rd, intrcnt[i]);
                         }
                     }
@@ -513,11 +513,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             error("DISABLED: system.dev_intr");
         } else {
 
-            st = rrdset_find_bytype("system", "dev_intr");
+            st = rrdset_find_bytype_localhost("system", "dev_intr");
             if (unlikely(!st)) {
-                st = rrdset_create("system", "dev_intr", NULL, "interrupts", NULL, "Device Interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create_localhost("system", "dev_intr", NULL, "interrupts", NULL, "Device Interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_LINE);
 
-                rrddim_add(st, "interrupts", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -534,11 +534,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             error("DISABLED: system.dev_intr");
         } else {
 
-            st = rrdset_find_bytype("system", "soft_intr");
+            st = rrdset_find_bytype_localhost("system", "soft_intr");
             if (unlikely(!st)) {
-                st = rrdset_create("system", "soft_intr", NULL, "interrupts", NULL, "Software Interrupts", "interrupts/s", 1100, update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create_localhost("system", "soft_intr", NULL, "interrupts", NULL, "Software Interrupts", "interrupts/s", 1100, update_every, RRDSET_TYPE_LINE);
 
-                rrddim_add(st, "interrupts", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -555,11 +555,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             error("DISABLED: system.ctxt");
         } else {
 
-            st = rrdset_find_bytype("system", "ctxt");
+            st = rrdset_find_bytype_localhost("system", "ctxt");
             if (unlikely(!st)) {
-                st = rrdset_create("system", "ctxt", NULL, "processes", NULL, "CPU Context Switches", "context switches/s", 800, update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create_localhost("system", "ctxt", NULL, "processes", NULL, "CPU Context Switches", "context switches/s", 800, update_every, RRDSET_TYPE_LINE);
 
-                rrddim_add(st, "switches", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -576,12 +576,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             error("DISABLED: system.forks");
         } else {
 
-            st = rrdset_find_bytype("system", "forks");
+            st = rrdset_find_bytype_localhost("system", "forks");
             if (unlikely(!st)) {
-                st = rrdset_create("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s", 700, update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create_localhost("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s", 700, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
 
-                rrddim_add(st, "started", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -612,12 +612,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype(RRD_TYPE_DISK, disk);
+                        st = rrdset_find_bytype_localhost(RRD_TYPE_DISK, disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create(RRD_TYPE_DISK, disk, NULL, disk, "disk.io", "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
+                            st = rrdset_create_localhost(RRD_TYPE_DISK, disk, NULL, disk, "disk.io", "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
 
-                            rrddim_add(st, "reads", NULL, 1, 1024, RRDDIM_INCREMENTAL);
-                            rrddim_add(st, "writes", NULL, -1, 1024, RRDDIM_INCREMENTAL);
+                            rrddim_add(st, "reads", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
+                            rrddim_add(st, "writes", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
                         }
                         else rrdset_next(st);
 
@@ -629,13 +629,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype("disk_ops", disk);
+                        st = rrdset_find_bytype_localhost("disk_ops", disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_ops", disk, NULL, disk, "disk.ops", "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
+                            st = rrdset_create_localhost("disk_ops", disk, NULL, disk, "disk.ops", "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
                             st->isdetail = 1;
 
-                            rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                            rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                            rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                            rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                         }
                         else rrdset_next(st);
 
@@ -645,12 +645,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype("disk_qops", disk);
+                        st = rrdset_find_bytype_localhost("disk_qops", disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_qops", disk, NULL, disk, "disk.qops", "Disk Current I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
+                            st = rrdset_create_localhost("disk_qops", disk, NULL, disk, "disk.qops", "Disk Current I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
                             st->isdetail = 1;
 
-                            rrddim_add(st, "operations", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                            rrddim_add(st, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         }
                         else rrdset_next(st);
 
@@ -659,12 +659,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype("disk_util", disk);
+                        st = rrdset_find_bytype_localhost("disk_util", disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_util", disk, NULL, disk, "disk.util", "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
+                            st = rrdset_create_localhost("disk_util", disk, NULL, disk, "disk.util", "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
                             st->isdetail = 1;
 
-                            rrddim_add(st, "utilization", NULL, 1, 10, RRDDIM_INCREMENTAL);
+                            rrddim_add(st, "utilization", NULL, 1, 10, RRD_ALGORITHM_INCREMENTAL);
                         }
                         else rrdset_next(st);
 
@@ -674,13 +674,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                         // --------------------------------------------------------------------
 
-                        st = rrdset_find_bytype("disk_iotime", disk);
+                        st = rrdset_find_bytype_localhost("disk_iotime", disk);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_iotime", disk, NULL, disk, "disk.iotime", "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
+                            st = rrdset_create_localhost("disk_iotime", disk, NULL, disk, "disk.iotime", "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
                             st->isdetail = 1;
 
-                            rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                            rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                            rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                            rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                         }
                         else rrdset_next(st);
 
@@ -698,13 +698,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                             // --------------------------------------------------------------------
 
-                            st = rrdset_find_bytype("disk_await", disk);
+                            st = rrdset_find_bytype_localhost("disk_await", disk);
                             if (unlikely(!st)) {
-                                st = rrdset_create("disk_await", disk, NULL, disk, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
+                                st = rrdset_create_localhost("disk_await", disk, NULL, disk, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
                                 st->isdetail = 1;
 
-                                rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ABSOLUTE);
-                                rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_ABSOLUTE);
+                                rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                                rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
                             }
                             else rrdset_next(st);
 
@@ -716,13 +716,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                             // --------------------------------------------------------------------
 
-                            st = rrdset_find_bytype("disk_avgsz", disk);
+                            st = rrdset_find_bytype_localhost("disk_avgsz", disk);
                             if (unlikely(!st)) {
-                                st = rrdset_create("disk_avgsz", disk, NULL, disk, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
+                                st = rrdset_create_localhost("disk_avgsz", disk, NULL, disk, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
                                 st->isdetail = 1;
 
-                                rrddim_add(st, "reads", NULL, 1, 1024, RRDDIM_ABSOLUTE);
-                                rrddim_add(st, "writes", NULL, -1, 1024, RRDDIM_ABSOLUTE);
+                                rrddim_add(st, "reads", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                                rrddim_add(st, "writes", NULL, -1, 1024, RRD_ALGORITHM_ABSOLUTE);
                             }
                             else rrdset_next(st);
 
@@ -734,12 +734,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                             // --------------------------------------------------------------------
 
-                            st = rrdset_find_bytype("disk_svctm", disk);
+                            st = rrdset_find_bytype_localhost("disk_svctm", disk);
                             if (unlikely(!st)) {
-                                st = rrdset_create("disk_svctm", disk, NULL, disk, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
+                                st = rrdset_create_localhost("disk_svctm", disk, NULL, disk, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
                                 st->isdetail = 1;
 
-                                rrddim_add(st, "svctm", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                                rrddim_add(st, "svctm", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                             }
                             else rrdset_next(st);
 
@@ -752,11 +752,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find_bytype("system", "io");
+                st = rrdset_find_bytype_localhost("system", "io");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150, update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "in",  NULL,  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "out", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    st = rrdset_create_localhost("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150, update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -798,13 +798,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             }
 
             if (likely(do_swap)) {
-                st = rrdset_find("system.swap");
+                st = rrdset_find_localhost("system.swap");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
+                    st = rrdset_create_localhost("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "free",    NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "used",    NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "free",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "used",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -829,18 +829,18 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             do_ram = 0;
             error("DISABLED: system.ram");
         } else {
-            st = rrdset_find("system.ram");
+            st = rrdset_find_localhost("system.ram");
             if (unlikely(!st)) {
-                st = rrdset_create("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
+                st = rrdset_create_localhost("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
 
-                rrddim_add(st, "active",    NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "inactive",  NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "wired",     NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "active",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(st, "inactive",  NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(st, "wired",     NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
 #if __FreeBSD_version < 1200016
-                rrddim_add(st, "cache",     NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "cache",     NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
 #endif
-                rrddim_add(st, "buffers",   NULL, 1, MEGA_FACTOR, RRDDIM_ABSOLUTE);
-                rrddim_add(st, "free",      NULL, system_pagesize, MEGA_FACTOR, RRDDIM_ABSOLUTE);
+                rrddim_add(st, "buffers",   NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(st, "free",      NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(st);
 
@@ -863,12 +863,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             do_swapio = 0;
             error("DISABLED: system.swapio");
         } else {
-            st = rrdset_find("system.swapio");
+            st = rrdset_find_localhost("system.swapio");
             if (unlikely(!st)) {
-                st = rrdset_create("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
+                st = rrdset_create_localhost("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
 
-                rrddim_add(st, "in",  NULL, system_pagesize, 1024, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "out", NULL, -system_pagesize, 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "in",  NULL, system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "out", NULL, -system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -889,16 +889,16 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             do_pgfaults = 0;
             error("DISABLED: mem.pgfaults");
         } else {
-            st = rrdset_find("mem.pgfaults");
+            st = rrdset_find_localhost("mem.pgfaults");
             if (unlikely(!st)) {
-                st = rrdset_create("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create_localhost("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
 
-                rrddim_add(st, "memory", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "io_requiring", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "cow", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "cow_optimized", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "in_transit", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "memory", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "io_requiring", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "cow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "cow_optimized", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "in_transit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -934,10 +934,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("system.ipc_semaphores");
+                st = rrdset_find_localhost("system.ipc_semaphores");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_semaphores", NULL, "ipc semaphores", NULL, "IPC Semaphores", "semaphores", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "semaphores", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                    st = rrdset_create_localhost("system", "ipc_semaphores", NULL, "ipc semaphores", NULL, "IPC Semaphores", "semaphores", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -946,10 +946,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("system.ipc_semaphore_arrays");
+                st = rrdset_find_localhost("system.ipc_semaphore_arrays");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "arrays", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                    st = rrdset_create_localhost("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -982,10 +982,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("system.ipc_shared_mem_segs");
+                st = rrdset_find_localhost("system.ipc_shared_mem_segs");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_shared_mem_segs", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments", "segments", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "segments", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                    st = rrdset_create_localhost("system", "ipc_shared_mem_segs", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments", "segments", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "segments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -994,10 +994,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("system.ipc_shared_mem_size");
+                st = rrdset_find_localhost("system.ipc_shared_mem_size");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_shared_mem_size", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments Size", "kilobytes", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "allocated", NULL, 1, 1024, RRDDIM_ABSOLUTE);
+                    st = rrdset_create_localhost("system", "ipc_shared_mem_size", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments Size", "kilobytes", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "allocated", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -1034,10 +1034,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("system.ipc_msq_queues");
+                st = rrdset_find_localhost("system.ipc_msq_queues");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 990, rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "queues", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                    st = rrdset_create_localhost("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 990, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "queues", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -1046,10 +1046,10 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("system.ipc_msq_messages");
+                st = rrdset_find_localhost("system.ipc_msq_messages");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_msq_messages", NULL, "ipc message queues", NULL, "Number of Messages in IPC Message Queues", "messages", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "messages", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                    st = rrdset_create_localhost("system", "ipc_msq_messages", NULL, "ipc message queues", NULL, "Number of Messages in IPC Message Queues", "messages", 1000, rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(st, "messages", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -1058,11 +1058,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("system.ipc_msq_size");
+                st = rrdset_find_localhost("system.ipc_msq_size");
                 if (unlikely(!st)) {
-                    st = rrdset_create("system", "ipc_msq_size", NULL, "ipc message queues", NULL, "Size of IPC Message Queues", "bytes", 1100, rrd_update_every, RRDSET_TYPE_LINE);
-                    rrddim_add(st, "allocated", NULL, 1, 1, RRDDIM_ABSOLUTE);
-                    rrddim_add(st, "used", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                    st = rrdset_create_localhost("system", "ipc_msq_size", NULL, "ipc message queues", NULL, "Size of IPC Message Queues", "bytes", 1100, rrd_update_every, RRDSET_TYPE_LINE);
+                    rrddim_add(st, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -1129,13 +1129,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_netisr)) {
-        st = rrdset_find_bytype("system", "softnet_stat");
+        st = rrdset_find_bytype_localhost("system", "softnet_stat");
         if (unlikely(!st)) {
-            st = rrdset_create("system", "softnet_stat", NULL, "softnet_stat", NULL, "System softnet_stat", "events/s", 955, update_every, RRDSET_TYPE_LINE);
-            rrddim_add(st, "dispatched", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "hybrid_dispatched", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "qdrops", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "queued", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            st = rrdset_create_localhost("system", "softnet_stat", NULL, "softnet_stat", NULL, "System softnet_stat", "events/s", 955, update_every, RRDSET_TYPE_LINE);
+            rrddim_add(st, "dispatched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "hybrid_dispatched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "qdrops", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -1152,13 +1152,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
         for (i = 0; i < ncpus ;i++) {
             snprintfz(netstat_cpuid, 21, "cpu%d_softnet_stat", i);
 
-            st = rrdset_find_bytype("cpu", netstat_cpuid);
+            st = rrdset_find_bytype_localhost("cpu", netstat_cpuid);
             if (unlikely(!st)) {
-                st = rrdset_create("cpu", netstat_cpuid, NULL, "softnet_stat", NULL, "Per CPU netisr statistics", "events/s", 1101 + i, update_every, RRDSET_TYPE_LINE);
-                rrddim_add(st, "dispatched", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "hybrid_dispatched", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "qdrops", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "queued", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                st = rrdset_create_localhost("cpu", netstat_cpuid, NULL, "softnet_stat", NULL, "Per CPU netisr statistics", "events/s", 1101 + i, update_every, RRDSET_TYPE_LINE);
+                rrddim_add(st, "dispatched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "hybrid_dispatched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "qdrops", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -1186,12 +1186,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 iftot.ift_obytes += IFA_DATA(obytes);
             }
 
-            st = rrdset_find("system.ipv4");
+            st = rrdset_find_localhost("system.ipv4");
             if (unlikely(!st)) {
-                st = rrdset_create("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
+                st = rrdset_create_localhost("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
 
-                rrddim_add(st, "InOctets", "received", 8, 1024, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "OutOctets", "sent", -8, 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "InOctets", "received", 8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "OutOctets", "sent", -8, 1024, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -1209,12 +1209,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 iftot.ift_obytes += IFA_DATA(obytes);
             }
 
-            st = rrdset_find("system.ipv6");
+            st = rrdset_find_localhost("system.ipv6");
             if (unlikely(!st)) {
-                st = rrdset_create("system", "ipv6", NULL, "network", NULL, "IPv6 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
+                st = rrdset_create_localhost("system", "ipv6", NULL, "network", NULL, "IPv6 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
 
-                rrddim_add(st, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
-                rrddim_add(st, "sent", NULL, -8, 1024, RRDDIM_INCREMENTAL);
+                rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -1228,12 +1228,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find_bytype("net", ifa->ifa_name);
+                st = rrdset_find_bytype_localhost("net", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net", ifa->ifa_name, NULL, ifa->ifa_name, "net.net", "Bandwidth", "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost("net", ifa->ifa_name, NULL, ifa->ifa_name, "net.net", "Bandwidth", "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
 
-                    rrddim_add(st, "received", NULL, 8, 1024, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -8, 1024, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -1243,15 +1243,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find_bytype("net_packets", ifa->ifa_name);
+                st = rrdset_find_bytype_localhost("net_packets", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net_packets", ifa->ifa_name, NULL, ifa->ifa_name, "net.packets", "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("net_packets", ifa->ifa_name, NULL, ifa->ifa_name, "net.packets", "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "multicast_received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "multicast_sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "multicast_received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "multicast_sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -1263,13 +1263,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find_bytype("net_errors", ifa->ifa_name);
+                st = rrdset_find_bytype_localhost("net_errors", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net_errors", ifa->ifa_name, NULL, ifa->ifa_name, "net.errors", "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("net_errors", ifa->ifa_name, NULL, ifa->ifa_name, "net.errors", "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -1279,14 +1279,14 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find_bytype("net_drops", ifa->ifa_name);
+                st = rrdset_find_bytype_localhost("net_drops", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net_drops", ifa->ifa_name, NULL, ifa->ifa_name, "net.drops", "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("net_drops", ifa->ifa_name, NULL, ifa->ifa_name, "net.drops", "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "inbound", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 #if __FreeBSD__ >= 11
-                    rrddim_add(st, "outbound", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 #endif
                 }
                 else rrdset_next(st);
@@ -1299,14 +1299,14 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find_bytype("net_events", ifa->ifa_name);
+                st = rrdset_find_bytype_localhost("net_events", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net_events", ifa->ifa_name, NULL, ifa->ifa_name, "net.events", "Network Interface Events", "events/s", 7006, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("net_events", ifa->ifa_name, NULL, ifa->ifa_name, "net.events", "Network Interface Events", "events/s", 7006, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "frames", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "collisions", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "carrier", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "frames", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "carrier", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -1327,12 +1327,12 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.tcpsock");
         } else {
             if (likely(do_tcp_sockets)) {
-                st = rrdset_find("ipv4.tcpsock");
+                st = rrdset_find_localhost("ipv4.tcpsock");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "tcpsock", NULL, "tcp", NULL, "IPv4 TCP Connections",
+                    st = rrdset_create_localhost("ipv4", "tcpsock", NULL, "tcp", NULL, "IPv4 TCP Connections",
                                        "active connections", 2500, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "CurrEstab", "connections", 1, 1, RRDDIM_ABSOLUTE);
+                    rrddim_add(st, "CurrEstab", "connections", 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 } else
                     rrdset_next(st);
 
@@ -1363,14 +1363,14 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.ecnpkts");
         } else {
             if (likely(do_tcp_packets)) {
-                st = rrdset_find("ipv4.tcppackets");
+                st = rrdset_find_localhost("ipv4.tcppackets");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "tcppackets", NULL, "tcp", NULL, "IPv4 TCP Packets",
+                    st = rrdset_create_localhost("ipv4", "tcppackets", NULL, "tcp", NULL, "IPv4 TCP Packets",
                                        "packets/s",
                                        2600, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InSegs", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutSegs", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InSegs", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutSegs", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1382,16 +1382,16 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_tcp_errors)) {
-                st = rrdset_find("ipv4.tcperrors");
+                st = rrdset_find_localhost("ipv4.tcperrors");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "tcperrors", NULL, "tcp", NULL, "IPv4 TCP Errors",
+                    st = rrdset_create_localhost("ipv4", "tcperrors", NULL, "tcp", NULL, "IPv4 TCP Errors",
                                        "packets/s",
                                        2700, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InErrs", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "RetransSegs", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrs", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "RetransSegs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1408,17 +1408,17 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_tcp_handshake)) {
-                st = rrdset_find("ipv4.tcphandshake");
+                st = rrdset_find_localhost("ipv4.tcphandshake");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "tcphandshake", NULL, "tcp", NULL,
+                    st = rrdset_create_localhost("ipv4", "tcphandshake", NULL, "tcp", NULL,
                                        "IPv4 TCP Handshake Issues",
                                        "events/s", 2900, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "EstabResets", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ActiveOpens", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "PassiveOpens", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "AttemptFails", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "EstabResets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ActiveOpens", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "PassiveOpens", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "AttemptFails", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1433,15 +1433,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
             if (do_tcpext_connaborts == CONFIG_ONDEMAND_YES || (do_tcpext_connaborts == CONFIG_ONDEMAND_ONDEMAND && (tcpstat.tcps_rcvpackafterwin || tcpstat.tcps_rcvafterclose || tcpstat.tcps_rcvmemdrop || tcpstat.tcps_persistdrop || tcpstat.tcps_finwait2_drops))) {
                 do_tcpext_connaborts = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.tcpconnaborts");
+                st = rrdset_find_localhost("ipv4.tcpconnaborts");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts", "connections/s", 3010, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts", "connections/s", 3010, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnClose",   "userclosed",  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnMemory",  "nomemory",    1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnLinger",  "linger",      1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnClose",   "userclosed",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnMemory",  "nomemory",    1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPAbortOnLinger",  "linger",      1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -1457,11 +1457,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
             if (do_tcpext_ofo == CONFIG_ONDEMAND_YES || (do_tcpext_ofo == CONFIG_ONDEMAND_ONDEMAND && tcpstat.tcps_rcvoopack)) {
                 do_tcpext_ofo = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.tcpofo");
+                st = rrdset_find_localhost("ipv4.tcpofo");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "tcpofo", NULL, "tcp", NULL, "TCP Out-Of-Order Queue", "packets/s", 3050, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("ipv4", "tcpofo", NULL, "tcp", NULL, "TCP Out-Of-Order Queue", "packets/s", 3050, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -1474,13 +1474,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             if (do_tcpext_syscookies == CONFIG_ONDEMAND_YES || (do_tcpext_syscookies == CONFIG_ONDEMAND_ONDEMAND && (tcpstat.tcps_sc_sendcookie || tcpstat.tcps_sc_recvcookie || tcpstat.tcps_sc_zonefail))) {
                 do_tcpext_syscookies = CONFIG_ONDEMAND_YES;
 
-                st = rrdset_find("ipv4.tcpsyncookies");
+                st = rrdset_find_localhost("ipv4.tcpsyncookies");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "tcpsyncookies", NULL, "tcp", NULL, "TCP SYN Cookies", "packets/s", 3100, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("ipv4", "tcpsyncookies", NULL, "tcp", NULL, "TCP SYN Cookies", "packets/s", 3100, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -1494,15 +1494,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
             if (do_ecn == CONFIG_ONDEMAND_YES || (do_ecn == CONFIG_ONDEMAND_ONDEMAND && (tcpstat.tcps_ecn_ce || tcpstat.tcps_ecn_ect0 || tcpstat.tcps_ecn_ect1))) {
                 do_ecn = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv4.ecnpkts");
+                st = rrdset_find_localhost("ipv4.ecnpkts");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics", "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics", "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InECT0Pkts", "ECTP0", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InECT1Pkts", "ECTP1", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InECT0Pkts", "ECTP0", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InECT1Pkts", "ECTP1", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -1527,13 +1527,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.udperrors");
         } else {
             if (likely(do_udp_packets)) {
-                st = rrdset_find("ipv4.udppackets");
+                st = rrdset_find_localhost("ipv4.udppackets");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "udppackets", NULL, "udp", NULL, "IPv4 UDP Packets",
+                    st = rrdset_create_localhost("ipv4", "udppackets", NULL, "udp", NULL, "IPv4 UDP Packets",
                                        "packets/s", 2601, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InDatagrams", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDatagrams", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDatagrams", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDatagrams", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1545,17 +1545,17 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_udp_errors)) {
-                st = rrdset_find("ipv4.udperrors");
+                st = rrdset_find_localhost("ipv4.udperrors");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "udperrors", NULL, "udp", NULL, "IPv4 UDP Errors", "events/s",
+                    st = rrdset_create_localhost("ipv4", "udperrors", NULL, "udp", NULL, "IPv4 UDP Errors", "events/s",
                                        2701, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "NoPorts", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "NoPorts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1588,14 +1588,14 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_icmp_packets)) {
-                st = rrdset_find("ipv4.icmp");
+                st = rrdset_find_localhost("ipv4.icmp");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "icmp", NULL, "icmp", NULL, "IPv4 ICMP Packets", "packets/s",
+                    st = rrdset_create_localhost("ipv4", "icmp", NULL, "icmp", NULL, "IPv4 ICMP Packets", "packets/s",
                                        2602,
                                        update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InMsgs", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutMsgs", "sent", -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InMsgs", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutMsgs", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1606,15 +1606,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                st = rrdset_find("ipv4.icmp_errors");
+                st = rrdset_find_localhost("ipv4.icmp_errors");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors",
+                    st = rrdset_create_localhost("ipv4", "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors",
                                        "packets/s",
                                        2603, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1628,15 +1628,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_icmpmsg)) {
-                st = rrdset_find("ipv4.icmpmsg");
+                st = rrdset_find_localhost("ipv4.icmpmsg");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages",
+                    st = rrdset_create_localhost("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages",
                                        "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InEchoReps", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InEchos", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InEchoReps", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InEchos", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1665,15 +1665,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv4.errors");
         } else {
             if (likely(do_ip_packets)) {
-                st = rrdset_find("ipv4.packets");
+                st = rrdset_find_localhost("ipv4.packets");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "packets", NULL, "packets", NULL, "IPv4 Packets", "packets/s",
+                    st = rrdset_create_localhost("ipv4", "packets", NULL, "packets", NULL, "IPv4 Packets", "packets/s",
                                        3000, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InReceives", "received", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutRequests", "sent", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InDelivers", "delivered", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InReceives", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutRequests", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InDelivers", "delivered", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1687,15 +1687,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsout)) {
-                st = rrdset_find("ipv4.fragsout");
+                st = rrdset_find_localhost("ipv4.fragsout");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "fragsout", NULL, "fragments", NULL, "IPv4 Fragments Sent",
+                    st = rrdset_create_localhost("ipv4", "fragsout", NULL, "fragments", NULL, "IPv4 Fragments Sent",
                                        "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "FragOKs", "ok", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "FragFails", "failed", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "FragCreates", "created", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "FragOKs", "ok", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "FragFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "FragCreates", "created", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1708,16 +1708,16 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsin)) {
-                st = rrdset_find("ipv4.fragsin");
+                st = rrdset_find_localhost("ipv4.fragsin");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "fragsin", NULL, "fragments", NULL,
+                    st = rrdset_create_localhost("ipv4", "fragsin", NULL, "fragments", NULL,
                                        "IPv4 Fragments Reassembly",
                                        "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "ReasmOKs", "ok", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ReasmFails", "failed", -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "ReasmReqds", "all", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ReasmOKs", "ok", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ReasmFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ReasmReqds", "all", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1730,21 +1730,21 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (likely(do_ip_errors)) {
-                st = rrdset_find("ipv4.errors");
+                st = rrdset_find_localhost("ipv4.errors");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv4", "errors", NULL, "errors", NULL, "IPv4 Errors", "packets/s",
+                    st = rrdset_create_localhost("ipv4", "errors", NULL, "errors", NULL, "IPv4 Errors", "packets/s",
                                        3002,
                                        update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InUnknownProtos", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InUnknownProtos", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1776,15 +1776,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                                                           (ip6stat.ip6s_localout || ip6stat.ip6s_total ||
                                                            ip6stat.ip6s_forward || ip6stat.ip6s_delivered))) {
                 do_ip6_packets = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.packets");
+                st = rrdset_find_localhost("ipv6.packets");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "packets", NULL, "packets", NULL, "IPv6 Packets", "packets/s", 3000,
+                    st = rrdset_create_localhost("ipv6", "packets", NULL, "packets", NULL, "IPv6 Packets", "packets/s", 3000,
                                        update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "forwarded", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "delivers", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "forwarded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "delivers", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1801,15 +1801,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                                                            (ip6stat.ip6s_fragmented || ip6stat.ip6s_cantfrag ||
                                                             ip6stat.ip6s_ofragments))) {
                 do_ip6_fragsout = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.fragsout");
+                st = rrdset_find_localhost("ipv6.fragsout");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "fragsout", NULL, "fragments", NULL, "IPv6 Fragments Sent",
+                    st = rrdset_create_localhost("ipv6", "fragsout", NULL, "fragments", NULL, "IPv6 Fragments Sent",
                                        "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "failed", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "all", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "all", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1825,16 +1825,16 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                                                           (ip6stat.ip6s_reassembled || ip6stat.ip6s_fragdropped ||
                                                            ip6stat.ip6s_fragtimeout || ip6stat.ip6s_fragments))) {
                 do_ip6_fragsin = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.fragsin");
+                st = rrdset_find_localhost("ipv6.fragsin");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "fragsin", NULL, "fragments", NULL, "IPv6 Fragments Reassembly",
+                    st = rrdset_create_localhost("ipv6", "fragsin", NULL, "fragments", NULL, "IPv6 Fragments Reassembly",
                                        "packets/s", 3011, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "ok", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "failed", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "timeout", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "all", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "timeout", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "all", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1858,21 +1858,21 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                     ip6stat.ip6s_cantforward ||
                     ip6stat.ip6s_noroute))) {
                 do_ip6_errors = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.errors");
+                st = rrdset_find_localhost("ipv6.errors");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "errors", NULL, "errors", NULL, "IPv6 Errors", "packets/s", 3002,
+                    st = rrdset_create_localhost("ipv6", "errors", NULL, "errors", NULL, "IPv6 Errors", "packets/s", 3002,
                                        update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InDiscards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDiscards", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InTruncatedPkts", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InNoRoutes", NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InTruncatedPkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InNoRoutes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1905,13 +1905,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             icmp6_total.msgs_in += icmp6stat.icp6s_badcode + icmp6stat.icp6s_badlen + icmp6stat.icp6s_checksum + icmp6stat.icp6s_tooshort;
             if (do_icmp6 == CONFIG_ONDEMAND_YES || (do_icmp6 == CONFIG_ONDEMAND_ONDEMAND && (icmp6_total.msgs_in || icmp6_total.msgs_out))) {
                 do_icmp6 = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmp");
+                st = rrdset_find_localhost("ipv6.icmp");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "icmp", NULL, "icmp", NULL, "IPv6 ICMP Messages",
+                    st = rrdset_create_localhost("ipv6", "icmp", NULL, "icmp", NULL, "IPv6 ICMP Messages",
                                        "messages/s", 10000, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1924,13 +1924,13 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
 
             if (do_icmp6_redir == CONFIG_ONDEMAND_YES || (do_icmp6_redir == CONFIG_ONDEMAND_ONDEMAND && (icmp6stat.icp6s_inhist[ND_REDIRECT] || icmp6stat.icp6s_outhist[ND_REDIRECT]))) {
                 do_icmp6_redir = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmpredir");
+                st = rrdset_find_localhost("ipv6.icmpredir");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "icmpredir", NULL, "icmp", NULL, "IPv6 ICMP Redirects",
+                    st = rrdset_create_localhost("ipv6", "icmpredir", NULL, "icmp", NULL, "IPv6 ICMP Redirects",
                                        "redirects/s", 10050, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "received", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1954,21 +1954,21 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                                                                             icmp6stat.icp6s_outhist[ICMP6_TIME_EXCEEDED] ||
                                                                             icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB]))) {
                 do_icmp6_errors = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmperrors");
+                st = rrdset_find_localhost("ipv6.icmperrors");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "icmperrors", NULL, "icmp", NULL, "IPv6 ICMP Errors", "errors/s", 10100, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("ipv6", "icmperrors", NULL, "icmp", NULL, "IPv6 ICMP Errors", "errors/s", 10100, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InDestUnreachs", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InPktTooBigs", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InTimeExcds", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InParmProblems", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutTimeExcds", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InDestUnreachs", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InPktTooBigs", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InTimeExcds", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InParmProblems", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutTimeExcds", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -1993,14 +1993,14 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                                                                  icmp6stat.icp6s_inhist[ICMP6_ECHO_REPLY] ||
                                                                  icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY]))) {
                 do_icmp6_echos = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmpechos");
+                st = rrdset_find_localhost("ipv6.icmpechos");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "icmpechos", NULL, "icmp", NULL, "IPv6 ICMP Echo", "messages/s", 10200, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("ipv6", "icmpechos", NULL, "icmp", NULL, "IPv6 ICMP Echo", "messages/s", 10200, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InEchos", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InEchoReplies", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutEchoReplies", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InEchos", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InEchoReplies", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutEchoReplies", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -2019,14 +2019,14 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                                                                     icmp6stat.icp6s_inhist[ND_ROUTER_ADVERT] ||
                                                                     icmp6stat.icp6s_outhist[ND_ROUTER_ADVERT]))) {
                 do_icmp6_router = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmprouter");
+                st = rrdset_find_localhost("ipv6.icmprouter");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "icmprouter", NULL, "icmp", NULL, "IPv6 Router Messages", "messages/s", 10400, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("ipv6", "icmprouter", NULL, "icmp", NULL, "IPv6 Router Messages", "messages/s", 10400, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InSolicits", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutSolicits", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InSolicits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutSolicits", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -2045,14 +2045,14 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                                                                     icmp6stat.icp6s_inhist[ND_NEIGHBOR_ADVERT] ||
                                                                     icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT]))) {
                 do_icmp6_neighbor = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmpneighbor");
+                st = rrdset_find_localhost("ipv6.icmpneighbor");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "icmpneighbor", NULL, "icmp", NULL, "IPv6 Neighbor Messages", "messages/s", 10500, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("ipv6", "icmpneighbor", NULL, "icmp", NULL, "IPv6 Neighbor Messages", "messages/s", 10500, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InSolicits", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutSolicits", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InSolicits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutSolicits", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -2077,21 +2077,21 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                                                                     icmp6stat.icp6s_outhist[135] ||
                                                                     icmp6stat.icp6s_outhist[136]))) {
                 do_icmp6_types = CONFIG_ONDEMAND_YES;
-                st = rrdset_find("ipv6.icmptypes");
+                st = rrdset_find_localhost("ipv6.icmptypes");
                 if (unlikely(!st)) {
-                    st = rrdset_create("ipv6", "icmptypes", NULL, "icmp", NULL, "IPv6 ICMP Types",
+                    st = rrdset_create_localhost("ipv6", "icmptypes", NULL, "icmp", NULL, "IPv6 ICMP Types",
                                        "messages/s", 10700, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "InType1", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InType128", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InType129", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "InType136", NULL, 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType1", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType128", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType129", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType133", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType135", NULL, -1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "OutType143", NULL, -1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "InType1", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InType128", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InType129", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InType136", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType1", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType128", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType129", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType133", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType135", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutType143", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -2135,17 +2135,17 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------------
 
                 if (likely(do_space)) {
-                    st = rrdset_find_bytype("disk_space", mntbuf[i].f_mntonname);
+                    st = rrdset_find_bytype_localhost("disk_space", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
                         snprintfz(title, 4096, "Disk Space Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
-                        st = rrdset_create("disk_space", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.space", title, "GB", 2023,
+                        st = rrdset_create_localhost("disk_space", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.space", title, "GB", 2023,
                                            update_every,
                                            RRDSET_TYPE_STACKED);
 
-                        rrddim_add(st, "avail", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRDDIM_ABSOLUTE);
-                        rrddim_add(st, "used", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRDDIM_ABSOLUTE);
+                        rrddim_add(st, "avail", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                        rrddim_add(st, "used", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "reserved_for_root", "reserved for root", mntbuf[i].f_bsize, GIGA_FACTOR,
-                                   RRDDIM_ABSOLUTE);
+                                RRD_ALGORITHM_ABSOLUTE);
                     } else
                         rrdset_next(st);
 
@@ -2158,15 +2158,15 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------------
 
                 if (likely(do_inodes)) {
-                    st = rrdset_find_bytype("disk_inodes", mntbuf[i].f_mntonname);
+                    st = rrdset_find_bytype_localhost("disk_inodes", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
                         snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
-                        st = rrdset_create("disk_inodes", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.inodes", title, "Inodes", 2024,
+                        st = rrdset_create_localhost("disk_inodes", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.inodes", title, "Inodes", 2024,
                                            update_every, RRDSET_TYPE_STACKED);
 
-                        rrddim_add(st, "avail", NULL, 1, 1, RRDDIM_ABSOLUTE);
-                        rrddim_add(st, "used", NULL, 1, 1, RRDDIM_ABSOLUTE);
-                        rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRDDIM_ABSOLUTE);
+                        rrddim_add(st, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                        rrddim_add(st, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                        rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     } else
                         rrdset_next(st);
 
@@ -2186,11 +2186,11 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             error("DISABLED: system.uptime");
         } else {
             clock_gettime(CLOCK_REALTIME, &cur_time);
-            st = rrdset_find("system.uptime");
+            st = rrdset_find_localhost("system.uptime");
 
             if(unlikely(!st)) {
-                st = rrdset_create("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000, update_every, RRDSET_TYPE_LINE);
-                rrddim_add(st, "uptime", NULL, 1, 1, RRDDIM_ABSOLUTE);
+                st = rrdset_create_localhost("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000, update_every, RRDSET_TYPE_LINE);
+                rrddim_add(st, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(st);
 

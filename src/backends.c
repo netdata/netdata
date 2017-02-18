@@ -239,7 +239,9 @@ void *backends_main(void *ptr) {
 
     RRDSET *chart_metrics = rrdset_find_localhost("netdata.backend_metrics");
     if(!chart_metrics) {
-        chart_metrics = rrdset_create("netdata", "backend_metrics", NULL, "backend", NULL, "Netdata Buffered Metrics", "metrics", 130600, frequency, RRDSET_TYPE_LINE);
+        chart_metrics = rrdset_create_localhost("netdata", "backend_metrics", NULL, "backend", NULL
+                                                , "Netdata Buffered Metrics", "metrics", 130600, frequency
+                                                , RRDSET_TYPE_LINE);
         rrddim_add(chart_metrics, "buffered", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(chart_metrics, "lost",     NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(chart_metrics, "sent",     NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -247,7 +249,8 @@ void *backends_main(void *ptr) {
 
     RRDSET *chart_bytes = rrdset_find_localhost("netdata.backend_bytes");
     if(!chart_bytes) {
-        chart_bytes = rrdset_create("netdata", "backend_bytes", NULL, "backend", NULL, "Netdata Backend Data Size", "KB", 130610, frequency, RRDSET_TYPE_AREA);
+        chart_bytes = rrdset_create_localhost("netdata", "backend_bytes", NULL, "backend", NULL
+                                              , "Netdata Backend Data Size", "KB", 130610, frequency, RRDSET_TYPE_AREA);
         rrddim_add(chart_bytes, "buffered", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(chart_bytes, "lost",     NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(chart_bytes, "sent",     NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -256,7 +259,9 @@ void *backends_main(void *ptr) {
 
     RRDSET *chart_ops = rrdset_find_localhost("netdata.backend_ops");
     if(!chart_ops) {
-        chart_ops = rrdset_create("netdata", "backend_ops", NULL, "backend", NULL, "Netdata Backend Operations", "operations", 130630, frequency, RRDSET_TYPE_LINE);
+        chart_ops = rrdset_create_localhost("netdata", "backend_ops", NULL, "backend", NULL
+                                            , "Netdata Backend Operations", "operations", 130630, frequency
+                                            , RRDSET_TYPE_LINE);
         rrddim_add(chart_ops, "write",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(chart_ops, "discard",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(chart_ops, "reconnect", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -273,14 +278,16 @@ void *backends_main(void *ptr) {
      *
     RRDSET *chart_latency = rrdset_find_localhost("netdata.backend_latency");
     if(!chart_latency) {
-        chart_latency = rrdset_create("netdata", "backend_latency", NULL, "backend", NULL, "Netdata Backend Latency", "ms", 130620, frequency, RRDSET_TYPE_AREA);
+        chart_latency = rrdset_create_localhost("netdata", "backend_latency", NULL, "backend", NULL, "Netdata Backend Latency", "ms", 130620, frequency, RRDSET_TYPE_AREA);
         rrddim_add(chart_latency, "latency",   NULL,  1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
     */
 
     RRDSET *chart_rusage = rrdset_find_localhost("netdata.backend_thread_cpu");
     if(!chart_rusage) {
-        chart_rusage = rrdset_create("netdata", "backend_thread_cpu", NULL, "backend", NULL, "NetData Backend Thread CPU usage", "milliseconds/s", 130630, frequency, RRDSET_TYPE_STACKED);
+        chart_rusage = rrdset_create_localhost("netdata", "backend_thread_cpu", NULL, "backend", NULL
+                                               , "NetData Backend Thread CPU usage", "milliseconds/s", 130630, frequency
+                                               , RRDSET_TYPE_STACKED);
         rrddim_add(chart_rusage, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         rrddim_add(chart_rusage, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
     }

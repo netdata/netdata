@@ -138,7 +138,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                     st = rrdset_find_bytype_localhost("disk", diskstat.name);
                     if (unlikely(!st)) {
-                        st = rrdset_create("disk", diskstat.name, NULL, diskstat.name, "disk.io", "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
+                        st = rrdset_create_localhost("disk", diskstat.name, NULL, diskstat.name, "disk.io"
+                                                     , "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every
+                                                     , RRDSET_TYPE_AREA);
 
                         rrddim_add(st, "reads", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
                         rrddim_add(st, "writes", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -163,7 +165,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                     st = rrdset_find_bytype_localhost("disk_ops", diskstat.name);
                     if (unlikely(!st)) {
-                        st = rrdset_create("disk_ops", diskstat.name, NULL, diskstat.name, "disk.ops", "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
+                        st = rrdset_create_localhost("disk_ops", diskstat.name, NULL, diskstat.name, "disk.ops"
+                                                     , "Disk Completed I/O Operations", "operations/s", 2001
+                                                     , update_every, RRDSET_TYPE_LINE);
                         st->isdetail = 1;
 
                         rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -189,7 +193,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                     st = rrdset_find_bytype_localhost("disk_util", diskstat.name);
                     if (unlikely(!st)) {
-                        st = rrdset_create("disk_util", diskstat.name, NULL, diskstat.name, "disk.util", "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
+                        st = rrdset_create_localhost("disk_util", diskstat.name, NULL, diskstat.name, "disk.util"
+                                                     , "Disk Utilization Time", "% of time working", 2004, update_every
+                                                     , RRDSET_TYPE_AREA);
                         st->isdetail = 1;
 
                         rrddim_add(st, "utilization", NULL, 1, 10000000, RRD_ALGORITHM_INCREMENTAL);
@@ -214,7 +220,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                     st = rrdset_find_bytype_localhost("disk_iotime", diskstat.name);
                     if (unlikely(!st)) {
-                        st = rrdset_create("disk_iotime", diskstat.name, NULL, diskstat.name, "disk.iotime", "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
+                        st = rrdset_create_localhost("disk_iotime", diskstat.name, NULL, diskstat.name, "disk.iotime"
+                                                     , "Disk Total I/O Time", "milliseconds/s", 2022, update_every
+                                                     , RRDSET_TYPE_LINE);
                         st->isdetail = 1;
 
                         rrddim_add(st, "reads", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
@@ -238,7 +246,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                         st = rrdset_find_bytype_localhost("disk_await", diskstat.name);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_await", diskstat.name, NULL, diskstat.name, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
+                            st = rrdset_create_localhost("disk_await", diskstat.name, NULL, diskstat.name, "disk.await"
+                                                         , "Average Completed I/O Operation Time", "ms per operation"
+                                                         , 2005, update_every, RRDSET_TYPE_LINE);
                             st->isdetail = 1;
 
                             rrddim_add(st, "reads", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
@@ -256,7 +266,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                         st = rrdset_find_bytype_localhost("disk_avgsz", diskstat.name);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_avgsz", diskstat.name, NULL, diskstat.name, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
+                            st = rrdset_create_localhost("disk_avgsz", diskstat.name, NULL, diskstat.name, "disk.avgsz"
+                                                         , "Average Completed I/O Operation Bandwidth"
+                                                         , "kilobytes per operation", 2006, update_every
+                                                         , RRDSET_TYPE_AREA);
                             st->isdetail = 1;
 
                             rrddim_add(st, "reads", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -274,7 +287,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                         st = rrdset_find_bytype_localhost("disk_svctm", diskstat.name);
                         if (unlikely(!st)) {
-                            st = rrdset_create("disk_svctm", diskstat.name, NULL, diskstat.name, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
+                            st = rrdset_create_localhost("disk_svctm", diskstat.name, NULL, diskstat.name, "disk.svctm"
+                                                         , "Average Service Time", "ms per operation", 2007
+                                                         , update_every, RRDSET_TYPE_LINE);
                             st->isdetail = 1;
 
                             rrddim_add(st, "svctm", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
@@ -303,7 +318,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
     if (likely(do_io)) {
         st = rrdset_find_bytype_localhost("system", "io");
         if (unlikely(!st)) {
-            st = rrdset_create("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150, update_every, RRDSET_TYPE_AREA);
+            st = rrdset_create_localhost("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150
+                                         , update_every, RRDSET_TYPE_AREA);
             rrddim_add(st, "in",  NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "out", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
         }
@@ -343,9 +359,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     st = rrdset_find_bytype_localhost("disk_space", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
                         snprintfz(title, 4096, "Disk Space Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
-                        st = rrdset_create("disk_space", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.space", title, "GB", 2023,
-                                           update_every,
-                                           RRDSET_TYPE_STACKED);
+                        st = rrdset_create_localhost("disk_space", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname
+                                                     , "disk.space", title, "GB", 2023, update_every
+                                                     , RRDSET_TYPE_STACKED);
 
                         rrddim_add(st, "avail", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "used", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
@@ -366,8 +382,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     st = rrdset_find_bytype_localhost("disk_inodes", mntbuf[i].f_mntonname);
                     if (unlikely(!st)) {
                         snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
-                        st = rrdset_create("disk_inodes", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.inodes", title, "Inodes", 2024,
-                                           update_every, RRDSET_TYPE_STACKED);
+                        st = rrdset_create_localhost("disk_inodes", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname
+                                                     , "disk.inodes", title, "Inodes", 2024, update_every
+                                                     , RRDSET_TYPE_STACKED);
 
                         rrddim_add(st, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -400,7 +417,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                 st = rrdset_find_bytype_localhost("net", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net", ifa->ifa_name, NULL, ifa->ifa_name, "net.net", "Bandwidth", "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost("net", ifa->ifa_name, NULL, ifa->ifa_name, "net.net", "Bandwidth"
+                                                 , "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
 
                     rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -415,7 +433,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                 st = rrdset_find_bytype_localhost("net_packets", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net_packets", ifa->ifa_name, NULL, ifa->ifa_name, "net.packets", "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("net_packets", ifa->ifa_name, NULL, ifa->ifa_name, "net.packets"
+                                                 , "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
                     rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -435,7 +454,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                 st = rrdset_find_bytype_localhost("net_errors", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net_errors", ifa->ifa_name, NULL, ifa->ifa_name, "net.errors", "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("net_errors", ifa->ifa_name, NULL, ifa->ifa_name, "net.errors"
+                                                 , "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
                     rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -451,7 +471,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                 st = rrdset_find_bytype_localhost("net_drops", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net_drops", ifa->ifa_name, NULL, ifa->ifa_name, "net.drops", "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("net_drops", ifa->ifa_name, NULL, ifa->ifa_name, "net.drops"
+                                                 , "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
                     rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -465,7 +486,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                 st = rrdset_find_bytype_localhost("net_events", ifa->ifa_name);
                 if (unlikely(!st)) {
-                    st = rrdset_create("net_events", ifa->ifa_name, NULL, ifa->ifa_name, "net.events", "Network Interface Events", "events/s", 7006, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("net_events", ifa->ifa_name, NULL, ifa->ifa_name, "net.events"
+                                                 , "Network Interface Events", "events/s", 7006, update_every
+                                                 , RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
                     rrddim_add(st, "frames", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

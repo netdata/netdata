@@ -21,7 +21,8 @@ void *cpuidlejitter_main(void *ptr) {
 
     RRDSET *st = rrdset_find_localhost("system.idlejitter");
     if(!st) {
-        st = rrdset_create("system", "idlejitter", NULL, "processes", NULL, "CPU Idle Jitter", "microseconds lost/s", 9999, rrd_update_every, RRDSET_TYPE_LINE);
+        st = rrdset_create_localhost("system", "idlejitter", NULL, "processes", NULL, "CPU Idle Jitter"
+                                     , "microseconds lost/s", 9999, rrd_update_every, RRDSET_TYPE_LINE);
         rrddim_add(st, "jitter", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
