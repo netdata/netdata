@@ -208,7 +208,7 @@ void rrdhost_free(RRDHOST *host) {
 
         pthread_rwlock_unlock(&st->rwlock);
 
-        if(st->mapped == RRD_MEMORY_MODE_SAVE || st->mapped == RRD_MEMORY_MODE_MAP) {
+        if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
             debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
             munmap(st, st->memsize);
         }
@@ -244,14 +244,14 @@ void rrdhost_save(RRDHOST *host) {
     for(st = host->rrdset_root; st ; st = st->next) {
         pthread_rwlock_rdlock(&st->rwlock);
 
-        if(st->mapped == RRD_MEMORY_MODE_SAVE) {
-            debug(D_RRD_CALLS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
+        if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+            debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
             savememory(st->cache_filename, st, st->memsize);
         }
 
         for(rd = st->dimensions; rd ; rd = rd->next) {
-            if(likely(rd->memory_mode == RRD_MEMORY_MODE_SAVE)) {
-                debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
+            if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
+                debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
                 savememory(rd->cache_filename, rd, rd->memsize);
             }
         }
@@ -279,6 +279,8 @@ void rrdhost_free_all(void) {
 }
 
 void rrdhost_save_all(void) {
+    info("Saving database...");
+
     RRDHOST *host;
     for(host = localhost; host ; host = host->next)
         rrdhost_save(host);

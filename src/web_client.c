@@ -1386,22 +1386,22 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
     switch(action) {
         case 'A':
             w->tracking_required = 1;
-            return registry_request_access_json(w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
+            return registry_request_access_json(localhost, w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
 
         case 'D':
             w->tracking_required = 1;
-            return registry_request_delete_json(w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
+            return registry_request_delete_json(localhost, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
             w->tracking_required = 1;
-            return registry_request_search_json(w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
+            return registry_request_search_json(localhost, w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
 
         case 'W':
             w->tracking_required = 1;
-            return registry_request_switch_json(w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
+            return registry_request_switch_json(localhost, w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
 
         case 'H':
-            return registry_request_hello_json(w);
+            return registry_request_hello_json(localhost, w);
 
         default:
             buffer_flush(w->response.data);

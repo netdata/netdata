@@ -291,7 +291,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
         st->units = NULL;
         st->dimensions = NULL;
         st->next = NULL;
-        st->mapped = host->rrd_memory_mode;
+        st->rrd_memory_mode = host->rrd_memory_mode;
         st->variables = NULL;
         st->alarms = NULL;
         memset(&st->rwlock, 0, sizeof(pthread_rwlock_t));
@@ -302,7 +302,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     }
     else {
         st = callocz(1, size);
-        st->mapped = RRD_MEMORY_MODE_RAM;
+        st->rrd_memory_mode = RRD_MEMORY_MODE_RAM;
     }
 
     st->rrdhost = host;

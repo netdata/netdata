@@ -122,7 +122,7 @@ struct rrddim {
                                                     // DO NOT FREE THIS - IT IS ALLOCATED IN CONFIG
 
     RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
-    RRD_MEMORY_MODE memory_mode;                    // the memory mode for this dimension
+    RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
 
     collected_number multiplier;                    // the multiplier of the collected values
     collected_number divisor;                       // the divider of the collected values
@@ -235,7 +235,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
 
-    int mapped;                                     // if set to 1, this is memory mapped
+    RRD_MEMORY_MODE rrd_memory_mode;                // if set to 1, this is memory mapped
 
     int debug;
 
