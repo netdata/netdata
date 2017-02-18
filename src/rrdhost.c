@@ -1,6 +1,8 @@
 #define NETDATA_RRD_INTERNALS 1
 #include "common.h"
 
+RRDHOST *localhost = NULL;
+
 // ----------------------------------------------------------------------------
 // RRDHOST index
 
@@ -62,12 +64,57 @@ RRDHOST *rrdhost_create(const char *hostname, const char *guid) {
     avl_init_lock(&(host->rrdfamily_root_index), rrdfamily_compare);
     avl_init_lock(&(host->variables_root_index), rrdvar_compare);
 
+
+    // ------------------------------------------------------------------------
+    // initialize health variables
+
     host->health_log.next_log_id = 1;
     host->health_log.next_alarm_id = 1;
     host->health_log.max = 1000;
     host->health_log.next_log_id =
     host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
+
+    long n = config_get_number("health", "in memory max health log entries", host->health_log.max);
+    if(n < 10) {
+        error("Health configuration has invalid max log entries %ld. Using default %u", n, host->health_log.max);
+        config_set_number("health", "in memory max health log entries", (long)host->health_log.max);
+    }
+    else
+        host->health_log.max = (unsigned int)n;
+
     pthread_rwlock_init(&(host->health_log.alarm_log_rwlock), NULL);
+
+    char filename[FILENAME_MAX + 1];
+
+    if(!localhost) {
+        // this is localhost
+        snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", netdata_configured_varlib_dir);
+        host->health_log_filename = strdupz(config_get("health", "health db file", filename));
+    }
+    else {
+        // this is not localhost - append our GUID to localhost path
+        snprintfz(filename, FILENAME_MAX, "%s.%s", localhost->health_log_filename, host->machine_guid);
+        host->health_log_filename = strdupz(filename);
+    }
+
+    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
+    host->health_default_exec = strdupz(config_get("health", "script to execute on alarm", filename));
+    host->health_default_recipient = strdup("root");
+
+
+    // ------------------------------------------------------------------------
+    // load health configuration
+
+    health_alarm_log_load(host);
+    health_alarm_log_open(host);
+
+    rrdhost_rwlock(host);
+    health_readdir(host, health_config_dir());
+    rrdhost_unlock(host);
+
+
+    // ------------------------------------------------------------------------
+    // add it to the index
 
     if(rrdhost_index_add(host) != host)
         fatal("Cannot add host '%s' to index. It already exists.", hostname);
@@ -88,8 +135,6 @@ RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid) {
 
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
-
-RRDHOST *localhost = NULL;
 
 void rrd_init(char *hostname) {
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
@@ -143,14 +188,9 @@ void rrdhost_free(RRDHOST *host) {
 
         pthread_rwlock_wrlock(&st->rwlock);
 
-        while(st->variables)
-            rrdsetvar_free(st->variables);
-
-        while(st->alarms)
-            rrdsetcalc_unlink(st->alarms);
-
-        while(st->dimensions)
-            rrddim_free(st, st->dimensions);
+        while(st->variables)  rrdsetvar_free(st->variables);
+        while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+        while(st->dimensions) rrddim_free(st, st->dimensions);
 
         if(unlikely(rrdset_index_del(host, st) != st))
             error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", st->id);
@@ -174,6 +214,9 @@ void rrdhost_free(RRDHOST *host) {
     }
     host->rrdset_root = NULL;
 
+    freez(host->health_default_exec);
+    freez(host->health_default_recipient);
+    freez(host->health_log_filename);
     freez(host->hostname);
     rrdhost_unlock(host);
     freez(host);

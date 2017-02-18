@@ -369,4 +369,47 @@ extern void rrdvar_custom_host_variable_set(RRDVAR *rv, calculated_number value)
 
 extern const char *rrdcalc_status2string(int status);
 
+
+extern int health_alarm_log_open(RRDHOST *host);
+extern void health_alarm_log_close(RRDHOST *host);
+extern void health_log_rotate(RRDHOST *host);
+extern void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
+extern ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename);
+extern void health_alarm_log_load(RRDHOST *host);
+extern void health_alarm_log(
+        RRDHOST *host,
+        uint32_t alarm_id,
+        uint32_t alarm_event_id,
+        time_t when,
+        const char *name,
+        const char *chart,
+        const char *family,
+        const char *exec,
+        const char *recipient,
+        time_t duration,
+        calculated_number old_value,
+        calculated_number new_value,
+        int old_status,
+        int new_status,
+        const char *source,
+        const char *units,
+        const char *info,
+        int delay,
+        uint32_t flags
+);
+
+extern void health_readdir(RRDHOST *host, const char *path);
+extern char *health_config_dir(void);
+extern void health_free_host_nolock(RRDHOST *host);
+extern void health_reload_host(RRDHOST *host);
+
+#ifdef NETDATA_HEALTH_INTERNALS
+extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name);
+extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
+extern void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc);
+extern void rrdcalc_free(RRDHOST *host, RRDCALC *rc);
+extern void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
+extern int rrdvar_fix_name(char *variable);
+#endif
+
 #endif //NETDATA_HEALTH_H

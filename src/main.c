@@ -796,6 +796,11 @@ int main(int argc, char **argv) {
     }
 
     // ------------------------------------------------------------------------
+    // initialize health monitoring
+
+    health_init();
+
+    // ------------------------------------------------------------------------
     // initialize the registry
 
     registry_init();
@@ -804,11 +809,6 @@ int main(int argc, char **argv) {
     // initialize rrd host
 
     rrd_init(hostname);
-
-    // ------------------------------------------------------------------------
-    // initialize health monitoring
-
-    health_init();
 
     if(check_config)
         exit(1);

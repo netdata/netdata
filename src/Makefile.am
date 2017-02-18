@@ -39,7 +39,7 @@ netdata_SOURCES = \
 	dictionary.c dictionary.h \
 	eval.c eval.h \
 	global_statistics.c global_statistics.h \
-	health.c health.h \
+	health.c health.h health_log.c health_config.c health_json.c \
 	inlined.h \
 	log.c log.h \
 	main.c main.h \
