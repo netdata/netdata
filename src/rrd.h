@@ -120,7 +120,7 @@ struct rrddim {
                                                     // (the user overwrites the name of the charts)
                                                     // DO NOT FREE THIS - IT IS ALLOCATED IN CONFIG
 
-    RRD_ALGORITHM algorithm;                     // the algorithm that is applied to add new collected values
+    RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
     RRD_MEMORY_MODE memory_mode;                    // the memory mode for this dimension
 
     collected_number multiplier;                    // the multiplier of the collected values
@@ -297,7 +297,10 @@ struct rrdhost {
     avl avl;
 
     char *hostname;
+    uint32_t hash_hostname;
+
     char machine_guid[GUID_LEN + 1];
+    uint32_t hash_machine_guid;
 
     RRDSET *rrdset_root;
     pthread_rwlock_t rrdset_root_rwlock;
@@ -326,8 +329,12 @@ struct rrdhost {
     struct rrdhost *next;
 };
 typedef struct rrdhost RRDHOST;
-extern RRDHOST localhost;
-extern void rrdhost_init(char *hostname);
+
+extern RRDHOST *localhost;
+
+extern void rrd_init(char *hostname);
+
+extern RRDHOST *rrdhost_find(const char *guid, uint32_t hash);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)
@@ -345,7 +352,7 @@ extern void rrdhost_rdlock(RRDHOST *host);
 extern void rrdhost_unlock(RRDHOST *host);
 
 // ----------------------------------------------------------------------------
-// RRD SET functions
+// RRDSET functions
 
 extern void rrdset_set_name(RRDSET *st, const char *name);
 
@@ -367,13 +374,13 @@ extern void rrdhost_free(RRDHOST *host);
 extern void rrdhost_save(RRDHOST *host);
 
 extern RRDSET *rrdset_find(RRDHOST *host, const char *id);
-#define rrdset_find_localhost(id) rrdset_find(&localhost, id)
+#define rrdset_find_localhost(id) rrdset_find(localhost, id)
 
 extern RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id);
-#define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(&localhost, type, id)
+#define rrdset_find_bytype_localhost(type, id) rrdset_find_bytype(localhost, type, id)
 
 extern RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
-#define rrdset_find_byname_localhost(name)  rrdset_find_byname(&localhost, name)
+#define rrdset_find_byname_localhost(name)  rrdset_find_byname(localhost, name)
 
 extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
 extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
@@ -433,6 +440,8 @@ extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number 
 // RRD internal functions
 
 #ifdef NETDATA_RRD_INTERNALS
+
+extern avl_tree_lock rrdhost_root_index;
 
 extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern char *rrdset_cache_dir(const char *id);

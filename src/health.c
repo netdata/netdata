@@ -1555,7 +1555,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if (rrdcalc_exists(host, rc->chart, rc->name, rc->hash_chart, rc->hash))
         return 0;
 
-    rc->id = rrdcalc_get_unique_id(&localhost, rc->chart, rc->name, &rc->next_event_id);
+    rc->id = rrdcalc_get_unique_id(localhost, rc->chart, rc->name, &rc->next_event_id);
 
     debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
           rc->chart?rc->chart:"NOCHART",
@@ -2040,12 +2040,12 @@ int health_readfile(const char *path, const char *filename) {
         uint32_t hash = simple_uhash(key);
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
-            if(rc && !rrdcalc_add_alarm_from_config(&localhost, rc))
-                rrdcalc_free(&localhost, rc);
+            if(rc && !rrdcalc_add_alarm_from_config(localhost, rc))
+                rrdcalc_free(localhost, rc);
 
             if(rt) {
-                if (!rrdcalctemplate_add_template_from_config(&localhost, rt))
-                    rrdcalctemplate_free(&localhost, rt);
+                if (!rrdcalctemplate_add_template_from_config(localhost, rt))
+                    rrdcalctemplate_free(localhost, rt);
                 rt = NULL;
             }
 
@@ -2065,13 +2065,13 @@ int health_readfile(const char *path, const char *filename) {
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
-                if(!rrdcalc_add_alarm_from_config(&localhost, rc))
-                    rrdcalc_free(&localhost, rc);
+                if(!rrdcalc_add_alarm_from_config(localhost, rc))
+                    rrdcalc_free(localhost, rc);
                 rc = NULL;
             }
 
-            if(rt && !rrdcalctemplate_add_template_from_config(&localhost, rt))
-                rrdcalctemplate_free(&localhost, rt);
+            if(rt && !rrdcalctemplate_add_template_from_config(localhost, rt))
+                rrdcalctemplate_free(localhost, rt);
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
             rt->name = strdupz(value);
@@ -2332,11 +2332,11 @@ int health_readfile(const char *path, const char *filename) {
         }
     }
 
-    if(rc && !rrdcalc_add_alarm_from_config(&localhost, rc))
-        rrdcalc_free(&localhost, rc);
+    if(rc && !rrdcalc_add_alarm_from_config(localhost, rc))
+        rrdcalc_free(localhost, rc);
 
-    if(rt && !rrdcalctemplate_add_template_from_config(&localhost, rt))
-        rrdcalctemplate_free(&localhost, rt);
+    if(rt && !rrdcalctemplate_add_template_from_config(localhost, rt))
+        rrdcalctemplate_free(localhost, rt);
 
     fclose(fp);
     return 1;
@@ -2410,7 +2410,7 @@ void health_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/health-log.db", pathname);
     health.log_filename = config_get("health", "health db file", filename);
 
-    health_alarm_log_load(&localhost);
+    health_alarm_log_load(localhost);
     health_alarm_log_open();
 
     char *path = health_config_dir();
@@ -2418,16 +2418,16 @@ void health_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
     health.health_default_exec = config_get("health", "script to execute on alarm", filename);
 
-    long n = config_get_number("health", "in memory max health log entries", (long)localhost.health_log.max);
+    long n = config_get_number("health", "in memory max health log entries", (long)localhost->health_log.max);
     if(n < 10) {
-        error("Health configuration has invalid max log entries %ld. Using default %u", n, localhost.health_log.max);
-        config_set_number("health", "in memory max health log entries", (long)localhost.health_log.max);
+        error("Health configuration has invalid max log entries %ld. Using default %u", n, localhost->health_log.max);
+        config_set_number("health", "in memory max health log entries", (long)localhost->health_log.max);
     }
-    else localhost.health_log.max = (unsigned int)n;
+    else localhost->health_log.max = (unsigned int)n;
 
-    rrdhost_rwlock(&localhost);
+    rrdhost_rwlock(localhost);
     health_readdir(path);
-    rrdhost_unlock(&localhost);
+    rrdhost_unlock(localhost);
 }
 
 // ----------------------------------------------------------------------------
@@ -2651,7 +2651,7 @@ static inline void health_rrdcalc2json_nolock(BUFFER *wb, RRDCALC *rc) {
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
     int i;
 
-    rrdhost_rdlock(&localhost);
+    rrdhost_rdlock(localhost);
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                         "\n\t\"latest_alarm_log_unique_id\": %u,"
                         "\n\t\"status\": %s,"
@@ -2681,7 +2681,7 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
 //        health_rrdcalctemplate2json_nolock(wb, rt);
 
     buffer_strcat(wb, "\n\t}\n}\n");
-    rrdhost_unlock(&localhost);
+    rrdhost_unlock(localhost);
 }
 
 
@@ -2705,37 +2705,37 @@ void health_reload(void) {
     char *path = health_config_dir();
 
     // free all running alarms
-    rrdhost_rwlock(&localhost);
-    health_free_all_nolock(&localhost);
-    rrdhost_unlock(&localhost);
+    rrdhost_rwlock(localhost);
+    health_free_all_nolock(localhost);
+    rrdhost_unlock(localhost);
 
     // invalidate all previous entries in the alarm log
     ALARM_ENTRY *t;
-    for(t = localhost.health_log.alarms ; t ; t = t->next) {
+    for(t = localhost->health_log.alarms ; t ; t = t->next) {
         if(t->new_status != RRDCALC_STATUS_REMOVED)
             t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
     }
 
     // reset all thresholds to all charts
     RRDSET *st;
-    for(st = localhost.rrdset_root; st ; st = st->next) {
+    for(st = localhost->rrdset_root; st ; st = st->next) {
         st->green = NAN;
         st->red = NAN;
     }
 
     // load the new alarms
-    rrdhost_rwlock(&localhost);
+    rrdhost_rwlock(localhost);
     health_readdir(path);
-    rrdhost_unlock(&localhost);
+    rrdhost_unlock(localhost);
 
     // link the loaded alarms to their charts
-    for(st = localhost.rrdset_root; st ; st = st->next) {
-        rrdhost_rwlock(&localhost);
+    for(st = localhost->rrdset_root; st ; st = st->next) {
+        rrdhost_rwlock(localhost);
 
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
 
-        rrdhost_unlock(&localhost);
+        rrdhost_unlock(localhost);
     }
 }
 
@@ -3013,10 +3013,10 @@ void *health_main(void *ptr) {
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
 
-        rrdhost_rdlock(&localhost);
+        rrdhost_rdlock(localhost);
 
         // the first loop is to lookup values from the db
-        for(rc = localhost.alarms; rc; rc = rc->next) {
+        for(rc = localhost->alarms; rc; rc = rc->next) {
             if(unlikely(!rrdcalc_isrunnable(rc, now, &next_run))) {
                 if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE))
                     rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUNNABLE;
@@ -3121,12 +3121,12 @@ void *health_main(void *ptr) {
                 }
             }
         }
-        rrdhost_unlock(&localhost);
+        rrdhost_unlock(localhost);
 
         if(unlikely(runnable && !netdata_exit)) {
-            rrdhost_rdlock(&localhost);
+            rrdhost_rdlock(localhost);
 
-            for(rc = localhost.alarms; rc; rc = rc->next) {
+            for(rc = localhost->alarms; rc; rc = rc->next) {
                 if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE)))
                     continue;
 
@@ -3251,7 +3251,7 @@ void *health_main(void *ptr) {
                     rc->delay_last = delay;
                     rc->delay_up_to_timestamp = now + delay;
                     health_alarm_log(
-                            &localhost,
+                            localhost,
                             rc->id,
                             rc->next_event_id++,
                             now,
@@ -3282,7 +3282,7 @@ void *health_main(void *ptr) {
                     next_run = rc->next_update;
             }
 
-            rrdhost_unlock(&localhost);
+            rrdhost_unlock(localhost);
         }
 
         if (unlikely(pthread_setcancelstate(oldstate, NULL) != 0))
@@ -3293,7 +3293,7 @@ void *health_main(void *ptr) {
 
         // execute notifications
         // and cleanup
-        health_alarm_log_process(&localhost);
+        health_alarm_log_process(localhost);
 
         if(unlikely(netdata_exit))
             break;

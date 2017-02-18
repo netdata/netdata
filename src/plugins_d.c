@@ -109,7 +109,7 @@ void *pluginsd_worker_thread(void *arg) {
 #endif
 
     size_t count = 0;
-    RRDHOST *host = &localhost;
+    RRDHOST *host = localhost;
 
     for(;;) {
         if(unlikely(netdata_exit)) break;
