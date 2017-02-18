@@ -133,12 +133,12 @@ void rrdset_set_name(RRDSET *st, const char *name) {
 
     if(st->name) {
         rrdset_index_del_name(st->rrdhost, st);
-        st->name = config_set_default(st->id, "name", b);
+        st->name = config_set_default(st->config_section, "name", b);
         st->hash_name = simple_hash(st->name);
         rrdsetvar_rename_all(st);
     }
     else {
-        st->name = config_get(st->id, "name", b);
+        st->name = config_get(st->config_section, "name", b);
         st->hash_name = simple_hash(st->name);
     }
 
@@ -207,11 +207,43 @@ static inline void timeval_align(struct timeval *tv, int update_every) {
 }
 
 // ----------------------------------------------------------------------------
+// RRDSET - free a chart
+
+void rrdset_free(RRDSET *st) {
+    pthread_rwlock_wrlock(&st->rwlock);
+
+    while(st->variables)  rrdsetvar_free(st->variables);
+    while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+    while(st->dimensions) rrddim_free(st, st->dimensions);
+
+    if(unlikely(rrdset_index_del(st->rrdhost, st) != st))
+        error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", st->id);
+
+    rrdset_index_del_name(st->rrdhost, st);
+
+    st->rrdfamily->use_count--;
+    if(!st->rrdfamily->use_count)
+        rrdfamily_free(st->rrdhost, st->rrdfamily);
+
+    pthread_rwlock_unlock(&st->rwlock);
+
+    // free directly allocated memory
+    freez(st->config_section);
+
+    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
+        debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
+        munmap(st, st->memsize);
+    }
+    else
+        freez(st);
+}
+
+// ----------------------------------------------------------------------------
 // RRDSET - create a chart
 
 RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const char *name, const char *family
                       , const char *context, const char *title, const char *units, long priority
-                      , int update_every, int chart_type) {
+                      , int update_every, RRDSET_TYPE chart_type) {
 
     if(!type || !type[0]) {
         fatal("Cannot create rrd stats without a type.");
@@ -223,9 +255,10 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
         return NULL;
     }
 
-    char fullid[RRD_ID_LENGTH_MAX + 1];
-    char fullfilename[FILENAME_MAX + 1];
+    // ------------------------------------------------------------------------
+    // check if it already exists
 
+    char fullid[RRD_ID_LENGTH_MAX + 1];
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
     RRDSET *st = rrdset_find(host, fullid);
@@ -234,77 +267,101 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
         return st;
     }
 
-    long rentries = config_get_number(fullid, "history", host->rrd_history_entries);
-    long entries = align_entries_to_pagesize(rentries);
-    if(entries != rentries) entries = config_set_number(fullid, "history", entries);
+    char fullfilename[FILENAME_MAX + 1];
 
-    int enabled = config_get_boolean(fullid, "enabled", 1);
+    // ------------------------------------------------------------------------
+    // compose the config_section for this chart
+
+    char config_section[RRD_ID_LENGTH_MAX + 1];
+    if(host == localhost)
+        strcpy(config_section, fullid);
+    else
+        snprintfz(config_section, RRD_ID_LENGTH_MAX, "%s/%s", host->machine_guid, fullid);
+
+    // ------------------------------------------------------------------------
+    // get the options from the config, we need to create it
+
+    long rentries = config_get_number(config_section, "history", host->rrd_history_entries);
+    long entries = align_entries_to_pagesize(rentries);
+    if(entries != rentries) entries = config_set_number(config_section, "history", entries);
+
+    int enabled = config_get_boolean(config_section, "enabled", 1);
     if(!enabled) entries = 5;
 
     unsigned long size = sizeof(RRDSET);
-    char *cache_dir = rrdset_cache_dir(host, fullid);
+    char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
+
+    // ------------------------------------------------------------------------
+    // load it or allocate it
 
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(host->rrd_memory_mode != RRD_MEMORY_MODE_RAM) st = (RRDSET *)mymmap(fullfilename, size, ((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 0);
-    if(st) {
-        if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
-            errno = 0;
-            info("Initializing file %s.", fullfilename);
-            memset(st, 0, size);
-        }
-        else if(strcmp(st->id, fullid) != 0) {
-            errno = 0;
-            error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
-            // munmap(st, size);
-            // st = NULL;
-            memset(st, 0, size);
-        }
-        else if(st->memsize != size || st->entries != entries) {
-            errno = 0;
-            error("File %s does not have the desired size. Clearing it.", fullfilename);
-            memset(st, 0, size);
-        }
-        else if(st->update_every != update_every) {
-            errno = 0;
-            error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
-            memset(st, 0, size);
-        }
-        else if((now_realtime_sec() - st->last_updated.tv_sec) > update_every * entries) {
-            errno = 0;
-            error("File %s is too old. Clearing it.", fullfilename);
-            memset(st, 0, size);
-        }
+    if(host->rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
+        st = (RRDSET *) mymmap(fullfilename, size, ((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 0);
+        if(st) {
+            memset(&st->avl, 0, sizeof(avl));
+            memset(&st->avlname, 0, sizeof(avl));
+            memset(&st->variables_root_index, 0, sizeof(avl_tree_lock));
+            memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
+            memset(&st->rwlock, 0, sizeof(pthread_rwlock_t));
 
-        // make sure the database is aligned
-        if(st->last_updated.tv_sec)
-            timeval_align(&st->last_updated, update_every);
+            st->name = NULL;
+            st->type = NULL;
+            st->family = NULL;
+            st->context = NULL;
+            st->title = NULL;
+            st->units = NULL;
+            st->dimensions = NULL;
+            st->next = NULL;
+            st->variables = NULL;
+            st->alarms = NULL;
+            st->flags = 0x00000000;
+
+            if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
+                errno = 0;
+                info("Initializing file %s.", fullfilename);
+                memset(st, 0, size);
+            }
+            else if(strcmp(st->id, fullid) != 0) {
+                errno = 0;
+                error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
+                // munmap(st, size);
+                // st = NULL;
+                memset(st, 0, size);
+            }
+            else if(st->memsize != size || st->entries != entries) {
+                errno = 0;
+                error("File %s does not have the desired size. Clearing it.", fullfilename);
+                memset(st, 0, size);
+            }
+            else if(st->update_every != update_every) {
+                errno = 0;
+                error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
+                memset(st, 0, size);
+            }
+            else if((now_realtime_sec() - st->last_updated.tv_sec) > update_every * entries) {
+                errno = 0;
+                error("File %s is too old. Clearing it.", fullfilename);
+                memset(st, 0, size);
+            }
+
+            // make sure the database is aligned
+            if(st->last_updated.tv_sec)
+                timeval_align(&st->last_updated, update_every);
+
+            // make sure we have the right memory mode
+            // even if we cleared the memory
+            st->rrd_memory_mode = host->rrd_memory_mode;
+        }
     }
 
-    if(st) {
-        st->name = NULL;
-        st->type = NULL;
-        st->family = NULL;
-        st->context = NULL;
-        st->title = NULL;
-        st->units = NULL;
-        st->dimensions = NULL;
-        st->next = NULL;
-        st->rrd_memory_mode = host->rrd_memory_mode;
-        st->variables = NULL;
-        st->alarms = NULL;
-        memset(&st->rwlock, 0, sizeof(pthread_rwlock_t));
-        memset(&st->avl, 0, sizeof(avl));
-        memset(&st->avlname, 0, sizeof(avl));
-        memset(&st->variables_root_index, 0, sizeof(avl_tree_lock));
-        memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
-    }
-    else {
+    if(unlikely(!st)) {
         st = callocz(1, size);
         st->rrd_memory_mode = RRD_MEMORY_MODE_RAM;
     }
 
+    st->config_section = strdup(config_section);
     st->rrdhost = host;
     st->memsize = size;
     st->entries = entries;
@@ -320,15 +377,15 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
 
     st->cache_dir = cache_dir;
 
-    st->chart_type = rrdset_type_id(config_get(st->id, "chart type", rrdset_type_name(chart_type)));
-    st->type       = config_get(st->id, "type", type);
-    st->family     = config_get(st->id, "family", family?family:st->type);
-    st->units      = config_get(st->id, "units", units?units:"");
+    st->chart_type = rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
+    st->type       = config_get(st->config_section, "type", type);
+    st->family     = config_get(st->config_section, "family", family?family:st->type);
+    st->units      = config_get(st->config_section, "units", units?units:"");
 
-    st->context    = config_get(st->id, "context", context?context:st->id);
+    st->context    = config_get(st->config_section, "context", context?context:st->id);
     st->hash_context = simple_hash(st->context);
 
-    st->priority = config_get_number(st->id, "priority", priority);
+    st->priority = config_get_number(st->config_section, "priority", priority);
     if(enabled)
         rrdset_flag_set(st, RRDSET_FLAG_ENABLED);
     else
@@ -351,7 +408,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     st->counter_done = 0;
 
     st->gap_when_lost_iterations_above = (int) (
-            config_get_number(st->id, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2);
+            config_get_number(st->config_section, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2);
 
     avl_init_lock(&st->dimensions_index, rrddim_compare);
     avl_init_lock(&st->variables_root_index, rrdvar_compare);
@@ -367,7 +424,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
         char varvalue2[CONFIG_MAX_VALUE + 1];
         snprintfz(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
         json_escape_string(varvalue2, varvalue, sizeof(varvalue2));
-        st->title = config_get(st->id, "title", varvalue2);
+        st->title = config_get(st->config_section, "title", varvalue2);
     }
 
     st->rrdfamily = rrdfamily_create(host, st->family);

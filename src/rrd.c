@@ -113,15 +113,15 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type) {
 // ----------------------------------------------------------------------------
 // RRD - cache directory
 
-char *rrdset_cache_dir(RRDHOST *host, const char *id) {
+char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section) {
     char *ret = NULL;
 
     char b[FILENAME_MAX + 1];
     char n[FILENAME_MAX + 1];
     rrdset_strncpyz_name(b, id, FILENAME_MAX);
 
-    snprintfz(n, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, b);
-    ret = config_get(id, "cache directory", n);
+    snprintfz(n, FILENAME_MAX, "%s/%s", host->cache_dir, b);
+    ret = config_get(config_section, "cache directory", n);
 
     if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
         int r = mkdir(ret, 0775);
