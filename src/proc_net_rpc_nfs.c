@@ -273,7 +273,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("nfs", "net", NULL, "network", NULL, "NFS Client Network", "operations/s", 5007
                                          , update_every, RRDSET_TYPE_STACKED);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -296,7 +296,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("nfs", "rpc", NULL, "rpc", NULL, "NFS Client Remote Procedure Calls Statistics"
                                          , "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "calls", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "retransmits", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

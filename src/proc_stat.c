@@ -137,7 +137,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("system", "intr", NULL, "interrupts", NULL, "CPU Interrupts"
                                                  , "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
-                    st->isdetail = 1;
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
@@ -184,7 +184,7 @@ int do_proc_stat(int update_every, usec_t dt) {
         if(unlikely(!st)) {
             st = rrdset_create_localhost("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s"
                                          , 700, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }

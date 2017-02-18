@@ -252,8 +252,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->st_packets = rrdset_create_localhost("net_packets", d->name, NULL, d->name, "net.packets"
                                                             , "Packets", "packets/s", 7001, update_every
                                                             , RRDSET_TYPE_LINE);
-
-                d->st_packets->isdetail = 1;
+                rrdset_flag_set(d->st_packets, RRDSET_FLAG_DETAIL);
 
                 d->rd_rpackets = rrddim_add(d->st_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tpackets = rrddim_add(d->st_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -281,7 +280,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                                            , "Interface Errors", "errors/s", 7002, update_every
                                                            , RRDSET_TYPE_LINE);
 
-                d->st_errors->isdetail = 1;
+                rrdset_flag_set(d->st_errors, RRDSET_FLAG_DETAIL);
 
                 d->rd_rerrors = rrddim_add(d->st_errors, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_terrors = rrddim_add(d->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -307,7 +306,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                                           , "Interface Drops", "drops/s", 7003, update_every
                                                           , RRDSET_TYPE_LINE);
 
-                d->st_drops->isdetail = 1;
+                rrdset_flag_set(d->st_drops, RRDSET_FLAG_DETAIL);
 
                 d->rd_rdrops = rrddim_add(d->st_drops, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tdrops = rrddim_add(d->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -333,7 +332,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                                          , "Interface FIFO Buffer Errors", "errors", 7004, update_every
                                                          , RRDSET_TYPE_LINE);
 
-                d->st_fifo->isdetail = 1;
+                rrdset_flag_set(d->st_fifo, RRDSET_FLAG_DETAIL);
 
                 d->rd_rfifo = rrddim_add(d->st_fifo, "receive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tfifo = rrddim_add(d->st_fifo, "transmit", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -358,7 +357,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                                                , "net.compressed", "Compressed Packets", "packets/s"
                                                                , 7005, update_every, RRDSET_TYPE_LINE);
 
-                d->st_compressed->isdetail = 1;
+                rrdset_flag_set(d->st_compressed, RRDSET_FLAG_DETAIL);
 
                 d->rd_rcompressed = rrddim_add(d->st_compressed, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcompressed = rrddim_add(d->st_compressed, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -383,7 +382,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                                            , "Network Interface Events", "events/s", 7006, update_every
                                                            , RRDSET_TYPE_LINE);
 
-                d->st_events->isdetail = 1;
+                rrdset_flag_set(d->st_events, RRDSET_FLAG_DETAIL);
 
                 d->rd_rframe      = rrddim_add(d->st_events, "frames", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcollisions = rrddim_add(d->st_events, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

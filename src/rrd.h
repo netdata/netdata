@@ -188,6 +188,17 @@ typedef struct rrddim RRDDIM;
 // ----------------------------------------------------------------------------
 // RRDSET - this is a chart
 
+typedef enum rrdset_flags {
+    RRDSET_FLAG_ENABLED = 1 << 0, // enables or disables a chart
+    RRDSET_FLAG_DETAIL  = 1 << 1, // if set, the data set should be considered as a detail of another
+                                  // (the master data set should be the one that has the same family and is not detail)
+    RRDSET_FLAG_DEBUG   = 1 << 2  // enables or disables debugging for a chart
+} RRDSET_FLAGS;
+
+#define rrdset_flag_check(st, flag) ((st)->flags & flag)
+#define rrdset_flag_set(st, flag)   (st)->flags |= flag
+#define rrdset_flag_clear(st, flag) (st)->flags &= ~flag
+
 struct rrdset {
     // ------------------------------------------------------------------------
     // binary indexing structures
@@ -222,22 +233,18 @@ struct rrdset {
     long current_entry;                             // the entry that is currently being updated
                                                     // it goes around in a round-robin fashion
 
-    int enabled;
+    uint32_t flags;
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
 
     long priority;
 
-    int isdetail;                                   // if set, the data set should be considered as a detail of another
-                                                    // (the master data set should be the one that has the same family and is not detail)
 
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
 
     RRD_MEMORY_MODE rrd_memory_mode;                // if set to 1, this is memory mapped
-
-    int debug;
 
     char *cache_dir;                                // the directory to store dimensions
     char cache_filename[FILENAME_MAX+1];            // the filename to store this set

@@ -899,7 +899,7 @@ int run_test(struct test *test)
     if(test->feed2)
         rd2 = rrddim_add(st, "dim2", NULL, test->multiplier, test->divisor, test->algorithm);
 
-    st->debug = 1;
+    rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
 
     // feed it with the test data
     time_t time_now = 0, time_start = now_realtime_sec();
@@ -1101,7 +1101,7 @@ int unit_test(long delay, long shift)
 
     RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1
                                          , RRDSET_TYPE_LINE);
-    st->debug = 1;
+    rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
 
     RRDDIM *rdabs = NULL;
     RRDDIM *rdinc = NULL;

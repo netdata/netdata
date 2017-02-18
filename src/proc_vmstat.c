@@ -130,7 +130,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         if(unlikely(!st_pgfaults)) {
             st_pgfaults = rrdset_create_localhost("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults"
                                                   , "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
-            st_pgfaults->isdetail = 1;
+            rrdset_flag_set(st_pgfaults, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st_pgfaults, "minor",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -159,7 +159,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         if(unlikely(!st_numa)) {
             st_numa = rrdset_create_localhost("mem", "numa", NULL, "numa", NULL, "NUMA events", "events/s", 800
                                               , update_every, RRDSET_TYPE_LINE);
-            st_numa->isdetail = 1;
+            rrdset_flag_set(st_numa, RRDSET_FLAG_DETAIL);
 
             // These depend on CONFIG_NUMA in the kernel.
             rrddim_add(st_numa, "local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

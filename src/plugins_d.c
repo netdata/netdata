@@ -161,7 +161,7 @@ void *pluginsd_worker_thread(void *arg) {
                     break;
                 }
 
-                if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value?value:"<nothing>");
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value?value:"<nothing>");
 
                 if(value) rrddim_set(st, dimension, strtoll(value, NULL, 0));
             }
@@ -199,7 +199,7 @@ void *pluginsd_worker_thread(void *arg) {
                     break;
                 }
 
-                if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting an END on chart %s", cd->fullfilename, st->id);
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting an END on chart %s", cd->fullfilename, st->id);
 
                 rrdset_done(st);
                 st = NULL;
@@ -322,15 +322,16 @@ void *pluginsd_worker_thread(void *arg) {
 
                 if(unlikely(!algorithm || !*algorithm)) algorithm = "absolute";
 
-                if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
-                    , st->id
-                    , id
-                    , name?name:""
-                    , rrd_algorithm_name(rrd_algorithm_id(algorithm))
-                    , multiplier
-                    , divisor
-                    , options?options:""
-                    );
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                    debug(D_PLUGINSD, "PLUGINSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
+                        , st->id
+                        , id
+                        , name?name:""
+                        , rrd_algorithm_name(rrd_algorithm_id(algorithm))
+                        , multiplier
+                        , divisor
+                        , options?options:""
+                        );
 
                 RRDDIM *rd = rrddim_find(st, id);
                 if(unlikely(!rd)) {
@@ -342,7 +343,8 @@ void *pluginsd_worker_thread(void *arg) {
                         if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
                     }
                 }
-                else if(unlikely(st->debug)) debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
+                else if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                    debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
             }
             else if(unlikely(hash == DISABLE_HASH && !strcmp(s, "DISABLE"))) {
                 info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);

@@ -137,7 +137,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults"
                                                  , "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
-                    st->isdetail = 1;
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "memory",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "cow",       NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

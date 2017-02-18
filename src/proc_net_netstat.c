@@ -253,7 +253,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4", "inerrors", NULL, "errors", NULL, "IPv4 Input Errors"
                                                  , "packets/s", 4000, update_every, RRDSET_TYPE_LINE);
-                    st->isdetail = 1;
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InNoRoutes", "noroutes", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InTruncatedPkts", "truncated", 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -275,7 +275,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4", "mcast", NULL, "multicast", NULL, "IPv4 Multicast Bandwidth"
                                                  , "kilobits/s", 9000, update_every, RRDSET_TYPE_AREA);
-                    st->isdetail = 1;
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InMcastOctets", "received", 8, 1024, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutMcastOctets", "sent", -8, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -295,7 +295,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4", "bcast", NULL, "broadcast", NULL, "IPv4 Broadcast Bandwidth"
                                                  , "kilobits/s", 8000, update_every, RRDSET_TYPE_AREA);
-                    st->isdetail = 1;
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InBcastOctets", "received", 8, 1024, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutBcastOctets", "sent", -8, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -315,7 +315,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4", "mcastpkts", NULL, "multicast", NULL, "IPv4 Multicast Packets"
                                                  , "packets/s", 8600, update_every, RRDSET_TYPE_LINE);
-                    st->isdetail = 1;
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InMcastPkts", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutMcastPkts", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -335,7 +335,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4", "bcastpkts", NULL, "broadcast", NULL, "IPv4 Broadcast Packets"
                                                  , "packets/s", 8500, update_every, RRDSET_TYPE_LINE);
-                    st->isdetail = 1;
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InBcastPkts", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutBcastPkts", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -355,7 +355,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics"
                                                  , "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
-                    st->isdetail = 1;
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
