@@ -55,7 +55,7 @@ inline void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
 
 RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm) {
     RRDDIM *rd = rrddim_find(st, id);
-    if(rd) {
+    if(unlikely(rd)) {
         debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
         return rd;
     }
@@ -71,20 +71,20 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
     rrdset_strncpyz_name(filename, id, FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    if(st->rrdhost->rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
-        rd = (RRDDIM *)mymmap(fullfilename, size, ((st->rrdhost->rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
+    if(st->rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
+        rd = (RRDDIM *)mymmap(fullfilename, size, ((st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
         if(likely(rd)) {
             // we have a file mapped for rd
 
+            memset(&rd->avl, 0, sizeof(avl));
             rd->id = NULL;
             rd->name = NULL;
             rd->cache_filename = NULL;
-            rd->memory_mode = st->rrdhost->rrd_memory_mode;
             rd->flags = 0x00000000;
             rd->variables = NULL;
             rd->next = NULL;
             rd->rrdset = NULL;
-            memset(&rd->avl, 0, sizeof(avl));
+            rd->rrd_memory_mode = st->rrd_memory_mode;
 
             struct timeval now;
             now_realtime_timeval(&now);
@@ -130,7 +130,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
     if(unlikely(!rd)) {
         // if we didn't manage to get a mmap'd dimension, just create one
         rd = callocz(1, size);
-        rd->memory_mode = RRD_MEMORY_MODE_RAM;
+        rd->rrd_memory_mode = RRD_MEMORY_MODE_RAM;
     }
 
     rd->memsize = size;
@@ -227,7 +227,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 
     // free(rd->annotations);
 
-    switch(rd->memory_mode) {
+    switch(rd->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
             debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
             savememory(rd->cache_filename, rd, rd->memsize);
