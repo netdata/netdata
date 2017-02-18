@@ -33,7 +33,7 @@ inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
     }
 }
 
-int rrd_memory_mode_id(const char *name) {
+RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
     if(unlikely(!strcmp(name, RRD_MEMORY_MODE_RAM_NAME)))
         return RRD_MEMORY_MODE_RAM;
     else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_MAP_NAME)))

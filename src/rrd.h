@@ -50,7 +50,7 @@ typedef enum rrd_memory_mode {
 RRD_MEMORY_MODE rrd_memory_mode;
 
 extern const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
-extern int rrd_memory_mode_id(const char *name);
+extern RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
 
 
 // ----------------------------------------------------------------------------
