@@ -639,7 +639,7 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
 
-        rrd_memory_mode = rrd_memory_mode_id(config_get("global", "memory mode", rrd_memory_mode_name(rrd_memory_mode)));
+        default_localhost_rrd_memory_mode = rrd_memory_mode_id(config_get("global", "memory mode", rrd_memory_mode_name(default_localhost_rrd_memory_mode)));
 
         // --------------------------------------------------------------------
 

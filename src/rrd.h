@@ -47,7 +47,7 @@ typedef enum rrd_memory_mode {
 #define RRD_MEMORY_MODE_MAP_NAME "map"
 #define RRD_MEMORY_MODE_SAVE_NAME "save"
 
-RRD_MEMORY_MODE rrd_memory_mode;
+extern RRD_MEMORY_MODE default_localhost_rrd_memory_mode;
 
 extern const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
 extern RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
@@ -294,32 +294,32 @@ typedef struct rrdset RRDSET;
 // RRD HOST
 
 struct rrdhost {
-    avl avl;
+    avl avl;                                        // the index of hosts
 
-    char *hostname;
-    uint32_t hash_hostname;
+    char *hostname;                                 // the hostname of this host
+    uint32_t hash_hostname;                         // the hostname hash
 
-    char machine_guid[GUID_LEN + 1];
-    uint32_t hash_machine_guid;
+    char machine_guid[GUID_LEN + 1];                // the unique ID of this host
+    uint32_t hash_machine_guid;                     // the hash of the unique ID
 
-    uint32_t flags;
+    int health_enabled;                             // 1 when this host has health enabled
+    RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
 
-    RRDSET *rrdset_root;
-    pthread_rwlock_t rrdset_root_rwlock;
+    RRDSET *rrdset_root;                            // the host charts
+    pthread_rwlock_t rrdset_root_rwlock;            // lock for the host charts
 
-    avl_tree_lock rrdset_root_index;
-    avl_tree_lock rrdset_root_index_name;
+    avl_tree_lock rrdset_root_index;                // the host's charts index (by id)
+    avl_tree_lock rrdset_root_index_name;           // the host's charts index (by name)
 
-    avl_tree_lock rrdfamily_root_index;
-    avl_tree_lock variables_root_index;
+    avl_tree_lock rrdfamily_root_index;             // the host's chart families index
+    avl_tree_lock variables_root_index;             // the host's chart variables index
 
     // all RRDCALCs are primarily allocated and linked here
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
     RRDCALC *alarms;
 
-    // alarms historical events
-    ALARM_LOG health_log;
+    ALARM_LOG health_log;                           // alarms historical events (event log)
 
     // templates of alarms
     // these are used to create alarms when charts
@@ -455,7 +455,7 @@ extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number 
 extern avl_tree_lock rrdhost_root_index;
 
 extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
-extern char *rrdset_cache_dir(const char *id);
+extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
 
 extern void rrdset_reset(RRDSET *st);
 

@@ -3,7 +3,7 @@
 
 #define RRDVAR_MAX_LENGTH 1024
 
-int health_enabled = 1;
+int default_localhost_health_enabled = 1;
 
 // ----------------------------------------------------------------------------
 // RRDVAR management
@@ -1075,7 +1075,7 @@ inline char *health_config_dir(void) {
 void health_init(void) {
     debug(D_HEALTH, "Health configuration initializing");
 
-    if(!(health_enabled = config_get_boolean("health", "enabled", 1))) {
+    if(!(default_localhost_health_enabled = config_get_boolean("health", "enabled", 1))) {
         debug(D_HEALTH, "Health is disabled.");
         return;
     }
@@ -1098,11 +1098,6 @@ inline void health_free_host_nolock(RRDHOST *host) {
 }
 
 void health_reload_host(RRDHOST *host) {
-    if(!health_enabled) {
-        error("Health reload is requested, but health is not enabled.");
-        return;
-    }
-
     char *path = health_config_dir();
 
     // free all running alarms
@@ -1406,7 +1401,7 @@ void *health_main(void *ptr) {
     BUFFER *wb = buffer_create(100);
 
     unsigned int loop = 0;
-    while(health_enabled && !netdata_exit) {
+    while(!netdata_exit) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
@@ -1420,6 +1415,8 @@ void *health_main(void *ptr) {
 
         RRDHOST *host;
         for(host = localhost; host ; host = host->next) {
+            if(unlikely(!host->health_enabled)) continue;
+
             rrdhost_rdlock(host);
 
             // the first loop is to lookup values from the db
