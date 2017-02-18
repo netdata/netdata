@@ -94,7 +94,7 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("mem", m->name, NULL, "numa", NULL, "NUMA events", "events/s", 1000
                                                  , update_every, RRDSET_TYPE_LINE);
-                    st->isdetail = 1;
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "local_node", "local", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "numa_foreign", "foreign", 1, 1, RRD_ALGORITHM_INCREMENTAL);

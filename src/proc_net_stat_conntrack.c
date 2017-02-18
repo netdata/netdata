@@ -173,7 +173,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             st = rrdset_create_localhost(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_changes", NULL
                                          , RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Changes", "changes/s"
                                          , 3002, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "inserted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "deleted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -195,7 +195,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             st = rrdset_create_localhost(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_expect", NULL
                                          , RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Expectations"
                                          , "expectations/s", 3003, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "created", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "deleted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -217,7 +217,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             st = rrdset_create_localhost(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_search", NULL
                                          , RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Searches"
                                          , "searches/s", 3010, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "searched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "restarted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -239,7 +239,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             st = rrdset_create_localhost(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_CONNTRACK "_errors", NULL
                                          , RRD_TYPE_NET_STAT_CONNTRACK, NULL, "Connection Tracker Errors", "events/s"
                                          , 3005, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "icmp_error", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "insert_failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

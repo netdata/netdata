@@ -516,7 +516,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("nfsd", "filehandles", NULL, "filehandles", NULL, "NFS Server File Handles"
                                          , "handles/s", 5001, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "stale", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_add(st, "total_lookups", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -658,7 +658,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("nfsd", "net", NULL, "network", NULL, "NFS Server Network Statistics"
                                          , "packets/s", 5007, update_every, RRDSET_TYPE_STACKED);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -682,7 +682,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             st = rrdset_create_localhost("nfsd", "rpc", NULL, "rpc", NULL
                                          , "NFS Server Remote Procedure Calls Statistics", "calls/s", 5008, update_every
                                          , RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "calls", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "bad_format", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

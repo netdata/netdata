@@ -170,7 +170,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every
                                          , RRDSET_TYPE_STACKED);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rrddim_add(st, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -191,7 +191,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("mem", "hwcorrupt", NULL, "ecc", NULL, "Hardware Corrupted ECC", "MB", 9000
                                          , update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "HardwareCorrupted", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -208,7 +208,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("mem", "committed", NULL, "system", NULL, "Committed (Allocated) Memory", "MB"
                                          , 5000, update_every, RRDSET_TYPE_AREA);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "Committed_AS", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -225,7 +225,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("mem", "writeback", NULL, "kernel", NULL, "Writeback Memory", "MB", 4000
                                          , update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "Dirty", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rrddim_add(st, "Writeback", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -250,7 +250,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("mem", "kernel", NULL, "kernel", NULL, "Memory Used by Kernel", "MB", 6000
                                          , update_every, RRDSET_TYPE_STACKED);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "Slab", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rrddim_add(st, "KernelStack", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -273,7 +273,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create_localhost("mem", "slab", NULL, "slab", NULL, "Reclaimable Kernel Memory", "MB", 6500
                                          , update_every, RRDSET_TYPE_STACKED);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "reclaimable", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rrddim_add(st, "unreclaimable", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);

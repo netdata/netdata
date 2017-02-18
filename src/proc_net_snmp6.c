@@ -324,7 +324,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "fragsout", NULL, "fragments", NULL, "IPv6 Fragments Sent"
                                          , "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -353,7 +353,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "fragsin", NULL, "fragments", NULL
                                          , "IPv6 Fragments Reassembly", "packets/s", 3011, update_every
                                          , RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -387,7 +387,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "errors", NULL, "errors", NULL, "IPv6 Errors", "packets/s"
                                          , 3002, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "InDiscards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "OutDiscards", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -452,7 +452,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udperrors", NULL, "udp", NULL, "IPv6 UDP Errors"
                                          , "events/s", 3701, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -507,7 +507,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udpliteerrors", NULL, "udplite", NULL
                                          , "IPv6 UDP Lite Errors", "events/s", 3701, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -534,7 +534,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "mcast", NULL, "multicast", NULL
                                          , "IPv6 Multicast Bandwidth", "kilobits/s", 9000, update_every
                                          , RRDSET_TYPE_AREA);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -555,7 +555,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "bcast", NULL, "broadcast", NULL
                                          , "IPv6 Broadcast Bandwidth", "kilobits/s", 8000, update_every
                                          , RRDSET_TYPE_AREA);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -575,7 +575,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "mcastpkts", NULL, "multicast", NULL
                                          , "IPv6 Multicast Packets", "packets/s", 9500, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
             rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

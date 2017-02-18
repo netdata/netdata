@@ -29,7 +29,7 @@ void rrd_stats_api_v1_chart_with_data(RRDSET *st, BUFFER *wb, size_t *dimensions
         , st->context
         , st->title
         , st->priority
-        , st->enabled?"true":"false"
+        , rrdset_flag_check(st, RRDSET_FLAG_ENABLED)?"true":"false"
         , st->units
         , st->name
         , rrdset_type_name(st->chart_type)
@@ -99,7 +99,7 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb)
 
     pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
     for(st = host->rrdset_root, c = 0; st ; st = st->next) {
-        if(st->enabled && st->dimensions) {
+        if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
             if(c) buffer_strcat(wb, ",");
             buffer_strcat(wb, "\n\t\t\"");
             buffer_strcat(wb, st->id);
@@ -162,7 +162,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
         prometheus_name_copy(chart, st->id, PROMETHEUS_ELEMENT_MAX);
 
         buffer_strcat(wb, "\n");
-        if(st->enabled && st->dimensions) {
+        if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
             pthread_rwlock_rdlock(&st->rwlock);
 
             // for each dimension
@@ -234,7 +234,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
         shell_name_copy(chart, st->id, SHELL_ELEMENT_MAX);
 
         buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, st->name);
-        if(st->enabled && st->dimensions) {
+        if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
             pthread_rwlock_rdlock(&st->rwlock);
 
             // for each dimension
@@ -330,7 +330,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
         , st->context
         , st->title
         , st->priority
-        , st->enabled
+        , rrdset_flag_check(st, RRDSET_FLAG_ENABLED)?1:0
         , st->units
         , st->name, options?options:""
         , rrdset_type_name(st->chart_type)
@@ -341,7 +341,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
         , rrdset_last_entry_t(st)
         , (now < rrdset_last_entry_t(st)) ? (time_t)0 : now - rrdset_last_entry_t(st)
         , st->update_every
-        , st->isdetail
+        , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?1:0
         , st->usec_since_last_update
         , st->collected_total
         , st->last_collected_total
@@ -418,7 +418,7 @@ void rrd_stats_all_json(RRDHOST *host, BUFFER *wb)
 
     pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
     for(st = host->rrdset_root, c = 0; st ; st = st->next) {
-        if(st->enabled && st->dimensions) {
+        if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
             if(c) buffer_strcat(wb, ",\n");
             memory += rrd_stats_one_json(st, NULL, wb);
             c++;
@@ -1421,7 +1421,7 @@ static RRDR *rrdr_create(RRDSET *st, long n)
 
 RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int group_method, int aligned)
 {
-    int debug = st->debug;
+    int debug = rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?1:0;
     int absolute_period_requested = -1;
 
     time_t first_entry_t = rrdset_first_entry_t(st);
@@ -2056,7 +2056,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
     // -------------------------------------------------------------------------
     // checks for debugging
 
-    if(st->debug) {
+    if(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)) {
         debug(D_RRD_STATS, "%s first_entry_t = %ld, last_entry_t = %ld, duration = %ld, after = %ld, before = %ld, duration = %ld, entries_to_show = %ld, group = %ld"
             , st->id
             , rrdset_first_entry_t(st)
@@ -2149,7 +2149,8 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
         long count = 0, printed = 0, group_count = 0;
         last_timestamp = 0;
 
-        if(st->debug) debug(D_RRD_STATS, "%s: REQUEST after:%u before:%u, points:%ld, group:%ld, CHART cur:%ld first: %u last:%u, CALC start_t:%ld, stop_t:%ld"
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+            debug(D_RRD_STATS, "%s: REQUEST after:%u before:%u, points:%ld, group:%ld, CHART cur:%ld first: %u last:%u, CALC start_t:%ld, stop_t:%ld"
                     , st->id
                     , (uint32_t)after
                     , (uint32_t)before
@@ -2169,7 +2170,8 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 
             int print_this = 0;
 
-            if(st->debug) debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %ld, %s %s"
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                debug(D_RRD_STATS, "%s t = %ld, count = %ld, group_count = %ld, printed = %ld, now = %ld, %s %s"
                     , st->id
                     , t
                     , count + 1

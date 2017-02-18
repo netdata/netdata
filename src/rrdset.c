@@ -329,10 +329,13 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     st->hash_context = simple_hash(st->context);
 
     st->priority = config_get_number(st->id, "priority", priority);
-    st->enabled = enabled;
+    if(enabled)
+        rrdset_flag_set(st, RRDSET_FLAG_ENABLED);
+    else
+        rrdset_flag_clear(st, RRDSET_FLAG_ENABLED);
 
-    st->isdetail = 0;
-    st->debug = 0;
+    rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+    rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
 
     // if(!strcmp(st->id, "disk_util.dm-0")) {
     //     st->debug = 1;
@@ -446,7 +449,9 @@ void rrdset_next_usec(RRDSET *st, usec_t microseconds)
     }
     debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
 
-    if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+        debug(D_RRD_STATS, "%s: NEXT: %llu microseconds", st->name, microseconds);
+
     st->usec_since_last_update = microseconds;
 }
 
@@ -497,7 +502,9 @@ usec_t rrdset_done(RRDSET *st) {
         st->usec_since_last_update = update_every_ut;
         first_entry = 1;
     }
-    if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: microseconds since last update: %llu", st->name, st->usec_since_last_update);
+
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+        debug(D_RRD_STATS, "%s: microseconds since last update: %llu", st->name, st->usec_since_last_update);
 
     // set last_collected_time
     if(unlikely(!st->last_collected_time.tv_sec)) {
@@ -512,7 +519,8 @@ usec_t rrdset_done(RRDSET *st) {
         store_this_entry = 0;
         first_entry = 1;
 
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: has not set last_collected_time. Setting it now. Will not store the next entry.", st->name);
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+            debug(D_RRD_STATS, "%s: has not set last_collected_time. Setting it now. Will not store the next entry.", st->name);
     }
     else {
         // it is not the first entry
@@ -536,7 +544,8 @@ usec_t rrdset_done(RRDSET *st) {
         store_this_entry = 0;
         first_entry = 1;
 
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: initializing last_updated to now - %llu microseconds (%0.3Lf). Will not store the next entry.", st->name, st->usec_since_last_update, (long double)ut/1000000.0);
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+            debug(D_RRD_STATS, "%s: initializing last_updated to now - %llu microseconds (%0.3Lf). Will not store the next entry.", st->name, st->usec_since_last_update, (long double)ut/1000000.0);
     }
 
     // check if we will re-write the entire data set
@@ -566,7 +575,7 @@ usec_t rrdset_done(RRDSET *st) {
     now_collect_ut = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
     next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
-    if(unlikely(st->debug)) {
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
         debug(D_RRD_STATS, "%s: last_collect_ut = %0.3Lf (last collection time)", st->name, (long double)last_collect_ut/1000000.0);
         debug(D_RRD_STATS, "%s: now_collect_ut  = %0.3Lf (current collection time)", st->name, (long double)now_collect_ut/1000000.0);
         debug(D_RRD_STATS, "%s: last_stored_ut  = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/1000000.0);
@@ -575,7 +584,8 @@ usec_t rrdset_done(RRDSET *st) {
 
     if(unlikely(!st->counter_done)) {
         store_this_entry = 0;
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: Will not store the next entry.", st->name);
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+            debug(D_RRD_STATS, "%s: Will not store the next entry.", st->name);
     }
     st->counter_done++;
 
@@ -598,7 +608,8 @@ usec_t rrdset_done(RRDSET *st) {
             continue;
         }
 
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: START "
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+            debug(D_RRD_STATS, "%s/%s: START "
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
                     " collected_value = " COLLECTED_NUMBER_FORMAT
                     " last_calculated_value = " CALCULATED_NUMBER_FORMAT
@@ -616,7 +627,7 @@ usec_t rrdset_done(RRDSET *st) {
                                        * (calculated_number)rd->multiplier
                                        / (calculated_number)rd->divisor;
 
-                if(unlikely(st->debug))
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                     debug(D_RRD_STATS, "%s/%s: CALC ABS/ABS-NO-IN "
                             CALCULATED_NUMBER_FORMAT " = "
                             COLLECTED_NUMBER_FORMAT
@@ -641,7 +652,7 @@ usec_t rrdset_done(RRDSET *st) {
                             * (calculated_number)rd->collected_value
                             / (calculated_number)st->collected_total;
 
-                if(unlikely(st->debug))
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                     debug(D_RRD_STATS, "%s/%s: CALC PCENT-ROW "
                             CALCULATED_NUMBER_FORMAT " = 100"
                                     " * " COLLECTED_NUMBER_FORMAT
@@ -678,7 +689,7 @@ usec_t rrdset_done(RRDSET *st) {
                         * (calculated_number)rd->multiplier
                         / (calculated_number)rd->divisor;
 
-                if(unlikely(st->debug))
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                     debug(D_RRD_STATS, "%s/%s: CALC INC PRE "
                             CALCULATED_NUMBER_FORMAT " = ("
                             COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT
@@ -723,7 +734,7 @@ usec_t rrdset_done(RRDSET *st) {
                             * (calculated_number)(rd->collected_value - rd->last_collected_value)
                             / (calculated_number)(st->collected_total - st->last_collected_total);
 
-                if(unlikely(st->debug))
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                     debug(D_RRD_STATS, "%s/%s: CALC PCENT-DIFF "
                             CALCULATED_NUMBER_FORMAT " = 100"
                                     " * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
@@ -740,7 +751,7 @@ usec_t rrdset_done(RRDSET *st) {
                 // it gets noticed when we add new types
                 rd->calculated_value = 0;
 
-                if(unlikely(st->debug))
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                     debug(D_RRD_STATS, "%s/%s: CALC "
                             CALCULATED_NUMBER_FORMAT " = 0"
                           , st->id, rd->name
@@ -749,7 +760,8 @@ usec_t rrdset_done(RRDSET *st) {
                 break;
         }
 
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: PHASE2 "
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+            debug(D_RRD_STATS, "%s/%s: PHASE2 "
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
                     " collected_value = " COLLECTED_NUMBER_FORMAT
                     " last_calculated_value = " CALCULATED_NUMBER_FORMAT
@@ -768,7 +780,10 @@ usec_t rrdset_done(RRDSET *st) {
 
     if(unlikely(now_collect_ut < next_store_ut)) {
         // this is collected in the same interpolation point
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: THIS IS IN THE SAME INTERPOLATION POINT", st->name);
+
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+            debug(D_RRD_STATS, "%s: THIS IS IN THE SAME INTERPOLATION POINT", st->name);
+
 #ifdef NETDATA_INTERNAL_CHECKS
         info("%s is collected in the same interpolation point: short by %llu microseconds", st->name, next_store_ut - now_collect_ut);
 #endif
@@ -783,7 +798,7 @@ usec_t rrdset_done(RRDSET *st) {
         if(iterations < 0) { error("%s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
 #endif
 
-        if(unlikely(st->debug)) {
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
             debug(D_RRD_STATS, "%s: last_stored_ut = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/1000000.0);
             debug(D_RRD_STATS, "%s: next_store_ut  = %0.3Lf (next interpolation point)", st->name, (long double)next_store_ut/1000000.0);
         }
@@ -802,7 +817,7 @@ usec_t rrdset_done(RRDSET *st) {
                                    / (calculated_number)(now_collect_ut - last_collect_ut)
                             );
 
-                    if(unlikely(st->debug))
+                    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                         debug(D_RRD_STATS, "%s/%s: CALC2 INC "
                                 CALCULATED_NUMBER_FORMAT " = "
                                 CALCULATED_NUMBER_FORMAT
@@ -821,7 +836,7 @@ usec_t rrdset_done(RRDSET *st) {
                     new_value /= (calculated_number)st->update_every;
 
                     if(unlikely(next_store_ut - last_stored_ut < update_every_ut)) {
-                        if(unlikely(st->debug))
+                        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                             debug(D_RRD_STATS, "%s/%s: COLLECTION POINT IS SHORT " CALCULATED_NUMBER_FORMAT " - EXTRAPOLATING",
                                     st->id, rd->name
                                   , (calculated_number)(next_store_ut - last_stored_ut)
@@ -853,7 +868,7 @@ usec_t rrdset_done(RRDSET *st) {
                                     +  rd->last_calculated_value
                                 );
 
-                        if(unlikely(st->debug))
+                        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                             debug(D_RRD_STATS, "%s/%s: CALC2 DEF "
                                     CALCULATED_NUMBER_FORMAT " = ((("
                                             "(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
@@ -878,7 +893,7 @@ usec_t rrdset_done(RRDSET *st) {
                 rd->values[st->current_entry] = pack_storage_number(new_value, storage_flags );
                 rd->last_stored_value = new_value;
 
-                if(unlikely(st->debug))
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                     debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
                             CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
                           , st->id, rd->name
@@ -887,9 +902,10 @@ usec_t rrdset_done(RRDSET *st) {
                     );
             }
             else {
-                if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: STORE[%ld] = NON EXISTING "
-                                              , st->id, rd->name
-                                              , st->current_entry
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                    debug(D_RRD_STATS, "%s/%s: STORE[%ld] = NON EXISTING "
+                          , st->id, rd->name
+                          , st->current_entry
                     );
                 rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
                 rd->last_stored_value = NAN;
@@ -897,7 +913,7 @@ usec_t rrdset_done(RRDSET *st) {
 
             stored_entries++;
 
-            if(unlikely(st->debug)) {
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
                 calculated_number t1 = new_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor;
                 calculated_number t2 = unpack_storage_number(rd->values[st->current_entry]);
                 calculated_number accuracy = accuracy_loss(t1, t2);
@@ -939,24 +955,29 @@ usec_t rrdset_done(RRDSET *st) {
         if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED)))
             continue;
 
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", st->id, rd->name, rd->last_collected_value, rd->collected_value);
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+            debug(D_RRD_STATS, "%s/%s: setting last_collected_value (old: " COLLECTED_NUMBER_FORMAT ") to last_collected_value (new: " COLLECTED_NUMBER_FORMAT ")", st->id, rd->name, rd->last_collected_value, rd->collected_value);
+
         rd->last_collected_value = rd->collected_value;
 
         switch(rd->algorithm) {
             case RRD_ALGORITHM_INCREMENTAL:
                 if(unlikely(!first_entry)) {
-                    if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", st->id, rd->name, rd->last_calculated_value + rd->calculated_value, rd->calculated_value);
+                    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                        debug(D_RRD_STATS, "%s/%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", st->id, rd->name, rd->last_calculated_value + rd->calculated_value, rd->calculated_value);
                     rd->last_calculated_value += rd->calculated_value;
                 }
                 else {
-                    if(unlikely(st->debug)) debug(D_RRD_STATS, "%s: THIS IS THE FIRST POINT", st->name);
+                    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                        debug(D_RRD_STATS, "%s: THIS IS THE FIRST POINT", st->name);
                 }
                 break;
 
             case RRD_ALGORITHM_ABSOLUTE:
             case RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL:
             case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
-                if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", st->id, rd->name, rd->last_calculated_value, rd->calculated_value);
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                    debug(D_RRD_STATS, "%s/%s: setting last_calculated_value (old: " CALCULATED_NUMBER_FORMAT ") to last_calculated_value (new: " CALCULATED_NUMBER_FORMAT ")", st->id, rd->name, rd->last_calculated_value, rd->calculated_value);
                 rd->last_calculated_value = rd->calculated_value;
                 break;
         }
@@ -965,7 +986,8 @@ usec_t rrdset_done(RRDSET *st) {
         rd->collected_value = 0;
         rrddim_flag_clear(rd, RRDDIM_FLAG_UPDATED);
 
-        if(unlikely(st->debug)) debug(D_RRD_STATS, "%s/%s: END "
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+            debug(D_RRD_STATS, "%s/%s: END "
                     " last_collected_value = " COLLECTED_NUMBER_FORMAT
                     " collected_value = " COLLECTED_NUMBER_FORMAT
                     " last_calculated_value = " CALCULATED_NUMBER_FORMAT

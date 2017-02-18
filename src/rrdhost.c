@@ -237,7 +237,7 @@ void rrdhost_save(RRDHOST *host) {
     RRDSET *st;
     RRDDIM *rd;
 
-    // we get an write lock
+    // we get a write lock
     // to ensure only one thread is saving the database
     rrdhost_rwlock(host);
 

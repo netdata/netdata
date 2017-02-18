@@ -2250,10 +2250,15 @@ void web_client_process(struct web_client *w) {
                         else {
                             code = 200;
                             debug_flags |= D_RRD_STATS;
-                            st->debug = !st->debug;
-                            buffer_sprintf(w->response.data, "Chart has now debug %s: ", st->debug?"enabled":"disabled");
+
+                            if(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))
+                                rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
+                            else
+                                rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
+
+                            buffer_sprintf(w->response.data, "Chart has now debug %s: ", rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
                             buffer_strcat_htmlescape(w->response.data, tok);
-                            debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, st->debug?"enabled":"disabled");
+                            debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
                         }
                     }
                     else {
