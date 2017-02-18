@@ -43,7 +43,7 @@ inline void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
 
     char varname[CONFIG_MAX_NAME + 1];
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-    rd->name = config_set_default(st->id, varname, name);
+    rd->name = config_set_default(st->config_section, varname, name);
     rd->hash_name = simple_hash(rd->name);
 
     rrddimvar_rename_all(rd);
@@ -84,7 +84,6 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
             rd->variables = NULL;
             rd->next = NULL;
             rd->rrdset = NULL;
-            rd->rrd_memory_mode = st->rrd_memory_mode;
 
             struct timeval now;
             now_realtime_timeval(&now);
@@ -124,6 +123,10 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
                 error("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong."
                       , fullfilename, algorithm, rrd_algorithm_name(algorithm), rd->algorithm,
                         rrd_algorithm_name(rd->algorithm));
+
+            // make sure we have the right memory mode
+            // even if we cleared the memory
+            rd->rrd_memory_mode = st->rrd_memory_mode;
         }
     }
 
@@ -143,17 +146,17 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
     rd->cache_filename = strdupz(fullfilename);
 
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
-    rd->name = config_get(st->id, varname, (name && *name)?name:rd->id);
+    rd->name = config_get(st->config_section, varname, (name && *name)?name:rd->id);
     rd->hash_name = simple_hash(rd->name);
 
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s algorithm", rd->id);
-    rd->algorithm = rrd_algorithm_id(config_get(st->id, varname, rrd_algorithm_name(algorithm)));
+    rd->algorithm = rrd_algorithm_id(config_get(st->config_section, varname, rrd_algorithm_name(algorithm)));
 
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s multiplier", rd->id);
-    rd->multiplier = config_get_number(st->id, varname, multiplier);
+    rd->multiplier = config_get_number(st->config_section, varname, multiplier);
 
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s divisor", rd->id);
-    rd->divisor = config_get_number(st->id, varname, divisor);
+    rd->divisor = config_get_number(st->config_section, varname, divisor);
     if(!rd->divisor) rd->divisor = 1;
 
     rd->entries = st->entries;

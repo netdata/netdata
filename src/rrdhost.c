@@ -93,13 +93,38 @@ RRDHOST *rrdhost_create(const char *hostname, const char *guid) {
 
     if(!localhost) {
         // this is localhost
-        snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", netdata_configured_varlib_dir);
+
+        host->cache_dir = strdupz(netdata_configured_cache_dir);
+        host->varlib_dir = strdupz(netdata_configured_varlib_dir);
+
+        snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
         host->health_log_filename = strdupz(config_get("health", "health db file", filename));
+
     }
     else {
         // this is not localhost - append our GUID to localhost path
-        snprintfz(filename, FILENAME_MAX, "%s.%s", localhost->health_log_filename, host->machine_guid);
+
+        snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
+        host->cache_dir = strdupz(filename);
+
+        if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+            int r = mkdir(host->cache_dir, 0775);
+            if(r != 0 && errno != EEXIST)
+                error("Cannot create directory '%s'", host->cache_dir);
+        }
+
+        snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_varlib_dir, host->machine_guid);
+        host->varlib_dir = strdupz(filename);
+
+        if(host->health_enabled) {
+            int r = mkdir(host->varlib_dir, 0775);
+            if(r != 0 && errno != EEXIST)
+                error("Cannot create directory '%s'", host->varlib_dir);
+        }
+
+        snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
         host->health_log_filename = strdupz(filename);
+
     }
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
@@ -191,34 +216,14 @@ void rrdhost_free(RRDHOST *host) {
     for(st = host->rrdset_root; st ;) {
         RRDSET *next = st->next;
 
-        pthread_rwlock_wrlock(&st->rwlock);
-
-        while(st->variables)  rrdsetvar_free(st->variables);
-        while(st->alarms)     rrdsetcalc_unlink(st->alarms);
-        while(st->dimensions) rrddim_free(st, st->dimensions);
-
-        if(unlikely(rrdset_index_del(host, st) != st))
-            error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", st->id);
-
-        rrdset_index_del_name(host, st);
-
-        st->rrdfamily->use_count--;
-        if(!st->rrdfamily->use_count)
-            rrdfamily_free(host, st->rrdfamily);
-
-        pthread_rwlock_unlock(&st->rwlock);
-
-        if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
-            debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
-            munmap(st, st->memsize);
-        }
-        else
-            freez(st);
+        rrdset_free(st);
 
         st = next;
     }
     host->rrdset_root = NULL;
 
+    freez(host->cache_dir);
+    freez(host->varlib_dir);
     freez(host->health_default_exec);
     freez(host->health_default_recipient);
     freez(host->health_log_filename);

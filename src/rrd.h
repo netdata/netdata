@@ -216,6 +216,8 @@ struct rrdset {
                                                     // since the config always has a higher priority
                                                     // (the user overwrites the name of the charts)
 
+    char *config_section;                           // the config section for the chart
+
     char *type;                                     // the type of graph RRD_TYPE_* (a category, for determining graphing options)
     char *family;                                   // grouping sets under the same family
     char *title;                                    // title shown to user
@@ -325,6 +327,9 @@ struct rrdhost {
     avl_tree_lock rrdfamily_root_index;             // the host's chart families index
     avl_tree_lock variables_root_index;             // the host's chart variables index
 
+    char *cache_dir;                                // the directory to save RRD cache files
+    char *varlib_dir;                               // the directory to save health log
+
     // all RRDCALCs are primarily allocated and linked here
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
@@ -385,7 +390,7 @@ extern RRDSET *rrdset_create(RRDHOST *host
                              , const char *units
                              , long priority
                              , int update_every
-                             , int chart_type);
+                             , RRDSET_TYPE chart_type);
 
 #define rrdset_create_localhost(type, id, name, family, context, title, units, priority, update_every, chart_type) rrdset_create(localhost, type, id, name, family, context, title, units, priority, update_every, chart_type)
 
@@ -463,10 +468,11 @@ extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number 
 
 #ifdef NETDATA_RRD_INTERNALS
 
+extern void rrdset_free(RRDSET *st);
 extern avl_tree_lock rrdhost_root_index;
 
 extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
-extern char *rrdset_cache_dir(RRDHOST *host, const char *id);
+extern char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section);
 
 extern void rrdset_reset(RRDSET *st);
 
