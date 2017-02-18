@@ -78,7 +78,7 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrd_stats_api_v1_chart_with_data(st, wb, NULL, NULL);
 }
 
-void rrd_stats_api_v1_charts(BUFFER *wb)
+void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb)
 {
     size_t c, dimensions = 0, memory = 0, alarms = 0;
     RRDSET *st;
@@ -90,15 +90,15 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
         ",\n\t\"update_every\": %d"
         ",\n\t\"history\": %d"
         ",\n\t\"charts\": {"
-        , localhost->hostname
+        , host->hostname
         , program_version
         , os_type
-        , localhost->rrd_update_every
-        , localhost->rrd_history_entries
+        , host->rrd_update_every
+        , host->rrd_history_entries
         );
 
-    pthread_rwlock_rdlock(&localhost->rrdset_root_rwlock);
-    for(st = localhost->rrdset_root, c = 0; st ; st = st->next) {
+    pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
+    for(st = host->rrdset_root, c = 0; st ; st = st->next) {
         if(st->enabled && st->dimensions) {
             if(c) buffer_strcat(wb, ",");
             buffer_strcat(wb, "\n\t\t\"");
@@ -110,11 +110,11 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
     }
 
     RRDCALC *rc;
-    for(rc = localhost->alarms; rc ; rc = rc->next) {
+    for(rc = host->alarms; rc ; rc = rc->next) {
         if(rc->rrdset)
             alarms++;
     }
-    pthread_rwlock_unlock(&localhost->rrdset_root_rwlock);
+    pthread_rwlock_unlock(&host->rrdset_root_rwlock);
 
     buffer_sprintf(wb, "\n\t}"
                     ",\n\t\"charts_count\": %zu"
@@ -149,16 +149,15 @@ static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
 
 #define PROMETHEUS_ELEMENT_MAX 256
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
-{
-    pthread_rwlock_rdlock(&localhost->rrdset_root_rwlock);
+void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
+    pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
 
-    char host[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_name_copy(host, config_get("global", "hostname", "localhost"), PROMETHEUS_ELEMENT_MAX);
+    char hostname[PROMETHEUS_ELEMENT_MAX + 1];
+    prometheus_name_copy(hostname, config_get("global", "hostname", "localhost"), PROMETHEUS_ELEMENT_MAX);
 
     // for each chart
     RRDSET *st;
-    for(st = localhost->rrdset_root; st ; st = st->next) {
+    for(st = host->rrdset_root; st ; st = st->next) {
         char chart[PROMETHEUS_ELEMENT_MAX + 1];
         prometheus_name_copy(chart, st->id, PROMETHEUS_ELEMENT_MAX);
 
@@ -191,7 +190,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
                     //        (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
 
                     buffer_sprintf(wb, "%s_%s{instance=\"%s\"} " COLLECTED_NUMBER_FORMAT " %llu\n",
-                            chart, dimension, host, rd->last_collected_value,
+                            chart, dimension, hostname, rd->last_collected_value,
                             (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
 
                 }
@@ -201,7 +200,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
         }
     }
 
-    pthread_rwlock_unlock(&localhost->rrdset_root_rwlock);
+    pthread_rwlock_unlock(&host->rrdset_root_rwlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -224,16 +223,12 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 
 #define SHELL_ELEMENT_MAX 100
 
-void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
-{
-    pthread_rwlock_rdlock(&localhost->rrdset_root_rwlock);
-
-    char host[SHELL_ELEMENT_MAX + 1];
-    shell_name_copy(host, config_get("global", "hostname", "localhost"), SHELL_ELEMENT_MAX);
+void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
+    pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
 
     // for each chart
     RRDSET *st;
-    for(st = localhost->rrdset_root; st ; st = st->next) {
+    for(st = host->rrdset_root; st ; st = st->next) {
         calculated_number total = 0.0;
         char chart[SHELL_ELEMENT_MAX + 1];
         shell_name_copy(chart, st->id, SHELL_ELEMENT_MAX);
@@ -271,7 +266,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
     buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
 
     RRDCALC *rc;
-    for(rc = localhost->alarms; rc ;rc = rc->next) {
+    for(rc = host->alarms; rc ;rc = rc->next) {
         if(!rc->rrdset) continue;
 
         char chart[SHELL_ELEMENT_MAX + 1];
@@ -292,7 +287,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
         buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));
     }
 
-    pthread_rwlock_unlock(&localhost->rrdset_root_rwlock);
+    pthread_rwlock_unlock(&host->rrdset_root_rwlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -413,7 +408,7 @@ void rrd_stats_graph_json(RRDSET *st, char *options, BUFFER *wb)
     buffer_strcat(wb, RRD_GRAPH_JSON_FOOTER);
 }
 
-void rrd_stats_all_json(BUFFER *wb)
+void rrd_stats_all_json(RRDHOST *host, BUFFER *wb)
 {
     unsigned long memory = 0;
     long c;
@@ -421,15 +416,15 @@ void rrd_stats_all_json(BUFFER *wb)
 
     buffer_strcat(wb, RRD_GRAPH_JSON_HEADER);
 
-    pthread_rwlock_rdlock(&localhost->rrdset_root_rwlock);
-    for(st = localhost->rrdset_root, c = 0; st ; st = st->next) {
+    pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
+    for(st = host->rrdset_root, c = 0; st ; st = st->next) {
         if(st->enabled && st->dimensions) {
             if(c) buffer_strcat(wb, ",\n");
             memory += rrd_stats_one_json(st, NULL, wb);
             c++;
         }
     }
-    pthread_rwlock_unlock(&localhost->rrdset_root_rwlock);
+    pthread_rwlock_unlock(&host->rrdset_root_rwlock);
 
     buffer_sprintf(wb, "\n\t],\n"
         "\t\"hostname\": \"%s\",\n"
@@ -437,9 +432,9 @@ void rrd_stats_all_json(BUFFER *wb)
         "\t\"history\": %d,\n"
         "\t\"memory\": %lu\n"
         "}\n"
-        , localhost->hostname
-        , localhost->rrd_update_every
-        , localhost->rrd_history_entries
+        , host->hostname
+        , host->rrd_update_every
+        , host->rrd_history_entries
         , memory
         );
 }
