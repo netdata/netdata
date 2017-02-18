@@ -90,15 +90,15 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
         ",\n\t\"update_every\": %d"
         ",\n\t\"history\": %d"
         ",\n\t\"charts\": {"
-        , localhost.hostname
+        , localhost->hostname
         , program_version
         , os_type
         , rrd_update_every
         , rrd_default_history_entries
         );
 
-    pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
-    for(st = localhost.rrdset_root, c = 0; st ; st = st->next) {
+    pthread_rwlock_rdlock(&localhost->rrdset_root_rwlock);
+    for(st = localhost->rrdset_root, c = 0; st ; st = st->next) {
         if(st->enabled && st->dimensions) {
             if(c) buffer_strcat(wb, ",");
             buffer_strcat(wb, "\n\t\t\"");
@@ -110,11 +110,11 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
     }
 
     RRDCALC *rc;
-    for(rc = localhost.alarms; rc ; rc = rc->next) {
+    for(rc = localhost->alarms; rc ; rc = rc->next) {
         if(rc->rrdset)
             alarms++;
     }
-    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+    pthread_rwlock_unlock(&localhost->rrdset_root_rwlock);
 
     buffer_sprintf(wb, "\n\t}"
                     ",\n\t\"charts_count\": %zu"
@@ -151,14 +151,14 @@ static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
 
 void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
 {
-    pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
+    pthread_rwlock_rdlock(&localhost->rrdset_root_rwlock);
 
     char host[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_name_copy(host, config_get("global", "hostname", "localhost"), PROMETHEUS_ELEMENT_MAX);
 
     // for each chart
     RRDSET *st;
-    for(st = localhost.rrdset_root; st ; st = st->next) {
+    for(st = localhost->rrdset_root; st ; st = st->next) {
         char chart[PROMETHEUS_ELEMENT_MAX + 1];
         prometheus_name_copy(chart, st->id, PROMETHEUS_ELEMENT_MAX);
 
@@ -201,7 +201,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
         }
     }
 
-    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+    pthread_rwlock_unlock(&localhost->rrdset_root_rwlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -226,14 +226,14 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 
 void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
 {
-    pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
+    pthread_rwlock_rdlock(&localhost->rrdset_root_rwlock);
 
     char host[SHELL_ELEMENT_MAX + 1];
     shell_name_copy(host, config_get("global", "hostname", "localhost"), SHELL_ELEMENT_MAX);
 
     // for each chart
     RRDSET *st;
-    for(st = localhost.rrdset_root; st ; st = st->next) {
+    for(st = localhost->rrdset_root; st ; st = st->next) {
         calculated_number total = 0.0;
         char chart[SHELL_ELEMENT_MAX + 1];
         shell_name_copy(chart, st->id, SHELL_ELEMENT_MAX);
@@ -271,7 +271,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
     buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
 
     RRDCALC *rc;
-    for(rc = localhost.alarms; rc ;rc = rc->next) {
+    for(rc = localhost->alarms; rc ;rc = rc->next) {
         if(!rc->rrdset) continue;
 
         char chart[SHELL_ELEMENT_MAX + 1];
@@ -292,7 +292,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb)
         buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));
     }
 
-    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+    pthread_rwlock_unlock(&localhost->rrdset_root_rwlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -421,15 +421,15 @@ void rrd_stats_all_json(BUFFER *wb)
 
     buffer_strcat(wb, RRD_GRAPH_JSON_HEADER);
 
-    pthread_rwlock_rdlock(&localhost.rrdset_root_rwlock);
-    for(st = localhost.rrdset_root, c = 0; st ; st = st->next) {
+    pthread_rwlock_rdlock(&localhost->rrdset_root_rwlock);
+    for(st = localhost->rrdset_root, c = 0; st ; st = st->next) {
         if(st->enabled && st->dimensions) {
             if(c) buffer_strcat(wb, ",\n");
             memory += rrd_stats_one_json(st, NULL, wb);
             c++;
         }
     }
-    pthread_rwlock_unlock(&localhost.rrdset_root_rwlock);
+    pthread_rwlock_unlock(&localhost->rrdset_root_rwlock);
 
     buffer_sprintf(wb, "\n\t],\n"
         "\t\"hostname\": \"%s\",\n"
@@ -437,7 +437,7 @@ void rrd_stats_all_json(BUFFER *wb)
         "\t\"history\": %d,\n"
         "\t\"memory\": %lu\n"
         "}\n"
-        , localhost.hostname
+        , localhost->hostname
         , rrd_update_every
         , rrd_default_history_entries
         , memory

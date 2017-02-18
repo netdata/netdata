@@ -184,8 +184,8 @@ int do_ipc(int update_every, usec_t dt) {
             return 1;
         }
 
-        arrays_max     = rrdvar_custom_host_variable_create(&localhost, "ipc.semaphores.arrays.max");
-        semaphores_max = rrdvar_custom_host_variable_create(&localhost, "ipc.semaphores.max");
+        arrays_max     = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.arrays.max");
+        semaphores_max = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.max");
 
         if(arrays_max)     rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
         if(semaphores_max) rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);

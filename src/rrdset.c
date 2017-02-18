@@ -210,7 +210,7 @@ static inline void timeval_align(struct timeval *tv, int update_every) {
 // RRDSET - create a chart
 
 RRDSET *rrdset_create(const char *type, const char *id, const char *name, const char *family, const char *context, const char *title, const char *units, long priority, int update_every, int chart_type) {
-    RRDHOST *host = &localhost;
+    RRDHOST *host = localhost;
 
     if(!type || !type[0]) {
         fatal("Cannot create rrd stats without a type.");

@@ -23,6 +23,7 @@ void netdata_cleanup_and_exit(int ret) {
     //kill_childs();
 
     // free database
+    sleep(2);
     rrdhost_free_all();
 #endif
 
@@ -578,11 +579,11 @@ int main(int argc, char **argv) {
 
     char *user = NULL;
     {
-        char *flags = config_get("global", "debug flags",  "0x00000000");
+        char *flags = config_get("global", "debug flags",  "0x0000000000000000");
         setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
         debug_flags = strtoull(flags, NULL, 0);
-        debug(D_OPTIONS, "Debug flags set to '0x%8llx'.", debug_flags);
+        debug(D_OPTIONS, "Debug flags set to '0x%" PRIX64 "'.", debug_flags);
 
         if(debug_flags != 0) {
             struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
@@ -795,14 +796,14 @@ int main(int argc, char **argv) {
     }
 
     // ------------------------------------------------------------------------
-    // initialize rrd host
-
-    rrdhost_init(hostname);
-
-    // ------------------------------------------------------------------------
     // initialize the registry
 
     registry_init();
+
+    // ------------------------------------------------------------------------
+    // initialize rrd host
+
+    rrd_init(hostname);
 
     // ------------------------------------------------------------------------
     // initialize health monitoring

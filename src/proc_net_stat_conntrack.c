@@ -47,7 +47,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         if(!do_sockets && !read_full)
             return 1;
 
-        rrdvar_max = rrdvar_custom_host_variable_create(&localhost, "netfilter.conntrack.max");
+        rrdvar_max = rrdvar_custom_host_variable_create(localhost, "netfilter.conntrack.max");
     }
 
     if(likely(read_full)) {

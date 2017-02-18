@@ -69,4 +69,6 @@ extern int registry_request_hello_json(struct web_client *w);
 // update the registry monitoring charts
 extern void registry_statistics(void);
 
+extern char *registry_get_this_machine_guid(void);
+
 #endif /* NETDATA_REGISTRY_H */

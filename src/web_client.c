@@ -683,7 +683,7 @@ int web_client_api_request_v1_alarms(struct web_client *w, char *url)
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarms2json(&localhost, w->response.data, all);
+    health_alarms2json(localhost, w->response.data, all);
     return 200;
 }
 
@@ -704,7 +704,7 @@ int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarm_log2json(&localhost, w->response.data, after);
+    health_alarm_log2json(localhost, w->response.data, after);
     return 200;
 }
 
@@ -2202,7 +2202,7 @@ void web_client_process(struct web_client *w) {
                     debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
 
                     buffer_flush(w->response.data);
-                    RRDSET *st = localhost.rrdset_root;
+                    RRDSET *st = localhost->rrdset_root;
 
                     for ( ; st ; st = st->next )
                         buffer_sprintf(w->response.data, "%s\n", st->name);

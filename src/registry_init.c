@@ -15,7 +15,6 @@ int registry_init(void) {
     // filenames
     snprintfz(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);
     registry.machine_guid_filename = config_get("registry", "netdata unique id file", filename);
-    registry_get_this_machine_guid();
 
     snprintfz(filename, FILENAME_MAX, "%s/registry.db", registry.pathname);
     registry.db_filename = config_get("registry", "registry db file", filename);
@@ -28,7 +27,7 @@ int registry_init(void) {
     registry.persons_expiration = config_get_number("registry", "registry expire idle persons days", 365) * 86400;
     registry.registry_domain = config_get("registry", "registry domain", "");
     registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.my-netdata.io");
-    registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", localhost.hostname));
+    registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", "localhost"));
     registry.verify_cookies_redirects = config_get_boolean("registry", "verify browser cookies support", 1);
 
     setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);

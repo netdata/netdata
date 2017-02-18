@@ -1,7 +1,7 @@
 #include "common.h"
 
 const char *program_name = "";
-unsigned long long debug_flags = DEBUG;
+uint64_t debug_flags = DEBUG;
 
 int access_log_syslog = 1;
 int error_log_syslog = 1;

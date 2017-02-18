@@ -2,45 +2,87 @@
 #include "common.h"
 
 // ----------------------------------------------------------------------------
-// RRDHOST
+// RRDHOST index
 
-RRDHOST localhost = {
-        .hostname = "localhost",
-        .machine_guid = "",
-        .rrdset_root = NULL,
-        .rrdset_root_rwlock = PTHREAD_RWLOCK_INITIALIZER,
-        .rrdset_root_index = {
-                { NULL, rrdset_compare },
-                AVL_LOCK_INITIALIZER
-        },
-        .rrdset_root_index_name = {
-                { NULL, rrdset_compare_name },
-                AVL_LOCK_INITIALIZER
-        },
-        .rrdfamily_root_index = {
-                { NULL, rrdfamily_compare },
-                AVL_LOCK_INITIALIZER
-        },
-        .variables_root_index = {
-                { NULL, rrdvar_compare },
-                AVL_LOCK_INITIALIZER
-        },
-        .health_log = {
-                .next_log_id = 1,
-                .next_alarm_id = 1,
-                .count = 0,
-                .max = 1000,
-                .alarms = NULL,
-                .alarm_log_rwlock = PTHREAD_RWLOCK_INITIALIZER
-        },
-        .next = NULL
+int rrdhost_compare(void* a, void* b) {
+    if(((RRDHOST *)a)->hash_machine_guid < ((RRDHOST *)b)->hash_machine_guid) return -1;
+    else if(((RRDHOST *)a)->hash_machine_guid > ((RRDHOST *)b)->hash_machine_guid) return 1;
+    else return strcmp(((RRDHOST *)a)->machine_guid, ((RRDHOST *)b)->machine_guid);
+}
+
+avl_tree_lock rrdhost_root_index = {
+        .avl_tree = { NULL, rrdhost_compare },
+        .rwlock = AVL_LOCK_INITIALIZER
 };
 
-void rrdhost_init(char *hostname) {
-    localhost.hostname = hostname;
-    localhost.health_log.next_log_id =
-        localhost.health_log.next_alarm_id = (uint32_t)now_realtime_sec();
+RRDHOST *rrdhost_find(const char *guid, uint32_t hash) {
+    RRDHOST tmp;
+    strncpyz(tmp.machine_guid, guid, GUID_LEN);
+    tmp.hash_machine_guid = (hash)?hash:simple_hash(tmp.machine_guid);
+
+    return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl *) &tmp);
 }
+
+#define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl *)(rrdhost))
+#define rrdhost_index_del(rrdhost) (RRDHOST *)avl_remove_lock(&(rrdhost_root_index), (avl *)(rrdhost))
+
+
+// ----------------------------------------------------------------------------
+// RRDHOST - internal helpers
+
+static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
+    freez(host->hostname);
+    host->hostname = strdupz(hostname);
+    host->hash_hostname = simple_hash(host->hostname);
+}
+
+static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_guid) {
+    strncpy(host->machine_guid, machine_guid, GUID_LEN);
+    host->machine_guid[GUID_LEN] = '\0';
+    host->hash_machine_guid = simple_hash(host->machine_guid);
+}
+
+// ----------------------------------------------------------------------------
+// RRDHOST - add a host
+
+RRDHOST *rrdhost_create(const char *hostname, const char *guid) {
+    RRDHOST *host = callocz(1, sizeof(RRDHOST));
+
+    pthread_rwlock_init(&(host->rrdset_root_rwlock), NULL);
+
+    rrdhost_init_hostname(host, hostname);
+    rrdhost_init_machine_guid(host, guid);
+
+    avl_init_lock(&(host->rrdset_root_index), rrdset_compare);
+    avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
+    avl_init_lock(&(host->rrdfamily_root_index), rrdfamily_compare);
+    avl_init_lock(&(host->variables_root_index), rrdvar_compare);
+
+    host->health_log.next_log_id = 1;
+    host->health_log.next_alarm_id = 1;
+    host->health_log.max = 1000;
+    host->health_log.next_log_id =
+    host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
+    pthread_rwlock_init(&(host->health_log.alarm_log_rwlock), NULL);
+
+    if(rrdhost_index_add(host) != host)
+        fatal("Cannot add host '%s' to index. It already exists.", hostname);
+
+    debug(D_RRDHOST, "Added host '%s'", host->hostname);
+    return host;
+}
+
+// ----------------------------------------------------------------------------
+// RRDHOST global / startup initialization
+
+RRDHOST *localhost = NULL;
+
+void rrd_init(char *hostname) {
+    localhost = rrdhost_create(hostname, registry_get_this_machine_guid());
+}
+
+// ----------------------------------------------------------------------------
+// RRDHOST - locks
 
 void rrdhost_rwlock(RRDHOST *host) {
     pthread_rwlock_wrlock(&host->rrdset_root_rwlock);
@@ -69,7 +111,9 @@ void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *funct
 }
 
 void rrdhost_free(RRDHOST *host) {
-    info("Freeing all memory...");
+    if(!host) return;
+
+    info("Freeing all memory for host '%s'...", host->hostname);
 
     rrdhost_rwlock(host);
 
@@ -110,13 +154,17 @@ void rrdhost_free(RRDHOST *host) {
     }
     host->rrdset_root = NULL;
 
+    freez(host->hostname);
     rrdhost_unlock(host);
+    freez(host);
 
-    info("Memory cleanup completed...");
+    info("Host memory cleanup completed...");
 }
 
 void rrdhost_save(RRDHOST *host) {
-    info("Saving database...");
+    if(!host) return;
+
+    info("Saving host '%s' database...", host->hostname);
 
     RRDSET *st;
     RRDDIM *rd;
@@ -147,21 +195,23 @@ void rrdhost_save(RRDHOST *host) {
 }
 
 void rrdhost_free_all(void) {
-    RRDHOST *host;
+    RRDHOST *host = localhost;
 
     // FIXME: lock all hosts
 
-    for(host = &localhost; host ;) {
+    while(host) {
         RRDHOST *next = host = host->next;
         rrdhost_free(host);
         host = next;
     }
+
+    localhost = NULL;
 
     // FIXME: unlock all hosts
 }
 
 void rrdhost_save_all(void) {
     RRDHOST *host;
-    for(host = &localhost; host ; host = host->next)
+    for(host = localhost; host ; host = host->next)
         rrdhost_save(host);
 }

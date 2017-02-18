@@ -157,7 +157,7 @@ void *backends_main(void *ptr) {
     const char *type = config_get("backend", "type", "graphite");
     const char *destination = config_get("backend", "destination", "localhost");
     const char *prefix = config_get("backend", "prefix", "netdata");
-    const char *hostname = config_get("backend", "hostname", localhost.hostname);
+    const char *hostname = config_get("backend", "hostname", localhost->hostname);
     int frequency = (int)config_get_number("backend", "update every", 10);
     int buffer_on_failures = (int)config_get_number("backend", "buffer on failures", 10);
     long timeoutms = config_get_number("backend", "timeout ms", frequency * 2 * 1000);
@@ -310,19 +310,19 @@ void *backends_main(void *ptr) {
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
 
-        rrdhost_rdlock(&localhost);
-        for(st = localhost.rrdset_root; st ;st = st->next) {
+        rrdhost_rdlock(localhost);
+        for(st = localhost->rrdset_root; st ;st = st->next) {
             pthread_rwlock_rdlock(&st->rwlock);
 
             RRDDIM *rd;
             for(rd = st->dimensions; rd ;rd = rd->next) {
                 if(rd->last_collected_time.tv_sec >= after)
-                    chart_buffered_metrics += backend_request_formatter(b, prefix, &localhost, hostname, st, rd, after, before, options);
+                    chart_buffered_metrics += backend_request_formatter(b, prefix, localhost, hostname, st, rd, after, before, options);
             }
 
             pthread_rwlock_unlock(&st->rwlock);
         }
-        rrdhost_unlock(&localhost);
+        rrdhost_unlock(localhost);
 
         if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
             error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
