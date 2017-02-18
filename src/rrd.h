@@ -302,6 +302,8 @@ struct rrdhost {
     char machine_guid[GUID_LEN + 1];
     uint32_t hash_machine_guid;
 
+    uint32_t flags;
+
     RRDSET *rrdset_root;
     pthread_rwlock_t rrdset_root_rwlock;
 
@@ -324,7 +326,12 @@ struct rrdhost {
     // are created or renamed, that match them
     RRDCALCTEMPLATE *templates;
 
-    uint32_t flags;
+    // health / alarm settings
+    char *health_default_exec;
+    char *health_default_recipient;
+    char *health_log_filename;
+    size_t health_log_entries_written;
+    FILE *health_log_fp;
 
     struct rrdhost *next;
 };
