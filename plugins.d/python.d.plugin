@@ -73,10 +73,16 @@ try:
     DICT = OrderedDict
     msg.info('YAML output is ordered')
 except ImportError:
-    ORDERED = False
-    DICT = dict
-    msg.info('YAML output is unordered')
-else:
+    try:
+        from ordereddict import OrderedDict
+        ORDERED = True
+        DICT = OrderedDict
+        msg.info('YAML output is ordered')
+    except ImportError:
+        ORDERED = False
+        DICT = dict
+        msg.info('YAML output is unordered')
+if ORDERED:
     def ordered_load(stream, Loader=yaml.Loader, object_pairs_hook=OrderedDict):
         class OrderedLoader(Loader):
             pass
