@@ -13,7 +13,7 @@ int rrd_delete_unupdated_dimensions = 0;
 
 int rrd_update_every = UPDATE_EVERY;
 int rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
-RRD_MEMORY_MODE rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
+RRD_MEMORY_MODE default_localhost_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 
 
 // ----------------------------------------------------------------------------
@@ -113,7 +113,7 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type) {
 // ----------------------------------------------------------------------------
 // RRD - cache directory
 
-char *rrdset_cache_dir(const char *id) {
+char *rrdset_cache_dir(RRDHOST *host, const char *id) {
     char *ret = NULL;
 
     char b[FILENAME_MAX + 1];
@@ -123,7 +123,7 @@ char *rrdset_cache_dir(const char *id) {
     snprintfz(n, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, b);
     ret = config_get(id, "cache directory", n);
 
-    if(rrd_memory_mode == RRD_MEMORY_MODE_MAP || rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+    if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
         int r = mkdir(ret, 0775);
         if(r != 0 && errno != EEXIST)
             error("Cannot create directory '%s'", ret);

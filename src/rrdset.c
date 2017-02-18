@@ -242,12 +242,12 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     if(!enabled) entries = 5;
 
     unsigned long size = sizeof(RRDSET);
-    char *cache_dir = rrdset_cache_dir(fullid);
+    char *cache_dir = rrdset_cache_dir(host, fullid);
 
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) st = (RRDSET *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 0);
+    if(host->rrd_memory_mode != RRD_MEMORY_MODE_RAM) st = (RRDSET *)mymmap(fullfilename, size, ((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP)?MAP_SHARED:MAP_PRIVATE), 0);
     if(st) {
         if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
             errno = 0;
@@ -291,7 +291,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
         st->units = NULL;
         st->dimensions = NULL;
         st->next = NULL;
-        st->mapped = rrd_memory_mode;
+        st->mapped = host->rrd_memory_mode;
         st->variables = NULL;
         st->alarms = NULL;
         memset(&st->rwlock, 0, sizeof(pthread_rwlock_t));
@@ -372,7 +372,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     st->next = host->rrdset_root;
     host->rrdset_root = st;
 
-    if(health_enabled) {
+    if(host->health_enabled) {
         rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, 0);
         rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, 0);
         rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, 0);

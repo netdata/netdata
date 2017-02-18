@@ -227,7 +227,7 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
                     "\n\t\"alarms\": {\n",
             host->hostname,
             (host->health_log.next_log_id > 0)?(host->health_log.next_log_id - 1):0,
-            health_enabled?"true":"false",
+            host->health_enabled?"true":"false",
             (unsigned long)now_realtime_sec());
 
     RRDCALC *rc;

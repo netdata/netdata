@@ -828,6 +828,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
 }
 
 void health_readdir(RRDHOST *host, const char *path) {
+    if(!host->health_enabled) return;
+
     size_t pathlen = strlen(path);
 
     debug(D_HEALTH, "Health configuration reading directory '%s'", path);

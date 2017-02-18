@@ -884,7 +884,7 @@ int run_test(struct test *test)
 {
     fprintf(stderr, "\nRunning test '%s':\n%s\n", test->name, test->description);
 
-    rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    default_localhost_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
     rrd_update_every = test->update_every;
 
     char name[101];
@@ -1091,7 +1091,7 @@ int unit_test(long delay, long shift)
     snprintfz(name, 100, "unittest-%d-%ld-%ld", repeat, delay, shift);
 
     //debug_flags = 0xffffffff;
-    rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    default_localhost_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
     rrd_update_every = 1;
 
     int do_abs = 1;

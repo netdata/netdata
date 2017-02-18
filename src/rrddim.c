@@ -71,15 +71,15 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
     rrdset_strncpyz_name(filename, id, FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    if(rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
-        rd = (RRDDIM *)mymmap(fullfilename, size, ((rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
+    if(st->rrdhost->rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
+        rd = (RRDDIM *)mymmap(fullfilename, size, ((st->rrdhost->rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
         if(likely(rd)) {
             // we have a file mapped for rd
 
             rd->id = NULL;
             rd->name = NULL;
             rd->cache_filename = NULL;
-            rd->memory_mode = rrd_memory_mode;
+            rd->memory_mode = st->rrdhost->rrd_memory_mode;
             rd->flags = 0x00000000;
             rd->variables = NULL;
             rd->next = NULL;
@@ -184,7 +184,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
         td->next = rd;
     }
 
-    if(health_enabled) {
+    if(st->rrdhost->health_enabled) {
         rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, 0);
         rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, 0);
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, 0);
