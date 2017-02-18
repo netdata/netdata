@@ -760,13 +760,13 @@ int web_client_api_request_v1_alarm_variables(struct web_client *w, char *url)
     return web_client_api_request_single_chart(w, url, health_api_v1_chart_variables2json);
 }
 
-int web_client_api_request_v1_charts(struct web_client *w, char *url)
+int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url)
 {
     (void)url;
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    rrd_stats_api_v1_charts(w->response.data);
+    rrd_stats_api_v1_charts(host, w->response.data);
     return 200;
 }
 
@@ -798,12 +798,12 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
     switch(format) {
         case ALLMETRICS_SHELL:
             w->response.data->contenttype = CT_TEXT_PLAIN;
-            rrd_stats_api_v1_charts_allmetrics_shell(w->response.data);
+            rrd_stats_api_v1_charts_allmetrics_shell(localhost, w->response.data);
             return 200;
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus(w->response.data);
+            rrd_stats_api_v1_charts_allmetrics_prometheus(localhost, w->response.data);
             return 200;
 
         default:
@@ -1438,7 +1438,7 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
             return web_client_api_request_v1_chart(w, url);
 
         else if(hash == hash_charts && !strcmp(tok, "charts"))
-            return web_client_api_request_v1_charts(w, url);
+            return web_client_api_request_v1_charts(localhost, w, url);
 
         else if(hash == hash_registry && !strcmp(tok, "registry"))
             return web_client_api_request_v1_registry(w, url);
@@ -2214,7 +2214,7 @@ void web_client_process(struct web_client *w) {
 
                     w->response.data->contenttype = CT_APPLICATION_JSON;
                     buffer_flush(w->response.data);
-                    rrd_stats_all_json(w->response.data);
+                    rrd_stats_all_json(localhost, w->response.data);
                 }
 #ifdef NETDATA_INTERNAL_CHECKS
                 else if(hash == hash_exit && strcmp(tok, "exit") == 0) {
