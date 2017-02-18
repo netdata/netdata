@@ -222,6 +222,9 @@ void rrdhost_free(RRDHOST *host) {
     }
     host->rrdset_root = NULL;
 
+    if(rrdhost_index_del(host) != host)
+        error("RRDHOST '%s' removed from index, deleted the wrong entry.", host->hostname);
+
     freez(host->cache_dir);
     freez(host->varlib_dir);
     freez(host->health_default_exec);
