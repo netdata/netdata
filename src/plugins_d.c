@@ -84,8 +84,7 @@ static int pluginsd_split_words(char *str, char **words, int max_words) {
 }
 
 
-void *pluginsd_worker_thread(void *arg)
-{
+void *pluginsd_worker_thread(void *arg) {
     struct plugind *cd = (struct plugind *)arg;
     cd->obsolete = 0;
 
@@ -97,6 +96,7 @@ void *pluginsd_worker_thread(void *arg)
 #endif
 
     char *words[MAX_WORDS] = { NULL };
+    uint32_t HOST_HASH = simple_hash("HOST");
     uint32_t BEGIN_HASH = simple_hash("BEGIN");
     uint32_t END_HASH = simple_hash("END");
     uint32_t FLUSH_HASH = simple_hash("FLUSH");
@@ -109,6 +109,7 @@ void *pluginsd_worker_thread(void *arg)
 #endif
 
     size_t count = 0;
+    RRDHOST *host = &localhost;
 
     for(;;) {
         if(unlikely(netdata_exit)) break;
@@ -175,7 +176,7 @@ void *pluginsd_worker_thread(void *arg)
                     break;
                 }
 
-                st = rrdset_find_localhost(id);
+                st = rrdset_find(host, id);
                 if(unlikely(!st)) {
                     error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist. Disabling it.", cd->fullfilename, id);
                     cd->enabled = 0;
@@ -252,7 +253,7 @@ void *pluginsd_worker_thread(void *arg)
                 if(unlikely(!family || !*family)) family = NULL;
                 if(unlikely(!context || !*context)) context = NULL;
 
-                st = rrdset_find_bytype_localhost(type, id);
+                st = rrdset_find_bytype(host, type, id);
                 if(unlikely(!st)) {
                     debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d"
                         , type, id
@@ -305,7 +306,7 @@ void *pluginsd_worker_thread(void *arg)
                     , st->id
                     , id
                     , name?name:""
-                    , rrddim_algorithm_name(rrddim_algorithm_id(algorithm))
+                    , rrd_algorithm_name(rrd_algorithm_id(algorithm))
                     , multiplier
                     , divisor
                     , options?options:""
@@ -313,7 +314,7 @@ void *pluginsd_worker_thread(void *arg)
 
                 RRDDIM *rd = rrddim_find(st, id);
                 if(unlikely(!rd)) {
-                    rd = rrddim_add(st, id, name, multiplier, divisor, rrddim_algorithm_id(algorithm));
+                    rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
                     rd->flags = 0x00000000;
                     if(options && *options) {
                         if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);

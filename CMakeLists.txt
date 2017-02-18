@@ -123,7 +123,7 @@ set(NETDATA_SOURCE_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        )
+        src/rrdhost.c src/rrdfamily.c src/rrdset.c src/rrddim.c)
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c

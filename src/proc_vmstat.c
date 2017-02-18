@@ -94,8 +94,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         if(unlikely(!st_swapio)) {
             st_swapio = rrdset_create("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
 
-            rrddim_add(st_swapio, "in",  NULL, sysconf(_SC_PAGESIZE), 1024, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_swapio, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRDDIM_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_swapio, "in",  NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_swapio, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_swapio);
 
@@ -111,8 +111,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         if(unlikely(!st_io)) {
             st_io = rrdset_create("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150, update_every, RRDSET_TYPE_AREA);
 
-            rrddim_add(st_io, "in",  NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_io, "out", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_io);
 
@@ -129,8 +129,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             st_pgfaults = rrdset_create("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
             st_pgfaults->isdetail = 1;
 
-            rrddim_add(st_pgfaults, "minor",  NULL,  1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_pgfaults, "minor",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_pgfaults);
 
@@ -158,18 +158,18 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             st_numa->isdetail = 1;
 
             // These depend on CONFIG_NUMA in the kernel.
-            rrddim_add(st_numa, "local", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "foreign", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "interleave", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "other", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "foreign", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "interleave", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "other", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             // The following stats depend on CONFIG_NUMA_BALANCING in the
             // kernel.
-            rrddim_add(st_numa, "pte updates", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "huge pte updates", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "hint faults", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "hint faults local", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "pages migrated", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "pte updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "huge pte updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "hint faults", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "hint faults local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "pages migrated", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_numa);
 

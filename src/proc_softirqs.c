@@ -141,7 +141,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
         if(unlikely(!irr->rd || strncmp(irr->name, irr->rd->name, MAX_INTERRUPT_NAME) != 0)) {
             irr->rd = rrddim_find(st, irr->id);
             if(unlikely(!irr->rd))
-                irr->rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                irr->rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else
                 rrddim_set_name(st, irr->rd, irr->name);
 
@@ -186,7 +186,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 if(unlikely(!irr->cpu[c].rd)) {
                     irr->cpu[c].rd = rrddim_find(st, irr->id);
                     if(unlikely(!irr->cpu[c].rd))
-                        irr->cpu[c].rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                        irr->cpu[c].rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     else
                         rrddim_set_name(st, irr->cpu[c].rd, irr->name);
                 }

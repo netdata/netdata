@@ -30,7 +30,7 @@ endif
 
 netdata_SOURCES = \
 	appconfig.c appconfig.h \
-	adaptive_resortable_list.c adaptive_resortable_list.h \
+	adaptive_resortable_list.c \adaptive_resortable_list.h \
 	avl.c avl.h \
 	backends.c backends.h \
 	clocks.c clocks.h \
@@ -65,6 +65,10 @@ netdata_SOURCES = \
 	registry_db.c \
 	registry_log.c \
 	rrd.c rrd.h \
+	rrddim.c \
+	rrdfamily.c \
+	rrdhost.c \
+	rrdset.c \
 	rrd2json.c rrd2json.h \
 	storage_number.c storage_number.h \
 	unit_test.c unit_test.h \

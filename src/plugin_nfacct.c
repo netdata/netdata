@@ -142,14 +142,14 @@ void *nfacct_main(void *ptr) {
                 st = rrdset_create("netfilter", "nfacct_packets", NULL, "nfacct", NULL, "Netfilter Accounting Packets", "packets/s", 3206, rrd_update_every, RRDSET_TYPE_STACKED);
 
                 for(i = 0; i < nfacct_list->len ; i++)
-                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
             for(i = 0; i < nfacct_list->len ; i++) {
                 RRDDIM *rd = rrddim_find(st, nfacct_list->data[i].name);
 
-                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRDDIM_ALGORITHM_INCREMENTAL);
+                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
                 if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].pkts);
             }
 
@@ -162,14 +162,14 @@ void *nfacct_main(void *ptr) {
                 st = rrdset_create("netfilter", "nfacct_bytes", NULL, "nfacct", NULL, "Netfilter Accounting Bandwidth", "kilobytes/s", 3207, rrd_update_every, RRDSET_TYPE_STACKED);
 
                 for(i = 0; i < nfacct_list->len ; i++)
-                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
             for(i = 0; i < nfacct_list->len ; i++) {
                 RRDDIM *rd = rrddim_find(st, nfacct_list->data[i].name);
 
-                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRDDIM_ALGORITHM_INCREMENTAL);
+                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
                 if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].bytes);
             }
 

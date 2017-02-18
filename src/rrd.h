@@ -56,20 +56,20 @@ extern int rrd_memory_mode_id(const char *name);
 // ----------------------------------------------------------------------------
 // algorithms types
 
-typedef enum rrddim_algorithm {
-    RRDDIM_ALGORITHM_ABSOLUTE              = 0,
-    RRDDIM_ALGORITHM_INCREMENTAL           = 1,
-    RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL = 2,
-    RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL  = 3
-} RRDDIM_ALGORITHM;
+typedef enum rrd_algorithm {
+    RRD_ALGORITHM_ABSOLUTE              = 0,
+    RRD_ALGORITHM_INCREMENTAL           = 1,
+    RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL = 2,
+    RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL  = 3
+} RRD_ALGORITHM;
 
-#define RRDDIM_ALGORITHM_ABSOLUTE_NAME                "absolute"
-#define RRDDIM_ALGORITHM_INCREMENTAL_NAME             "incremental"
-#define RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME   "percentage-of-incremental-row"
-#define RRDDIM_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME    "percentage-of-absolute-row"
+#define RRD_ALGORITHM_ABSOLUTE_NAME                "absolute"
+#define RRD_ALGORITHM_INCREMENTAL_NAME             "incremental"
+#define RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL_NAME   "percentage-of-incremental-row"
+#define RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL_NAME    "percentage-of-absolute-row"
 
-extern RRDDIM_ALGORITHM rrddim_algorithm_id(const char *name);
-extern const char *rrddim_algorithm_name(RRDDIM_ALGORITHM algorithm);
+extern RRD_ALGORITHM rrd_algorithm_id(const char *name);
+extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 
 // ----------------------------------------------------------------------------
 // flags
@@ -120,7 +120,7 @@ struct rrddim {
                                                     // (the user overwrites the name of the charts)
                                                     // DO NOT FREE THIS - IT IS ALLOCATED IN CONFIG
 
-    RRDDIM_ALGORITHM algorithm;                     // the algorithm that is applied to add new collected values
+    RRD_ALGORITHM algorithm;                     // the algorithm that is applied to add new collected values
     RRD_MEMORY_MODE memory_mode;                    // the memory mode for this dimension
 
     collected_number multiplier;                    // the multiplier of the collected values
@@ -312,8 +312,13 @@ struct rrdhost {
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
     RRDCALC *alarms;
+
+    // alarms historical events
     ALARM_LOG health_log;
 
+    // templates of alarms
+    // these are used to create alarms when charts
+    // are created or renamed, that match them
     RRDCALCTEMPLATE *templates;
 
     uint32_t flags;
@@ -342,12 +347,7 @@ extern void rrdhost_unlock(RRDHOST *host);
 // ----------------------------------------------------------------------------
 // RRD SET functions
 
-extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern void rrdset_set_name(RRDSET *st, const char *name);
-
-extern char *rrdset_cache_dir(const char *id);
-
-extern void rrdset_reset(RRDSET *st);
 
 extern RRDSET *rrdset_create(const char *type
         , const char *id
@@ -360,8 +360,11 @@ extern RRDSET *rrdset_create(const char *type
         , int update_every
         , int chart_type);
 
-extern void rrdset_free_all(void);
-extern void rrdset_save_all(void);
+extern void rrdhost_free_all(void);
+extern void rrdhost_save_all(void);
+
+extern void rrdhost_free(RRDHOST *host);
+extern void rrdhost_save(RRDHOST *host);
 
 extern RRDSET *rrdset_find(RRDHOST *host, const char *id);
 #define rrdset_find_localhost(id) rrdset_find(&localhost, id)
@@ -414,11 +417,9 @@ extern usec_t rrdset_done(RRDSET *st);
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
 
-extern RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRDDIM_ALGORITHM algorithm);
+extern RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm);
 
 extern void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
-extern void rrddim_free(RRDSET *st, RRDDIM *rd);
-
 extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
 
 extern int rrddim_hide(RRDSET *st, const char *id);
@@ -426,5 +427,33 @@ extern int rrddim_unhide(RRDSET *st, const char *id);
 
 extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
+
+
+// ----------------------------------------------------------------------------
+// RRD internal functions
+
+#ifdef NETDATA_RRD_INTERNALS
+
+extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
+extern char *rrdset_cache_dir(const char *id);
+
+extern void rrdset_reset(RRDSET *st);
+
+extern void rrddim_free(RRDSET *st, RRDDIM *rd);
+
+extern int rrddim_compare(void* a, void* b);
+extern int rrdset_compare(void* a, void* b);
+extern int rrdset_compare_name(void* a, void* b);
+extern int rrdfamily_compare(void *a, void *b);
+
+extern RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id);
+extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc);
+
+#define rrdset_index_add(host, st) (RRDSET *)avl_insert_lock(&((host)->rrdset_root_index), (avl *)(st))
+#define rrdset_index_del(host, st) (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index), (avl *)(st))
+extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
+
+#endif /* NETDATA_RRD_INTERNALS */
+
 
 #endif /* NETDATA_RRD_H */
