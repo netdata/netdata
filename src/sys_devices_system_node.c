@@ -92,7 +92,8 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
 
                 RRDSET *st = m->numastat_st;
                 if(unlikely(!st)) {
-                    st = rrdset_create("mem", m->name, NULL, "numa", NULL, "NUMA events", "events/s", 1000, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost("mem", m->name, NULL, "numa", NULL, "NUMA events", "events/s", 1000
+                                                 , update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
                     rrddim_add(st, "local_node", "local", 1, 1, RRD_ALGORITHM_INCREMENTAL);

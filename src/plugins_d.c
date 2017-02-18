@@ -284,7 +284,8 @@ void *pluginsd_worker_thread(void *arg) {
                         , update_every
                         );
 
-                    st = rrdset_create(type, id, name, family, context, title, units, priority, update_every, chart_type);
+                    st = rrdset_create(host, type, id, name, family, context, title, units, priority, update_every
+                                                 , chart_type);
                     cd->update_every = update_every;
                 }
                 else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);

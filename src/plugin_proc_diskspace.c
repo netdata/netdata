@@ -157,7 +157,8 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             if(unlikely(!m->st_space)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mi->mount_source);
-                m->st_space = rrdset_create("disk_space", disk, NULL, family, "disk.space", title, "GB", 2023, update_every, RRDSET_TYPE_STACKED);
+                m->st_space = rrdset_create_localhost("disk_space", disk, NULL, family, "disk.space", title, "GB", 2023
+                                                      , update_every, RRDSET_TYPE_STACKED);
             }
 
             m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -184,7 +185,8 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             if(unlikely(!m->st_inodes)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mi->mount_source);
-                m->st_inodes = rrdset_create("disk_inodes", disk, NULL, family, "disk.inodes", title, "Inodes", 2024, update_every, RRDSET_TYPE_STACKED);
+                m->st_inodes = rrdset_create_localhost("disk_inodes", disk, NULL, family, "disk.inodes", title, "Inodes"
+                                                       , 2024, update_every, RRDSET_TYPE_STACKED);
             }
 
             m->rd_inodes_avail    = rrddim_add(m->st_inodes, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -273,9 +275,11 @@ void *proc_diskspace_main(void *ptr) {
 
             if(!stcpu_thread) {
                 stcpu_thread = rrdset_find_localhost("netdata.plugin_diskspace");
-                if(!stcpu_thread) stcpu_thread = rrdset_create("netdata", "plugin_diskspace", NULL, "diskspace", NULL
-                                                 , "NetData Disk Space Plugin CPU usage", "milliseconds/s", 132020
-                                                 , update_every, RRDSET_TYPE_STACKED);
+                if(!stcpu_thread) stcpu_thread = rrdset_create_localhost("netdata", "plugin_diskspace", NULL
+                                                                         , "diskspace", NULL
+                                                                         , "NetData Disk Space Plugin CPU usage"
+                                                                         , "milliseconds/s", 132020
+                                                                         , update_every, RRDSET_TYPE_STACKED);
 
                 rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
                 rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
@@ -291,9 +295,11 @@ void *proc_diskspace_main(void *ptr) {
 
             if(!st_duration) {
                 st_duration = rrdset_find_localhost("netdata.plugin_diskspace_dt");
-                if(!st_duration) st_duration = rrdset_create("netdata", "plugin_diskspace_dt", NULL, "diskspace", NULL
-                                                 , "NetData Disk Space Plugin Duration", "milliseconds/run", 132021
-                                                 , update_every, RRDSET_TYPE_AREA);
+                if(!st_duration) st_duration = rrdset_create_localhost("netdata", "plugin_diskspace_dt", NULL
+                                                                       , "diskspace", NULL
+                                                                       , "NetData Disk Space Plugin Duration"
+                                                                       , "milliseconds/run", 132021
+                                                                       , update_every, RRDSET_TYPE_AREA);
 
                 rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             }

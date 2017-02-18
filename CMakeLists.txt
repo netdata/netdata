@@ -28,6 +28,7 @@ set(NETDATA_SOURCE_FILES
         src/dictionary.h
         src/eval.c
         src/eval.h
+        src/freebsd_sysctl.c
         src/global_statistics.c
         src/global_statistics.h
         src/health.c

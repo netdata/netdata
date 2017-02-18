@@ -364,16 +364,19 @@ extern void rrdhost_unlock(RRDHOST *host);
 
 extern void rrdset_set_name(RRDSET *st, const char *name);
 
-extern RRDSET *rrdset_create(const char *type
-        , const char *id
-        , const char *name
-        , const char *family
-        , const char *context
-        , const char *title
-        , const char *units
-        , long priority
-        , int update_every
-        , int chart_type);
+extern RRDSET *rrdset_create(RRDHOST *host
+                             , const char *type
+                             , const char *id
+                             , const char *name
+                             , const char *family
+                             , const char *context
+                             , const char *title
+                             , const char *units
+                             , long priority
+                             , int update_every
+                             , int chart_type);
+
+#define rrdset_create_localhost(type, id, name, family, context, title, units, priority, update_every, chart_type) rrdset_create(localhost, type, id, name, family, context, title, units, priority, update_every, chart_type)
 
 extern void rrdhost_free_all(void);
 extern void rrdhost_save_all(void);

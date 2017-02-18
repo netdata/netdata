@@ -226,7 +226,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->st_bandwidth = rrdset_find_bytype_localhost("net", d->name);
 
                 if(!d->st_bandwidth)
-                    d->st_bandwidth = rrdset_create("net", d->name, NULL, d->name, "net.net", "Bandwidth", "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
+                    d->st_bandwidth = rrdset_create_localhost("net", d->name, NULL, d->name, "net.net", "Bandwidth"
+                                                              , "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
 
                 d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -248,7 +249,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->st_packets = rrdset_find_bytype_localhost("net_packets", d->name);
 
                 if(!d->st_packets)
-                    d->st_packets = rrdset_create("net_packets", d->name, NULL, d->name, "net.packets", "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
+                    d->st_packets = rrdset_create_localhost("net_packets", d->name, NULL, d->name, "net.packets"
+                                                            , "Packets", "packets/s", 7001, update_every
+                                                            , RRDSET_TYPE_LINE);
 
                 d->st_packets->isdetail = 1;
 
@@ -274,7 +277,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->st_errors = rrdset_find_bytype_localhost("net_errors", d->name);
 
                 if(!d->st_errors)
-                    d->st_errors = rrdset_create("net_errors", d->name, NULL, d->name, "net.errors", "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
+                    d->st_errors = rrdset_create_localhost("net_errors", d->name, NULL, d->name, "net.errors"
+                                                           , "Interface Errors", "errors/s", 7002, update_every
+                                                           , RRDSET_TYPE_LINE);
 
                 d->st_errors->isdetail = 1;
 
@@ -298,7 +303,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->st_drops = rrdset_find_bytype_localhost("net_drops", d->name);
 
                 if(!d->st_drops)
-                    d->st_drops = rrdset_create("net_drops", d->name, NULL, d->name, "net.drops", "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
+                    d->st_drops = rrdset_create_localhost("net_drops", d->name, NULL, d->name, "net.drops"
+                                                          , "Interface Drops", "drops/s", 7003, update_every
+                                                          , RRDSET_TYPE_LINE);
 
                 d->st_drops->isdetail = 1;
 
@@ -322,7 +329,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->st_fifo = rrdset_find_bytype_localhost("net_fifo", d->name);
 
                 if(!d->st_fifo)
-                    d->st_fifo = rrdset_create("net_fifo", d->name, NULL, d->name, "net.fifo", "Interface FIFO Buffer Errors", "errors", 7004, update_every, RRDSET_TYPE_LINE);
+                    d->st_fifo = rrdset_create_localhost("net_fifo", d->name, NULL, d->name, "net.fifo"
+                                                         , "Interface FIFO Buffer Errors", "errors", 7004, update_every
+                                                         , RRDSET_TYPE_LINE);
 
                 d->st_fifo->isdetail = 1;
 
@@ -345,7 +354,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_compressed)) {
                 d->st_compressed = rrdset_find_bytype_localhost("net_compressed", d->name);
                 if(!d->st_compressed)
-                    d->st_compressed = rrdset_create("net_compressed", d->name, NULL, d->name, "net.compressed", "Compressed Packets", "packets/s", 7005, update_every, RRDSET_TYPE_LINE);
+                    d->st_compressed = rrdset_create_localhost("net_compressed", d->name, NULL, d->name
+                                                               , "net.compressed", "Compressed Packets", "packets/s"
+                                                               , 7005, update_every, RRDSET_TYPE_LINE);
 
                 d->st_compressed->isdetail = 1;
 
@@ -368,7 +379,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_events)) {
                 d->st_events = rrdset_find_bytype_localhost("net_events", d->name);
                 if(!d->st_events)
-                    d->st_events = rrdset_create("net_events", d->name, NULL, d->name, "net.events", "Network Interface Events", "events/s", 7006, update_every, RRDSET_TYPE_LINE);
+                    d->st_events = rrdset_create_localhost("net_events", d->name, NULL, d->name, "net.events"
+                                                           , "Network Interface Events", "events/s", 7006, update_every
+                                                           , RRDSET_TYPE_LINE);
 
                 d->st_events->isdetail = 1;
 
