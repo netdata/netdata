@@ -93,8 +93,8 @@ void rrd_stats_api_v1_charts(BUFFER *wb)
         , localhost->hostname
         , program_version
         , os_type
-        , rrd_update_every
-        , rrd_default_history_entries
+        , localhost->rrd_update_every
+        , localhost->rrd_history_entries
         );
 
     pthread_rwlock_rdlock(&localhost->rrdset_root_rwlock);
@@ -438,8 +438,8 @@ void rrd_stats_all_json(BUFFER *wb)
         "\t\"memory\": %lu\n"
         "}\n"
         , localhost->hostname
-        , rrd_update_every
-        , rrd_default_history_entries
+        , localhost->rrd_update_every
+        , localhost->rrd_history_entries
         , memory
         );
 }

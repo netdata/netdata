@@ -22,7 +22,7 @@ void *macos_main(void *ptr) {
     unsigned long long sutime_macos_mach_smi = 0ULL;
     unsigned long long sutime_macos_iokit = 0ULL;
 
-    usec_t step = rrd_update_every * USEC_PER_SEC;
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     for(;;) {
@@ -34,19 +34,19 @@ void *macos_main(void *ptr) {
 
         if(!vdo_macos_sysctl) {
             debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_sysctl().");
-            vdo_macos_sysctl = do_macos_sysctl(rrd_update_every, hb_dt);
+            vdo_macos_sysctl = do_macos_sysctl(localhost->rrd_update_every, hb_dt);
         }
         if(unlikely(netdata_exit)) break;
 
         if(!vdo_macos_mach_smi) {
             debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_mach_smi().");
-            vdo_macos_mach_smi = do_macos_mach_smi(rrd_update_every, hb_dt);
+            vdo_macos_mach_smi = do_macos_mach_smi(localhost->rrd_update_every, hb_dt);
         }
         if(unlikely(netdata_exit)) break;
 
         if(!vdo_macos_iokit) {
             debug(D_PROCNETDEV_LOOP, "MACOS: calling do_macos_iokit().");
-            vdo_macos_iokit = do_macos_iokit(rrd_update_every, hb_dt);
+            vdo_macos_iokit = do_macos_iokit(localhost->rrd_update_every, hb_dt);
         }
         if(unlikely(netdata_exit)) break;
 

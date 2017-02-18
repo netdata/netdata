@@ -11,8 +11,8 @@
 int rrd_delete_unupdated_dimensions = 0;
 */
 
-int rrd_update_every = UPDATE_EVERY;
-int rrd_default_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
+int default_localhost_rrd_update_every = UPDATE_EVERY;
+int default_localhost_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 RRD_MEMORY_MODE default_localhost_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
 
 

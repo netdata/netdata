@@ -64,9 +64,9 @@ void read_cgroup_plugin_configuration() {
     user_hash = simple_hash("user");
     system_hash = simple_hash("system");
 
-    cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", rrd_update_every);
-    if(cgroup_update_every < rrd_update_every)
-        cgroup_update_every = rrd_update_every;
+    cgroup_update_every = (int)config_get_number("plugin:cgroups", "update every", localhost->rrd_update_every);
+    if(cgroup_update_every < localhost->rrd_update_every)
+        cgroup_update_every = localhost->rrd_update_every;
 
     cgroup_check_for_new_every = (int)config_get_number("plugin:cgroups", "check for new cgroups every", cgroup_check_for_new_every * cgroup_update_every);
     if(cgroup_check_for_new_every < cgroup_update_every)

@@ -234,7 +234,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
         return st;
     }
 
-    long rentries = config_get_number(fullid, "history", rrd_default_history_entries);
+    long rentries = config_get_number(fullid, "history", host->rrd_history_entries);
     long entries = align_entries_to_pagesize(rentries);
     if(entries != rentries) entries = config_set_number(fullid, "history", entries);
 

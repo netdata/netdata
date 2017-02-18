@@ -326,7 +326,7 @@ void registry_statistics(void) {
     if(!sts) sts = rrdset_find_localhost("netdata.registry_sessions");
     if(!sts) {
         sts = rrdset_create_localhost("netdata", "registry_sessions", NULL, "registry", NULL
-                                      , "NetData Registry Sessions", "session", 131000, rrd_update_every
+                                      , "NetData Registry Sessions", "session", 131000, localhost->rrd_update_every
                                       , RRDSET_TYPE_LINE);
 
         rrddim_add(sts, "sessions",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -341,7 +341,7 @@ void registry_statistics(void) {
     if(!stc) stc = rrdset_find_localhost("netdata.registry_entries");
     if(!stc) {
         stc = rrdset_create_localhost("netdata", "registry_entries", NULL, "registry", NULL, "NetData Registry Entries"
-                                      , "entries", 131100, rrd_update_every, RRDSET_TYPE_LINE);
+                                      , "entries", 131100, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rrddim_add(stc, "persons",        NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines",       NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -363,7 +363,7 @@ void registry_statistics(void) {
     if(!stm) stm = rrdset_find_localhost("netdata.registry_mem");
     if(!stm) {
         stm = rrdset_create_localhost("netdata", "registry_mem", NULL, "registry", NULL, "NetData Registry Memory", "KB"
-                                      , 131300, rrd_update_every, RRDSET_TYPE_STACKED);
+                                      , 131300, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rrddim_add(stm, "persons",        NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "machines",       NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);

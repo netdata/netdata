@@ -223,9 +223,9 @@ void *proc_diskspace_main(void *ptr) {
 
     int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
 
-    int update_every = (int)config_get_number("plugin:proc:diskspace", "update every", rrd_update_every);
-    if(update_every < rrd_update_every)
-        update_every = rrd_update_every;
+    int update_every = (int)config_get_number("plugin:proc:diskspace", "update every", localhost->rrd_update_every);
+    if(update_every < localhost->rrd_update_every)
+        update_every = localhost->rrd_update_every;
 
     check_for_new_mountpoints_every = (int)config_get_number("plugin:proc:diskspace", "check for new mount points every", check_for_new_mountpoints_every);
     if(check_for_new_mountpoints_every < update_every)

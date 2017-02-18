@@ -133,7 +133,7 @@ void global_statistics_charts(void) {
     if (!stcpu_thread) {
         stcpu_thread = rrdset_create_localhost("netdata", "plugin_proc_cpu", NULL, "proc", NULL
                                                , "NetData Proc Plugin CPU usage", "milliseconds/s", 132000
-                                               , rrd_update_every, RRDSET_TYPE_STACKED);
+                                               , localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
@@ -148,7 +148,7 @@ void global_statistics_charts(void) {
     if (!stcpu) stcpu = rrdset_find_localhost("netdata.server_cpu");
     if (!stcpu) {
         stcpu = rrdset_create_localhost("netdata", "server_cpu", NULL, "netdata", NULL, "NetData CPU usage"
-                                        , "milliseconds/s", 130000, rrd_update_every, RRDSET_TYPE_STACKED);
+                                        , "milliseconds/s", 130000, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rrddim_add(stcpu, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         rrddim_add(stcpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
@@ -163,7 +163,7 @@ void global_statistics_charts(void) {
     if (!stclients) stclients = rrdset_find_localhost("netdata.clients");
     if (!stclients) {
         stclients = rrdset_create_localhost("netdata", "clients", NULL, "netdata", NULL, "NetData Web Clients"
-                                            , "connected clients", 130200, rrd_update_every, RRDSET_TYPE_LINE);
+                                            , "connected clients", 130200, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rrddim_add(stclients, "clients", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     } else rrdset_next(stclients);
@@ -176,7 +176,7 @@ void global_statistics_charts(void) {
     if (!streqs) streqs = rrdset_find_localhost("netdata.requests");
     if (!streqs) {
         streqs = rrdset_create_localhost("netdata", "requests", NULL, "netdata", NULL, "NetData Web Requests"
-                                         , "requests/s", 130300, rrd_update_every, RRDSET_TYPE_LINE);
+                                         , "requests/s", 130300, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rrddim_add(streqs, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     } else rrdset_next(streqs);
@@ -189,7 +189,7 @@ void global_statistics_charts(void) {
     if (!stbytes) stbytes = rrdset_find_localhost("netdata.net");
     if (!stbytes) {
         stbytes = rrdset_create_localhost("netdata", "net", NULL, "netdata", NULL, "NetData Network Traffic"
-                                          , "kilobits/s", 130000, rrd_update_every, RRDSET_TYPE_AREA);
+                                          , "kilobits/s", 130000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
         rrddim_add(stbytes, "in", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
         rrddim_add(stbytes, "out", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -204,7 +204,7 @@ void global_statistics_charts(void) {
     if (!stduration) stduration = rrdset_find_localhost("netdata.response_time");
     if (!stduration) {
         stduration = rrdset_create_localhost("netdata", "response_time", NULL, "netdata", NULL
-                                             , "NetData API Response Time", "ms/request", 130400, rrd_update_every
+                                             , "NetData API Response Time", "ms/request", 130400, localhost->rrd_update_every
                                              , RRDSET_TYPE_LINE);
 
         rrddim_add(stduration, "average", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
@@ -237,7 +237,7 @@ void global_statistics_charts(void) {
     if (!stcompression) {
         stcompression = rrdset_create_localhost("netdata", "compression_ratio", NULL, "netdata", NULL
                                                 , "NetData API Responses Compression Savings Ratio", "percentage"
-                                                , 130500, rrd_update_every, RRDSET_TYPE_LINE);
+                                                , 130500, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rrddim_add(stcompression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     } else rrdset_next(stcompression);

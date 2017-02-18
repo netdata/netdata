@@ -1532,7 +1532,7 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
     debug(D_WEB_CLIENT, "%llu: Found RRD data with name '%s'.", w->id, tok);
 
     // how many entries does the client want?
-    int lines = rrd_default_history_entries;
+    int lines = (int)st->entries;
     int group_count = 1;
     time_t after = 0, before = 0;
     int group_method = GROUP_AVERAGE;
@@ -1934,7 +1934,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     // set a proper expiration date, if not already set
     if(unlikely(!w->response.data->expires)) {
         if(w->response.data->options & WB_CONTENT_NO_CACHEABLE)
-            w->response.data->expires = w->tv_ready.tv_sec + rrd_update_every;
+            w->response.data->expires = w->tv_ready.tv_sec + localhost->rrd_update_every;
         else
             w->response.data->expires = w->tv_ready.tv_sec + 86400;
     }
