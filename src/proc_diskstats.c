@@ -421,8 +421,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!st)) {
                 st = rrdset_create(RRD_TYPE_DISK, disk, NULL, family, "disk.io", "Disk I/O Bandwidth", "kilobytes/s", 2000, update_every, RRDSET_TYPE_AREA);
 
-                rrddim_add(st, "reads", NULL, d->sector_size, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "writes", NULL, d->sector_size * -1, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "reads", NULL, d->sector_size, 1024, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -441,8 +441,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 st = rrdset_create("disk_ops", disk, NULL, family, "disk.ops", "Disk Completed I/O Operations", "operations/s", 2001, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
 
-                rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -461,7 +461,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 st = rrdset_create("disk_qops", disk, NULL, family, "disk.qops", "Disk Current I/O Operations", "operations", 2002, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
 
-                rrddim_add(st, "operations", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+                rrddim_add(st, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(st);
 
@@ -479,7 +479,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 st = rrdset_create("disk_backlog", disk, NULL, family, "disk.backlog", "Disk Backlog", "backlog (ms)", 2003, update_every, RRDSET_TYPE_AREA);
                 st->isdetail = 1;
 
-                rrddim_add(st, "backlog", NULL, 1, 10, RRDDIM_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "backlog", NULL, 1, 10, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -497,7 +497,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 st = rrdset_create("disk_util", disk, NULL, family, "disk.util", "Disk Utilization Time", "% of time working", 2004, update_every, RRDSET_TYPE_AREA);
                 st->isdetail = 1;
 
-                rrddim_add(st, "utilization", NULL, 1, 10, RRDDIM_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "utilization", NULL, 1, 10, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -515,8 +515,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 st = rrdset_create("disk_mops", disk, NULL, family, "disk.mops", "Disk Merged Operations", "merged operations/s", 2021, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
 
-                rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -535,8 +535,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 st = rrdset_create("disk_iotime", disk, NULL, family, "disk.iotime", "Disk Total I/O Time", "milliseconds/s", 2022, update_every, RRDSET_TYPE_LINE);
                 st->isdetail = 1;
 
-                rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
@@ -557,8 +557,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     st = rrdset_create("disk_await", disk, NULL, family, "disk.await", "Average Completed I/O Operation Time", "ms per operation", 2005, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "reads", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
-                    rrddim_add(st, "writes", NULL, -1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -574,8 +574,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     st = rrdset_create("disk_avgsz", disk, NULL, family, "disk.avgsz", "Average Completed I/O Operation Bandwidth", "kilobytes per operation", 2006, update_every, RRDSET_TYPE_AREA);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "reads", NULL, d->sector_size, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-                    rrddim_add(st, "writes", NULL, d->sector_size * -1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "reads", NULL, d->sector_size, 1024, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 
@@ -591,7 +591,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     st = rrdset_create("disk_svctm", disk, NULL, family, "disk.svctm", "Average Service Time", "ms per operation", 2007, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "svctm", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(st, "svctm", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(st);
 

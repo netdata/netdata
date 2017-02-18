@@ -95,10 +95,10 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
                     st = rrdset_create("mem", m->name, NULL, "numa", NULL, "NUMA events", "events/s", 1000, update_every, RRDSET_TYPE_LINE);
                     st->isdetail = 1;
 
-                    rrddim_add(st, "local_node", "local", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "numa_foreign", "foreign", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "interleave_hit", "interleave", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "other_node", "other", 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "local_node", "local", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "numa_foreign", "foreign", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "interleave_hit", "interleave", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "other_node", "other", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                     m->numastat_st = st;
                 }

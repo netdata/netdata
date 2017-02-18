@@ -160,9 +160,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 m->st_space = rrdset_create("disk_space", disk, NULL, family, "disk.space", title, "GB", 2023, update_every, RRDSET_TYPE_STACKED);
             }
 
-            m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, bsize, 1024 * 1024 * 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, bsize, 1024 * 1024 * 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root", bsize, 1024 * 1024 * 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+            m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root", bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else
             rrdset_next(m->st_space);
@@ -187,9 +187,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 m->st_inodes = rrdset_create("disk_inodes", disk, NULL, family, "disk.inodes", title, "Inodes", 2024, update_every, RRDSET_TYPE_STACKED);
             }
 
-            m->rd_inodes_avail    = rrddim_add(m->st_inodes, "avail", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
-            m->rd_inodes_used     = rrddim_add(m->st_inodes, "used", NULL, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
-            m->rd_inodes_reserved = rrddim_add(m->st_inodes, "reserved_for_root", "reserved for root", 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+            m->rd_inodes_avail    = rrddim_add(m->st_inodes, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            m->rd_inodes_used     = rrddim_add(m->st_inodes, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            m->rd_inodes_reserved = rrddim_add(m->st_inodes, "reserved_for_root", "reserved for root", 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         else
             rrdset_next(m->st_inodes);
@@ -277,8 +277,8 @@ void *proc_diskspace_main(void *ptr) {
                                                  , "NetData Disk Space Plugin CPU usage", "milliseconds/s", 132020
                                                  , update_every, RRDSET_TYPE_STACKED);
 
-                rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRDDIM_ALGORITHM_INCREMENTAL);
-                rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_ALGORITHM_INCREMENTAL);
+                rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+                rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
             }
             else
                 rrdset_next(stcpu_thread);
@@ -295,7 +295,7 @@ void *proc_diskspace_main(void *ptr) {
                                                  , "NetData Disk Space Plugin Duration", "milliseconds/run", 132021
                                                  , update_every, RRDSET_TYPE_AREA);
 
-                rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRDDIM_ALGORITHM_ABSOLUTE);
+                rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             }
             else
                 rrdset_next(st_duration);

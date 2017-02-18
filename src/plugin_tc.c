@@ -388,7 +388,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_bytes))
-                c->rd_bytes = rrddim_add(d->st_bytes, c->id, c->name?c->name:c->id, 8, 1024, RRDDIM_ALGORITHM_INCREMENTAL);
+                c->rd_bytes = rrddim_add(d->st_bytes, c->id, c->name?c->name:c->id, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_bytes, c->rd_bytes, c->name);
 
@@ -428,7 +428,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_packets))
-                c->rd_packets = rrddim_add(d->st_packets, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                c->rd_packets = rrddim_add(d->st_packets, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_packets, c->rd_packets, c->name);
 
@@ -468,7 +468,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_dropped))
-                c->rd_dropped = rrddim_add(d->st_dropped, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_ALGORITHM_INCREMENTAL);
+                c->rd_dropped = rrddim_add(d->st_dropped, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_dropped, c->rd_dropped, c->name);
 
@@ -508,7 +508,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_tokens)) {
-                c->rd_tokens = rrddim_add(d->st_tokens, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+                c->rd_tokens = rrddim_add(d->st_tokens, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_tokens, c->rd_tokens, c->name);
@@ -550,7 +550,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_ctokens))
-                c->rd_ctokens = rrddim_add(d->st_ctokens, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+                c->rd_ctokens = rrddim_add(d->st_ctokens, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_ctokens, c->rd_ctokens, c->name);
 
@@ -977,8 +977,8 @@ void *tc_main(void *ptr) {
                 if(unlikely(!stcpu)) stcpu = rrdset_find_localhost("netdata.plugin_tc_cpu");
                 if(unlikely(!stcpu)) {
                     stcpu = rrdset_create("netdata", "plugin_tc_cpu", NULL, "tc.helper", NULL, "NetData TC CPU usage", "milliseconds/s", 135000, rrd_update_every, RRDSET_TYPE_STACKED);
-                    rrddim_add(stcpu, "user",  NULL,  1, 1000, RRDDIM_ALGORITHM_INCREMENTAL);
-                    rrddim_add(stcpu, "system", NULL, 1, 1000, RRDDIM_ALGORITHM_INCREMENTAL);
+                    rrddim_add(stcpu, "user",  NULL,  1, 1000, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(stcpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(stcpu);
 
@@ -989,7 +989,7 @@ void *tc_main(void *ptr) {
                 if(unlikely(!sttime)) stcpu = rrdset_find_localhost("netdata.plugin_tc_time");
                 if(unlikely(!sttime)) {
                     sttime = rrdset_create("netdata", "plugin_tc_time", NULL, "tc.helper", NULL, "NetData TC script execution", "milliseconds/run", 135001, rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(sttime, "run_time",  "run time",  1, 1, RRDDIM_ALGORITHM_ABSOLUTE);
+                    rrddim_add(sttime, "run_time",  "run time",  1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(sttime);
 

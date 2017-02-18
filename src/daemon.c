@@ -27,7 +27,7 @@ void sig_handler_save(int signo)
     if(signo) {
         error_log_limit_unlimited();
         info("Received signal %d to save the database...", signo);
-        rrdset_save_all();
+        rrdhost_save_all();
         error_log_limit_reset();
     }
 }

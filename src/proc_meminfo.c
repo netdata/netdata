@@ -144,10 +144,10 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         if(!st) {
             st = rrdset_create("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
 
-            rrddim_add(st, "free",    NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "used",    NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "cached",  NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "buffers", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "cached",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "buffers", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
@@ -170,8 +170,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             st = rrdset_create("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
             st->isdetail = 1;
 
-            rrddim_add(st, "free",    NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "used",    NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
@@ -190,7 +190,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             st = rrdset_create("mem", "hwcorrupt", NULL, "ecc", NULL, "Hardware Corrupted ECC", "MB", 9000, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
-            rrddim_add(st, "HardwareCorrupted", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "HardwareCorrupted", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
@@ -206,7 +206,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             st = rrdset_create("mem", "committed", NULL, "system", NULL, "Committed (Allocated) Memory", "MB", 5000, update_every, RRDSET_TYPE_AREA);
             st->isdetail = 1;
 
-            rrddim_add(st, "Committed_AS", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "Committed_AS", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
@@ -222,11 +222,11 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             st = rrdset_create("mem", "writeback", NULL, "kernel", NULL, "Writeback Memory", "MB", 4000, update_every, RRDSET_TYPE_LINE);
             st->isdetail = 1;
 
-            rrddim_add(st, "Dirty", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "Writeback", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "FuseWriteback", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "NfsWriteback", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "Bounce", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "Dirty", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "Writeback", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "FuseWriteback", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "NfsWriteback", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "Bounce", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
@@ -246,10 +246,10 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             st = rrdset_create("mem", "kernel", NULL, "kernel", NULL, "Memory Used by Kernel", "MB", 6000, update_every, RRDSET_TYPE_STACKED);
             st->isdetail = 1;
 
-            rrddim_add(st, "Slab", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "KernelStack", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "PageTables", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "VmallocUsed", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "Slab", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "KernelStack", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "PageTables", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "VmallocUsed", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
@@ -268,8 +268,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             st = rrdset_create("mem", "slab", NULL, "slab", NULL, "Reclaimable Kernel Memory", "MB", 6500, update_every, RRDSET_TYPE_STACKED);
             st->isdetail = 1;
 
-            rrddim_add(st, "reclaimable", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "unreclaimable", NULL, 1, 1024, RRDDIM_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "reclaimable", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "unreclaimable", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 

@@ -176,8 +176,8 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb)
                     // buffer_sprintf(wb, "# HELP %s.%s %s\n", st->id, rd->id, st->units);
 
                     switch(rd->algorithm) {
-                        case RRDDIM_ALGORITHM_INCREMENTAL:
-                        case RRDDIM_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
+                        case RRD_ALGORITHM_INCREMENTAL:
+                        case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
                             buffer_sprintf(wb, "# TYPE %s_%s counter\n", chart, dimension);
                             break;
 
@@ -379,7 +379,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
             , rd->name
             , rd->entries
             , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?1:0
-            , rrddim_algorithm_name(rd->algorithm)
+            , rrd_algorithm_name(rd->algorithm)
             , rd->multiplier
             , rd->divisor
             , rd->last_collected_time.tv_sec
