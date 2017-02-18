@@ -16,6 +16,8 @@ avl_tree_lock rrdhost_root_index = {
 };
 
 RRDHOST *rrdhost_find(const char *guid, uint32_t hash) {
+    debug(D_RRDHOST, "Searching in index for host with guid '%s'", guid);
+
     RRDHOST tmp;
     strncpyz(tmp.machine_guid, guid, GUID_LEN);
     tmp.hash_machine_guid = (hash)?hash:simple_hash(tmp.machine_guid);
@@ -46,6 +48,8 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
 // RRDHOST - add a host
 
 RRDHOST *rrdhost_create(const char *hostname, const char *guid) {
+    debug(D_RRDHOST, "Adding host '%s' with guid '%s'", hostname, guid);
+
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
     pthread_rwlock_init(&(host->rrdset_root_rwlock), NULL);
@@ -68,7 +72,17 @@ RRDHOST *rrdhost_create(const char *hostname, const char *guid) {
     if(rrdhost_index_add(host) != host)
         fatal("Cannot add host '%s' to index. It already exists.", hostname);
 
-    debug(D_RRDHOST, "Added host '%s'", host->hostname);
+    debug(D_RRDHOST, "Added host '%s' with guid '%s'", host->hostname, host->machine_guid);
+    return host;
+}
+
+RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid) {
+    debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
+
+    RRDHOST *host = rrdhost_find(guid, 0);
+    if(!host)
+        host = rrdhost_create(hostname, guid);
+
     return host;
 }
 
@@ -78,6 +92,7 @@ RRDHOST *rrdhost_create(const char *hostname, const char *guid) {
 RRDHOST *localhost = NULL;
 
 void rrd_init(char *hostname) {
+    debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     localhost = rrdhost_create(hostname, registry_get_this_machine_guid());
 }
 
@@ -85,27 +100,32 @@ void rrd_init(char *hostname) {
 // RRDHOST - locks
 
 void rrdhost_rwlock(RRDHOST *host) {
+    debug(D_RRDHOST, "Write lock host '%s'", host->hostname);
     pthread_rwlock_wrlock(&host->rrdset_root_rwlock);
 }
 
 void rrdhost_rdlock(RRDHOST *host) {
+    debug(D_RRDHOST, "Read lock host '%s'", host->hostname);
     pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
 }
 
 void rrdhost_unlock(RRDHOST *host) {
+    debug(D_RRDHOST, "Unlock host '%s'", host->hostname);
     pthread_rwlock_unlock(&host->rrdset_root_rwlock);
 }
 
 void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
-    int ret = pthread_rwlock_trywrlock(&host->rrdset_root_rwlock);
+    debug(D_RRDHOST, "Read lock host '%s'", host->hostname);
 
+    int ret = pthread_rwlock_trywrlock(&host->rrdset_root_rwlock);
     if(ret == 0)
         fatal("RRDHOST '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }
 
 void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
-    int ret = pthread_rwlock_tryrdlock(&host->rrdset_root_rwlock);
+    debug(D_RRDHOST, "Write lock host '%s'", host->hostname);
 
+    int ret = pthread_rwlock_tryrdlock(&host->rrdset_root_rwlock);
     if(ret == 0)
         fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }

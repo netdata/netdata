@@ -206,6 +206,25 @@ void *pluginsd_worker_thread(void *arg) {
 
                 count++;
             }
+            else if(likely(hash == HOST_HASH && !strcmp(s, "HOST"))) {
+                char *guid = words[1];
+                char *hostname = words[2];
+
+                if(unlikely(!guid || !*guid)) {
+                    error("PLUGINSD: '%s' is requesting a HOST, without a guid. Disabling it.", cd->fullfilename);
+                    cd->enabled = 0;
+                    killpid(cd->pid, SIGTERM);
+                    break;
+                }
+                if(unlikely(!hostname || !*hostname)) {
+                    error("PLUGINSD: '%s' is requesting a HOST, without a hostname. Disabling it.", cd->fullfilename);
+                    cd->enabled = 0;
+                    killpid(cd->pid, SIGTERM);
+                    break;
+                }
+
+                host = rrdhost_find_or_create(hostname, guid);
+            }
             else if(likely(hash == FLUSH_HASH && !strcmp(s, "FLUSH"))) {
                 debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
                 st = NULL;
@@ -246,7 +265,7 @@ void *pluginsd_worker_thread(void *arg) {
                 if(likely(update_every_s)) update_every = str2i(update_every_s);
                 if(unlikely(!update_every)) update_every = cd->update_every;
 
-                int chart_type = RRDSET_TYPE_LINE;
+                RRDSET_TYPE chart_type = RRDSET_TYPE_LINE;
                 if(unlikely(chart)) chart_type = rrdset_type_id(chart);
 
                 if(unlikely(noname || !name || !*name || strcasecmp(name, "NULL") == 0 || strcasecmp(name, "(NULL)") == 0)) name = NULL;

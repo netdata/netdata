@@ -335,6 +335,7 @@ extern RRDHOST *localhost;
 extern void rrd_init(char *hostname);
 
 extern RRDHOST *rrdhost_find(const char *guid, uint32_t hash);
+extern RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)

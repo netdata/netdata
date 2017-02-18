@@ -11,7 +11,7 @@ struct plugind {
 
     char filename[FILENAME_MAX+1];      // just the filename
     char fullfilename[FILENAME_MAX+1];  // with path
-    char cmd[PLUGINSD_CMD_MAX+1];       // the command that is executes
+    char cmd[PLUGINSD_CMD_MAX+1];       // the command that it executes
 
     pid_t pid;
     pthread_t thread;
