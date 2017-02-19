@@ -65,6 +65,7 @@ void arl_begin(ARL_BASE *base) {
             info("ARL '%s' has %zu fast searches and %zu slow searches. Is the source really changing so fast?"
                  , base->name, base->fast, base->slow);
 
+        /*
         if(unlikely(base->iteration % 60 == 0)) {
             info("ARL '%s' statistics: iteration %zu, expected %zu, wanted %zu, allocated %zu, fred %zu, relinkings %zu, found %zu, added %zu, fast %zu, slow %zu"
                  , base->name
@@ -82,6 +83,7 @@ void arl_begin(ARL_BASE *base) {
             // for(e = base->head; e; e = e->next) fprintf(stderr, "%s ", e->name);
             // fprintf(stderr, "\n");
         }
+        */
     }
 #endif
 
