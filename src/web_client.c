@@ -1853,7 +1853,13 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 // > 0 : request is not supported
 // < 0 : request is incomplete - wait for more data
 
-static inline int http_request_validate(struct web_client *w) {
+typedef enum http_validation {
+    HTTP_VALIDATION_OK,
+    HTTP_VALIDATION_NOT_SUPPORTED,
+    HTTP_VALIDATION_INCOMPLETE
+} HTTP_VALIDATION;
+
+static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     char *s = w->response.data->buffer, *encoded_url = NULL;
 
     // is is a valid request?
@@ -1867,7 +1873,7 @@ static inline int http_request_validate(struct web_client *w) {
     }
     else {
         w->wait_receive = 0;
-        return 1;
+        return HTTP_VALIDATION_NOT_SUPPORTED;
     }
 
     // find the SPACE + "HTTP/"
@@ -1883,7 +1889,7 @@ static inline int http_request_validate(struct web_client *w) {
     // incomplete requests
     if(unlikely(!*s)) {
         w->wait_receive = 1;
-        return -2;
+        return HTTP_VALIDATION_INCOMPLETE;
     }
 
     // we have the end of encoded_url - remember it
@@ -1914,7 +1920,7 @@ static inline int http_request_validate(struct web_client *w) {
                 strncpyz(w->last_url, w->decoded_url, URL_MAX);
 
                 w->wait_receive = 0;
-                return 0;
+                return HTTP_VALIDATION_OK;
             }
 
             // another header line
@@ -1924,7 +1930,7 @@ static inline int http_request_validate(struct web_client *w) {
 
     // incomplete request
     w->wait_receive = 1;
-    return -3;
+    return HTTP_VALIDATION_INCOMPLETE;
 }
 
 static inline void web_client_send_http_header(struct web_client *w) {
@@ -2069,7 +2075,35 @@ static inline void web_client_send_http_header(struct web_client *w) {
         w->stats_sent_bytes += bytes;
 }
 
-void web_client_process(struct web_client *w) {
+static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *url);
+
+static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url) {
+    if(host != localhost) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Nesting of hosts is not allowed.");
+        return 400;
+    }
+
+    char *tok = mystrsep(&url, "/?&");
+    if(tok && *tok) {
+        debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
+
+        uint32_t hash = simple_hash(tok);
+        RRDHOST *h;
+        for(h = localhost; h; h = h->next) {
+            if(unlikely((hash == h->hash_hostname && !strcmp(tok, h->hostname)) ||
+                        (hash == h->hash_machine_guid && !strcmp(tok, h->machine_guid))))
+                return web_client_process_url(h, w, url);
+        }
+    }
+
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "Host is not found: ");
+    buffer_strcat_htmlescape(w->response.data, tok?tok:"");
+    return 404;
+}
+
+static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *url) {
     static uint32_t
             hash_api = 0,
             hash_netdata_conf = 0,
@@ -2077,14 +2111,12 @@ void web_client_process(struct web_client *w) {
             hash_datasource = 0,
             hash_graph = 0,
             hash_list = 0,
-            hash_all_json = 0;
+            hash_all_json = 0,
+            hash_host = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
 #endif
-
-    // start timing us
-    now_realtime_timeval(&w->tv_in);
 
     if(unlikely(!hash_api)) {
         hash_api = simple_hash("api");
@@ -2094,6 +2126,7 @@ void web_client_process(struct web_client *w) {
         hash_graph = simple_hash(WEB_PATH_GRAPH);
         hash_list = simple_hash("list");
         hash_all_json = simple_hash("all.json");
+        hash_host = simple_hash("host");
 #ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
@@ -2101,207 +2134,201 @@ void web_client_process(struct web_client *w) {
 #endif
     }
 
-    int code = 500;
+    char *tok = mystrsep(&url, "/?");
+    if(likely(tok && *tok)) {
+        uint32_t hash = simple_hash(tok);
+        debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-    int what_to_do = http_request_validate(w);
-
-    // wait for more data
-    if(what_to_do < 0) {
-        if(w->response.data->len > TOO_BIG_REQUEST) {
-            strcpy(w->last_url, "too big request");
-
-            debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, w->response.data->len);
-
-            code = 400;
-            buffer_flush(w->response.data);
-            buffer_sprintf(w->response.data, "Received request is too big  (%zu bytes).\r\n", w->response.data->len);
+        if(unlikely(hash == hash_host && strcmp(tok, "host") == 0)) {
+            debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
+            return web_client_switch_host(host, w, url);
         }
-        else {
-            // wait for more data
-            return;
+        if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {
+            debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
+            return web_client_api_request(host, w, url);
         }
-    }
-    else if(what_to_do > 0) {
-        // strcpy(w->last_url, "not a valid request");
-
-        debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
-
-        code = 500;
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "I don't understand you...\r\n");
-    }
-    else { // what_to_do == 0
-        if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
-            code = 200;
+        else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {
+            debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
             w->response.data->contenttype = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "OK");
+            generate_config(w->response.data, 0);
+            return 200;
         }
-        else {
-            char *url = w->decoded_url;
-            char *tok = mystrsep(&url, "/?");
+        else if(unlikely(hash == hash_data && strcmp(tok, WEB_PATH_DATA) == 0)) { // "data"
+            // the client is requesting rrd data -- OLD API
+            return web_client_api_old_data_request(host, w, url, DATASOURCE_JSON);
+        }
+        else if(unlikely(hash == hash_datasource && strcmp(tok, WEB_PATH_DATASOURCE) == 0)) { // "datasource"
+            // the client is requesting google datasource -- OLD API
+            return web_client_api_old_data_request(host, w, url, DATASOURCE_DATATABLE_JSONP);
+        }
+        else if(unlikely(hash == hash_graph && strcmp(tok, WEB_PATH_GRAPH) == 0)) { // "graph"
+            // the client is requesting an rrd graph -- OLD API
+
+            // get the name of the data to show
+            tok = mystrsep(&url, "/?&");
             if(tok && *tok) {
-                uint32_t hash = simple_hash(tok);
-                debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
+                debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
-                if(hash == hash_api && strcmp(tok, "api") == 0) {
-                    // the client is requesting api access
-                    code = web_client_api_request(localhost, w, url);
-                }
-                else if(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0) {
-                    code = 200;
-                    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
-
-                    w->response.data->contenttype = CT_TEXT_PLAIN;
+                // do we have such a data set?
+                RRDSET *st = rrdset_find_byname(host, tok);
+                if(!st) st = rrdset_find(host, tok);
+                if(!st) {
+                    // we don't have it
+                    // try to send a file with that name
                     buffer_flush(w->response.data);
-                    generate_config(w->response.data, 0);
+                    return mysendfile(w, tok);
                 }
-                else if(hash == hash_data && strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
-                    // the client is requesting rrd data -- OLD API
-                    code = web_client_api_old_data_request(localhost, w, url, DATASOURCE_JSON);
-                }
-                else if(hash == hash_datasource && strcmp(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
-                    // the client is requesting google datasource -- OLD API
-                    code = web_client_api_old_data_request(localhost, w, url, DATASOURCE_DATATABLE_JSONP);
-                }
-                else if(hash == hash_graph && strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
-                    // the client is requesting an rrd graph -- OLD API
 
-                    // get the name of the data to show
-                    tok = mystrsep(&url, "/?&");
-                    if(tok && *tok) {
-                        debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
-
-                        // do we have such a data set?
-                        RRDSET *st = rrdset_find_byname(localhost, tok);
-                        if(!st) st = rrdset_find(localhost, tok);
-                        if(!st) {
-                            // we don't have it
-                            // try to send a file with that name
-                            buffer_flush(w->response.data);
-                            code = mysendfile(w, tok);
-                        }
-                        else {
-                            code = 200;
-                            debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
-                            w->response.data->contenttype = CT_APPLICATION_JSON;
-                            buffer_flush(w->response.data);
-                            rrd_stats_graph_json(st, url, w->response.data);
-                        }
-                    }
-                    else {
-                        code = 400;
-                        buffer_flush(w->response.data);
-                        buffer_strcat(w->response.data, "Graph name?\r\n");
-                    }
-                }
-                else if(hash == hash_list && strcmp(tok, "list") == 0) {
-                    // OLD API
-                    code = 200;
-
-                    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
-
-                    buffer_flush(w->response.data);
-                    RRDSET *st = localhost->rrdset_root;
-
-                    for ( ; st ; st = st->next )
-                        buffer_sprintf(w->response.data, "%s\n", st->name);
-                }
-                else if(hash == hash_all_json && strcmp(tok, "all.json") == 0) {
-                    // OLD API
-                    code = 200;
-                    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
-
-                    w->response.data->contenttype = CT_APPLICATION_JSON;
-                    buffer_flush(w->response.data);
-                    rrd_stats_all_json(localhost, w->response.data);
-                }
-#ifdef NETDATA_INTERNAL_CHECKS
-                else if(hash == hash_exit && strcmp(tok, "exit") == 0) {
-                    code = 200;
-                    w->response.data->contenttype = CT_TEXT_PLAIN;
-                    buffer_flush(w->response.data);
-
-                    if(!netdata_exit)
-                        buffer_strcat(w->response.data, "ok, will do...");
-                    else
-                        buffer_strcat(w->response.data, "I am doing it already");
-
-                    error("web request to exit received.");
-                    netdata_cleanup_and_exit(0);
-                }
-                else if(hash == hash_debug && strcmp(tok, "debug") == 0) {
-                    buffer_flush(w->response.data);
-
-                    // get the name of the data to show
-                    tok = mystrsep(&url, "/?&");
-                    if(tok && *tok) {
-                        debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
-
-                        // do we have such a data set?
-                        RRDSET *st = rrdset_find_byname(localhost, tok);
-                        if(!st) st = rrdset_find(localhost, tok);
-                        if(!st) {
-                            code = 404;
-                            buffer_strcat(w->response.data, "Chart is not found: ");
-                            buffer_strcat_htmlescape(w->response.data, tok);
-                            debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
-                        }
-                        else {
-                            code = 200;
-                            debug_flags |= D_RRD_STATS;
-
-                            if(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))
-                                rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
-                            else
-                                rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
-
-                            buffer_sprintf(w->response.data, "Chart has now debug %s: ", rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
-                            buffer_strcat_htmlescape(w->response.data, tok);
-                            debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
-                        }
-                    }
-                    else {
-                        code = 500;
-                        buffer_flush(w->response.data);
-                        buffer_strcat(w->response.data, "debug which chart?\r\n");
-                    }
-                }
-                else if(hash == hash_mirror && strcmp(tok, "mirror") == 0) {
-                    code = 200;
-
-                    debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
-
-                    // replace the zero bytes with spaces
-                    buffer_char_replace(w->response.data, '\0', ' ');
-
-                    // just leave the buffer as is
-                    // it will be copied back to the client
-                }
-#endif  /* NETDATA_INTERNAL_CHECKS */
-                else {
-                    char filename[FILENAME_MAX+1];
-                    url = filename;
-                    strncpyz(filename, w->last_url, FILENAME_MAX);
-                    tok = mystrsep(&url, "?");
-                    buffer_flush(w->response.data);
-                    code = mysendfile(w, (tok && *tok)?tok:"/");
-                }
-            }
-            else {
-                char filename[FILENAME_MAX+1];
-                url = filename;
-                strncpyz(filename, w->last_url, FILENAME_MAX);
-                tok = mystrsep(&url, "?");
+                debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
+                w->response.data->contenttype = CT_APPLICATION_JSON;
                 buffer_flush(w->response.data);
-                code = mysendfile(w, (tok && *tok)?tok:"/");
+                rrd_stats_graph_json(st, url, w->response.data);
+                return 200;
             }
+
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, "Graph name?\r\n");
+            return 400;
         }
+        else if(unlikely(hash == hash_list && strcmp(tok, "list") == 0)) {
+            // OLD API
+            debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
+
+            buffer_flush(w->response.data);
+            RRDSET *st = host->rrdset_root;
+
+            for ( ; st ; st = st->next )
+                buffer_sprintf(w->response.data, "%s\n", st->name);
+
+            return 200;
+        }
+        else if(unlikely(hash == hash_all_json && strcmp(tok, "all.json") == 0)) {
+            // OLD API
+            debug(D_WEB_CLIENT_ACCESS, "%llu: Sending JSON list of all monitors of RRD_STATS...", w->id);
+
+            w->response.data->contenttype = CT_APPLICATION_JSON;
+            buffer_flush(w->response.data);
+            rrd_stats_all_json(host, w->response.data);
+            return 200;
+        }
+#ifdef NETDATA_INTERNAL_CHECKS
+        else if(unlikely(hash == hash_exit && strcmp(tok, "exit") == 0)) {
+            w->response.data->contenttype = CT_TEXT_PLAIN;
+            buffer_flush(w->response.data);
+
+            if(!netdata_exit)
+                buffer_strcat(w->response.data, "ok, will do...");
+            else
+                buffer_strcat(w->response.data, "I am doing it already");
+
+            error("web request to exit received.");
+            netdata_cleanup_and_exit(0);
+            return 200;
+        }
+        else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
+            buffer_flush(w->response.data);
+
+            // get the name of the data to show
+            tok = mystrsep(&url, "/?&");
+            if(tok && *tok) {
+                debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
+
+                // do we have such a data set?
+                RRDSET *st = rrdset_find_byname(host, tok);
+                if(!st) st = rrdset_find(host, tok);
+                if(!st) {
+                    buffer_strcat(w->response.data, "Chart is not found: ");
+                    buffer_strcat_htmlescape(w->response.data, tok);
+                    debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
+                    return 404;
+                }
+
+                debug_flags |= D_RRD_STATS;
+
+                if(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))
+                    rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
+                else
+                    rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
+
+                buffer_sprintf(w->response.data, "Chart has now debug %s: ", rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
+                buffer_strcat_htmlescape(w->response.data, tok);
+                debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
+                return 200;
+            }
+
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, "debug which chart?\r\n");
+            return 400;
+        }
+        else if(unlikely(hash == hash_mirror && strcmp(tok, "mirror") == 0)) {
+            debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
+
+            // replace the zero bytes with spaces
+            buffer_char_replace(w->response.data, '\0', ' ');
+
+            // just leave the buffer as is
+            // it will be copied back to the client
+
+            return 200;
+        }
+#endif  /* NETDATA_INTERNAL_CHECKS */
     }
 
+    char filename[FILENAME_MAX+1];
+    url = filename;
+    strncpyz(filename, w->last_url, FILENAME_MAX);
+    tok = mystrsep(&url, "?");
+    buffer_flush(w->response.data);
+    return mysendfile(w, (tok && *tok)?tok:"/");
+}
+
+void web_client_process_request(struct web_client *w) {
+
+    // start timing us
+    now_realtime_timeval(&w->tv_in);
+
+    switch(http_request_validate(w)) {
+        case HTTP_VALIDATION_OK:
+            if(unlikely(w->mode == WEB_CLIENT_MODE_OPTIONS)) {
+                w->response.data->contenttype = CT_TEXT_PLAIN;
+                buffer_flush(w->response.data);
+                buffer_strcat(w->response.data, "OK");
+                w->response.code = 200;
+            }
+            else
+                w->response.code = web_client_process_url(localhost, w, w->decoded_url);
+            break;
+
+        case HTTP_VALIDATION_INCOMPLETE:
+            if(w->response.data->len > TOO_BIG_REQUEST) {
+                strcpy(w->last_url, "too big request");
+
+                debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, w->response.data->len);
+
+                buffer_flush(w->response.data);
+                buffer_sprintf(w->response.data, "Received request is too big  (%zu bytes).\r\n", w->response.data->len);
+                w->response.code = 400;
+            }
+            else {
+                // wait for more data
+                return;
+            }
+            break;
+
+        case HTTP_VALIDATION_NOT_SUPPORTED:
+            debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
+
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, "I don't understand you...\r\n");
+            w->response.code = 400;
+            break;
+    }
+
+    // keep track of the time we done processing
     now_realtime_timeval(&w->tv_ready);
+
     w->response.sent = 0;
-    w->response.code = code;
 
     // set a proper last modified date
     if(unlikely(!w->response.data->date))
@@ -2313,7 +2340,6 @@ void web_client_process(struct web_client *w) {
     if(w->response.data->len) w->wait_send = 1;
     else w->wait_send = 0;
 
-    // pretty logging
     switch(w->mode) {
         case WEB_CLIENT_MODE_OPTIONS:
             debug(D_WEB_CLIENT, "%llu: Done preparing the OPTIONS response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
@@ -2756,7 +2782,7 @@ void *web_client_main(void *ptr)
 
             if(w->mode == WEB_CLIENT_MODE_NORMAL) {
                 debug(D_WEB_CLIENT, "%llu: Attempting to process received data.", w->id);
-                web_client_process(w);
+                web_client_process_request(w);
             }
         }
 

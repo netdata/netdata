@@ -614,7 +614,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 
                     if (w->mode != WEB_CLIENT_MODE_FILECOPY) {
                         debug(D_WEB_CLIENT, "%llu: Processing received data.", w->id);
-                        web_client_process(w);
+                        web_client_process_request(w);
                     }
                 }
 
