@@ -1,20 +1,20 @@
-%define contentdir %{_datadir}/netdata
+%global contentdir %{_datadir}/netdata
 %if 0%{?suse_version}
-%define distro_post %service_add_post netdata.service
-%define distro_preun %service_del_preun netdata.service
-%define distro_postun %service_del_postun netdata.service
-%define distro_buildrequires BuildRequires:\ systemd-rpm-macros
+%global distro_post %service_add_post netdata.service
+%global distro_preun %service_del_preun netdata.service
+%global distro_postun %service_del_postun netdata.service
+%global distro_buildrequires BuildRequires:\ systemd-rpm-macros
 %else
-%define distro_post %systemd_post netdata.service
-%define distro_preun %systemd_preun netdata.service
-%define distro_postun %systemd_postun_with_restart netdata.service
-%define distro_buildrequires %{nil}
+%global distro_post %systemd_post netdata.service
+%global distro_preun %systemd_preun netdata.service
+%global distro_postun %systemd_postun_with_restart netdata.service
+%global distro_buildrequires %{nil}
 %endif
 
 # This is temporary and should eventually be resolved. This bypasses
 # the default rhel __os_install_post which throws a python compile
 # error.
-%define __os_install_post %{nil}
+%global __os_install_post %{nil}
 
 #
 # Conditional build:
