@@ -103,7 +103,7 @@ extern struct web_client *web_client_create(int listener);
 extern struct web_client *web_client_free(struct web_client *w);
 extern ssize_t web_client_send(struct web_client *w);
 extern ssize_t web_client_receive(struct web_client *w);
-extern void web_client_process(struct web_client *w);
+extern void web_client_process_request(struct web_client *w);
 extern void web_client_reset(struct web_client *w);
 
 extern void *web_client_main(void *ptr);
