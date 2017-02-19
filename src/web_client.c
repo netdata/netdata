@@ -2078,6 +2078,12 @@ static inline void web_client_send_http_header(struct web_client *w) {
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *url);
 
 static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url) {
+    static uint32_t hash_localhost = 0;
+
+    if(unlikely(!hash_localhost)) {
+        hash_localhost = simple_hash("localhost");
+    }
+
     if(host != localhost) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Nesting of hosts is not allowed.");
@@ -2088,7 +2094,16 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
 
+        // copy the URL, we need it to serve files
+        w->last_url[0] = '/';
+        if(url && *url) strncpyz(&w->last_url[1], url, URL_MAX - 1);
+        else w->last_url[1] = '\0';
+
         uint32_t hash = simple_hash(tok);
+
+        if(unlikely(hash == hash_localhost && !strcmp(tok, "localhost")))
+            return web_client_process_url(localhost, w, url);
+
         RRDHOST *h;
         for(h = localhost; h; h = h->next) {
             if(unlikely((hash == h->hash_hostname && !strcmp(tok, h->hostname)) ||

@@ -503,29 +503,29 @@ void rrdset_next_usec(RRDSET *st, usec_t microseconds)
     }
     else {
         // microseconds has the time since the last collection
-#ifdef NETDATA_INTERNAL_CHECKS
-        usec_t now_usec = timeval_usec(&now);
-        usec_t last_usec = timeval_usec(&st->last_collected_time);
-#endif
+//#ifdef NETDATA_INTERNAL_CHECKS
+//        usec_t now_usec = timeval_usec(&now);
+//        usec_t last_usec = timeval_usec(&st->last_collected_time);
+//#endif
         usec_t since_last_usec = dt_usec(&now, &st->last_collected_time);
 
         // verify the microseconds given is good
         if(unlikely(microseconds > since_last_usec)) {
             debug(D_RRD_CALLS, "dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-            if(unlikely(last_usec + microseconds > now_usec + 1000))
-                error("dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
-#endif
+//#ifdef NETDATA_INTERNAL_CHECKS
+//            if(unlikely(last_usec + microseconds > now_usec + 1000))
+//                error("dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
+//#endif
 
             microseconds = since_last_usec;
         }
         else if(unlikely(microseconds < since_last_usec * 0.8)) {
             debug(D_RRD_CALLS, "dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-            error("dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
-#endif
+//#ifdef NETDATA_INTERNAL_CHECKS
+//            error("dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
+//#endif
             microseconds = since_last_usec;
         }
     }
@@ -866,9 +866,9 @@ usec_t rrdset_done(RRDSET *st) {
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
             debug(D_RRD_STATS, "%s: THIS IS IN THE SAME INTERPOLATION POINT", st->name);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-        info("%s is collected in the same interpolation point: short by %llu microseconds", st->name, next_store_ut - now_collect_ut);
-#endif
+//#ifdef NETDATA_INTERNAL_CHECKS
+//        info("%s is collected in the same interpolation point: short by %llu microseconds", st->name, next_store_ut - now_collect_ut);
+//#endif
     }
 
     usec_t first_ut = last_stored_ut;
@@ -876,9 +876,9 @@ usec_t rrdset_done(RRDSET *st) {
     if((now_collect_ut % (update_every_ut)) == 0) iterations++;
 
     for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(iterations < 0) { error("%s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
-#endif
+//#ifdef NETDATA_INTERNAL_CHECKS
+//        if(iterations < 0) { error("%s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
+//#endif
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
             debug(D_RRD_STATS, "%s: last_stored_ut = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/1000000.0);
