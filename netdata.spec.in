@@ -86,7 +86,7 @@ so that you can get insights of what is happening now and what just
 happened, on your systems and applications.
 
 %prep
-%setup -q
+%setup -q -n @PACKAGE_NAME@-@PACKAGE_VERSION@
 
 %build
 %configure \
