@@ -34,5 +34,6 @@ struct plugind {
 extern struct plugind *pluginsd_root;
 
 extern void *pluginsd_main(void *ptr);
+extern size_t pluginsd_process(struct plugind *cd, FILE *fp, int trust_durations);
 
 #endif /* NETDATA_PLUGINS_D_H */
