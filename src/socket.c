@@ -160,8 +160,10 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
 
         fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if(fd != -1) {
-            if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)timeout, sizeof(struct timeval)) < 0)
-                error("Failed to set timeout on the socket to ip '%s' port '%s'", hostBfr, servBfr);
+            if(timeout) {
+                if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
+                    error("Failed to set timeout on the socket to ip '%s' port '%s'", hostBfr, servBfr);
+            }
 
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
                 error("Failed to connect to '%s', port '%s'", hostBfr, servBfr);
@@ -176,4 +178,31 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
     freeaddrinfo(ai_head);
 
     return fd;
+}
+
+int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter) {
+    int sock = -1;
+
+    const char *s = destination;
+    while(*s) {
+        const char *e = s;
+
+        // skip separators, moving both s(tart) and e(nd)
+        while(isspace(*e) || *e == ',') s = ++e;
+
+        // move e(nd) to the first separator
+        while(*e && !isspace(*e) && *e != ',') e++;
+
+        // is there anything?
+        if(!*s || s == e) break;
+
+        char buf[e - s + 1];
+        strncpyz(buf, s, e - s);
+        if(reconnects_counter) *reconnects_counter += 1;
+        sock = connect_to(buf, default_port, timeout);
+        if(sock != -1) break;
+        s = e;
+    }
+
+    return sock;
 }

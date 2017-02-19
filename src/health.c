@@ -1,7 +1,7 @@
 #define NETDATA_HEALTH_INTERNALS
 #include "common.h"
 
-int default_localhost_health_enabled = 1;
+int default_health_enabled = 1;
 
 // ----------------------------------------------------------------------------
 // health initialization
@@ -15,9 +15,16 @@ inline char *health_config_dir(void) {
 void health_init(void) {
     debug(D_HEALTH, "Health configuration initializing");
 
-    if(!(default_localhost_health_enabled = config_get_boolean("health", "enabled", 1))) {
-        debug(D_HEALTH, "Health is disabled.");
-        return;
+    if(!central_netdata_to_push_data) {
+        if(!(default_health_enabled = config_get_boolean("health", "enabled", 1))) {
+            debug(D_HEALTH, "Health is disabled.");
+            return;
+        }
+    }
+    else {
+        info("Health is disabled - setup alarms at the central netdata.");
+        config_set_boolean("health", "enabled", 0);
+        default_health_enabled = 0;
     }
 
     char pathname[FILENAME_MAX + 1];

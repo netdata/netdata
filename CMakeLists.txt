@@ -124,7 +124,7 @@ set(NETDATA_SOURCE_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        src/rrdhost.c src/rrdfamily.c src/rrdset.c src/rrddim.c src/health_log.c src/health_config.c src/health_json.c src/rrdcalc.c src/rrdcalctemplate.c src/rrdvar.c src/rrddimvar.c src/rrdsetvar.c)
+        src/rrdhost.c src/rrdfamily.c src/rrdset.c src/rrddim.c src/health_log.c src/health_config.c src/health_json.c src/rrdcalc.c src/rrdcalctemplate.c src/rrdvar.c src/rrddimvar.c src/rrdsetvar.c src/rrdpush.c src/rrdpush.h)
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c

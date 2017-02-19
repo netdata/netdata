@@ -178,13 +178,14 @@ void rrdset_reset(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // RRDSET - helpers for rrdset_create()
 
-static inline long align_entries_to_pagesize(long entries) {
+inline long align_entries_to_pagesize(long entries) {
+    if(central_netdata_to_push_data)
+        return entries;
+
     if(entries < 5) entries = 5;
     if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
 
-#ifdef NETDATA_LOG_ALLOCATIONS
     long page = (size_t)sysconf(_SC_PAGESIZE);
-
     long size = sizeof(RRDDIM) + entries * sizeof(storage_number);
     if(size % page) {
         size -= (size % page);
@@ -195,9 +196,6 @@ static inline long align_entries_to_pagesize(long entries) {
     }
 
     return entries;
-#else
-    return entries;
-#endif
 }
 
 static inline void timeval_align(struct timeval *tv, int update_every) {
@@ -541,8 +539,12 @@ void rrdset_next_usec(RRDSET *st, usec_t microseconds)
 // ----------------------------------------------------------------------------
 // RRDSET - process the collected values for all dimensions of a chart
 
-usec_t rrdset_done(RRDSET *st) {
-    if(unlikely(netdata_exit)) return 0;
+void rrdset_done(RRDSET *st) {
+    if(unlikely(netdata_exit)) return;
+    if(unlikely(central_netdata_to_push_data)) {
+        rrdset_done_push(st);
+        return;
+    }
 
     debug(D_RRD_CALLS, "rrdset_done() for chart %s", st->name);
 
@@ -1138,7 +1140,5 @@ usec_t rrdset_done(RRDSET *st) {
 
     if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
         error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
-
-    return(st->usec_since_last_update);
 }
 

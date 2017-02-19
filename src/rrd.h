@@ -7,8 +7,8 @@
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
 #define RRD_HISTORY_ENTRIES_MAX (86400*10)
 
-extern int default_localhost_rrd_update_every;
-extern int default_localhost_rrd_history_entries;
+extern int default_rrd_update_every;
+extern int default_rrd_history_entries;
 
 #define RRD_ID_LENGTH_MAX 200
 
@@ -48,7 +48,7 @@ typedef enum rrd_memory_mode {
 #define RRD_MEMORY_MODE_MAP_NAME "map"
 #define RRD_MEMORY_MODE_SAVE_NAME "save"
 
-extern RRD_MEMORY_MODE default_localhost_rrd_memory_mode;
+extern RRD_MEMORY_MODE default_rrd_memory_mode;
 
 extern const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
 extern RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
@@ -78,7 +78,8 @@ extern const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
 typedef enum rrddim_flags {
     RRDDIM_FLAG_HIDDEN                          = 1 << 0,  // this dimension will not be offered to callers
     RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = 1 << 1,  // do not offer RESET or OVERFLOW info to callers
-    RRDDIM_FLAG_UPDATED                         = 1 << 31  // the dimension has been updated since the last processing
+    RRDDIM_FLAG_UPDATED                         = 1 << 2,  // the dimension has been updated since the last processing
+    RRDDIM_FLAG_EXPOSED                         = 1 << 3   // when set what have sent this dimension to the central netdata
 } RRDDIM_FLAGS;
 
 #define rrddim_flag_check(rd, flag) ((rd)->flags & flag)
@@ -430,7 +431,7 @@ extern void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds);
 extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
 #define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
-extern usec_t rrdset_done(RRDSET *st);
+extern void rrdset_done(RRDSET *st);
 
 // get the total duration in seconds of the round robin database
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
@@ -478,6 +479,8 @@ extern int rrddim_unhide(RRDSET *st, const char *id);
 
 extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
+
+extern long align_entries_to_pagesize(long entries);
 
 
 // ----------------------------------------------------------------------------

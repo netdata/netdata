@@ -178,10 +178,10 @@ RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid) {
     if(!host)
         host = rrdhost_create(hostname,
                 guid,
-                default_localhost_rrd_update_every,
-                default_localhost_rrd_history_entries,
-                default_localhost_rrd_memory_mode,
-                default_localhost_health_enabled
+                default_rrd_update_every,
+                default_rrd_history_entries,
+                default_rrd_memory_mode,
+                default_health_enabled
         );
 
     return host;
@@ -195,10 +195,10 @@ void rrd_init(char *hostname) {
 
     localhost = rrdhost_create(hostname,
             registry_get_this_machine_guid(),
-            default_localhost_rrd_update_every,
-            default_localhost_rrd_history_entries,
-            default_localhost_rrd_memory_mode,
-            default_localhost_health_enabled
+            default_rrd_update_every,
+            default_rrd_history_entries,
+            default_rrd_memory_mode,
+            default_health_enabled
     );
 }
 

@@ -2,6 +2,8 @@
 
 extern void *cgroups_main(void *ptr);
 
+char *central_netdata_to_push_data = NULL;
+
 void netdata_cleanup_and_exit(int ret) {
     netdata_exit = 1;
 
@@ -55,20 +57,38 @@ struct netdata_static_thread static_threads[] = {
     {"plugins.d",           NULL,       NULL,         1, NULL, NULL, pluginsd_main},
     {"web",                 NULL,       NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
     {"web-single-threaded", NULL,       NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
+    {"central-netdata-push",NULL,       NULL,         0, NULL, NULL, central_netdata_push_thread},
     {NULL,                  NULL,       NULL,         0, NULL, NULL, NULL}
 };
 
 void web_server_threading_selection(void) {
-    int threaded = config_get_boolean("global", "multi threaded web server", 1);
+    int multi_threaded = 0;
+    int single_threaded = 0;
+    int central_thread = 0;
+
+    if(!central_netdata_to_push_data) {
+        multi_threaded = config_get_boolean("global", "multi threaded web server", 1);
+        single_threaded = !multi_threaded;
+    }
+    else {
+        central_thread = 1;
+        info("Web servers are disabled - use the central netdata.");
+    }
 
     int i;
     for(i = 0; static_threads[i].name ; i++) {
         if(static_threads[i].start_routine == socket_listen_main_multi_threaded)
-            static_threads[i].enabled = threaded?1:0;
+            static_threads[i].enabled = multi_threaded;
 
         if(static_threads[i].start_routine == socket_listen_main_single_threaded)
-            static_threads[i].enabled = threaded?0:1;
+            static_threads[i].enabled = single_threaded;
+
+        if(static_threads[i].start_routine == central_netdata_push_thread)
+            static_threads[i].enabled = central_thread;
     }
+
+    if(central_netdata_to_push_data)
+        return;
 
     web_client_timeout = (int) config_get_number("global", "disconnect idle web clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
 
@@ -443,7 +463,7 @@ int main(int argc, char **argv) {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
                         if(strcmp(optarg, "unittest") == 0) {
-                            default_localhost_rrd_update_every = 1;
+                            default_rrd_update_every = 1;
                             if(run_all_mockup_tests()) exit(1);
                             if(unit_test_storage()) exit(1);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
@@ -528,7 +548,7 @@ int main(int argc, char **argv) {
             setenv("MALLOC_ARENA_MAX", pmax, 1);
 
 #if defined(HAVE_C_MALLOPT)
-        int i = config_get_number("global", "glibc malloc arena max for netdata", 1);
+        i = (int)config_get_number("global", "glibc malloc arena max for netdata", 1);
         if(i > 0)
             mallopt(M_ARENA_MAX, 1);
 #endif
@@ -578,7 +598,11 @@ int main(int argc, char **argv) {
     }
 
     char *user = NULL;
+
     {
+        // --------------------------------------------------------------------
+        // get the debugging flags from the configuration file
+
         char *flags = config_get("global", "debug flags",  "0x0000000000000000");
         setenv("NETDATA_DEBUG_FLAGS", flags, 1);
 
@@ -595,21 +619,9 @@ int main(int argc, char **argv) {
 #endif
         }
 
-        // --------------------------------------------------------------------
-
-#ifdef MADV_MERGEABLE
-        enable_ksm = config_get_boolean("global", "memory deduplication (ksm)", enable_ksm);
-#else
-#warning "Kernel memory deduplication (KSM) is not available"
-#endif
 
         // --------------------------------------------------------------------
-
-        get_system_HZ();
-        get_system_cpus();
-        get_system_pid_max();
-        
-        // --------------------------------------------------------------------
+        // get log filenames and settings
 
         {
             char filename[FILENAME_MAX + 1];
@@ -624,11 +636,12 @@ int main(int argc, char **argv) {
         }
 
         error_log_throttle_period_backup =
-            error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);
+        error_log_throttle_period = config_get_number("global", "errors flood protection period", error_log_throttle_period);
+
         setenv("NETDATA_ERRORS_THROTTLE_PERIOD", config_get("global", "errors flood protection period"    , ""), 1);
 
-        error_log_errors_per_period = (unsigned long)config_get_number("global", "errors to trigger flood protection", error_log_errors_per_period);
-        setenv("NETDATA_ERRORS_PER_PERIOD"     , config_get("global", "errors to trigger flood protection", ""), 1);
+        error_log_errors_per_period = (unsigned long)config_get_number("global", "errors to trigger flood protection", (long long int)error_log_errors_per_period);
+        setenv("NETDATA_ERRORS_PER_PERIOD", config_get("global", "errors to trigger flood protection", ""), 1);
 
         if(check_config) {
             stdout_filename = stderr_filename = stdaccess_filename = "system";
@@ -637,49 +650,102 @@ int main(int argc, char **argv) {
         }
         error_log_limit_unlimited();
 
-        // --------------------------------------------------------------------
-
-        default_localhost_rrd_memory_mode = rrd_memory_mode_id(config_get("global", "memory mode", rrd_memory_mode_name(default_localhost_rrd_memory_mode)));
 
         // --------------------------------------------------------------------
+        // get KSM settings
+
+#ifdef MADV_MERGEABLE
+        enable_ksm = config_get_boolean("global", "memory deduplication (ksm)", enable_ksm);
+#else
+#warning "Kernel memory deduplication (KSM) is not available"
+#endif
+
+        // --------------------------------------------------------------------
+        // get various system parameters
+
+        get_system_HZ();
+        get_system_cpus();
+        get_system_pid_max();
+
+
+        // --------------------------------------------------------------------
+        // find the system hostname
 
         {
             char hostnamebuf[HOSTNAME_MAX + 1];
             if(gethostname(hostnamebuf, HOSTNAME_MAX) == -1)
                 error("WARNING: Cannot get machine hostname.");
+
             hostname = config_get("global", "hostname", hostnamebuf);
             debug(D_OPTIONS, "hostname set to '%s'", hostname);
+
             setenv("NETDATA_HOSTNAME", hostname, 1);
         }
 
-        // --------------------------------------------------------------------
-
-        default_localhost_rrd_history_entries = (int) config_get_number("global", "history", RRD_DEFAULT_HISTORY_ENTRIES);
-        if(default_localhost_rrd_history_entries < 5 || default_localhost_rrd_history_entries > RRD_HISTORY_ENTRIES_MAX) {
-            error("Invalid history entries %d given. Defaulting to %d.", default_localhost_rrd_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
-            default_localhost_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
-        }
-        else {
-            debug(D_OPTIONS, "save lines set to %d.", default_localhost_rrd_history_entries);
-        }
 
         // --------------------------------------------------------------------
+        // find we need to send data to a central netdata
 
-        default_localhost_rrd_update_every = (int) config_get_number("global", "update every", UPDATE_EVERY);
-        if(default_localhost_rrd_update_every < 1 || default_localhost_rrd_update_every > 600) {
-            error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_localhost_rrd_update_every, UPDATE_EVERY_MAX);
-            default_localhost_rrd_update_every = UPDATE_EVERY;
+        central_netdata_to_push_data = config_get("global", "central netdata to send all data", "");
+        if(central_netdata_to_push_data && !*central_netdata_to_push_data)
+            central_netdata_to_push_data = NULL;
+
+
+        // --------------------------------------------------------------------
+        // get default memory mode for the database
+
+        if(central_netdata_to_push_data) {
+            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+            config_set("global", "memory mode", rrd_memory_mode_name(default_rrd_memory_mode));
         }
-        else debug(D_OPTIONS, "update timer set to %d.", default_localhost_rrd_update_every);
+        else
+            default_rrd_memory_mode = rrd_memory_mode_id(config_get("global", "memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
+
+
+        // --------------------------------------------------------------------
+        // get default database size
+
+        if(central_netdata_to_push_data) {
+            default_rrd_history_entries = 10;
+            config_set_number("global", "history", default_rrd_history_entries);
+        }
+        else
+            default_rrd_history_entries = (int) config_get_number("global", "history", align_entries_to_pagesize(RRD_DEFAULT_HISTORY_ENTRIES));
+
+        long h = align_entries_to_pagesize(default_rrd_history_entries);
+        if(h != default_rrd_history_entries) {
+            config_set_number("global", "history", h);
+            default_rrd_history_entries = (int)h;
+        }
+
+        if(default_rrd_history_entries < 5 || default_rrd_history_entries > RRD_HISTORY_ENTRIES_MAX) {
+            error("Invalid history entries %d given. Defaulting to %d.", default_rrd_history_entries, RRD_DEFAULT_HISTORY_ENTRIES);
+            default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
+        }
+        else
+            debug(D_OPTIONS, "save lines set to %d.", default_rrd_history_entries);
+
+
+        // --------------------------------------------------------------------
+        // get default database update frequency
+
+        default_rrd_update_every = (int) config_get_number("global", "update every", UPDATE_EVERY);
+        if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
+            error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY_MAX);
+            default_rrd_update_every = UPDATE_EVERY;
+        }
+        else debug(D_OPTIONS, "update timer set to %d.", default_rrd_update_every);
 
         // let the plugins know the min update_every
         {
             char buf[16];
-            snprintfz(buf, 15, "%d", default_localhost_rrd_update_every);
+            snprintfz(buf, 15, "%d", default_rrd_update_every);
             setenv("NETDATA_UPDATE_EVERY", buf, 1);
         }
 
+
         // --------------------------------------------------------------------
+        // setup process signals
 
         // block signals while initializing threads.
         // this causes the threads to block signals.
@@ -725,7 +791,9 @@ int main(int argc, char **argv) {
         if(sigaction(SIGUSR2, &sa, NULL) == -1)
             error("Failed to change signal handler for SIGUSR2");
 
+
         // --------------------------------------------------------------------
+        // get the required stack size of the threads of netdata
 
         i = pthread_attr_init(&attr);
         if(i != 0)
@@ -739,18 +807,24 @@ int main(int argc, char **argv) {
 
         wanted_stacksize = (size_t)config_get_number("global", "pthread stack size", (long)stacksize);
 
+
         // --------------------------------------------------------------------
+        // check which threads are enabled and initialize them
 
         for (i = 0; static_threads[i].name != NULL ; i++) {
             struct netdata_static_thread *st = &static_threads[i];
 
-            if(st->config_name) st->enabled = config_get_boolean(st->config_section, st->config_name, st->enabled);
-            if(st->enabled && st->init_routine) st->init_routine();
+            if(st->config_name)
+                st->enabled = config_get_boolean(st->config_section, st->config_name, st->enabled);
+
+            if(st->enabled && st->init_routine)
+                st->init_routine();
         }
 
-        // --------------------------------------------------------------------
 
+        // --------------------------------------------------------------------
         // get the user we should run
+
         // IMPORTANT: this is required before web_files_uid()
         user = config_get("global", "run as user"    , (getuid() == 0)?NETDATA_USER:"");
 
@@ -758,9 +832,11 @@ int main(int argc, char **argv) {
         web_files_uid(); // IMPORTANT: web_files_uid() before web_files_gid()
         web_files_gid();
 
-        // --------------------------------------------------------------------
 
-        if(!check_config)
+        // --------------------------------------------------------------------
+        // create the listening sockets
+
+        if(!check_config && !central_netdata_to_push_data)
             create_listen_sockets();
     }
 
@@ -778,14 +854,16 @@ int main(int argc, char **argv) {
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
+
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
 
     info("netdata started on pid %d.", getpid());
 
+
     // ------------------------------------------------------------------------
-    // get default pthread stack size
+    // set default pthread stack size - after we have forked
 
     if(stacksize < wanted_stacksize) {
         i = pthread_attr_setstacksize(&attr, wanted_stacksize);
@@ -795,28 +873,34 @@ int main(int argc, char **argv) {
             debug(D_SYSTEM, "Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
     }
 
+
     // ------------------------------------------------------------------------
     // initialize health monitoring
 
     health_init();
+
 
     // ------------------------------------------------------------------------
     // initialize the registry
 
     registry_init();
 
+
     // ------------------------------------------------------------------------
     // initialize rrd host
 
     rrd_init(hostname);
 
+
     if(check_config)
         exit(1);
+
 
     // ------------------------------------------------------------------------
     // enable log flood protection
 
     error_log_limit_reset();
+
 
     // ------------------------------------------------------------------------
     // spawn the threads
@@ -841,6 +925,7 @@ int main(int argc, char **argv) {
     }
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
+
 
     // ------------------------------------------------------------------------
     // block signals while initializing threads.
