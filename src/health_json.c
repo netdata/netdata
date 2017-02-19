@@ -219,7 +219,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
     int i;
 
-    rrdhost_rdlock(localhost);
+    rrdhost_rdlock(host);
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                     "\n\t\"latest_alarm_log_unique_id\": %u,"
                     "\n\t\"status\": %s,"
@@ -249,7 +249,7 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
 //        health_rrdcalctemplate2json_nolock(wb, rt);
 
     buffer_strcat(wb, "\n\t}\n}\n");
-    rrdhost_unlock(localhost);
+    rrdhost_unlock(host);
 }
 
 

@@ -669,7 +669,7 @@ int web_client_api_request_v1_data_group(char *name, int def)
     return def;
 }
 
-int web_client_api_request_v1_alarms(struct web_client *w, char *url)
+int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url)
 {
     int all = 0;
 
@@ -683,11 +683,11 @@ int web_client_api_request_v1_alarms(struct web_client *w, char *url)
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarms2json(localhost, w->response.data, all);
+    health_alarms2json(host, w->response.data, all);
     return 200;
 }
 
-int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
+int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url)
 {
     uint32_t after = 0;
 
@@ -699,16 +699,16 @@ int web_client_api_request_v1_alarm_log(struct web_client *w, char *url)
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        if(!strcmp(name, "after")) after = strtoul(value, NULL, 0);
+        if(!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
     }
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarm_log2json(localhost, w->response.data, after);
+    health_alarm_log2json(host, w->response.data, after);
     return 200;
 }
 
-int web_client_api_request_single_chart(struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf))
+int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf))
 {
     int ret = 400;
     char *chart = NULL;
@@ -738,8 +738,8 @@ int web_client_api_request_single_chart(struct web_client *w, char *url, void ca
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find_localhost(chart);
-    if(!st) st = rrdset_find_byname_localhost(chart);
+    RRDSET *st = rrdset_find(host, chart);
+    if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
@@ -755,9 +755,9 @@ int web_client_api_request_single_chart(struct web_client *w, char *url, void ca
     return ret;
 }
 
-int web_client_api_request_v1_alarm_variables(struct web_client *w, char *url)
+int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url)
 {
-    return web_client_api_request_single_chart(w, url, health_api_v1_chart_variables2json);
+    return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
 }
 
 int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url)
@@ -770,7 +770,7 @@ int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *
     return 200;
 }
 
-int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
+int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url)
 {
     int format = ALLMETRICS_SHELL;
 
@@ -798,12 +798,12 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
     switch(format) {
         case ALLMETRICS_SHELL:
             w->response.data->contenttype = CT_TEXT_PLAIN;
-            rrd_stats_api_v1_charts_allmetrics_shell(localhost, w->response.data);
+            rrd_stats_api_v1_charts_allmetrics_shell(host, w->response.data);
             return 200;
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus(localhost, w->response.data);
+            rrd_stats_api_v1_charts_allmetrics_prometheus(host, w->response.data);
             return 200;
 
         default:
@@ -813,12 +813,12 @@ int web_client_api_request_v1_allmetrics(struct web_client *w, char *url)
     }
 }
 
-int web_client_api_request_v1_chart(struct web_client *w, char *url)
+int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url)
 {
-    return web_client_api_request_single_chart(w, url, rrd_stats_api_v1_chart);
+    return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
 }
 
-int web_client_api_request_v1_badge(struct web_client *w, char *url) {
+int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
     int ret = 400;
     buffer_flush(w->response.data);
 
@@ -888,8 +888,8 @@ int web_client_api_request_v1_badge(struct web_client *w, char *url) {
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find_localhost(chart);
-    if(!st) st = rrdset_find_byname_localhost(chart);
+    RRDSET *st = rrdset_find(host, chart);
+    if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
         buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1);
@@ -1072,7 +1072,7 @@ cleanup:
 }
 
 // returns the HTTP code
-int web_client_api_request_v1_data(struct web_client *w, char *url)
+int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url)
 {
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
@@ -1174,8 +1174,8 @@ int web_client_api_request_v1_data(struct web_client *w, char *url)
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find_localhost(chart);
-    if(!st) st = rrdset_find_byname_localhost(chart);
+    RRDSET *st = rrdset_find(host, chart);
+    if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
@@ -1247,7 +1247,7 @@ cleanup:
 }
 
 
-int web_client_api_request_v1_registry(struct web_client *w, char *url)
+int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url)
 {
     static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
             hash_switch = 0, hash_machine = 0, hash_url = 0, hash_name = 0, hash_delete_url = 0, hash_for = 0,
@@ -1386,22 +1386,22 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
     switch(action) {
         case 'A':
             w->tracking_required = 1;
-            return registry_request_access_json(localhost, w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
+            return registry_request_access_json(host, w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
 
         case 'D':
             w->tracking_required = 1;
-            return registry_request_delete_json(localhost, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
+            return registry_request_delete_json(host, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
             w->tracking_required = 1;
-            return registry_request_search_json(localhost, w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
+            return registry_request_search_json(host, w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
 
         case 'W':
             w->tracking_required = 1;
-            return registry_request_switch_json(localhost, w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
+            return registry_request_switch_json(host, w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
 
         case 'H':
-            return registry_request_hello_json(localhost, w);
+            return registry_request_hello_json(host, w);
 
         default:
             buffer_flush(w->response.data);
@@ -1410,7 +1410,7 @@ int web_client_api_request_v1_registry(struct web_client *w, char *url)
     }
 }
 
-int web_client_api_request_v1(struct web_client *w, char *url) {
+int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
     static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0, hash_alarm_log = 0, hash_alarm_variables = 0, hash_raw = 0;
 
     if(unlikely(hash_data == 0)) {
@@ -1432,31 +1432,31 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
         uint32_t hash = simple_hash(tok);
 
         if(hash == hash_data && !strcmp(tok, "data"))
-            return web_client_api_request_v1_data(w, url);
+            return web_client_api_request_v1_data(host, w, url);
 
         else if(hash == hash_chart && !strcmp(tok, "chart"))
-            return web_client_api_request_v1_chart(w, url);
+            return web_client_api_request_v1_chart(host, w, url);
 
         else if(hash == hash_charts && !strcmp(tok, "charts"))
-            return web_client_api_request_v1_charts(localhost, w, url);
+            return web_client_api_request_v1_charts(host, w, url);
 
         else if(hash == hash_registry && !strcmp(tok, "registry"))
-            return web_client_api_request_v1_registry(w, url);
+            return web_client_api_request_v1_registry(host, w, url);
 
         else if(hash == hash_badge && !strcmp(tok, "badge.svg"))
-            return web_client_api_request_v1_badge(w, url);
+            return web_client_api_request_v1_badge(host, w, url);
 
         else if(hash == hash_alarms && !strcmp(tok, "alarms"))
-            return web_client_api_request_v1_alarms(w, url);
+            return web_client_api_request_v1_alarms(host, w, url);
 
         else if(hash == hash_alarm_log && !strcmp(tok, "alarm_log"))
-            return web_client_api_request_v1_alarm_log(w, url);
+            return web_client_api_request_v1_alarm_log(host, w, url);
 
         else if(hash == hash_alarm_variables && !strcmp(tok, "alarm_variables"))
-            return web_client_api_request_v1_alarm_variables(w, url);
+            return web_client_api_request_v1_alarm_variables(host, w, url);
 
         else if(hash == hash_raw && !strcmp(tok, "allmetrics"))
-            return web_client_api_request_v1_allmetrics(w, url);
+            return web_client_api_request_v1_allmetrics(host, w, url);
 
         else {
             buffer_flush(w->response.data);
@@ -1472,14 +1472,14 @@ int web_client_api_request_v1(struct web_client *w, char *url) {
     }
 }
 
-int web_client_api_request(struct web_client *w, char *url)
+int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
 {
     // get the api version
     char *tok = mystrsep(&url, "/?&");
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
         if(strcmp(tok, "v1") == 0)
-            return web_client_api_request_v1(w, url);
+            return web_client_api_request_v1(host, w, url);
         else {
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Unsupported API version: ");
@@ -1494,7 +1494,7 @@ int web_client_api_request(struct web_client *w, char *url)
     }
 }
 
-int web_client_api_old_data_request(struct web_client *w, char *url, int datasource_type)
+int web_client_api_old_data_request(RRDHOST *host, struct web_client *w, char *url, int datasource_type)
 {
     if(!url || !*url) {
         buffer_flush(w->response.data);
@@ -1517,8 +1517,8 @@ int web_client_api_old_data_request(struct web_client *w, char *url, int datasou
     // do we have such a data set?
     if(*tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
-        st = rrdset_find_byname_localhost(tok);
-        if(!st) st = rrdset_find_localhost(tok);
+        st = rrdset_find_byname(host, tok);
+        if(!st) st = rrdset_find(host, tok);
     }
 
     if(!st) {
@@ -2146,7 +2146,7 @@ void web_client_process(struct web_client *w) {
 
                 if(hash == hash_api && strcmp(tok, "api") == 0) {
                     // the client is requesting api access
-                    code = web_client_api_request(w, url);
+                    code = web_client_api_request(localhost, w, url);
                 }
                 else if(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0) {
                     code = 200;
@@ -2158,11 +2158,11 @@ void web_client_process(struct web_client *w) {
                 }
                 else if(hash == hash_data && strcmp(tok, WEB_PATH_DATA) == 0) { // "data"
                     // the client is requesting rrd data -- OLD API
-                    code = web_client_api_old_data_request(w, url, DATASOURCE_JSON);
+                    code = web_client_api_old_data_request(localhost, w, url, DATASOURCE_JSON);
                 }
                 else if(hash == hash_datasource && strcmp(tok, WEB_PATH_DATASOURCE) == 0) { // "datasource"
                     // the client is requesting google datasource -- OLD API
-                    code = web_client_api_old_data_request(w, url, DATASOURCE_DATATABLE_JSONP);
+                    code = web_client_api_old_data_request(localhost, w, url, DATASOURCE_DATATABLE_JSONP);
                 }
                 else if(hash == hash_graph && strcmp(tok, WEB_PATH_GRAPH) == 0) { // "graph"
                     // the client is requesting an rrd graph -- OLD API
@@ -2173,8 +2173,8 @@ void web_client_process(struct web_client *w) {
                         debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
                         // do we have such a data set?
-                        RRDSET *st = rrdset_find_byname_localhost(tok);
-                        if(!st) st = rrdset_find_localhost(tok);
+                        RRDSET *st = rrdset_find_byname(localhost, tok);
+                        if(!st) st = rrdset_find(localhost, tok);
                         if(!st) {
                             // we don't have it
                             // try to send a file with that name
@@ -2239,8 +2239,8 @@ void web_client_process(struct web_client *w) {
                         debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
                         // do we have such a data set?
-                        RRDSET *st = rrdset_find_byname_localhost(tok);
-                        if(!st) st = rrdset_find_localhost(tok);
+                        RRDSET *st = rrdset_find_byname(localhost, tok);
+                        if(!st) st = rrdset_find(localhost, tok);
                         if(!st) {
                             code = 404;
                             buffer_strcat(w->response.data, "Chart is not found: ");
