@@ -178,7 +178,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
     rd->rrdset = st;
 
     // append this dimension
-    pthread_rwlock_wrlock(&st->rwlock);
+    rrdset_wrlock(st);
     if(!st->dimensions)
         st->dimensions = rd;
     else {
@@ -193,7 +193,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, 0);
     }
 
-    pthread_rwlock_unlock(&st->rwlock);
+    rrdset_unlock(st);
 
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);

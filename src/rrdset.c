@@ -100,7 +100,6 @@ inline RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
     return(st);
 }
 
-
 // ----------------------------------------------------------------------------
 // RRDSET - rename charts
 
@@ -142,11 +141,11 @@ void rrdset_set_name(RRDSET *st, const char *name) {
         st->hash_name = simple_hash(st->name);
     }
 
-    pthread_rwlock_wrlock(&st->rwlock);
+    rrdset_wrlock(st);
     RRDDIM *rd;
     for(rd = st->dimensions; rd ;rd = rd->next)
         rrddimvar_rename_all(rd);
-    pthread_rwlock_unlock(&st->rwlock);
+    rrdset_unlock(st);
 
     if(unlikely(rrdset_index_add_name(st->rrdhost, st) != st))
         error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", st->name);
@@ -210,7 +209,7 @@ static inline void timeval_align(struct timeval *tv, int update_every) {
 // RRDSET - free a chart
 
 void rrdset_free(RRDSET *st) {
-    pthread_rwlock_wrlock(&st->rwlock);
+    rrdset_wrlock(st);
 
     while(st->variables)  rrdsetvar_free(st->variables);
     while(st->alarms)     rrdsetcalc_unlink(st->alarms);
@@ -225,7 +224,7 @@ void rrdset_free(RRDSET *st) {
     if(!st->rrdfamily->use_count)
         rrdfamily_free(st->rrdhost, st->rrdfamily);
 
-    pthread_rwlock_unlock(&st->rwlock);
+    rrdset_unlock(st);
 
     // free directly allocated memory
     freez(st->config_section);
@@ -304,7 +303,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
             memset(&st->avlname, 0, sizeof(avl));
             memset(&st->variables_root_index, 0, sizeof(avl_tree_lock));
             memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
-            memset(&st->rwlock, 0, sizeof(pthread_rwlock_t));
+            memset(&st->rrdset_rwlock, 0, sizeof(pthread_rwlock_t));
 
             st->name = NULL;
             st->type = NULL;
@@ -413,8 +412,8 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     avl_init_lock(&st->dimensions_index, rrddim_compare);
     avl_init_lock(&st->variables_root_index, rrdvar_compare);
 
-    pthread_rwlock_init(&st->rwlock, NULL);
-    rrdhost_rwlock(host);
+    pthread_rwlock_init(&st->rrdset_rwlock, NULL);
+    rrdhost_wrlock(host);
 
     if(name && *name) rrdset_set_name(st, name);
     else rrdset_set_name(st, id);
@@ -544,7 +543,7 @@ usec_t rrdset_done(RRDSET *st) {
         error("Cannot set pthread cancel state to DISABLE.");
 
     // a read lock is OK here
-    pthread_rwlock_rdlock(&st->rwlock);
+    rrdset_rdlock(st);
 
 /*
     // enable the chart, if it was disabled
@@ -1072,8 +1071,8 @@ usec_t rrdset_done(RRDSET *st) {
             RRDDIM *last;
             // there is dimension to free
             // upgrade our read lock to a write lock
-            pthread_rwlock_unlock(&st->rwlock);
-            pthread_rwlock_wrlock(&st->rwlock);
+            pthread_rwlock_unlock(&st->rrdset_rwlock);
+            pthread_rwlock_wrlock(&st->rrdset_rwlock);
 
             for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
                 // remove it only it is not updated in rrd_delete_unupdated_dimensions seconds
@@ -1109,7 +1108,7 @@ usec_t rrdset_done(RRDSET *st) {
     }
 */
 
-    pthread_rwlock_unlock(&st->rwlock);
+    rrdset_unlock(st);
 
     if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
         error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);

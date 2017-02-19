@@ -2,7 +2,7 @@
 
 void rrd_stats_api_v1_chart_with_data(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used)
 {
-    pthread_rwlock_rdlock(&st->rwlock);
+    rrdset_rdlock(st);
 
     buffer_sprintf(wb,
         "\t\t{\n"
@@ -71,7 +71,7 @@ void rrd_stats_api_v1_chart_with_data(RRDSET *st, BUFFER *wb, size_t *dimensions
         "\n\t\t}"
         );
 
-    pthread_rwlock_unlock(&st->rwlock);
+    rrdset_unlock(st);
 }
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
@@ -97,7 +97,7 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb)
         , host->rrd_history_entries
         );
 
-    pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
+    rrdhost_rdlock(host);
     for(st = host->rrdset_root, c = 0; st ; st = st->next) {
         if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
             if(c) buffer_strcat(wb, ",");
@@ -114,7 +114,7 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb)
         if(rc->rrdset)
             alarms++;
     }
-    pthread_rwlock_unlock(&host->rrdset_root_rwlock);
+    rrdhost_unlock(host);
 
     buffer_sprintf(wb, "\n\t}"
                     ",\n\t\"charts_count\": %zu"
@@ -150,7 +150,7 @@ static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
 #define PROMETHEUS_ELEMENT_MAX 256
 
 void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
-    pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
+    rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_name_copy(hostname, config_get("global", "hostname", "localhost"), PROMETHEUS_ELEMENT_MAX);
@@ -163,7 +163,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
 
         buffer_strcat(wb, "\n");
         if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
-            pthread_rwlock_rdlock(&st->rwlock);
+            rrdset_rdlock(st);
 
             // for each dimension
             RRDDIM *rd;
@@ -196,11 +196,11 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
                 }
             }
 
-            pthread_rwlock_unlock(&st->rwlock);
+            rrdset_unlock(st);
         }
     }
 
-    pthread_rwlock_unlock(&host->rrdset_root_rwlock);
+    rrdhost_unlock(host);
 }
 
 // ----------------------------------------------------------------------------
@@ -224,7 +224,7 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 #define SHELL_ELEMENT_MAX 100
 
 void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
-    pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
+    rrdhost_rdlock(host);
 
     // for each chart
     RRDSET *st;
@@ -235,7 +235,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
 
         buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, st->name);
         if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
-            pthread_rwlock_rdlock(&st->rwlock);
+            rrdset_rdlock(st);
 
             // for each dimension
             RRDDIM *rd;
@@ -259,7 +259,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
 
             total = roundl(total);
             buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"%0.0Lf\"      # %s\n", chart, total, st->units);
-            pthread_rwlock_unlock(&st->rwlock);
+            rrdset_unlock(st);
         }
     }
 
@@ -287,7 +287,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
         buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));
     }
 
-    pthread_rwlock_unlock(&host->rrdset_root_rwlock);
+    rrdhost_unlock(host);
 }
 
 // ----------------------------------------------------------------------------
@@ -296,7 +296,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
 {
     time_t now = now_realtime_sec();
 
-    pthread_rwlock_rdlock(&st->rwlock);
+    rrdset_rdlock(st);
 
     buffer_sprintf(wb,
         "\t\t{\n"
@@ -394,7 +394,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
         , memory
         );
 
-    pthread_rwlock_unlock(&st->rwlock);
+    rrdset_unlock(st);
     return memory;
 }
 
@@ -416,7 +416,8 @@ void rrd_stats_all_json(RRDHOST *host, BUFFER *wb)
 
     buffer_strcat(wb, RRD_GRAPH_JSON_HEADER);
 
-    pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
+    rrdhost_rdlock(host);
+
     for(st = host->rrdset_root, c = 0; st ; st = st->next) {
         if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
             if(c) buffer_strcat(wb, ",\n");
@@ -424,7 +425,6 @@ void rrd_stats_all_json(RRDHOST *host, BUFFER *wb)
             c++;
         }
     }
-    pthread_rwlock_unlock(&host->rrdset_root_rwlock);
 
     buffer_sprintf(wb, "\n\t],\n"
         "\t\"hostname\": \"%s\",\n"
@@ -437,6 +437,8 @@ void rrd_stats_all_json(RRDHOST *host, BUFFER *wb)
         , host->rrd_history_entries
         , memory
         );
+
+    rrdhost_unlock(host);
 }
 
 
@@ -1344,7 +1346,7 @@ inline static void rrdr_lock_rrdset(RRDR *r) {
         return;
     }
 
-    pthread_rwlock_rdlock(&r->st->rwlock);
+    rrdset_rdlock(r->st);
     r->has_st_lock = 1;
 }
 
@@ -1355,7 +1357,7 @@ inline static void rrdr_unlock_rrdset(RRDR *r) {
     }
 
     if(likely(r->has_st_lock)) {
-        pthread_rwlock_unlock(&r->st->rwlock);
+        rrdset_unlock(r->st);
         r->has_st_lock = 0;
     }
 }
@@ -1992,7 +1994,7 @@ int rrd2format(RRDSET *st, BUFFER *wb, BUFFER *dimensions, uint32_t format, long
 time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group, int group_method, time_t after, time_t before, int only_non_zero)
 {
     int c;
-    pthread_rwlock_rdlock(&st->rwlock);
+    rrdset_rdlock(st);
 
 
     // -------------------------------------------------------------------------
@@ -2036,7 +2038,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
     RRDDIM *rd;
     for( rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
     if(!dimensions) {
-        pthread_rwlock_unlock(&st->rwlock);
+        rrdset_unlock(st);
         buffer_strcat(wb, "No dimensions yet.");
         return 0;
     }
@@ -2309,6 +2311,6 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 
     debug(D_RRD_STATS, "RRD_STATS_JSON: %s total %zu bytes", st->name, wb->len);
 
-    pthread_rwlock_unlock(&st->rwlock);
+    rrdset_unlock(st);
     return last_timestamp;
 }
