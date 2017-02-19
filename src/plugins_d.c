@@ -83,17 +83,18 @@ static int pluginsd_split_words(char *str, char **words, int max_words) {
     return i;
 }
 
+inline size_t pluginsd_process(struct plugind *cd, FILE *fp, int trust_durations) {
+    int enabled = cd->enabled;
 
-void *pluginsd_worker_thread(void *arg) {
-    struct plugind *cd = (struct plugind *)arg;
-    cd->obsolete = 0;
+    if(!fp || !enabled) {
+        cd->enabled = 0;
+        return 0;
+    }
+
+    size_t count = 0;
+    RRDHOST *host = localhost;
 
     char line[PLUGINSD_LINE_MAX + 1];
-
-#ifdef DETACH_PLUGINS_FROM_NETDATA
-    usec_t usec = 0, susec = 0;
-    struct timeval last = {0, 0} , now = {0, 0};
-#endif
 
     char *words[MAX_WORDS] = { NULL };
     uint32_t HOST_HASH = simple_hash("HOST");
@@ -103,13 +104,255 @@ void *pluginsd_worker_thread(void *arg) {
     uint32_t CHART_HASH = simple_hash("CHART");
     uint32_t DIMENSION_HASH = simple_hash("DIMENSION");
     uint32_t DISABLE_HASH = simple_hash("DISABLE");
-#ifdef DETACH_PLUGINS_FROM_NETDATA
-    uint32_t MYPID_HASH = simple_hash("MYPID");
-    uint32_t STOPPING_WAKE_ME_UP_PLEASE_HASH = simple_hash("STOPPING_WAKE_ME_UP_PLEASE");
-#endif
+
+    RRDSET *st = NULL;
+    uint32_t hash;
+
+    while(likely(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL)) {
+        if(unlikely(netdata_exit)) break;
+
+        line[PLUGINSD_LINE_MAX] = '\0';
+
+        // debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
+
+        int w = pluginsd_split_words(line, words, MAX_WORDS);
+        char *s = words[0];
+        if(unlikely(!s || !*s || !w)) {
+            // debug(D_PLUGINSD, "PLUGINSD: empty line");
+            continue;
+        }
+
+        // debug(D_PLUGINSD, "PLUGINSD: words 0='%s' 1='%s' 2='%s' 3='%s' 4='%s' 5='%s' 6='%s' 7='%s' 8='%s' 9='%s'", words[0], words[1], words[2], words[3], words[4], words[5], words[6], words[7], words[8], words[9]);
+
+        if(likely(!simple_hash_strcmp(s, "SET", &hash))) {
+            char *dimension = words[1];
+            char *value = words[2];
+
+            if(unlikely(!dimension || !*dimension)) {
+                error("PLUGINSD: '%s' is requesting a SET on chart '%s', without a dimension. Disabling it.", cd->fullfilename, st->id);
+                enabled = 0;
+                break;
+            }
+
+            if(unlikely(!value || !*value)) value = NULL;
+
+            if(unlikely(!st)) {
+                error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s, without a BEGIN. Disabling it.", cd->fullfilename, dimension, value?value:"<nothing>");
+                enabled = 0;
+                break;
+            }
+
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value?value:"<nothing>");
+
+            if(value) rrddim_set(st, dimension, strtoll(value, NULL, 0));
+        }
+        else if(likely(hash == BEGIN_HASH && !strcmp(s, "BEGIN"))) {
+            char *id = words[1];
+            char *microseconds_txt = words[2];
+
+            if(unlikely(!id)) {
+                error("PLUGINSD: '%s' is requesting a BEGIN without a chart id. Disabling it.", cd->fullfilename);
+                enabled = 0;
+                break;
+            }
+
+            st = rrdset_find(host, id);
+            if(unlikely(!st)) {
+                error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist. Disabling it.", cd->fullfilename, id);
+                enabled = 0;
+                break;
+            }
+
+            if(likely(st->counter_done)) {
+                usec_t microseconds = 0;
+                if(microseconds_txt && *microseconds_txt) microseconds = str2ull(microseconds_txt);
+
+                if(likely(microseconds)) {
+                    if(trust_durations)
+                        rrdset_next_usec_unfiltered(st, microseconds);
+                    else
+                        rrdset_next_usec(st, microseconds);
+                }
+                else rrdset_next(st);
+            }
+        }
+        else if(likely(hash == END_HASH && !strcmp(s, "END"))) {
+            if(unlikely(!st)) {
+                error("PLUGINSD: '%s' is requesting an END, without a BEGIN. Disabling it.", cd->fullfilename);
+                enabled = 0;
+                break;
+            }
+
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting an END on chart %s", cd->fullfilename, st->id);
+
+            rrdset_done(st);
+            st = NULL;
+
+            count++;
+        }
+        else if(likely(hash == HOST_HASH && !strcmp(s, "HOST"))) {
+            char *guid = words[1];
+            char *hostname = words[2];
+
+            if(unlikely(!guid || !*guid)) {
+                error("PLUGINSD: '%s' is requesting a HOST, without a guid. Disabling it.", cd->fullfilename);
+                enabled = 0;
+                break;
+            }
+            if(unlikely(!hostname || !*hostname)) {
+                error("PLUGINSD: '%s' is requesting a HOST, without a hostname. Disabling it.", cd->fullfilename);
+                enabled = 0;
+                break;
+            }
+
+            host = rrdhost_find_or_create(hostname, guid);
+        }
+        else if(likely(hash == FLUSH_HASH && !strcmp(s, "FLUSH"))) {
+            debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
+            st = NULL;
+        }
+        else if(likely(hash == CHART_HASH && !strcmp(s, "CHART"))) {
+            int noname = 0;
+            st = NULL;
+
+            if((words[1]) != NULL && (words[2]) != NULL && strcmp(words[1], words[2]) == 0)
+                noname = 1;
+
+            char *type = words[1];
+            char *id = NULL;
+            if(likely(type)) {
+                id = strchr(type, '.');
+                if(likely(id)) { *id = '\0'; id++; }
+            }
+            char *name = words[2];
+            char *title = words[3];
+            char *units = words[4];
+            char *family = words[5];
+            char *context = words[6];
+            char *chart = words[7];
+            char *priority_s = words[8];
+            char *update_every_s = words[9];
+
+            if(unlikely(!type || !*type || !id || !*id)) {
+                error("PLUGINSD: '%s' is requesting a CHART, without a type.id. Disabling it.", cd->fullfilename);
+                enabled = 0;
+                break;
+            }
+
+            int priority = 1000;
+            if(likely(priority_s)) priority = str2i(priority_s);
+
+            int update_every = cd->update_every;
+            if(likely(update_every_s)) update_every = str2i(update_every_s);
+            if(unlikely(!update_every)) update_every = cd->update_every;
+
+            RRDSET_TYPE chart_type = RRDSET_TYPE_LINE;
+            if(unlikely(chart)) chart_type = rrdset_type_id(chart);
+
+            if(unlikely(noname || !name || !*name || strcasecmp(name, "NULL") == 0 || strcasecmp(name, "(NULL)") == 0)) name = NULL;
+            if(unlikely(!family || !*family)) family = NULL;
+            if(unlikely(!context || !*context)) context = NULL;
+
+            st = rrdset_find_bytype(host, type, id);
+            if(unlikely(!st)) {
+                debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d"
+                      , type, id
+                      , name?name:""
+                      , family?family:""
+                      , context?context:""
+                      , rrdset_type_name(chart_type)
+                      , priority
+                      , update_every
+                );
+
+                st = rrdset_create(host, type, id, name, family, context, title, units, priority, update_every, chart_type);
+                cd->update_every = update_every;
+            }
+            else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
+        }
+        else if(likely(hash == DIMENSION_HASH && !strcmp(s, "DIMENSION"))) {
+            char *id = words[1];
+            char *name = words[2];
+            char *algorithm = words[3];
+            char *multiplier_s = words[4];
+            char *divisor_s = words[5];
+            char *options = words[6];
+
+            if(unlikely(!id || !*id)) {
+                error("PLUGINSD: '%s' is requesting a DIMENSION, without an id. Disabling it.", cd->fullfilename);
+                enabled = 0;
+                break;
+            }
+
+            if(unlikely(!st)) {
+                error("PLUGINSD: '%s' is requesting a DIMENSION, without a CHART. Disabling it.", cd->fullfilename);
+                enabled = 0;
+                break;
+            }
+
+            long multiplier = 1;
+            if(multiplier_s && *multiplier_s) multiplier = strtol(multiplier_s, NULL, 0);
+            if(unlikely(!multiplier)) multiplier = 1;
+
+            long divisor = 1;
+            if(likely(divisor_s && *divisor_s)) divisor = strtol(divisor_s, NULL, 0);
+            if(unlikely(!divisor)) divisor = 1;
+
+            if(unlikely(!algorithm || !*algorithm)) algorithm = "absolute";
+
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                debug(D_PLUGINSD, "PLUGINSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
+                      , st->id
+                      , id
+                      , name?name:""
+                      , rrd_algorithm_name(rrd_algorithm_id(algorithm))
+                      , multiplier
+                      , divisor
+                      , options?options:""
+                );
+
+            RRDDIM *rd = rrddim_find(st, id);
+            if(unlikely(!rd)) {
+                rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
+                rd->flags = 0x00000000;
+                if(options && *options) {
+                    if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+                    if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+                    if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+                }
+            }
+            else if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
+        }
+        else if(unlikely(hash == DISABLE_HASH && !strcmp(s, "DISABLE"))) {
+            info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
+            enabled = 0;
+            break;
+        }
+        else {
+            error("PLUGINSD: '%s' is sending command '%s' which is not known by netdata. Disabling it.", cd->fullfilename, s);
+            enabled = 0;
+            break;
+        }
+    }
+
+    cd->enabled = enabled;
+
+    if(likely(count)) {
+        cd->successful_collections += count;
+        cd->serial_failures = 0;
+    }
+    else
+        cd->serial_failures++;
+
+    return count;
+}
+
+void *pluginsd_worker_thread(void *arg) {
+    struct plugind *cd = (struct plugind *)arg;
+    cd->obsolete = 0;
 
     size_t count = 0;
-    RRDHOST *host = localhost;
 
     for(;;) {
         if(unlikely(netdata_exit)) break;
@@ -122,286 +365,16 @@ void *pluginsd_worker_thread(void *arg) {
 
         info("PLUGINSD: '%s' running on pid %d", cd->fullfilename, cd->pid);
 
-        RRDSET *st = NULL;
-        uint32_t hash;
+        count = pluginsd_process(cd, fp, 0);
+        error("PLUGINSD: plugin '%s' disconnected.", cd->fullfilename);
 
-        while(likely(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL)) {
-            if(unlikely(netdata_exit)) break;
-
-            line[PLUGINSD_LINE_MAX] = '\0';
-
-            // debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
-
-            int w = pluginsd_split_words(line, words, MAX_WORDS);
-            char *s = words[0];
-            if(unlikely(!s || !*s || !w)) {
-                // debug(D_PLUGINSD, "PLUGINSD: empty line");
-                continue;
-            }
-
-            // debug(D_PLUGINSD, "PLUGINSD: words 0='%s' 1='%s' 2='%s' 3='%s' 4='%s' 5='%s' 6='%s' 7='%s' 8='%s' 9='%s'", words[0], words[1], words[2], words[3], words[4], words[5], words[6], words[7], words[8], words[9]);
-
-            if(likely(!simple_hash_strcmp(s, "SET", &hash))) {
-                char *dimension = words[1];
-                char *value = words[2];
-
-                if(unlikely(!dimension || !*dimension)) {
-                    error("PLUGINSD: '%s' is requesting a SET on chart '%s', without a dimension. Disabling it.", cd->fullfilename, st->id);
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-
-                if(unlikely(!value || !*value)) value = NULL;
-
-                if(unlikely(!st)) {
-                    error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s, without a BEGIN. Disabling it.", cd->fullfilename, dimension, value?value:"<nothing>");
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-
-                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value?value:"<nothing>");
-
-                if(value) rrddim_set(st, dimension, strtoll(value, NULL, 0));
-            }
-            else if(likely(hash == BEGIN_HASH && !strcmp(s, "BEGIN"))) {
-                char *id = words[1];
-                char *microseconds_txt = words[2];
-
-                if(unlikely(!id)) {
-                    error("PLUGINSD: '%s' is requesting a BEGIN without a chart id. Disabling it.", cd->fullfilename);
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-
-                st = rrdset_find(host, id);
-                if(unlikely(!st)) {
-                    error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist. Disabling it.", cd->fullfilename, id);
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-
-                if(likely(st->counter_done)) {
-                    usec_t microseconds = 0;
-                    if(microseconds_txt && *microseconds_txt) microseconds = str2ull(microseconds_txt);
-                    if(microseconds) rrdset_next_usec(st, microseconds);
-                    else rrdset_next(st);
-                }
-            }
-            else if(likely(hash == END_HASH && !strcmp(s, "END"))) {
-                if(unlikely(!st)) {
-                    error("PLUGINSD: '%s' is requesting an END, without a BEGIN. Disabling it.", cd->fullfilename);
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-
-                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting an END on chart %s", cd->fullfilename, st->id);
-
-                rrdset_done(st);
-                st = NULL;
-
-                count++;
-            }
-            else if(likely(hash == HOST_HASH && !strcmp(s, "HOST"))) {
-                char *guid = words[1];
-                char *hostname = words[2];
-
-                if(unlikely(!guid || !*guid)) {
-                    error("PLUGINSD: '%s' is requesting a HOST, without a guid. Disabling it.", cd->fullfilename);
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-                if(unlikely(!hostname || !*hostname)) {
-                    error("PLUGINSD: '%s' is requesting a HOST, without a hostname. Disabling it.", cd->fullfilename);
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-
-                host = rrdhost_find_or_create(hostname, guid);
-            }
-            else if(likely(hash == FLUSH_HASH && !strcmp(s, "FLUSH"))) {
-                debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
-                st = NULL;
-            }
-            else if(likely(hash == CHART_HASH && !strcmp(s, "CHART"))) {
-                int noname = 0;
-                st = NULL;
-
-                if((words[1]) != NULL && (words[2]) != NULL && strcmp(words[1], words[2]) == 0)
-                    noname = 1;
-
-                char *type = words[1];
-                char *id = NULL;
-                if(likely(type)) {
-                    id = strchr(type, '.');
-                    if(likely(id)) { *id = '\0'; id++; }
-                }
-                char *name = words[2];
-                char *title = words[3];
-                char *units = words[4];
-                char *family = words[5];
-                char *context = words[6];
-                char *chart = words[7];
-                char *priority_s = words[8];
-                char *update_every_s = words[9];
-
-                if(unlikely(!type || !*type || !id || !*id)) {
-                    error("PLUGINSD: '%s' is requesting a CHART, without a type.id. Disabling it.", cd->fullfilename);
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-
-                int priority = 1000;
-                if(likely(priority_s)) priority = str2i(priority_s);
-
-                int update_every = cd->update_every;
-                if(likely(update_every_s)) update_every = str2i(update_every_s);
-                if(unlikely(!update_every)) update_every = cd->update_every;
-
-                RRDSET_TYPE chart_type = RRDSET_TYPE_LINE;
-                if(unlikely(chart)) chart_type = rrdset_type_id(chart);
-
-                if(unlikely(noname || !name || !*name || strcasecmp(name, "NULL") == 0 || strcasecmp(name, "(NULL)") == 0)) name = NULL;
-                if(unlikely(!family || !*family)) family = NULL;
-                if(unlikely(!context || !*context)) context = NULL;
-
-                st = rrdset_find_bytype(host, type, id);
-                if(unlikely(!st)) {
-                    debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d"
-                        , type, id
-                        , name?name:""
-                        , family?family:""
-                        , context?context:""
-                        , rrdset_type_name(chart_type)
-                        , priority
-                        , update_every
-                        );
-
-                    st = rrdset_create(host, type, id, name, family, context, title, units, priority, update_every
-                                                 , chart_type);
-                    cd->update_every = update_every;
-                }
-                else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
-            }
-            else if(likely(hash == DIMENSION_HASH && !strcmp(s, "DIMENSION"))) {
-                char *id = words[1];
-                char *name = words[2];
-                char *algorithm = words[3];
-                char *multiplier_s = words[4];
-                char *divisor_s = words[5];
-                char *options = words[6];
-
-                if(unlikely(!id || !*id)) {
-                    error("PLUGINSD: '%s' is requesting a DIMENSION, without an id. Disabling it.", cd->fullfilename);
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-
-                if(unlikely(!st)) {
-                    error("PLUGINSD: '%s' is requesting a DIMENSION, without a CHART. Disabling it.", cd->fullfilename);
-                    cd->enabled = 0;
-                    killpid(cd->pid, SIGTERM);
-                    break;
-                }
-
-                long multiplier = 1;
-                if(multiplier_s && *multiplier_s) multiplier = strtol(multiplier_s, NULL, 0);
-                if(unlikely(!multiplier)) multiplier = 1;
-
-                long divisor = 1;
-                if(likely(divisor_s && *divisor_s)) divisor = strtol(divisor_s, NULL, 0);
-                if(unlikely(!divisor)) divisor = 1;
-
-                if(unlikely(!algorithm || !*algorithm)) algorithm = "absolute";
-
-                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                    debug(D_PLUGINSD, "PLUGINSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
-                        , st->id
-                        , id
-                        , name?name:""
-                        , rrd_algorithm_name(rrd_algorithm_id(algorithm))
-                        , multiplier
-                        , divisor
-                        , options?options:""
-                        );
-
-                RRDDIM *rd = rrddim_find(st, id);
-                if(unlikely(!rd)) {
-                    rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
-                    rd->flags = 0x00000000;
-                    if(options && *options) {
-                        if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
-                        if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-                        if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-                    }
-                }
-                else if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                    debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
-            }
-            else if(unlikely(hash == DISABLE_HASH && !strcmp(s, "DISABLE"))) {
-                info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
-                cd->enabled = 0;
-                killpid(cd->pid, SIGTERM);
-                break;
-            }
-#ifdef DETACH_PLUGINS_FROM_NETDATA
-            else if(likely(hash == MYPID_HASH && !strcmp(s, "MYPID"))) {
-                char *pid_s = words[1];
-                pid_t pid = strtod(pid_s, NULL, 0);
-
-                if(likely(pid)) cd->pid = pid;
-                debug(D_PLUGINSD, "PLUGINSD: %s is on pid %d", cd->id, cd->pid);
-            }
-            else if(likely(hash == STOPPING_WAKE_ME_UP_PLEASE_HASH && !strcmp(s, "STOPPING_WAKE_ME_UP_PLEASE"))) {
-                error("PLUGINSD: '%s' (pid %d) called STOPPING_WAKE_ME_UP_PLEASE.", cd->fullfilename, cd->pid);
-
-                now_realtime_timeval(&now);
-                if(unlikely(!usec && !susec)) {
-                    // our first run
-                    susec = cd->rrd_update_every * USEC_PER_SEC;
-                }
-                else {
-                    // second+ run
-                    usec = dt_usec(&now, &last) - susec;
-                    error("PLUGINSD: %s last loop took %llu usec (worked for %llu, sleeped for %llu).\n", cd->fullfilename, usec + susec, usec, susec);
-                    if(unlikely(usec < (localhost->rrd_update_every * USEC_PER_SEC / 2ULL))) susec = (localhost->rrd_update_every * USEC_PER_SEC) - usec;
-                    else susec = localhost->rrd_update_every * USEC_PER_SEC / 2ULL;
-                }
-
-                error("PLUGINSD: %s sleeping for %llu. Will kill with SIGCONT pid %d to wake it up.\n", cd->fullfilename, susec, cd->pid);
-                usleep(susec);
-                killpid(cd->pid, SIGCONT);
-                memmove(&last, &now, sizeof(struct timeval));
-                break;
-            }
-#endif
-            else {
-                error("PLUGINSD: '%s' is sending command '%s' which is not known by netdata. Disabling it.", cd->fullfilename, s);
-                cd->enabled = 0;
-                killpid(cd->pid, SIGTERM);
-                break;
-            }
-        }
-        if(likely(count)) {
-            cd->successful_collections += count;
-            cd->serial_failures = 0;
-        }
-        else
-            cd->serial_failures++;
+        killpid(cd->pid, SIGTERM);
 
         info("PLUGINSD: '%s' on pid %d stopped after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
 
         // get the return code
         int code = mypclose(fp, cd->pid);
-        
+
         if(unlikely(netdata_exit)) break;
         else if(code != 0) {
             // the plugin reports failure

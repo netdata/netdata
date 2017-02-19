@@ -1667,6 +1667,92 @@ int web_client_api_old_data_request(RRDHOST *host, struct web_client *w, char *u
     return 200;
 }
 
+int validate_stream_api_key(const char *key) {
+    return 0;
+}
+
+int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
+    (void)host;
+
+    info("STREAM request from client '%s:%s'", w->client_ip, w->client_port);
+
+    char *key = NULL;
+
+    while(url) {
+        char *value = mystrsep(&url, "?&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        if(!strcmp(name, "key"))
+            key = value;
+    }
+
+    if(!key || !*key) {
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "You need an API key for this request.");
+        error("STREAM request from client '%s:%s', without an API key. Forbidding access.", w->client_ip, w->client_port);
+        return 401;
+    }
+
+    if(!validate_stream_api_key(key)) {
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "Your API key is not permitted access.");
+        error("STREAM request from client '%s:%s': API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
+        return 401;
+    }
+
+    struct plugind cd = {
+            .enabled = 1,
+            .update_every = default_localhost_rrd_update_every,
+            .pid = 0,
+            .serial_failures = 0,
+            .successful_collections = 0,
+            .obsolete = 0,
+            .started_t = now_realtime_sec(),
+            .next = NULL,
+    };
+
+    // put the client IP and port into the buffers used by plugins.d
+    snprintfz(cd.id,           CONFIG_MAX_NAME,  "%s:%s", w->client_ip, w->client_port);
+    snprintfz(cd.filename,     FILENAME_MAX,     "%s:%s", w->client_ip, w->client_port);
+    snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", w->client_ip, w->client_port);
+    snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", w->client_ip, w->client_port);
+
+    // remove the non-blocking flag from the socket
+    if(fcntl(w->ifd, F_SETFL, fcntl(w->ifd, F_GETFL, 0) & ~O_NONBLOCK) == -1)
+        error("STREAM from '%s:%s': cannot remove the non-blocking flag from socket %d", w->client_ip, w->client_port, w->ifd);
+
+    // convert the socket to a FILE *
+    FILE *fp = fdopen(w->ifd, "r");
+    if(!fp) {
+        error("STREAM from '%s:%s': failed to get a FILE for FD %d.", w->client_ip, w->client_port, w->ifd);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "Failed to get a FILE for an FD.");
+        return 500;
+    }
+
+    // call the plugins.d processor to receive the metrics
+    size_t count = pluginsd_process(&cd, fp, 1);
+    error("STREAM from '%s:%s': client disconnected.", w->client_ip, w->client_port);
+
+    // close all sockets, to let the socket worker we are done
+    fclose(fp);
+    w->ifd = -1;
+    if(w->ofd != -1 && w->ofd != w->ifd) {
+        close(w->ofd);
+        w->ofd = -1;
+    }
+
+    // this will not send anything
+    // the socket is closed
+    buffer_flush(w->response.data);
+    if(count) return 200;
+    return 400;
+}
+
 const char *web_content_type_to_string(uint8_t contenttype) {
     switch(contenttype) {
         case CT_TEXT_HTML:
@@ -2113,7 +2199,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     }
 
     buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, "Host is not found: ");
+    buffer_strcat(w->response.data, "This netdata does not maintain a database for host: ");
     buffer_strcat_htmlescape(w->response.data, tok?tok:"");
     return 404;
 }
@@ -2127,7 +2213,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             hash_graph = 0,
             hash_list = 0,
             hash_all_json = 0,
-            hash_host = 0;
+            hash_host = 0,
+            hash_stream = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
@@ -2142,6 +2229,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_list = simple_hash("list");
         hash_all_json = simple_hash("all.json");
         hash_host = simple_hash("host");
+        hash_stream = simple_hash("stream");
 #ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
@@ -2154,13 +2242,17 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         uint32_t hash = simple_hash(tok);
         debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-        if(unlikely(hash == hash_host && strcmp(tok, "host") == 0)) {
-            debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, url);
-        }
         if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {
             debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return web_client_api_request(host, w, url);
+        }
+        else if(unlikely(hash == hash_host && strcmp(tok, "host") == 0)) {
+            debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
+            return web_client_switch_host(host, w, url);
+        }
+        else if(unlikely(hash == hash_stream && strcmp(tok, "stream") == 0)) {
+            debug(D_WEB_CLIENT_ACCESS, "%llu: stream request ...", w->id);
+            return web_client_stream_request(host, w, url);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {
             debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
@@ -2709,7 +2801,8 @@ void *web_client_main(void *ptr)
 
     struct web_client *w = ptr;
     struct pollfd fds[2], *ifd, *ofd;
-    int retval, fdmax = 0, timeout;
+    int retval, timeout;
+    nfds_t fdmax = 0;
 
     log_access("%llu: %s port %s connected on thread task id %d", w->id, w->client_ip, w->client_port, gettid());
 
@@ -2798,6 +2891,10 @@ void *web_client_main(void *ptr)
             if(w->mode == WEB_CLIENT_MODE_NORMAL) {
                 debug(D_WEB_CLIENT, "%llu: Attempting to process received data.", w->id);
                 web_client_process_request(w);
+
+                // if the sockets are closed, may have transferred this client
+                // to plugins.d
+                if(w->ifd == -1 && w->ofd == -1) break;
             }
         }
 
