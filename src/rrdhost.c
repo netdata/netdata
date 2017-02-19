@@ -49,15 +49,21 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
-RRDHOST *rrdhost_create(const char *hostname, const char *guid) {
+RRDHOST *rrdhost_create(const char *hostname,
+        const char *guid,
+        int update_every,
+        int entries,
+        RRD_MEMORY_MODE memory_mode,
+        int health_enabled) {
+
     debug(D_RRDHOST, "Adding host '%s' with guid '%s'", hostname, guid);
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
-    host->rrd_update_every    = default_localhost_rrd_update_every;
-    host->rrd_history_entries = default_localhost_rrd_history_entries;
-    host->rrd_memory_mode     = default_localhost_rrd_memory_mode;
-    host->health_enabled      = default_localhost_health_enabled;
+    host->rrd_update_every    = update_every;
+    host->rrd_history_entries = entries;
+    host->rrd_memory_mode     = memory_mode;
+    host->health_enabled      = health_enabled;
 
     pthread_rwlock_init(&(host->rrdset_root_rwlock), NULL);
 
@@ -158,7 +164,13 @@ RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid) {
 
     RRDHOST *host = rrdhost_find(guid, 0);
     if(!host)
-        host = rrdhost_create(hostname, guid);
+        host = rrdhost_create(hostname,
+                guid,
+                default_localhost_rrd_update_every,
+                default_localhost_rrd_history_entries,
+                default_localhost_rrd_memory_mode,
+                default_localhost_health_enabled
+        );
 
     return host;
 }
@@ -168,7 +180,14 @@ RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid) {
 
 void rrd_init(char *hostname) {
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
-    localhost = rrdhost_create(hostname, registry_get_this_machine_guid());
+
+    localhost = rrdhost_create(hostname,
+            registry_get_this_machine_guid(),
+            default_localhost_rrd_update_every,
+            default_localhost_rrd_history_entries,
+            default_localhost_rrd_memory_mode,
+            default_localhost_health_enabled
+    );
 }
 
 // ----------------------------------------------------------------------------
