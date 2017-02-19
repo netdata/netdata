@@ -436,3 +436,30 @@ inline void health_alarm_log(
     health_alarm_log_save(host, ae);
 }
 
+inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
+    freez(ae->name);
+    freez(ae->chart);
+    freez(ae->family);
+    freez(ae->exec);
+    freez(ae->recipient);
+    freez(ae->source);
+    freez(ae->units);
+    freez(ae->info);
+    freez(ae->old_value_string);
+    freez(ae->new_value_string);
+    freez(ae);
+}
+
+inline void health_alarm_log_free(RRDHOST *host) {
+    rrdhost_check_wrlock(host);
+
+    pthread_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+
+    ALARM_ENTRY *ae;
+    while((ae = host->health_log.alarms)) {
+        host->health_log.alarms = ae->next;
+        health_alarm_log_free_one_nochecks_nounlink(ae);
+    }
+
+    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+}

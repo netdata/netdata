@@ -31,6 +31,8 @@ void *cpuidlejitter_main(void *ptr) {
     for(counter = 0; 1 ;counter++) {
         usec_t usec = 0, susec = 0;
 
+        if(netdata_exit) break;
+
         while(susec < (localhost->rrd_update_every * USEC_PER_SEC)) {
 
             now_monotonic_timeval(&before);

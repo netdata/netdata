@@ -209,24 +209,50 @@ static inline void timeval_align(struct timeval *tv, int update_every) {
 // RRDSET - free a chart
 
 void rrdset_free(RRDSET *st) {
-    rrdset_wrlock(st);
+    if(unlikely(!st)) return;
+
+    rrdhost_check_wrlock(st->rrdhost);  // make sure we have a write lock on the host
+    rrdset_wrlock(st);                  // lock this RRDSET
+
+    // ------------------------------------------------------------------------
+    // free its children structures
 
     while(st->variables)  rrdsetvar_free(st->variables);
     while(st->alarms)     rrdsetcalc_unlink(st->alarms);
     while(st->dimensions) rrddim_free(st, st->dimensions);
+
+    rrdfamily_free(st->rrdhost, st->rrdfamily);
+
+    // ------------------------------------------------------------------------
+    // remove it from the indexes
 
     if(unlikely(rrdset_index_del(st->rrdhost, st) != st))
         error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", st->id);
 
     rrdset_index_del_name(st->rrdhost, st);
 
-    st->rrdfamily->use_count--;
-    if(!st->rrdfamily->use_count)
-        rrdfamily_free(st->rrdhost, st->rrdfamily);
+    // ------------------------------------------------------------------------
+    // unlink it from the host
+
+    if(st == st->rrdhost->rrdset_root) {
+        st->rrdhost->rrdset_root = st->next;
+    }
+    else {
+        // find the previous one
+        RRDSET *s;
+        for(s = st->rrdhost->rrdset_root; s && s->next != st ; s = s->next) ;
+
+        // bypass it
+        if(s) s->next = st->next;
+        else error("Request to free RRDSET '%s': cannot find it under host '%s'", st->id, st->rrdhost->hostname);
+    }
 
     rrdset_unlock(st);
 
-    // free directly allocated memory
+    // ------------------------------------------------------------------------
+    // free it
+
+    // free directly allocated members
     freez(st->config_section);
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {

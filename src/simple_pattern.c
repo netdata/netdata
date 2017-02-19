@@ -184,8 +184,8 @@ int simple_pattern_matches(SIMPLE_PATTERN *list, const char *str) {
 static inline void free_pattern(struct simple_pattern *m) {
     if(!m) return;
 
-    if(m->next) free_pattern(m->next);
-    if(m->child) free_pattern(m->child);
+    free_pattern(m->child);
+    free_pattern(m->next);
     freez((void *)m->match);
     freez(m);
 }
@@ -193,5 +193,5 @@ static inline void free_pattern(struct simple_pattern *m) {
 void simple_pattern_free(SIMPLE_PATTERN *list) {
     if(!list) return;
 
-    free_pattern(((struct simple_pattern *)list)->next);
+    free_pattern(((struct simple_pattern *)list));
 }

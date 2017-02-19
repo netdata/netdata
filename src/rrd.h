@@ -371,13 +371,26 @@ extern RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid);
 #ifdef NETDATA_INTERNAL_CHECKS
 #define rrdhost_check_rdlock(host) rrdhost_check_rdlock_int(host, __FILE__, __FUNCTION__, __LINE__)
 #define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)
+#define rrd_check_rdlock() rrd_check_rdlock_int(__FILE__, __FUNCTION__, __LINE__)
+#define rrd_check_wrlock() rrd_check_wrlock_int(__FILE__, __FUNCTION__, __LINE__)
 #else
 #define rrdhost_check_rdlock(host) (void)0
 #define rrdhost_check_wrlock(host) (void)0
+#define rrd_check_rdlock() (void)0
+#define rrd_check_wrlock() (void)0
 #endif
 
 extern void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);
 extern void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);
+
+// ----------------------------------------------------------------------------
+// global lock for all RRDHOSTs
+
+extern pthread_rwlock_t rrd_rwlock;
+#define rrd_rdlock() pthread_rwlock_rdlock(&rrd_rwlock)
+#define rrd_wrlock() pthread_rwlock_wrlock(&rrd_rwlock)
+#define rrd_unlock() pthread_rwlock_unlock(&rrd_rwlock)
+
 
 // ----------------------------------------------------------------------------
 // RRDSET functions
