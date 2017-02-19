@@ -26,6 +26,22 @@
 %undefine	with_systemd
 %endif
 
+%if 0%{?fedora}
+%global netdata_recommends \
+Recommends:	curl \
+Recommends:	iproute-tc \
+Recommends:	lm_sensors \
+Recommends:	nmap-ncat \
+Recommends:	nodejs \
+Recommends:	python \
+Recommends:	PyYAML \
+Recommends:	python2-PyMySQL \
+Recommends:	python2-psycopg2 \
+%{nil}
+%else
+%global netdata_recommends %{nil}
+%endif
+
 Summary:	Real-time performance monitoring, done right
 Name:		@PACKAGE_NAME@
 Version:	@PACKAGE_RPM_VERSION@
@@ -42,15 +58,7 @@ BuildRequires:	libuuid-devel
 Requires:	zlib
 Requires:	libuuid
 Requires(post): libcap
-Recommends:	curl
-Recommends:	iproute-tc
-Recommends:	lm_sensors
-Recommends:	nmap-ncat
-Recommends:	nodejs
-Recommends:	python
-Recommends:	PyYAML
-Recommends:	python2-PyMySQL
-Recommends:	python2-psycopg2
+%{netdata_recommends}
 
 # Packages can be found in the EPEL repo
 %if %{with nfacct}
