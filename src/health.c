@@ -1101,7 +1101,7 @@ void health_reload_host(RRDHOST *host) {
     char *path = health_config_dir();
 
     // free all running alarms
-    rrdhost_rwlock(host);
+    rrdhost_wrlock(host);
     health_free_host_nolock(host);
     rrdhost_unlock(host);
 
@@ -1120,13 +1120,13 @@ void health_reload_host(RRDHOST *host) {
     }
 
     // load the new alarms
-    rrdhost_rwlock(host);
+    rrdhost_wrlock(host);
     health_readdir(host, path);
     rrdhost_unlock(host);
 
     // link the loaded alarms to their charts
     for(st = host->rrdset_root; st ; st = st->next) {
-        rrdhost_rwlock(host);
+        rrdhost_wrlock(host);
 
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);

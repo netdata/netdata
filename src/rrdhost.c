@@ -65,7 +65,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_memory_mode     = memory_mode;
     host->health_enabled      = health_enabled;
 
-    pthread_rwlock_init(&(host->rrdset_root_rwlock), NULL);
+    pthread_rwlock_init(&(host->rrdhost_rwlock), NULL);
 
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
@@ -144,7 +144,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     health_alarm_log_load(host);
     health_alarm_log_open(host);
 
-    rrdhost_rwlock(host);
+    rrdhost_wrlock(host);
     health_readdir(host, health_config_dir());
     rrdhost_unlock(host);
 
@@ -191,45 +191,34 @@ void rrd_init(char *hostname) {
 }
 
 // ----------------------------------------------------------------------------
-// RRDHOST - locks
-
-void rrdhost_rwlock(RRDHOST *host) {
-    debug(D_RRDHOST, "Write lock host '%s'", host->hostname);
-    pthread_rwlock_wrlock(&host->rrdset_root_rwlock);
-}
-
-void rrdhost_rdlock(RRDHOST *host) {
-    debug(D_RRDHOST, "Read lock host '%s'", host->hostname);
-    pthread_rwlock_rdlock(&host->rrdset_root_rwlock);
-}
-
-void rrdhost_unlock(RRDHOST *host) {
-    debug(D_RRDHOST, "Unlock host '%s'", host->hostname);
-    pthread_rwlock_unlock(&host->rrdset_root_rwlock);
-}
+// RRDHOST - lock validations
+// there are only used when NETDATA_INTERNAL_CHECKS is set
 
 void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
-    debug(D_RRDHOST, "Read lock host '%s'", host->hostname);
+    debug(D_RRDHOST, "Checking read lock on host '%s'", host->hostname);
 
-    int ret = pthread_rwlock_trywrlock(&host->rrdset_root_rwlock);
+    int ret = pthread_rwlock_trywrlock(&host->rrdhost_rwlock);
     if(ret == 0)
         fatal("RRDHOST '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }
 
 void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
-    debug(D_RRDHOST, "Write lock host '%s'", host->hostname);
+    debug(D_RRDHOST, "Checking write lock on host '%s'", host->hostname);
 
-    int ret = pthread_rwlock_tryrdlock(&host->rrdset_root_rwlock);
+    int ret = pthread_rwlock_tryrdlock(&host->rrdhost_rwlock);
     if(ret == 0)
         fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }
+
+// ----------------------------------------------------------------------------
+// RRDHOST - free
 
 void rrdhost_free(RRDHOST *host) {
     if(!host) return;
 
     info("Freeing all memory for host '%s'...", host->hostname);
 
-    rrdhost_rwlock(host);
+    rrdhost_wrlock(host);
 
     RRDSET *st;
     for(st = host->rrdset_root; st ;) {
@@ -256,39 +245,6 @@ void rrdhost_free(RRDHOST *host) {
     info("Host memory cleanup completed...");
 }
 
-void rrdhost_save(RRDHOST *host) {
-    if(!host) return;
-
-    info("Saving host '%s' database...", host->hostname);
-
-    RRDSET *st;
-    RRDDIM *rd;
-
-    // we get a write lock
-    // to ensure only one thread is saving the database
-    rrdhost_rwlock(host);
-
-    for(st = host->rrdset_root; st ; st = st->next) {
-        pthread_rwlock_rdlock(&st->rwlock);
-
-        if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
-            debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
-            savememory(st->cache_filename, st, st->memsize);
-        }
-
-        for(rd = st->dimensions; rd ; rd = rd->next) {
-            if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
-                debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
-                savememory(rd->cache_filename, rd, rd->memsize);
-            }
-        }
-
-        pthread_rwlock_unlock(&st->rwlock);
-    }
-
-    rrdhost_unlock(host);
-}
-
 void rrdhost_free_all(void) {
     RRDHOST *host = localhost;
 
@@ -303,6 +259,42 @@ void rrdhost_free_all(void) {
     localhost = NULL;
 
     // FIXME: unlock all hosts
+}
+
+// ----------------------------------------------------------------------------
+// RRDHOST - save
+
+void rrdhost_save(RRDHOST *host) {
+    if(!host) return;
+
+    info("Saving host '%s' database...", host->hostname);
+
+    RRDSET *st;
+    RRDDIM *rd;
+
+    // we get a write lock
+    // to ensure only one thread is saving the database
+    rrdhost_wrlock(host);
+
+    for(st = host->rrdset_root; st ; st = st->next) {
+        rrdset_rdlock(st);
+
+        if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+            debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
+            savememory(st->cache_filename, st, st->memsize);
+        }
+
+        for(rd = st->dimensions; rd ; rd = rd->next) {
+            if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
+                debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
+                savememory(rd->cache_filename, rd, rd->memsize);
+            }
+        }
+
+        rrdset_unlock(st);
+    }
+
+    rrdhost_unlock(host);
 }
 
 void rrdhost_save_all(void) {

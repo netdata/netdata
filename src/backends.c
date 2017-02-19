@@ -314,7 +314,7 @@ void *backends_main(void *ptr) {
             for(st = host->rrdset_root; st; st = st->next) {
                 // for each chart
 
-                pthread_rwlock_rdlock(&st->rwlock);
+                rrdset_rdlock(st);
 
                 RRDDIM *rd;
                 for(rd = st->dimensions; rd; rd = rd->next) {
@@ -324,7 +324,7 @@ void *backends_main(void *ptr) {
                         chart_buffered_metrics += backend_request_formatter(b, prefix, host, (host == localhost)?hostname:host->hostname, st, rd, after, before, options);
                 }
 
-                pthread_rwlock_unlock(&st->rwlock);
+                rrdset_unlock(st);
             }
 
             rrdhost_unlock(host);

@@ -251,7 +251,7 @@ struct rrdset {
     char *cache_dir;                                // the directory to store dimensions
     char cache_filename[FILENAME_MAX+1];            // the filename to store this set
 
-    pthread_rwlock_t rwlock;
+    pthread_rwlock_t rrdset_rwlock;
 
     unsigned long counter;                          // the number of times we added values to this rrd
     unsigned long counter_done;                     // the number of times we added values to this rrd
@@ -300,6 +300,10 @@ struct rrdset {
 };
 typedef struct rrdset RRDSET;
 
+#define rrdset_rdlock(st) pthread_rwlock_rdlock(&((st)->rrdset_rwlock))
+#define rrdset_wrlock(st) pthread_rwlock_wrlock(&((st)->rrdset_rwlock))
+#define rrdset_unlock(st) pthread_rwlock_unlock(&((st)->rrdset_rwlock))
+
 // ----------------------------------------------------------------------------
 // RRD HOST
 
@@ -319,7 +323,8 @@ struct rrdhost {
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
 
     RRDSET *rrdset_root;                            // the host charts
-    pthread_rwlock_t rrdset_root_rwlock;            // lock for the host charts
+
+    pthread_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST
 
     avl_tree_lock rrdset_root_index;                // the host's charts index (by id)
     avl_tree_lock rrdset_root_index_name;           // the host's charts index (by name)
@@ -352,8 +357,11 @@ struct rrdhost {
     struct rrdhost *next;
 };
 typedef struct rrdhost RRDHOST;
-
 extern RRDHOST *localhost;
+
+#define rrdhost_rdlock(h) pthread_rwlock_rdlock(&((h)->rrdhost_rwlock))
+#define rrdhost_wrlock(h) pthread_rwlock_wrlock(&((h)->rrdhost_rwlock))
+#define rrdhost_unlock(h) pthread_rwlock_unlock(&((h)->rrdhost_rwlock))
 
 extern void rrd_init(char *hostname);
 
@@ -361,8 +369,8 @@ extern RRDHOST *rrdhost_find(const char *guid, uint32_t hash);
 extern RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)
 #define rrdhost_check_rdlock(host) rrdhost_check_rdlock_int(host, __FILE__, __FUNCTION__, __LINE__)
+#define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)
 #else
 #define rrdhost_check_rdlock(host) (void)0
 #define rrdhost_check_wrlock(host) (void)0
@@ -370,10 +378,6 @@ extern RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid);
 
 extern void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);
 extern void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-
-extern void rrdhost_rwlock(RRDHOST *host);
-extern void rrdhost_rdlock(RRDHOST *host);
-extern void rrdhost_unlock(RRDHOST *host);
 
 // ----------------------------------------------------------------------------
 // RRDSET functions
