@@ -69,6 +69,11 @@ netdata_SOURCES = \
 	rrdfamily.c \
 	rrdhost.c \
 	rrdset.c \
+	rrdcalc.c \
+	rrdcalctemplate.c \
+	rrdvar.c \
+	rrddimvar.c \
+	rrdsetvar.c \
 	rrd2json.c rrd2json.h \
 	storage_number.c storage_number.h \
 	unit_test.c unit_test.h \

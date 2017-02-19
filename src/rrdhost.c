@@ -3,6 +3,9 @@
 
 RRDHOST *localhost = NULL;
 
+pthread_rwlock_t rrd_rwlock = PTHREAD_RWLOCK_INITIALIZER;
+
+
 // ----------------------------------------------------------------------------
 // RRDHOST index
 
@@ -46,6 +49,7 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
     host->hash_machine_guid = simple_hash(host->machine_guid);
 }
 
+
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
@@ -74,7 +78,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
     avl_init_lock(&(host->rrdfamily_root_index), rrdfamily_compare);
     avl_init_lock(&(host->variables_root_index), rrdvar_compare);
-
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -150,10 +153,19 @@ RRDHOST *rrdhost_create(const char *hostname,
 
 
     // ------------------------------------------------------------------------
-    // add it to the index
+    // link it and add it to the index
+
+    rrd_wrlock();
+
+    if(localhost) {
+        host->next = localhost->next;
+        localhost->next = host;
+    }
 
     if(rrdhost_index_add(host) != host)
         fatal("Cannot add host '%s' to index. It already exists.", hostname);
+
+    rrd_unlock();
 
     debug(D_RRDHOST, "Added host '%s' with guid '%s'", host->hostname, host->machine_guid);
     return host;
@@ -210,6 +222,22 @@ void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *funct
         fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }
 
+void rrd_check_rdlock_int(const char *file, const char *function, const unsigned long line) {
+    debug(D_RRDHOST, "Checking read lock on all RRDs");
+
+    int ret = pthread_rwlock_trywrlock(&rrd_rwlock);
+    if(ret == 0)
+        fatal("RRDs should be read-locked, but it are not, at function %s() at line %lu of file '%s'", function, line, file);
+}
+
+void rrd_check_wrlock_int(const char *file, const char *function, const unsigned long line) {
+    debug(D_RRDHOST, "Checking write lock on all RRDs");
+
+    int ret = pthread_rwlock_tryrdlock(&rrd_rwlock);
+    if(ret == 0)
+        fatal("RRDs should be write-locked, but it are not, at function %s() at line %lu of file '%s'", function, line, file);
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - free
 
@@ -218,20 +246,44 @@ void rrdhost_free(RRDHOST *host) {
 
     info("Freeing all memory for host '%s'...", host->hostname);
 
-    rrdhost_wrlock(host);
+    rrd_check_wrlock();     // make sure the RRDs are write locked
+    rrdhost_wrlock(host);   // lock this RRDHOST
 
-    RRDSET *st;
-    for(st = host->rrdset_root; st ;) {
-        RRDSET *next = st->next;
+    // ------------------------------------------------------------------------
+    // release its children resources
 
-        rrdset_free(st);
+    while(host->rrdset_root) rrdset_free(host->rrdset_root);
 
-        st = next;
-    }
-    host->rrdset_root = NULL;
+    while(host->alarms) rrdcalc_free(host, host->alarms);
+    while(host->templates) rrdcalctemplate_free(host, host->templates);
+    health_alarm_log_free(host);
+
+
+    // ------------------------------------------------------------------------
+    // remove it from the indexes
 
     if(rrdhost_index_del(host) != host)
         error("RRDHOST '%s' removed from index, deleted the wrong entry.", host->hostname);
+
+
+    // ------------------------------------------------------------------------
+    // unlink it from the host
+
+    if(host == localhost) {
+        localhost = host->next;
+    }
+    else {
+        // find the previous one
+        RRDHOST *h;
+        for(h = localhost; h && h->next != host ; h = h->next) ;
+
+        // bypass it
+        if(h) h->next = host->next;
+        else error("Request to free RRDHOST '%s': cannot find it", host->hostname);
+    }
+
+    // ------------------------------------------------------------------------
+    // free it
 
     freez(host->cache_dir);
     freez(host->varlib_dir);
@@ -246,19 +298,9 @@ void rrdhost_free(RRDHOST *host) {
 }
 
 void rrdhost_free_all(void) {
-    RRDHOST *host = localhost;
-
-    // FIXME: lock all hosts
-
-    while(host) {
-        RRDHOST *next = host = host->next;
-        rrdhost_free(host);
-        host = next;
-    }
-
-    localhost = NULL;
-
-    // FIXME: unlock all hosts
+    rrd_wrlock();
+    while(localhost) rrdhost_free(localhost);
+    rrd_unlock();
 }
 
 // ----------------------------------------------------------------------------
@@ -300,7 +342,11 @@ void rrdhost_save(RRDHOST *host) {
 void rrdhost_save_all(void) {
     info("Saving database...");
 
+    rrd_rdlock();
+
     RRDHOST *host;
     for(host = localhost; host ; host = host->next)
         rrdhost_save(host);
+
+    rrd_unlock();
 }

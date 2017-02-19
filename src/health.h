@@ -400,16 +400,27 @@ extern void health_alarm_log(
 
 extern void health_readdir(RRDHOST *host, const char *path);
 extern char *health_config_dir(void);
-extern void health_free_host_nolock(RRDHOST *host);
 extern void health_reload_host(RRDHOST *host);
+extern void health_alarm_log_free(RRDHOST *host);
 
-#ifdef NETDATA_HEALTH_INTERNALS
-extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name);
-extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
-extern void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc);
 extern void rrdcalc_free(RRDHOST *host, RRDCALC *rc);
 extern void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
+
+#ifdef NETDATA_HEALTH_INTERNALS
+#define RRDVAR_MAX_LENGTH 1024
+
+extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name);
+extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
 extern int rrdvar_fix_name(char *variable);
-#endif
+
+extern RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
+extern void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc);
+
+extern RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, int type, void *value);
+extern void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv);
+
+extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
+
+#endif // NETDATA_HEALTH_INTERNALS
 
 #endif //NETDATA_HEALTH_H
