@@ -35,8 +35,6 @@ Group:		Applications/System
 Source0:	http://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
 URL:		http://my-netdata.io/
 %distro_buildrequires
-BuildRequires:	/usr/bin/autoconf
-BuildRequires:	/usr/bin/automake
 BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
@@ -91,7 +89,6 @@ happened, on your systems and applications.
 %setup -q
 
 %build
-./autogen.sh
 %configure \
 	--with-zlib \
 	--with-math \
