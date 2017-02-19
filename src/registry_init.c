@@ -4,7 +4,14 @@ int registry_init(void) {
     char filename[FILENAME_MAX + 1];
 
     // registry enabled?
-    registry.enabled = config_get_boolean("registry", "enabled", 0);
+    if(!central_netdata_to_push_data) {
+        registry.enabled = config_get_boolean("registry", "enabled", 0);
+    }
+    else {
+        info("Registry is disabled - use the central netdata");
+        config_set_boolean("registry", "enabled", 0);
+        registry.enabled = 0;
+    }
 
     // pathnames
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);

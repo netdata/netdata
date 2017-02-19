@@ -128,11 +128,13 @@ static inline int process_opentsdb_response(BUFFER *b) {
 }
 
 void *backends_main(void *ptr) {
+    int default_port = 0;
+    int sock = -1;
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
-    int (*backend_request_formatter)(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) = NULL;
-    int (*backend_response_checker)(BUFFER *b) = NULL;
+    int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, uint32_t) = NULL;
+    int (*backend_response_checker)(BUFFER *) = NULL;
 
     info("BACKEND thread created with task id %d", gettid());
 
@@ -145,12 +147,15 @@ void *backends_main(void *ptr) {
     // ------------------------------------------------------------------------
     // collect configuration options
 
+    if(central_netdata_to_push_data) {
+        info("Backend is disabled - use the central netdata");
+        goto cleanup;
+    }
+
     struct timeval timeout = {
             .tv_sec = 0,
             .tv_usec = 0
     };
-    int default_port = 0;
-    int sock = -1;
     uint32_t options;
     int enabled             = config_get_boolean("backend", "enabled", 0);
     const char *source      = config_get("backend", "data source", "average");
@@ -398,26 +403,11 @@ void *backends_main(void *ptr) {
 
         if(unlikely(sock == -1)) {
             usec_t start_ut = now_monotonic_usec();
-            const char *s = destination;
-            while(*s) {
-                const char *e = s;
+            size_t reconnects = 0;
 
-                // skip separators, moving both s(tart) and e(nd)
-                while(isspace(*e) || *e == ',') s = ++e;
+            sock = connect_to_one_of(destination, default_port, &timeout, &reconnects);
 
-                // move e(nd) to the first separator
-                while(*e && !isspace(*e) && *e != ',') e++;
-
-                // is there anything?
-                if(!*s || s == e) break;
-
-                char buf[e - s + 1];
-                strncpyz(buf, s, e - s);
-                chart_backend_reconnects++;
-                sock = connect_to(buf, default_port, &timeout);
-                if(sock != -1) break;
-                s = e;
-            }
+            chart_backend_reconnects += reconnects;
             chart_backend_latency += now_monotonic_usec() - start_ut;
         }
 

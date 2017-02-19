@@ -164,7 +164,10 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
 
     // prevent incremental calculation spikes
     rd->counter = 0;
+
     rrddim_flag_clear(rd, RRDDIM_FLAG_UPDATED);
+    rrddim_flag_clear(rd, RRDDIM_FLAG_EXPOSED);
+
     rd->calculated_value = 0;
     rd->last_calculated_value = 0;
     rd->collected_value = 0;

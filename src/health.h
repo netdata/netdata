@@ -1,7 +1,7 @@
 #ifndef NETDATA_HEALTH_H
 #define NETDATA_HEALTH_H
 
-extern int default_localhost_health_enabled;
+extern int default_health_enabled;
 
 extern int rrdvar_compare(void *a, void *b);
 

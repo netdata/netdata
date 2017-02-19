@@ -1672,9 +1672,7 @@ int validate_stream_api_key(const char *key) {
 }
 
 int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
-    (void)host;
-
-    info("STREAM request from client '%s:%s'", w->client_ip, w->client_port);
+    info("STREAM request from client '%s:%s' for host '%s'", w->client_ip, w->client_port, host->hostname);
 
     char *key = NULL;
 
@@ -1706,7 +1704,7 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
 
     struct plugind cd = {
             .enabled = 1,
-            .update_every = default_localhost_rrd_update_every,
+            .update_every = default_rrd_update_every,
             .pid = 0,
             .serial_failures = 0,
             .successful_collections = 0,
@@ -1735,7 +1733,7 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     // call the plugins.d processor to receive the metrics
-    size_t count = pluginsd_process(&cd, fp, 1);
+    size_t count = pluginsd_process(host, &cd, fp, 1);
     error("STREAM from '%s:%s': client disconnected.", w->client_ip, w->client_port);
 
     // close all sockets, to let the socket worker we are done

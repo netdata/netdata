@@ -83,7 +83,7 @@ static int pluginsd_split_words(char *str, char **words, int max_words) {
     return i;
 }
 
-inline size_t pluginsd_process(struct plugind *cd, FILE *fp, int trust_durations) {
+inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations) {
     int enabled = cd->enabled;
 
     if(!fp || !enabled) {
@@ -92,7 +92,6 @@ inline size_t pluginsd_process(struct plugind *cd, FILE *fp, int trust_durations
     }
 
     size_t count = 0;
-    RRDHOST *host = localhost;
 
     char line[PLUGINSD_LINE_MAX + 1];
 
@@ -365,7 +364,7 @@ void *pluginsd_worker_thread(void *arg) {
 
         info("PLUGINSD: '%s' running on pid %d", cd->fullfilename, cd->pid);
 
-        count = pluginsd_process(cd, fp, 0);
+        count = pluginsd_process(localhost, cd, fp, 0);
         error("PLUGINSD: plugin '%s' disconnected.", cd->fullfilename);
 
         killpid(cd->pid, SIGTERM);
