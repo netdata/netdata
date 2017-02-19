@@ -97,23 +97,23 @@ happened, on your systems and applications.
 %{__make} %{?_smp_mflags}
 
 %install
-rm -rf $RPM_BUILD_ROOT
-%{__make} %{?_smp_mflags} DESTDIR=$RPM_BUILD_ROOT install
+rm -rf "${RPM_BUILD_ROOT}"
+%{__make} %{?_smp_mflags} DESTDIR="${RPM_BUILD_ROOT}" install
 
-find $RPM_BUILD_ROOT -name .keep -delete
+find "${RPM_BUILD_ROOT}" -name .keep -delete
 
-install -m 644 -p system/netdata.conf $RPM_BUILD_ROOT%{_sysconfdir}/%{name}
-install -d $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
-install -m 644 -p system/netdata.logrotate $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/%{name}
+install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
+install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
 
 %if %{with systemd}
-install -d $RPM_BUILD_ROOT%{_unitdir}
-install -m 644 -p system/netdata.service $RPM_BUILD_ROOT%{_unitdir}/netdata.service
+install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
+install -m 644 -p system/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
 %else
 # install SYSV init stuff
-install -d $RPM_BUILD_ROOT/etc/rc.d/init.d
-install -m755 system/netdata-init-d \
-        $RPM_BUILD_ROOT/etc/rc.d/init.d/netdata
+install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"
+install -m 755 system/netdata-init-d \
+        "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
 %endif
 
 %if %{with systemd}
@@ -170,7 +170,7 @@ exit 0
 %endif
 
 %clean
-rm -rf $RPM_BUILD_ROOT
+rm -rf "${RPM_BUILD_ROOT}"
 
 %files
 %doc README.md
