@@ -318,7 +318,7 @@ void rrdhost_save(RRDHOST *host) {
     // to ensure only one thread is saving the database
     rrdhost_wrlock(host);
 
-    for(st = host->rrdset_root; st ; st = st->next) {
+    rrdset_foreach_write(st, host) {
         rrdset_rdlock(st);
 
         if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
@@ -326,7 +326,7 @@ void rrdhost_save(RRDHOST *host) {
             savememory(st->cache_filename, st, st->memsize);
         }
 
-        for(rd = st->dimensions; rd ; rd = rd->next) {
+        rrddim_foreach_read(rd, st) {
             if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
                 debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
                 savememory(rd->cache_filename, rd, rd->memsize);
@@ -345,7 +345,7 @@ void rrdhost_save_all(void) {
     rrd_rdlock();
 
     RRDHOST *host;
-    for(host = localhost; host ; host = host->next)
+    rrdhost_foreach_read(host)
         rrdhost_save(host);
 
     rrd_unlock();

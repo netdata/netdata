@@ -57,34 +57,37 @@ void health_reload_host(RRDHOST *host) {
             t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
     }
 
+    rrdhost_rdlock(host);
     // reset all thresholds to all charts
     RRDSET *st;
-    for(st = host->rrdset_root; st ; st = st->next) {
+    rrdset_foreach_read(st, host) {
         st->green = NAN;
         st->red = NAN;
     }
+    rrdhost_unlock(host);
 
     // load the new alarms
     rrdhost_wrlock(host);
     health_readdir(host, path);
-    rrdhost_unlock(host);
 
     // link the loaded alarms to their charts
-    for(st = host->rrdset_root; st ; st = st->next) {
-        rrdhost_wrlock(host);
-
+    rrdset_foreach_write(st, host) {
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
-
-        rrdhost_unlock(host);
     }
+
+    rrdhost_unlock(host);
 }
 
 void health_reload(void) {
-    RRDHOST *host;
 
-    for(host = localhost; host ; host = host->next)
+    rrd_rdlock();
+
+    RRDHOST *host;
+    rrdhost_foreach_read(host)
         health_reload_host(host);
+
+    rrd_unlock();
 }
 
 // ----------------------------------------------------------------------------
@@ -348,8 +351,10 @@ void *health_main(void *ptr) {
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
 
+        rrd_rdlock();
+
         RRDHOST *host;
-        for(host = localhost; host ; host = host->next) {
+        rrdhost_foreach_read(host) {
             if(unlikely(!host->health_enabled)) continue;
 
             rrdhost_rdlock(host);
@@ -595,6 +600,8 @@ void *health_main(void *ptr) {
                 break;
 
         } /* host loop */
+
+        rrd_unlock();
 
         if(unlikely(pthread_setcancelstate(oldstate, NULL) != 0))
             error("Cannot set pthread cancel state to RESTORE (%d).", oldstate);

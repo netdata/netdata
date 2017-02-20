@@ -43,7 +43,7 @@ void rrd_stats_api_v1_chart_with_data(RRDSET *st, BUFFER *wb, size_t *dimensions
 
     size_t dimensions = 0;
     RRDDIM *rd;
-    for(rd = st->dimensions; rd ; rd = rd->next) {
+    rrddim_foreach_read(rd, st) {
         if(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) continue;
 
         memory += rd->memsize;
@@ -97,8 +97,9 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb)
         , host->rrd_history_entries
         );
 
+    c = 0;
     rrdhost_rdlock(host);
-    for(st = host->rrdset_root, c = 0; st ; st = st->next) {
+    rrdset_foreach_read(st, host) {
         if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
             if(c) buffer_strcat(wb, ",");
             buffer_strcat(wb, "\n\t\t\"");
@@ -157,7 +158,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
 
     // for each chart
     RRDSET *st;
-    for(st = host->rrdset_root; st ; st = st->next) {
+    rrdset_foreach_read(st, host) {
         char chart[PROMETHEUS_ELEMENT_MAX + 1];
         prometheus_name_copy(chart, st->id, PROMETHEUS_ELEMENT_MAX);
 
@@ -167,7 +168,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
 
             // for each dimension
             RRDDIM *rd;
-            for(rd = st->dimensions; rd ; rd = rd->next) {
+            rrddim_foreach_read(rd, st) {
                 if(rd->counter) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     prometheus_name_copy(dimension, rd->id, PROMETHEUS_ELEMENT_MAX);
@@ -228,7 +229,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
 
     // for each chart
     RRDSET *st;
-    for(st = host->rrdset_root; st ; st = st->next) {
+    rrdset_foreach_read(st, host) {
         calculated_number total = 0.0;
         char chart[SHELL_ELEMENT_MAX + 1];
         shell_name_copy(chart, st->id, SHELL_ELEMENT_MAX);
@@ -239,7 +240,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
 
             // for each dimension
             RRDDIM *rd;
-            for(rd = st->dimensions; rd ; rd = rd->next) {
+            rrddim_foreach_read(rd, st) {
                 if(rd->counter) {
                     char dimension[SHELL_ELEMENT_MAX + 1];
                     shell_name_copy(dimension, rd->id, SHELL_ELEMENT_MAX);
@@ -350,7 +351,7 @@ unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb)
     unsigned long memory = st->memsize;
 
     RRDDIM *rd;
-    for(rd = st->dimensions; rd ; rd = rd->next) {
+    rrddim_foreach_read(rd, st) {
 
         memory += rd->memsize;
 
@@ -411,20 +412,20 @@ void rrd_stats_graph_json(RRDSET *st, char *options, BUFFER *wb)
 void rrd_stats_all_json(RRDHOST *host, BUFFER *wb)
 {
     unsigned long memory = 0;
-    long c;
+    long c = 0;
     RRDSET *st;
 
     buffer_strcat(wb, RRD_GRAPH_JSON_HEADER);
 
     rrdhost_rdlock(host);
-
-    for(st = host->rrdset_root, c = 0; st ; st = st->next) {
+    rrdset_foreach_read(st, host) {
         if(rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && st->dimensions) {
             if(c) buffer_strcat(wb, ",\n");
             memory += rrd_stats_one_json(st, NULL, wb);
             c++;
         }
     }
+    rrdhost_unlock(host);
 
     buffer_sprintf(wb, "\n\t],\n"
         "\t\"hostname\": \"%s\",\n"
@@ -437,8 +438,6 @@ void rrd_stats_all_json(RRDHOST *host, BUFFER *wb)
         , host->rrd_history_entries
         , memory
         );
-
-    rrdhost_unlock(host);
 }
 
 
@@ -544,6 +543,8 @@ static void rrdr_dump(RRDR *r)
 */
 
 void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char *dims) {
+    rrdset_check_rdlock(r->st);
+
     if(unlikely(!dims || !*dims)) return;
 
     char b[strlen(dims) + 1];
@@ -649,6 +650,8 @@ void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)
 
 uint32_t rrdr_check_options(RRDR *r, uint32_t options, const char *dims)
 {
+    rrdset_check_rdlock(r->st);
+
     (void)dims;
 
     if(options & RRDR_OPTION_NONZERO) {
@@ -684,6 +687,8 @@ uint32_t rrdr_check_options(RRDR *r, uint32_t options, const char *dims)
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t options, int string_value)
 {
+    rrdset_check_rdlock(r->st);
+
     long rows = rrdr_rows(r);
     long c, i;
     RRDDIM *rd;
@@ -865,6 +870,8 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, uint32_t format, uint32_t option
 
 static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 {
+    rrdset_check_rdlock(r->st);
+
     //info("RRD2JSON(): %s: BEGIN", r->st->id);
     int row_annotations = 0, dates, dates_with_new = 0;
     char kq[2] = "",                    // key quote
@@ -1091,6 +1098,8 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
 
 static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startline, const char *separator, const char *endline, const char *betweenlines)
 {
+    rrdset_check_rdlock(r->st);
+
     //info("RRD2CSV(): %s: BEGIN", r->st->id);
     long c, i;
     RRDDIM *d;
@@ -1196,6 +1205,8 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
 }
 
 inline static calculated_number rrdr2value(RRDR *r, long i, uint32_t options, int *all_values_are_null) {
+    rrdset_check_rdlock(r->st);
+
     long c;
     RRDDIM *d;
 
@@ -1396,7 +1407,7 @@ static RRDR *rrdr_create(RRDSET *st, long n)
     rrdr_lock_rrdset(r);
 
     RRDDIM *rd;
-    for(rd = st->dimensions ; rd ; rd = rd->next) r->d++;
+    rrddim_foreach_read(rd, st) r->d++;
 
     r->n = n;
 
@@ -1599,6 +1610,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
     // initialize them
     RRDDIM *rd;
     long c;
+    rrdset_check_rdlock(st);
     for( rd = st->dimensions, c = 0 ; rd && c < dimensions ; rd = rd->next, c++) {
         last_values[c] = 0;
         group_values[c] = (group_method == GROUP_MAX || group_method == GROUP_MIN)?NAN:0;
@@ -2036,7 +2048,7 @@ time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long points, long group,
 
     int dimensions = 0;
     RRDDIM *rd;
-    for( rd = st->dimensions ; rd ; rd = rd->next) dimensions++;
+    rrddim_foreach_read(rd, st) dimensions++;
     if(!dimensions) {
         rrdset_unlock(st);
         buffer_strcat(wb, "No dimensions yet.");

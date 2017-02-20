@@ -3,6 +3,23 @@
 
 #define RRD_DEFAULT_GAP_INTERPOLATIONS 1
 
+void rrdset_check_rdlock_int(RRDSET *st, const char *file, const char *function, const unsigned long line) {
+    debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);
+
+    int ret = pthread_rwlock_trywrlock(&st->rrdset_rwlock);
+    if(ret == 0)
+        fatal("RRDSET '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", st->id, function, line, file);
+}
+
+void rrdset_check_wrlock_int(RRDSET *st, const char *file, const char *function, const unsigned long line) {
+    debug(D_RRD_CALLS, "Checking write lock on chart '%s'", st->id);
+
+    int ret = pthread_rwlock_tryrdlock(&st->rrdset_rwlock);
+    if(ret == 0)
+        fatal("RRDSET '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", st->id, function, line, file);
+}
+
+
 // ----------------------------------------------------------------------------
 // RRDSET index
 
@@ -143,7 +160,7 @@ void rrdset_set_name(RRDSET *st, const char *name) {
 
     rrdset_wrlock(st);
     RRDDIM *rd;
-    for(rd = st->dimensions; rd ;rd = rd->next)
+    rrddim_foreach_write(rd, st)
         rrddimvar_rename_all(rd);
     rrdset_unlock(st);
 
@@ -167,7 +184,7 @@ void rrdset_reset(RRDSET *st) {
     st->counter_done = 0;
 
     RRDDIM *rd;
-    for(rd = st->dimensions; rd ; rd = rd->next) {
+    rrddim_foreach_read(rd, st) {
         rd->last_collected_time.tv_sec = 0;
         rd->last_collected_time.tv_usec = 0;
         rd->counter = 0;
@@ -674,18 +691,20 @@ void rrdset_done(RRDSET *st) {
     st->counter_done++;
 
     // calculate totals and count the dimensions
-    int dimensions;
+    int dimensions = 0;
     st->collected_total = 0;
-    for( rd = st->dimensions, dimensions = 0 ; rd ; rd = rd->next, dimensions++ )
+    rrddim_foreach_read(rd, st) {
+        dimensions++;
         if(likely(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED)))
             st->collected_total += rd->collected_value;
+    }
 
     uint32_t storage_flags = SN_EXISTS;
 
     // process all dimensions to calculate their values
     // based on the collected figures only
     // at this stage we do not interpolate anything
-    for( rd = st->dimensions ; rd ; rd = rd->next ) {
+    rrddim_foreach_read(rd, st) {
 
         if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED))) {
             rd->calculated_value = 0;
@@ -890,7 +909,7 @@ void rrdset_done(RRDSET *st) {
         st->last_updated.tv_sec = (time_t) (next_store_ut / USEC_PER_SEC);
         st->last_updated.tv_usec = 0;
 
-        for( rd = st->dimensions ; likely(rd) ; rd = rd->next ) {
+        rrddim_foreach_read(rd, st) {
             calculated_number new_value;
 
             switch(rd->algorithm) {
@@ -1035,7 +1054,7 @@ void rrdset_done(RRDSET *st) {
 
     st->last_collected_total  = st->collected_total;
 
-    for( rd = st->dimensions; rd ; rd = rd->next ) {
+    rrddim_foreach_read(rd, st) {
         if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED)))
             continue;
 

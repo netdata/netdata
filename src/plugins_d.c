@@ -107,7 +107,23 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     RRDSET *st = NULL;
     uint32_t hash;
 
-    while(likely(fgets(line, PLUGINSD_LINE_MAX, fp) != NULL)) {
+    errno = 0;
+    clearerr(fp);
+
+    if(unlikely(fileno(fp) == -1)) {
+        error("PLUGINSD: %s: file is not a valid stream.", cd->fullfilename);
+        goto cleanup;
+    }
+
+    while(!ferror(fp)) {
+        if(unlikely(netdata_exit)) break;
+
+        char *r = fgets(line, PLUGINSD_LINE_MAX, fp);
+        if(unlikely(!r)) {
+            error("PLUGINSD: %s : read failed.", cd->fullfilename);
+            break;
+        }
+
         if(unlikely(netdata_exit)) break;
 
         line[PLUGINSD_LINE_MAX] = '\0';
@@ -335,6 +351,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         }
     }
 
+cleanup:
     cd->enabled = enabled;
 
     if(likely(count)) {

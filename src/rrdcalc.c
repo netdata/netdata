@@ -285,7 +285,7 @@ inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
 
     // link it to its chart
     RRDSET *st;
-    for(st = host->rrdset_root; st ; st = st->next) {
+    rrdset_foreach_read(st, host) {
         if(rrdcalc_is_matching_this_rrdset(rc, st)) {
             rrdsetcalc_link(st, rc);
             break;

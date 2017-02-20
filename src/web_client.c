@@ -1672,7 +1672,7 @@ int validate_stream_api_key(const char *key) {
 }
 
 int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
-    info("STREAM request from client '%s:%s' for host '%s'", w->client_ip, w->client_port, host->hostname);
+    info("STREAM request from client '%s:%s', starting as host '%s'", w->client_ip, w->client_port, host->hostname);
 
     char *key = NULL;
 
@@ -1689,16 +1689,16 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     if(!key || !*key) {
+        error("STREAM request from client '%s:%s', without an API key. Forbidding access.", w->client_ip, w->client_port);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "You need an API key for this request.");
-        error("STREAM request from client '%s:%s', without an API key. Forbidding access.", w->client_ip, w->client_port);
         return 401;
     }
 
     if(!validate_stream_api_key(key)) {
+        error("STREAM request from client '%s:%s': API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your API key is not permitted access.");
-        error("STREAM request from client '%s:%s': API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
         return 401;
     }
 
@@ -1733,6 +1733,7 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     // call the plugins.d processor to receive the metrics
+    info("STREAM connecting client '%s:%s' to plugins.d.", w->client_ip, w->client_port);
     size_t count = pluginsd_process(host, &cd, fp, 1);
     error("STREAM from '%s:%s': client disconnected.", w->client_ip, w->client_port);
 
@@ -2188,12 +2189,16 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         if(unlikely(hash == hash_localhost && !strcmp(tok, "localhost")))
             return web_client_process_url(localhost, w, url);
 
+        rrd_rdlock();
         RRDHOST *h;
-        for(h = localhost; h; h = h->next) {
+        rrdhost_foreach_read(h) {
             if(unlikely((hash == h->hash_hostname && !strcmp(tok, h->hostname)) ||
-                        (hash == h->hash_machine_guid && !strcmp(tok, h->machine_guid))))
+                        (hash == h->hash_machine_guid && !strcmp(tok, h->machine_guid)))) {
+                rrd_unlock();
                 return web_client_process_url(h, w, url);
+            }
         }
+        rrd_unlock();
     }
 
     buffer_flush(w->response.data);
@@ -2301,10 +2306,11 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             debug(D_WEB_CLIENT_ACCESS, "%llu: Sending list of RRD_STATS...", w->id);
 
             buffer_flush(w->response.data);
-            RRDSET *st = host->rrdset_root;
+            RRDSET *st;
 
-            for ( ; st ; st = st->next )
-                buffer_sprintf(w->response.data, "%s\n", st->name);
+            rrdhost_rdlock(host);
+            rrdset_foreach_read(st, host) buffer_sprintf(w->response.data, "%s\n", st->name);
+            rrdhost_unlock(host);
 
             return 200;
         }
