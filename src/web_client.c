@@ -1719,9 +1719,25 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", w->client_ip, w->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", w->client_ip, w->client_port);
 
+    if(send_timeout(w->ifd, "STREAM", 6, 0, 60) != 6) {
+        error("Cannot send STREAM to netdata at %s:%s", w->client_ip, w->client_port);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "STREAM failed to reply back with STREAM");
+        return 400;
+    }
+
     // remove the non-blocking flag from the socket
     if(fcntl(w->ifd, F_SETFL, fcntl(w->ifd, F_GETFL, 0) & ~O_NONBLOCK) == -1)
         error("STREAM from '%s:%s': cannot remove the non-blocking flag from socket %d", w->client_ip, w->client_port, w->ifd);
+
+    /*
+    char buffer[1000 + 1];
+    ssize_t len;
+    while((len = read(w->ifd, buffer, 1000)) != -1) {
+        buffer[len] = '\0';
+        fprintf(stderr, "BEGIN READ %zu bytes\n%s\nEND READ\n", (size_t)len, buffer);
+    }
+    */
 
     // convert the socket to a FILE *
     FILE *fp = fdopen(w->ifd, "r");
