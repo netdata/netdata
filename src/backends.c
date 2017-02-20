@@ -102,16 +102,35 @@ static inline int format_dimension_collected_json_plaintext(BUFFER *b, const cha
         "\"prefix\":\"%s\","
         "\"hostname\":\"%s\","
 
-        "\"type\":\"%s\","
+        "\"chart_id\":\"%s\","
+        "\"chart_name\":\"%s\","
         "\"family\":\"%s\","
         "\"context\": \"%s\","
+        "\"type\":\"%s\","
         "\"units\": \"%s\","
-        "\"title\": \"%s\","
 
         "\"id\":\"%s\","
-        "\"subid\":\"%s\","
+        "\"name\":\"%s\","
         "\"value\":" COLLECTED_NUMBER_FORMAT ","
-        "\"timestamp\": %u}\n", prefix, hostname, st->type, st->family, st->context, st->units, st->title, st->id, rd->id, rd->last_collected_value, (uint32_t)rd->last_collected_time.tv_sec);
+
+        "\"timestamp\": %u}\n", 
+            prefix,
+            hostname,
+            
+            st->id,
+            st->name,
+            st->family,
+            st->context,
+            st->type,
+            st->units,
+
+            rd->id,
+            rd->name,
+            rd->last_collected_value, 
+            
+            (uint32_t)rd->last_collected_time.tv_sec
+    );
+
     return 1;
 }
 
@@ -123,16 +142,35 @@ static inline int format_dimension_stored_json_plaintext(BUFFER *b, const char *
             "\"prefix\":\"%s\","
             "\"hostname\":\"%s\","
 
-            "\"type\":\"%s\","
+            "\"chart_id\":\"%s\","
+            "\"chart_name\":\"%s\","
             "\"family\":\"%s\","
             "\"context\": \"%s\","
+            "\"type\":\"%s\","
             "\"units\": \"%s\","
-            "\"title\": \"%s\","
 
             "\"id\":\"%s\","
-            "\"subid\":\"%s\","
+            "\"name\":\"%s\","
             "\"value\":" CALCULATED_NUMBER_FORMAT ","
-            "\"timestamp\": %u}\n", prefix, hostname, st->type, st->family, st->context, st->units, st->title, st->id, rd->id, value, (uint32_t)before);
+
+            "\"timestamp\": %u}\n", 
+                prefix,
+                hostname,
+                
+                st->id,
+                st->name,
+                st->family,
+                st->context,
+                st->type,
+                st->units,
+
+                rd->id,
+                rd->name,
+                value, 
+                
+                (uint32_t)before
+        );
+        
         return 1;
     }
     return 0;
