@@ -206,3 +206,65 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
 
     return sock;
 }
+
+ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+    for(;;) {
+        struct pollfd fd = {
+                .fd = sockfd,
+                .events = POLLIN,
+                .revents = 0
+        };
+
+        errno = 0;
+        int retval = poll(&fd, 1, timeout * 1000);
+
+        if(retval == -1) {
+            // failed
+
+            if(errno == EINTR || errno == EAGAIN)
+                continue;
+
+            return -1;
+        }
+
+        if(!retval) {
+            // timeout
+            return 0;
+        }
+
+        if(fd.events & POLLIN) break;
+    }
+
+    return recv(sockfd, buf, len, flags);
+}
+
+ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+    for(;;) {
+        struct pollfd fd = {
+                .fd = sockfd,
+                .events = POLLOUT,
+                .revents = 0
+        };
+
+        errno = 0;
+        int retval = poll(&fd, 1, timeout * 1000);
+
+        if(retval == -1) {
+            // failed
+
+            if(errno == EINTR || errno == EAGAIN)
+                continue;
+
+            return -1;
+        }
+
+        if(!retval) {
+            // timeout
+            return 0;
+        }
+
+        if(fd.events & POLLOUT) break;
+    }
+
+    return send(sockfd, buf, len, flags);
+}
