@@ -19,7 +19,7 @@ static inline void rrdpush_unlock() {
 
 static inline int need_to_send_chart_definitions(RRDSET *st) {
     RRDDIM *rd;
-    for(rd = st->dimensions; rd ;rd = rd->next)
+    rrddim_foreach_read(rd, st)
         if(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED) && !rrddim_flag_check(rd, RRDDIM_FLAG_EXPOSED))
             return 1;
 
@@ -40,7 +40,7 @@ static inline void send_chart_definitions(RRDSET *st) {
     );
 
     RRDDIM *rd;
-    for(rd = st->dimensions; rd ;rd = rd->next) {
+    rrddim_foreach_read(rd, st) {
         buffer_sprintf(rrdpush_buffer, "DIMENSION '%s' '%s' '%s' " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " '%s %s'\n"
                        , rd->id
                        , rd->name
@@ -50,6 +50,7 @@ static inline void send_chart_definitions(RRDSET *st) {
                        , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
                        , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
+        rrddim_flag_set(rd, RRDDIM_FLAG_EXPOSED);
     }
 }
 
@@ -57,7 +58,7 @@ static inline void send_chart_metrics(RRDSET *st) {
     buffer_sprintf(rrdpush_buffer, "BEGIN %s %llu\n", st->id, st->usec_since_last_update);
 
     RRDDIM *rd;
-    for(rd = st->dimensions; rd ;rd = rd->next) {
+    rrddim_foreach_read(rd, st) {
         if(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED))
             buffer_sprintf(rrdpush_buffer, "SET %s = " COLLECTED_NUMBER_FORMAT "\n"
                        , rd->id
@@ -71,35 +72,39 @@ static inline void send_chart_metrics(RRDSET *st) {
 static void reset_all_charts(void) {
     rrd_rdlock();
 
-    RRDHOST *h;
-    for(h = localhost; h ;h = h->next) {
+    RRDHOST *host;
+    rrdhost_foreach_read(host) {
+        rrdhost_rdlock(host);
+
         RRDSET *st;
-        for(st = h->rrdset_root ; st ; st = st->next) {
+        rrdset_foreach_read(st, host) {
             rrdset_rdlock(st);
 
             RRDDIM *rd;
-            for(rd = st->dimensions; rd ;rd = rd->next)
+            rrddim_foreach_read(rd, st)
                 rrddim_flag_clear(rd, RRDDIM_FLAG_EXPOSED);
 
             rrdset_unlock(st);
         }
+        rrdhost_unlock(host);
     }
+    rrd_unlock();
 
     last_host = NULL;
-
-    rrd_unlock();
 }
 
 void rrdset_done_push(RRDSET *st) {
 
-    if(!rrdset_flag_check(st, RRDSET_FLAG_ENABLED))
+    if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ENABLED) || !rrdpush_buffer))
         return;
 
     rrdpush_lock();
     rrdset_rdlock(st);
 
-    if(st->rrdhost != last_host)
-        buffer_sprintf(rrdpush_buffer, "HOST '%s' '%s'\n", st->rrdhost->hostname, st->rrdhost->machine_guid);
+    if(st->rrdhost != last_host) {
+        buffer_sprintf(rrdpush_buffer, "HOST '%s' '%s'\n", st->rrdhost->machine_guid, st->rrdhost->hostname);
+        last_host = st->rrdhost;
+    }
 
     if(need_to_send_chart_definitions(st))
         send_chart_definitions(st);
@@ -139,36 +144,58 @@ void *central_netdata_push_thread(void *ptr) {
     size_t begin = 0;
     size_t max_size = 1024 * 1024;
     size_t reconnects_counter = 0;
+    size_t sent_bytes = 0;
+    size_t sent_connection = 0;
     int sock = -1;
     char buffer[1];
 
     for(;;) {
         if(unlikely(sock == -1)) {
+            info("PUSH: connecting to central netdata at: %s", central_netdata_to_push_data);
             sock = connect_to_one_of(central_netdata_to_push_data, 19999, &tv, &reconnects_counter);
 
             if(unlikely(sock != -1)) {
-                if(fcntl(sock, F_SETFL, O_NONBLOCK) < 0)
-                    error("Cannot set non-blocking mode for socket.");
+                info("PUSH: connected to central netdata at: %s", central_netdata_to_push_data);
 
-                buffer_sprintf(rrdpush_buffer, "GET /stream?key=%s\r\n\r\n", config_get("global", "central netdata api key", ""));
-                reset_all_charts();
+                if(fcntl(sock, F_SETFL, O_NONBLOCK) < 0)
+                    error("PUSH: cannot set non-blocking mode for socket.");
             }
+            else
+                error("PUSH: failed to connect to central netdata at: %s", central_netdata_to_push_data);
+
+            rrdpush_lock();
+            if(buffer_strlen(rrdpush_buffer))
+                error("PUSH: discarding %zu bytes of metrics data already in the buffer.", buffer_strlen(rrdpush_buffer));
+
+            buffer_flush(rrdpush_buffer);
+            buffer_sprintf(rrdpush_buffer, "GET /stream?key=%s HTTP/1.1\r\nUser-Agent: netdata-push-service/%s\r\nAccept: */*\r\n\r\n", config_get("global", "central netdata api key", ""), VERSION);
+            reset_all_charts();
+            rrdpush_unlock();
+            sent_connection = 0;
         }
 
         if(read(rrdpush_pipe[PIPE_READ], buffer, 1) == -1) {
-            error("Cannot read from internal pipe.");
+            error("PUSH: Cannot read from internal pipe.");
             sleep(1);
         }
 
-        if(likely(sock != -1)) {
+        if(likely(sock != -1 && begin < rrdpush_buffer->len)) {
+            // fprintf(stderr, "PUSH BEGIN\n");
+            // fwrite(&rrdpush_buffer->buffer[begin], 1, rrdpush_buffer->len - begin, stderr);
+            // fprintf(stderr, "\nPUSH END\n");
+
             rrdpush_lock();
-            ssize_t ret = send(sock, &rrdpush_buffer->buffer[begin], rrdpush_buffer->len, MSG_DONTWAIT);
+            ssize_t ret = send(sock, &rrdpush_buffer->buffer[begin], rrdpush_buffer->len - begin, MSG_DONTWAIT);
             if(ret == -1) {
-                error("Failed to send metrics to central netdata at %s", central_netdata_to_push_data);
-                close(sock);
-                sock = -1;
+                if(errno != EAGAIN) {
+                    error("PUSH: failed to send metrics to central netdata at %s. We have sent %zu bytes on this connection.", central_netdata_to_push_data, sent_connection);
+                    close(sock);
+                    sock = -1;
+                }
             }
             else {
+                sent_connection += ret;
+                sent_bytes += ret;
                 begin += ret;
                 if(begin == rrdpush_buffer->len) {
                     buffer_flush(rrdpush_buffer);
@@ -180,23 +207,15 @@ void *central_netdata_push_thread(void *ptr) {
 
         // protection from overflow
         if(rrdpush_buffer->len > max_size) {
-            rrdpush_lock();
-
-            error("Discarding %zu bytes of metrics data, because we cannot connect to central netdata at %s"
-                  , buffer_strlen(rrdpush_buffer), central_netdata_to_push_data);
-
-            buffer_flush(rrdpush_buffer);
-
+            errno = 0;
+            error("PUSH: too many data pending. Buffer is %zu bytes long, %zu unsent. We have sent %zu bytes in total, %zu on this connection. Closing connection to flush the data.", rrdpush_buffer->len, rrdpush_buffer->len - begin, sent_bytes, sent_connection);
             if(sock != -1) {
                 close(sock);
                 sock = -1;
             }
-
-            rrdpush_unlock();
         }
     }
 
-cleanup:
     debug(D_WEB_CLIENT, "Central netdata push thread exits.");
     if(sock != -1)
         close(sock);

@@ -309,31 +309,25 @@ void *backends_main(void *ptr) {
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
 
+        rrd_rdlock();
         RRDHOST *host;
-        for(host = localhost; host ; host = host->next) {
-            // for each host
-
+        rrdhost_foreach_read(host) {
             rrdhost_rdlock(host);
 
             RRDSET *st;
-            for(st = host->rrdset_root; st; st = st->next) {
-                // for each chart
-
+            rrdset_foreach_read(st, host) {
                 rrdset_rdlock(st);
 
                 RRDDIM *rd;
-                for(rd = st->dimensions; rd; rd = rd->next) {
-                    // for each dimension
-
+                rrddim_foreach_read(rd, st) {
                     if(rd->last_collected_time.tv_sec >= after)
                         chart_buffered_metrics += backend_request_formatter(b, prefix, host, (host == localhost)?hostname:host->hostname, st, rd, after, before, options);
                 }
-
                 rrdset_unlock(st);
             }
-
             rrdhost_unlock(host);
         }
+        rrd_unlock();
 
         if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
             error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
