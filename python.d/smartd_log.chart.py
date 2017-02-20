@@ -113,7 +113,7 @@ class Service(SimpleService):
         if not disks:
             self.error('Can\'t locate any smartd log files in %s' % self.log_path)
             return False
-        
+
         # List of namedtuples to track smartd log file size
         self.disks = [NAMED_DISKS(name=disks[i], size=0, number=i) for i in range(len(disks))]
 
@@ -138,7 +138,7 @@ class Service(SimpleService):
                     break
             result = f.readline()
 
-        result = result.decode(encoding='utf-8')    
+        result = result.decode()
         result = self.regex.findall(result)
 
         queue.put([basename(disk), result])
@@ -147,7 +147,7 @@ class Service(SimpleService):
         threads, result = list(), list()
         queue = Queue()
         to_netdata = dict()
-        
+
         # If the size has not changed there is no reason to poll log files.
         disks = [disk for disk in self.disks if self.size_changed(disk)]
         if disks:
@@ -166,7 +166,7 @@ class Service(SimpleService):
         for elem in result:
             for a, n, r in elem[1]:
                 to_netdata.update({'_'.join([elem[0], a]): r if self.raw_values else n})
-        
+
         self.previous_data.update(to_netdata)
 
         return to_netdata or None
@@ -185,7 +185,7 @@ class Service(SimpleService):
         except OSError:
             # Remove unreadable/nonexisting log files from list of disks and previous_data
             self.disks.remove(disk)
-            self.previous_data = {k: v for k, v in self.previous_data.items() if basename(disk.name) not in k}
+            self.previous_data = dict([(k, v) for k, v in self.previous_data.items() if basename(disk.name) not in k])
             return False
 
     def create_charts(self):
@@ -206,7 +206,7 @@ class Service(SimpleService):
         self.definitions = dict()
         units = 'raw' if self.raw_values else 'normalized'
 
-        for k, v in {k: v for k, v in SMART_ATTR.items() if k in ORDER}.items():
+        for k, v in dict([(k, v) for k, v in SMART_ATTR.items() if k in ORDER]).items():
             self.definitions.update({''.join(['attrid', k]): {
                                       'options': [None, v, units, v, 'smartd.attrid' + k, 'line'],
                                        'lines': create_lines(k)}})
