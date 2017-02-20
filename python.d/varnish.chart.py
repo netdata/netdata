@@ -152,10 +152,10 @@ class Service(SimpleService):
             return None
 
         # 1. ALL data from 'varnishstat -1'. t - type(MAIN, MEMPOOL etc)
-        to_netdata = {k: int(v) for t, k, v in data_all}
+        to_netdata = dict([(k, int(v)) for t, k, v in data_all])
         
         # 2. ADD backend statistics
-        to_netdata.update({'_'.join([n, k]): int(v) for n, k, v in data_backend})
+        to_netdata.update(dict([('_'.join([n, k]), int(v)) for n, k, v in data_backend]))
 
         # 3. ADD additional keys to dict
         # 3.1 Cache hit/miss/hitpass OVERALL in percent
