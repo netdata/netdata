@@ -50,15 +50,15 @@ class Service(SimpleService):
         if not run_rndc.returncode:
             # 'rndc' was found, stats file is exist and readable and we can run 'rndc stats'. Lets go!
             self.create_charts()
-            
+
             # BIND APPEND dump on every run 'rndc stats'
             # that is why stats file size can be VERY large if update_interval too small
             dump_size_24hr = round(86400 / self.update_every * (int(size_after) - int(size_before)) / 1048576, 3)
-            
+
             # If update_every too small we should WARN user
             if self.update_every < 30:
                 self.info('Update_every %s is NOT recommended for use. Increase the value to > 30' % self.update_every)
-            
+
             self.info('With current update_interval it will be + %s MB every 24hr. '
                       'Don\'t forget to create logrotate conf file for %s' % (dump_size_24hr, self.named_stats_path))
 
@@ -77,12 +77,11 @@ class Service(SimpleService):
                        named.stats file size
                       )
         """
-
         try:
             current_size = getsize(self.named_stats_path)
         except OSError:
             return None, None
-        
+
         run_rndc = Popen([self.rndc, 'stats'], shell=False)
         run_rndc.wait()
 
@@ -110,7 +109,7 @@ class Service(SimpleService):
             return None
 
         rndc_stats = dict()
-        
+
         # Result: dict.
         # topic = Cache DB RRsets; body = A 178303 NS 86790 ... ; desc = A; value = 178303
         # {'Cache DB RRsets': [('A', 178303), ('NS', 286790), ...],
@@ -119,14 +118,14 @@ class Service(SimpleService):
         for regex in self.regex_options:
             rndc_stats.update({topic: [(desc, int(value)) for value, desc in self.regex_values.findall(body)]
                                for topic, body in findall(regex, raw_data)})
-        
+
         nms = dict(rndc_stats.get('Name Server Statistics', []))
 
-        inc_queries = {'i' + k: 0 for k in QUERIES}
-        inc_queries.update({'i' + k: v for k, v in rndc_stats.get('Incoming Queries', [])})
-        out_queries = {'o' + k: 0 for k in QUERIES}
-        out_queries.update({'o' + k: v for k, v in rndc_stats.get('Outgoing Queries', [])})
-        
+        inc_queries = dict([('i' + k, 0) for k in QUERIES])
+        inc_queries.update(dict([('i' + k, v) for k, v in rndc_stats.get('Incoming Queries', [])]))
+        out_queries = dict([('o' + k, 0) for k in QUERIES])
+        out_queries.update(dict([('o' + k, v) for k, v in rndc_stats.get('Outgoing Queries', [])]))
+
         to_netdata = dict()
         to_netdata['requests'] = sum([v for k, v in nms.items() if 'request' in k and 'received' in k])
         to_netdata['responses'] = sum([v for k, v in nms.items() if 'responses' in k and 'sent' in k])
@@ -140,7 +139,7 @@ class Service(SimpleService):
         to_netdata['duplicate'] = nms.get('duplicate queries received', 0)
         to_netdata['rejections'] = nms.get('recursive queries rejected', 0)
         to_netdata['stats_size'] = size
-        
+
         to_netdata.update(inc_queries)
         to_netdata.update(out_queries)
         return to_netdata

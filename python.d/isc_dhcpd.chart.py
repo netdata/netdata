@@ -48,7 +48,7 @@ class Service(SimpleService):
             except (ValueError, IndexError, AttributeError, SyntaxError) as e:
                 self.error('Pools configurations is incorrect', str(e))
                 return False
-            
+
             # Creating static charts
             self.order = ['parse_time', 'leases_size', 'utilization', 'total']
             self.definitions = {'utilization':
@@ -109,12 +109,11 @@ class Service(SimpleService):
         :return: dict
         """
         raw_leases = self._get_raw_data()
-        
         if not raw_leases:
             return None
 
         # Result: {ipaddress: end lease time, ...}
-        all_leases = {k[6:len(k)-3]:v[7:len(v)-2] for k, v in raw_leases[0].items()}
+        all_leases = dict([(k[6:len(k)-3], v[7:len(v)-2]) for k, v in raw_leases[0].items()])
 
         # Result: [active binding, active binding....]. (Expire time (ends date;) - current time > 0)
         active_leases = [k for k, v in all_leases.items() if is_binding_active(all_leases[k])]
@@ -132,9 +131,9 @@ class Service(SimpleService):
                       for pool in self.pools}
 
         # Bulding dicts to send to netdata
-        final_count = {''.join(['le_', k]): v for k, v in pools_count.items()}
-        final_util = {''.join(['ut_', k]): v for k, v in pools_util.items()}
-        
+        final_count = dict([(''.join(['le_', k]), v) for k, v in pools_count.items()])
+        final_util = dict([(''.join(['ut_', k]), v) for k, v in pools_util.items()])
+
         to_netdata = {'total': len(active_leases)}
         to_netdata.update({'lsize': int(stat(self.leases_path)[6] / 1024)})
         to_netdata.update({'ptime': int(raw_leases[1])})
