@@ -26,11 +26,6 @@ void health_init(void) {
         config_set_boolean("health", "enabled", 0);
         default_health_enabled = 0;
     }
-
-    char pathname[FILENAME_MAX + 1];
-    snprintfz(pathname, FILENAME_MAX, "%s/health", netdata_configured_varlib_dir);
-    if(mkdir(pathname, 0770) == -1 && errno != EEXIST)
-        fatal("Cannot create directory '%s'.", pathname);
 }
 
 // ----------------------------------------------------------------------------
