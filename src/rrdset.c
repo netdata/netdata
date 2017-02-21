@@ -529,26 +529,40 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 //        usec_t now_usec = timeval_usec(&now);
 //        usec_t last_usec = timeval_usec(&st->last_collected_time);
 //#endif
-        usec_t since_last_usec = dt_usec(&now, &st->last_collected_time);
+        susec_t since_last_usec = dt_usec_signed(&now, &st->last_collected_time);
+
+        if(unlikely(since_last_usec < 0)) {
+            // oops! the database is in the future
+            error("Database for chart '%s' on host '%s' is %lld microseconds in the future.", st->id, st->rrdhost->hostname, -since_last_usec);
+            memcpy(&st->last_collected_time, &now, sizeof(struct timeval));
+            st->last_collected_time.tv_sec -= st->update_every;
+
+            memcpy(&st->last_updated, &now, sizeof(struct timeval));
+            timeval_align(&st->last_updated, st->update_every);
+            st->last_updated.tv_sec -= st->update_every;
+
+            microseconds = st->update_every * USEC_PER_SEC;
+            since_last_usec = st->update_every * USEC_PER_SEC;
+        }
 
         // verify the microseconds given is good
-        if(unlikely(microseconds > since_last_usec)) {
-            debug(D_RRD_CALLS, "dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
+        if(unlikely(microseconds > (usec_t)since_last_usec)) {
+            debug(D_RRD_CALLS, "dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - (usec_t)since_last_usec, st->name, st->id);
 
 //#ifdef NETDATA_INTERNAL_CHECKS
 //            if(unlikely(last_usec + microseconds > now_usec + 1000))
-//                error("dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - since_last_usec, st->name, st->id);
+//                error("dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - (usec_t)since_last_usec, st->name, st->id);
 //#endif
 
-            microseconds = since_last_usec;
+            microseconds = (usec_t)since_last_usec;
         }
-        else if(unlikely(microseconds < since_last_usec * 0.8)) {
-            debug(D_RRD_CALLS, "dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
+        else if(unlikely(microseconds < (usec_t)since_last_usec * 0.8)) {
+            debug(D_RRD_CALLS, "dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, (usec_t)since_last_usec, st->name, st->id);
 
 //#ifdef NETDATA_INTERNAL_CHECKS
-//            error("dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, since_last_usec, st->name, st->id);
+//            error("dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, (usec_t)since_last_usec, st->name, st->id);
 //#endif
-            microseconds = since_last_usec;
+            microseconds = (usec_t)since_last_usec;
         }
     }
     debug(D_RRD_CALLS, "rrdset_next_usec() for chart %s with microseconds %llu", st->name, microseconds);
@@ -596,6 +610,9 @@ static inline void rrdset_done_push_int(RRDSET *st) {
     }
 
     rrdset_done_push(st);
+
+    st->counter++;
+    st->counter_done++;
 }
 
 void rrdset_done(RRDSET *st) {

@@ -60,7 +60,7 @@ static inline void send_chart_definition(RRDSET *st) {
 }
 
 static inline void send_chart_metrics(RRDSET *st) {
-    buffer_sprintf(rrdpush_buffer, "BEGIN %s %llu\n", st->id, st->usec_since_last_update);
+    buffer_sprintf(rrdpush_buffer, "BEGIN %s %llu\n", st->id, (st->counter_done > 60)?st->usec_since_last_update:0);
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
@@ -83,6 +83,11 @@ static void reset_all_charts(void) {
 
         RRDSET *st;
         rrdset_foreach_read(st, host) {
+
+            // make it re-align the current time
+            // on the remote host
+            st->counter_done = 0;
+
             rrdset_rdlock(st);
 
             RRDDIM *rd;
