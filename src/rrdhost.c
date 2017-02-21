@@ -60,7 +60,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         RRD_MEMORY_MODE memory_mode,
         int health_enabled) {
 
-    debug(D_RRDHOST, "Adding host '%s' with guid '%s'", hostname, guid);
+    debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
@@ -90,7 +90,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     long n = config_get_number("health", "in memory max health log entries", host->health_log.max);
     if(n < 10) {
-        error("Health configuration has invalid max log entries %ld. Using default %u", n, host->health_log.max);
+        error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", host->hostname, n, host->health_log.max);
         config_set_number("health", "in memory max health log entries", (long)host->health_log.max);
     }
     else
@@ -119,7 +119,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
             int r = mkdir(host->cache_dir, 0775);
             if(r != 0 && errno != EEXIST)
-                error("Cannot create directory '%s'", host->cache_dir);
+                error("Host '%s': cannot create directory '%s'", host->hostname, host->cache_dir);
         }
 
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_varlib_dir, host->machine_guid);
@@ -128,8 +128,13 @@ RRDHOST *rrdhost_create(const char *hostname,
         if(host->health_enabled) {
             int r = mkdir(host->varlib_dir, 0775);
             if(r != 0 && errno != EEXIST)
-                error("Cannot create directory '%s'", host->varlib_dir);
+                error("Host '%s': cannot create directory '%s'", host->hostname, host->varlib_dir);
         }
+
+        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
+        int r = mkdir(filename, 0775);
+        if(r != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", host->hostname, filename);
 
         snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
         host->health_log_filename = strdupz(filename);
@@ -163,11 +168,11 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
 
     if(rrdhost_index_add(host) != host)
-        fatal("Cannot add host '%s' to index. It already exists.", hostname);
+        fatal("Host '%s': cannot add host to index. It already exists.", hostname);
 
     rrd_unlock();
 
-    debug(D_RRDHOST, "Added host '%s' with guid '%s'", host->hostname, host->machine_guid);
+    debug(D_RRDHOST, "Host '%s', added with guid '%s'", host->hostname, host->machine_guid);
     return host;
 }
 
