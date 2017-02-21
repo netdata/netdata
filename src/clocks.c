@@ -74,6 +74,14 @@ inline usec_t timeval_usec(struct timeval *tv) {
     return (usec_t)tv->tv_sec * USEC_PER_SEC + tv->tv_usec;
 }
 
+inline susec_t dt_usec_signed(struct timeval *now, struct timeval *old) {
+    usec_t ts1 = timeval_usec(now);
+    usec_t ts2 = timeval_usec(old);
+
+    if(likely(ts1 >= ts2)) return (susec_t)(ts1 - ts2);
+    return -((susec_t)(ts2 - ts1));
+}
+
 inline usec_t dt_usec(struct timeval *now, struct timeval *old) {
     usec_t ts1 = timeval_usec(now);
     usec_t ts2 = timeval_usec(old);

@@ -13,6 +13,7 @@ typedef int clockid_t;
 #endif
 
 typedef unsigned long long usec_t;
+typedef long long susec_t;
 
 typedef usec_t heartbeat_t;
 
@@ -94,6 +95,7 @@ extern usec_t now_boottime_usec(void);
 
 extern usec_t timeval_usec(struct timeval *ts);
 extern usec_t dt_usec(struct timeval *now, struct timeval *old);
+extern susec_t dt_usec_signed(struct timeval *now, struct timeval *old);
 
 extern void heartbeat_init(heartbeat_t *hb);
 
