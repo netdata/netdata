@@ -2828,6 +2828,8 @@ void *web_client_main(void *ptr)
     log_access("%llu: %s port %s connected on thread task id %d", w->id, w->client_ip, w->client_port, gettid());
 
     for(;;) {
+        if(unlikely(netdata_exit)) break;
+
         if(unlikely(w->dead)) {
             debug(D_WEB_CLIENT, "%llu: client is dead.", w->id);
             break;
@@ -2879,6 +2881,8 @@ void *web_client_main(void *ptr)
         timeout = web_client_timeout * 1000;
         retval = poll(fds, fdmax, timeout);
 
+        if(unlikely(netdata_exit)) break;
+
         if(unlikely(retval == -1)) {
             if(errno == EAGAIN || errno == EINTR) {
                 debug(D_WEB_CLIENT, "%llu: EAGAIN received.", w->id);
@@ -2893,6 +2897,8 @@ void *web_client_main(void *ptr)
             break;
         }
 
+        if(unlikely(netdata_exit)) break;
+
         int used = 0;
         if(w->wait_send && ofd->revents & POLLOUT) {
             used++;
@@ -2901,6 +2907,8 @@ void *web_client_main(void *ptr)
                 break;
             }
         }
+
+        if(unlikely(netdata_exit)) break;
 
         if(w->wait_receive && (ifd->revents & POLLIN || ifd->revents & POLLPRI)) {
             used++;
