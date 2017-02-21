@@ -355,6 +355,16 @@ static const char *verify_required_directory(const char *dir) {
     return dir;
 }
 
+static void get_netdata_configured_directories() {
+    netdata_configured_config_dir  = config_get("global", "config directory",    CONFIG_DIR);
+    netdata_configured_log_dir     = config_get("global", "log directory",       LOG_DIR);
+    netdata_configured_plugins_dir = config_get("global", "plugins directory",   PLUGINS_DIR);
+    netdata_configured_web_dir     = config_get("global", "web files directory", WEB_DIR);
+    netdata_configured_cache_dir   = config_get("global", "cache directory",     CACHE_DIR);
+    netdata_configured_varlib_dir  = config_get("global", "lib directory",       VARLIB_DIR);
+    netdata_configured_home_dir    = config_get("global", "home directory",      CACHE_DIR);
+}
+
 int main(int argc, char **argv) {
     char *hostname = "localhost";
     int i, check_config = 0;
@@ -464,6 +474,10 @@ int main(int argc, char **argv) {
                         char* debug_flags_string = "debug_flags=";
                         if(strcmp(optarg, "unittest") == 0) {
                             default_rrd_update_every = 1;
+                            if(!config_loaded) load_config(NULL, 0);
+                            get_netdata_configured_directories();
+                            registry_init();
+                            rrd_init("unittest");
                             if(run_all_mockup_tests()) exit(1);
                             if(unit_test_storage()) exit(1);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
@@ -555,13 +569,7 @@ int main(int argc, char **argv) {
 
         // prepare configuration environment variables for the plugins
 
-        netdata_configured_config_dir  = config_get("global", "config directory",    CONFIG_DIR);
-        netdata_configured_log_dir     = config_get("global", "log directory",       LOG_DIR);
-        netdata_configured_plugins_dir = config_get("global", "plugins directory",   PLUGINS_DIR);
-        netdata_configured_web_dir     = config_get("global", "web files directory", WEB_DIR);
-        netdata_configured_cache_dir   = config_get("global", "cache directory",     CACHE_DIR);
-        netdata_configured_varlib_dir  = config_get("global", "lib directory",       VARLIB_DIR);
-        netdata_configured_home_dir    = config_get("global", "home directory",      CACHE_DIR);
+        get_netdata_configured_directories();
 
         setenv("NETDATA_CONFIG_DIR" , verify_required_directory(netdata_configured_config_dir),  1);
         setenv("NETDATA_PLUGINS_DIR", verify_required_directory(netdata_configured_plugins_dir), 1);
