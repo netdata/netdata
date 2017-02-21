@@ -7,6 +7,10 @@
 
 #include "common.h"
 
+#ifdef __FreeBSD__
+#include <sys/user.h>
+#endif
+
 // ----------------------------------------------------------------------------
 // per O/S configuration
 
@@ -19,8 +23,11 @@
 // set this to 1
 // when set to 0, apps.plugin builds a sort list of processes, in order
 // to process children processes, before parent processes
+#ifdef __FreeBSD__
+#define ALL_PIDS_ARE_READ_INSTANTLY 1
+#else
 #define ALL_PIDS_ARE_READ_INSTANTLY 0
-
+#endif
 
 // ----------------------------------------------------------------------------
 // string lengths
@@ -774,6 +781,17 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
 
 static inline int read_proc_pid_cmdline(struct pid_stat *p) {
 
+#ifdef __FreeBSD__
+    size_t i, bytes = MAX_CMDLINE;
+    int mib[4];
+
+    mib[0] = CTL_KERN;
+    mib[1] = KERN_PROC;
+    mib[2] = KERN_PROC_ARGS;
+    mib[3] = p->pid;
+    if (unlikely(sysctl(mib, 4, p->cmdline, &bytes, NULL, 0)))
+        goto cleanup;
+#else
     if(unlikely(!p->cmdline_filename)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
@@ -787,6 +805,7 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
     close(fd);
 
     if(unlikely(bytes < 0)) goto cleanup;
+#endif
 
     p->cmdline[bytes] = '\0';
     for(i = 0; i < bytes ; i++)
@@ -805,7 +824,14 @@ cleanup:
 
 static inline int read_proc_pid_ownership(struct pid_stat *p, void *ptr) {
     (void)ptr;
+#ifdef __FreeBSD__
+    struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
 
+    p->uid = proc_info->ki_uid;
+    p->gid = proc_info->ki_groups[0];
+
+    return 1;
+#else
     if(unlikely(!p->stat_filename)) {
         error("pid %d does not have a stat_filename", p->pid);
         return 0;
@@ -824,6 +850,7 @@ static inline int read_proc_pid_ownership(struct pid_stat *p, void *ptr) {
     p->gid = st.st_gid;
 
     return 1;
+#endif
 }
 
 // ----------------------------------------------------------------------------
@@ -847,6 +874,12 @@ static inline int read_proc_pid_ownership(struct pid_stat *p, void *ptr) {
 static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     (void)ptr;
 
+#ifdef __FreeBSD__
+    struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
+
+    if (unlikely(proc_info->ki_tdflags & TDF_IDLETD))
+        goto cleanup;
+#else
     static procfile *ff = NULL;
 
     if(unlikely(!p->stat_filename)) {
@@ -866,11 +899,16 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
+#endif
 
     p->last_stat_collected_usec = p->stat_collected_usec;
     p->stat_collected_usec = now_monotonic_usec();
     calls_counter++;
 
+#ifdef __FreeBSD__
+    char *comm          = proc_info->ki_comm;
+    p->ppid             = proc_info->ki_ppid;
+#else
     // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0));
     char *comm          = procfile_lineword(ff, 0, 1);
     // p->state         = *(procfile_lineword(ff, 0, 2));
@@ -880,6 +918,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->tty_nr        = (int32_t)str2pid_t(procfile_lineword(ff, 0, 6));
     // p->tpgid         = (int32_t)str2pid_t(procfile_lineword(ff, 0, 7));
     // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
+#endif
 
     if(strcmp(p->comm, comm)) {
         if(unlikely(debug)) {
@@ -898,6 +937,23 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
         assign_target_to_pid(p);
     }
 
+#ifdef __FreeBSD__
+    pid_incremental_rate(stat, p->minflt,  (kernel_uint_t)proc_info->ki_rusage.ru_minflt);
+    pid_incremental_rate(stat, p->cminflt, (kernel_uint_t)proc_info->ki_rusage_ch.ru_minflt);
+    pid_incremental_rate(stat, p->majflt,  (kernel_uint_t)proc_info->ki_rusage.ru_majflt);
+    pid_incremental_rate(stat, p->cmajflt, (kernel_uint_t)proc_info->ki_rusage_ch.ru_majflt);
+    pid_incremental_rate(stat, p->utime,   (kernel_uint_t)proc_info->ki_rusage.ru_utime.tv_sec * 100 + proc_info->ki_rusage.ru_utime.tv_usec / 10000);
+    pid_incremental_rate(stat, p->stime,   (kernel_uint_t)proc_info->ki_rusage.ru_stime.tv_sec * 100 + proc_info->ki_rusage.ru_stime.tv_usec / 10000);
+    pid_incremental_rate(stat, p->cutime,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_utime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_utime.tv_usec / 10000);
+    pid_incremental_rate(stat, p->cstime,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_stime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_utime.tv_usec / 10000);
+
+    p->num_threads      = proc_info->ki_numthreads;
+
+    if(enable_guest_charts) {
+        enable_guest_charts = 0;
+        info("Guest charts aren't supported by FreeBSD");
+    }
+#else
     pid_incremental_rate(stat, p->minflt,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
     pid_incremental_rate(stat, p->cminflt, str2kernel_uint_t(procfile_lineword(ff, 0, 10)));
     pid_incremental_rate(stat, p->majflt,  str2kernel_uint_t(procfile_lineword(ff, 0, 11)));
@@ -906,7 +962,6 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     pid_incremental_rate(stat, p->stime,   str2kernel_uint_t(procfile_lineword(ff, 0, 14)));
     pid_incremental_rate(stat, p->cutime,  str2kernel_uint_t(procfile_lineword(ff, 0, 15)));
     pid_incremental_rate(stat, p->cstime,  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
-
     // p->priority      = str2kernel_uint_t(procfile_lineword(ff, 0, 17));
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
@@ -944,6 +999,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
             show_guest_time = 1;
         }
     }
+#endif
 
     if(unlikely(debug || (p->target && p->target->debug)))
         fprintf(stderr, "apps.plugin: READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d\n", netdata_configured_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
@@ -981,7 +1037,9 @@ cleanup:
 
 static inline int read_proc_pid_statm(struct pid_stat *p, void *ptr) {
     (void)ptr;
-
+#ifdef __FreeBSD__
+    struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
+#else
     static procfile *ff = NULL;
 
     if(unlikely(!p->statm_filename)) {
@@ -995,9 +1053,15 @@ static inline int read_proc_pid_statm(struct pid_stat *p, void *ptr) {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
+#endif
 
     calls_counter++;
 
+#ifdef __FreeBSD__
+    p->statm_size           = proc_info->ki_size / sysconf(_SC_PAGESIZE);
+    p->statm_resident       = proc_info->ki_rssize;
+    p->statm_share          = 0; // do we have to use ru_ixrss here?
+#else
     p->statm_size           = str2kernel_uint_t(procfile_lineword(ff, 0, 0));
     p->statm_resident       = str2kernel_uint_t(procfile_lineword(ff, 0, 1));
     p->statm_share          = str2kernel_uint_t(procfile_lineword(ff, 0, 2));
@@ -1005,6 +1069,7 @@ static inline int read_proc_pid_statm(struct pid_stat *p, void *ptr) {
     // p->statm_lib            = str2kernel_uint_t(procfile_lineword(ff, 0, 4));
     // p->statm_data           = str2kernel_uint_t(procfile_lineword(ff, 0, 5));
     // p->statm_dirty          = str2kernel_uint_t(procfile_lineword(ff, 0, 6));
+#endif
 
     return 1;
 
@@ -1021,7 +1086,9 @@ cleanup:
 
 static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
     (void)ptr;
-
+#ifdef __FreeBSD__
+    struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
+#else
     static procfile *ff = NULL;
 
     if(unlikely(!p->io_filename)) {
@@ -1036,12 +1103,17 @@ static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
+#endif
 
     calls_counter++;
 
     p->last_io_collected_usec = p->io_collected_usec;
     p->io_collected_usec = now_monotonic_usec();
 
+#ifdef __FreeBSD__
+    pid_incremental_rate(io, p->io_storage_bytes_read,       proc_info->ki_rusage.ru_inblock);
+    pid_incremental_rate(io, p->io_storage_bytes_written,    proc_info->ki_rusage.ru_oublock);
+#else
     pid_incremental_rate(io, p->io_logical_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 0,  1)));
     pid_incremental_rate(io, p->io_logical_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 1,  1)));
     // pid_incremental_rate(io, p->io_read_calls,               str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
@@ -1049,6 +1121,7 @@ static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
     pid_incremental_rate(io, p->io_storage_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 4,  1)));
     pid_incremental_rate(io, p->io_storage_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 5,  1)));
     // pid_incremental_rate(io, p->io_cancelled_write_bytes,    str2kernel_uint_t(procfile_lineword(ff, 6,  1)));
+#endif
 
     if(unlikely(global_iterations_counter == 1)) {
         p->io_logical_bytes_read        = 0;
@@ -1074,11 +1147,23 @@ cleanup:
 }
 
 static inline int read_proc_stat() {
+#ifdef __FreeBSD__
+    long cp_time[CPUSTATES];
+    int i;
+
+    if (unlikely(CPUSTATES != 5)) {
+        error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
+        goto cleanup;
+    }
+    if (unlikely(GETSYSCTL("kern.cp_time", cp_time))) goto cleanup;
+#else
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
+#endif
     static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
     static usec_t collected_usec = 0, last_collected_usec = 0;
 
+#ifndef __FreeBSD__
     if(unlikely(!ff)) {
         snprintfz(filename, FILENAME_MAX, "%s/proc/stat", netdata_configured_host_prefix);
         ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
@@ -1087,6 +1172,7 @@ static inline int read_proc_stat() {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
+#endif
 
     last_collected_usec = collected_usec;
     collected_usec = now_monotonic_usec();
@@ -1096,13 +1182,25 @@ static inline int read_proc_stat() {
     // temporary - it is added global_ntime;
     kernel_uint_t global_ntime = 0;
 
+#ifdef __FreeBSD__
+    incremental_rate(global_utime, utime_raw, cp_time[0], collected_usec, last_collected_usec);
+    incremental_rate(global_ntime, ntime_raw, cp_time[1], collected_usec, last_collected_usec);
+    incremental_rate(global_stime, stime_raw, cp_time[2], collected_usec, last_collected_usec);
+#else
     incremental_rate(global_utime, utime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  1)), collected_usec, last_collected_usec);
     incremental_rate(global_ntime, ntime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  2)), collected_usec, last_collected_usec);
     incremental_rate(global_stime, stime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  3)), collected_usec, last_collected_usec);
     incremental_rate(global_gtime, gtime_raw, str2kernel_uint_t(procfile_lineword(ff, 0, 10)), collected_usec, last_collected_usec);
+#endif
 
     global_utime += global_ntime;
 
+#ifdef __FreeBSD__
+    if(enable_guest_charts) {
+        enable_guest_charts = 0;
+        info("Guest charts aren't supported by FreeBSD");
+    }
+#else
     if(enable_guest_charts) {
         // temporary - it is added global_ntime;
         kernel_uint_t global_gntime = 0;
@@ -1115,6 +1213,7 @@ static inline int read_proc_stat() {
         // remove guest time from user time
         global_utime -= (global_utime > global_gtime) ? global_gtime : global_utime;
     }
+#endif
 
     if(unlikely(global_iterations_counter == 1)) {
         global_utime = 0;
@@ -1393,7 +1492,127 @@ static inline void zero_pid_fds(struct pid_stat *p, int first, int size) {
 
 static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     (void)ptr;
+#ifdef __FreeBSD__
+    int mib[4];
+    size_t size;
+    struct kinfo_file *fds;
+    static char *fdsbuf;
+    char *bfdsbuf, *efdsbuf;
+    char fdsname[FILENAME_MAX + 1];
 
+    // we make all pid fds negative, so that
+    // we can detect unused file descriptors
+    // at the end, to free them
+    make_all_pid_fds_negative(p);
+
+    mib[0] = CTL_KERN;
+    mib[1] = KERN_PROC;
+    mib[2] = KERN_PROC_FILEDESC;
+    mib[3] = p->pid;
+
+    if (unlikely(sysctl(mib, 4, NULL, &size, NULL, 0))) {
+        error("sysctl error: Can't get file descriptors data size for pid %d", p->pid);
+        return 0;
+    }
+    if (likely(size > 0))
+        fdsbuf = reallocz(fdsbuf, size);
+    if (unlikely(sysctl(mib, 4, fdsbuf, &size, NULL, 0))) {
+        error("sysctl error: Can't get file descriptors data for pid %d", p->pid);
+        return 0;
+    }
+
+    bfdsbuf = fdsbuf;
+    efdsbuf = fdsbuf + size;
+    while (bfdsbuf < efdsbuf) {
+        fds = (struct kinfo_file *)(uintptr_t)bfdsbuf;
+        if (unlikely(fds->kf_structsize == 0))
+            break;
+
+        // do not process file descriptors for current working directory, root directory,
+        // jail directory, ktrace vnode, text vnode and controlling terminal
+        if (unlikely(fds->kf_fd < 0)) {
+            bfdsbuf += fds->kf_structsize;
+            continue;
+        }
+
+        // get file descriptors array index
+        int fdid = fds->kf_fd;
+
+        // check if the fds array is small
+        if (unlikely(fdid >= p->fds_size)) {
+            // it is small, extend it
+
+            if (unlikely(debug))
+                fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
+
+            p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
+
+            // and initialize it
+            zero_pid_fds(p, p->fds_size, (fdid + MAX_SPARE_FDS) - p->fds_size);
+            p->fds_size = fdid + MAX_SPARE_FDS;
+        }
+
+        if (unlikely(p->fds[fdid] == 0)) {
+            // we don't know this fd, get it
+
+            switch (fds->kf_type) {
+                case KF_TYPE_FIFO:
+                case KF_TYPE_VNODE:
+                    if (unlikely(!fds->kf_path[0])) {
+                        sprintf(fdsname, "other: inode: %lu", fds->kf_un.kf_file.kf_file_fileid);
+                        break;
+                    }
+                    sprintf(fdsname, "%s", fds->kf_path);
+                    break;
+                case KF_TYPE_SOCKET:
+                    switch (fds->kf_sock_domain) {
+                        case AF_INET:
+                        case AF_INET6:
+                            if (fds->kf_sock_protocol == IPPROTO_TCP)
+                                sprintf(fdsname, "socket: %d %lx", fds->kf_sock_protocol, fds->kf_un.kf_sock.kf_sock_inpcb);
+                            else
+                                sprintf(fdsname, "socket: %d %lx", fds->kf_sock_protocol, fds->kf_un.kf_sock.kf_sock_pcb);
+                            break;
+                        case AF_UNIX:
+                            /* print address of pcb and connected pcb */
+                            sprintf(fdsname, "socket: %lx %lx", fds->kf_un.kf_sock.kf_sock_pcb, fds->kf_un.kf_sock.kf_sock_unpconn);
+                            break;
+                        default:
+                            /* print protocol number and socket address */
+                            sprintf(fdsname, "socket: other: %d %s %s", fds->kf_sock_protocol, fds->kf_sa_local.__ss_pad1, fds->kf_sa_local.__ss_pad2);
+                    }
+                    break;
+                case KF_TYPE_PIPE:
+                    sprintf(fdsname, "pipe: %lu %lu", fds->kf_un.kf_pipe.kf_pipe_addr, fds->kf_un.kf_pipe.kf_pipe_peer);
+                    break;
+                case KF_TYPE_PTS:
+                    sprintf(fdsname, "other: pts: %u", fds->kf_un.kf_pts.kf_pts_dev);
+                    break;
+                case KF_TYPE_SHM:
+                    sprintf(fdsname, "other: shm: %s size: %lu", fds->kf_path, fds->kf_un.kf_file.kf_file_size);
+                    break;
+                case KF_TYPE_SEM:
+                    sprintf(fdsname, "other: sem: %u", fds->kf_un.kf_sem.kf_sem_value);
+                    break;
+                default:
+                    sprintf(fdsname, "other: pid: %d fd: %d", fds->kf_un.kf_proc.kf_pid, fds->kf_fd);
+            }
+
+            // if another process already has this, we will get
+            // the same id
+            p->fds[fdid] = file_descriptor_find_or_add(fdsname);
+        }
+
+            // else make it positive again, we need it
+            // of course, the actual file may have changed, but we don't care so much
+            // FIXME: we could compare the inode as returned by readdir dirent structure
+
+        else
+            p->fds[fdid] = -p->fds[fdid];
+
+        bfdsbuf += fds->kf_structsize;
+    }
+#else
     if(unlikely(!p->fds_dirname)) {
         char dirname[FILENAME_MAX+1];
         snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", netdata_configured_host_prefix, p->pid);
@@ -1473,6 +1692,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     }
 
     closedir(fds);
+#endif
     cleanup_negative_pid_fds(p);
 
     return 1;
@@ -1846,6 +2066,28 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
 static int collect_data_for_all_processes(void) {
     struct pid_stat *p = NULL;
 
+#ifdef __FreeBSD__
+    int i, procnum;
+    size_t procbase_size;
+    static struct kinfo_proc *procbase;
+
+    int mib[3];
+
+    mib[0] = CTL_KERN;
+    mib[1] = KERN_PROC;
+    mib[2] = KERN_PROC_PROC;
+    if (unlikely(sysctl(mib, 3, NULL, &procbase_size, NULL, 0))) {
+        error("sysctl error: Can't get processes data size");
+        return 0;
+    }
+    procbase = reallocz(procbase, procbase_size);
+    if (unlikely(sysctl(mib, 3, procbase, &procbase_size, NULL, 0))) {
+        error("sysctl error: Can't get processes data");
+        return 0;
+    }
+    procnum = procbase_size / sizeof(struct kinfo_proc);
+#endif
+
     if(all_pids_count) {
         size_t slc = 0;
         for(p = root_of_pids; p ; p = p->next) {
@@ -1884,6 +2126,12 @@ static int collect_data_for_all_processes(void) {
 #endif
     }
 
+#ifdef __FreeBSD__
+    for (i = INIT_PID; i < procnum - INIT_PID; ++i) {
+        pid_t pid = procbase[i].ki_pid;
+        collect_data_for_pid(pid, &procbase[i]);
+    }
+#else
     char dirname[FILENAME_MAX + 1];
 
     snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
@@ -1907,6 +2155,7 @@ static int collect_data_for_all_processes(void) {
         collect_data_for_pid(pid, NULL);
     }
     closedir(dir);
+#endif
 
     if(!all_pids_count)
         return 0;
@@ -2704,6 +2953,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 
+#ifndef __FreeBSD__
     send_BEGIN(type, "lreads", usec);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
@@ -2717,6 +2967,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
             send_SET(w->name, w->io_logical_bytes_written);
     }
     send_END();
+#endif
 
     send_BEGIN(type, "preads", usec);
     for (w = root; w ; w = w->next) {
@@ -2842,6 +3093,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
 
+#ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
@@ -2853,7 +3105,21 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
+#endif
 
+#ifdef __FreeBSD__
+    fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'blocks/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+    }
+
+    fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'blocks/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
+    }
+#else
     fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'kilobytes/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
@@ -2865,6 +3131,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
+#endif
 
     if(enable_file_charts) {
         fprintf(stdout, "CHART %s.files '' '%s Open Files' 'open files' disk %s.files stacked 20050 %d\n", type,
