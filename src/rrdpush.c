@@ -104,40 +104,43 @@ void rrdset_done_push(RRDSET *st) {
     if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_ENABLED)))
         return;
 
+
+    rrdpush_lock();
+
     if(unlikely(!rrdpush_buffer || !rrdpush_connected)) {
         if(!error_shown)
-            error("PUSH: not ready - discarding collected metrics.");
+            error("STREAM: not ready - discarding collected metrics.");
 
         error_shown = 1;
+
+        rrdpush_unlock();
         return;
     }
     error_shown = 0;
-
-    rrdpush_lock();
-    rrdset_rdlock(st);
 
     if(st->rrdhost != last_host) {
         buffer_sprintf(rrdpush_buffer, "HOST '%s' '%s'\n", st->rrdhost->machine_guid, st->rrdhost->hostname);
         last_host = st->rrdhost;
     }
 
+    rrdset_rdlock(st);
     if(need_to_send_chart_definition(st))
         send_chart_definition(st);
 
     send_chart_metrics(st);
+    rrdset_unlock(st);
 
     // signal the sender there are more data
     if(write(rrdpush_pipe[PIPE_WRITE], " ", 1) == -1)
-        error("Cannot write to internal pipe");
+        error("STREAM: cannot write to internal pipe");
 
-    rrdset_unlock(st);
     rrdpush_unlock();
 }
 
 static inline void rrdpush_flush(void) {
     rrdpush_lock();
     if(buffer_strlen(rrdpush_buffer))
-        error("PUSH: discarding %zu bytes of metrics data already in the buffer.", buffer_strlen(rrdpush_buffer));
+        error("STREAM: discarding %zu bytes of metrics data already in the buffer.", buffer_strlen(rrdpush_buffer));
 
     buffer_flush(rrdpush_buffer);
     reset_all_charts();
@@ -148,19 +151,19 @@ static inline void rrdpush_flush(void) {
 void *central_netdata_push_thread(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
-    info("Central netdata push thread created with task id %d", gettid());
+    info("STREAM: central netdata push thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+        error("STREAM: cannot set pthread cancel type to DEFERRED.");
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+        error("STREAM: cannot set pthread cancel state to ENABLE.");
 
 
     rrdpush_buffer = buffer_create(1);
 
     if(pipe(rrdpush_pipe) == -1)
-        fatal("Cannot create required pipe.");
+        fatal("STREAM: cannot create required pipe.");
 
     struct timeval tv = {
             .tv_sec = 60,
@@ -176,6 +179,7 @@ void *central_netdata_push_thread(void *ptr) {
     int sock = -1;
 
     struct pollfd fds[2], *ifd, *ofd;
+    nfds_t fdmax;
 
     ifd = &fds[0];
     ofd = &fds[1];
@@ -184,32 +188,37 @@ void *central_netdata_push_thread(void *ptr) {
         if(netdata_exit) break;
 
         if(unlikely(sock == -1)) {
+            // stop appending data into rrdpush_buffer
+            // they will be lost, so there is no point to do it
             rrdpush_connected = 0;
 
-            info("PUSH: connecting to central netdata at: %s", central_netdata_to_push_data);
+            info("STREAM: connecting to central netdata at: %s", central_netdata_to_push_data);
             sock = connect_to_one_of(central_netdata_to_push_data, 19999, &tv, &reconnects_counter);
 
             if(unlikely(sock == -1)) {
-                error("PUSH: failed to connect to central netdata at: %s", central_netdata_to_push_data);
+                error("STREAM: failed to connect to central netdata at: %s", central_netdata_to_push_data);
+                sleep(5);
                 continue;
             }
 
-            info("PUSH: connected to central netdata at: %s", central_netdata_to_push_data);
+            info("STREAM: initializing communication to central netdata at: %s", central_netdata_to_push_data);
 
             char http[1000 + 1];
             snprintfz(http, 1000, "GET /stream?key=%s HTTP/1.1\r\nUser-Agent: netdata-push-service/%s\r\nAccept: */*\r\n\r\n", config_get("global", "central netdata api key", ""), program_version);
             if(send_timeout(sock, http, strlen(http), 0, 60) == -1) {
                 close(sock);
                 sock = -1;
-                error("PUSH: failed to send http header to netdata at: %s", central_netdata_to_push_data);
+                error("STREAM: failed to send http header to netdata at: %s", central_netdata_to_push_data);
                 sleep(5);
                 continue;
             }
 
+            info("STREAM: Waiting for STREAM from central netdata at: %s", central_netdata_to_push_data);
+
             if(recv_timeout(sock, http, 1000, 0, 60) == -1) {
                 close(sock);
                 sock = -1;
-                error("PUSH: failed to receive OK from netdata at: %s", central_netdata_to_push_data);
+                error("STREAM: failed to receive STREAM from netdata at: %s", central_netdata_to_push_data);
                 sleep(5);
                 continue;
             }
@@ -217,16 +226,20 @@ void *central_netdata_push_thread(void *ptr) {
             if(strncmp(http, "STREAM", 6)) {
                 close(sock);
                 sock = -1;
-                error("PUSH: netdata servers at  %s, did not send STREAM", central_netdata_to_push_data);
+                error("STREAM: netdata servers at  %s, did not send STREAM", central_netdata_to_push_data);
                 sleep(5);
                 continue;
             }
 
+            info("STREAM: Established STREAM with central netdata at: %s - sending metrics...", central_netdata_to_push_data);
+
             if(fcntl(sock, F_SETFL, O_NONBLOCK) < 0)
-                error("PUSH: cannot set non-blocking mode for socket.");
+                error("STREAM: cannot set non-blocking mode for socket.");
 
             rrdpush_flush();
             sent_connection = 0;
+
+            // allow appending data into rrdpush_buffer
             rrdpush_connected = 1;
         }
 
@@ -235,15 +248,15 @@ void *central_netdata_push_thread(void *ptr) {
         ifd->revents = 0;
 
         ofd->fd = sock;
-        ofd->events = POLLOUT;
         ofd->revents = 0;
-
-        nfds_t fdmax = 2;
-
-        if(begin < buffer_strlen(rrdpush_buffer))
+        if(begin < buffer_strlen(rrdpush_buffer)) {
             ofd->events = POLLOUT;
-        else
+            fdmax = 2;
+        }
+        else {
             ofd->events = 0;
+            fdmax = 1;
+        }
 
         if(netdata_exit) break;
         int retval = poll(fds, fdmax, 60 * 1000);
@@ -253,7 +266,7 @@ void *central_netdata_push_thread(void *ptr) {
             if(errno == EAGAIN || errno == EINTR)
                 continue;
 
-            error("PUSH: Failed to poll().");
+            error("STREAM: Failed to poll().");
             close(sock);
             sock = -1;
             break;
@@ -266,11 +279,11 @@ void *central_netdata_push_thread(void *ptr) {
         if(ifd->revents & POLLIN) {
             char buffer[1000 + 1];
             if(read(rrdpush_pipe[PIPE_READ], buffer, 1000) == -1)
-                error("PUSH: Cannot read from internal pipe.");
+                error("STREAM: Cannot read from internal pipe.");
         }
 
         if(ofd->revents & POLLOUT && begin < buffer_strlen(rrdpush_buffer)) {
-            // info("PUSH: send buffer is ready, sending %zu bytes starting at %zu", buffer_strlen(rrdpush_buffer) - begin, begin);
+            // info("STREAM: send buffer is ready, sending %zu bytes starting at %zu", buffer_strlen(rrdpush_buffer) - begin, begin);
 
             // fprintf(stderr, "PUSH BEGIN\n");
             // fwrite(&rrdpush_buffer->buffer[begin], 1, buffer_strlen(rrdpush_buffer) - begin, stderr);
@@ -280,7 +293,7 @@ void *central_netdata_push_thread(void *ptr) {
             ssize_t ret = send(sock, &rrdpush_buffer->buffer[begin], buffer_strlen(rrdpush_buffer) - begin, MSG_DONTWAIT);
             if(ret == -1) {
                 if(errno != EAGAIN && errno != EINTR) {
-                    error("PUSH: failed to send metrics to central netdata at %s. We have sent %zu bytes on this connection.", central_netdata_to_push_data, sent_connection);
+                    error("STREAM: failed to send metrics to central netdata at %s. We have sent %zu bytes on this connection.", central_netdata_to_push_data, sent_connection);
                     close(sock);
                     sock = -1;
                 }
@@ -300,7 +313,7 @@ void *central_netdata_push_thread(void *ptr) {
         // protection from overflow
         if(rrdpush_buffer->len > max_size) {
             errno = 0;
-            error("PUSH: too many data pending. Buffer is %zu bytes long, %zu unsent. We have sent %zu bytes in total, %zu on this connection. Closing connection to flush the data.", rrdpush_buffer->len, rrdpush_buffer->len - begin, sent_bytes, sent_connection);
+            error("STREAM: too many data pending. Buffer is %zu bytes long, %zu unsent. We have sent %zu bytes in total, %zu on this connection. Closing connection to flush the data.", rrdpush_buffer->len, rrdpush_buffer->len - begin, sent_bytes, sent_connection);
             if(sock != -1) {
                 close(sock);
                 sock = -1;
@@ -308,7 +321,7 @@ void *central_netdata_push_thread(void *ptr) {
         }
     }
 
-    debug(D_WEB_CLIENT, "Central netdata push thread exits.");
+    debug(D_WEB_CLIENT, "STREAM: central netdata push thread exits.");
     if(sock != -1) {
         close(sock);
     }
