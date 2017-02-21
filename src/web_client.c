@@ -1689,14 +1689,14 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     if(!key || !*key) {
-        error("STREAM request from client '%s:%s', without an API key. Forbidding access.", w->client_ip, w->client_port);
+        error("STREAM [%s]:%s: request without an API key. Forbidding access.", w->client_ip, w->client_port);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "You need an API key for this request.");
         return 401;
     }
 
     if(!validate_stream_api_key(key)) {
-        error("STREAM request from client '%s:%s': API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
+        error("STREAM [%s]:%s: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your API key is not permitted access.");
         return 401;
@@ -1719,16 +1719,17 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", w->client_ip, w->client_port);
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", w->client_ip, w->client_port);
 
+    info("STREAM [%s]:%s: sending STREAM to initiate streaming...", w->client_ip, w->client_port);
     if(send_timeout(w->ifd, "STREAM", 6, 0, 60) != 6) {
-        error("Cannot send STREAM to netdata at %s:%s", w->client_ip, w->client_port);
+        error("STREAM [%s]:%s: cannot send STREAM.", w->client_ip, w->client_port);
         buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "STREAM failed to reply back with STREAM");
+        buffer_sprintf(w->response.data, "Failed to reply back with STREAM");
         return 400;
     }
 
     // remove the non-blocking flag from the socket
     if(fcntl(w->ifd, F_SETFL, fcntl(w->ifd, F_GETFL, 0) & ~O_NONBLOCK) == -1)
-        error("STREAM from '%s:%s': cannot remove the non-blocking flag from socket %d", w->client_ip, w->client_port, w->ifd);
+        error("STREAM [%s]:%s: cannot remove the non-blocking flag from socket %d", w->client_ip, w->client_port, w->ifd);
 
     /*
     char buffer[1000 + 1];
@@ -1742,16 +1743,16 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     // convert the socket to a FILE *
     FILE *fp = fdopen(w->ifd, "r");
     if(!fp) {
-        error("STREAM from '%s:%s': failed to get a FILE for FD %d.", w->client_ip, w->client_port, w->ifd);
+        error("STREAM [%s]:%s: failed to get a FILE for FD %d.", w->client_ip, w->client_port, w->ifd);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Failed to get a FILE for an FD.");
         return 500;
     }
 
     // call the plugins.d processor to receive the metrics
-    info("STREAM connecting client '%s:%s' to plugins.d.", w->client_ip, w->client_port);
+    info("STREAM [%s]:%s: connecting client to plugins.d.", w->client_ip, w->client_port);
     size_t count = pluginsd_process(host, &cd, fp, 1);
-    error("STREAM from '%s:%s': client disconnected.", w->client_ip, w->client_port);
+    error("STREAM [%s]:%s: client disconnected.", w->client_ip, w->client_port);
 
     // close all sockets, to let the socket worker we are done
     fclose(fp);
