@@ -17,16 +17,20 @@ static inline void rrdpush_unlock() {
     pthread_mutex_unlock(&rrdpush_mutex);
 }
 
-static inline int need_to_send_chart_definitions(RRDSET *st) {
+static inline int need_to_send_chart_definition(RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st)
-        if(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED) && !rrddim_flag_check(rd, RRDDIM_FLAG_EXPOSED))
+        if(!rrddim_flag_check(rd, RRDDIM_FLAG_EXPOSED))
             return 1;
 
+
+    // fprintf(stderr, "NOT Sending CHART '%s' '%s'\n", st->id, st->name);
     return 0;
 }
 
-static inline void send_chart_definitions(RRDSET *st) {
+static inline void send_chart_definition(RRDSET *st) {
+    // fprintf(stderr, "Sending CHART '%s' '%s'\n", st->id, st->name);
+
     buffer_sprintf(rrdpush_buffer, "CHART '%s' '%s' '%s' '%s' '%s' '%s' '%s' %ld %d\n"
                 , st->id
                 , st->name
@@ -59,7 +63,7 @@ static inline void send_chart_metrics(RRDSET *st) {
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED))
+        if(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED) && rrddim_flag_check(rd, RRDDIM_FLAG_EXPOSED))
             buffer_sprintf(rrdpush_buffer, "SET %s = " COLLECTED_NUMBER_FORMAT "\n"
                        , rd->id
                        , rd->collected_value
@@ -106,8 +110,8 @@ void rrdset_done_push(RRDSET *st) {
         last_host = st->rrdhost;
     }
 
-    if(need_to_send_chart_definitions(st))
-        send_chart_definitions(st);
+    if(need_to_send_chart_definition(st))
+        send_chart_definition(st);
 
     send_chart_metrics(st);
 
@@ -153,12 +157,6 @@ void *central_netdata_push_thread(void *ptr) {
 
     ifd = &fds[0];
     ofd = &fds[1];
-
-    ifd->fd = rrdpush_pipe[PIPE_READ];
-    ifd->events = POLLIN;
-    ofd->events = POLLOUT;
-
-    nfds_t fdmax = 2;
 
     for(;;) {
         if(netdata_exit) break;
@@ -215,9 +213,15 @@ void *central_netdata_push_thread(void *ptr) {
             sent_connection = 0;
         }
 
+        ifd->fd = rrdpush_pipe[PIPE_READ];
+        ifd->events = POLLIN;
         ifd->revents = 0;
-        ofd->revents = 0;
+
         ofd->fd = sock;
+        ofd->events = POLLOUT;
+        ofd->revents = 0;
+
+        nfds_t fdmax = 2;
 
         if(begin < buffer_strlen(rrdpush_buffer))
             ofd->events = POLLOUT;
@@ -248,6 +252,8 @@ void *central_netdata_push_thread(void *ptr) {
         }
 
         if(ofd->revents & POLLOUT && begin < buffer_strlen(rrdpush_buffer)) {
+            // info("PUSH: send buffer is ready, sending %zu bytes starting at %zu", buffer_strlen(rrdpush_buffer) - begin, begin);
+
             // fprintf(stderr, "PUSH BEGIN\n");
             // fwrite(&rrdpush_buffer->buffer[begin], 1, buffer_strlen(rrdpush_buffer) - begin, stderr);
             // fprintf(stderr, "\nPUSH END\n");

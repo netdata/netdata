@@ -144,7 +144,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *value = words[2];
 
             if(unlikely(!dimension || !*dimension)) {
-                error("PLUGINSD: '%s' is requesting a SET on chart '%s', without a dimension. Disabling it.", cd->fullfilename, st->id);
+                error("PLUGINSD: '%s' is requesting a SET on chart '%s' of host '%s', without a dimension. Disabling it.", cd->fullfilename, st->id, host->hostname);
                 enabled = 0;
                 break;
             }
@@ -152,7 +152,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             if(unlikely(!value || !*value)) value = NULL;
 
             if(unlikely(!st)) {
-                error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s, without a BEGIN. Disabling it.", cd->fullfilename, dimension, value?value:"<nothing>");
+                error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s on host '%s', without a BEGIN. Disabling it.", cd->fullfilename, dimension, value?value:"<nothing>", host->hostname);
                 enabled = 0;
                 break;
             }
@@ -166,14 +166,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *microseconds_txt = words[2];
 
             if(unlikely(!id)) {
-                error("PLUGINSD: '%s' is requesting a BEGIN without a chart id. Disabling it.", cd->fullfilename);
+                error("PLUGINSD: '%s' is requesting a BEGIN without a chart id for host '%s'. Disabling it.", cd->fullfilename, host->hostname);
                 enabled = 0;
                 break;
             }
 
             st = rrdset_find(host, id);
             if(unlikely(!st)) {
-                error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist. Disabling it.", cd->fullfilename, id);
+                error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist on host '%s'. Disabling it.", cd->fullfilename, id, host->hostname);
                 enabled = 0;
                 break;
             }
@@ -193,7 +193,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         }
         else if(likely(hash == END_HASH && !strcmp(s, "END"))) {
             if(unlikely(!st)) {
-                error("PLUGINSD: '%s' is requesting an END, without a BEGIN. Disabling it.", cd->fullfilename);
+                error("PLUGINSD: '%s' is requesting an END, without a BEGIN on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
                 enabled = 0;
                 break;
             }
@@ -210,12 +210,12 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *hostname = words[2];
 
             if(unlikely(!guid || !*guid)) {
-                error("PLUGINSD: '%s' is requesting a HOST, without a guid. Disabling it.", cd->fullfilename);
+                error("PLUGINSD: '%s' is requesting HOST with guid '%s' and hostname '%s', without a guid. Disabling it.", cd->fullfilename, guid?guid:"", hostname?hostname:"");
                 enabled = 0;
                 break;
             }
             if(unlikely(!hostname || !*hostname)) {
-                error("PLUGINSD: '%s' is requesting a HOST, without a hostname. Disabling it.", cd->fullfilename);
+                error("PLUGINSD: '%s' is requesting HOST with guid '%s' and hostname '%s', without a hostname. Disabling it.", cd->fullfilename, guid?guid:"", hostname?hostname:"");
                 enabled = 0;
                 break;
             }
@@ -249,7 +249,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *update_every_s = words[9];
 
             if(unlikely(!type || !*type || !id || !*id)) {
-                error("PLUGINSD: '%s' is requesting a CHART, without a type.id. Disabling it.", cd->fullfilename);
+                error("PLUGINSD: '%s' is requesting a CHART, without a type.id, on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
                 enabled = 0;
                 break;
             }
@@ -294,13 +294,13 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *options = words[6];
 
             if(unlikely(!id || !*id)) {
-                error("PLUGINSD: '%s' is requesting a DIMENSION, without an id. Disabling it.", cd->fullfilename);
+                error("PLUGINSD: '%s' is requesting a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", cd->fullfilename, host->hostname, st?st->id:"UNSET");
                 enabled = 0;
                 break;
             }
 
             if(unlikely(!st)) {
-                error("PLUGINSD: '%s' is requesting a DIMENSION, without a CHART. Disabling it.", cd->fullfilename);
+                error("PLUGINSD: '%s' is requesting a DIMENSION, without a CHART, on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
                 enabled = 0;
                 break;
             }
@@ -329,7 +329,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             RRDDIM *rd = rrddim_find(st, id);
             if(unlikely(!rd)) {
                 rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
-                rd->flags = 0x00000000;
+                rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+                rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
                 if(options && *options) {
                     if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
                     if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
@@ -345,7 +346,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             break;
         }
         else {
-            error("PLUGINSD: '%s' is sending command '%s' which is not known by netdata. Disabling it.", cd->fullfilename, s);
+            error("PLUGINSD: '%s' is sending command '%s' which is not known by netdata, for host '%s'. Disabling it.", cd->fullfilename, s, host->hostname);
             enabled = 0;
             break;
         }

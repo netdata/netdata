@@ -80,7 +80,6 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
             rd->id = NULL;
             rd->name = NULL;
             rd->cache_filename = NULL;
-            rd->flags = 0x00000000;
             rd->variables = NULL;
             rd->next = NULL;
             rd->rrdset = NULL;
@@ -164,9 +163,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
 
     // prevent incremental calculation spikes
     rd->counter = 0;
-
-    rrddim_flag_clear(rd, RRDDIM_FLAG_UPDATED);
-    rrddim_flag_clear(rd, RRDDIM_FLAG_EXPOSED);
+    rd->flags = 0x00000000;
 
     rd->calculated_value = 0;
     rd->last_calculated_value = 0;
