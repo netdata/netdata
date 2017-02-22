@@ -1673,6 +1673,8 @@ int validate_stream_api_key(const char *key) {
 }
 
 int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
+    info("STREAM [%s]:%s: client connection.", w->client_ip, w->client_port);
+    
     char *key = NULL, *hostname = NULL, *machine_guid = NULL, *os = NULL;
     int update_every = default_rrd_update_every;
     int history = default_rrd_history_entries;
@@ -2481,18 +2483,23 @@ void web_client_process_request(struct web_client *w) {
 
     switch(http_request_validate(w)) {
         case HTTP_VALIDATION_OK:
-            if(unlikely(w->mode == WEB_CLIENT_MODE_OPTIONS)) {
-                w->response.data->contenttype = CT_TEXT_PLAIN;
-                buffer_flush(w->response.data);
-                buffer_strcat(w->response.data, "OK");
-                w->response.code = 200;
+            switch(w->mode) {
+                case WEB_CLIENT_MODE_STREAM:
+                    w->response.code = web_client_stream_request(localhost, w, w->decoded_url);
+                    return;
+
+                case WEB_CLIENT_MODE_OPTIONS:
+                    w->response.data->contenttype = CT_TEXT_PLAIN;
+                    buffer_flush(w->response.data);
+                    buffer_strcat(w->response.data, "OK");
+                    w->response.code = 200;
+                    break;
+
+                case WEB_CLIENT_MODE_FILECOPY:
+                case WEB_CLIENT_MODE_NORMAL:
+                    w->response.code = web_client_process_url(localhost, w, w->decoded_url);
+                    break;
             }
-            else if(unlikely(w->mode == WEB_CLIENT_MODE_STREAM)) {
-                w->response.code = web_client_stream_request(localhost, w, w->decoded_url);
-                return;
-            }
-            else
-                w->response.code = web_client_process_url(localhost, w, w->decoded_url);
             break;
 
         case HTTP_VALIDATION_INCOMPLETE:
