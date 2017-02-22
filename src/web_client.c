@@ -2278,7 +2278,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
             w->response.data->contenttype = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
-            generate_config(w->response.data, 0);
+            config_generate(w->response.data, 0);
             return 200;
         }
         else if(unlikely(hash == hash_data && strcmp(tok, WEB_PATH_DATA) == 0)) { // "data"

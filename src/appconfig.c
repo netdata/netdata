@@ -2,8 +2,6 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-pthread_mutex_t config_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 // ----------------------------------------------------------------------------
 // definitions
 
@@ -12,7 +10,7 @@ pthread_mutex_t config_mutex = PTHREAD_MUTEX_INITIALIZER;
 #define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value
 #define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
 
-struct config_value {
+struct config_option {
     avl avl;                // the index - this has to be first!
 
     uint8_t flags;
@@ -22,10 +20,10 @@ struct config_value {
     char *name;
     char *value;
 
-    struct config_value *next; // config->mutex protects just this
+    struct config_option *next; // config->mutex protects just this
 };
 
-struct config {
+struct section {
     avl avl;
 
     uint32_t hash;          // a simple hash to speed up searching
@@ -33,32 +31,51 @@ struct config {
 
     char *name;
 
-    struct config *next;    // gloabl config_mutex protects just this
+    struct section *next;    // gloabl config_mutex protects just this
 
-    struct config_value *values;
+    struct config_option *values;
     avl_tree_lock values_index;
 
     pthread_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
                             // readers are protected using the rwlock in avl_tree_lock
-} *config_root = NULL;
+};
 
+static int appconfig_section_compare(void *a, void *b);
+
+struct config netdata_config = {
+        .sections = NULL,
+        .mutex = PTHREAD_MUTEX_INITIALIZER,
+        .index = {
+            { NULL, appconfig_section_compare },
+            AVL_LOCK_INITIALIZER
+        }
+};
+
+struct config stream_config = {
+        .sections = NULL,
+        .mutex = PTHREAD_MUTEX_INITIALIZER,
+        .index = {
+                { NULL, appconfig_section_compare },
+                AVL_LOCK_INITIALIZER
+        }
+};
 
 // ----------------------------------------------------------------------------
 // locking
 
-static inline void config_global_write_lock(void) {
-    pthread_mutex_lock(&config_mutex);
+static inline void appconfig_wrlock(struct config *root) {
+    pthread_mutex_lock(&root->mutex);
 }
 
-static inline void config_global_unlock(void) {
-    pthread_mutex_unlock(&config_mutex);
+static inline void appconfig_unlock(struct config *root) {
+    pthread_mutex_unlock(&root->mutex);
 }
 
-static inline void config_section_write_lock(struct config *co) {
+static inline void config_section_wrlock(struct section *co) {
     pthread_mutex_lock(&co->mutex);
 }
 
-static inline void config_section_unlock(struct config *co) {
+static inline void config_section_unlock(struct section *co) {
     pthread_mutex_unlock(&co->mutex);
 }
 
@@ -66,78 +83,72 @@ static inline void config_section_unlock(struct config *co) {
 // ----------------------------------------------------------------------------
 // config name-value index
 
-static int config_value_compare(void* a, void* b) {
-    if(((struct config_value *)a)->hash < ((struct config_value *)b)->hash) return -1;
-    else if(((struct config_value *)a)->hash > ((struct config_value *)b)->hash) return 1;
-    else return strcmp(((struct config_value *)a)->name, ((struct config_value *)b)->name);
+static int appconfig_option_compare(void *a, void *b) {
+    if(((struct config_option *)a)->hash < ((struct config_option *)b)->hash) return -1;
+    else if(((struct config_option *)a)->hash > ((struct config_option *)b)->hash) return 1;
+    else return strcmp(((struct config_option *)a)->name, ((struct config_option *)b)->name);
 }
 
-#define config_value_index_add(co, cv) (struct config_value *)avl_insert_lock(&((co)->values_index), (avl *)(cv))
-#define config_value_index_del(co, cv) (struct config_value *)avl_remove_lock(&((co)->values_index), (avl *)(cv))
+#define appconfig_option_index_add(co, cv) (struct config_option *)avl_insert_lock(&((co)->values_index), (avl *)(cv))
+#define appconfig_option_index_del(co, cv) (struct config_option *)avl_remove_lock(&((co)->values_index), (avl *)(cv))
 
-static struct config_value *config_value_index_find(struct config *co, const char *name, uint32_t hash) {
-    struct config_value tmp;
+static struct config_option *appconfig_option_index_find(struct section *co, const char *name, uint32_t hash) {
+    struct config_option tmp;
     tmp.hash = (hash)?hash:simple_hash(name);
     tmp.name = (char *)name;
 
-    return (struct config_value *)avl_search_lock(&(co->values_index), (avl *) &tmp);
+    return (struct config_option *)avl_search_lock(&(co->values_index), (avl *) &tmp);
 }
 
 
 // ----------------------------------------------------------------------------
 // config sections index
 
-static int config_compare(void* a, void* b) {
-    if(((struct config *)a)->hash < ((struct config *)b)->hash) return -1;
-    else if(((struct config *)a)->hash > ((struct config *)b)->hash) return 1;
-    else return strcmp(((struct config *)a)->name, ((struct config *)b)->name);
+static int appconfig_section_compare(void *a, void *b) {
+    if(((struct section *)a)->hash < ((struct section *)b)->hash) return -1;
+    else if(((struct section *)a)->hash > ((struct section *)b)->hash) return 1;
+    else return strcmp(((struct section *)a)->name, ((struct section *)b)->name);
 }
 
-avl_tree_lock config_root_index = {
-        { NULL, config_compare },
-        AVL_LOCK_INITIALIZER
-};
+#define appconfig_index_add(root, cfg) (struct section *)avl_insert_lock(&root->index, (avl *)(cfg))
+#define appconfig_index_del(root, cfg) (struct section *)avl_remove_lock(&root->index, (avl *)(cfg))
 
-#define config_index_add(cfg) (struct config *)avl_insert_lock(&config_root_index, (avl *)(cfg))
-#define config_index_del(cfg) (struct config *)avl_remove_lock(&config_root_index, (avl *)(cfg))
-
-static struct config *config_index_find(const char *name, uint32_t hash) {
-    struct config tmp;
+static struct section *appconfig_index_find(struct config *root, const char *name, uint32_t hash) {
+    struct section tmp;
     tmp.hash = (hash)?hash:simple_hash(name);
     tmp.name = (char *)name;
 
-    return (struct config *)avl_search_lock(&config_root_index, (avl *) &tmp);
+    return (struct section *)avl_search_lock(&root->index, (avl *) &tmp);
 }
 
 
 // ----------------------------------------------------------------------------
 // config section methods
 
-static inline struct config *config_section_find(const char *section) {
-    return config_index_find(section, 0);
+static inline struct section *appconfig_section_find(struct config *root, const char *section) {
+    return appconfig_index_find(root, section, 0);
 }
 
-static inline struct config *config_section_create(const char *section)
-{
+static inline struct section *appconfig_section_create(struct config *root, const char *section) {
     debug(D_CONFIG, "Creating section '%s'.", section);
 
-    struct config *co = callocz(1, sizeof(struct config));
+    struct section *co = callocz(1, sizeof(struct section));
     co->name = strdupz(section);
     co->hash = simple_hash(co->name);
 
-    avl_init_lock(&co->values_index, config_value_compare);
+    avl_init_lock(&co->values_index, appconfig_option_compare);
 
-    if(unlikely(config_index_add(co) != co))
+    if(unlikely(appconfig_index_add(root, co) != co))
         error("INTERNAL ERROR: indexing of section '%s', already exists.", co->name);
 
-    config_global_write_lock();
-    struct config *co2 = config_root;
+    appconfig_wrlock(root);
+    struct section *co2 = root->sections;
     if(co2) {
         while (co2->next) co2 = co2->next;
         co2->next = co;
     }
-    else config_root = co;
-    config_global_unlock();
+    else root->sections = co;
+    appconfig_unlock(root);
 
     return co;
 }
@@ -146,20 +157,20 @@ static inline struct config *config_section_create(const char *section)
 // ----------------------------------------------------------------------------
 // config name-value methods
 
-static inline struct config_value *config_value_create(struct config *co, const char *name, const char *value)
+static inline struct config_option *appconfig_value_create(struct section *co, const char *name, const char *value)
 {
     debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
 
-    struct config_value *cv = callocz(1, sizeof(struct config_value));
+    struct config_option *cv = callocz(1, sizeof(struct config_option));
     cv->name = strdupz(name);
     cv->hash = simple_hash(cv->name);
     cv->value = strdupz(value);
 
-    if(unlikely(config_value_index_add(co, cv) != cv))
+    if(unlikely(appconfig_option_index_add(co, cv) != cv))
         error("INTERNAL ERROR: indexing of config '%s' in section '%s': already exists.", cv->name, co->name);
 
-    config_section_write_lock(co);
-    struct config_value *cv2 = co->values;
+    config_section_wrlock(co);
+    struct config_option *cv2 = co->values;
     if(cv2) {
         while (cv2->next) cv2 = cv2->next;
         cv2->next = cv;
@@ -170,43 +181,43 @@ static inline struct config_value *config_value_create(struct config *co, const 
     return cv;
 }
 
-int config_exists(const char *section, const char *name) {
-    struct config_value *cv;
+int appconfig_exists(struct config *root, const char *section, const char *name) {
+    struct config_option *cv;
 
     debug(D_CONFIG, "request to get config in section '%s', name '%s'", section, name);
 
-    struct config *co = config_section_find(section);
+    struct section *co = appconfig_section_find(root, section);
     if(!co) return 0;
 
-    cv = config_value_index_find(co, name, 0);
+    cv = appconfig_option_index_find(co, name, 0);
     if(!cv) return 0;
 
     return 1;
 }
 
-int config_rename(const char *section, const char *old, const char *new) {
-    struct config_value *cv, *cv2;
+int appconfig_rename(struct config *root, const char *section, const char *old, const char *new) {
+    struct config_option *cv, *cv2;
 
     debug(D_CONFIG, "request to rename config in section '%s', old name '%s', new name '%s'", section, old, new);
 
-    struct config *co = config_section_find(section);
+    struct section *co = appconfig_section_find(root, section);
     if(!co) return -1;
 
-    config_section_write_lock(co);
+    config_section_wrlock(co);
 
-    cv = config_value_index_find(co, old, 0);
+    cv = appconfig_option_index_find(co, old, 0);
     if(!cv) goto cleanup;
 
-    cv2 = config_value_index_find(co, new, 0);
+    cv2 = appconfig_option_index_find(co, new, 0);
     if(cv2) goto cleanup;
 
-    if(unlikely(config_value_index_del(co, cv) != cv))
+    if(unlikely(appconfig_option_index_del(co, cv) != cv))
         error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted tge wrong config entry.", cv->name, co->name);
 
     freez(cv->name);
     cv->name = strdupz(new);
     cv->hash = simple_hash(cv->name);
-    if(unlikely(config_value_index_add(co, cv) != cv))
+    if(unlikely(appconfig_option_index_add(co, cv) != cv))
         error("INTERNAL ERROR: indexing of config '%s' in section '%s', already exists.", cv->name, co->name);
 
     config_section_unlock(co);
@@ -218,18 +229,18 @@ cleanup:
     return -1;
 }
 
-char *config_get(const char *section, const char *name, const char *default_value)
+char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
-    struct config_value *cv;
+    struct config_option *cv;
 
     debug(D_CONFIG, "request to get config in section '%s', name '%s', default_value '%s'", section, name, default_value);
 
-    struct config *co = config_section_find(section);
-    if(!co) co = config_section_create(section);
+    struct section *co = appconfig_section_find(root, section);
+    if(!co) co = appconfig_section_create(root, section);
 
-    cv = config_value_index_find(co, name, 0);
+    cv = appconfig_option_index_find(co, name, 0);
     if(!cv) {
-        cv = config_value_create(co, name, default_value);
+        cv = appconfig_value_create(co, name, default_value);
         if(!cv) return NULL;
     }
     cv->flags |= CONFIG_VALUE_USED;
@@ -246,67 +257,67 @@ char *config_get(const char *section, const char *name, const char *default_valu
     return(cv->value);
 }
 
-long long config_get_number(const char *section, const char *name, long long value)
+long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value)
 {
     char buffer[100], *s;
     sprintf(buffer, "%lld", value);
 
-    s = config_get(section, name, buffer);
+    s = appconfig_get(root, section, name, buffer);
     if(!s) return value;
 
     return strtoll(s, NULL, 0);
 }
 
-int config_get_boolean(const char *section, const char *name, int value)
+int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value)
 {
     char *s;
     if(value) s = "yes";
     else s = "no";
 
-    s = config_get(section, name, s);
+    s = appconfig_get(root, section, name, s);
     if(!s) return value;
 
     if(!strcmp(s, "yes") || !strcmp(s, "auto") || !strcmp(s, "on demand")) return 1;
     return 0;
 }
 
-int config_get_boolean_ondemand(const char *section, const char *name, int value)
+int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value)
 {
     char *s;
 
-    if(value == CONFIG_ONDEMAND_ONDEMAND)
+    if(value == CONFIG_BOOLEAN_AUTO)
         s = "auto";
 
-    else if(value == CONFIG_ONDEMAND_NO)
+    else if(value == CONFIG_BOOLEAN_NO)
         s = "no";
 
     else
         s = "yes";
 
-    s = config_get(section, name, s);
+    s = appconfig_get(root, section, name, s);
     if(!s) return value;
 
     if(!strcmp(s, "yes"))
-        return CONFIG_ONDEMAND_YES;
+        return CONFIG_BOOLEAN_YES;
     else if(!strcmp(s, "no"))
-        return CONFIG_ONDEMAND_NO;
+        return CONFIG_BOOLEAN_NO;
     else if(!strcmp(s, "auto") || !strcmp(s, "on demand"))
-        return CONFIG_ONDEMAND_ONDEMAND;
+        return CONFIG_BOOLEAN_AUTO;
 
     return value;
 }
 
-const char *config_set_default(const char *section, const char *name, const char *value)
+const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value)
 {
-    struct config_value *cv;
+    struct config_option *cv;
 
     debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
 
-    struct config *co = config_section_find(section);
-    if(!co) return config_set(section, name, value);
+    struct section *co = appconfig_section_find(root, section);
+    if(!co) return appconfig_set(root, section, name, value);
 
-    cv = config_value_index_find(co, name, 0);
-    if(!cv) return config_set(section, name, value);
+    cv = appconfig_option_index_find(co, name, 0);
+    if(!cv) return appconfig_set(root, section, name, value);
 
     cv->flags |= CONFIG_VALUE_USED;
 
@@ -323,17 +334,17 @@ const char *config_set_default(const char *section, const char *name, const char
     return cv->value;
 }
 
-const char *config_set(const char *section, const char *name, const char *value)
+const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value)
 {
-    struct config_value *cv;
+    struct config_option *cv;
 
     debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
 
-    struct config *co = config_section_find(section);
-    if(!co) co = config_section_create(section);
+    struct section *co = appconfig_section_find(root, section);
+    if(!co) co = appconfig_section_create(root, section);
 
-    cv = config_value_index_find(co, name, 0);
-    if(!cv) cv = config_value_create(co, name, value);
+    cv = appconfig_option_index_find(co, name, 0);
+    if(!cv) cv = appconfig_value_create(co, name, value);
     cv->flags |= CONFIG_VALUE_USED;
 
     if(strcmp(cv->value, value) != 0) {
@@ -346,23 +357,23 @@ const char *config_set(const char *section, const char *name, const char *value)
     return value;
 }
 
-long long config_set_number(const char *section, const char *name, long long value)
+long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value)
 {
     char buffer[100];
     sprintf(buffer, "%lld", value);
 
-    config_set(section, name, buffer);
+    appconfig_set(root, section, name, buffer);
 
     return value;
 }
 
-int config_set_boolean(const char *section, const char *name, int value)
+int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value)
 {
     char *s;
     if(value) s = "yes";
     else s = "no";
 
-    config_set(section, name, s);
+    appconfig_set(root, section, name, s);
 
     return value;
 }
@@ -371,10 +382,10 @@ int config_set_boolean(const char *section, const char *name, int value)
 // ----------------------------------------------------------------------------
 // config load/save
 
-int load_config(char *filename, int overwrite_used)
+int appconfig_load(struct config *root, char *filename, int overwrite_used)
 {
     int line = 0;
-    struct config *co = NULL;
+    struct section *co = NULL;
 
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
@@ -404,8 +415,8 @@ int load_config(char *filename, int overwrite_used)
             s[len - 1] = '\0';
             s++;
 
-            co = config_section_find(s);
-            if(!co) co = config_section_create(s);
+            co = appconfig_section_find(root, s);
+            if(!co) co = appconfig_section_create(root, s);
 
             continue;
         }
@@ -437,9 +448,9 @@ int load_config(char *filename, int overwrite_used)
             continue;
         }
 
-        struct config_value *cv = config_value_index_find(co, name, 0);
+        struct config_option *cv = appconfig_option_index_find(co, name, 0);
 
-        if(!cv) cv = config_value_create(co, name, value);
+        if(!cv) cv = appconfig_value_create(co, name, value);
         else {
             if(((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
                 debug(D_CONFIG, "Line %d, overwriting '%s/%s'.", line, co->name, cv->name);
@@ -457,11 +468,11 @@ int load_config(char *filename, int overwrite_used)
     return 1;
 }
 
-void generate_config(BUFFER *wb, int only_changed)
+void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
 {
     int i, pri;
-    struct config *co;
-    struct config_value *cv;
+    struct section *co;
+    struct config_option *cv;
 
     for(i = 0; i < 3 ;i++) {
         switch(i) {
@@ -490,8 +501,8 @@ void generate_config(BUFFER *wb, int only_changed)
                 break;
         }
 
-        config_global_write_lock();
-        for(co = config_root; co ; co = co->next) {
+        appconfig_wrlock(root);
+        for(co = root->sections; co ; co = co->next) {
             if(!strcmp(co->name, "global") ||
                     !strcmp(co->name, "plugins")  ||
                     !strcmp(co->name, "registry") ||
@@ -506,7 +517,7 @@ void generate_config(BUFFER *wb, int only_changed)
                 int changed = 0;
                 int count = 0;
 
-                config_section_write_lock(co);
+                config_section_wrlock(co);
                 for(cv = co->values; cv ; cv = cv->next) {
                     used += (cv->flags & CONFIG_VALUE_USED)?1:0;
                     changed += (cv->flags & CONFIG_VALUE_CHANGED)?1:0;
@@ -523,7 +534,7 @@ void generate_config(BUFFER *wb, int only_changed)
 
                 buffer_sprintf(wb, "\n[%s]\n", co->name);
 
-                config_section_write_lock(co);
+                config_section_wrlock(co);
                 for(cv = co->values; cv ; cv = cv->next) {
 
                     if(used && !(cv->flags & CONFIG_VALUE_USED)) {
@@ -534,6 +545,6 @@ void generate_config(BUFFER *wb, int only_changed)
                 config_section_unlock(co);
             }
         }
-        config_global_unlock();
+        appconfig_unlock(root);
     }
 }

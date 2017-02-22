@@ -198,17 +198,17 @@ static inline int is_major_enabled(int major) {
 
 int do_proc_diskstats(int update_every, usec_t dt) {
     static procfile *ff = NULL;
-    static int  global_enable_new_disks_detected_at_runtime = CONFIG_ONDEMAND_YES,
-                global_enable_performance_for_physical_disks = CONFIG_ONDEMAND_ONDEMAND,
-                global_enable_performance_for_virtual_disks = CONFIG_ONDEMAND_ONDEMAND,
-                global_enable_performance_for_partitions = CONFIG_ONDEMAND_NO,
-                global_do_io = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_ops = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_mops = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_iotime = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_qops = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_util = CONFIG_ONDEMAND_ONDEMAND,
-                global_do_backlog = CONFIG_ONDEMAND_ONDEMAND,
+    static int  global_enable_new_disks_detected_at_runtime = CONFIG_BOOLEAN_YES,
+                global_enable_performance_for_physical_disks = CONFIG_BOOLEAN_AUTO,
+                global_enable_performance_for_virtual_disks = CONFIG_BOOLEAN_AUTO,
+                global_enable_performance_for_partitions = CONFIG_BOOLEAN_NO,
+                global_do_io = CONFIG_BOOLEAN_AUTO,
+                global_do_ops = CONFIG_BOOLEAN_AUTO,
+                global_do_mops = CONFIG_BOOLEAN_AUTO,
+                global_do_iotime = CONFIG_BOOLEAN_AUTO,
+                global_do_qops = CONFIG_BOOLEAN_AUTO,
+                global_do_util = CONFIG_BOOLEAN_AUTO,
+                global_do_backlog = CONFIG_BOOLEAN_AUTO,
                 globals_initialized = 0;
 
     if(unlikely(!globals_initialized)) {
@@ -333,21 +333,21 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", disk);
 
             int def_enable = config_get_boolean_ondemand(var_name, "enable", global_enable_new_disks_detected_at_runtime);
-            if(unlikely(def_enable == CONFIG_ONDEMAND_NO)) {
+            if(unlikely(def_enable == CONFIG_BOOLEAN_NO)) {
                 // the user does not want any metrics for this disk
-                d->do_io = CONFIG_ONDEMAND_NO;
-                d->do_ops = CONFIG_ONDEMAND_NO;
-                d->do_mops = CONFIG_ONDEMAND_NO;
-                d->do_iotime = CONFIG_ONDEMAND_NO;
-                d->do_qops = CONFIG_ONDEMAND_NO;
-                d->do_util = CONFIG_ONDEMAND_NO;
-                d->do_backlog = CONFIG_ONDEMAND_NO;
+                d->do_io = CONFIG_BOOLEAN_NO;
+                d->do_ops = CONFIG_BOOLEAN_NO;
+                d->do_mops = CONFIG_BOOLEAN_NO;
+                d->do_iotime = CONFIG_BOOLEAN_NO;
+                d->do_qops = CONFIG_BOOLEAN_NO;
+                d->do_util = CONFIG_BOOLEAN_NO;
+                d->do_backlog = CONFIG_BOOLEAN_NO;
             }
             else {
                 // this disk is enabled
                 // check its direct settings
 
-                int def_performance = CONFIG_ONDEMAND_ONDEMAND;
+                int def_performance = CONFIG_BOOLEAN_AUTO;
 
                 // since this is 'on demand' we can figure the performance settings
                 // based on the type of disk
@@ -378,16 +378,16 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 // check the user configuration (this will also show our 'on demand' decision)
                 def_performance = config_get_boolean_ondemand(var_name, "enable performance metrics", def_performance);
 
-                int ddo_io = CONFIG_ONDEMAND_NO,
-                    ddo_ops = CONFIG_ONDEMAND_NO,
-                    ddo_mops = CONFIG_ONDEMAND_NO,
-                    ddo_iotime = CONFIG_ONDEMAND_NO,
-                    ddo_qops = CONFIG_ONDEMAND_NO,
-                    ddo_util = CONFIG_ONDEMAND_NO,
-                    ddo_backlog = CONFIG_ONDEMAND_NO;
+                int ddo_io = CONFIG_BOOLEAN_NO,
+                    ddo_ops = CONFIG_BOOLEAN_NO,
+                    ddo_mops = CONFIG_BOOLEAN_NO,
+                    ddo_iotime = CONFIG_BOOLEAN_NO,
+                    ddo_qops = CONFIG_BOOLEAN_NO,
+                    ddo_util = CONFIG_BOOLEAN_NO,
+                    ddo_backlog = CONFIG_BOOLEAN_NO;
 
                 // we enable individual performance charts only when def_performance is not disabled
-                if(unlikely(def_performance != CONFIG_ONDEMAND_NO)) {
+                if(unlikely(def_performance != CONFIG_BOOLEAN_NO)) {
                     ddo_io = global_do_io,
                     ddo_ops = global_do_ops,
                     ddo_mops = global_do_mops,
@@ -414,8 +414,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // --------------------------------------------------------------------------
         // Do performance metrics
 
-        if(d->do_io == CONFIG_ONDEMAND_YES || (d->do_io == CONFIG_ONDEMAND_ONDEMAND && (readsectors || writesectors))) {
-            d->do_io = CONFIG_ONDEMAND_YES;
+        if(d->do_io == CONFIG_BOOLEAN_YES || (d->do_io == CONFIG_BOOLEAN_AUTO && (readsectors || writesectors))) {
+            d->do_io = CONFIG_BOOLEAN_YES;
 
             st = rrdset_find_bytype_localhost(RRD_TYPE_DISK, disk);
             if(unlikely(!st)) {
@@ -434,8 +434,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(d->do_ops == CONFIG_ONDEMAND_YES || (d->do_ops == CONFIG_ONDEMAND_ONDEMAND && (reads || writes))) {
-            d->do_ops = CONFIG_ONDEMAND_YES;
+        if(d->do_ops == CONFIG_BOOLEAN_YES || (d->do_ops == CONFIG_BOOLEAN_AUTO && (reads || writes))) {
+            d->do_ops = CONFIG_BOOLEAN_YES;
 
             st = rrdset_find_bytype_localhost("disk_ops", disk);
             if(unlikely(!st)) {
@@ -455,8 +455,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(d->do_qops == CONFIG_ONDEMAND_YES || (d->do_qops == CONFIG_ONDEMAND_ONDEMAND && queued_ios)) {
-            d->do_qops = CONFIG_ONDEMAND_YES;
+        if(d->do_qops == CONFIG_BOOLEAN_YES || (d->do_qops == CONFIG_BOOLEAN_AUTO && queued_ios)) {
+            d->do_qops = CONFIG_BOOLEAN_YES;
 
             st = rrdset_find_bytype_localhost("disk_qops", disk);
             if(unlikely(!st)) {
@@ -474,8 +474,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(d->do_backlog == CONFIG_ONDEMAND_YES || (d->do_backlog == CONFIG_ONDEMAND_ONDEMAND && backlog_ms)) {
-            d->do_backlog = CONFIG_ONDEMAND_YES;
+        if(d->do_backlog == CONFIG_BOOLEAN_YES || (d->do_backlog == CONFIG_BOOLEAN_AUTO && backlog_ms)) {
+            d->do_backlog = CONFIG_BOOLEAN_YES;
 
             st = rrdset_find_bytype_localhost("disk_backlog", disk);
             if(unlikely(!st)) {
@@ -493,8 +493,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(d->do_util == CONFIG_ONDEMAND_YES || (d->do_util == CONFIG_ONDEMAND_ONDEMAND && busy_ms)) {
-            d->do_util = CONFIG_ONDEMAND_YES;
+        if(d->do_util == CONFIG_BOOLEAN_YES || (d->do_util == CONFIG_BOOLEAN_AUTO && busy_ms)) {
+            d->do_util = CONFIG_BOOLEAN_YES;
 
             st = rrdset_find_bytype_localhost("disk_util", disk);
             if(unlikely(!st)) {
@@ -512,8 +512,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(d->do_mops == CONFIG_ONDEMAND_YES || (d->do_mops == CONFIG_ONDEMAND_ONDEMAND && (mreads || mwrites))) {
-            d->do_mops = CONFIG_ONDEMAND_YES;
+        if(d->do_mops == CONFIG_BOOLEAN_YES || (d->do_mops == CONFIG_BOOLEAN_AUTO && (mreads || mwrites))) {
+            d->do_mops = CONFIG_BOOLEAN_YES;
 
             st = rrdset_find_bytype_localhost("disk_mops", disk);
             if(unlikely(!st)) {
@@ -533,8 +533,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(d->do_iotime == CONFIG_ONDEMAND_YES || (d->do_iotime == CONFIG_ONDEMAND_ONDEMAND && (readms || writems))) {
-            d->do_iotime = CONFIG_ONDEMAND_YES;
+        if(d->do_iotime == CONFIG_BOOLEAN_YES || (d->do_iotime == CONFIG_BOOLEAN_AUTO && (readms || writems))) {
+            d->do_iotime = CONFIG_BOOLEAN_YES;
 
             st = rrdset_find_bytype_localhost("disk_iotime", disk);
             if(unlikely(!st)) {
@@ -557,8 +557,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // only if this is not the first time we run
 
         if(likely(dt)) {
-            if( (d->do_iotime == CONFIG_ONDEMAND_YES || (d->do_iotime == CONFIG_ONDEMAND_ONDEMAND && (readms || writems))) &&
-                (d->do_ops    == CONFIG_ONDEMAND_YES || (d->do_ops    == CONFIG_ONDEMAND_ONDEMAND && (reads || writes)))) {
+            if( (d->do_iotime == CONFIG_BOOLEAN_YES || (d->do_iotime == CONFIG_BOOLEAN_AUTO && (readms || writems))) &&
+                (d->do_ops    == CONFIG_BOOLEAN_YES || (d->do_ops    == CONFIG_BOOLEAN_AUTO && (reads || writes)))) {
                 st = rrdset_find_bytype_localhost("disk_await", disk);
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("disk_await", disk, NULL, family, "disk.await"
@@ -576,8 +576,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if( (d->do_io  == CONFIG_ONDEMAND_YES || (d->do_io  == CONFIG_ONDEMAND_ONDEMAND && (readsectors || writesectors))) &&
-                (d->do_ops == CONFIG_ONDEMAND_YES || (d->do_ops == CONFIG_ONDEMAND_ONDEMAND && (reads || writes)))) {
+            if( (d->do_io  == CONFIG_BOOLEAN_YES || (d->do_io  == CONFIG_BOOLEAN_AUTO && (readsectors || writesectors))) &&
+                (d->do_ops == CONFIG_BOOLEAN_YES || (d->do_ops == CONFIG_BOOLEAN_AUTO && (reads || writes)))) {
                 st = rrdset_find_bytype_localhost("disk_avgsz", disk);
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("disk_avgsz", disk, NULL, family, "disk.avgsz"
@@ -595,8 +595,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-            if( (d->do_util == CONFIG_ONDEMAND_YES || (d->do_util == CONFIG_ONDEMAND_ONDEMAND && busy_ms)) &&
-                (d->do_ops  == CONFIG_ONDEMAND_YES || (d->do_ops  == CONFIG_ONDEMAND_ONDEMAND && (reads || writes)))) {
+            if( (d->do_util == CONFIG_BOOLEAN_YES || (d->do_util == CONFIG_BOOLEAN_AUTO && busy_ms)) &&
+                (d->do_ops  == CONFIG_BOOLEAN_YES || (d->do_ops  == CONFIG_BOOLEAN_AUTO && (reads || writes)))) {
                 st = rrdset_find_bytype_localhost("disk_svctm", disk);
                 if(unlikely(!st)) {
                     st = rrdset_create_localhost("disk_svctm", disk, NULL, family, "disk.svctm", "Average Service Time"

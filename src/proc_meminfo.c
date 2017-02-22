@@ -55,8 +55,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     if(unlikely(!arl_base)) {
         do_ram          = config_get_boolean("plugin:proc:/proc/meminfo", "system ram", 1);
-        do_swap         = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "system swap", CONFIG_ONDEMAND_ONDEMAND);
-        do_hwcorrupt    = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "hardware corrupted ECC", CONFIG_ONDEMAND_ONDEMAND);
+        do_swap         = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "system swap", CONFIG_BOOLEAN_AUTO);
+        do_hwcorrupt    = config_get_boolean_ondemand("plugin:proc:/proc/meminfo", "hardware corrupted ECC", CONFIG_BOOLEAN_AUTO);
         do_committed    = config_get_boolean("plugin:proc:/proc/meminfo", "committed memory", 1);
         do_writeback    = config_get_boolean("plugin:proc:/proc/meminfo", "writeback memory", 1);
         do_kernel       = config_get_boolean("plugin:proc:/proc/meminfo", "kernel memory", 1);
@@ -163,8 +163,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     unsigned long long SwapUsed = SwapTotal - SwapFree;
 
-    if(SwapTotal || SwapUsed || SwapFree || do_swap == CONFIG_ONDEMAND_YES) {
-        do_swap = CONFIG_ONDEMAND_YES;
+    if(SwapTotal || SwapUsed || SwapFree || do_swap == CONFIG_BOOLEAN_YES) {
+        do_swap = CONFIG_BOOLEAN_YES;
 
         st = rrdset_find_localhost("system.swap");
         if(!st) {
@@ -184,8 +184,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND && (do_hwcorrupt == CONFIG_ONDEMAND_YES || (do_hwcorrupt == CONFIG_ONDEMAND_ONDEMAND && HardwareCorrupted > 0))) {
-        do_hwcorrupt = CONFIG_ONDEMAND_YES;
+    if(arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND && (do_hwcorrupt == CONFIG_BOOLEAN_YES || (do_hwcorrupt == CONFIG_BOOLEAN_AUTO && HardwareCorrupted > 0))) {
+        do_hwcorrupt = CONFIG_BOOLEAN_YES;
 
         st = rrdset_find_localhost("mem.hwcorrupt");
         if(!st) {

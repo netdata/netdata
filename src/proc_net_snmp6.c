@@ -126,28 +126,28 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
     static unsigned long long UdpLite6InCsumErrors = 0ULL;
 
     if(unlikely(!arl_base)) {
-        do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 packets", CONFIG_ONDEMAND_ONDEMAND);
-        do_ip_fragsout      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments sent", CONFIG_ONDEMAND_ONDEMAND);
-        do_ip_fragsin       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments assembly", CONFIG_ONDEMAND_ONDEMAND);
-        do_ip_errors        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 errors", CONFIG_ONDEMAND_ONDEMAND);
-        do_udp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDP packets", CONFIG_ONDEMAND_ONDEMAND);
-        do_udp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDP errors", CONFIG_ONDEMAND_ONDEMAND);
-        do_udplite_packets  = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite packets", CONFIG_ONDEMAND_ONDEMAND);
-        do_udplite_errors   = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite errors", CONFIG_ONDEMAND_ONDEMAND);
-        do_bandwidth        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "bandwidth", CONFIG_ONDEMAND_ONDEMAND);
-        do_mcast            = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "multicast bandwidth", CONFIG_ONDEMAND_ONDEMAND);
-        do_bcast            = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "broadcast bandwidth", CONFIG_ONDEMAND_ONDEMAND);
-        do_mcast_p          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "multicast packets", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp             = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp_redir       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp redirects", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp_errors      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp errors", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp_echos       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp echos", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp_groupmemb   = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp group membership", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp_router      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp router", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp_neighbor    = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp neighbor", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp_mldv2       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp mldv2", CONFIG_ONDEMAND_ONDEMAND);
-        do_icmp_types       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp types", CONFIG_ONDEMAND_ONDEMAND);
-        do_ect              = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ect", CONFIG_ONDEMAND_ONDEMAND);
+        do_ip_packets       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 packets", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsout      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments sent", CONFIG_BOOLEAN_AUTO);
+        do_ip_fragsin       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 fragments assembly", CONFIG_BOOLEAN_AUTO);
+        do_ip_errors        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 errors", CONFIG_BOOLEAN_AUTO);
+        do_udp_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDP packets", CONFIG_BOOLEAN_AUTO);
+        do_udp_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDP errors", CONFIG_BOOLEAN_AUTO);
+        do_udplite_packets  = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite packets", CONFIG_BOOLEAN_AUTO);
+        do_udplite_errors   = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ipv6 UDPlite errors", CONFIG_BOOLEAN_AUTO);
+        do_bandwidth        = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_mcast            = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "multicast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_bcast            = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "broadcast bandwidth", CONFIG_BOOLEAN_AUTO);
+        do_mcast_p          = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "multicast packets", CONFIG_BOOLEAN_AUTO);
+        do_icmp             = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp", CONFIG_BOOLEAN_AUTO);
+        do_icmp_redir       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp redirects", CONFIG_BOOLEAN_AUTO);
+        do_icmp_errors      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp errors", CONFIG_BOOLEAN_AUTO);
+        do_icmp_echos       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp echos", CONFIG_BOOLEAN_AUTO);
+        do_icmp_groupmemb   = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp group membership", CONFIG_BOOLEAN_AUTO);
+        do_icmp_router      = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp router", CONFIG_BOOLEAN_AUTO);
+        do_icmp_neighbor    = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp neighbor", CONFIG_BOOLEAN_AUTO);
+        do_icmp_mldv2       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp mldv2", CONFIG_BOOLEAN_AUTO);
+        do_icmp_types       = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "icmp types", CONFIG_BOOLEAN_AUTO);
+        do_ect              = config_get_boolean_ondemand("plugin:proc:/proc/net/snmp6", "ect", CONFIG_BOOLEAN_AUTO);
 
         arl_base = arl_create("snmp6", NULL, 60);
         arl_expect(arl_base, "Ip6InReceives", &Ip6InReceives);
@@ -276,8 +276,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_bandwidth == CONFIG_ONDEMAND_YES || (do_bandwidth == CONFIG_ONDEMAND_ONDEMAND && (Ip6InOctets || Ip6OutOctets))) {
-        do_bandwidth = CONFIG_ONDEMAND_YES;
+    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO && (Ip6InOctets || Ip6OutOctets))) {
+        do_bandwidth = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost("system.ipv6");
         if(unlikely(!st)) {
             st = rrdset_create_localhost("system", "ipv6", NULL, "network", NULL, "IPv6 Bandwidth", "kilobits/s", 500
@@ -295,8 +295,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ip_packets == CONFIG_ONDEMAND_YES || (do_ip_packets == CONFIG_ONDEMAND_ONDEMAND && (Ip6InReceives || Ip6OutRequests || Ip6InDelivers || Ip6OutForwDatagrams))) {
-        do_ip_packets = CONFIG_ONDEMAND_YES;
+    if(do_ip_packets == CONFIG_BOOLEAN_YES || (do_ip_packets == CONFIG_BOOLEAN_AUTO && (Ip6InReceives || Ip6OutRequests || Ip6InDelivers || Ip6OutForwDatagrams))) {
+        do_ip_packets = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".packets");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "packets", NULL, "packets", NULL, "IPv6 Packets"
@@ -318,8 +318,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ip_fragsout == CONFIG_ONDEMAND_YES || (do_ip_fragsout == CONFIG_ONDEMAND_ONDEMAND && (Ip6FragOKs || Ip6FragFails || Ip6FragCreates))) {
-        do_ip_fragsout = CONFIG_ONDEMAND_YES;
+    if(do_ip_fragsout == CONFIG_BOOLEAN_YES || (do_ip_fragsout == CONFIG_BOOLEAN_AUTO && (Ip6FragOKs || Ip6FragFails || Ip6FragCreates))) {
+        do_ip_fragsout = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".fragsout");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "fragsout", NULL, "fragments", NULL, "IPv6 Fragments Sent"
@@ -340,14 +340,14 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ip_fragsin == CONFIG_ONDEMAND_YES || (do_ip_fragsin == CONFIG_ONDEMAND_ONDEMAND
+    if(do_ip_fragsin == CONFIG_BOOLEAN_YES || (do_ip_fragsin == CONFIG_BOOLEAN_AUTO
         && (
             Ip6ReasmOKs
             || Ip6ReasmFails
             || Ip6ReasmTimeout
             || Ip6ReasmReqds
             ))) {
-        do_ip_fragsin = CONFIG_ONDEMAND_YES;
+        do_ip_fragsin = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".fragsin");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "fragsin", NULL, "fragments", NULL
@@ -371,7 +371,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ip_errors == CONFIG_ONDEMAND_YES || (do_ip_errors == CONFIG_ONDEMAND_ONDEMAND
+    if(do_ip_errors == CONFIG_BOOLEAN_YES || (do_ip_errors == CONFIG_BOOLEAN_AUTO
         && (
             Ip6InDiscards
             || Ip6OutDiscards
@@ -382,7 +382,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Ip6InTruncatedPkts
             || Ip6InNoRoutes
         ))) {
-        do_ip_errors = CONFIG_ONDEMAND_YES;
+        do_ip_errors = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".errors");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "errors", NULL, "errors", NULL, "IPv6 Errors", "packets/s"
@@ -419,8 +419,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_udp_packets == CONFIG_ONDEMAND_YES || (do_udp_packets == CONFIG_ONDEMAND_ONDEMAND && (Udp6InDatagrams || Udp6OutDatagrams))) {
-        do_udp_packets = CONFIG_ONDEMAND_YES;
+    if(do_udp_packets == CONFIG_BOOLEAN_YES || (do_udp_packets == CONFIG_BOOLEAN_AUTO && (Udp6InDatagrams || Udp6OutDatagrams))) {
+        do_udp_packets = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udppackets");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udppackets", NULL, "udp", NULL, "IPv6 UDP Packets"
@@ -438,7 +438,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_udp_errors == CONFIG_ONDEMAND_YES || (do_udp_errors == CONFIG_ONDEMAND_ONDEMAND
+    if(do_udp_errors == CONFIG_BOOLEAN_YES || (do_udp_errors == CONFIG_BOOLEAN_AUTO
         && (
             Udp6InErrors
             || Udp6NoPorts
@@ -447,7 +447,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Udp6InCsumErrors
             || Udp6IgnoredMulti
         ))) {
-        do_udp_errors = CONFIG_ONDEMAND_YES;
+        do_udp_errors = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udperrors");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udperrors", NULL, "udp", NULL, "IPv6 UDP Errors"
@@ -474,8 +474,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_udplite_packets == CONFIG_ONDEMAND_YES || (do_udplite_packets == CONFIG_ONDEMAND_ONDEMAND && (UdpLite6InDatagrams || UdpLite6OutDatagrams))) {
-        do_udplite_packets = CONFIG_ONDEMAND_YES;
+    if(do_udplite_packets == CONFIG_BOOLEAN_YES || (do_udplite_packets == CONFIG_BOOLEAN_AUTO && (UdpLite6InDatagrams || UdpLite6OutDatagrams))) {
+        do_udplite_packets = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udplitepackets");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udplitepackets", NULL, "udplite", NULL
@@ -493,7 +493,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_udplite_errors == CONFIG_ONDEMAND_YES || (do_udplite_errors == CONFIG_ONDEMAND_ONDEMAND
+    if(do_udplite_errors == CONFIG_BOOLEAN_YES || (do_udplite_errors == CONFIG_BOOLEAN_AUTO
         && (
             UdpLite6InErrors
             || UdpLite6NoPorts
@@ -502,7 +502,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Udp6InCsumErrors
             || UdpLite6InCsumErrors
         ))) {
-        do_udplite_errors = CONFIG_ONDEMAND_YES;
+        do_udplite_errors = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udpliteerrors");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udpliteerrors", NULL, "udplite", NULL
@@ -527,8 +527,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_mcast == CONFIG_ONDEMAND_YES || (do_mcast == CONFIG_ONDEMAND_ONDEMAND && (Ip6OutMcastOctets || Ip6InMcastOctets))) {
-        do_mcast = CONFIG_ONDEMAND_YES;
+    if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO && (Ip6OutMcastOctets || Ip6InMcastOctets))) {
+        do_mcast = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".mcast");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "mcast", NULL, "multicast", NULL
@@ -548,8 +548,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_bcast == CONFIG_ONDEMAND_YES || (do_bcast == CONFIG_ONDEMAND_ONDEMAND && (Ip6OutBcastOctets || Ip6InBcastOctets))) {
-        do_bcast = CONFIG_ONDEMAND_YES;
+    if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO && (Ip6OutBcastOctets || Ip6InBcastOctets))) {
+        do_bcast = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".bcast");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "bcast", NULL, "broadcast", NULL
@@ -569,8 +569,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_mcast_p == CONFIG_ONDEMAND_YES || (do_mcast_p == CONFIG_ONDEMAND_ONDEMAND && (Ip6OutMcastPkts || Ip6InMcastPkts))) {
-        do_mcast_p = CONFIG_ONDEMAND_YES;
+    if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO && (Ip6OutMcastPkts || Ip6InMcastPkts))) {
+        do_mcast_p = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".mcastpkts");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "mcastpkts", NULL, "multicast", NULL
@@ -589,8 +589,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp == CONFIG_ONDEMAND_YES || (do_icmp == CONFIG_ONDEMAND_ONDEMAND && (Icmp6InMsgs || Icmp6OutMsgs))) {
-        do_icmp = CONFIG_ONDEMAND_YES;
+    if(do_icmp == CONFIG_BOOLEAN_YES || (do_icmp == CONFIG_BOOLEAN_AUTO && (Icmp6InMsgs || Icmp6OutMsgs))) {
+        do_icmp = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmp");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmp", NULL, "icmp", NULL, "IPv6 ICMP Messages"
@@ -608,8 +608,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_redir == CONFIG_ONDEMAND_YES || (do_icmp_redir == CONFIG_ONDEMAND_ONDEMAND && (Icmp6InRedirects || Icmp6OutRedirects))) {
-        do_icmp_redir = CONFIG_ONDEMAND_YES;
+    if(do_icmp_redir == CONFIG_BOOLEAN_YES || (do_icmp_redir == CONFIG_BOOLEAN_AUTO && (Icmp6InRedirects || Icmp6OutRedirects))) {
+        do_icmp_redir = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpredir");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmpredir", NULL, "icmp", NULL, "IPv6 ICMP Redirects"
@@ -627,7 +627,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_errors == CONFIG_ONDEMAND_YES || (do_icmp_errors == CONFIG_ONDEMAND_ONDEMAND
+    if(do_icmp_errors == CONFIG_BOOLEAN_YES || (do_icmp_errors == CONFIG_BOOLEAN_AUTO
         && (
             Icmp6InErrors
             || Icmp6OutErrors
@@ -641,7 +641,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutTimeExcds
             || Icmp6OutParmProblems
         ))) {
-        do_icmp_errors = CONFIG_ONDEMAND_YES;
+        do_icmp_errors = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmperrors");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmperrors", NULL, "icmp", NULL, "IPv6 ICMP Errors"
@@ -678,14 +678,14 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_echos == CONFIG_ONDEMAND_YES || (do_icmp_echos == CONFIG_ONDEMAND_ONDEMAND
+    if(do_icmp_echos == CONFIG_BOOLEAN_YES || (do_icmp_echos == CONFIG_BOOLEAN_AUTO
         && (
             Icmp6InEchos
             || Icmp6OutEchos
             || Icmp6InEchoReplies
             || Icmp6OutEchoReplies
         ))) {
-        do_icmp_echos = CONFIG_ONDEMAND_YES;
+        do_icmp_echos = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpechos");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmpechos", NULL, "icmp", NULL, "IPv6 ICMP Echo"
@@ -707,7 +707,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_groupmemb == CONFIG_ONDEMAND_YES || (do_icmp_groupmemb == CONFIG_ONDEMAND_ONDEMAND
+    if(do_icmp_groupmemb == CONFIG_BOOLEAN_YES || (do_icmp_groupmemb == CONFIG_BOOLEAN_AUTO
         && (
             Icmp6InGroupMembQueries
             || Icmp6OutGroupMembQueries
@@ -716,7 +716,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6InGroupMembReductions
             || Icmp6OutGroupMembReductions
         ))) {
-        do_icmp_groupmemb = CONFIG_ONDEMAND_YES;
+        do_icmp_groupmemb = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".groupmemb");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "groupmemb", NULL, "icmp", NULL
@@ -743,14 +743,14 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_router == CONFIG_ONDEMAND_YES || (do_icmp_router == CONFIG_ONDEMAND_ONDEMAND
+    if(do_icmp_router == CONFIG_BOOLEAN_YES || (do_icmp_router == CONFIG_BOOLEAN_AUTO
         && (
             Icmp6InRouterSolicits
             || Icmp6OutRouterSolicits
             || Icmp6InRouterAdvertisements
             || Icmp6OutRouterAdvertisements
         ))) {
-        do_icmp_router = CONFIG_ONDEMAND_YES;
+        do_icmp_router = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmprouter");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmprouter", NULL, "icmp", NULL, "IPv6 Router Messages"
@@ -772,14 +772,14 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_neighbor == CONFIG_ONDEMAND_YES || (do_icmp_neighbor == CONFIG_ONDEMAND_ONDEMAND
+    if(do_icmp_neighbor == CONFIG_BOOLEAN_YES || (do_icmp_neighbor == CONFIG_BOOLEAN_AUTO
         && (
             Icmp6InNeighborSolicits
             || Icmp6OutNeighborSolicits
             || Icmp6InNeighborAdvertisements
             || Icmp6OutNeighborAdvertisements
         ))) {
-        do_icmp_neighbor = CONFIG_ONDEMAND_YES;
+        do_icmp_neighbor = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpneighbor");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmpneighbor", NULL, "icmp", NULL
@@ -802,8 +802,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_mldv2 == CONFIG_ONDEMAND_YES || (do_icmp_mldv2 == CONFIG_ONDEMAND_ONDEMAND && (Icmp6InMLDv2Reports || Icmp6OutMLDv2Reports))) {
-        do_icmp_mldv2 = CONFIG_ONDEMAND_YES;
+    if(do_icmp_mldv2 == CONFIG_BOOLEAN_YES || (do_icmp_mldv2 == CONFIG_BOOLEAN_AUTO && (Icmp6InMLDv2Reports || Icmp6OutMLDv2Reports))) {
+        do_icmp_mldv2 = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpmldv2");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmpmldv2", NULL, "icmp", NULL, "IPv6 ICMP MLDv2 Reports"
@@ -821,7 +821,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_types == CONFIG_ONDEMAND_YES || (do_icmp_types == CONFIG_ONDEMAND_ONDEMAND
+    if(do_icmp_types == CONFIG_BOOLEAN_YES || (do_icmp_types == CONFIG_BOOLEAN_AUTO
         && (
             Icmp6InType1
             || Icmp6InType128
@@ -834,7 +834,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutType135
             || Icmp6OutType143
         ))) {
-        do_icmp_types = CONFIG_ONDEMAND_YES;
+        do_icmp_types = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmptypes");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmptypes", NULL, "icmp", NULL, "IPv6 ICMP Types"
@@ -868,14 +868,14 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ect == CONFIG_ONDEMAND_YES || (do_ect == CONFIG_ONDEMAND_ONDEMAND
+    if(do_ect == CONFIG_BOOLEAN_YES || (do_ect == CONFIG_BOOLEAN_AUTO
         && (
             Ip6InNoECTPkts
             || Ip6InECT1Pkts
             || Ip6InECT0Pkts
             || Ip6InCEPkts
         ))) {
-        do_ect = CONFIG_ONDEMAND_YES;
+        do_ect = CONFIG_BOOLEAN_YES;
         st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".ect");
         if(unlikely(!st)) {
             st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "ect", NULL, "packets", NULL, "IPv6 ECT Packets"

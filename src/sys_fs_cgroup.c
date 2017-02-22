@@ -8,22 +8,22 @@
 
 static long system_page_size = 4096; // system will be queried via sysconf() in configuration()
 
-static int cgroup_enable_cpuacct_stat = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_cpuacct_usage = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_memory = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_detailed_memory = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_memory_failcnt = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_swap = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_blkio_io = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_blkio_ops = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_blkio_throttle_io = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_blkio_throttle_ops = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_blkio_merged_ops = CONFIG_ONDEMAND_ONDEMAND;
-static int cgroup_enable_blkio_queued_ops = CONFIG_ONDEMAND_ONDEMAND;
+static int cgroup_enable_cpuacct_stat = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_memory = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_detailed_memory = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_swap = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_blkio_io = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_blkio_ops = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_blkio_throttle_io = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_blkio_throttle_ops = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_blkio_merged_ops = CONFIG_BOOLEAN_AUTO;
+static int cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_AUTO;
 
-static int cgroup_enable_systemd_services = CONFIG_ONDEMAND_YES;
-static int cgroup_enable_systemd_services_detailed_memory = CONFIG_ONDEMAND_NO;
-static int cgroup_used_memory_without_cache = CONFIG_ONDEMAND_YES;
+static int cgroup_enable_systemd_services = CONFIG_BOOLEAN_YES;
+static int cgroup_enable_systemd_services_detailed_memory = CONFIG_BOOLEAN_NO;
+static int cgroup_used_memory_without_cache = CONFIG_BOOLEAN_YES;
 
 static int cgroup_search_in_devices = 1;
 
@@ -211,7 +211,7 @@ void read_cgroup_plugin_configuration() {
 
 struct blkio {
     int updated;
-    int enabled; // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
+    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
     int delay_counter;
 
     char *filename;
@@ -236,10 +236,10 @@ struct memory {
     int updated_msw_usage_in_bytes;
     int updated_failcnt;
 
-    int enabled_detailed;           // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
-    int enabled_usage_in_bytes;     // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
-    int enabled_msw_usage_in_bytes; // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
-    int enabled_failcnt;            // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
+    int enabled_detailed;           // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
+    int enabled_usage_in_bytes;     // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
+    int enabled_msw_usage_in_bytes; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
+    int enabled_failcnt;            // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
 
     int delay_counter_detailed;
     int delay_counter_failcnt;
@@ -298,7 +298,7 @@ struct memory {
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
 struct cpuacct_stat {
     int updated;
-    int enabled; // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
+    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
 
     char *filename;
 
@@ -309,7 +309,7 @@ struct cpuacct_stat {
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
 struct cpuacct_usage {
     int updated;
-    int enabled; // CONFIG_ONDEMAND_YES or CONFIG_ONDEMAND_ONDEMAND
+    int enabled; // CONFIG_BOOLEAN_YES or CONFIG_BOOLEAN_AUTO
 
     char *filename;
 
@@ -437,8 +437,8 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
 
         cp->updated = 1;
 
-        if(unlikely(cp->enabled == CONFIG_ONDEMAND_ONDEMAND && (cp->user || cp->system)))
-            cp->enabled = CONFIG_ONDEMAND_YES;
+        if(unlikely(cp->enabled == CONFIG_BOOLEAN_AUTO && (cp->user || cp->system)))
+            cp->enabled = CONFIG_BOOLEAN_YES;
     }
 }
 
@@ -492,15 +492,15 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 
         ca->updated = 1;
 
-        if(unlikely(ca->enabled == CONFIG_ONDEMAND_ONDEMAND && total))
-            ca->enabled = CONFIG_ONDEMAND_YES;
+        if(unlikely(ca->enabled == CONFIG_BOOLEAN_AUTO && total))
+            ca->enabled = CONFIG_BOOLEAN_YES;
     }
 }
 
 static inline void cgroup_read_blkio(struct blkio *io) {
     static procfile *ff = NULL;
 
-    if(unlikely(io->enabled == CONFIG_ONDEMAND_ONDEMAND && io->delay_counter > 0)) {
+    if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0)) {
         io->delay_counter--;
         return;
     }
@@ -558,9 +558,9 @@ static inline void cgroup_read_blkio(struct blkio *io) {
 
         io->updated = 1;
 
-        if(unlikely(io->enabled == CONFIG_ONDEMAND_ONDEMAND)) {
+        if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO)) {
             if(unlikely(io->Read || io->Write))
-                io->enabled = CONFIG_ONDEMAND_YES;
+                io->enabled = CONFIG_BOOLEAN_YES;
             else
                 io->delay_counter = cgroup_recheck_zero_blkio_every_iterations;
         }
@@ -572,7 +572,7 @@ static inline void cgroup_read_memory(struct memory *mem) {
 
     // read detailed ram usage
     if(likely(mem->filename_detailed)) {
-        if(unlikely(mem->enabled_detailed == CONFIG_ONDEMAND_ONDEMAND && mem->delay_counter_detailed > 0)) {
+        if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO && mem->delay_counter_detailed > 0)) {
             mem->delay_counter_detailed--;
             goto memory_next;
         }
@@ -631,9 +631,9 @@ static inline void cgroup_read_memory(struct memory *mem) {
 
         mem->updated_detailed = 1;
 
-        if(unlikely(mem->enabled_detailed == CONFIG_ONDEMAND_ONDEMAND)) {
+        if(unlikely(mem->enabled_detailed == CONFIG_BOOLEAN_AUTO)) {
             if(mem->cache || mem->dirty || mem->rss || mem->rss_huge || mem->mapped_file || mem->writeback || mem->swap || mem->pgpgin || mem->pgpgout || mem->pgfault || mem->pgmajfault)
-                mem->enabled_detailed = CONFIG_ONDEMAND_YES;
+                mem->enabled_detailed = CONFIG_BOOLEAN_YES;
             else
                 mem->delay_counter_detailed = cgroup_recheck_zero_mem_detailed_every_iterations;
         }
@@ -644,30 +644,30 @@ memory_next:
     // read usage_in_bytes
     if(likely(mem->filename_usage_in_bytes)) {
         mem->updated_usage_in_bytes = !read_single_number_file(mem->filename_usage_in_bytes, &mem->usage_in_bytes);
-        if(unlikely(mem->updated_usage_in_bytes && mem->enabled_usage_in_bytes == CONFIG_ONDEMAND_ONDEMAND && mem->usage_in_bytes))
-            mem->enabled_usage_in_bytes = CONFIG_ONDEMAND_YES;
+        if(unlikely(mem->updated_usage_in_bytes && mem->enabled_usage_in_bytes == CONFIG_BOOLEAN_AUTO && mem->usage_in_bytes))
+            mem->enabled_usage_in_bytes = CONFIG_BOOLEAN_YES;
     }
 
     // read msw_usage_in_bytes
     if(likely(mem->filename_msw_usage_in_bytes)) {
         mem->updated_msw_usage_in_bytes = !read_single_number_file(mem->filename_msw_usage_in_bytes, &mem->msw_usage_in_bytes);
-        if(unlikely(mem->updated_msw_usage_in_bytes && mem->enabled_msw_usage_in_bytes == CONFIG_ONDEMAND_ONDEMAND && mem->msw_usage_in_bytes))
-            mem->enabled_msw_usage_in_bytes = CONFIG_ONDEMAND_YES;
+        if(unlikely(mem->updated_msw_usage_in_bytes && mem->enabled_msw_usage_in_bytes == CONFIG_BOOLEAN_AUTO && mem->msw_usage_in_bytes))
+            mem->enabled_msw_usage_in_bytes = CONFIG_BOOLEAN_YES;
     }
 
     // read failcnt
     if(likely(mem->filename_failcnt)) {
-        if(unlikely(mem->enabled_failcnt == CONFIG_ONDEMAND_ONDEMAND && mem->delay_counter_failcnt > 0)) {
+        if(unlikely(mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO && mem->delay_counter_failcnt > 0)) {
             mem->updated_failcnt = 0;
             mem->delay_counter_failcnt--;
         }
         else {
             mem->updated_failcnt = !read_single_number_file(mem->filename_failcnt, &mem->failcnt);
-            if(unlikely(mem->updated_failcnt && mem->enabled_failcnt == CONFIG_ONDEMAND_ONDEMAND)) {
+            if(unlikely(mem->updated_failcnt && mem->enabled_failcnt == CONFIG_BOOLEAN_AUTO)) {
                 if(unlikely(!mem->failcnt))
                     mem->delay_counter_failcnt = cgroup_recheck_zero_mem_failcnt_every_iterations;
                 else
-                    mem->enabled_failcnt = CONFIG_ONDEMAND_YES;
+                    mem->enabled_failcnt = CONFIG_BOOLEAN_YES;
             }
         }
     }
@@ -1074,7 +1074,7 @@ static inline void find_all_cgroups() {
     if(cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage) {
         if(find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_subdir_in_dir) == -1) {
             cgroup_enable_cpuacct_stat =
-            cgroup_enable_cpuacct_usage = CONFIG_ONDEMAND_NO;
+            cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_NO;
             error("disabled CGROUP cpu statistics.");
         }
     }
@@ -1086,7 +1086,7 @@ static inline void find_all_cgroups() {
             cgroup_enable_blkio_throttle_io =
             cgroup_enable_blkio_throttle_ops =
             cgroup_enable_blkio_merged_ops =
-            cgroup_enable_blkio_queued_ops = CONFIG_ONDEMAND_NO;
+            cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
             error("disabled CGROUP blkio statistics.");
         }
     }
@@ -1096,7 +1096,7 @@ static inline void find_all_cgroups() {
             cgroup_enable_memory =
             cgroup_enable_detailed_memory =
             cgroup_enable_swap =
-            cgroup_enable_memory_failcnt = CONFIG_ONDEMAND_NO;
+            cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_NO;
             error("disabled CGROUP memory statistics.");
         }
     }
@@ -1150,7 +1150,7 @@ static inline void find_all_cgroups() {
             snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_memory_base, cg->id);
             if(likely(stat(filename, &buf) != -1)) {
                 cg->memory.filename_detailed = strdupz(filename);
-                cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_ONDEMAND_YES)?CONFIG_ONDEMAND_YES:CONFIG_ONDEMAND_ONDEMAND;
+                cg->memory.enabled_detailed = (cgroup_enable_detailed_memory == CONFIG_BOOLEAN_YES)?CONFIG_BOOLEAN_YES:CONFIG_BOOLEAN_AUTO;
                 debug(D_CGROUP, "memory.stat filename for cgroup '%s': '%s'", cg->id, cg->memory.filename_detailed);
             }
             else
@@ -1836,25 +1836,25 @@ void update_cgroup_charts(int update_every) {
             continue;
 
         if(likely(cgroup_enable_systemd_services && cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE)) {
-            if(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_ONDEMAND_YES) services_do_cpu++;
+            if(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES) services_do_cpu++;
 
             if(cgroup_enable_systemd_services_detailed_memory && cg->memory.updated_detailed && cg->memory.enabled_detailed) services_do_mem_detailed++;
-            if(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_ONDEMAND_YES) services_do_mem_usage++;
-            if(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_ONDEMAND_YES) services_do_mem_failcnt++;
-            if(cg->memory.updated_msw_usage_in_bytes && cg->memory.enabled_msw_usage_in_bytes == CONFIG_ONDEMAND_YES) services_do_swap_usage++;
+            if(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_BOOLEAN_YES) services_do_mem_usage++;
+            if(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_BOOLEAN_YES) services_do_mem_failcnt++;
+            if(cg->memory.updated_msw_usage_in_bytes && cg->memory.enabled_msw_usage_in_bytes == CONFIG_BOOLEAN_YES) services_do_swap_usage++;
 
-            if(cg->io_service_bytes.updated && cg->io_service_bytes.enabled == CONFIG_ONDEMAND_YES) services_do_io++;
-            if(cg->io_serviced.updated && cg->io_serviced.enabled == CONFIG_ONDEMAND_YES) services_do_io_ops++;
-            if(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.enabled == CONFIG_ONDEMAND_YES) services_do_throttle_io++;
-            if(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.enabled == CONFIG_ONDEMAND_YES) services_do_throttle_ops++;
-            if(cg->io_queued.updated && cg->io_queued.enabled == CONFIG_ONDEMAND_YES) services_do_queued_ops++;
-            if(cg->io_merged.updated && cg->io_merged.enabled == CONFIG_ONDEMAND_YES) services_do_merged_ops++;
+            if(cg->io_service_bytes.updated && cg->io_service_bytes.enabled == CONFIG_BOOLEAN_YES) services_do_io++;
+            if(cg->io_serviced.updated && cg->io_serviced.enabled == CONFIG_BOOLEAN_YES) services_do_io_ops++;
+            if(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.enabled == CONFIG_BOOLEAN_YES) services_do_throttle_io++;
+            if(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.enabled == CONFIG_BOOLEAN_YES) services_do_throttle_ops++;
+            if(cg->io_queued.updated && cg->io_queued.enabled == CONFIG_BOOLEAN_YES) services_do_queued_ops++;
+            if(cg->io_merged.updated && cg->io_merged.enabled == CONFIG_BOOLEAN_YES) services_do_merged_ops++;
             continue;
         }
 
         type[0] = '\0';
 
-        if(likely(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->cpuacct_stat.updated && cg->cpuacct_stat.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_cpu)) {
                 cg->st_cpu = rrdset_find_bytype_localhost(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                                                           , "cpu");
@@ -1874,7 +1874,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_cpu);
         }
 
-        if(likely(cg->cpuacct_usage.updated && cg->cpuacct_usage.enabled == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->cpuacct_usage.updated && cg->cpuacct_usage.enabled == CONFIG_BOOLEAN_YES)) {
             char id[RRD_ID_LENGTH_MAX + 1];
             unsigned int i;
 
@@ -1902,7 +1902,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_cpu_per_core);
         }
 
-        if(likely(cg->memory.updated_detailed && cg->memory.enabled_detailed == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->memory.updated_detailed && cg->memory.enabled_detailed == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_mem)) {
                 cg->st_mem = rrdset_find_bytype_localhost(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                                                           , "mem");
@@ -1991,7 +1991,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_pgfaults);
         }
 
-        if(likely(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->memory.updated_usage_in_bytes && cg->memory.enabled_usage_in_bytes == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_mem_usage)) {
                 cg->st_mem_usage = rrdset_find_bytype_localhost(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX)
                                                                 , "mem_usage");
@@ -2012,7 +2012,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_mem_usage);
         }
 
-        if(likely(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->memory.updated_failcnt && cg->memory.enabled_failcnt == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_mem_failcnt)) {
                 cg->st_mem_failcnt = rrdset_find_bytype_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "mem_failcnt");
@@ -2031,7 +2031,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_mem_failcnt);
         }
 
-        if(likely(cg->io_service_bytes.updated && cg->io_service_bytes.enabled == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->io_service_bytes.updated && cg->io_service_bytes.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_io)) {
                 cg->st_io = rrdset_find_bytype_localhost(cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "io");
                 if(likely(!cg->st_io)) {
@@ -2050,7 +2050,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_io);
         }
 
-        if(likely(cg->io_serviced.updated && cg->io_serviced.enabled == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->io_serviced.updated && cg->io_serviced.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_serviced_ops)) {
                 cg->st_serviced_ops = rrdset_find_bytype_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "serviced_ops");
@@ -2071,7 +2071,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_serviced_ops);
         }
 
-        if(likely(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.enabled == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->throttle_io_service_bytes.updated && cg->throttle_io_service_bytes.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_throttle_io)) {
                 cg->st_throttle_io = rrdset_find_bytype_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "throttle_io");
@@ -2092,7 +2092,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_throttle_io);
         }
 
-        if(likely(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.enabled == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->throttle_io_serviced.updated && cg->throttle_io_serviced.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_throttle_serviced_ops)) {
                 cg->st_throttle_serviced_ops = rrdset_find_bytype_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "throttle_serviced_ops");
@@ -2115,7 +2115,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_throttle_serviced_ops);
         }
 
-        if(likely(cg->io_queued.updated && cg->io_queued.enabled == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->io_queued.updated && cg->io_queued.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_queued_ops)) {
                 cg->st_queued_ops = rrdset_find_bytype_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "queued_ops");
@@ -2136,7 +2136,7 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_queued_ops);
         }
 
-        if(likely(cg->io_merged.updated && cg->io_merged.enabled == CONFIG_ONDEMAND_YES)) {
+        if(likely(cg->io_merged.updated && cg->io_merged.enabled == CONFIG_BOOLEAN_YES)) {
             if(unlikely(!cg->st_merged_ops)) {
                 cg->st_merged_ops = rrdset_find_bytype_localhost(
                         cgroup_chart_type(type, cg->chart_id, RRD_ID_LENGTH_MAX), "merged_ops");
