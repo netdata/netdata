@@ -1749,7 +1749,7 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, key, "health enabled by default", health_enabled);
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled", health_enabled);
 
-    if(strcmp(machine_guid, "localhost"))
+    if(!strcmp(machine_guid, "localhost"))
         host = localhost;
     else
         host = rrdhost_find_or_create(hostname, machine_guid, os, update_every, history, mode, health_enabled?1:0);
