@@ -117,15 +117,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
 
     if(unlikely(enable_new_interfaces == -1)) {
-        enable_new_interfaces = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", CONFIG_ONDEMAND_ONDEMAND);
+        enable_new_interfaces = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
 
-        do_bandwidth    = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        do_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "packets for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        do_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "errors for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        do_drops        = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "drops for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        do_fifo         = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "fifo for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        do_compressed   = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        do_events       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
+        do_bandwidth    = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_packets      = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "packets for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_errors       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "errors for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_drops        = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "drops for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_fifo         = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "fifo for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_compressed   = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", CONFIG_BOOLEAN_AUTO);
+        do_events       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", CONFIG_BOOLEAN_AUTO);
 
         disabled_list = simple_pattern_create(
                 config_get("plugin:proc:/proc/net/dev", "disable by default interfaces matching", "lo fireqos* *-ifb")
@@ -164,7 +164,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", d->name);
             d->enabled = config_get_boolean_ondemand(var_name, "enabled", d->enabled);
 
-            if(d->enabled == CONFIG_ONDEMAND_NO)
+            if(d->enabled == CONFIG_BOOLEAN_NO)
                 continue;
 
             d->do_bandwidth  = config_get_boolean_ondemand(var_name, "bandwidth", do_bandwidth);
@@ -179,38 +179,38 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if(unlikely(!d->enabled))
             continue;
 
-        if(likely(d->do_bandwidth != CONFIG_ONDEMAND_NO)) {
+        if(likely(d->do_bandwidth != CONFIG_BOOLEAN_NO)) {
             d->rbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 1));
             d->tbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 9));
         }
 
-        if(likely(d->do_packets != CONFIG_ONDEMAND_NO)) {
+        if(likely(d->do_packets != CONFIG_BOOLEAN_NO)) {
             d->rpackets    = str2kernel_uint_t(procfile_lineword(ff, l, 2));
             d->rmulticast  = str2kernel_uint_t(procfile_lineword(ff, l, 8));
             d->tpackets    = str2kernel_uint_t(procfile_lineword(ff, l, 10));
         }
 
-        if(likely(d->do_errors != CONFIG_ONDEMAND_NO)) {
+        if(likely(d->do_errors != CONFIG_BOOLEAN_NO)) {
             d->rerrors     = str2kernel_uint_t(procfile_lineword(ff, l, 3));
             d->terrors     = str2kernel_uint_t(procfile_lineword(ff, l, 11));
         }
 
-        if(likely(d->do_drops != CONFIG_ONDEMAND_NO)) {
+        if(likely(d->do_drops != CONFIG_BOOLEAN_NO)) {
             d->rdrops      = str2kernel_uint_t(procfile_lineword(ff, l, 4));
             d->tdrops      = str2kernel_uint_t(procfile_lineword(ff, l, 12));
         }
 
-        if(likely(d->do_fifo != CONFIG_ONDEMAND_NO)) {
+        if(likely(d->do_fifo != CONFIG_BOOLEAN_NO)) {
             d->rfifo       = str2kernel_uint_t(procfile_lineword(ff, l, 5));
             d->tfifo       = str2kernel_uint_t(procfile_lineword(ff, l, 13));
         }
 
-        if(likely(d->do_compressed != CONFIG_ONDEMAND_NO)) {
+        if(likely(d->do_compressed != CONFIG_BOOLEAN_NO)) {
             d->rcompressed = str2kernel_uint_t(procfile_lineword(ff, l, 7));
             d->tcompressed = str2kernel_uint_t(procfile_lineword(ff, l, 16));
         }
 
-        if(likely(d->do_events != CONFIG_ONDEMAND_NO)) {
+        if(likely(d->do_events != CONFIG_BOOLEAN_NO)) {
             d->rframe      = str2kernel_uint_t(procfile_lineword(ff, l, 6));
             d->tcollisions = str2kernel_uint_t(procfile_lineword(ff, l, 14));
             d->tcarrier    = str2kernel_uint_t(procfile_lineword(ff, l, 15));
@@ -218,10 +218,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_bandwidth == CONFIG_ONDEMAND_ONDEMAND && (d->rbytes || d->tbytes))))
-            d->do_bandwidth = CONFIG_ONDEMAND_YES;
+        if(unlikely((d->do_bandwidth == CONFIG_BOOLEAN_AUTO && (d->rbytes || d->tbytes))))
+            d->do_bandwidth = CONFIG_BOOLEAN_YES;
 
-        if(d->do_bandwidth == CONFIG_ONDEMAND_YES) {
+        if(d->do_bandwidth == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_bandwidth)) {
                 d->st_bandwidth = rrdset_find_bytype_localhost("net", d->name);
 
@@ -241,10 +241,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_packets == CONFIG_ONDEMAND_ONDEMAND && (d->rpackets || d->tpackets || d->rmulticast))))
-            d->do_packets = CONFIG_ONDEMAND_YES;
+        if(unlikely((d->do_packets == CONFIG_BOOLEAN_AUTO && (d->rpackets || d->tpackets || d->rmulticast))))
+            d->do_packets = CONFIG_BOOLEAN_YES;
 
-        if(d->do_packets == CONFIG_ONDEMAND_YES) {
+        if(d->do_packets == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_packets)) {
                 d->st_packets = rrdset_find_bytype_localhost("net_packets", d->name);
 
@@ -268,10 +268,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_errors == CONFIG_ONDEMAND_ONDEMAND && (d->rerrors || d->terrors))))
-            d->do_errors = CONFIG_ONDEMAND_YES;
+        if(unlikely((d->do_errors == CONFIG_BOOLEAN_AUTO && (d->rerrors || d->terrors))))
+            d->do_errors = CONFIG_BOOLEAN_YES;
 
-        if(d->do_errors == CONFIG_ONDEMAND_YES) {
+        if(d->do_errors == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_errors)) {
                 d->st_errors = rrdset_find_bytype_localhost("net_errors", d->name);
 
@@ -294,10 +294,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_drops == CONFIG_ONDEMAND_ONDEMAND && (d->rdrops || d->tdrops))))
-            d->do_drops = CONFIG_ONDEMAND_YES;
+        if(unlikely((d->do_drops == CONFIG_BOOLEAN_AUTO && (d->rdrops || d->tdrops))))
+            d->do_drops = CONFIG_BOOLEAN_YES;
 
-        if(d->do_drops == CONFIG_ONDEMAND_YES) {
+        if(d->do_drops == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_drops)) {
                 d->st_drops = rrdset_find_bytype_localhost("net_drops", d->name);
 
@@ -320,10 +320,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_fifo == CONFIG_ONDEMAND_ONDEMAND && (d->rfifo || d->tfifo))))
-            d->do_fifo = CONFIG_ONDEMAND_YES;
+        if(unlikely((d->do_fifo == CONFIG_BOOLEAN_AUTO && (d->rfifo || d->tfifo))))
+            d->do_fifo = CONFIG_BOOLEAN_YES;
 
-        if(d->do_fifo == CONFIG_ONDEMAND_YES) {
+        if(d->do_fifo == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_fifo)) {
                 d->st_fifo = rrdset_find_bytype_localhost("net_fifo", d->name);
 
@@ -346,10 +346,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_compressed == CONFIG_ONDEMAND_ONDEMAND && (d->rcompressed || d->tcompressed))))
-            d->do_compressed = CONFIG_ONDEMAND_YES;
+        if(unlikely((d->do_compressed == CONFIG_BOOLEAN_AUTO && (d->rcompressed || d->tcompressed))))
+            d->do_compressed = CONFIG_BOOLEAN_YES;
 
-        if(d->do_compressed == CONFIG_ONDEMAND_YES) {
+        if(d->do_compressed == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_compressed)) {
                 d->st_compressed = rrdset_find_bytype_localhost("net_compressed", d->name);
                 if(!d->st_compressed)
@@ -371,10 +371,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_events == CONFIG_ONDEMAND_ONDEMAND && (d->rframe || d->tcollisions || d->tcarrier))))
-            d->do_events = CONFIG_ONDEMAND_YES;
+        if(unlikely((d->do_events == CONFIG_BOOLEAN_AUTO && (d->rframe || d->tcollisions || d->tcarrier))))
+            d->do_events = CONFIG_BOOLEAN_YES;
 
-        if(d->do_events == CONFIG_ONDEMAND_YES) {
+        if(d->do_events == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_events)) {
                 d->st_events = rrdset_find_bytype_localhost("net_events", d->name);
                 if(!d->st_events)

@@ -190,13 +190,13 @@ static inline void tc_device_commit(struct tc_device *d) {
     static int enable_new_interfaces = -1, enable_bytes = -1, enable_packets = -1, enable_dropped = -1, enable_tokens = -1, enable_ctokens = -1, enabled_all_classes_qdiscs = -1;
 
     if(unlikely(enable_new_interfaces == -1)) {
-        enable_new_interfaces      = config_get_boolean_ondemand("plugin:tc", "enable new interfaces detected at runtime", CONFIG_ONDEMAND_YES);
-        enable_bytes               = config_get_boolean_ondemand("plugin:tc", "enable traffic charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        enable_packets             = config_get_boolean_ondemand("plugin:tc", "enable packets charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        enable_dropped             = config_get_boolean_ondemand("plugin:tc", "enable dropped charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        enable_tokens              = config_get_boolean_ondemand("plugin:tc", "enable tokens charts for all interfaces", CONFIG_ONDEMAND_NO);
-        enable_ctokens             = config_get_boolean_ondemand("plugin:tc", "enable ctokens charts for all interfaces", CONFIG_ONDEMAND_NO);
-        enabled_all_classes_qdiscs = config_get_boolean_ondemand("plugin:tc", "enable show all classes and qdiscs for all interfaces", CONFIG_ONDEMAND_NO);
+        enable_new_interfaces      = config_get_boolean_ondemand("plugin:tc", "enable new interfaces detected at runtime", CONFIG_BOOLEAN_YES);
+        enable_bytes               = config_get_boolean_ondemand("plugin:tc", "enable traffic charts for all interfaces", CONFIG_BOOLEAN_AUTO);
+        enable_packets             = config_get_boolean_ondemand("plugin:tc", "enable packets charts for all interfaces", CONFIG_BOOLEAN_AUTO);
+        enable_dropped             = config_get_boolean_ondemand("plugin:tc", "enable dropped charts for all interfaces", CONFIG_BOOLEAN_AUTO);
+        enable_tokens              = config_get_boolean_ondemand("plugin:tc", "enable tokens charts for all interfaces", CONFIG_BOOLEAN_NO);
+        enable_ctokens             = config_get_boolean_ondemand("plugin:tc", "enable ctokens charts for all interfaces", CONFIG_BOOLEAN_NO);
+        enabled_all_classes_qdiscs = config_get_boolean_ondemand("plugin:tc", "enable show all classes and qdiscs for all interfaces", CONFIG_BOOLEAN_NO);
     }
 
     if(unlikely(d->enabled == (char)-1)) {
@@ -370,8 +370,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // bytes
 
-    if(d->enabled_bytes == CONFIG_ONDEMAND_YES || (d->enabled_bytes == CONFIG_ONDEMAND_ONDEMAND && bytes_sum)) {
-        d->enabled_bytes = CONFIG_ONDEMAND_YES;
+    if(d->enabled_bytes == CONFIG_BOOLEAN_YES || (d->enabled_bytes == CONFIG_BOOLEAN_AUTO && bytes_sum)) {
+        d->enabled_bytes = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_bytes))
             d->st_bytes = rrdset_create_localhost(RRD_TYPE_TC, d->id, d->name ? d->name : d->id
@@ -404,8 +404,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // packets
 
-    if(d->enabled_packets == CONFIG_ONDEMAND_YES || (d->enabled_packets == CONFIG_ONDEMAND_ONDEMAND && packets_sum)) {
-        d->enabled_packets = CONFIG_ONDEMAND_YES;
+    if(d->enabled_packets == CONFIG_BOOLEAN_YES || (d->enabled_packets == CONFIG_BOOLEAN_AUTO && packets_sum)) {
+        d->enabled_packets = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_packets)) {
             char id[RRD_ID_LENGTH_MAX + 1];
@@ -447,8 +447,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // dropped
 
-    if(d->enabled_dropped == CONFIG_ONDEMAND_YES || (d->enabled_dropped == CONFIG_ONDEMAND_ONDEMAND && dropped_sum)) {
-        d->enabled_dropped = CONFIG_ONDEMAND_YES;
+    if(d->enabled_dropped == CONFIG_BOOLEAN_YES || (d->enabled_dropped == CONFIG_BOOLEAN_AUTO && dropped_sum)) {
+        d->enabled_dropped = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_dropped)) {
             char id[RRD_ID_LENGTH_MAX + 1];
@@ -491,8 +491,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // tokens
 
-    if(d->enabled_tokens == CONFIG_ONDEMAND_YES || (d->enabled_tokens == CONFIG_ONDEMAND_ONDEMAND && tokens_sum)) {
-        d->enabled_tokens = CONFIG_ONDEMAND_YES;
+    if(d->enabled_tokens == CONFIG_BOOLEAN_YES || (d->enabled_tokens == CONFIG_BOOLEAN_AUTO && tokens_sum)) {
+        d->enabled_tokens = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_tokens)) {
             char id[RRD_ID_LENGTH_MAX + 1];
@@ -534,8 +534,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // ctokens
 
-    if(d->enabled_ctokens == CONFIG_ONDEMAND_YES || (d->enabled_ctokens == CONFIG_ONDEMAND_ONDEMAND && ctokens_sum)) {
-        d->enabled_ctokens = CONFIG_ONDEMAND_YES;
+    if(d->enabled_ctokens == CONFIG_BOOLEAN_YES || (d->enabled_ctokens == CONFIG_BOOLEAN_AUTO && ctokens_sum)) {
+        d->enabled_ctokens = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_ctokens)) {
             char id[RRD_ID_LENGTH_MAX + 1];

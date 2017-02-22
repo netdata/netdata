@@ -10,10 +10,10 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     static procfile *ff = NULL;
 
     if(unlikely(do_entries == -1)) {
-        do_entries  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY entries", CONFIG_ONDEMAND_ONDEMAND);
-        do_cookies  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY cookies", CONFIG_ONDEMAND_ONDEMAND);
-        do_syns     = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY SYN received", CONFIG_ONDEMAND_ONDEMAND);
-        do_reopened = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY connections reopened", CONFIG_ONDEMAND_ONDEMAND);
+        do_entries  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY entries", CONFIG_BOOLEAN_AUTO);
+        do_cookies  = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY cookies", CONFIG_BOOLEAN_AUTO);
+        do_syns     = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY SYN received", CONFIG_BOOLEAN_AUTO);
+        do_reopened = config_get_boolean_ondemand("plugin:proc:/proc/net/stat/synproxy", "SYNPROXY connections reopened", CONFIG_BOOLEAN_AUTO);
     }
 
     if(unlikely(!ff)) {
@@ -57,8 +57,8 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if((do_entries == CONFIG_ONDEMAND_ONDEMAND && events) || do_entries == CONFIG_ONDEMAND_YES) {
-        do_entries = CONFIG_ONDEMAND_YES;
+    if((do_entries == CONFIG_BOOLEAN_AUTO && events) || do_entries == CONFIG_BOOLEAN_YES) {
+        do_entries = CONFIG_BOOLEAN_YES;
 
         st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_entries");
         if(unlikely(!st)) {
@@ -76,8 +76,8 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if((do_syns == CONFIG_ONDEMAND_ONDEMAND && events) || do_syns == CONFIG_ONDEMAND_YES) {
-        do_syns = CONFIG_ONDEMAND_YES;
+    if((do_syns == CONFIG_BOOLEAN_AUTO && events) || do_syns == CONFIG_BOOLEAN_YES) {
+        do_syns = CONFIG_BOOLEAN_YES;
 
         st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_syn_received");
         if(unlikely(!st)) {
@@ -95,8 +95,8 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if((do_reopened == CONFIG_ONDEMAND_ONDEMAND && events) || do_reopened == CONFIG_ONDEMAND_YES) {
-        do_reopened = CONFIG_ONDEMAND_YES;
+    if((do_reopened == CONFIG_BOOLEAN_AUTO && events) || do_reopened == CONFIG_BOOLEAN_YES) {
+        do_reopened = CONFIG_BOOLEAN_YES;
 
         st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened");
         if(unlikely(!st)) {
@@ -114,8 +114,8 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if((do_cookies == CONFIG_ONDEMAND_ONDEMAND && events) || do_cookies == CONFIG_ONDEMAND_YES) {
-        do_cookies = CONFIG_ONDEMAND_YES;
+    if((do_cookies == CONFIG_BOOLEAN_AUTO && events) || do_cookies == CONFIG_BOOLEAN_YES) {
+        do_cookies = CONFIG_BOOLEAN_YES;
 
         st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_cookies");
         if(unlikely(!st)) {

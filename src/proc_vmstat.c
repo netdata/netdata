@@ -25,10 +25,10 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     static unsigned long long pswpout = 0ULL;
 
     if(unlikely(!arl_base)) {
-        do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_ONDEMAND_ONDEMAND);
+        do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_BOOLEAN_AUTO);
         do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", 1);
         do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", 1);
-        do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_ONDEMAND_ONDEMAND);
+        do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_BOOLEAN_AUTO);
 
 
         arl_base = arl_create("vmstat", NULL, 60);
@@ -39,7 +39,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         arl_expect(arl_base, "pswpin", &pswpin);
         arl_expect(arl_base, "pswpout", &pswpout);
 
-        if(do_numa == CONFIG_ONDEMAND_YES || (do_numa == CONFIG_ONDEMAND_ONDEMAND && get_numa_node_count() >= 2)) {
+        if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO && get_numa_node_count() >= 2)) {
             arl_expect(arl_base, "numa_foreign", &numa_foreign);
             arl_expect(arl_base, "numa_hint_faults_local", &numa_hint_faults_local);
             arl_expect(arl_base, "numa_hint_faults", &numa_hint_faults);
@@ -56,7 +56,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             // when all the expected metrics are collected.
             // Also ARL will not parse their values.
             has_numa = 0;
-            do_numa = CONFIG_ONDEMAND_NO;
+            do_numa = CONFIG_BOOLEAN_NO;
         }
     }
 
@@ -87,8 +87,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(pswpin || pswpout || do_swapio == CONFIG_ONDEMAND_YES) {
-        do_swapio = CONFIG_ONDEMAND_YES;
+    if(pswpin || pswpout || do_swapio == CONFIG_BOOLEAN_YES) {
+        do_swapio = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_swapio = NULL;
         if(unlikely(!st_swapio)) {
@@ -152,8 +152,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         has_numa = (numa_local || numa_foreign || numa_interleave || numa_other || numa_pte_updates ||
                      numa_huge_pte_updates || numa_hint_faults || numa_hint_faults_local || numa_pages_migrated) ? 1 : 0;
 
-    if(do_numa == CONFIG_ONDEMAND_YES || (do_numa == CONFIG_ONDEMAND_ONDEMAND && has_numa)) {
-        do_numa = CONFIG_ONDEMAND_YES;
+    if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO && has_numa)) {
+        do_numa = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_numa = NULL;
         if(unlikely(!st_numa)) {

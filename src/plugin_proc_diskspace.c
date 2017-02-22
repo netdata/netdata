@@ -68,12 +68,12 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         char var_name[4096 + 1];
         snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
 
-        int def_space = config_get_boolean_ondemand("plugin:proc:diskspace", "space usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
-        int def_inodes = config_get_boolean_ondemand("plugin:proc:diskspace", "inodes usage for all disks", CONFIG_ONDEMAND_ONDEMAND);
+        int def_space = config_get_boolean_ondemand("plugin:proc:diskspace", "space usage for all disks", CONFIG_BOOLEAN_AUTO);
+        int def_inodes = config_get_boolean_ondemand("plugin:proc:diskspace", "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
 
         if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
-            def_space = CONFIG_ONDEMAND_NO;
-            def_inodes = CONFIG_ONDEMAND_NO;
+            def_space = CONFIG_BOOLEAN_NO;
+            def_inodes = CONFIG_BOOLEAN_NO;
         }
 
         do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
@@ -103,7 +103,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         do_inodes = m->do_inodes;
     }
 
-    if(unlikely(do_space == CONFIG_ONDEMAND_NO && do_inodes == CONFIG_ONDEMAND_NO))
+    if(unlikely(do_space == CONFIG_BOOLEAN_NO && do_inodes == CONFIG_BOOLEAN_NO))
         return;
 
     if(unlikely(mi->flags & MOUNTINFO_READONLY && !m->collected))
@@ -150,9 +150,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     int rendered = 0;
 
-    if(do_space == CONFIG_ONDEMAND_YES || (do_space == CONFIG_ONDEMAND_ONDEMAND && (bavail || breserved_root || bused))) {
+    if(do_space == CONFIG_BOOLEAN_YES || (do_space == CONFIG_BOOLEAN_AUTO && (bavail || breserved_root || bused))) {
         if(unlikely(!m->st_space)) {
-            m->do_space = CONFIG_ONDEMAND_YES;
+            m->do_space = CONFIG_BOOLEAN_YES;
             m->st_space = rrdset_find_bytype_localhost("disk_space", disk);
             if(unlikely(!m->st_space)) {
                 char title[4096 + 1];
@@ -178,9 +178,9 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     // --------------------------------------------------------------------------
 
-    if(do_inodes == CONFIG_ONDEMAND_YES || (do_inodes == CONFIG_ONDEMAND_ONDEMAND && (favail || freserved_root || fused))) {
+    if(do_inodes == CONFIG_BOOLEAN_YES || (do_inodes == CONFIG_BOOLEAN_AUTO && (favail || freserved_root || fused))) {
         if(unlikely(!m->st_inodes)) {
-            m->do_inodes = CONFIG_ONDEMAND_YES;
+            m->do_inodes = CONFIG_BOOLEAN_YES;
             m->st_inodes = rrdset_find_bytype_localhost("disk_inodes", disk);
             if(unlikely(!m->st_inodes)) {
                 char title[4096 + 1];

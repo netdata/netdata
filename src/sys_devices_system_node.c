@@ -72,10 +72,10 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
     struct node *m;
 
     if(unlikely(do_numastat == -1)) {
-        do_numastat = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/node", "enable per-node numa metrics", CONFIG_ONDEMAND_ONDEMAND);
+        do_numastat = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/node", "enable per-node numa metrics", CONFIG_BOOLEAN_AUTO);
     }
 
-    if(do_numastat == CONFIG_ONDEMAND_YES || (do_numastat == CONFIG_ONDEMAND_ONDEMAND && numa_node_count >= 2)) {
+    if(do_numastat == CONFIG_BOOLEAN_YES || (do_numastat == CONFIG_BOOLEAN_AUTO && numa_node_count >= 2)) {
         for(m = numa_root; m; m = m->next) {
             if(m->numastat_filename) {
                 if(unlikely(!m->numastat_ff)) {

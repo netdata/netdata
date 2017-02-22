@@ -427,7 +427,7 @@ int main(int argc, char **argv) {
         while( (opt = getopt(argc, argv, optstring)) != -1 ) {
             switch(opt) {
                 case 'c':
-                    if(load_config(optarg, 1) != 1) {
+                    if(config_load(optarg, 1) != 1) {
                         error("Cannot load configuration file %s.", optarg);
                         exit(1);
                     }
@@ -474,7 +474,7 @@ int main(int argc, char **argv) {
                         char* debug_flags_string = "debug_flags=";
                         if(strcmp(optarg, "unittest") == 0) {
                             default_rrd_update_every = 1;
-                            if(!config_loaded) load_config(NULL, 0);
+                            if(!config_loaded) config_load(NULL, 0);
                             get_netdata_configured_directories();
                             registry_init();
                             rrd_init("unittest");
@@ -554,7 +554,7 @@ int main(int argc, char **argv) {
 #endif
 
     if(!config_loaded)
-        load_config(NULL, 0);
+        config_load(NULL, 0);
 
     {
         char *pmax = config_get("global", "glibc malloc arena max for plugins", "1");
