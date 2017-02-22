@@ -1668,13 +1668,18 @@ int web_client_api_old_data_request(RRDHOST *host, struct web_client *w, char *u
 }
 
 int validate_stream_api_key(const char *key) {
+    if(appconfig_get(&stream_config, key, "enabled", 0))
+        return 1;
+
     return 0;
 }
 
 int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
-    info("STREAM request from client '%s:%s', starting as host '%s'", w->client_ip, w->client_port, host->hostname);
-
-    char *key = NULL;
+    char *key = NULL, *hostname = NULL, *machine_guid = NULL;
+    int update_every = default_rrd_update_every;
+    int history = default_rrd_history_entries;
+    RRD_MEMORY_MODE mode = default_rrd_memory_mode;
+    int health_enabled = default_health_enabled;
 
     while(url) {
         char *value = mystrsep(&url, "?&");
@@ -1686,6 +1691,12 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
 
         if(!strcmp(name, "key"))
             key = value;
+        else if(!strcmp(name, "hostname"))
+            hostname = value;
+        else if(!strcmp(name, "machine_guid"))
+            machine_guid = value;
+        else if(!strcmp(name, "update_every"))
+            update_every = (int)strtoul(value, NULL, 0);
     }
 
     if(!key || !*key) {
@@ -1695,12 +1706,58 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
         return 401;
     }
 
+    if(!hostname || !*hostname) {
+        error("STREAM [%s]:%s: request without a hostname. Forbidding access.", w->client_ip, w->client_port);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "You need to send a hostname too.");
+        return 400;
+    }
+
+    if(!machine_guid || !*machine_guid) {
+        error("STREAM [%s]:%s: request without a machine GUID. Forbidding access.", w->client_ip, w->client_port);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "You need to send a machine GUID too.");
+        return 400;
+    }
+
     if(!validate_stream_api_key(key)) {
         error("STREAM [%s]:%s: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your API key is not permitted access.");
         return 401;
     }
+
+    if(!appconfig_get_boolean(&stream_config, machine_guid, "enabled", 1)) {
+        error("STREAM [%s]:%s: machine GUID '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, machine_guid);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "Your machine guide is not permitted access.");
+        return 404;
+    }
+
+    // update_every = (int)appconfig_get_number(&stream_config, key, "default update every", update_every);
+    update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
+    if(update_every < 0) update_every = 1;
+
+    history = (int)appconfig_get_number(&stream_config, key, "default history", history);
+    history = (int)appconfig_get_number(&stream_config, machine_guid, "history", history);
+    if(history < 5) history = 5;
+
+    mode = rrd_memory_mode_id(appconfig_get(&stream_config, key, "default memory mode", rrd_memory_mode_name(mode)));
+    mode = rrd_memory_mode_id(appconfig_get(&stream_config, machine_guid, "memory mode", rrd_memory_mode_name(mode)));
+
+    health_enabled = appconfig_get_boolean_ondemand(&stream_config, key, "health enabled by default", health_enabled);
+    health_enabled = appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled", health_enabled);
+
+    host = rrdhost_find_or_create(hostname, machine_guid, update_every, history, mode, health_enabled?1:0);
+
+    info("STREAM request from client '%s:%s' for host '%s' with machine_guid '%s': update every = %d, history = %d, memory mode = %s, health %s",
+            w->client_ip, w->client_port,
+            hostname, machine_guid,
+            update_every,
+            history,
+            rrd_memory_mode_name(mode),
+            (health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
+    );
 
     struct plugind cd = {
             .enabled = 1,
@@ -1750,9 +1807,11 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     // call the plugins.d processor to receive the metrics
-    info("STREAM [%s]:%s: connecting client to plugins.d.", w->client_ip, w->client_port);
+    info("STREAM [%s]:%s: connecting client to plugins.d on host '%s' with machine GUID '%s'.", w->client_ip, w->client_port, host->hostname, host->machine_guid);
     size_t count = pluginsd_process(host, &cd, fp, 1);
-    error("STREAM [%s]:%s: client disconnected.", w->client_ip, w->client_port);
+    error("STREAM [%s]:%s: client disconnected (host '%s', machine GUID '%s').", w->client_ip, w->client_port, host->hostname, host->machine_guid);
+    if(health_enabled == CONFIG_BOOLEAN_AUTO)
+        host->health_enabled = 0;
 
     // close all sockets, to let the socket worker we are done
     fclose(fp);

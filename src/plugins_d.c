@@ -96,7 +96,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     char line[PLUGINSD_LINE_MAX + 1];
 
     char *words[MAX_WORDS] = { NULL };
-    uint32_t HOST_HASH = simple_hash("HOST");
+    /* uint32_t HOST_HASH = simple_hash("HOST"); */
     uint32_t BEGIN_HASH = simple_hash("BEGIN");
     uint32_t END_HASH = simple_hash("END");
     uint32_t FLUSH_HASH = simple_hash("FLUSH");
@@ -205,7 +205,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
             count++;
         }
-        else if(likely(hash == HOST_HASH && !strcmp(s, "HOST"))) {
+/*        else if(likely(hash == HOST_HASH && !strcmp(s, "HOST"))) {
             char *guid = words[1];
             char *hostname = words[2];
 
@@ -221,7 +221,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             }
 
             host = rrdhost_find_or_create(hostname, guid);
-        }
+        } */
         else if(likely(hash == FLUSH_HASH && !strcmp(s, "FLUSH"))) {
             debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
             st = NULL;

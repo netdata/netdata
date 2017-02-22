@@ -176,18 +176,32 @@ RRDHOST *rrdhost_create(const char *hostname,
     return host;
 }
 
-RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid) {
+RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, int update_every, int history, RRD_MEMORY_MODE mode, int health_enabled) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
     RRDHOST *host = rrdhost_find(guid, 0);
-    if(!host)
-        host = rrdhost_create(hostname,
-                guid,
-                default_rrd_update_every,
-                default_rrd_history_entries,
-                default_rrd_memory_mode,
-                default_health_enabled
-        );
+    if(!host) {
+        host = rrdhost_create(hostname, guid, update_every, history, mode, health_enabled);
+    }
+    else {
+        host->health_enabled = health_enabled;
+
+        if(strcmp(host->hostname, hostname)) {
+            char *t = host->hostname;
+            char *n = strdupz(hostname);
+            host->hostname = n;
+            freez(t);
+        }
+
+        if(host->rrd_update_every != update_every)
+            error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds.", host->hostname, host->rrd_update_every, update_every);
+
+        if(host->rrd_history_entries != history)
+            error("Host '%s' has history of %d entries, but the wanted one is %d entries.", host->hostname, host->rrd_history_entries, history);
+
+        if(host->rrd_memory_mode != mode)
+            error("Host '%s' has memory mode '%s', but the wanted one is '%s'.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+    }
 
     return host;
 }

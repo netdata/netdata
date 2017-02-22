@@ -4,6 +4,7 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_config_DATA = \
+    aggregated_hosts.conf \
     apps_groups.conf \
     charts.d.conf \
     fping.conf \

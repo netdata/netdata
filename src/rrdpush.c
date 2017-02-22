@@ -7,7 +7,6 @@ int rrdpush_pipe[2];
 
 static BUFFER *rrdpush_buffer = NULL;
 static pthread_mutex_t rrdpush_mutex = PTHREAD_MUTEX_INITIALIZER;
-static volatile RRDHOST *last_host = NULL;
 static volatile int rrdpush_connected = 0;
 
 static inline void rrdpush_lock() {
@@ -99,8 +98,6 @@ static void reset_all_charts(void) {
         rrdhost_unlock(host);
     }
     rrd_unlock();
-
-    last_host = NULL;
 }
 
 void rrdset_done_push(RRDSET *st) {
@@ -123,11 +120,6 @@ void rrdset_done_push(RRDSET *st) {
     }
     error_shown = 0;
 
-    if(st->rrdhost != last_host) {
-        buffer_sprintf(rrdpush_buffer, "HOST '%s' '%s'\n", st->rrdhost->machine_guid, st->rrdhost->hostname);
-        last_host = st->rrdhost;
-    }
-
     rrdset_rdlock(st);
     if(need_to_send_chart_definition(st))
         send_chart_definition(st);
@@ -149,7 +141,6 @@ static inline void rrdpush_flush(void) {
 
     buffer_flush(rrdpush_buffer);
     reset_all_charts();
-    last_host = NULL;
     rrdpush_unlock();
 }
 
@@ -209,7 +200,16 @@ void *central_netdata_push_thread(void *ptr) {
             info("STREAM: initializing communication to central netdata at: %s", central_netdata_to_push_data);
 
             char http[1000 + 1];
-            snprintfz(http, 1000, "GET /stream?key=%s HTTP/1.1\r\nUser-Agent: netdata-push-service/%s\r\nAccept: */*\r\n\r\n", config_get("global", "central netdata api key", ""), program_version);
+            snprintfz(http, 1000, "GET /stream?key=%s&hostname=%s&machine_guid=%s&update_every=%d HTTP/1.1\r\n"
+                    "User-Agent: netdata-push-service/%s\r\n"
+                    "Accept: */*\r\n\r\n"
+                      , config_get("global", "central netdata api key", "")
+                      , localhost->hostname
+                      , localhost->machine_guid
+                      , default_rrd_update_every
+                      , program_version
+            );
+
             if(send_timeout(sock, http, strlen(http), 0, 60) == -1) {
                 close(sock);
                 sock = -1;

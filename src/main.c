@@ -844,8 +844,12 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // create the listening sockets
 
-        if(!check_config && !central_netdata_to_push_data)
+        if(!check_config && !central_netdata_to_push_data) {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "%s/aggregated_hosts.conf", netdata_configured_config_dir);
+            appconfig_load(&stream_config, filename, 0);
             create_listen_sockets();
+        }
     }
 
     // initialize the log files
