@@ -1674,7 +1674,7 @@ int validate_stream_api_key(const char *key) {
 
 int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     info("STREAM [%s]:%s: client connection.", w->client_ip, w->client_port);
-    
+
     char *key = NULL, *hostname = NULL, *machine_guid = NULL, *os = NULL;
     int update_every = default_rrd_update_every;
     int history = default_rrd_history_entries;
@@ -2040,8 +2040,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         encoded_url = s = &s[8];
         w->mode = WEB_CLIENT_MODE_OPTIONS;
     }
-    else if(!strncmp(s, "STREAM ", 8)) {
-        encoded_url = s = &s[8];
+    else if(!strncmp(s, "STREAM ", 7)) {
+        encoded_url = s = &s[7];
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {
