@@ -3,6 +3,7 @@
 # Author: l2isbad
 
 from base import SimpleService
+from copy import deepcopy
 try:
     from pymongo import MongoClient
     from pymongo.errors import PyMongoError
@@ -14,6 +15,19 @@ except ImportError:
 # update_every = 2
 priority = 60000
 retries = 60
+
+REPLSET_STATES = [
+        ('1', 'primary'),
+        ('8', 'down'),
+        ('2', 'secondary'),
+        ('3', 'recovering'),
+        ('5', 'startup2'),
+        ('4', 'fatal'),
+        ('7', 'arbiter'),
+        ('6', 'unknown'),
+        ('9', 'rollback'),
+        ('10', 'removed'),
+        ('0', 'startup')]
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['read_operations', 'write_operations', 'active_clients', 'journaling_transactions',
@@ -139,12 +153,11 @@ CHARTS = {
             ['errors_user', 'user', 'incremental', 1, 1]
             ]},
     'wiredtiger_cache': {
-        'options': [None, "Amount of space taken by cached data/dirty data in the cache and maximum cache size",
+        'options': [None, "Amount of space taken by cached data and by dirty data in the cache",
                     "KB", 'resource utilization', 'mongodb.wiredtiger_cache', 'stacked'],
         'lines': [
             ['wiredTiger_bytes_in_cache', 'cached', 'absolute', 1, 1024],
-            ['wiredTiger_dirty_in_cache', 'dirty', 'absolute', 1, 1024],
-            ['wiredTiger_maximum_in_conf', 'maximum', 'absolute', 1, 1024]
+            ['wiredTiger_dirty_in_cache', 'dirty', 'absolute', 1, 1024]
             ]},
     'wiredtiger_pages_evicted': {
         'options': [None, "Pages evicted from the cache",
@@ -218,6 +231,8 @@ class Service(SimpleService):
             self.error(error)
             return False
 
+        self.repl = 'repl' in server_status
+        self.databases = self.connection.database_names()
         self._create_charts(server_status)
 
         return True
@@ -225,7 +240,7 @@ class Service(SimpleService):
     def _create_charts(self, server_status):
 
         self.order = ORDER[:]
-        self.definitions = CHARTS
+        self.definitions = deepcopy(CHARTS)
         self.ss = dict()
 
         for elem in ['dur', 'backgroundFlushing', 'wiredTiger', 'tcmalloc', 'cursor', 'commands']:
@@ -255,8 +270,6 @@ class Service(SimpleService):
             self.order.remove('command_total_rate')
             self.order.remove('command_failed_rate')
 
-        self.databases = self.connection.database_names()
-
         for dbase in self.databases:
             self.order.append('_'.join([dbase, 'dbstats']))
             self.definitions['_'.join([dbase, 'dbstats'])] = {
@@ -269,17 +282,61 @@ class Service(SimpleService):
                       ]}
             self.definitions['dbstats_objects']['lines'].append(['_'.join([dbase, 'objects']), dbase, 'absolute'])
 
+        if server_status.get('repl'):
+            hosts = server_status['repl']['hosts']
+            for host in hosts:
+                chart_name = '_'.join([host, 'state'])
+                self.order.append(chart_name)
+                self.definitions[chart_name] = {
+                       'options': [None, "%s state" % host, "state",
+                                   'replication', 'mongodb.replication_state', 'line'],
+                       'lines': [
+                         ]}
+                for state, description in REPLSET_STATES:
+                    self.definitions[chart_name]['lines'].append(['_'.join([host, 'state', state]), description, 'absolute', 1, 1])
+
+
 
     def _get_raw_data(self):
         raw_data = dict()
 
+        raw_data.update(self.get_serverstatus_() or dict())
+        raw_data.update(self.get_dbstats_() or dict())
+        raw_data.update(self.get_replsetgetstatus_() or dict())
+
+        return raw_data or None
+
+    def get_serverstatus_(self):
+        raw_data = dict()
         try:
             raw_data['serverStatus'] = self.connection.admin.command('serverStatus')
-            for dbase in self.databases:
-                raw_data[dbase] = self.connection[dbase].command('dbStats')
         except PyMongoError:
-                return None
-        return raw_data
+            return None
+        else:
+            return raw_data
+
+    def get_dbstats_(self):
+        raw_data = dict()
+        raw_data['dbStats'] = dict()
+        try:
+            for dbase in self.databases:
+                raw_data['dbStats'][dbase] = self.connection[dbase].command('dbStats')
+        except PyMongoError:
+            return None
+        else:
+            return raw_data
+
+    def get_replsetgetstatus_(self):
+        if not self.repl:
+            return None
+
+        raw_data = dict()
+        try:
+            raw_data['replSetGetStatus'] = self.connection.admin.command('replSetGetStatus')
+        except PyMongoError:
+            return None
+        else:
+            return raw_data
 
     def _get_data(self):
         """
@@ -291,66 +348,78 @@ class Service(SimpleService):
             return None
 
         to_netdata = dict()
-        server_status = raw_data['serverStatus']
+        serverStatus = raw_data['serverStatus']
+        dbStats = raw_data['dbStats']
+        replSetGetStatus = raw_data.get('replSetGetStatus')
 
-        to_netdata.update(update_dict_key(server_status['opcounters'], 'readWriteOper'))
-        to_netdata.update(update_dict_key(server_status['globalLock']['activeClients'], 'activeClients'))
-        to_netdata.update(update_dict_key(server_status['connections'], 'connections'))
-        to_netdata.update(update_dict_key(server_status['mem'], 'memory'))
-        to_netdata.update(update_dict_key(server_status['globalLock']['currentQueue'], 'currentQueue'))
-        to_netdata.update(update_dict_key(server_status['asserts'], 'errors'))
-        to_netdata['page_faults'] = server_status['extra_info']['page_faults']
-        to_netdata['record_moves'] = server_status['metrics']['record']['moves']
+        # serverStatus
+        to_netdata.update(update_dict_key(serverStatus['opcounters'], 'readWriteOper'))
+        to_netdata.update(update_dict_key(serverStatus['globalLock']['activeClients'], 'activeClients'))
+        to_netdata.update(update_dict_key(serverStatus['connections'], 'connections'))
+        to_netdata.update(update_dict_key(serverStatus['mem'], 'memory'))
+        to_netdata.update(update_dict_key(serverStatus['globalLock']['currentQueue'], 'currentQueue'))
+        to_netdata.update(update_dict_key(serverStatus['asserts'], 'errors'))
+        to_netdata['page_faults'] = serverStatus['extra_info']['page_faults']
+        to_netdata['record_moves'] = serverStatus['metrics']['record']['moves']
 
         if self.ss['dur']:
-            to_netdata['journalTrans_commits'] = server_status['dur']['commits']
-            to_netdata['journalTrans_journaled'] = int(server_status['dur']['journaledMB'] * 100)
+            to_netdata['journalTrans_commits'] = serverStatus['dur']['commits']
+            to_netdata['journalTrans_journaled'] = int(serverStatus['dur']['journaledMB'] * 100)
 
         if self.ss['backgroundFlushing']:
-            to_netdata['background_flush_average'] = int(server_status['backgroundFlushing']['average_ms'] * 100)
-            to_netdata['background_flush_last'] = int(server_status['backgroundFlushing']['last_ms'] * 100)
-            to_netdata['background_flush_rate'] = server_status['backgroundFlushing']['flushes']
+            to_netdata['background_flush_average'] = int(serverStatus['backgroundFlushing']['average_ms'] * 100)
+            to_netdata['background_flush_last'] = int(serverStatus['backgroundFlushing']['last_ms'] * 100)
+            to_netdata['background_flush_rate'] = serverStatus['backgroundFlushing']['flushes']
 
         if self.ss['cursor']:
-            to_netdata['cursor_timedOut'] = server_status['metrics']['cursor']['timedOut']
-            to_netdata.update(update_dict_key(server_status['metrics']['cursor']['open'], 'cursor'))
+            to_netdata['cursor_timedOut'] = serverStatus['metrics']['cursor']['timedOut']
+            to_netdata.update(update_dict_key(serverStatus['metrics']['cursor']['open'], 'cursor'))
 
         if self.ss['wiredTiger']:
-            wired_tiger = server_status['wiredTiger']
-            to_netdata.update(update_dict_key(server_status['wiredTiger']['concurrentTransactions']['read'],
+            wired_tiger = serverStatus['wiredTiger']
+            to_netdata.update(update_dict_key(serverStatus['wiredTiger']['concurrentTransactions']['read'],
                                               'wiredTigerRead'))
-            to_netdata.update(update_dict_key(server_status['wiredTiger']['concurrentTransactions']['write'],
+            to_netdata.update(update_dict_key(serverStatus['wiredTiger']['concurrentTransactions']['write'],
                                               'wiredTigerWrite'))
             to_netdata['wiredTiger_bytes_in_cache'] = wired_tiger['cache']['bytes currently in the cache']
-            to_netdata['wiredTiger_maximum_in_conf'] = wired_tiger['cache']['maximum bytes configured']
             to_netdata['wiredTiger_dirty_in_cache'] = wired_tiger['cache']['tracked dirty bytes in the cache']
             to_netdata['wiredTiger_unmodified_pages_evicted'] = wired_tiger['cache']['unmodified pages evicted']
             to_netdata['wiredTiger_modified_pages_evicted'] = wired_tiger['cache']['modified pages evicted']
 
         if self.ss['tcmalloc']:
-            to_netdata.update(server_status['tcmalloc']['generic'])
-            to_netdata.update(dict([(k, v) for k, v in server_status['tcmalloc']['tcmalloc'].items()
+            to_netdata.update(serverStatus['tcmalloc']['generic'])
+            to_netdata.update(dict([(k, v) for k, v in serverStatus['tcmalloc']['tcmalloc'].items()
                                     if int_or_float(v)]))
 
         if self.ss['commands']:
             for elem in ['count', 'createIndexes', 'delete', 'eval', 'findAndModify', 'insert', 'update']:
-                to_netdata.update(update_dict_key(server_status['metrics']['commands'][elem], elem))
+                to_netdata.update(update_dict_key(serverStatus['metrics']['commands'][elem], elem))
 
-        for dbase in self.databases:
-            dbase_dbstats = raw_data[dbase]
-            dbase_dbstats = dict([(k, v) for k, v in dbase_dbstats.items() if int_or_float(v)])
-            to_netdata.update(update_dict_key(dbase_dbstats, dbase))
+        # dbStats
+        for dbase in dbStats:
+            to_netdata.update(update_dict_key(dbStats[dbase], dbase))
+
+        # replSetGetStatus
+        if replSetGetStatus:
+            members = replSetGetStatus['members']
+            for member in members:
+                for elem in REPLSET_STATES:
+                    state = elem[0]
+                    to_netdata.update({'_'.join([member['name'], 'state', state]): 0})
+                to_netdata.update({'_'.join([member['name'], 'state', str(member['state'])]): member['state']})
 
         return to_netdata
 
     def _create_connection(self):
         conn_vars = {'host': self.host, 'port': self.port}
-        if 'server_selection_timeout' in dir(MongoClient):
+        if hasattr(MongoClient, 'server_selection_timeout'):
             conn_vars.update({'serverselectiontimeoutms': self.timeout})
         try:
             connection = MongoClient(**conn_vars)
             if self.user and self.password:
                 connection.admin.authenticate(name=self.user, password=self.password)
+          #  elif self.user:
+          #      connection.admin.authenticate(name=self.user, mechanism='MONGODB-X509')
             server_status = connection.admin.command('serverStatus')
         except PyMongoError as error:
             return None, None, str(error)
@@ -359,11 +428,11 @@ class Service(SimpleService):
 
 
 def update_dict_key(collection, string):
-    return dict([('_'.join([string, k]), int(round(v))) for k, v in collection.items()])
+    return dict([('_'.join([string, k]), int(round(v))) for k, v in collection.items() if int_or_float(v)])
 
 
 def int_or_float(value):
-    return isinstance(value, int) or isinstance(value, float)
+    return isinstance(value, (int, float))
 
 
 def in_server_status(elem, server_status):
