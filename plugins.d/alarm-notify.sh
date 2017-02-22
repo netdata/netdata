@@ -214,6 +214,7 @@ DEFAULT_RECIPIENT_TWILIO=
 declare -A role_recipients_twilio=()
 
 # hipchat configs
+HIPCHAT_CUSTOM_SERVER=
 HIPCHAT_AUTH_TOKEN=
 DEFAULT_RECIPIENT_HIPCHAT=
 declare -A role_recipients_hipchat=()
@@ -852,11 +853,16 @@ send_twilio() {
 # hipchat sender
 
 send_hipchat() {
-    local authtoken="${1}" recipients="${2}" message="${3}" httpcode sent=0 room color sender msg_format notify
+    local hipchat_server="${1}" authtoken="${2}" recipients="${3}" message="${4}" httpcode sent=0 room color sender msg_format notify
 
-    if [ "${SEND_HIPCHAT}" = "YES" -a ! -z "${authtoken}" -a ! -z "${recipients}" -a ! -z "${message}" ]
-        then
+    # Use HipChat Cloud if no server specified
+    if [ -z "${hipchat_server}" ]
+    then
+        hipchat_server="api.hipchat.com"
+    fi
 
+    if [ "${SEND_HIPCHAT}" = "YES" -a ! -z "${hipchat_server}" -a ! -z "${authtoken}" -a ! -z "${recipients}" -a ! -z "${message}" ]
+    then
         # A label to be shown in addition to the sender's name
         # Valid length range: 0 - 64. 
         sender="netdata"
@@ -890,7 +896,7 @@ send_hipchat() {
                     -H "Content-type: application/json" \
                     -H "Authorization: Bearer ${authtoken}" \
                     -d "{\"color\": \"${color}\", \"from\": \"${netdata}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
-                    "https://api.hipchat.com/v2/room/${room}/notification")
+                    "https://${hipchat_server}/v2/room/${room}/notification")
  
             if [ "${httpcode}" == "204" ]
             then
@@ -1290,7 +1296,7 @@ SENT_PD=$?
 # -----------------------------------------------------------------------------
 # send hipchat message
 
-send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" " \
+send_hipchat "${HIPCHAT_CUSTOM_SERVER}" "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" " \
 ${host} ${status_message}<br/> \
 <b>${alarm}</b> ${info_html}<br/> \
 <b>${chart}</b> (family <b>${family}</b>)<br/> \
