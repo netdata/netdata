@@ -147,7 +147,7 @@ void *backends_main(void *ptr) {
     // ------------------------------------------------------------------------
     // collect configuration options
 
-    if(central_netdata_to_push_data) {
+    if(rrdpush_exclusive) {
         info("Backend is disabled - use the central netdata");
         goto cleanup;
     }
@@ -399,7 +399,7 @@ void *backends_main(void *ptr) {
             usec_t start_ut = now_monotonic_usec();
             size_t reconnects = 0;
 
-            sock = connect_to_one_of(destination, default_port, &timeout, &reconnects);
+            sock = connect_to_one_of(destination, default_port, &timeout, &reconnects, NULL, 0);
 
             chart_backend_reconnects += reconnects;
             chart_backend_latency += now_monotonic_usec() - start_ut;

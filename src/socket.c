@@ -180,7 +180,7 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
     return fd;
 }
 
-int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter) {
+int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
     int sock = -1;
 
     const char *s = destination;
@@ -200,7 +200,13 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
         strncpyz(buf, s, e - s);
         if(reconnects_counter) *reconnects_counter += 1;
         sock = connect_to(buf, default_port, timeout);
-        if(sock != -1) break;
+        if(sock != -1) {
+            if(connected_to && connected_to_size) {
+                strncpy(connected_to, buf, connected_to_size);
+                connected_to[connected_to_size - 1] = '\0';
+            }
+            break;
+        }
         s = e;
     }
 

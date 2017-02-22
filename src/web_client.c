@@ -45,8 +45,7 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
     return 0;
 }
 
-struct web_client *web_client_create(int listener)
-{
+struct web_client *web_client_create(int listener) {
     struct web_client *w;
 
     w = callocz(1, sizeof(struct web_client));
@@ -223,9 +222,9 @@ struct web_client *web_client_free(struct web_client *w) {
 
     if(w->prev) w->prev->next = w->next;
     if(w->next) w->next->prev = w->prev;
-    if(w->response.header_output) buffer_free(w->response.header_output);
-    if(w->response.header) buffer_free(w->response.header);
-    if(w->response.data) buffer_free(w->response.data);
+    buffer_free(w->response.header_output);
+    buffer_free(w->response.header);
+    buffer_free(w->response.data);
     if(w->ifd != -1) close(w->ifd);
     if(w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
     freez(w);
@@ -1066,8 +1065,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     }
 
 cleanup:
-    if(dimensions)
-        buffer_free(dimensions);
+    buffer_free(dimensions);
     return ret;
 }
 
@@ -1242,7 +1240,7 @@ int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *ur
         buffer_strcat(w->response.data, ");");
 
 cleanup:
-    if(dimensions) buffer_free(dimensions);
+    buffer_free(dimensions);
     return ret;
 }
 
@@ -1675,7 +1673,7 @@ int validate_stream_api_key(const char *key) {
 }
 
 int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
-    char *key = NULL, *hostname = NULL, *machine_guid = NULL;
+    char *key = NULL, *hostname = NULL, *machine_guid = NULL, *os = NULL;
     int update_every = default_rrd_update_every;
     int history = default_rrd_history_entries;
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
@@ -1697,6 +1695,8 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
             machine_guid = value;
         else if(!strcmp(name, "update_every"))
             update_every = (int)strtoul(value, NULL, 0);
+        else if(!strcmp(name, "os"))
+            os = value;
     }
 
     if(!key || !*key) {
@@ -1734,7 +1734,6 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
         return 404;
     }
 
-    // update_every = (int)appconfig_get_number(&stream_config, key, "default update every", update_every);
     update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
     if(update_every < 0) update_every = 1;
 
@@ -1748,7 +1747,10 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, key, "health enabled by default", health_enabled);
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled", health_enabled);
 
-    host = rrdhost_find_or_create(hostname, machine_guid, update_every, history, mode, health_enabled?1:0);
+    if(strcmp(machine_guid, "localhost"))
+        host = localhost;
+    else
+        host = rrdhost_find_or_create(hostname, machine_guid, os, update_every, history, mode, health_enabled?1:0);
 
     info("STREAM request from client '%s:%s' for host '%s' with machine_guid '%s': update every = %d, history = %d, memory mode = %s, health %s",
             w->client_ip, w->client_port,
@@ -1806,20 +1808,24 @@ int web_client_stream_request(RRDHOST *host, struct web_client *w, char *url) {
         return 500;
     }
 
+    rrdhost_wrlock(host);
+    host->use_counter++;
+    rrdhost_unlock(host);
+
     // call the plugins.d processor to receive the metrics
     info("STREAM [%s]:%s: connecting client to plugins.d on host '%s' with machine GUID '%s'.", w->client_ip, w->client_port, host->hostname, host->machine_guid);
     size_t count = pluginsd_process(host, &cd, fp, 1);
     error("STREAM [%s]:%s: client disconnected (host '%s', machine GUID '%s').", w->client_ip, w->client_port, host->hostname, host->machine_guid);
-    if(health_enabled == CONFIG_BOOLEAN_AUTO)
-        host->health_enabled = 0;
 
-    // close all sockets, to let the socket worker we are done
+    rrdhost_wrlock(host);
+    host->use_counter--;
+    if(!host->use_counter && health_enabled == CONFIG_BOOLEAN_AUTO)
+        host->health_enabled = 0;
+    rrdhost_unlock(host);
+
+    // cleanup
     fclose(fp);
     w->ifd = -1;
-    if(w->ofd != -1 && w->ofd != w->ifd) {
-        close(w->ofd);
-        w->ofd = -1;
-    }
 
     // this will not send anything
     // the socket is closed
@@ -2031,6 +2037,10 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     else if(!strncmp(s, "OPTIONS ", 8)) {
         encoded_url = s = &s[8];
         w->mode = WEB_CLIENT_MODE_OPTIONS;
+    }
+    else if(!strncmp(s, "STREAM ", 8)) {
+        encoded_url = s = &s[8];
+        w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {
         w->wait_receive = 0;
@@ -2292,8 +2302,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             hash_graph = 0,
             hash_list = 0,
             hash_all_json = 0,
-            hash_host = 0,
-            hash_stream = 0;
+            hash_host = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
@@ -2308,7 +2317,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_list = simple_hash("list");
         hash_all_json = simple_hash("all.json");
         hash_host = simple_hash("host");
-        hash_stream = simple_hash("stream");
 #ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
@@ -2328,10 +2336,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         else if(unlikely(hash == hash_host && strcmp(tok, "host") == 0)) {
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
             return web_client_switch_host(host, w, url);
-        }
-        else if(unlikely(hash == hash_stream && strcmp(tok, "stream") == 0)) {
-            debug(D_WEB_CLIENT_ACCESS, "%llu: stream request ...", w->id);
-            return web_client_stream_request(host, w, url);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {
             debug(D_WEB_CLIENT_ACCESS, "%llu: Sending netdata.conf ...", w->id);
@@ -2483,6 +2487,10 @@ void web_client_process_request(struct web_client *w) {
                 buffer_strcat(w->response.data, "OK");
                 w->response.code = 200;
             }
+            else if(unlikely(w->mode == WEB_CLIENT_MODE_STREAM)) {
+                w->response.code = web_client_stream_request(localhost, w, w->decoded_url);
+                return;
+            }
             else
                 w->response.code = web_client_process_url(localhost, w, w->decoded_url);
             break;
@@ -2528,6 +2536,10 @@ void web_client_process_request(struct web_client *w) {
     else w->wait_send = 0;
 
     switch(w->mode) {
+        case WEB_CLIENT_MODE_STREAM:
+            debug(D_WEB_CLIENT, "%llu: STREAM done.", w->id);
+            break;
+
         case WEB_CLIENT_MODE_OPTIONS:
             debug(D_WEB_CLIENT, "%llu: Done preparing the OPTIONS response. Sending data (%zu bytes) to client.", w->id, w->response.data->len);
             break;
@@ -2559,7 +2571,7 @@ void web_client_process_request(struct web_client *w) {
             break;
 
         default:
-            fatal("%llu: Unknown client mode %d.", w->id, w->mode);
+            fatal("%llu: Unknown client mode %u.", w->id, w->mode);
             break;
     }
 }
@@ -2982,7 +2994,8 @@ void *web_client_main(void *ptr)
 
                 // if the sockets are closed, may have transferred this client
                 // to plugins.d
-                if(w->ifd == -1 && w->ofd == -1) break;
+                if(unlikely(w->mode == WEB_CLIENT_MODE_STREAM))
+                    break;
             }
         }
 

@@ -359,8 +359,9 @@ BUFFER *buffer_create(size_t size)
     return(b);
 }
 
-void buffer_free(BUFFER *b)
-{
+void buffer_free(BUFFER *b) {
+    if(unlikely(!b)) return;
+
     buffer_overflow_check(b);
 
     debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);

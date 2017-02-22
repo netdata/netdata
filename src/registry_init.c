@@ -4,7 +4,7 @@ int registry_init(void) {
     char filename[FILENAME_MAX + 1];
 
     // registry enabled?
-    if(!central_netdata_to_push_data) {
+    if(!rrdpush_exclusive) {
         registry.enabled = config_get_boolean("registry", "enabled", 0);
     }
     else {

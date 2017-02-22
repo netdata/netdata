@@ -43,6 +43,11 @@ static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
     host->hash_hostname = simple_hash(host->hostname);
 }
 
+static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
+    freez(host->os);
+    host->os = strdupz(os?os:"unknown");
+}
+
 static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_guid) {
     strncpy(host->machine_guid, machine_guid, GUID_LEN);
     host->machine_guid[GUID_LEN] = '\0';
@@ -55,6 +60,7 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
 
 RRDHOST *rrdhost_create(const char *hostname,
         const char *guid,
+        const char *os,
         int update_every,
         int entries,
         RRD_MEMORY_MODE memory_mode,
@@ -73,6 +79,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
+    rrdhost_init_os(host, os);
 
     avl_init_lock(&(host->rrdset_root_index), rrdset_compare);
     avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
@@ -176,12 +183,12 @@ RRDHOST *rrdhost_create(const char *hostname,
     return host;
 }
 
-RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, int update_every, int history, RRD_MEMORY_MODE mode, int health_enabled) {
+RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, const char *os, int update_every, int history, RRD_MEMORY_MODE mode, int health_enabled) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
     RRDHOST *host = rrdhost_find(guid, 0);
     if(!host) {
-        host = rrdhost_create(hostname, guid, update_every, history, mode, health_enabled);
+        host = rrdhost_create(hostname, guid, os, update_every, history, mode, health_enabled);
     }
     else {
         host->health_enabled = health_enabled;
@@ -214,6 +221,7 @@ void rrd_init(char *hostname) {
 
     localhost = rrdhost_create(hostname,
             registry_get_this_machine_guid(),
+            os_type,
             default_rrd_update_every,
             default_rrd_history_entries,
             default_rrd_memory_mode,
@@ -304,6 +312,7 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
+    freez(host->os);
     freez(host->cache_dir);
     freez(host->varlib_dir);
     freez(host->health_default_exec);

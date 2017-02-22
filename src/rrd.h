@@ -367,6 +367,10 @@ struct rrdhost {
     // are created or renamed, that match them
     RRDCALCTEMPLATE *templates;
 
+    char *os;                                       // the O/S type of the host
+    volatile size_t use_counter;                    // when remote hosts are streaming to this
+                                                    // host, this is the counter of connected clients
+
     // health / alarm settings
     char *health_default_exec;
     char *health_default_recipient;
@@ -406,7 +410,7 @@ extern pthread_rwlock_t rrd_rwlock;
 extern void rrd_init(char *hostname);
 
 extern RRDHOST *rrdhost_find(const char *guid, uint32_t hash);
-extern RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, int update_every, int history, RRD_MEMORY_MODE mode, int health_enabled);
+extern RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, const char *os, int update_every, int history, RRD_MEMORY_MODE mode, int health_enabled);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 extern void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);

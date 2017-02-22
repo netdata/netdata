@@ -92,7 +92,7 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb)
         ",\n\t\"charts\": {"
         , host->hostname
         , program_version
-        , os_type
+        , host->os
         , host->rrd_update_every
         , host->rrd_history_entries
         );

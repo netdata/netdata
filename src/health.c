@@ -15,7 +15,7 @@ inline char *health_config_dir(void) {
 void health_init(void) {
     debug(D_HEALTH, "Health configuration initializing");
 
-    if(!central_netdata_to_push_data) {
+    if(!rrdpush_exclusive) {
         if(!(default_health_enabled = config_get_boolean("health", "enabled", 1))) {
             debug(D_HEALTH, "Health is disabled.");
             return;
