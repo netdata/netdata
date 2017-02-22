@@ -865,6 +865,12 @@ send_hipchat() {
         # Defaults to 'html'.
         msg_format="text"
 
+        # Detect html messages
+        if echo "${message}" | tr -d '\n' | grep -q "<[a-z]\+>.*</[a-z]\+>\|<[a-z]\+/>"
+        then
+            msg_format="html"
+        fi
+
         # Background color for message. Valid values: yellow, green, red, purple, gray, random. Defaults to 'yellow'.
         case "${status}" in
             WARNING)  color="yellow" ;;
