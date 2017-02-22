@@ -1668,7 +1668,7 @@ int web_client_api_old_data_request(RRDHOST *host, struct web_client *w, char *u
 }
 
 int validate_stream_api_key(const char *key) {
-    if(appconfig_get_number(&stream_config, key, "enabled", 0))
+    if(appconfig_get_boolean(&stream_config, key, "enabled", 0))
         return 1;
 
     return 0;
