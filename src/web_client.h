@@ -13,9 +13,12 @@ extern int web_enable_gzip,
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
 
-#define WEB_CLIENT_MODE_NORMAL      0
-#define WEB_CLIENT_MODE_FILECOPY    1
-#define WEB_CLIENT_MODE_OPTIONS     2
+typedef enum web_client_mode {
+    WEB_CLIENT_MODE_NORMAL      = 0,
+    WEB_CLIENT_MODE_FILECOPY    = 1,
+    WEB_CLIENT_MODE_OPTIONS     = 2,
+    WEB_CLIENT_MODE_STREAM      = 3
+} WEB_CLIENT_MODE;
 
 #define URL_MAX 8192
 #define ZLIB_CHUNK  16384
@@ -55,13 +58,13 @@ struct web_client {
 
     uint8_t keepalive:1;                // if set to 1, the web client will be re-used
 
-    uint8_t mode:3;                     // the operational mode of the client
-
     uint8_t wait_receive:1;             // 1 = we are waiting more input data
     uint8_t wait_send:1;                // 1 = we have data to send to the client
 
     uint8_t donottrack:1;               // 1 = we should not set cookies on this client
     uint8_t tracking_required:1;        // 1 = if the request requires cookies
+
+    WEB_CLIENT_MODE mode;               // the operational mode of the client
 
     int tcp_cork;                       // 1 = we have a cork on the socket
 

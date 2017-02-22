@@ -2,8 +2,6 @@
 
 extern void *cgroups_main(void *ptr);
 
-char *central_netdata_to_push_data = NULL;
-
 void netdata_cleanup_and_exit(int ret) {
     netdata_exit = 1;
 
@@ -64,15 +62,16 @@ struct netdata_static_thread static_threads[] = {
 void web_server_threading_selection(void) {
     int multi_threaded = 0;
     int single_threaded = 0;
-    int central_thread = 0;
+    int rrdpush_thread = 1;
+    int backends_thread = 1;
 
-    if(!central_netdata_to_push_data) {
-        multi_threaded = config_get_boolean("global", "multi threaded web server", 1);
-        single_threaded = !multi_threaded;
+    if(rrdpush_exclusive) {
+        backends_thread = 0;
+        info("Web servers and backends thread are disabled - use the central netdata.");
     }
     else {
-        central_thread = 1;
-        info("Web servers are disabled - use the central netdata.");
+        multi_threaded = config_get_boolean("global", "multi threaded web server", 1);
+        single_threaded = !multi_threaded;
     }
 
     int i;
@@ -84,10 +83,13 @@ void web_server_threading_selection(void) {
             static_threads[i].enabled = single_threaded;
 
         if(static_threads[i].start_routine == central_netdata_push_thread)
-            static_threads[i].enabled = central_thread;
+            static_threads[i].enabled = rrdpush_thread;
+
+        if(static_threads[i].start_routine == backends_main)
+            static_threads[i].enabled = backends_thread;
     }
 
-    if(central_netdata_to_push_data)
+    if(rrdpush_exclusive)
         return;
 
     web_client_timeout = (int) config_get_number("global", "disconnect idle web clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
@@ -694,15 +696,13 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // find we need to send data to a central netdata
 
-        central_netdata_to_push_data = config_get("global", "central netdata to send all data", "");
-        if(central_netdata_to_push_data && !*central_netdata_to_push_data)
-            central_netdata_to_push_data = NULL;
+        rrdpush_init();
 
 
         // --------------------------------------------------------------------
         // get default memory mode for the database
 
-        if(central_netdata_to_push_data) {
+        if(rrdpush_exclusive) {
             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
             config_set("global", "memory mode", rrd_memory_mode_name(default_rrd_memory_mode));
         }
@@ -713,7 +713,7 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get default database size
 
-        if(central_netdata_to_push_data) {
+        if(rrdpush_exclusive) {
             default_rrd_history_entries = 10;
             config_set_number("global", "history", default_rrd_history_entries);
         }
@@ -844,7 +844,7 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // create the listening sockets
 
-        if(!check_config && !central_netdata_to_push_data) {
+        if(!check_config && !rrdpush_exclusive) {
             char filename[FILENAME_MAX + 1];
             snprintfz(filename, FILENAME_MAX, "%s/aggregated_hosts.conf", netdata_configured_config_dir);
             appconfig_load(&stream_config, filename, 0);

@@ -503,11 +503,13 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
 
         appconfig_wrlock(root);
         for(co = root->sections; co ; co = co->next) {
-            if(!strcmp(co->name, "global") ||
-                    !strcmp(co->name, "plugins")  ||
-                    !strcmp(co->name, "registry") ||
-                    !strcmp(co->name, "health")   ||
-                    !strcmp(co->name, "backend"))
+            if(!strcmp(co->name, "global")
+               || !strcmp(co->name, "plugins")
+               || !strcmp(co->name, "registry")
+               || !strcmp(co->name, "health")
+               || !strcmp(co->name, "backend")
+               || !strcmp(co->name, "stream")
+                    )
                 pri = 0;
             else if(!strncmp(co->name, "plugin:", 7)) pri = 1;
             else pri = 2;

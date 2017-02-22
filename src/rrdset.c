@@ -196,7 +196,7 @@ void rrdset_reset(RRDSET *st) {
 // RRDSET - helpers for rrdset_create()
 
 inline long align_entries_to_pagesize(long entries) {
-    if(central_netdata_to_push_data)
+    if(rrdpush_exclusive)
         return entries;
 
     if(entries < 5) entries = 5;
@@ -609,16 +609,16 @@ static inline void rrdset_done_push_int(RRDSET *st) {
         rrdset_update_last_collected_time(st);
     }
 
-    rrdset_done_push(st);
-
     st->counter++;
     st->counter_done++;
+
+    rrdset_done_push(st);
 }
 
 void rrdset_done(RRDSET *st) {
     if(unlikely(netdata_exit)) return;
 
-    if(unlikely(central_netdata_to_push_data)) {
+    if(unlikely(rrdpush_exclusive)) {
         rrdset_done_push_int(st);
         return;
     }
@@ -1207,5 +1207,8 @@ void rrdset_done(RRDSET *st) {
 
     if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
         error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
+
+    if(unlikely(rrdpush_enabled))
+        rrdset_done_push_int(st);
 }
 
