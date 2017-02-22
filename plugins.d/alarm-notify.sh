@@ -214,7 +214,7 @@ DEFAULT_RECIPIENT_TWILIO=
 declare -A role_recipients_twilio=()
 
 # hipchat configs
-HIPCHAT_CUSTOM_SERVER=
+HIPCHAT_SERVER=
 HIPCHAT_AUTH_TOKEN=
 DEFAULT_RECIPIENT_HIPCHAT=
 declare -A role_recipients_hipchat=()
@@ -853,15 +853,9 @@ send_twilio() {
 # hipchat sender
 
 send_hipchat() {
-    local hipchat_server="${1}" authtoken="${2}" recipients="${3}" message="${4}" httpcode sent=0 room color sender msg_format notify
+    local authtoken="${1}" recipients="${2}" message="${3}" httpcode sent=0 room color sender msg_format notify
 
-    # Use HipChat Cloud if no server specified
-    if [ -z "${hipchat_server}" ]
-    then
-        hipchat_server="api.hipchat.com"
-    fi
-
-    if [ "${SEND_HIPCHAT}" = "YES" -a ! -z "${hipchat_server}" -a ! -z "${authtoken}" -a ! -z "${recipients}" -a ! -z "${message}" ]
+    if [ "${SEND_HIPCHAT}" = "YES" -a ! -z "${HIPCHAT_SERVER}" -a ! -z "${authtoken}" -a ! -z "${recipients}" -a ! -z "${message}" ]
     then
         # A label to be shown in addition to the sender's name
         # Valid length range: 0 - 64. 
@@ -869,13 +863,7 @@ send_hipchat() {
 
         # Valid values: html, text.
         # Defaults to 'html'.
-        msg_format="text"
-
-        # Detect html messages
-        if echo "${message}" | tr -d '\n' | grep -q "<[a-z]\+>.*</[a-z]\+>\|<[a-z]\+/>"
-        then
-            msg_format="html"
-        fi
+        msg_format="html"
 
         # Background color for message. Valid values: yellow, green, red, purple, gray, random. Defaults to 'yellow'.
         case "${status}" in
@@ -896,7 +884,7 @@ send_hipchat() {
                     -H "Content-type: application/json" \
                     -H "Authorization: Bearer ${authtoken}" \
                     -d "{\"color\": \"${color}\", \"from\": \"${netdata}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
-                    "https://${hipchat_server}/v2/room/${room}/notification")
+                    "https://${HIPCHAT_SERVER}/v2/room/${room}/notification")
  
             if [ "${httpcode}" == "204" ]
             then
@@ -1296,7 +1284,7 @@ SENT_PD=$?
 # -----------------------------------------------------------------------------
 # send hipchat message
 
-send_hipchat "${HIPCHAT_CUSTOM_SERVER}" "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" " \
+send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" " \
 ${host} ${status_message}<br/> \
 <b>${alarm}</b> ${info_html}<br/> \
 <b>${chart}</b> (family <b>${family}</b>)<br/> \
