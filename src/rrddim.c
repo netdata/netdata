@@ -71,7 +71,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
     rrdset_strncpyz_name(filename, id, FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    if(st->rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
+    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
         rd = (RRDDIM *)mymmap(fullfilename, size, ((st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
         if(likely(rd)) {
             // we have a file mapped for rd
@@ -132,7 +132,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
     if(unlikely(!rd)) {
         // if we didn't manage to get a mmap'd dimension, just create one
         rd = callocz(1, size);
-        rd->rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+        rd->rrd_memory_mode = (st->rrd_memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_RAM;
     }
 
     rd->memsize = size;
@@ -243,6 +243,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
             munmap(rd, rd->memsize);
             break;
 
+        case RRD_MEMORY_MODE_NONE:
         case RRD_MEMORY_MODE_RAM:
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
             freez((void *)rd->id);

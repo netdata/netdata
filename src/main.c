@@ -703,7 +703,7 @@ int main(int argc, char **argv) {
         // get default memory mode for the database
 
         if(rrdpush_exclusive) {
-            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+            default_rrd_memory_mode = RRD_MEMORY_MODE_NONE;
             config_set("global", "memory mode", rrd_memory_mode_name(default_rrd_memory_mode));
         }
         else

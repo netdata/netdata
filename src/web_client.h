@@ -115,4 +115,7 @@ extern int web_client_api_request_v1_data_group(char *name, int def);
 extern const char *group_method2string(int group);
 
 extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
+
+extern int mysendfile(struct web_client *w, char *filename);
+
 #endif

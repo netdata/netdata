@@ -79,6 +79,8 @@ netdata_SOURCES = \
 	storage_number.c storage_number.h \
 	unit_test.c unit_test.h \
 	url.c url.h \
+	web_api_old.c web_api_old.h \
+	web_api_v1.c web_api_v1.h \
 	web_buffer.c web_buffer.h \
 	web_buffer_svg.c web_buffer_svg.h \
 	web_client.c web_client.h \

@@ -325,6 +325,9 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     long entries = align_entries_to_pagesize(rentries);
     if(entries != rentries) entries = config_set_number(config_section, "history", entries);
 
+    if(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
+        entries = config_set_number(config_section, "history", 10);
+
     int enabled = config_get_boolean(config_section, "enabled", 1);
     if(!enabled) entries = 5;
 
@@ -339,7 +342,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(host->rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
+    if(host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || host->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
         st = (RRDSET *) mymmap(fullfilename, size, ((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 0);
         if(st) {
             memset(&st->avl, 0, sizeof(avl));
@@ -405,7 +408,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
 
     if(unlikely(!st)) {
         st = callocz(1, size);
-        st->rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+        st->rrd_memory_mode = (host->rrd_memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_RAM;
     }
 
     st->config_section = strdup(config_section);
