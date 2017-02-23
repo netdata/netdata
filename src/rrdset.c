@@ -331,6 +331,8 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
 
+    time_t now = now_realtime_sec();
+
     // ------------------------------------------------------------------------
     // load it or allocate it
 
@@ -380,9 +382,14 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
                 error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
                 memset(st, 0, size);
             }
-            else if((now_realtime_sec() - st->last_updated.tv_sec) > update_every * entries) {
+            else if((now - st->last_updated.tv_sec) > update_every * entries) {
                 errno = 0;
                 error("File %s is too old. Clearing it.", fullfilename);
+                memset(st, 0, size);
+            }
+            else if(st->last_updated.tv_sec > now + update_every) {
+                errno = 0;
+                error("File %s refers to the future. Clearing it.", fullfilename);
                 memset(st, 0, size);
             }
 
