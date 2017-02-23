@@ -333,20 +333,28 @@ void *health_main(void *ptr) {
 
     BUFFER *wb = buffer_create(100);
 
+    time_t now               = now_realtime_sec();
+    time_t now_boottime      = now_boottime_sec();
+    time_t last_now          = now;
+    time_t last_now_boottime = now_boottime;
+    time_t hibernation_delay = config_get_number("health", "postpone alarms during hibernation for seconds", 60);
+
     unsigned int loop = 0;
     while(!netdata_exit) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
-        int oldstate, runnable = 0;
-        time_t now = now_realtime_sec();
-        time_t now_boot = now_boottime_sec();
+        int oldstate, runnable = 0, apply_hibernation_delay = 0;
         time_t next_run = now + min_run_every;
         RRDCALC *rc;
 
-        time_t last_now = now;
-        time_t last_now_boot = now_boot;
-        time_t hibernation_delay = config_get_number("health", "postpone alarms during hibernation for seconds", 60);
+        // detect if boottime and realtime have twice the difference
+        // in which case we assume the system was just waken from hibernation
+        if(unlikely(now - last_now > 2 * (now_boottime - last_now_boottime)))
+            apply_hibernation_delay = 1;
+
+        last_now = now;
+        last_now_boottime = now_boottime;
 
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
@@ -355,15 +363,20 @@ void *health_main(void *ptr) {
 
         RRDHOST *host;
         rrdhost_foreach_read(host) {
-            if(now - last_now > 2 * (now_boot - last_now_boot)) {
-                info("Postponing alarm checks for %ld seconds, on host '%s', due to boottime discrepancy (realtime dt: %ld, boottime dt: %ld).",
-                     hibernation_delay, host->hostname, (long)(now - last_now), (long)(now_boot - last_now_boot));
+            if(unlikely(apply_hibernation_delay)) {
+
+                info("Postponing alarm checks for %ld seconds, on host '%s', due to boottime discrepancy (realtime dt: %ld, boottime dt: %ld)."
+                     , hibernation_delay
+                     , host->hostname
+                     , (long)(now - last_now)
+                     , (long)(now_boottime - last_now_boottime)
+                );
+
                 host->health_delay_up_to = now + hibernation_delay;
             }
-            last_now = now;
-            last_now_boot = now_boot;
 
-            if(unlikely(!host->health_enabled || now < host->health_delay_up_to)) continue;
+            if(unlikely(!host->health_enabled || now < host->health_delay_up_to))
+                continue;
 
             rrdhost_rdlock(host);
 
@@ -379,27 +392,41 @@ void *health_main(void *ptr) {
                 rc->old_value = rc->value;
                 rc->rrdcalc_flags |= RRDCALC_FLAG_RUNNABLE;
 
-                // 1. if there is database lookup, do it
-                // 2. if there is calculation expression, run it
+                // ------------------------------------------------------------
+                // if there is database lookup, do it
 
                 if(unlikely(RRDCALC_HAS_DB_LOOKUP(rc))) {
                     /* time_t old_db_timestamp = rc->db_before; */
                     int value_is_null = 0;
 
-                    int ret = rrd2value(rc->rrdset, wb, &rc->value, rc->dimensions, 1, rc->after, rc->before, rc->group, rc->options, &rc->db_after, &rc->db_before, &value_is_null);
+                    int ret = rrd2value(rc->rrdset
+                                        , wb
+                                        , &rc->value
+                                        , rc->dimensions
+                                        , 1
+                                        , rc->after
+                                        , rc->before
+                                        , rc->group
+                                        , rc->options
+                                        , &rc->db_after
+                                        , &rc->db_before
+                                        , &value_is_null
+                    );
 
                     if(unlikely(ret != 200)) {
                         // database lookup failed
                         rc->value = NAN;
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_ERROR;
 
-                        debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup returned error %d", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, ret);
-
-                        if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_DB_ERROR))) {
-                            rc->rrdcalc_flags |= RRDCALC_FLAG_DB_ERROR;
-                            error("Health on host '%s', alarm '%s.%s': database lookup returned error %d", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, ret);
-                        }
+                        debug(D_HEALTH
+                              , "Health on host '%s', alarm '%s.%s': database lookup returned error %d"
+                              , host->hostname
+                              , rc->chart ? rc->chart : "NOCHART"
+                              , rc->name
+                              , ret
+                        );
                     }
-                    else if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_ERROR))
+                    else
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_ERROR;
 
                     /* - RRDCALC_FLAG_DB_STALE not currently used
@@ -419,44 +446,57 @@ void *health_main(void *ptr) {
 
                     if(unlikely(value_is_null)) {
                         // collected value is null
-
                         rc->value = NAN;
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_DB_NAN;
 
-                        debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name);
-
-                        if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_DB_NAN))) {
-                            rc->rrdcalc_flags |= RRDCALC_FLAG_DB_NAN;
-                            error("Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)", host->hostname,  rc->chart ? rc->chart : "NOCHART", rc->name);
-                        }
+                        debug(D_HEALTH
+                              , "Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)"
+                              , host->hostname
+                              , rc->chart ? rc->chart : "NOCHART"
+                              , rc->name
+                        );
                     }
-                    else if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_NAN))
+                    else
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_NAN;
 
-                    debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " CALCULATED_NUMBER_FORMAT, host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, rc->value);
+                    debug(D_HEALTH
+                          , "Health on host '%s', alarm '%s.%s': database lookup gave value " CALCULATED_NUMBER_FORMAT
+                          , host->hostname
+                          , rc->chart ? rc->chart : "NOCHART"
+                          , rc->name
+                          , rc->value
+                    );
                 }
+
+                // ------------------------------------------------------------
+                // if there is calculation expression, run it
 
                 if(unlikely(rc->calculation)) {
                     if(unlikely(!expression_evaluate(rc->calculation))) {
                         // calculation failed
-
                         rc->value = NAN;
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_CALC_ERROR;
 
-                        debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg));
-
-                        if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))) {
-                            rc->rrdcalc_flags |= RRDCALC_FLAG_CALC_ERROR;
-                            error("Health on host '%s', alarm '%s.%s': expression '%s' failed: %s", rc->chart ? rc->chart : "NOCHART", host->hostname,  rc->name, rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg));
-                        }
+                        debug(D_HEALTH
+                              , "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s"
+                              , host->hostname
+                              , rc->chart ? rc->chart : "NOCHART"
+                              , rc->name
+                              , rc->calculation->parsed_as
+                              , buffer_tostring(rc->calculation->error_msg)
+                        );
                     }
                     else {
-                        if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_CALC_ERROR))
-                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
+                        rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
-                        debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
-                                CALCULATED_NUMBER_FORMAT
-                                ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name
-                              , rc->calculation->parsed_as, rc->calculation->result,
-                                buffer_tostring(rc->calculation->error_msg), rc->source
+                        debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value " CALCULATED_NUMBER_FORMAT ": %s (source: %s)"
+                              , host->hostname
+                              , rc->chart ? rc->chart : "NOCHART"
+                              , rc->name
+                              , rc->calculation->parsed_as
+                              , rc->calculation->result
+                              , buffer_tostring(rc->calculation->error_msg)
+                              , rc->source
                         );
 
                         rc->value = rc->calculation->result;
@@ -472,50 +512,73 @@ void *health_main(void *ptr) {
                     if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE)))
                         continue;
 
-                    int warning_status = RRDCALC_STATUS_UNDEFINED;
+                    int warning_status  = RRDCALC_STATUS_UNDEFINED;
                     int critical_status = RRDCALC_STATUS_UNDEFINED;
+
+                    // --------------------------------------------------------
+                    // check the warning expression
 
                     if(likely(rc->warning)) {
                         if(unlikely(!expression_evaluate(rc->warning))) {
                             // calculation failed
+                            rc->rrdcalc_flags |= RRDCALC_FLAG_WARN_ERROR;
 
-                            debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, buffer_tostring(rc->warning->error_msg));
-
-                            if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_WARN_ERROR))) {
-                                rc->rrdcalc_flags |= RRDCALC_FLAG_WARN_ERROR;
-                                error("Health on host '%s', alarm '%s.%s': warning expression failed with error: %s", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, buffer_tostring(rc->warning->error_msg));
-                            }
+                            debug(D_HEALTH
+                                  , "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s"
+                                  , host->hostname
+                                  , rc->chart ? rc->chart : "NOCHART"
+                                  , rc->name
+                                  , buffer_tostring(rc->warning->error_msg)
+                            );
                         }
                         else {
-                            if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_WARN_ERROR))
-                                rc->rrdcalc_flags &= ~RRDCALC_FLAG_WARN_ERROR;
-
-                            debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression gave value " CALCULATED_NUMBER_FORMAT ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, rc->warning->result, buffer_tostring(rc->warning->error_msg), rc->source);
-
+                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_WARN_ERROR;
+                            debug(D_HEALTH
+                                  , "Health on host '%s', alarm '%s.%s': warning expression gave value " CALCULATED_NUMBER_FORMAT ": %s (source: %s)"
+                                  , host->hostname
+                                  , rc->chart ? rc->chart : "NOCHART"
+                                  , rc->name
+                                  , rc->warning->result
+                                  , buffer_tostring(rc->warning->error_msg)
+                                  , rc->source
+                            );
                             warning_status = rrdcalc_value2status(rc->warning->result);
                         }
                     }
 
+                    // --------------------------------------------------------
+                    // check the critical expression
+
                     if(likely(rc->critical)) {
                         if(unlikely(!expression_evaluate(rc->critical))) {
                             // calculation failed
+                            rc->rrdcalc_flags |= RRDCALC_FLAG_CRIT_ERROR;
 
-                            debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': critical expression failed with error: %s", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, buffer_tostring(rc->critical->error_msg));
-
-                            if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_CRIT_ERROR))) {
-                                rc->rrdcalc_flags |= RRDCALC_FLAG_CRIT_ERROR;
-                                error("Health on host '%s', alarm '%s.%s': critical expression failed with error: %s", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name, buffer_tostring(rc->critical->error_msg));
-                            }
+                            debug(D_HEALTH
+                                  , "Health on host '%s', alarm '%s.%s': critical expression failed with error: %s"
+                                  , host->hostname
+                                  , rc->chart ? rc->chart : "NOCHART"
+                                  , rc->name
+                                  , buffer_tostring(rc->critical->error_msg)
+                            );
                         }
                         else {
-                            if(unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_CRIT_ERROR))
-                                rc->rrdcalc_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
-
-                            debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': critical expression gave value " CALCULATED_NUMBER_FORMAT ": %s (source: %s)", host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name , rc->critical->result, buffer_tostring(rc->critical->error_msg), rc->source);
-
+                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
+                            debug(D_HEALTH
+                                  , "Health on host '%s', alarm '%s.%s': critical expression gave value " CALCULATED_NUMBER_FORMAT ": %s (source: %s)"
+                                  , host->hostname
+                                  , rc->chart ? rc->chart : "NOCHART"
+                                  , rc->name
+                                  , rc->critical->result
+                                  , buffer_tostring(rc->critical->error_msg)
+                                  , rc->source
+                            );
                             critical_status = rrdcalc_value2status(rc->critical->result);
                         }
                     }
+
+                    // --------------------------------------------------------
+                    // decide the final alarm status
 
                     int status = RRDCALC_STATUS_UNDEFINED;
 
@@ -546,8 +609,13 @@ void *health_main(void *ptr) {
                             break;
                     }
 
+                    // --------------------------------------------------------
+                    // check if the new status and the old differ
+
                     if(status != rc->status) {
                         int delay = 0;
+
+                        // apply trigger hysteresis
 
                         if(now > rc->delay_up_to_timestamp) {
                             rc->delay_up_current = rc->delay_up_duration;
@@ -576,13 +644,31 @@ void *health_main(void *ptr) {
 
                         rc->delay_last = delay;
                         rc->delay_up_to_timestamp = now + delay;
+
+                        // add the alarm into the log
+
                         health_alarm_log(
-                                host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id
-                                , rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change
-                                , rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info
-                                , rc->delay_last, (rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)
-                                                  ? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0
+                                host
+                                , rc->id
+                                , rc->next_event_id++
+                                , now
+                                , rc->name
+                                , rc->rrdset->id
+                                , rc->rrdset->family
+                                , rc->exec
+                                , rc->recipient
+                                , now - rc->last_status_change
+                                , rc->old_value
+                                , rc->value
+                                , rc->status
+                                , status
+                                , rc->source
+                                , rc->units
+                                , rc->info
+                                , rc->delay_last
+                                , (rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION) ? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0
                         );
+
                         rc->last_status_change = now;
                         rc->status = status;
                     }
@@ -607,7 +693,7 @@ void *health_main(void *ptr) {
             if(unlikely(netdata_exit))
                 break;
 
-        } /* host loop */
+        } /* rrdhost_foreach */
 
         rrd_unlock();
 
@@ -621,12 +707,14 @@ void *health_main(void *ptr) {
         if(now < next_run) {
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs", loop, (int) (next_run - now));
             sleep_usec(USEC_PER_SEC * (usec_t) (next_run - now));
+            now = now_realtime_sec();
         }
         else
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);
 
-        now_boot = now_boottime_sec();
-    }
+        now_boottime = now_boottime_sec();
+
+    } // forever
 
     buffer_free(wb);
 
