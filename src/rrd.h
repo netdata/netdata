@@ -340,6 +340,7 @@ struct rrdhost {
     int rrd_history_entries;                        // the number of history entries for the host's charts
 
     int health_enabled;                             // 1 when this host has health enabled
+    time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
 
     RRDSET *rrdset_root;                            // the host charts

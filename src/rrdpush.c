@@ -404,6 +404,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     int history = default_rrd_history_entries;
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
     int health_enabled = default_health_enabled;
+    time_t alarms_delay = 60;
 
     update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
     if(update_every < 0) update_every = 1;
@@ -417,6 +418,9 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
 
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, key, "health enabled by default", health_enabled);
     health_enabled = appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled", health_enabled);
+
+    alarms_delay = appconfig_get_number(&stream_config, key, "default postpone alarms on connect seconds", alarms_delay);
+    alarms_delay = appconfig_get_number(&stream_config, machine_guid, "postpone alarms on connect seconds", alarms_delay);
 
     if(!strcmp(machine_guid, "localhost"))
         host = localhost;
@@ -468,6 +472,8 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
 
     rrdhost_wrlock(host);
     host->use_counter++;
+    if(health_enabled != CONFIG_BOOLEAN_NO)
+        host->health_delay_up_to = now_realtime_sec() + alarms_delay;
     rrdhost_unlock(host);
 
     // call the plugins.d processor to receive the metrics
