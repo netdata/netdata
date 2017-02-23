@@ -55,7 +55,7 @@ struct netdata_static_thread static_threads[] = {
     {"plugins.d",           NULL,       NULL,         1, NULL, NULL, pluginsd_main},
     {"web",                 NULL,       NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
     {"web-single-threaded", NULL,       NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
-    {"central-netdata-push",NULL,       NULL,         0, NULL, NULL, central_netdata_push_thread},
+    {"central-netdata-push",NULL,       NULL,         0, NULL, NULL, rrdpush_sender_thread},
     {NULL,                  NULL,       NULL,         0, NULL, NULL, NULL}
 };
 
@@ -82,7 +82,7 @@ void web_server_threading_selection(void) {
         if(static_threads[i].start_routine == socket_listen_main_single_threaded)
             static_threads[i].enabled = single_threaded;
 
-        if(static_threads[i].start_routine == central_netdata_push_thread)
+        if(static_threads[i].start_routine == rrdpush_sender_thread)
             static_threads[i].enabled = rrdpush_thread;
 
         if(static_threads[i].start_routine == backends_main)

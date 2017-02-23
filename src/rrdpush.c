@@ -179,7 +179,7 @@ int rrdpush_init() {
     return rrdpush_enabled;
 }
 
-void *central_netdata_push_thread(void *ptr) {
+void *rrdpush_sender_thread(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
     info("STREAM: central netdata push thread created with task id %d", gettid());
@@ -393,4 +393,234 @@ cleanup:
     static_thread->enabled = 0;
     pthread_exit(NULL);
     return NULL;
+}
+
+
+// ----------------------------------------------------------------------------
+// STREAM receiver
+
+int rrdpush_receive(int fd, const char *key, const char *hostname, const char *machine_guid, const char *os, int update_every, char *client_ip, char *client_port) {
+    RRDHOST *host;
+    int history = default_rrd_history_entries;
+    RRD_MEMORY_MODE mode = default_rrd_memory_mode;
+    int health_enabled = default_health_enabled;
+
+    update_every = (int)appconfig_get_number(&stream_config, machine_guid, "update every", update_every);
+    if(update_every < 0) update_every = 1;
+
+    history = (int)appconfig_get_number(&stream_config, key, "default history", history);
+    history = (int)appconfig_get_number(&stream_config, machine_guid, "history", history);
+    if(history < 5) history = 5;
+
+    mode = rrd_memory_mode_id(appconfig_get(&stream_config, key, "default memory mode", rrd_memory_mode_name(mode)));
+    mode = rrd_memory_mode_id(appconfig_get(&stream_config, machine_guid, "memory mode", rrd_memory_mode_name(mode)));
+
+    health_enabled = appconfig_get_boolean_ondemand(&stream_config, key, "health enabled by default", health_enabled);
+    health_enabled = appconfig_get_boolean_ondemand(&stream_config, machine_guid, "health enabled", health_enabled);
+
+    if(!strcmp(machine_guid, "localhost"))
+        host = localhost;
+    else
+        host = rrdhost_find_or_create(hostname, machine_guid, os, update_every, history, mode, health_enabled?1:0);
+
+    info("STREAM request from client '%s:%s' for host '%s' with machine_guid '%s': update every = %d, history = %d, memory mode = %s, health %s",
+         client_ip, client_port,
+         hostname, machine_guid,
+         update_every,
+         history,
+         rrd_memory_mode_name(mode),
+         (health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
+    );
+
+    struct plugind cd = {
+            .enabled = 1,
+            .update_every = default_rrd_update_every,
+            .pid = 0,
+            .serial_failures = 0,
+            .successful_collections = 0,
+            .obsolete = 0,
+            .started_t = now_realtime_sec(),
+            .next = NULL,
+    };
+
+    // put the client IP and port into the buffers used by plugins.d
+    snprintfz(cd.id,           CONFIG_MAX_NAME,  "%s:%s", client_ip, client_port);
+    snprintfz(cd.filename,     FILENAME_MAX,     "%s:%s", client_ip, client_port);
+    snprintfz(cd.fullfilename, FILENAME_MAX,     "%s:%s", client_ip, client_port);
+    snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", client_ip, client_port);
+
+    info("STREAM [%s]:%s: sending STREAM to initiate streaming...", client_ip, client_port);
+    if(send_timeout(fd, "STREAM", 6, 0, 60) != 6) {
+        error("STREAM [%s]:%s: cannot send STREAM.", client_ip, client_port);
+        return 0;
+    }
+
+    // remove the non-blocking flag from the socket
+    if(fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) & ~O_NONBLOCK) == -1)
+        error("STREAM [%s]:%s: cannot remove the non-blocking flag from socket %d", client_ip, client_port, fd);
+
+    // convert the socket to a FILE *
+    FILE *fp = fdopen(fd, "r");
+    if(!fp) {
+        error("STREAM [%s]:%s: failed to get a FILE for FD %d.", client_ip, client_port, fd);
+        return 0;
+    }
+
+    rrdhost_wrlock(host);
+    host->use_counter++;
+    rrdhost_unlock(host);
+
+    // call the plugins.d processor to receive the metrics
+    info("STREAM [%s]:%s: connecting client to plugins.d on host '%s' with machine GUID '%s'.", client_ip, client_port, host->hostname, host->machine_guid);
+    size_t count = pluginsd_process(host, &cd, fp, 1);
+    error("STREAM [%s]:%s: client disconnected (host '%s', machine GUID '%s').", client_ip, client_port, host->hostname, host->machine_guid);
+
+    rrdhost_wrlock(host);
+    host->use_counter--;
+    if(!host->use_counter && health_enabled == CONFIG_BOOLEAN_AUTO)
+        host->health_enabled = 0;
+    rrdhost_unlock(host);
+
+    // cleanup
+    fclose(fp);
+
+    return (int)count;
+}
+
+struct rrdpush_thread {
+    int fd;
+    char *key;
+    char *hostname;
+    char *machine_guid;
+    char *os;
+    char *client_ip;
+    char *client_port;
+    int update_every;
+};
+
+void *rrdpush_receiver_thread(void *ptr) {
+    struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
+
+    info("STREAM: central netdata receive thread created with task id %d, for client [%s]:%s", gettid(), rpt->client_ip, rpt->client_port);
+
+    if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+        error("STREAM: cannot set pthread cancel type to DEFERRED.");
+
+    if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+        error("STREAM: cannot set pthread cancel state to ENABLE.");
+
+
+    rrdpush_receive(rpt->fd, rpt->key, rpt->hostname, rpt->machine_guid, rpt->os, rpt->update_every, rpt->client_ip, rpt->client_port);
+
+    close(rpt->fd);
+    freez(rpt->key);
+    freez(rpt->hostname);
+    freez(rpt->machine_guid);
+    freez(rpt->os);
+    freez(rpt->client_ip);
+    freez(rpt->client_port);
+    freez(rpt);
+
+    pthread_exit(NULL);
+    return NULL;
+}
+
+static inline int rrdpush_receive_validate_api_key(const char *key) {
+    return appconfig_get_boolean(&stream_config, key, "enabled", 0);
+}
+
+int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url) {
+    (void)host;
+    
+    info("STREAM [%s]:%s: client connection.", w->client_ip, w->client_port);
+
+    char *key = NULL, *hostname = NULL, *machine_guid = NULL, *os = NULL;
+    int update_every = default_rrd_update_every;
+
+    while(url) {
+        char *value = mystrsep(&url, "?&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        if(!strcmp(name, "key"))
+            key = value;
+        else if(!strcmp(name, "hostname"))
+            hostname = value;
+        else if(!strcmp(name, "machine_guid"))
+            machine_guid = value;
+        else if(!strcmp(name, "update_every"))
+            update_every = (int)strtoul(value, NULL, 0);
+        else if(!strcmp(name, "os"))
+            os = value;
+    }
+
+    if(!key || !*key) {
+        error("STREAM [%s]:%s: request without an API key. Forbidding access.", w->client_ip, w->client_port);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "You need an API key for this request.");
+        return 401;
+    }
+
+    if(!hostname || !*hostname) {
+        error("STREAM [%s]:%s: request without a hostname. Forbidding access.", w->client_ip, w->client_port);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "You need to send a hostname too.");
+        return 400;
+    }
+
+    if(!machine_guid || !*machine_guid) {
+        error("STREAM [%s]:%s: request without a machine GUID. Forbidding access.", w->client_ip, w->client_port);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "You need to send a machine GUID too.");
+        return 400;
+    }
+
+    if(!rrdpush_receive_validate_api_key(key)) {
+        error("STREAM [%s]:%s: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "Your API key is not permitted access.");
+        return 401;
+    }
+
+    if(!appconfig_get_boolean(&stream_config, machine_guid, "enabled", 1)) {
+        error("STREAM [%s]:%s: machine GUID '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, machine_guid);
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "Your machine guide is not permitted access.");
+        return 404;
+    }
+
+    struct rrdpush_thread *rpt = mallocz(sizeof(struct rrdpush_thread));
+    rpt->fd           = w->ifd;
+    rpt->key          = strdupz(key);
+    rpt->hostname     = strdupz(hostname);
+    rpt->machine_guid = strdupz(machine_guid);
+    rpt->os           = strdupz(os);
+    rpt->client_ip    = strdupz(w->client_ip);
+    rpt->client_port  = strdupz(w->client_port);
+    rpt->update_every = update_every;
+
+    pthread_t *thread = mallocz(sizeof(pthread_t));
+    pthread_attr_t attr;
+
+    debug(D_SYSTEM, "Starting STREAM thread for client [%s]:%s.", w->client_ip, w->client_port);
+
+    if(pthread_create(thread, &attr, rrdpush_receiver_thread, rpt))
+        error("failed to create new STREAM thread for client [%s]:%s.", w->client_ip, w->client_port);
+
+    else if(pthread_detach(*thread))
+        error("Cannot request detach newly created thread for client [%s]:%s.", w->client_ip, w->client_port);
+
+    rrdpush_receive(w->ifd, key, hostname, machine_guid, os, update_every, w->client_ip, w->client_port);
+
+    // prevent the caller from closing the streaming socket
+    if(w->ifd == w->ofd)
+        w->ifd = w->ofd = -1;
+    else
+        w->ifd = -1;
+
+    buffer_flush(w->response.data);
+    return 200;
 }
