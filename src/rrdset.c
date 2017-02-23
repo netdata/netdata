@@ -195,16 +195,16 @@ void rrdset_reset(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // RRDSET - helpers for rrdset_create()
 
-inline long align_entries_to_pagesize(long entries) {
-    if(rrdpush_exclusive)
-        return entries;
+inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
+    if(unlikely(entries < 5)) entries = 5;
+    if(unlikely(entries > RRD_HISTORY_ENTRIES_MAX)) entries = RRD_HISTORY_ENTRIES_MAX;
 
-    if(entries < 5) entries = 5;
-    if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
+    if(unlikely(mode == RRD_MEMORY_MODE_NONE || mode == RRD_MEMORY_MODE_RAM))
+        return entries;
 
     long page = (size_t)sysconf(_SC_PAGESIZE);
     long size = sizeof(RRDDIM) + entries * sizeof(storage_number);
-    if(size % page) {
+    if(unlikely(size % page)) {
         size -= (size % page);
         size += page;
 
@@ -322,7 +322,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
     // get the options from the config, we need to create it
 
     long rentries = config_get_number(config_section, "history", host->rrd_history_entries);
-    long entries = align_entries_to_pagesize(rentries);
+    long entries = align_entries_to_pagesize(host->rrd_memory_mode, rentries);
     if(entries != rentries) entries = config_set_number(config_section, "history", entries);
 
     if(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
@@ -628,7 +628,7 @@ static inline void rrdset_done_push_int(RRDSET *st) {
 void rrdset_done(RRDSET *st) {
     if(unlikely(netdata_exit)) return;
 
-    if(unlikely(rrdpush_exclusive)) {
+    if(unlikely(st->rrdhost->rrdpush_exclusive)) {
         rrdset_done_push_int(st);
         return;
     }
@@ -1218,7 +1218,7 @@ void rrdset_done(RRDSET *st) {
     if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
         error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
 
-    if(unlikely(rrdpush_enabled))
+    if(unlikely(st->rrdhost->rrdpush_enabled))
         rrdset_done_push_int(st);
 }
 

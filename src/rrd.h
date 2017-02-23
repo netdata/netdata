@@ -341,6 +341,17 @@ struct rrdhost {
     int rrd_update_every;                           // the update frequency of the host
     int rrd_history_entries;                        // the number of history entries for the host's charts
 
+    int rrdpush_enabled;                            // 1 when this host sends metrics to another netdata
+    int rrdpush_exclusive;                          // 1 when this host is exclusively sending metrics without a database
+    volatile int rrdpush_connected;                 // 1 when the sender is ready to push metrics
+    volatile int rrdpush_spawn;                     // 1 when the sender thread has been spawn
+    volatile int rrdpush_error_shown;               // 1 when we have logged a communication error
+    int rrdpush_socket;                             // the fd of the socket to the remote host, or -1
+    pthread_t rrdpush_thread;                       // the sender thread
+    pthread_mutex_t rrdpush_mutex;                  // exclusive access to rrdpush_buffer
+    int rrdpush_pipe[2];                            // collector to sender thread communication
+    BUFFER *rrdpush_buffer;                         // collector fills it, sender sends them
+
     int health_enabled;                             // 1 when this host has health enabled
     time_t health_delay_up_to;                      // a timestamp to delay alarms processing up to
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
@@ -526,7 +537,7 @@ extern int rrddim_unhide(RRDSET *st, const char *id);
 extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 
-extern long align_entries_to_pagesize(long entries);
+extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
 
 // ----------------------------------------------------------------------------

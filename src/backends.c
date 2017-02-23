@@ -147,11 +147,6 @@ void *backends_main(void *ptr) {
     // ------------------------------------------------------------------------
     // collect configuration options
 
-    if(rrdpush_exclusive) {
-        info("Backend is disabled - use the central netdata");
-        goto cleanup;
-    }
-
     struct timeval timeout = {
             .tv_sec = 0,
             .tv_usec = 0
@@ -312,6 +307,9 @@ void *backends_main(void *ptr) {
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
+            if(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)
+                continue;
+
             rrdhost_rdlock(host);
 
             RRDSET *st;

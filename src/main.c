@@ -55,19 +55,16 @@ struct netdata_static_thread static_threads[] = {
     {"plugins.d",           NULL,       NULL,         1, NULL, NULL, pluginsd_main},
     {"web",                 NULL,       NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
     {"web-single-threaded", NULL,       NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
-    {"central-netdata-push",NULL,       NULL,         0, NULL, NULL, rrdpush_sender_thread},
+    {"push-metrics",        NULL,       NULL,         0, NULL, NULL, rrdpush_sender_thread},
     {NULL,                  NULL,       NULL,         0, NULL, NULL, NULL}
 };
 
 void web_server_threading_selection(void) {
     int multi_threaded = 0;
     int single_threaded = 0;
-    int rrdpush_thread = 1;
-    int backends_thread = 1;
 
-    if(rrdpush_exclusive) {
-        backends_thread = 0;
-        info("Web servers and backends thread are disabled - use the central netdata.");
+    if(default_rrdpush_exclusive) {
+        info("Web server is disabled - use the remote netdata.");
     }
     else {
         multi_threaded = config_get_boolean("global", "multi threaded web server", 1);
@@ -81,15 +78,9 @@ void web_server_threading_selection(void) {
 
         if(static_threads[i].start_routine == socket_listen_main_single_threaded)
             static_threads[i].enabled = single_threaded;
-
-        if(static_threads[i].start_routine == rrdpush_sender_thread)
-            static_threads[i].enabled = rrdpush_thread;
-
-        if(static_threads[i].start_routine == backends_main)
-            static_threads[i].enabled = backends_thread;
     }
 
-    if(rrdpush_exclusive)
+    if(default_rrdpush_exclusive)
         return;
 
     web_client_timeout = (int) config_get_number("global", "disconnect idle web clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
@@ -694,7 +685,7 @@ int main(int argc, char **argv) {
 
 
         // --------------------------------------------------------------------
-        // find we need to send data to a central netdata
+        // find we need to send data to another netdata
 
         rrdpush_init();
 
@@ -702,7 +693,7 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get default memory mode for the database
 
-        if(rrdpush_exclusive) {
+        if(default_rrdpush_exclusive) {
             default_rrd_memory_mode = RRD_MEMORY_MODE_NONE;
             config_set("global", "memory mode", rrd_memory_mode_name(default_rrd_memory_mode));
         }
@@ -713,14 +704,14 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // get default database size
 
-        if(rrdpush_exclusive) {
+        if(default_rrdpush_exclusive) {
             default_rrd_history_entries = 10;
             config_set_number("global", "history", default_rrd_history_entries);
         }
         else
-            default_rrd_history_entries = (int) config_get_number("global", "history", align_entries_to_pagesize(RRD_DEFAULT_HISTORY_ENTRIES));
+            default_rrd_history_entries = (int) config_get_number("global", "history", align_entries_to_pagesize(default_rrd_memory_mode, RRD_DEFAULT_HISTORY_ENTRIES));
 
-        long h = align_entries_to_pagesize(default_rrd_history_entries);
+        long h = align_entries_to_pagesize(default_rrd_memory_mode, default_rrd_history_entries);
         if(h != default_rrd_history_entries) {
             config_set_number("global", "history", h);
             default_rrd_history_entries = (int)h;
@@ -844,11 +835,16 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // create the listening sockets
 
-        if(!check_config && !rrdpush_exclusive) {
+        if(!check_config && !default_rrdpush_exclusive)
+            create_listen_sockets();
+
+
+        // --------------------------------------------------------------------
+        // load the aggregated host configuration file
+        {
             char filename[FILENAME_MAX + 1];
             snprintfz(filename, FILENAME_MAX, "%s/aggregated_hosts.conf", netdata_configured_config_dir);
             appconfig_load(&stream_config, filename, 0);
-            create_listen_sockets();
         }
     }
 
