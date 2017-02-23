@@ -471,9 +471,9 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     rrdhost_unlock(host);
 
     // call the plugins.d processor to receive the metrics
-    info("STREAM [%s]:%s: connecting client to plugins.d on host '%s' with machine GUID '%s'.", client_ip, client_port, host->hostname, host->machine_guid);
+    info("STREAM [%s]:%s: connecting client to plugins.d (host '%s', machine GUID '%s').", client_ip, client_port, host->hostname, host->machine_guid);
     size_t count = pluginsd_process(host, &cd, fp, 1);
-    error("STREAM [%s]:%s: client disconnected (host '%s', machine GUID '%s').", client_ip, client_port, host->hostname, host->machine_guid);
+    error("STREAM [%s]:%s: client disconnected (host '%s', machine GUID '%s', completed updates %zu).", client_ip, client_port, host->hostname, host->machine_guid, count);
 
     rrdhost_wrlock(host);
     host->use_counter--;
@@ -501,8 +501,6 @@ struct rrdpush_thread {
 void *rrdpush_receiver_thread(void *ptr) {
     struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
 
-    info("STREAM: central netdata receive thread created with task id %d, for client [%s]:%s", gettid(), rpt->client_ip, rpt->client_port);
-
     if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
         error("STREAM: cannot set pthread cancel type to DEFERRED.");
 
@@ -510,7 +508,9 @@ void *rrdpush_receiver_thread(void *ptr) {
         error("STREAM: cannot set pthread cancel state to ENABLE.");
 
 
+    info("STREAM [%s]:%s: receive thread created (task id %d)", rpt->client_ip, rpt->client_port, gettid());
     rrdpush_receive(rpt->fd, rpt->key, rpt->hostname, rpt->machine_guid, rpt->os, rpt->update_every, rpt->client_ip, rpt->client_port);
+    info("STREAM [%s]:%s: receive thread ended (task id %d)", rpt->client_ip, rpt->client_port, gettid());
 
     close(rpt->fd);
     freez(rpt->key);
