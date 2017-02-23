@@ -4,6 +4,7 @@
 
 from base import SimpleService
 from copy import deepcopy
+from datetime import datetime
 try:
     from pymongo import MongoClient
     from pymongo.errors import PyMongoError
@@ -38,14 +39,14 @@ ORDER = ['read_operations', 'write_operations', 'active_clients', 'journaling_tr
 
 CHARTS = {
     'read_operations': {
-        'options': [None, "Received read requests", "requests/s", 'throughput metrics',
+        'options': [None, 'Received read requests', 'requests/s', 'throughput metrics',
                     'mongodb.read_operations', 'line'],
         'lines': [
             ['readWriteOper_query', 'query', 'incremental'],
             ['readWriteOper_getmore', 'getmore', 'incremental']
         ]},
     'write_operations': {
-        'options': [None, "Received write requests", "requests/s", 'throughput metrics',
+        'options': [None, 'Received write requests', 'requests/s', 'throughput metrics',
                     'mongodb.write_operations', 'line'],
         'lines': [
             ['readWriteOper_insert', 'insert', 'incremental'],
@@ -53,99 +54,99 @@ CHARTS = {
             ['readWriteOper_delete', 'delete', 'incremental']
         ]},
     'active_clients': {
-        'options': [None, "Clients with read or write operations in progress or queued", "clients",
+        'options': [None, 'Clients with read or write operations in progress or queued', 'clients',
                     'throughput metrics', 'mongodb.active_clients', 'line'],
         'lines': [
             ['activeClients_readers', 'readers', 'absolute'],
             ['activeClients_writers', 'writers', 'absolute']
             ]},
     'journaling_transactions': {
-        'options': [None, "Transactions that have been written to the journal", "commits",
+        'options': [None, 'Transactions that have been written to the journal', 'commits',
                     'database performance', 'mongodb.journaling_transactions', 'line'],
         'lines': [
             ['journalTrans_commits', 'commits', 'absolute']
             ]},
     'journaling_volume': {
-        'options': [None, "Volume of data written to the journal", "MB", 'database performance',
+        'options': [None, 'Volume of data written to the journal', 'MB', 'database performance',
                     'mongodb.journaling_volume', 'line'],
         'lines': [
             ['journalTrans_journaled', 'volume', 'absolute', 1, 100]
             ]},
     'background_flush_average': {
-        'options': [None, "Average time taken by flushes to execute", "ms", 'database performance',
+        'options': [None, 'Average time taken by flushes to execute', 'ms', 'database performance',
                     'mongodb.background_flush_average', 'line'],
         'lines': [
             ['background_flush_average', 'time', 'absolute', 1, 100]
             ]},
     'background_flush_last': {
-        'options': [None, "Time taken by the last flush operation to execute", "ms", 'database performance',
+        'options': [None, 'Time taken by the last flush operation to execute', 'ms', 'database performance',
                     'mongodb.background_flush_last', 'line'],
         'lines': [
             ['background_flush_last', 'time', 'absolute', 1, 100]
             ]},
     'background_flush_rate': {
-        'options': [None, "Flushes rate", "flushes", 'database performance', 'mongodb.background_flush_rate', 'line'],
+        'options': [None, 'Flushes rate', 'flushes', 'database performance', 'mongodb.background_flush_rate', 'line'],
         'lines': [
             ['background_flush_rate', 'flushes', 'incremental', 1, 1]
             ]},
     'wiredtiger_read': {
-        'options': [None, "Read tickets in use and remaining", "tickets", 'database performance',
+        'options': [None, 'Read tickets in use and remaining', 'tickets', 'database performance',
                     'mongodb.wiredtiger_read', 'stacked'],
         'lines': [
             ['wiredTigerRead_available', 'available', 'absolute', 1, 1],
             ['wiredTigerRead_out', 'inuse', 'absolute', 1, 1]
             ]},
     'wiredtiger_write': {
-        'options': [None, "Write tickets in use and remaining", "tickets", 'database performance',
+        'options': [None, 'Write tickets in use and remaining', 'tickets', 'database performance',
                     'mongodb.wiredtiger_write', 'stacked'],
         'lines': [
             ['wiredTigerWrite_available', 'available', 'absolute', 1, 1],
             ['wiredTigerWrite_out', 'inuse', 'absolute', 1, 1]
             ]},
     'cursors': {
-        'options': [None, "Currently openned cursors, cursors with timeout disabled and timed out cursors",
-                    "cursors", 'database performance', 'mongodb.cursors', 'stacked'],
+        'options': [None, 'Currently openned cursors, cursors with timeout disabled and timed out cursors',
+                    'cursors', 'database performance', 'mongodb.cursors', 'stacked'],
         'lines': [
             ['cursor_total', 'openned', 'absolute', 1, 1],
             ['cursor_noTimeout', 'notimeout', 'absolute', 1, 1],
             ['cursor_timedOut', 'timedout', 'incremental', 1, 1]
             ]},
     'connections': {
-        'options': [None, "Currently connected clients and unused connections", "connections",
+        'options': [None, 'Currently connected clients and unused connections', 'connections',
                     'resource utilization', 'mongodb.connections', 'stacked'],
         'lines': [
             ['connections_available', 'unused', 'absolute', 1, 1],
             ['connections_current', 'connected', 'absolute', 1, 1]
             ]},
     'memory': {
-        'options': [None, "Memory metrics", "MB", 'resource utilization', 'mongodb.memory', 'stacked'],
+        'options': [None, 'Memory metrics', 'MB', 'resource utilization', 'mongodb.memory', 'stacked'],
         'lines': [
             ['memory_virtual', 'virtual', 'absolute', 1, 1],
             ['memory_resident', 'resident', 'absolute', 1, 1],
             ['memory_mapped', 'mapped', 'absolute', 1, 1]
             ]},
     'page_faults': {
-        'options': [None, "Number of times MongoDB had to fetch data from disk", "request/s",
+        'options': [None, 'Number of times MongoDB had to fetch data from disk', 'request/s',
                     'resource utilization', 'mongodb.page_faults', 'line'],
         'lines': [
             ['page_faults', 'page_faults', 'incremental', 1, 1]
             ]},
     'queued_requests': {
-        'options': [None, "Currently queued read and wrire requests", "requests", 'resource saturation',
+        'options': [None, 'Currently queued read and wrire requests', 'requests', 'resource saturation',
                     'mongodb.queued_requests', 'line'],
         'lines': [
             ['currentQueue_readers', 'readers', 'absolute', 1, 1],
             ['currentQueue_writers', 'writers', 'absolute', 1, 1]
             ]},
     'record_moves': {
-        'options': [None, "Number of times documents had to be moved on-disk", "number",
+        'options': [None, 'Number of times documents had to be moved on-disk', 'number',
                     'resource saturation', 'mongodb.record_moves', 'line'],
         'lines': [
             ['record_moves', 'moves', 'incremental', 1, 1]
             ]},
     'asserts': {
-        'options': [None, "Number of message, warning, regular, corresponding to errors generated"
-                          " by users assertions raised", "number", 'errors (asserts)', 'mongodb.asserts', 'line'],
+        'options': [None, 'Number of message, warning, regular, corresponding to errors generated'
+                          ' by users assertions raised', 'number', 'errors (asserts)', 'mongodb.asserts', 'line'],
         'lines': [
             ['errors_msg', 'msg', 'incremental', 1, 1],
             ['errors_warning', 'warning', 'incremental', 1, 1],
@@ -153,32 +154,32 @@ CHARTS = {
             ['errors_user', 'user', 'incremental', 1, 1]
             ]},
     'wiredtiger_cache': {
-        'options': [None, "Amount of space taken by cached data and by dirty data in the cache",
-                    "KB", 'resource utilization', 'mongodb.wiredtiger_cache', 'stacked'],
+        'options': [None, 'Amount of space taken by cached data and by dirty data in the cache',
+                    'KB', 'resource utilization', 'mongodb.wiredtiger_cache', 'stacked'],
         'lines': [
             ['wiredTiger_bytes_in_cache', 'cached', 'absolute', 1, 1024],
             ['wiredTiger_dirty_in_cache', 'dirty', 'absolute', 1, 1024]
             ]},
     'wiredtiger_pages_evicted': {
-        'options': [None, "Pages evicted from the cache",
-                    "pages", 'resource utilization', 'mongodb.wiredtiger_pages_evicted', 'stacked'],
+        'options': [None, 'Pages evicted from the cache',
+                    'pages', 'resource utilization', 'mongodb.wiredtiger_pages_evicted', 'stacked'],
         'lines': [
             ['wiredTiger_unmodified_pages_evicted', 'unmodified', 'absolute', 1, 1],
             ['wiredTiger_modified_pages_evicted', 'modified', 'absolute', 1, 1]
             ]},
     'dbstats_objects': {
-        'options': [None, "Number of documents in the database among all the collections", "documents",
+        'options': [None, 'Number of documents in the database among all the collections', 'documents',
                     'storage size metrics', 'mongodb.dbstats_objects', 'stacked'],
         'lines': [
             ]},
     'tcmalloc_generic': {
-        'options': [None, "Tcmalloc generic metrics", "MB", 'tcmalloc', 'mongodb.tcmalloc_generic', 'stacked'],
+        'options': [None, 'Tcmalloc generic metrics', 'MB', 'tcmalloc', 'mongodb.tcmalloc_generic', 'stacked'],
         'lines': [
             ['current_allocated_bytes', 'allocated', 'absolute', 1, 1048576],
             ['heap_size', 'heap_size', 'absolute', 1, 1048576]
             ]},
     'tcmalloc_metrics': {
-        'options': [None, "Tcmalloc metrics", "KB", 'tcmalloc', 'mongodb.tcmalloc_metrics', 'stacked'],
+        'options': [None, 'Tcmalloc metrics', 'KB', 'tcmalloc', 'mongodb.tcmalloc_metrics', 'stacked'],
         'lines': [
             ['central_cache_free_bytes', 'central_cache_free', 'absolute', 1, 1024],
             ['current_total_thread_cache_bytes', 'current_total_thread_cache', 'absolute', 1, 1024],
@@ -188,7 +189,7 @@ CHARTS = {
             ['transfer_cache_free_bytes', 'transfer_cache_free', 'absolute', 1, 1024]
             ]},
     'command_total_rate': {
-        'options': [None, "Commands total rate", "commands/s", 'commands', 'mongodb.command_total_rate', 'stacked'],
+        'options': [None, 'Commands total rate', 'commands/s', 'commands', 'mongodb.command_total_rate', 'stacked'],
         'lines': [
             ['count_total', 'count', 'incremental', 1, 1],
             ['createIndexes_total', 'createIndexes', 'incremental', 1, 1],
@@ -199,7 +200,7 @@ CHARTS = {
             ['update_total', 'update', 'incremental', 1, 1]
             ]},
     'command_failed_rate': {
-        'options': [None, "Commands failed rate", "commands/s", 'commands', 'mongodb.command_failed_rate', 'stacked'],
+        'options': [None, 'Commands failed rate', 'commands/s', 'commands', 'mongodb.command_failed_rate', 'stacked'],
         'lines': [
             ['count_failed', 'count', 'incremental', 1, 1],
             ['createIndexes_failed', 'createIndexes', 'incremental', 1, 1],
@@ -225,19 +226,23 @@ class Service(SimpleService):
         if not PYMONGO:
             self.error('Pymongo module is needed to use mongodb.chart.py')
             return False
-
         self.connection, server_status, error = self._create_connection()
         if error:
             self.error(error)
             return False
 
         self.repl = 'repl' in server_status
-        self.databases = self.connection.database_names()
-        self._create_charts(server_status)
+        try:
+            self.databases = self.connection.database_names()
+        except PyMongoError as error:
+            self.databases = list()
+            self.info('Can\'t collect databases: %s' % str(error))
+
+        self.create_charts_(server_status)
 
         return True
 
-    def _create_charts(self, server_status):
+    def create_charts_(self, server_status):
 
         self.order = ORDER[:]
         self.definitions = deepcopy(CHARTS)
@@ -253,6 +258,7 @@ class Service(SimpleService):
         if not self.ss['backgroundFlushing']:
             self.order.remove('background_flush_average')
             self.order.remove('background_flush_last')
+            self.order.remove('background_flush_rate')
 
         if not self.ss['cursor']:
             self.order.remove('cursors')
@@ -273,7 +279,7 @@ class Service(SimpleService):
         for dbase in self.databases:
             self.order.append('_'.join([dbase, 'dbstats']))
             self.definitions['_'.join([dbase, 'dbstats'])] = {
-                    'options': [None, "%s: size of all documents, indexes, extents" % dbase, "KB",
+                    'options': [None, '%s: size of all documents, indexes, extents' % dbase, 'KB',
                                 'storage size metrics', 'mongodb.dbstats', 'line'],
                     'lines': [
                              ['_'.join([dbase, 'dataSize']), 'documents', 'absolute', 1, 1024],
@@ -283,19 +289,38 @@ class Service(SimpleService):
             self.definitions['dbstats_objects']['lines'].append(['_'.join([dbase, 'objects']), dbase, 'absolute'])
 
         if server_status.get('repl'):
-            hosts = server_status['repl']['hosts']
-            for host in hosts:
+            def create_heartbeat_lines(hosts):
+                lines = list()
+                for host in hosts:
+                    dim_id = '_'.join([host, 'heartbeat_lag'])
+                    lines.append([dim_id, host, 'absolute', 1, 1000])
+                return lines
+
+            def create_state_lines(states):
+                lines = list()
+                for state, description in states:
+                    dim_id = '_'.join([host, 'state', state])
+                    lines.append([dim_id, description, 'absolute', 1, 1])
+                return lines
+
+            all_hosts = server_status['repl']['hosts']
+            this_host = server_status['repl']['me']
+            other_hosts = [host for host in all_hosts if host != this_host]
+
+            # Create "heartbeat delay" charts
+            self.order.append('heartbeat_delay')
+            self.definitions['heartbeat_delay'] = {
+                       'options': [None, 'Latency between this node and replica set members (lastHeartbeatRecv)',
+                                   'seconds', 'replication', 'mongodb.replication_heartbeat_delay', 'stacked'],
+                       'lines': create_heartbeat_lines(other_hosts)}
+            # Create "replica set members state" chart
+            for host in all_hosts:
                 chart_name = '_'.join([host, 'state'])
                 self.order.append(chart_name)
                 self.definitions[chart_name] = {
-                       'options': [None, "%s state" % host, "state",
+                       'options': [None, '%s state' % host, 'state',
                                    'replication', 'mongodb.replication_state', 'line'],
-                       'lines': [
-                         ]}
-                for state, description in REPLSET_STATES:
-                    self.definitions[chart_name]['lines'].append(['_'.join([host, 'state', state]), description, 'absolute', 1, 1])
-
-
+                       'lines': create_state_lines(REPLSET_STATES)}
 
     def _get_raw_data(self):
         raw_data = dict()
@@ -316,6 +341,9 @@ class Service(SimpleService):
             return raw_data
 
     def get_dbstats_(self):
+        if not self.databases:
+            return None
+
         raw_data = dict()
         raw_data['dbStats'] = dict()
         try:
@@ -349,8 +377,9 @@ class Service(SimpleService):
 
         to_netdata = dict()
         serverStatus = raw_data['serverStatus']
-        dbStats = raw_data['dbStats']
+        dbStats = raw_data.get('dbStats')
         replSetGetStatus = raw_data.get('replSetGetStatus')
+        utc_now = datetime.utcnow()
 
         # serverStatus
         to_netdata.update(update_dict_key(serverStatus['opcounters'], 'readWriteOper'))
@@ -396,17 +425,27 @@ class Service(SimpleService):
                 to_netdata.update(update_dict_key(serverStatus['metrics']['commands'][elem], elem))
 
         # dbStats
-        for dbase in dbStats:
-            to_netdata.update(update_dict_key(dbStats[dbase], dbase))
+        if dbStats:
+            for dbase in dbStats:
+                to_netdata.update(update_dict_key(dbStats[dbase], dbase))
 
         # replSetGetStatus
         if replSetGetStatus:
+            other_hosts = list()
             members = replSetGetStatus['members']
             for member in members:
+                if not member.get('self'):
+                    other_hosts.append(member)
+                # Replica set members state
                 for elem in REPLSET_STATES:
                     state = elem[0]
                     to_netdata.update({'_'.join([member['name'], 'state', state]): 0})
                 to_netdata.update({'_'.join([member['name'], 'state', str(member['state'])]): member['state']})
+            # Heartbeat lag calculation
+            for other in other_hosts:
+                if other['lastHeartbeatRecv'] != datetime(1970, 1, 1, 0, 0):
+                    node = other['name'] + '_heartbeat_lag'
+                    to_netdata[node] = int(lag_calculation(utc_now - other['lastHeartbeatRecv']) * 1000)
 
         return to_netdata
 
@@ -418,8 +457,8 @@ class Service(SimpleService):
             connection = MongoClient(**conn_vars)
             if self.user and self.password:
                 connection.admin.authenticate(name=self.user, password=self.password)
-          #  elif self.user:
-          #      connection.admin.authenticate(name=self.user, mechanism='MONGODB-X509')
+            # elif self.user:
+            #     connection.admin.authenticate(name=self.user, mechanism='MONGODB-X509')
             server_status = connection.admin.command('serverStatus')
         except PyMongoError as error:
             return None, None, str(error)
@@ -437,3 +476,10 @@ def int_or_float(value):
 
 def in_server_status(elem, server_status):
     return elem in server_status or elem in server_status['metrics']
+
+
+def lag_calculation(lag):
+    if hasattr(lag, 'total_seconds'):
+        return lag.total_seconds()
+    else:
+        return (lag.microseconds + (lag.seconds + lag.days * 24 * 3600) * 10 ** 6) / 10.0 ** 6
