@@ -473,9 +473,9 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     rrdhost_unlock(host);
 
     // call the plugins.d processor to receive the metrics
-    info("STREAM [receive from [%s]:%s]: connecting client to plugins.d (host '%s', machine GUID '%s').", client_ip, client_port, host->hostname, host->machine_guid);
+    info("STREAM [receive from [%s]:%s]: receiving metrics... (host '%s', machine GUID '%s').", client_ip, client_port, host->hostname, host->machine_guid);
     size_t count = pluginsd_process(host, &cd, fp, 1);
-    error("STREAM [receive from [%s]:%s]: client disconnected (host '%s', machine GUID '%s', completed updates %zu).", client_ip, client_port, host->hostname, host->machine_guid, count);
+    error("STREAM [receive from [%s]:%s]: disconnected (host '%s', machine GUID '%s', completed updates %zu).", client_ip, client_port, host->hostname, host->machine_guid, count);
 
     rrdhost_wrlock(host);
     host->use_counter--;
