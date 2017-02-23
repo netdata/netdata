@@ -609,17 +609,14 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->update_every = update_every;
 
     pthread_t *thread = mallocz(sizeof(pthread_t));
-    pthread_attr_t attr;
 
     debug(D_SYSTEM, "Starting STREAM thread for client [%s]:%s.", w->client_ip, w->client_port);
 
-    if(pthread_create(thread, &attr, rrdpush_receiver_thread, rpt))
+    if(pthread_create(thread, NULL, rrdpush_receiver_thread, (void *)rpt))
         error("failed to create new STREAM thread for client [%s]:%s.", w->client_ip, w->client_port);
 
     else if(pthread_detach(*thread))
         error("Cannot request detach newly created thread for client [%s]:%s.", w->client_ip, w->client_port);
-
-    rrdpush_receive(w->ifd, key, hostname, machine_guid, os, update_every, w->client_ip, w->client_port);
 
     // prevent the caller from closing the streaming socket
     if(w->ifd == w->ofd)
