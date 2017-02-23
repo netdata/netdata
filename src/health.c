@@ -15,16 +15,9 @@ inline char *health_config_dir(void) {
 void health_init(void) {
     debug(D_HEALTH, "Health configuration initializing");
 
-    if(!rrdpush_exclusive) {
-        if(!(default_health_enabled = config_get_boolean("health", "enabled", 1))) {
-            debug(D_HEALTH, "Health is disabled.");
-            return;
-        }
-    }
-    else {
-        info("Health is disabled - setup alarms at the central netdata.");
-        config_set_boolean("health", "enabled", 0);
-        default_health_enabled = 0;
+    if(!(default_health_enabled = config_get_boolean("health", "enabled", 1))) {
+        debug(D_HEALTH, "Health is disabled.");
+        return;
     }
 }
 
@@ -32,6 +25,9 @@ void health_init(void) {
 // re-load health configuration
 
 void health_reload_host(RRDHOST *host) {
+    if(unlikely(!host->health_enabled))
+        return;
+
     char *path = health_config_dir();
 
     // free all running alarms
@@ -363,6 +359,9 @@ void *health_main(void *ptr) {
 
         RRDHOST *host;
         rrdhost_foreach_read(host) {
+            if(unlikely(!host->health_enabled))
+                continue;
+
             if(unlikely(apply_hibernation_delay)) {
 
                 info("Postponing alarm checks for %ld seconds, on host '%s', due to boottime discrepancy (realtime dt: %ld, boottime dt: %ld)."

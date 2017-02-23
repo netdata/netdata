@@ -73,18 +73,25 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_update_every    = update_every;
     host->rrd_history_entries = entries;
     host->rrd_memory_mode     = memory_mode;
-    host->health_enabled      = health_enabled;
+    host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
+    host->rrdpush_enabled     = default_rrdpush_enabled;
+    host->rrdpush_exclusive   = default_rrdpush_exclusive;
 
-    pthread_rwlock_init(&(host->rrdhost_rwlock), NULL);
+    host->rrdpush_pipe[0] = -1;
+    host->rrdpush_pipe[1] = -1;
+    host->rrdpush_socket = -1;
+
+    pthread_mutex_init(&host->rrdpush_mutex, NULL);
+    pthread_rwlock_init(&host->rrdhost_rwlock, NULL);
 
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
     rrdhost_init_os(host, os);
 
-    avl_init_lock(&(host->rrdset_root_index), rrdset_compare);
+    avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
     avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
-    avl_init_lock(&(host->rrdfamily_root_index), rrdfamily_compare);
-    avl_init_lock(&(host->variables_root_index), rrdvar_compare);
+    avl_init_lock(&(host->rrdfamily_root_index),   rrdfamily_compare);
+    avl_init_lock(&(host->variables_root_index),   rrdvar_compare);
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -110,11 +117,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(!localhost) {
         // this is localhost
 
-        host->cache_dir = strdupz(netdata_configured_cache_dir);
+        host->cache_dir  = strdupz(netdata_configured_cache_dir);
         host->varlib_dir = strdupz(netdata_configured_varlib_dir);
-
-        snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-        host->health_log_filename = strdupz(config_get("health", "health db file", filename));
 
     }
     else {
@@ -136,17 +140,17 @@ RRDHOST *rrdhost_create(const char *hostname,
             int r = mkdir(host->varlib_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", host->hostname, host->varlib_dir);
+
+            snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
+            r = mkdir(filename, 0775);
+            if(r != 0 && errno != EEXIST)
+                error("Host '%s': cannot create directory '%s'", host->hostname, filename);
         }
 
-        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-        int r = mkdir(filename, 0775);
-        if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", host->hostname, filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-        host->health_log_filename = strdupz(filename);
-
     }
+
+    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
+    host->health_log_filename = strdupz(config_get("health", "health db file", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
     host->health_default_exec = strdupz(config_get("health", "script to execute on alarm", filename));
@@ -156,12 +160,14 @@ RRDHOST *rrdhost_create(const char *hostname,
     // ------------------------------------------------------------------------
     // load health configuration
 
-    health_alarm_log_load(host);
-    health_alarm_log_open(host);
+    if(host->health_enabled) {
+        health_alarm_log_load(host);
+        health_alarm_log_open(host);
 
-    rrdhost_wrlock(host);
-    health_readdir(host, health_config_dir());
-    rrdhost_unlock(host);
+        rrdhost_wrlock(host);
+        health_readdir(host, health_config_dir());
+        rrdhost_unlock(host);
+    }
 
 
     // ------------------------------------------------------------------------
@@ -311,6 +317,11 @@ void rrdhost_free(RRDHOST *host) {
 
     // ------------------------------------------------------------------------
     // free it
+
+    if(host->rrdpush_spawn) {
+        pthread_cancel(host->rrdpush_thread);
+        rrdpush_sender_cleanup(host);
+    }
 
     freez(host->os);
     freez(host->cache_dir);
