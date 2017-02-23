@@ -340,8 +340,13 @@ void *health_main(void *ptr) {
 
         int oldstate, runnable = 0;
         time_t now = now_realtime_sec();
+        time_t now_boot = now_boottime_sec();
         time_t next_run = now + min_run_every;
         RRDCALC *rc;
+
+        time_t last_now = now;
+        time_t last_now_boot = now_boot;
+        time_t hibernation_delay = config_get_number("health", "postpone alarms during hibernation for seconds", 60);
 
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
@@ -350,7 +355,15 @@ void *health_main(void *ptr) {
 
         RRDHOST *host;
         rrdhost_foreach_read(host) {
-            if(unlikely(!host->health_enabled)) continue;
+            if(now - last_now > 2 * (now_boot - last_now_boot)) {
+                info("Postponing alarm checks for %ld seconds, on host '%s', due to boottime discrepancy (realtime dt: %ld, boottime dt: %ld).",
+                     hibernation_delay, host->hostname, (long)(now - last_now), (long)(now_boot - last_now_boot));
+                host->health_delay_up_to = now + hibernation_delay;
+            }
+            last_now = now;
+            last_now_boot = now_boot;
+
+            if(unlikely(!host->health_enabled || now < host->health_delay_up_to)) continue;
 
             rrdhost_rdlock(host);
 
@@ -611,6 +624,8 @@ void *health_main(void *ptr) {
         }
         else
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);
+
+        now_boot = now_boottime_sec();
     }
 
     buffer_free(wb);
