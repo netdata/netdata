@@ -27,6 +27,9 @@ inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
         case RRD_MEMORY_MODE_MAP:
             return RRD_MEMORY_MODE_MAP_NAME;
 
+        case RRD_MEMORY_MODE_NONE:
+            return RRD_MEMORY_MODE_NONE_NAME;
+
         case RRD_MEMORY_MODE_SAVE:
         default:
             return RRD_MEMORY_MODE_SAVE_NAME;
@@ -38,6 +41,8 @@ RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
         return RRD_MEMORY_MODE_RAM;
     else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_MAP_NAME)))
         return RRD_MEMORY_MODE_MAP;
+    else if(unlikely(!strcmp(name, RRD_MEMORY_MODE_NONE_NAME)))
+        return RRD_MEMORY_MODE_NONE;
 
     return RRD_MEMORY_MODE_SAVE;
 }

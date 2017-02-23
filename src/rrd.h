@@ -39,11 +39,13 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type);
 // memory mode
 
 typedef enum rrd_memory_mode {
-    RRD_MEMORY_MODE_RAM  = 0,
-    RRD_MEMORY_MODE_MAP  = 1,
-    RRD_MEMORY_MODE_SAVE = 2
+    RRD_MEMORY_MODE_NONE = 0,
+    RRD_MEMORY_MODE_RAM  = 1,
+    RRD_MEMORY_MODE_MAP  = 2,
+    RRD_MEMORY_MODE_SAVE = 3
 } RRD_MEMORY_MODE;
 
+#define RRD_MEMORY_MODE_NONE_NAME "none"
 #define RRD_MEMORY_MODE_RAM_NAME "ram"
 #define RRD_MEMORY_MODE_MAP_NAME "map"
 #define RRD_MEMORY_MODE_SAVE_NAME "save"
