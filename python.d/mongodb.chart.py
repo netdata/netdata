@@ -5,8 +5,9 @@
 from base import SimpleService
 from copy import deepcopy
 from datetime import datetime
+from sys import exc_info
 try:
-    from pymongo import MongoClient
+    from pymongo import MongoClient, ASCENDING, DESCENDING
     from pymongo.errors import PyMongoError
     PYMONGO = True
 except ImportError:
@@ -123,6 +124,7 @@ CHARTS = {
         'lines': [
             ['memory_virtual', 'virtual', 'absolute', 1, 1],
             ['memory_resident', 'resident', 'absolute', 1, 1],
+            ['memory_nonmapped', 'nonmapped', 'absolute', 1, 1],
             ['memory_mapped', 'mapped', 'absolute', 1, 1]
             ]},
     'page_faults': {
@@ -154,11 +156,11 @@ CHARTS = {
             ['errors_user', 'user', 'incremental', 1, 1]
             ]},
     'wiredtiger_cache': {
-        'options': [None, 'Amount of space taken by cached data and by dirty data in the cache',
-                    'KB', 'resource utilization', 'mongodb.wiredtiger_cache', 'stacked'],
+        'options': [None, 'The percentage of the wiredTiger cache that is in use and cache with dirty bytes',
+                    'percent', 'resource utilization', 'mongodb.wiredtiger_cache', 'stacked'],
         'lines': [
-            ['wiredTiger_bytes_in_cache', 'cached', 'absolute', 1, 1024],
-            ['wiredTiger_dirty_in_cache', 'dirty', 'absolute', 1, 1024]
+            ['wiredTiger_bytes_in_cache', 'inuse', 'absolute', 1, 1000],
+            ['wiredTiger_dirty_in_cache', 'dirty', 'absolute', 1, 1000]
             ]},
     'wiredtiger_pages_evicted': {
         'options': [None, 'Pages evicted from the cache',
@@ -231,25 +233,29 @@ class Service(SimpleService):
             self.error(error)
             return False
 
-        self.repl = 'repl' in server_status
         try:
             self.databases = self.connection.database_names()
         except PyMongoError as error:
             self.databases = list()
             self.info('Can\'t collect databases: %s' % str(error))
 
-        self.create_charts_(server_status)
+        self.ss = dict()
+        for elem in ['dur', 'backgroundFlushing', 'wiredTiger', 'tcmalloc', 'cursor', 'commands', 'repl']:
+            self.ss[elem] = in_server_status(elem, server_status)
 
-        return True
+        try:
+            self._get_data()
+        except (LookupError, SyntaxError, AttributeError):
+            self.error('Type: %s, error: %s' % (str(exc_info()[0]), str( exc_info()[1])))
+            return False
+        else:
+            self.create_charts_(server_status)
+            return True
 
     def create_charts_(self, server_status):
 
         self.order = ORDER[:]
         self.definitions = deepcopy(CHARTS)
-        self.ss = dict()
-
-        for elem in ['dur', 'backgroundFlushing', 'wiredTiger', 'tcmalloc', 'cursor', 'commands']:
-            self.ss[elem] = in_server_status(elem, server_status)
 
         if not self.ss['dur']:
             self.order.remove('journaling_transactions')
@@ -288,11 +294,11 @@ class Service(SimpleService):
                       ]}
             self.definitions['dbstats_objects']['lines'].append(['_'.join([dbase, 'objects']), dbase, 'absolute'])
 
-        if server_status.get('repl'):
-            def create_heartbeat_lines(hosts):
+        if self.ss['repl']:
+            def create_lines(hosts, string):
                 lines = list()
                 for host in hosts:
-                    dim_id = '_'.join([host, 'heartbeat_lag'])
+                    dim_id = '_'.join([host, string])
                     lines.append([dim_id, host, 'absolute', 1, 1000])
                 return lines
 
@@ -307,12 +313,25 @@ class Service(SimpleService):
             this_host = server_status['repl']['me']
             other_hosts = [host for host in all_hosts if host != this_host]
 
-            # Create "heartbeat delay" charts
+            if 'local' in self.databases:
+                self.order.append('oplog_window')
+                self.definitions['oplog_window'] = {
+                    'options': [None, 'Interval of time between the oldest and the latest entries in the oplog',
+                                'seconds', 'replication', 'mongodb.oplog_window', 'line'],
+                    'lines': [['timeDiff', 'window', 'absolute', 1, 1000]]}
+            # Create "heartbeat delay" chart
             self.order.append('heartbeat_delay')
             self.definitions['heartbeat_delay'] = {
                        'options': [None, 'Latency between this node and replica set members (lastHeartbeatRecv)',
                                    'seconds', 'replication', 'mongodb.replication_heartbeat_delay', 'stacked'],
-                       'lines': create_heartbeat_lines(other_hosts)}
+                       'lines': create_lines(other_hosts, 'heartbeat_lag')}
+            # Create "optimedate delay" chart
+            self.order.append('optimedate_delay')
+            self.definitions['optimedate_delay'] = {
+                       'options': [None, '"optimeDate"(time when last entry from the oplog was applied)'
+                                         ' diff between all nodes',
+                                   'seconds', 'replication', 'mongodb.replication_optimedate_delay', 'stacked'],
+                       'lines': create_lines(all_hosts, 'optimedate')}
             # Create "replica set members state" chart
             for host in all_hosts:
                 chart_name = '_'.join([host, 'state'])
@@ -328,6 +347,7 @@ class Service(SimpleService):
         raw_data.update(self.get_serverstatus_() or dict())
         raw_data.update(self.get_dbstats_() or dict())
         raw_data.update(self.get_replsetgetstatus_() or dict())
+        raw_data.update(self.get_getreplicationinfo_() or dict())
 
         return raw_data or None
 
@@ -355,12 +375,28 @@ class Service(SimpleService):
             return raw_data
 
     def get_replsetgetstatus_(self):
-        if not self.repl:
+        if not self.ss['repl']:
             return None
 
         raw_data = dict()
         try:
             raw_data['replSetGetStatus'] = self.connection.admin.command('replSetGetStatus')
+        except PyMongoError:
+            return None
+        else:
+            return raw_data
+
+    def get_getreplicationinfo_(self):
+        if not (self.ss['repl'] and 'local' in self.databases):
+            return None
+
+        raw_data = dict()
+        raw_data['getReplicationInfo'] = dict()
+        try:
+            raw_data['getReplicationInfo']['ASCENDING'] = self.connection.local.oplog.rs.find().sort(
+                "$natural", ASCENDING).limit(1)[0]
+            raw_data['getReplicationInfo']['DESCENDING'] = self.connection.local.oplog.rs.find().sort(
+                "$natural", DESCENDING).limit(1)[0]
         except PyMongoError:
             return None
         else:
@@ -379,6 +415,7 @@ class Service(SimpleService):
         serverStatus = raw_data['serverStatus']
         dbStats = raw_data.get('dbStats')
         replSetGetStatus = raw_data.get('replSetGetStatus')
+        getReplicationInfo = raw_data.get('getReplicationInfo')
         utc_now = datetime.utcnow()
 
         # serverStatus
@@ -386,6 +423,8 @@ class Service(SimpleService):
         to_netdata.update(update_dict_key(serverStatus['globalLock']['activeClients'], 'activeClients'))
         to_netdata.update(update_dict_key(serverStatus['connections'], 'connections'))
         to_netdata.update(update_dict_key(serverStatus['mem'], 'memory'))
+        to_netdata['memory_nonmapped'] = (serverStatus['mem']['virtual']
+                                          - serverStatus['mem'].get('mappedWithJournal', serverStatus['mem']['mapped']))
         to_netdata.update(update_dict_key(serverStatus['globalLock']['currentQueue'], 'currentQueue'))
         to_netdata.update(update_dict_key(serverStatus['asserts'], 'errors'))
         to_netdata['page_faults'] = serverStatus['extra_info']['page_faults']
@@ -410,8 +449,12 @@ class Service(SimpleService):
                                               'wiredTigerRead'))
             to_netdata.update(update_dict_key(serverStatus['wiredTiger']['concurrentTransactions']['write'],
                                               'wiredTigerWrite'))
-            to_netdata['wiredTiger_bytes_in_cache'] = wired_tiger['cache']['bytes currently in the cache']
-            to_netdata['wiredTiger_dirty_in_cache'] = wired_tiger['cache']['tracked dirty bytes in the cache']
+            to_netdata['wiredTiger_bytes_in_cache'] = (int(wired_tiger['cache']['bytes currently in the cache']
+                                                           * 100 / wired_tiger['cache']['maximum bytes configured']
+                                                           * 1000))
+            to_netdata['wiredTiger_dirty_in_cache'] = (int(wired_tiger['cache']['tracked dirty bytes in the cache']
+                                                           * 100 / wired_tiger['cache']['maximum bytes configured']
+                                                           * 1000))
             to_netdata['wiredTiger_unmodified_pages_evicted'] = wired_tiger['cache']['unmodified pages evicted']
             to_netdata['wiredTiger_modified_pages_evicted'] = wired_tiger['cache']['modified pages evicted']
 
@@ -433,19 +476,33 @@ class Service(SimpleService):
         if replSetGetStatus:
             other_hosts = list()
             members = replSetGetStatus['members']
+            unix_epoch = datetime(1970, 1, 1, 0, 0)
+
             for member in members:
                 if not member.get('self'):
                     other_hosts.append(member)
+                # Replica set time diff between current time and time when last entry from the oplog was applied
+                if member['optimeDate'] != unix_epoch:
+                    member_optimedate = member['name'] + '_optimedate'
+                    to_netdata.update({member_optimedate: int(delta_calculation(delta=utc_now - member['optimeDate'],
+                                                                                multiplier=1000))})
                 # Replica set members state
+                member_state = member['name'] + '_state'
                 for elem in REPLSET_STATES:
                     state = elem[0]
-                    to_netdata.update({'_'.join([member['name'], 'state', state]): 0})
-                to_netdata.update({'_'.join([member['name'], 'state', str(member['state'])]): member['state']})
+                    to_netdata.update({'_'.join([member_state, state]): 0})
+                to_netdata.update({'_'.join([member_state, str(member['state'])]): member['state']})
             # Heartbeat lag calculation
             for other in other_hosts:
-                if other['lastHeartbeatRecv'] != datetime(1970, 1, 1, 0, 0):
+                if other['lastHeartbeatRecv'] != unix_epoch:
                     node = other['name'] + '_heartbeat_lag'
-                    to_netdata[node] = int(lag_calculation(utc_now - other['lastHeartbeatRecv']) * 1000)
+                    to_netdata[node] = int(delta_calculation(delta=utc_now - other['lastHeartbeatRecv'],
+                                                             multiplier=1000))
+
+        if getReplicationInfo:
+            first_event = getReplicationInfo['ASCENDING']['ts'].as_datetime()
+            last_event = getReplicationInfo['DESCENDING']['ts'].as_datetime()
+            to_netdata['timeDiff'] = int(delta_calculation(delta=last_event - first_event, multiplier=1000))
 
         return to_netdata
 
@@ -478,8 +535,8 @@ def in_server_status(elem, server_status):
     return elem in server_status or elem in server_status['metrics']
 
 
-def lag_calculation(lag):
-    if hasattr(lag, 'total_seconds'):
-        return lag.total_seconds()
+def delta_calculation(delta, multiplier=1):
+    if hasattr(delta, 'total_seconds'):
+        return delta.total_seconds() * multiplier
     else:
-        return (lag.microseconds + (lag.seconds + lag.days * 24 * 3600) * 10 ** 6) / 10.0 ** 6
+        return (delta.microseconds + (delta.seconds + delta.days * 24 * 3600) * 10 ** 6) / 10.0 ** 6 * multiplier
