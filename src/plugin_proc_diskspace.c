@@ -1,6 +1,8 @@
 #include "common.h"
 
 #define DELAULT_EXLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/*"
+#define DEFAULT_EXCLUDED_FILESYSTEMS ""
+#define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
@@ -14,7 +16,7 @@ static inline void mountinfo_reload(int force) {
         mountinfo_free(disk_mountinfo_root);
 
         // re-read mountinfo in case something changed
-        disk_mountinfo_root = mountinfo_read(1);
+        disk_mountinfo_root = mountinfo_read(0);
 
         last_loaded = now;
     }
@@ -45,22 +47,29 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     static DICTIONARY *mount_points = NULL;
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
+    static SIMPLE_PATTERN *excluded_filesystems = NULL;
     int do_space, do_inodes;
 
     if(unlikely(!mount_points)) {
-        const char *s;
         SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
 
-        if(config_exists("plugin:proc:/proc/diskstats", "exclude space metrics on paths") && !config_exists("plugin:proc:diskspace", "exclude space metrics on paths")) {
+        if(config_exists("plugin:proc:/proc/diskstats", "exclude space metrics on paths") && !config_exists(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths")) {
             // the config exists in the old section
-            s = config_get("plugin:proc:/proc/diskstats", "exclude space metrics on paths", DELAULT_EXLUDED_PATHS);
+            config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths");
             mode = SIMPLE_PATTERN_PREFIX;
         }
-        else
-            s = config_get("plugin:proc:diskspace", "exclude space metrics on paths", DELAULT_EXLUDED_PATHS);
+
+        excluded_mountpoints = simple_pattern_create(
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DELAULT_EXLUDED_PATHS),
+                mode
+        );
+
+        excluded_filesystems = simple_pattern_create(
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS),
+                SIMPLE_PATTERN_EXACT
+        );
 
         mount_points = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
-        excluded_mountpoints = simple_pattern_create(s, mode);
     }
 
     struct mount_point_metadata *m = dictionary_get(mount_points, mi->mount_point);
@@ -68,10 +77,15 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         char var_name[4096 + 1];
         snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
 
-        int def_space = config_get_boolean_ondemand("plugin:proc:diskspace", "space usage for all disks", CONFIG_BOOLEAN_AUTO);
-        int def_inodes = config_get_boolean_ondemand("plugin:proc:diskspace", "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
+        int def_space = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
+        int def_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
 
         if(unlikely(simple_pattern_matches(excluded_mountpoints, mi->mount_point))) {
+            def_space = CONFIG_BOOLEAN_NO;
+            def_inodes = CONFIG_BOOLEAN_NO;
+        }
+
+        if(unlikely(simple_pattern_matches(excluded_filesystems, mi->filesystem))) {
             def_space = CONFIG_BOOLEAN_NO;
             def_inodes = CONFIG_BOOLEAN_NO;
         }
@@ -157,13 +171,23 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             if(unlikely(!m->st_space)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Space Usage for %s [%s]", family, mi->mount_source);
-                m->st_space = rrdset_create_localhost("disk_space", disk, NULL, family, "disk.space", title, "GB", 2023
-                                                      , update_every, RRDSET_TYPE_STACKED);
+                m->st_space = rrdset_create_localhost(
+                        "disk_space"
+                        , disk
+                        , NULL
+                        , family
+                        , "disk.space"
+                        , title
+                        , "GB"
+                        , 2023
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
             }
 
-            m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-            m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-            m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root", bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root", (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else
             rrdset_next(m->st_space);
@@ -185,8 +209,18 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             if(unlikely(!m->st_inodes)) {
                 char title[4096 + 1];
                 snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", family, mi->mount_source);
-                m->st_inodes = rrdset_create_localhost("disk_inodes", disk, NULL, family, "disk.inodes", title, "Inodes"
-                                                       , 2024, update_every, RRDSET_TYPE_STACKED);
+                m->st_inodes = rrdset_create_localhost(
+                        "disk_inodes"
+                        , disk
+                        , NULL
+                        , family
+                        , "disk.inodes"
+                        , title
+                        , "Inodes"
+                        , 2024
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
             }
 
             m->rd_inodes_avail    = rrddim_add(m->st_inodes, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -223,11 +257,11 @@ void *proc_diskspace_main(void *ptr) {
 
     int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
 
-    int update_every = (int)config_get_number("plugin:proc:diskspace", "update every", localhost->rrd_update_every);
+    int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
     if(update_every < localhost->rrd_update_every)
         update_every = localhost->rrd_update_every;
 
-    check_for_new_mountpoints_every = (int)config_get_number("plugin:proc:diskspace", "check for new mount points every", check_for_new_mountpoints_every);
+    check_for_new_mountpoints_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "check for new mount points every", check_for_new_mountpoints_every);
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 
@@ -275,11 +309,19 @@ void *proc_diskspace_main(void *ptr) {
 
             if(!stcpu_thread) {
                 stcpu_thread = rrdset_find_localhost("netdata.plugin_diskspace");
-                if(!stcpu_thread) stcpu_thread = rrdset_create_localhost("netdata", "plugin_diskspace", NULL
-                                                                         , "diskspace", NULL
-                                                                         , "NetData Disk Space Plugin CPU usage"
-                                                                         , "milliseconds/s", 132020
-                                                                         , update_every, RRDSET_TYPE_STACKED);
+                if(!stcpu_thread)
+                    stcpu_thread = rrdset_create_localhost(
+                            "netdata"
+                            , "plugin_diskspace"
+                            , NULL
+                            , "diskspace"
+                            , NULL
+                            , "NetData Disk Space Plugin CPU usage"
+                            , "milliseconds/s"
+                            , 132020
+                            , update_every
+                            , RRDSET_TYPE_STACKED
+                    );
 
                 rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
                 rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
@@ -295,11 +337,19 @@ void *proc_diskspace_main(void *ptr) {
 
             if(!st_duration) {
                 st_duration = rrdset_find_localhost("netdata.plugin_diskspace_dt");
-                if(!st_duration) st_duration = rrdset_create_localhost("netdata", "plugin_diskspace_dt", NULL
-                                                                       , "diskspace", NULL
-                                                                       , "NetData Disk Space Plugin Duration"
-                                                                       , "milliseconds/run", 132021
-                                                                       , update_every, RRDSET_TYPE_AREA);
+                if(!st_duration)
+                    st_duration = rrdset_create_localhost(
+                            "netdata"
+                            , "plugin_diskspace_dt"
+                            , NULL
+                            , "diskspace"
+                            , NULL
+                            , "NetData Disk Space Plugin Duration"
+                            , "milliseconds/run"
+                            , 132021
+                            , update_every
+                            , RRDSET_TYPE_AREA
+                    );
 
                 rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             }
