@@ -24,15 +24,15 @@
  */
 
 int default_rrdpush_enabled = 0;
-static char *remote_netdata_config = NULL;
-static char *api_key = NULL;
+static char *rrdpush_destination = NULL;
+static char *rrdpush_api_key = NULL;
 
 int rrdpush_init() {
     default_rrdpush_enabled   = config_get_boolean(CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
-    remote_netdata_config     = config_get(CONFIG_SECTION_STREAM, "stream metrics to", "");
-    api_key                   = config_get(CONFIG_SECTION_STREAM, "api key", "");
+    rrdpush_destination       = config_get(CONFIG_SECTION_STREAM, "destination", "");
+    rrdpush_api_key           = config_get(CONFIG_SECTION_STREAM, "api key", "");
 
-    if(!default_rrdpush_enabled || !remote_netdata_config || !*remote_netdata_config || !api_key || !*api_key) {
+    if(default_rrdpush_enabled && (!rrdpush_destination || !*rrdpush_destination || !rrdpush_api_key || !*rrdpush_api_key)) {
         error("STREAM [send]: cannot enable sending thread - information is missing.");
         default_rrdpush_enabled = 0;
     }
@@ -244,7 +244,7 @@ void *rrdpush_sender_thread(void *ptr) {
     remote_clock_resync_iterations = (unsigned int)config_get_number(CONFIG_SECTION_STREAM, "initial clock resync iterations", remote_clock_resync_iterations);
     char connected_to[CONNECTED_TO_SIZE + 1] = "";
 
-    if(!host->rrdpush_enabled || !remote_netdata_config || !*remote_netdata_config || !api_key || !*api_key)
+    if(!host->rrdpush_enabled || !rrdpush_destination || !*rrdpush_destination || !rrdpush_api_key || !*rrdpush_api_key)
         goto cleanup;
 
     // initialize rrdpush globals
@@ -276,11 +276,11 @@ void *rrdpush_sender_thread(void *ptr) {
             // they will be lost, so there is no point to do it
             host->rrdpush_connected = 0;
 
-            info("STREAM [send to %s]: connecting...", remote_netdata_config);
-            host->rrdpush_socket = connect_to_one_of(remote_netdata_config, default_port, &tv, &reconnects_counter, connected_to, CONNECTED_TO_SIZE);
+            info("STREAM [send to %s]: connecting...", rrdpush_destination);
+            host->rrdpush_socket = connect_to_one_of(rrdpush_destination, default_port, &tv, &reconnects_counter, connected_to, CONNECTED_TO_SIZE);
 
             if(unlikely(host->rrdpush_socket == -1)) {
-                error("STREAM [send to %s]: failed to connect", remote_netdata_config);
+                error("STREAM [send to %s]: failed to connect", rrdpush_destination);
                 sleep(reconnect_delay);
                 continue;
             }
@@ -292,7 +292,7 @@ void *rrdpush_sender_thread(void *ptr) {
                     "STREAM key=%s&hostname=%s&machine_guid=%s&os=%s&update_every=%d HTTP/1.1\r\n"
                     "User-Agent: netdata-push-service/%s\r\n"
                     "Accept: */*\r\n\r\n"
-                      , api_key
+                      , rrdpush_api_key
                       , localhost->hostname
                       , localhost->machine_guid
                       , localhost->os

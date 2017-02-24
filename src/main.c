@@ -384,6 +384,9 @@ static void backwards_compatible_config() {
     if(config_exists(CONFIG_SECTION_GLOBAL, "respect web browser do not track policy") && !config_exists(CONFIG_SECTION_API, "respect do not track policy"))
         config_move(CONFIG_SECTION_GLOBAL, "respect web browser do not track policy", CONFIG_SECTION_API, "respect do not track policy");
 
+    if(config_exists(CONFIG_SECTION_GLOBAL, "web x-frame-options header") && !config_exists(CONFIG_SECTION_API, "x-frame-options header"))
+        config_move(CONFIG_SECTION_GLOBAL, "web x-frame-options header", CONFIG_SECTION_API, "x-frame-options header");
+
     if(config_exists(CONFIG_SECTION_GLOBAL, "enable web responses gzip compression") && !config_exists(CONFIG_SECTION_API, "gzip compression"))
         config_move(CONFIG_SECTION_GLOBAL, "enable web responses gzip compression", CONFIG_SECTION_API, "gzip compression");
 
