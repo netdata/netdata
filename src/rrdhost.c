@@ -150,7 +150,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
 
     snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health_log_filename = strdupz(config_get(CONFIG_SECTION_HEALTH, "health db file", filename));
+    host->health_log_filename = strdupz(filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
     host->health_default_exec = strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
@@ -192,16 +192,29 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrd_unlock();
 
-    info("Host '%s' with guid '%s' initialized, update every: %d, memory mode: %s, streaming: %s, health: %s, cache_dir: '%s', varlib_dir: '%s', health_log: '%s'"
+    info("Host '%s' with guid '%s' initialized"
+                 ", update every: %d"
+                 ", memory mode: %s"
+                 ", history entries: %d"
+                 ", streaming: %s"
+                 ", health: %s"
+                 ", cache_dir: '%s'"
+                 ", varlib_dir: '%s'"
+                 ", health_log: '%s'"
+                 ", alarms default handler: '%s'"
+                 ", alarms default recipient: '%s'"
          , host->hostname
          , host->machine_guid
          , host->rrd_update_every
          , rrd_memory_mode_name(host->rrd_memory_mode)
+         , host->rrd_history_entries
          , host->rrdpush_enabled?"enabled: ":"disabled"
          , host->health_enabled?"enabled":"disabled"
          , host->cache_dir
          , host->varlib_dir
          , host->health_log_filename
+         , host->health_default_exec
+         , host->health_default_recipient
     );
     return host;
 }
