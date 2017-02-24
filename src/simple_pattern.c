@@ -169,7 +169,7 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
 int simple_pattern_matches(SIMPLE_PATTERN *list, const char *str) {
     struct simple_pattern *m, *root = (struct simple_pattern *)list;
 
-    if(unlikely(!root)) return 0;
+    if(unlikely(!root || !str || !*str)) return 0;
 
     size_t len = strlen(str);
     for(m = root; m ; m = m->next)

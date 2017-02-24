@@ -293,7 +293,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
                     struct mountinfo *mt;
                     for(mt = root; mt; mt = mt->next) {
-                        if(unlikely(mt->st_dev == mi->st_dev && !(mi->flags & MOUNTINFO_NO_STAT))) {
+                        if(unlikely(mt->st_dev == mi->st_dev && !(mt->flags & MOUNTINFO_IS_SAME_DEV))) {
                             if(strlen(mi->mount_point) < strlen(mt->mount_point))
                                 mt->flags |= MOUNTINFO_IS_SAME_DEV;
                             else
@@ -319,7 +319,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
         }
 
         // check if it has size
-        if(do_statvfs) {
+        if(do_statvfs && !(mi->flags & MOUNTINFO_IS_DUMMY)) {
             struct statvfs buff_statvfs;
             if(unlikely(statvfs(mi->mount_point, &buff_statvfs) < 0)) {
                 mi->flags |= MOUNTINFO_NO_STAT;
