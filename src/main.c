@@ -77,7 +77,7 @@ void web_server_threading_selection(void) {
     web_client_timeout = (int) config_get_number(CONFIG_SECTION_API, "disconnect idle clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
 
     respect_web_browser_do_not_track_policy = config_get_boolean(CONFIG_SECTION_API, "respect do not track policy", respect_web_browser_do_not_track_policy);
-    web_x_frame_options = config_get("web", "x-frame-options header", "");
+    web_x_frame_options = config_get(CONFIG_SECTION_API, "x-frame-options header", "");
     if(!*web_x_frame_options) web_x_frame_options = NULL;
 
 #ifdef NETDATA_WITH_ZLIB
