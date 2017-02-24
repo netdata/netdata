@@ -27,6 +27,7 @@ static inline void mountinfo_reload(int force) {
 struct mount_point_metadata {
     int do_space;
     int do_inodes;
+    int shown_error;
 
     size_t collected; // the number of times this has been collected
 
@@ -95,6 +96,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         struct mount_point_metadata mp = {
                 .do_space = do_space,
                 .do_inodes = do_inodes,
+                .shown_error = 0,
 
                 .collected = 0,
 
@@ -111,12 +113,8 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         m = dictionary_set(mount_points, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
-    else {
-        do_space = m->do_space;
-        do_inodes = m->do_inodes;
-    }
 
-    if(unlikely(do_space == CONFIG_BOOLEAN_NO && do_inodes == CONFIG_BOOLEAN_NO))
+    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
         return;
 
     if(unlikely(mi->flags & MOUNTINFO_READONLY && !m->collected))
@@ -124,9 +122,18 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     struct statvfs buff_statvfs;
     if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
-        error("Failed statvfs() for '%s' (disk '%s')", mi->mount_point, disk);
+        if(!m->shown_error) {
+            error("Failed statvfs() for '%s' (disk '%s', filesystem '%s', root '%s')"
+                  , mi->mount_point
+                  , disk
+                  , mi->filesystem?mi->filesystem:""
+                  , mi->root?mi->root:""
+            );
+            m->shown_error = 1;
+        }
         return;
     }
+    m->shown_error = 0;
 
     // logic found at get_fs_usage() in coreutils
     unsigned long bsize = (buff_statvfs.f_frsize) ? buff_statvfs.f_frsize : buff_statvfs.f_bsize;
@@ -163,7 +170,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     int rendered = 0;
 
-    if(do_space == CONFIG_BOOLEAN_YES || (do_space == CONFIG_BOOLEAN_AUTO && (bavail || breserved_root || bused))) {
+    if(m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO && (bavail || breserved_root || bused))) {
         if(unlikely(!m->st_space)) {
             m->do_space = CONFIG_BOOLEAN_YES;
             m->st_space = rrdset_find_bytype_localhost("disk_space", disk);
@@ -201,7 +208,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     // --------------------------------------------------------------------------
 
-    if(do_inodes == CONFIG_BOOLEAN_YES || (do_inodes == CONFIG_BOOLEAN_AUTO && (favail || freserved_root || fused))) {
+    if(m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO && (favail || freserved_root || fused))) {
         if(unlikely(!m->st_inodes)) {
             m->do_inodes = CONFIG_BOOLEAN_YES;
             m->st_inodes = rrdset_find_bytype_localhost("disk_inodes", disk);
