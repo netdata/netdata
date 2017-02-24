@@ -225,7 +225,6 @@ struct option_def options[] = {
     { 'h', "Display this help message.",                  NULL,          NULL},
     { 'P', "File to save a pid while running.",           "filename",    "do not save pid to a file"},
     { 'i', "The IP address to listen to.",                "IP",          "all IP addresses IPv4 and IPv6"},
-    { 'k', "Check health configuration and exit.",        NULL,          NULL},
     { 'p', "API/Web port to use.",                        "port",        "19999"},
     { 's', "Prefix for /proc and /sys (for containers).", "path",        "no prefix"},
     { 't', "The internal clock of netdata.",              "seconds",     "1"},
@@ -517,7 +516,7 @@ void set_global_environment() {
 }
 
 int main(int argc, char **argv) {
-    int i, check_config = 0;
+    int i;
     int config_loaded = 0;
     int dont_fork = 0;
     size_t wanted_stacksize = 0, stacksize = 0;
@@ -594,10 +593,6 @@ int main(int argc, char **argv) {
                     break;
                 case 'i':
                     config_set(CONFIG_SECTION_API, "bind to", optarg);
-                    break;
-                case 'k':
-                    dont_fork = 1;
-                    check_config = 1;
                     break;
                 case 'P':
                     strncpy(pidfile, optarg, FILENAME_MAX);
@@ -756,11 +751,6 @@ int main(int argc, char **argv) {
         // get log filenames and settings
 
         log_init();
-        if(check_config) {
-            stdout_filename = stderr_filename = stdaccess_filename = "system";
-            error_log_throttle_period = 0;
-            error_log_errors_per_period = 0;
-        }
         error_log_limit_unlimited();
 
         // --------------------------------------------------------------------
@@ -855,7 +845,7 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // create the listening sockets
 
-        if(!check_config && web_server_mode != WEB_SERVER_MODE_NONE)
+        if(web_server_mode != WEB_SERVER_MODE_NONE)
             create_listen_sockets();
 
 
@@ -903,31 +893,9 @@ int main(int argc, char **argv) {
 
 
     // ------------------------------------------------------------------------
-    // initialize rrd host
+    // initialize rrd, registry, health, rrdpush, etc.
 
     rrd_init(netdata_configured_hostname);
-
-
-    // --------------------------------------------------------------------
-    // find we need to send data to another netdata
-
-    rrdpush_init();
-
-
-    // ------------------------------------------------------------------------
-    // initialize health monitoring
-
-    health_init();
-
-
-    // ------------------------------------------------------------------------
-    // initialize the registry
-
-    registry_init();
-
-
-    if(check_config)
-        exit(1);
 
 
     // ------------------------------------------------------------------------

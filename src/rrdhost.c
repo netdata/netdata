@@ -230,8 +230,10 @@ RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, const ch
 // RRDHOST global / startup initialization
 
 void rrd_init(char *hostname) {
-    debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
+    health_init();
+    registry_init();
 
+    debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     localhost = rrdhost_create(hostname,
             registry_get_this_machine_guid(),
             os_type,
@@ -241,6 +243,8 @@ void rrd_init(char *hostname) {
             default_health_enabled,
             1
     );
+
+    rrdpush_init();
 }
 
 // ----------------------------------------------------------------------------
