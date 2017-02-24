@@ -64,7 +64,9 @@ RRDHOST *rrdhost_create(const char *hostname,
         int update_every,
         int entries,
         RRD_MEMORY_MODE memory_mode,
-        int health_enabled) {
+        int health_enabled,
+        int is_localhost
+) {
 
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
@@ -113,8 +115,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     char filename[FILENAME_MAX + 1];
 
-    if(!localhost) {
-        // this is localhost
+    if(is_localhost) {
 
         host->cache_dir  = strdupz(netdata_configured_cache_dir);
         host->varlib_dir = strdupz(netdata_configured_varlib_dir);
@@ -174,9 +175,16 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrd_wrlock();
 
-    if(localhost) {
-        host->next = localhost->next;
-        localhost->next = host;
+    if(is_localhost) {
+        host->next = localhost;
+        localhost = host;
+    }
+    else {
+        if(localhost) {
+            host->next = localhost->next;
+            localhost->next = host;
+        }
+        else localhost = host;
     }
 
     if(rrdhost_index_add(host) != host)
@@ -193,7 +201,7 @@ RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, const ch
 
     RRDHOST *host = rrdhost_find(guid, 0);
     if(!host) {
-        host = rrdhost_create(hostname, guid, os, update_every, history, mode, health_enabled);
+        host = rrdhost_create(hostname, guid, os, update_every, history, mode, health_enabled, 0);
     }
     else {
         host->health_enabled = health_enabled;
@@ -230,7 +238,8 @@ void rrd_init(char *hostname) {
             default_rrd_update_every,
             default_rrd_history_entries,
             default_rrd_memory_mode,
-            default_health_enabled
+            default_health_enabled,
+            1
     );
 }
 
