@@ -571,7 +571,7 @@ void rrdpush_sender_thread_spawn(RRDHOST *host) {
 
 int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url) {
     (void)host;
-    
+
     info("STREAM [receive from [%s]:%s]: new client connection.", w->client_ip, w->client_port);
 
     char *key = NULL, *hostname = NULL, *machine_guid = NULL, *os = NULL;

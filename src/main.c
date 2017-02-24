@@ -902,6 +902,12 @@ int main(int argc, char **argv) {
     }
 
 
+    // ------------------------------------------------------------------------
+    // initialize rrd host
+
+    rrd_init(netdata_configured_hostname);
+
+
     // --------------------------------------------------------------------
     // find we need to send data to another netdata
 
@@ -918,12 +924,6 @@ int main(int argc, char **argv) {
     // initialize the registry
 
     registry_init();
-
-
-    // ------------------------------------------------------------------------
-    // initialize rrd host
-
-    rrd_init(netdata_configured_hostname);
 
 
     if(check_config)
