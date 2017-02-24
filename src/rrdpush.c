@@ -449,17 +449,22 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     if(!strcmp(machine_guid, "localhost"))
         host = localhost;
     else
-        host = rrdhost_find_or_create(hostname, machine_guid, os, update_every, history, mode, health_enabled?1:0);
+        host = rrdhost_find_or_create(hostname, machine_guid, os, update_every, history, mode, (health_enabled == CONFIG_BOOLEAN_NO)?0:1);
+
+    if(!host) {
+        error("STREAM %s [receive from [%s]:%s]: failed to find/create host structure.", hostname, client_ip, client_port);
+        return 1;
+    }
 
     info("STREAM %s [receive from [%s]:%s]: metrics for host '%s' with machine_guid '%s': update every = %d, history = %d, memory mode = %s, health %s"
-         , host->hostname
+         , hostname
          , client_ip
          , client_port
-         , hostname
-         , machine_guid
-         , update_every
-         , history
-         , rrd_memory_mode_name(mode)
+         , host->hostname
+         , host->machine_guid
+         , host->rrd_update_every
+         , host->rrd_history_entries
+         , rrd_memory_mode_name(host->rrd_memory_mode)
          , (health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
     );
 

@@ -187,35 +187,44 @@ RRDHOST *rrdhost_create(const char *hostname,
         else localhost = host;
     }
 
-    if(rrdhost_index_add(host) != host)
-        fatal("Host '%s': cannot add host to index. It already exists.", hostname);
+    RRDHOST *t = rrdhost_index_add(host);
+
+    if(t != host) {
+        error("Host '%s': cannot add host with machine guid '%s' to index. It already exists as host '%s' with machine guid '%s'.", host->hostname, host->machine_guid, t->hostname, t->machine_guid);
+        rrdhost_free(host);
+        host = NULL;
+    }
+    else {
+        info("Host '%s' with guid '%s' initialized"
+                     ", os: %s"
+                     ", update every: %d"
+                     ", memory mode: %s"
+                     ", history entries: %d"
+                     ", streaming: %s"
+                     ", health: %s"
+                     ", cache_dir: '%s'"
+                     ", varlib_dir: '%s'"
+                     ", health_log: '%s'"
+                     ", alarms default handler: '%s'"
+                     ", alarms default recipient: '%s'"
+             , host->hostname
+             , host->machine_guid
+             , host->os
+             , host->rrd_update_every
+             , rrd_memory_mode_name(host->rrd_memory_mode)
+             , host->rrd_history_entries
+             , host->rrdpush_enabled?"enabled":"disabled"
+             , host->health_enabled?"enabled":"disabled"
+             , host->cache_dir
+             , host->varlib_dir
+             , host->health_log_filename
+             , host->health_default_exec
+             , host->health_default_recipient
+        );
+    }
 
     rrd_unlock();
 
-    info("Host '%s' with guid '%s' initialized"
-                 ", update every: %d"
-                 ", memory mode: %s"
-                 ", history entries: %d"
-                 ", streaming: %s"
-                 ", health: %s"
-                 ", cache_dir: '%s'"
-                 ", varlib_dir: '%s'"
-                 ", health_log: '%s'"
-                 ", alarms default handler: '%s'"
-                 ", alarms default recipient: '%s'"
-         , host->hostname
-         , host->machine_guid
-         , host->rrd_update_every
-         , rrd_memory_mode_name(host->rrd_memory_mode)
-         , host->rrd_history_entries
-         , host->rrdpush_enabled?"enabled: ":"disabled"
-         , host->health_enabled?"enabled":"disabled"
-         , host->cache_dir
-         , host->varlib_dir
-         , host->health_log_filename
-         , host->health_default_exec
-         , host->health_default_recipient
-    );
     return host;
 }
 
