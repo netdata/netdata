@@ -53,9 +53,8 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(unlikely(!mount_points)) {
         SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
 
-        if(config_exists("plugin:proc:/proc/diskstats", "exclude space metrics on paths") && !config_exists(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths")) {
-            // the config exists in the old section
-            config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths");
+        if(config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
+            // old configuration, enable backwards compatibility
             mode = SIMPLE_PATTERN_PREFIX;
         }
 

@@ -202,7 +202,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     debug(D_CONFIG, "request to rename config in section '%s', old name '%s', to section '%s', new name '%s'", section_old, name_old, section_new, name_new);
 
     struct section *co_old = appconfig_section_find(root, section_old);
-    if(!co_old) return -1;
+    if(!co_old) return ret;
 
     struct section *co_new = appconfig_section_find(root, section_new);
     if(!co_new) co_new = appconfig_section_create(root, section_new);
@@ -235,6 +235,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     cv_old->name = strdupz(name_new);
     cv_old->hash = simple_hash(cv_old->name);
 
+    cv_new = cv_old;
     cv_new->next = co_new->values;
     co_new->values = cv_new;
 

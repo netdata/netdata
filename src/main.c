@@ -77,13 +77,13 @@ void web_server_threading_selection(void) {
     web_client_timeout = (int) config_get_number(CONFIG_SECTION_API, "disconnect idle clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
 
     respect_web_browser_do_not_track_policy = config_get_boolean(CONFIG_SECTION_API, "respect do not track policy", respect_web_browser_do_not_track_policy);
-    web_x_frame_options = config_get(CONFIG_SECTION_API, "x-frame-options header", "");
+    web_x_frame_options = config_get(CONFIG_SECTION_API, "x-frame-options response header", "");
     if(!*web_x_frame_options) web_x_frame_options = NULL;
 
 #ifdef NETDATA_WITH_ZLIB
-    web_enable_gzip = config_get_boolean(CONFIG_SECTION_API, "gzip compression", web_enable_gzip);
+    web_enable_gzip = config_get_boolean(CONFIG_SECTION_API, "enable gzip compression", web_enable_gzip);
 
-    char *s = config_get(CONFIG_SECTION_API, "compression strategy", "default");
+    char *s = config_get(CONFIG_SECTION_API, "gzip compression strategy", "default");
     if(!strcmp(s, "default"))
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
     else if(!strcmp(s, "filtered"))
@@ -99,7 +99,7 @@ void web_server_threading_selection(void) {
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
     }
 
-    web_gzip_level = (int)config_get_number(CONFIG_SECTION_API, "compression level", 3);
+    web_gzip_level = (int)config_get_number(CONFIG_SECTION_API, "gzip compression level", 3);
     if(web_gzip_level < 1) {
         error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).", web_gzip_level);
         web_gzip_level = 1;
@@ -366,41 +366,42 @@ static void backwards_compatible_config() {
         web_server_mode = (mode)?WEB_SERVER_MODE_MULTI_THREADED:WEB_SERVER_MODE_SINGLE_THREADED;
     }
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "bind socket to IP") && !config_exists(CONFIG_SECTION_API, "bind to"))
-        config_move(CONFIG_SECTION_GLOBAL, "bind socket to IP", CONFIG_SECTION_API, "bind to");
+    // move [global] options to the [api] section
+    config_move(CONFIG_SECTION_GLOBAL, "bind socket to IP",
+                CONFIG_SECTION_API,    "bind to");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "bind to") && !config_exists(CONFIG_SECTION_API, "bind to"))
-        config_move(CONFIG_SECTION_GLOBAL, "bind to", CONFIG_SECTION_API, "bind to");
+    config_move(CONFIG_SECTION_GLOBAL, "bind to",
+                CONFIG_SECTION_API,    "bind to");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "port") && !config_exists(CONFIG_SECTION_API, "default port"))
-        config_move(CONFIG_SECTION_GLOBAL, "port", CONFIG_SECTION_API, "default port");
+    config_move(CONFIG_SECTION_GLOBAL, "port",
+                CONFIG_SECTION_API,    "default port");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "default port") && !config_exists(CONFIG_SECTION_API, "default port"))
-        config_move(CONFIG_SECTION_GLOBAL, "default port", CONFIG_SECTION_API, "default port");
+    config_move(CONFIG_SECTION_GLOBAL, "default port",
+                CONFIG_SECTION_API,    "default port");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "disconnect idle clients after seconds") && !config_exists(CONFIG_SECTION_API, "disconnect idle clients after seconds"))
-        config_move(CONFIG_SECTION_GLOBAL, "disconnect idle clients after seconds", CONFIG_SECTION_API, "disconnect idle clients after seconds");
+    config_move(CONFIG_SECTION_GLOBAL, "disconnect idle clients after seconds",
+                CONFIG_SECTION_API,    "disconnect idle clients after seconds");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "respect web browser do not track policy") && !config_exists(CONFIG_SECTION_API, "respect do not track policy"))
-        config_move(CONFIG_SECTION_GLOBAL, "respect web browser do not track policy", CONFIG_SECTION_API, "respect do not track policy");
+    config_move(CONFIG_SECTION_GLOBAL, "respect web browser do not track policy",
+                CONFIG_SECTION_API,    "respect do not track policy");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "web x-frame-options header") && !config_exists(CONFIG_SECTION_API, "x-frame-options header"))
-        config_move(CONFIG_SECTION_GLOBAL, "web x-frame-options header", CONFIG_SECTION_API, "x-frame-options header");
+    config_move(CONFIG_SECTION_GLOBAL, "web x-frame-options header",
+                CONFIG_SECTION_API,    "x-frame-options response header");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "enable web responses gzip compression") && !config_exists(CONFIG_SECTION_API, "gzip compression"))
-        config_move(CONFIG_SECTION_GLOBAL, "enable web responses gzip compression", CONFIG_SECTION_API, "gzip compression");
+    config_move(CONFIG_SECTION_GLOBAL, "enable web responses gzip compression",
+                CONFIG_SECTION_API,    "enable gzip compression");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "web compression strategy") && !config_exists(CONFIG_SECTION_API, "compression strategy"))
-        config_move(CONFIG_SECTION_GLOBAL, "web compression strategy", CONFIG_SECTION_API, "compression strategy");
+    config_move(CONFIG_SECTION_GLOBAL, "web compression strategy",
+                CONFIG_SECTION_API,    "gzip compression strategy");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "web compression level") && !config_exists(CONFIG_SECTION_API, "compression level"))
-        config_move(CONFIG_SECTION_GLOBAL, "web compression level", CONFIG_SECTION_API, "compression level");
+    config_move(CONFIG_SECTION_GLOBAL, "web compression level",
+                CONFIG_SECTION_API,    "gzip compression level");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "web files owner") && !config_exists(CONFIG_SECTION_API, "web files owner"))
-        config_move(CONFIG_SECTION_GLOBAL, "web files owner", CONFIG_SECTION_API, "web files owner");
+    config_move(CONFIG_SECTION_GLOBAL, "web files owner",
+                CONFIG_SECTION_API,    "web files owner");
 
-    if(config_exists(CONFIG_SECTION_GLOBAL, "web files group") && !config_exists(CONFIG_SECTION_API, "web files group"))
-        config_move(CONFIG_SECTION_GLOBAL, "web files group", CONFIG_SECTION_API, "web files group");
+    config_move(CONFIG_SECTION_GLOBAL, "web files group",
+                CONFIG_SECTION_API,    "web files group");
 }
 
 static void get_netdata_configured_variables() {
