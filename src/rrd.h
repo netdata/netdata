@@ -342,7 +342,6 @@ struct rrdhost {
     int rrd_history_entries;                        // the number of history entries for the host's charts
 
     int rrdpush_enabled;                            // 1 when this host sends metrics to another netdata
-    int rrdpush_exclusive;                          // 1 when this host is exclusively sending metrics without a database
     volatile int rrdpush_connected;                 // 1 when the sender is ready to push metrics
     volatile int rrdpush_spawn;                     // 1 when the sender thread has been spawn
     volatile int rrdpush_error_shown;               // 1 when we have logged a communication error

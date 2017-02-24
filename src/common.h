@@ -220,6 +220,7 @@
 #include "web_api_v1.h"
 #include "web_api_old.h"
 
+extern char *netdata_configured_hostname;
 extern char *netdata_configured_config_dir;
 extern char *netdata_configured_log_dir;
 extern char *netdata_configured_plugins_dir;

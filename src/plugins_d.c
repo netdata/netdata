@@ -455,14 +455,14 @@ void *pluginsd_main(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    int automatic_run = config_get_boolean("plugins", "enable running new plugins", 1);
-    int scan_frequency = (int) config_get_number("plugins", "check for new plugins every", 60);
+    int automatic_run = config_get_boolean(CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
+    int scan_frequency = (int) config_get_number(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
     DIR *dir = NULL;
     struct dirent *file = NULL;
     struct plugind *cd;
 
     // enable the apps plugin by default
-    // config_get_boolean("plugins", "apps", 1);
+    // config_get_boolean(CONFIG_SECTION_PLUGINS, "apps", 1);
 
     if(scan_frequency < 1) scan_frequency = 1;
 
@@ -491,7 +491,7 @@ void *pluginsd_main(void *ptr) {
 
             char pluginname[CONFIG_MAX_NAME + 1];
             snprintfz(pluginname, CONFIG_MAX_NAME, "%.*s", (int)(len - PLUGINSD_FILE_SUFFIX_LEN), file->d_name);
-            int enabled = config_get_boolean("plugins", pluginname, automatic_run);
+            int enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
 
             if(unlikely(!enabled)) {
                 debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is not enabled", file->d_name);

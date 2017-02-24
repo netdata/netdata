@@ -607,7 +607,7 @@ static inline void rrdset_init_last_updated_time(RRDSET *st) {
     st->last_updated.tv_usec = 0;
 }
 
-static inline void rrdset_done_push_int(RRDSET *st) {
+static inline void rrdset_done_push_exclusive(RRDSET *st) {
     if(unlikely(!st->last_collected_time.tv_sec)) {
         // it is the first entry
         // set the last_collected_time to now
@@ -619,17 +619,20 @@ static inline void rrdset_done_push_int(RRDSET *st) {
         rrdset_update_last_collected_time(st);
     }
 
-    st->counter++;
     st->counter_done++;
 
+    rrdset_rdlock(st);
     rrdset_done_push(st);
+    rrdset_unlock(st);
 }
 
 void rrdset_done(RRDSET *st) {
     if(unlikely(netdata_exit)) return;
 
-    if(unlikely(st->rrdhost->rrdpush_exclusive)) {
-        rrdset_done_push_int(st);
+    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
+        if(unlikely(st->rrdhost->rrdpush_enabled))
+            rrdset_done_push_exclusive(st);
+
         return;
     }
 
@@ -747,6 +750,9 @@ void rrdset_done(RRDSET *st) {
             debug(D_RRD_STATS, "%s: Will not store the next entry.", st->name);
     }
     st->counter_done++;
+
+    if(unlikely(st->rrdhost->rrdpush_enabled))
+        rrdset_done_push(st);
 
     // calculate totals and count the dimensions
     int dimensions = 0;
@@ -1217,8 +1223,4 @@ void rrdset_done(RRDSET *st) {
 
     if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
         error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
-
-    if(unlikely(st->rrdhost->rrdpush_enabled))
-        rrdset_done_push_int(st);
 }
-

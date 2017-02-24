@@ -1,10 +1,44 @@
 #include "common.h"
 
-int default_rrdpush_enabled   = 0;
-int default_rrdpush_exclusive = 1;
+/*
+ * rrdpush
+ *
+ * 3 threads are involved for all stream operations
+ *
+ * 1. a random data collection thread, calling rrdset_done_push()
+ *    this is called for each chart.
+ *
+ *    the output of this work is kept in a BUFFER in RRDHOST
+ *    the sender thread is signalled via a pipe (also in RRDHOST)
+ *
+ * 2. a sender thread running at the sending netdata
+ *    this is spawned automatically on the first chart to be pushed
+ *
+ *    It tries to push the metrics to the remote netdata, as fast
+ *    as possible (i.e. immediately after they are collected).
+ *
+ * 3. a receiver thread, running at the receiving netdata
+ *    this is spawned automatically when the sender connects to
+ *    the receiver.
+ *
+ */
 
+int default_rrdpush_enabled = 0;
 static char *remote_netdata_config = NULL;
 static char *api_key = NULL;
+
+int rrdpush_init() {
+    default_rrdpush_enabled   = config_get_boolean(CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
+    remote_netdata_config     = config_get(CONFIG_SECTION_STREAM, "stream metrics to", "");
+    api_key                   = config_get(CONFIG_SECTION_STREAM, "api key", "");
+
+    if(!default_rrdpush_enabled || !remote_netdata_config || !*remote_netdata_config || !api_key || !*api_key) {
+        error("STREAM [send]: cannot enable sending thread - information is missing.");
+        default_rrdpush_enabled = 0;
+    }
+
+    return default_rrdpush_enabled;
+}
 
 #define CONNECTED_TO_SIZE 100
 
@@ -80,30 +114,6 @@ static inline void send_chart_metrics(RRDSET *st) {
     buffer_strcat(st->rrdhost->rrdpush_buffer, "END\n");
 }
 
-// resets all the chart, so that their definitions
-// will be resent to the central netdata
-static void reset_all_charts(RRDHOST *host) {
-    rrdhost_rdlock(host);
-
-    RRDSET *st;
-    rrdset_foreach_read(st, host) {
-
-        // make it re-align the current time
-        // on the remote host
-        st->counter_done = 0;
-
-        rrdset_rdlock(st);
-
-        RRDDIM *rd;
-        rrddim_foreach_read(rd, st)
-            rrddim_flag_clear(rd, RRDDIM_FLAG_EXPOSED);
-
-        rrdset_unlock(st);
-    }
-
-    rrdhost_unlock(host);
-}
-
 void rrdpush_sender_thread_spawn(RRDHOST *host);
 
 void rrdset_done_push(RRDSET *st) {
@@ -131,12 +141,10 @@ void rrdset_done_push(RRDSET *st) {
         host->rrdpush_error_shown = 0;
     }
 
-    rrdset_rdlock(st);
     if(need_to_send_chart_definition(st))
         send_chart_definition(st);
 
     send_chart_metrics(st);
-    rrdset_unlock(st);
 
     // signal the sender there are more data
     if(write(host->rrdpush_pipe[PIPE_WRITE], " ", 1) == -1)
@@ -145,45 +153,58 @@ void rrdset_done_push(RRDSET *st) {
     rrdpush_unlock(host);
 }
 
-static inline void rrdpush_flush(RRDHOST *host) {
+// ----------------------------------------------------------------------------
+// rrdpush sender thread
+
+// resets all the chart, so that their definitions
+// will be resent to the central netdata
+static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
+    rrdhost_rdlock(host);
+
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+
+        // make it re-align the current time
+        // on the remote host
+        st->counter_done = 0;
+
+        rrdset_rdlock(st);
+
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st)
+            rrddim_flag_clear(rd, RRDDIM_FLAG_EXPOSED);
+
+        rrdset_unlock(st);
+    }
+
+    rrdhost_unlock(host);
+}
+
+static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     rrdpush_lock(host);
     if(buffer_strlen(host->rrdpush_buffer))
         error("STREAM [send]: discarding %zu bytes of metrics already in the buffer.", buffer_strlen(host->rrdpush_buffer));
 
     buffer_flush(host->rrdpush_buffer);
-    reset_all_charts(host);
+    rrdpush_sender_thread_reset_all_charts(host);
     rrdpush_unlock(host);
 }
 
-int rrdpush_init() {
-    default_rrdpush_enabled = config_get_boolean("stream", "enabled", default_rrdpush_enabled);
-    default_rrdpush_exclusive = config_get_boolean("stream", "exclusive", default_rrdpush_exclusive);
-    remote_netdata_config = config_get("stream", "stream metrics to", "");
-    api_key = config_get("stream", "api key", "");
-
-    if(!default_rrdpush_enabled || !remote_netdata_config || !*remote_netdata_config || !api_key || !*api_key) {
-        default_rrdpush_enabled = 0;
-        default_rrdpush_exclusive = 0;
-    }
-
-    return default_rrdpush_enabled;
-}
-
-static inline void rrdpush_sender_lock(RRDHOST *host) {
+static inline void rrdpush_sender_thread_lock(RRDHOST *host) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
         error("STREAM [send]: cannot set pthread cancel state to DISABLE.");
 
     rrdpush_lock(host);
 }
 
-static inline void rrdpush_sender_unlock(RRDHOST *host) {
+static inline void rrdpush_sender_thread_unlock(RRDHOST *host) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("STREAM [send]: cannot set pthread cancel state to DISABLE.");
 
     rrdpush_unlock(host);
 }
 
-void rrdpush_sender_cleanup(RRDHOST *host) {
+void rrdpush_sender_thread_cleanup(RRDHOST *host) {
     rrdpush_lock(host);
 
     host->rrdpush_connected = 0;
@@ -216,11 +237,11 @@ void *rrdpush_sender_thread(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("STREAM [send]: cannot set pthread cancel state to ENABLE.");
 
-    int timeout = (int)config_get_number("stream", "timeout seconds", 60);
-    int default_port = (int)config_get_number("stream", "default port", 19999);
-    size_t max_size = (size_t)config_get_number("stream", "buffer size bytes", 1024 * 1024);
-    unsigned int reconnect_delay = (unsigned int)config_get_number("stream", "reconnect delay seconds", 5);
-    remote_clock_resync_iterations = (unsigned int)config_get_number("stream", "initial clock resync iterations", remote_clock_resync_iterations);
+    int timeout = (int)config_get_number(CONFIG_SECTION_STREAM, "timeout seconds", 60);
+    int default_port = (int)config_get_number(CONFIG_SECTION_STREAM, "default port", 19999);
+    size_t max_size = (size_t)config_get_number(CONFIG_SECTION_STREAM, "buffer size bytes", 1024 * 1024);
+    unsigned int reconnect_delay = (unsigned int)config_get_number(CONFIG_SECTION_STREAM, "reconnect delay seconds", 5);
+    remote_clock_resync_iterations = (unsigned int)config_get_number(CONFIG_SECTION_STREAM, "initial clock resync iterations", remote_clock_resync_iterations);
     char connected_to[CONNECTED_TO_SIZE + 1] = "";
 
     if(!host->rrdpush_enabled || !remote_netdata_config || !*remote_netdata_config || !api_key || !*api_key)
@@ -310,7 +331,7 @@ void *rrdpush_sender_thread(void *ptr) {
             if(fcntl(host->rrdpush_socket, F_SETFL, O_NONBLOCK) < 0)
                 error("STREAM [send to %s]: cannot set non-blocking mode for socket.", connected_to);
 
-            rrdpush_flush(host);
+            rrdpush_sender_thread_data_flush(host);
             sent_connection = 0;
 
             // allow appending data into rrdpush_buffer
@@ -357,7 +378,7 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         if(ofd->revents & POLLOUT && begin < buffer_strlen(host->rrdpush_buffer)) {
-            rrdpush_sender_lock(host);
+            rrdpush_sender_thread_lock(host);
             ssize_t ret = send(host->rrdpush_socket, &host->rrdpush_buffer->buffer[begin], buffer_strlen(host->rrdpush_buffer) - begin, MSG_DONTWAIT);
             if(ret == -1) {
                 if(errno != EAGAIN && errno != EINTR) {
@@ -375,7 +396,7 @@ void *rrdpush_sender_thread(void *ptr) {
                     begin = 0;
                 }
             }
-            rrdpush_sender_unlock(host);
+            rrdpush_sender_thread_unlock(host);
         }
 
         // protection from overflow
@@ -392,7 +413,7 @@ void *rrdpush_sender_thread(void *ptr) {
 cleanup:
     debug(D_WEB_CLIENT, "STREAM [send]: sending thread exits.");
 
-    rrdpush_sender_cleanup(host);
+    rrdpush_sender_thread_cleanup(host);
 
     pthread_exit(NULL);
     return NULL;
@@ -400,7 +421,7 @@ cleanup:
 
 
 // ----------------------------------------------------------------------------
-// STREAM receiver
+// rrdpush receiver thread
 
 int rrdpush_receive(int fd, const char *key, const char *hostname, const char *machine_guid, const char *os, int update_every, char *client_ip, char *client_port) {
     RRDHOST *host;

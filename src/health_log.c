@@ -32,7 +32,7 @@ inline void health_log_rotate(RRDHOST *host) {
     static size_t rotate_every = 0;
 
     if(unlikely(rotate_every == 0)) {
-        rotate_every = (size_t)config_get_number("health", "rotate log every lines", 2000);
+        rotate_every = (size_t)config_get_number(CONFIG_SECTION_HEALTH, "rotate log every lines", 2000);
         if(rotate_every < 100) rotate_every = 100;
     }
 

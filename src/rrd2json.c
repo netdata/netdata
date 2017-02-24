@@ -154,7 +154,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_name_copy(hostname, config_get("global", "hostname", "localhost"), PROMETHEUS_ELEMENT_MAX);
+    prometheus_name_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
 
     // for each chart
     RRDSET *st;

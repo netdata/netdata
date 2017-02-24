@@ -75,7 +75,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_memory_mode     = memory_mode;
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
     host->rrdpush_enabled     = default_rrdpush_enabled;
-    host->rrdpush_exclusive   = default_rrdpush_exclusive;
 
     host->rrdpush_pipe[0] = -1;
     host->rrdpush_pipe[1] = -1;
@@ -102,10 +101,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->health_log.next_log_id =
     host->health_log.next_alarm_id = (uint32_t)now_realtime_sec();
 
-    long n = config_get_number("health", "in memory max health log entries", host->health_log.max);
+    long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
     if(n < 10) {
         error("Host '%s': health configuration has invalid max log entries %ld. Using default %u", host->hostname, n, host->health_log.max);
-        config_set_number("health", "in memory max health log entries", (long)host->health_log.max);
+        config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
     }
     else
         host->health_log.max = (unsigned int)n;
@@ -150,10 +149,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
 
     snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health_log_filename = strdupz(config_get("health", "health db file", filename));
+    host->health_log_filename = strdupz(config_get(CONFIG_SECTION_HEALTH, "health db file", filename));
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
-    host->health_default_exec = strdupz(config_get("health", "script to execute on alarm", filename));
+    host->health_default_exec = strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health_default_recipient = strdup("root");
 
 
@@ -320,7 +319,7 @@ void rrdhost_free(RRDHOST *host) {
 
     if(host->rrdpush_spawn) {
         pthread_cancel(host->rrdpush_thread);
-        rrdpush_sender_cleanup(host);
+        rrdpush_sender_thread_cleanup(host);
     }
 
     freez(host->os);
