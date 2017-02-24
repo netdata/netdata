@@ -192,7 +192,17 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     rrd_unlock();
 
-    debug(D_RRDHOST, "Host '%s', added with guid '%s'", host->hostname, host->machine_guid);
+    info("Host '%s' with guid '%s' initialized, update every: %d, memory mode: %s, streaming: %s, health: %s, cache_dir: '%s', varlib_dir: '%s', health_log: '%s'"
+         , host->hostname
+         , host->machine_guid
+         , host->rrd_update_every
+         , rrd_memory_mode_name(host->rrd_memory_mode)
+         , host->rrdpush_enabled?"enabled: ":"disabled"
+         , host->health_enabled?"enabled":"disabled"
+         , host->cache_dir
+         , host->varlib_dir
+         , host->health_log_filename
+    );
     return host;
 }
 
@@ -232,6 +242,7 @@ RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, const ch
 void rrd_init(char *hostname) {
     health_init();
     registry_init();
+    rrdpush_init();
 
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     localhost = rrdhost_create(hostname,
@@ -243,8 +254,6 @@ void rrd_init(char *hostname) {
             default_health_enabled,
             1
     );
-
-    rrdpush_init();
 }
 
 // ----------------------------------------------------------------------------
