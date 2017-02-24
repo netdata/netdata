@@ -240,8 +240,10 @@ class Service(SimpleService):
             self.info('Can\'t collect databases: %s' % str(error))
 
         self.ss = dict()
-        for elem in ['dur', 'backgroundFlushing', 'wiredTiger', 'tcmalloc', 'cursor', 'commands', 'repl']:
+        for elem in ['dur', 'backgroundFlushing', 'wiredTiger', 'tcmalloc', 'repl']:
             self.ss[elem] = in_server_status(elem, server_status)
+        for elem in ['commands', 'cursor']:
+            self.ss[elem] = in_server_status(elem, server_status['metrics'])
 
         try:
             self._get_data()
@@ -532,7 +534,7 @@ def int_or_float(value):
 
 
 def in_server_status(elem, server_status):
-    return elem in server_status or elem in server_status['metrics']
+    return elem in server_status
 
 
 def delta_calculation(delta, multiplier=1):
