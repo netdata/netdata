@@ -13,11 +13,11 @@ inline int health_alarm_log_open(RRDHOST *host) {
 
     if(host->health_log_fp) {
         if (setvbuf(host->health_log_fp, NULL, _IOLBF, 0) != 0)
-            error("Health: cannot set line buffering on health log file.");
+            error("HEALTH [%s]: cannot set line buffering on health log file '%s'.", host->hostname, host->health_log_filename);
         return 0;
     }
 
-    error("Health: cannot open health log file '%s'. Health data will be lost in case of netdata or server crash.", host->health_log_filename);
+    error("HEALTH [%s]: cannot open health log file '%s'. Health data will be lost in case of netdata or server crash.", host->hostname, host->health_log_filename);
     return -1;
 }
 
@@ -43,13 +43,13 @@ inline void health_log_rotate(RRDHOST *host) {
         snprintfz(old_filename, FILENAME_MAX, "%s.old", host->health_log_filename);
 
         if(unlink(old_filename) == -1 && errno != ENOENT)
-            error("Health: cannot remove old alarms log file '%s'", old_filename);
+            error("HEALTH [%s]: cannot remove old alarms log file '%s'", host->hostname, old_filename);
 
         if(link(host->health_log_filename, old_filename) == -1 && errno != ENOENT)
-            error("Health: cannot move file '%s' to '%s'.", host->health_log_filename, old_filename);
+            error("HEALTH [%s]: cannot move file '%s' to '%s'.", host->hostname, host->health_log_filename, old_filename);
 
         if(unlink(host->health_log_filename) == -1 && errno != ENOENT)
-            error("Health: cannot remove old alarms log file '%s'", host->health_log_filename);
+            error("HEALTH [%s]: cannot remove old alarms log file '%s'", host->hostname, host->health_log_filename);
 
         // open it with truncate
         host->health_log_fp = fopen(host->health_log_filename, "w");
@@ -57,7 +57,7 @@ inline void health_log_rotate(RRDHOST *host) {
         if(host->health_log_fp)
             fclose(host->health_log_fp);
         else
-            error("Health: cannot truncate health log '%s'", host->health_log_filename);
+            error("HEALTH [%s]: cannot truncate health log '%s'", host->hostname, host->health_log_filename);
 
         host->health_log_fp = NULL;
 
@@ -112,7 +112,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , (long double)ae->new_value
                             , (long double)ae->old_value
         ) < 0))
-            error("Health: failed to save alarm log entry. Health data may be lost in case of abnormal restart.");
+            error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
             ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
             host->health_log_entries_written++;
@@ -144,7 +144,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 *s = '\0';
                 pointers[entries++] = ++s;
                 if(entries >= max_entries) {
-                    error("Health: line %zu of file '%s' has more than %d entries. Ignoring excessive entries.", line, filename, max_entries);
+                    error("HEALTH [%s]: line %zu of file '%s' has more than %d entries. Ignoring excessive entries.", host->hostname, line, filename, max_entries);
                     break;
                 }
             }
@@ -155,7 +155,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ALARM_ENTRY *ae = NULL;
 
             if(entries < 26) {
-                error("Health: line %zu of file '%s' should have at least 26 entries, but it has %d. Ignoring it.", line, filename, entries);
+                error("HEALTH [%s]: line %zu of file '%s' should have at least 26 entries, but it has %d. Ignoring it.", host->hostname, line, filename, entries);
                 errored++;
                 continue;
             }
@@ -163,14 +163,14 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             // check that we have valid ids
             uint32_t unique_id = (uint32_t)strtoul(pointers[2], NULL, 16);
             if(!unique_id) {
-                error("Health: line %zu of file '%s' states alarm entry with invalid unique id %u (%s). Ignoring it.", line, filename, unique_id, pointers[2]);
+                error("HEALTH [%s]: line %zu of file '%s' states alarm entry with invalid unique id %u (%s). Ignoring it.", host->hostname, line, filename, unique_id, pointers[2]);
                 errored++;
                 continue;
             }
 
             uint32_t alarm_id = (uint32_t)strtoul(pointers[3], NULL, 16);
             if(!alarm_id) {
-                error("Health: line %zu of file '%s' states alarm entry for invalid alarm id %u (%s). Ignoring it.", line, filename, alarm_id, pointers[3]);
+                error("HEALTH [%s]: line %zu of file '%s' states alarm entry for invalid alarm id %u (%s). Ignoring it.", host->hostname, line, filename, alarm_id, pointers[3]);
                 errored++;
                 continue;
             }
@@ -178,7 +178,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             if(unlikely(*pointers[0] == 'A')) {
                 // make sure it is properly numbered
                 if(unlikely(host->health_log.alarms && unique_id < host->health_log.alarms->unique_id)) {
-                    error("Health: line %zu of file '%s' has alarm log entry with %u in wrong order. Ignoring it.", line, filename, unique_id);
+                    error("HEALTH [%s]: line %zu of file '%s' has alarm log entry %u in wrong order. Ignoring it.", host->hostname, line, filename, unique_id);
                     errored++;
                     continue;
                 }
@@ -190,8 +190,8 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 for(ae = host->health_log.alarms; ae; ae = ae->next) {
                     if(unlikely(unique_id == ae->unique_id)) {
                         if(unlikely(*pointers[0] == 'A')) {
-                            error("Health: line %zu of file '%s' adds duplicate alarm log entry with unique id %u. Using the later."
-                                  , line, filename, unique_id);
+                            error("HEALTH [%s]: line %zu of file '%s' adds duplicate alarm log entry %u. Using the later."
+                                  , host->hostname, line, filename, unique_id);
                             *pointers[0] = 'U';
                             duplicate++;
                         }
@@ -208,13 +208,13 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
 
             // if not found, skip this line
             if(unlikely(!ae)) {
-                // error("Health: line %zu of file '%s' updates alarm log entry with unique id %u, but it is not found.", line, filename, unique_id);
+                // error("HEALTH [%s]: line %zu of file '%s' updates alarm log entry with unique id %u, but it is not found.", host->hostname, line, filename, unique_id);
                 continue;
             }
 
             // check for a possible host missmatch
             //if(strcmp(pointers[1], host->hostname))
-            //    error("Health: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", line, filename, pointers[1], host->hostname);
+            //    error("HEALTH [%s]: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", host->hostname, line, filename, pointers[1], host->hostname);
 
             ae->unique_id               = unique_id;
             ae->alarm_id                = alarm_id;
@@ -292,7 +292,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 max_alarm_id = ae->alarm_id;
         }
         else {
-            error("Health: line %zu of file '%s' is invalid (unrecognized entry type '%s').", line, filename, pointers[0]);
+            error("HEALTH [%s]: line %zu of file '%s' is invalid (unrecognized entry type '%s').", host->hostname, line, filename, pointers[0]);
             errored++;
         }
     }
@@ -307,7 +307,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
     host->health_log.next_log_id = max_unique_id + 1;
     host->health_log.next_alarm_id = max_alarm_id + 1;
 
-    debug(D_HEALTH, "Health: loaded file '%s' with %zd new alarm entries, updated %zd alarms, errors %zd entries, duplicate %zd", filename, loaded, updated, errored, duplicate);
+    debug(D_HEALTH, "HEALTH [%s]: loaded file '%s' with %zd new alarm entries, updated %zd alarms, errors %zd entries, duplicate %zd", host->hostname, filename, loaded, updated, errored, duplicate);
     return loaded;
 }
 
@@ -318,7 +318,7 @@ inline void health_alarm_log_load(RRDHOST *host) {
     snprintfz(filename, FILENAME_MAX, "%s.old", host->health_log_filename);
     FILE *fp = fopen(filename, "r");
     if(!fp)
-        error("Health: cannot open health file: %s", filename);
+        error("HEALTH [%s]: cannot open health file: %s", host->hostname, filename);
     else {
         health_alarm_log_read(host, fp, filename);
         fclose(fp);
@@ -327,7 +327,7 @@ inline void health_alarm_log_load(RRDHOST *host) {
     host->health_log_entries_written = 0;
     fp = fopen(host->health_log_filename, "r");
     if(!fp)
-        error("Health: cannot open health file: %s", host->health_log_filename);
+        error("HEALTH [%s]: cannot open health file: %s", host->hostname, host->health_log_filename);
     else {
         health_alarm_log_read(host, fp, host->health_log_filename);
         fclose(fp);
