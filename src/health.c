@@ -9,13 +9,13 @@ int default_health_enabled = 1;
 inline char *health_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_config_dir);
-    return config_get("health", "health configuration directory", buffer);
+    return config_get(CONFIG_SECTION_HEALTH, "health configuration directory", buffer);
 }
 
 void health_init(void) {
     debug(D_HEALTH, "Health configuration initializing");
 
-    if(!(default_health_enabled = config_get_boolean("health", "enabled", 1))) {
+    if(!(default_health_enabled = config_get_boolean(CONFIG_SECTION_HEALTH, "enabled", 1))) {
         debug(D_HEALTH, "Health is disabled.");
         return;
     }
@@ -324,7 +324,7 @@ void *health_main(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    int min_run_every = (int)config_get_number("health", "run at least every seconds", 10);
+    int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
 
     BUFFER *wb = buffer_create(100);
@@ -333,7 +333,7 @@ void *health_main(void *ptr) {
     time_t now_boottime      = now_boottime_sec();
     time_t last_now          = now;
     time_t last_now_boottime = now_boottime;
-    time_t hibernation_delay = config_get_number("health", "postpone alarms during hibernation for seconds", 60);
+    time_t hibernation_delay = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
     unsigned int loop = 0;
     while(!netdata_exit) {

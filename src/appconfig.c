@@ -195,38 +195,58 @@ int appconfig_exists(struct config *root, const char *section, const char *name)
     return 1;
 }
 
-int appconfig_rename(struct config *root, const char *section, const char *old, const char *new) {
-    struct config_option *cv, *cv2;
+int appconfig_move(struct config *root, const char *section_old, const char *name_old, const char *section_new, const char *name_new) {
+    struct config_option *cv_old, *cv_new;
+    int ret = -1;
 
-    debug(D_CONFIG, "request to rename config in section '%s', old name '%s', new name '%s'", section, old, new);
+    debug(D_CONFIG, "request to rename config in section '%s', old name '%s', to section '%s', new name '%s'", section_old, name_old, section_new, name_new);
 
-    struct section *co = appconfig_section_find(root, section);
-    if(!co) return -1;
+    struct section *co_old = appconfig_section_find(root, section_old);
+    if(!co_old) return -1;
 
-    config_section_wrlock(co);
+    struct section *co_new = appconfig_section_find(root, section_new);
+    if(!co_new) co_new = appconfig_section_create(root, section_new);
 
-    cv = appconfig_option_index_find(co, old, 0);
-    if(!cv) goto cleanup;
+    config_section_wrlock(co_old);
+    config_section_wrlock(co_new);
 
-    cv2 = appconfig_option_index_find(co, new, 0);
-    if(cv2) goto cleanup;
+    cv_old = appconfig_option_index_find(co_old, name_old, 0);
+    if(!cv_old) goto cleanup;
 
-    if(unlikely(appconfig_option_index_del(co, cv) != cv))
-        error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted tge wrong config entry.", cv->name, co->name);
+    cv_new = appconfig_option_index_find(co_new, name_new, 0);
+    if(cv_new) goto cleanup;
 
-    freez(cv->name);
-    cv->name = strdupz(new);
-    cv->hash = simple_hash(cv->name);
-    if(unlikely(appconfig_option_index_add(co, cv) != cv))
-        error("INTERNAL ERROR: indexing of config '%s' in section '%s', already exists.", cv->name, co->name);
+    if(unlikely(appconfig_option_index_del(co_old, cv_old) != cv_old))
+        error("INTERNAL ERROR: deletion of config '%s' from section '%s', deleted tge wrong config entry.", cv_old->name, co_old->name);
 
-    config_section_unlock(co);
+    if(co_old->values == cv_old) {
+        co_old->values = cv_old->next;
+    }
+    else {
+        struct config_option *t;
+        for(t = co_old->values; t && t->next != cv_old ;t = t->next) ;
+        if(!t || t->next != cv_old)
+            error("INTERNAL ERROR: cannot find variable '%s' in section '%s' of the config - but it should be there.", cv_old->name, co_old->name);
+        else
+            t->next = cv_old->next;
+    }
 
-    return 0;
+    freez(cv_old->name);
+    cv_old->name = strdupz(name_new);
+    cv_old->hash = simple_hash(cv_old->name);
+
+    cv_new->next = co_new->values;
+    co_new->values = cv_new;
+
+    if(unlikely(appconfig_option_index_add(co_new, cv_old) != cv_old))
+        error("INTERNAL ERROR: indexing of config '%s' in section '%s', already exists.", cv_old->name, co_new->name);
+
+    ret = 0;
 
 cleanup:
-    config_section_unlock(co);
-    return -1;
+    config_section_unlock(co_new);
+    config_section_unlock(co_old);
+    return ret;
 }
 
 char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
@@ -503,12 +523,13 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
 
         appconfig_wrlock(root);
         for(co = root->sections; co ; co = co->next) {
-            if(!strcmp(co->name, "global")
-               || !strcmp(co->name, "plugins")
-               || !strcmp(co->name, "registry")
-               || !strcmp(co->name, "health")
-               || !strcmp(co->name, "backend")
-               || !strcmp(co->name, "stream")
+            if(!strcmp(co->name, CONFIG_SECTION_GLOBAL)
+               || !strcmp(co->name, CONFIG_SECTION_API)
+               || !strcmp(co->name, CONFIG_SECTION_PLUGINS)
+               || !strcmp(co->name, CONFIG_SECTION_REGISTRY)
+               || !strcmp(co->name, CONFIG_SECTION_HEALTH)
+               || !strcmp(co->name, CONFIG_SECTION_BACKEND)
+               || !strcmp(co->name, CONFIG_SECTION_STREAM)
                     )
                 pri = 0;
             else if(!strncmp(co->name, "plugin:", 7)) pri = 1;

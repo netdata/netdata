@@ -152,15 +152,15 @@ void *backends_main(void *ptr) {
             .tv_usec = 0
     };
     uint32_t options;
-    int enabled             = config_get_boolean("backend", "enabled", 0);
-    const char *source      = config_get("backend", "data source", "average");
-    const char *type        = config_get("backend", "type", "graphite");
-    const char *destination = config_get("backend", "destination", "localhost");
-    const char *prefix      = config_get("backend", "prefix", "netdata");
-    const char *hostname    = config_get("backend", "hostname", localhost->hostname);
-    int frequency           = (int)config_get_number("backend", "update every", 10);
-    int buffer_on_failures  = (int)config_get_number("backend", "buffer on failures", 10);
-    long timeoutms          = config_get_number("backend", "timeout ms", frequency * 2 * 1000);
+    int enabled             = config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", 0);
+    const char *source      = config_get(CONFIG_SECTION_BACKEND, "data source", "average");
+    const char *type        = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
+    const char *destination = config_get(CONFIG_SECTION_BACKEND, "destination", "localhost");
+    const char *prefix      = config_get(CONFIG_SECTION_BACKEND, "prefix", "netdata");
+    const char *hostname    = config_get(CONFIG_SECTION_BACKEND, "hostname", localhost->hostname);
+    int frequency           = (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", 10);
+    int buffer_on_failures  = (int)config_get_number(CONFIG_SECTION_BACKEND, "buffer on failures", 10);
+    long timeoutms          = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", frequency * 2 * 1000);
 
     // ------------------------------------------------------------------------
     // validate configuration options
