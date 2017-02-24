@@ -293,9 +293,9 @@ void *rrdpush_sender_thread(void *ptr) {
                     "User-Agent: netdata-push-service/%s\r\n"
                     "Accept: */*\r\n\r\n"
                       , rrdpush_api_key
-                      , localhost->hostname
-                      , localhost->machine_guid
-                      , localhost->os
+                      , host->hostname
+                      , host->machine_guid
+                      , host->os
                       , default_rrd_update_every
                       , program_version
             );
@@ -452,6 +452,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
         host = rrdhost_find_or_create(hostname, machine_guid, os, update_every, history, mode, (health_enabled == CONFIG_BOOLEAN_NO)?0:1);
 
     if(!host) {
+        close(fd);
         error("STREAM %s [receive from [%s]:%s]: failed to find/create host structure.", hostname, client_ip, client_port);
         return 1;
     }
