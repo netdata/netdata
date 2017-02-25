@@ -65,6 +65,9 @@ RRDHOST *rrdhost_create(const char *hostname,
         int entries,
         RRD_MEMORY_MODE memory_mode,
         int health_enabled,
+        int rrdpush_enabled,
+        char *rrdpush_destination,
+        char *rrdpush_api_key,
         int is_localhost
 ) {
 
@@ -76,11 +79,13 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_history_entries = entries;
     host->rrd_memory_mode     = memory_mode;
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
-    host->rrdpush_enabled     = default_rrdpush_enabled;
+    host->rrdpush_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key);
+    host->rrdpush_destination = (host->rrdpush_enabled)?strdupz(rrdpush_destination):NULL;
+    host->rrdpush_api_key     = (host->rrdpush_enabled)?strdupz(rrdpush_api_key):NULL;
 
     host->rrdpush_pipe[0] = -1;
     host->rrdpush_pipe[1] = -1;
-    host->rrdpush_socket = -1;
+    host->rrdpush_socket  = -1;
 
     pthread_mutex_init(&host->rrdpush_mutex, NULL);
     pthread_rwlock_init(&host->rrdhost_rwlock, NULL);
@@ -201,6 +206,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                      ", memory mode: %s"
                      ", history entries: %d"
                      ", streaming: %s"
+                     " to: '%s' (api key: '%s')"
                      ", health: %s"
                      ", cache_dir: '%s'"
                      ", varlib_dir: '%s'"
@@ -214,6 +220,8 @@ RRDHOST *rrdhost_create(const char *hostname,
              , rrd_memory_mode_name(host->rrd_memory_mode)
              , host->rrd_history_entries
              , host->rrdpush_enabled?"enabled":"disabled"
+             , host->rrdpush_destination
+             , host->rrdpush_api_key
              , host->health_enabled?"enabled":"disabled"
              , host->cache_dir
              , host->varlib_dir
@@ -228,12 +236,35 @@ RRDHOST *rrdhost_create(const char *hostname,
     return host;
 }
 
-RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, const char *os, int update_every, int history, RRD_MEMORY_MODE mode, int health_enabled) {
+RRDHOST *rrdhost_find_or_create(
+          const char *hostname
+        , const char *guid
+        , const char *os
+        , int update_every
+        , int history
+        , RRD_MEMORY_MODE mode
+        , int health_enabled
+        , int rrdpush_enabled
+        , char *rrdpush_destination
+        , char *rrdpush_api_key
+) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
     RRDHOST *host = rrdhost_find(guid, 0);
     if(!host) {
-        host = rrdhost_create(hostname, guid, os, update_every, history, mode, health_enabled, 0);
+        host = rrdhost_create(
+                hostname
+                , guid
+                , os
+                , update_every
+                , history
+                , mode
+                , health_enabled
+                , rrdpush_enabled
+                , rrdpush_destination
+                , rrdpush_api_key
+                , 0
+        );
     }
     else {
         host->health_enabled = health_enabled;
@@ -267,14 +298,18 @@ void rrd_init(char *hostname) {
     rrdpush_init();
 
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
-    localhost = rrdhost_create(hostname,
-            registry_get_this_machine_guid(),
-            os_type,
-            default_rrd_update_every,
-            default_rrd_history_entries,
-            default_rrd_memory_mode,
-            default_health_enabled,
-            1
+    localhost = rrdhost_create(
+            hostname
+            , registry_get_this_machine_guid()
+            , os_type
+            , default_rrd_update_every
+            , default_rrd_history_entries
+            , default_rrd_memory_mode
+            , default_health_enabled
+            , default_rrdpush_enabled
+            , default_rrdpush_destination
+            , default_rrdpush_api_key
+            , 1
     );
 }
 
@@ -369,6 +404,8 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->os);
     freez(host->cache_dir);
     freez(host->varlib_dir);
+    freez(host->rrdpush_api_key);
+    freez(host->rrdpush_destination);
     freez(host->health_default_exec);
     freez(host->health_default_recipient);
     freez(host->health_log_filename);

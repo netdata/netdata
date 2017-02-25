@@ -59,7 +59,7 @@ struct registry {
     pthread_mutex_t lock;
 };
 
-extern int registry_regenerate_guid(const char *guid, char *result);
+extern int regenerate_guid(const char *guid, char *result);
 
 #include "registry_url.h"
 #include "registry_machine.h"

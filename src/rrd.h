@@ -342,6 +342,8 @@ struct rrdhost {
     int rrd_history_entries;                        // the number of history entries for the host's charts
 
     int rrdpush_enabled;                            // 1 when this host sends metrics to another netdata
+    char *rrdpush_destination;                      // where to send metrics to
+    char *rrdpush_api_key;                          // the api key at the receiving netdata
     volatile int rrdpush_connected;                 // 1 when the sender is ready to push metrics
     volatile int rrdpush_spawn;                     // 1 when the sender thread has been spawn
     volatile int rrdpush_error_shown;               // 1 when we have logged a communication error
@@ -423,7 +425,18 @@ extern pthread_rwlock_t rrd_rwlock;
 extern void rrd_init(char *hostname);
 
 extern RRDHOST *rrdhost_find(const char *guid, uint32_t hash);
-extern RRDHOST *rrdhost_find_or_create(const char *hostname, const char *guid, const char *os, int update_every, int history, RRD_MEMORY_MODE mode, int health_enabled);
+extern RRDHOST *rrdhost_find_or_create(
+        const char *hostname
+        , const char *guid
+        , const char *os
+        , int update_every
+        , int history
+        , RRD_MEMORY_MODE mode
+        , int health_enabled
+        , int rrdpush_enabled
+        , char *rrdpush_destination
+        , char *rrdpush_api_key
+);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 extern void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);

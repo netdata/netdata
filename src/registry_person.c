@@ -183,7 +183,7 @@ REGISTRY_PERSON *registry_person_get(const char *person_guid, time_t when) {
     if(person_guid && *person_guid) {
         char buf[GUID_LEN + 1];
         // validate it is a GUID
-        if(unlikely(registry_regenerate_guid(person_guid, buf) == -1))
+        if(unlikely(regenerate_guid(person_guid, buf) == -1))
             info("Registry: person guid '%s' is not a valid guid. Ignoring it.", person_guid);
         else {
             person_guid = buf;

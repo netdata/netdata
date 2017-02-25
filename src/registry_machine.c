@@ -58,7 +58,7 @@ REGISTRY_MACHINE *registry_machine_get(const char *machine_guid, time_t when) {
     if(likely(machine_guid && *machine_guid)) {
         // validate it is a GUID
         char buf[GUID_LEN + 1];
-        if(unlikely(registry_regenerate_guid(machine_guid, buf) == -1))
+        if(unlikely(regenerate_guid(machine_guid, buf) == -1))
             info("Registry: machine guid '%s' is not a valid guid. Ignoring it.", machine_guid);
         else {
             machine_guid = buf;
