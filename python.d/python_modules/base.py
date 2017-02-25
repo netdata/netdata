@@ -31,6 +31,7 @@ from subprocess import Popen, PIPE
 
 import threading
 import msg
+import ssl
 
 try:
     PATH = os.getenv('PATH').split(':')
@@ -460,7 +461,17 @@ class UrlService(SimpleService):
 
     def __add_openers(self):
         # TODO add error handling
-        self.opener = urllib2.build_opener()
+        if self.ss_cert:
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                self.opener = urllib2.build_opener(urllib2.HTTPSHandler(context=ctx))
+            except Exception as error:
+                self.error(str(error))
+                self.opener = urllib2.build_opener()
+        else:
+            self.opener = urllib2.build_opener()
 
         # Proxy handling
         # TODO currently self.proxies isn't parsed from configuration file
@@ -535,7 +546,7 @@ class UrlService(SimpleService):
             self.password = str(self.configuration['pass'])
         except (KeyError, TypeError):
             pass
-
+        self.ss_cert = self.configuration.get('ss_cert')
         self.__add_openers()
 
         test = self._get_data()
