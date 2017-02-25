@@ -157,8 +157,7 @@ static inline struct section *appconfig_section_create(struct config *root, cons
 // ----------------------------------------------------------------------------
 // config name-value methods
 
-static inline struct config_option *appconfig_value_create(struct section *co, const char *name, const char *value)
-{
+static inline struct config_option *appconfig_value_create(struct section *co, const char *name, const char *value) {
     debug(D_CONFIG, "Creating config entry for name '%s', value '%s', in section '%s'.", name, value, co->name);
 
     struct config_option *cv = callocz(1, sizeof(struct config_option));
@@ -166,8 +165,14 @@ static inline struct config_option *appconfig_value_create(struct section *co, c
     cv->hash = simple_hash(cv->name);
     cv->value = strdupz(value);
 
-    if(unlikely(appconfig_option_index_add(co, cv) != cv))
-        error("INTERNAL ERROR: indexing of config '%s' in section '%s': already exists.", cv->name, co->name);
+    struct config_option *found = appconfig_option_index_add(co, cv);
+    if(found != cv) {
+        error("indexing of config '%s' in section '%s': already exists - using the existing one.", cv->name, co->name);
+        freez(cv->value);
+        freez(cv->name);
+        freez(cv);
+        return found;
+    }
 
     config_section_wrlock(co);
     struct config_option *cv2 = co->values;
@@ -240,7 +245,7 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     co_new->values = cv_new;
 
     if(unlikely(appconfig_option_index_add(co_new, cv_old) != cv_old))
-        error("INTERNAL ERROR: indexing of config '%s' in section '%s', already exists.", cv_old->name, co_new->name);
+        error("INTERNAL ERROR: re-indexing of config '%s' in section '%s', already exists.", cv_old->name, co_new->name);
 
     ret = 0;
 
