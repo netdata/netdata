@@ -136,4 +136,3 @@ char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section
 
     return ret;
 }
-

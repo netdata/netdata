@@ -169,7 +169,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if(rd->counter) {
+                if(rd->collections_counter) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     prometheus_name_copy(dimension, rd->id, PROMETHEUS_ELEMENT_MAX);
 
@@ -241,7 +241,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if(rd->counter) {
+                if(rd->collections_counter) {
                     char dimension[SHELL_ELEMENT_MAX + 1];
                     shell_name_copy(dimension, rd->id, SHELL_ELEMENT_MAX);
 

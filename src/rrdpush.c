@@ -33,6 +33,7 @@ int rrdpush_init() {
     default_rrdpush_enabled     = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
+    rrdhost_free_orphan_time    = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "free orphan hosts after seconds", rrdhost_free_orphan_time);
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
         error("STREAM [send]: cannot enable sending thread - information is missing.");
@@ -65,7 +66,7 @@ static unsigned int remote_clock_resync_iterations = 60;
 static inline int need_to_send_chart_definition(RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st)
-        if(!rrddim_flag_check(rd, RRDDIM_FLAG_EXPOSED))
+        if(!rd->exposed)
             return 1;
 
     return 0;
@@ -96,7 +97,7 @@ static inline void send_chart_definition(RRDSET *st) {
                        , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
                        , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
-        rrddim_flag_set(rd, RRDDIM_FLAG_EXPOSED);
+        rd->exposed = 1;
     }
 }
 
@@ -106,7 +107,7 @@ static inline void send_chart_metrics(RRDSET *st) {
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED) && rrddim_flag_check(rd, RRDDIM_FLAG_EXPOSED))
+        if(rd->updated && rd->exposed)
             buffer_sprintf(st->rrdhost->rrdpush_buffer, "SET %s = " COLLECTED_NUMBER_FORMAT "\n"
                        , rd->id
                        , rd->collected_value
@@ -174,7 +175,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st)
-            rrddim_flag_clear(rd, RRDDIM_FLAG_EXPOSED);
+            rd->exposed = 0;
 
         rrdset_unlock(st);
     }
@@ -548,7 +549,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     }
 
     rrdhost_wrlock(host);
-    host->use_counter++;
+    host->connected_senders++;
     if(health_enabled != CONFIG_BOOLEAN_NO)
         host->health_delay_up_to = now_realtime_sec() + alarms_delay;
     rrdhost_unlock(host);
@@ -559,10 +560,12 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed updates %zu).", host->hostname, client_ip, client_port, count);
 
     rrdhost_wrlock(host);
-    host->use_counter--;
-    if(!host->use_counter) {
+    host->connected_senders--;
+    if(!host->connected_senders) {
         if(health_enabled == CONFIG_BOOLEAN_AUTO)
             host->health_enabled = 0;
+
+        host->senders_disconnected_time = now_realtime_sec();
 
         rrdpush_sender_thread_stop(host);
     }

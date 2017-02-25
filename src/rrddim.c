@@ -162,7 +162,8 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
     rd->update_every = st->update_every;
 
     // prevent incremental calculation spikes
-    rd->counter = 0;
+    rd->collections_counter = 0;
+    rd->updated = 0;
     rd->flags = 0x00000000;
 
     rd->calculated_value = 0;
@@ -292,8 +293,9 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
 
     now_realtime_timeval(&rd->last_collected_time);
     rd->collected_value = value;
-    rrddim_flag_set(rd, RRDDIM_FLAG_UPDATED);
-    rd->counter++;
+    rd->updated = 1;
+
+    rd->collections_counter++;
 
     // fprintf(stderr, "%s.%s %llu " COLLECTED_NUMBER_FORMAT " dt %0.6f" " rate " CALCULATED_NUMBER_FORMAT "\n", st->name, rd->name, st->usec_since_last_update, value, (float)((double)st->usec_since_last_update / (double)1000000), (calculated_number)((value - rd->last_collected_value) * (calculated_number)rd->multiplier / (calculated_number)rd->divisor * 1000000.0 / (calculated_number)st->usec_since_last_update));
 
