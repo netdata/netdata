@@ -37,8 +37,6 @@ int rrdpush_init() {
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
         error("STREAM [send]: cannot enable sending thread - information is missing.");
         default_rrdpush_enabled = 0;
-        default_rrdpush_api_key = NULL;
-        default_rrdpush_destination = NULL;
     }
 
     return default_rrdpush_enabled;
@@ -545,8 +543,15 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
 
     rrdhost_wrlock(host);
     host->use_counter--;
-    if(!host->use_counter && health_enabled == CONFIG_BOOLEAN_AUTO)
-        host->health_enabled = 0;
+    if(!host->use_counter) {
+        if(health_enabled == CONFIG_BOOLEAN_AUTO)
+            host->health_enabled = 0;
+
+        if(host->rrdpush_enabled && host->rrdpush_spawn) {
+            pthread_cancel(host->rrdpush_thread);
+            rrdpush_sender_thread_cleanup(host);
+        }
+    }
     rrdhost_unlock(host);
 
     // cleanup
