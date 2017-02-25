@@ -206,7 +206,7 @@ static inline void rrdpush_sender_thread_unlock(RRDHOST *host) {
     rrdpush_unlock(host);
 }
 
-void rrdpush_sender_thread_cleanup(RRDHOST *host) {
+static void rrdpush_sender_thread_cleanup(RRDHOST *host) {
     rrdpush_lock(host);
 
     host->rrdpush_connected = 0;
@@ -233,6 +233,16 @@ void rrdpush_sender_thread_cleanup(RRDHOST *host) {
     host->rrdpush_spawn = 0;
 
     rrdpush_unlock(host);
+}
+
+void rrdpush_sender_thread_stop(RRDHOST *host) {
+    rrdhost_check_wrlock(host);
+
+    if(host->rrdpush_spawn) {
+        info("STREAM %s [send]: stopping sending thread...", host->hostname);
+        pthread_cancel(host->rrdpush_thread);
+        rrdpush_sender_thread_cleanup(host);
+    }
 }
 
 void *rrdpush_sender_thread(void *ptr) {
@@ -554,10 +564,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
         if(health_enabled == CONFIG_BOOLEAN_AUTO)
             host->health_enabled = 0;
 
-        if(host->rrdpush_spawn) {
-            pthread_cancel(host->rrdpush_thread);
-            rrdpush_sender_thread_cleanup(host);
-        }
+        rrdpush_sender_thread_stop(host);
     }
     rrdhost_unlock(host);
 

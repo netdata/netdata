@@ -396,10 +396,7 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
-    if(host->rrdpush_spawn) {
-        pthread_cancel(host->rrdpush_thread);
-        rrdpush_sender_thread_cleanup(host);
-    }
+    rrdpush_sender_thread_stop(host);
 
     freez(host->os);
     freez(host->cache_dir);
