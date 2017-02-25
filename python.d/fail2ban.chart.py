@@ -15,7 +15,7 @@ from glob import glob
 
 priority = 60000
 retries = 60
-REGEX = compile(r'\[([A-Za-z-]+)][^\[\]]*? enabled = true')
+REGEX = compile(r'\[([A-Za-z-_]+)][^\[\]]*?(?<!# )enabled = true')
 ORDER = ['jails_group']
 
 
@@ -65,14 +65,19 @@ class Service(LogService):
         if not is_accessible(self.log_path, R_OK):
             self.error('Cannot access file %s' % self.log_path)
             return False
+        jails_list = list()
 
         if self.conf_dir:
-            jails_list, error = parse_conf_dir(self.conf_dir)
-        else:
-            jails_list, error = parse_conf_path(self.conf_path)
+            dir_jails, error = parse_conf_dir(self.conf_dir)
+            jails_list.extend(dir_jails)
+            if not dir_jails:
+                self.error(error)
 
-        if not jails_list:
-            self.error(error)
+        if self.conf_path:
+            path_jails, error = parse_conf_path(self.conf_path)
+            jails_list.extend(path_jails)
+            if not path_jails:
+                self.error(error)
 
         # If for some reason parse failed we still can START with default jails_list.
         self.jails_list = list(set(jails_list) - set(self.exclude)) or ['ssh']
