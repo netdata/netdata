@@ -619,10 +619,14 @@ int main(int argc, char **argv) {
                         char* debug_flags_string = "debug_flags=";
                         if(strcmp(optarg, "unittest") == 0) {
                             default_rrd_update_every = 1;
+                            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             if(!config_loaded) config_load(NULL, 0);
                             get_netdata_configured_variables();
-                            registry_init();
+                            default_rrd_update_every = 1;
+                            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+                            default_health_enabled = 0;
                             rrd_init("unittest");
+                            default_rrdpush_enabled = 0;
                             if(run_all_mockup_tests()) exit(1);
                             if(unit_test_storage()) exit(1);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
