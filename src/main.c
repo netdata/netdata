@@ -378,7 +378,7 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL, "default port",
                 CONFIG_SECTION_WEB,    "default port");
 
-    config_move(CONFIG_SECTION_GLOBAL, "disconnect idle clients after seconds",
+    config_move(CONFIG_SECTION_GLOBAL, "disconnect idle web clients after seconds",
                 CONFIG_SECTION_WEB,    "disconnect idle clients after seconds");
 
     config_move(CONFIG_SECTION_GLOBAL, "respect web browser do not track policy",
