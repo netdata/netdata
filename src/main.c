@@ -60,7 +60,7 @@ struct netdata_static_thread static_threads[] = {
 };
 
 void web_server_threading_selection(void) {
-    web_server_mode = web_server_mode_id(config_get(CONFIG_SECTION_API, "mode", web_server_mode_name(web_server_mode)));
+    web_server_mode = web_server_mode_id(config_get(CONFIG_SECTION_WEB, "mode", web_server_mode_name(web_server_mode)));
 
     int multi_threaded = (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED);
     int single_threaded = (web_server_mode == WEB_SERVER_MODE_SINGLE_THREADED);
@@ -74,16 +74,16 @@ void web_server_threading_selection(void) {
             static_threads[i].enabled = single_threaded;
     }
 
-    web_client_timeout = (int) config_get_number(CONFIG_SECTION_API, "disconnect idle clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
+    web_client_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
 
-    respect_web_browser_do_not_track_policy = config_get_boolean(CONFIG_SECTION_API, "respect do not track policy", respect_web_browser_do_not_track_policy);
-    web_x_frame_options = config_get(CONFIG_SECTION_API, "x-frame-options response header", "");
+    respect_web_browser_do_not_track_policy = config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
+    web_x_frame_options = config_get(CONFIG_SECTION_WEB, "x-frame-options response header", "");
     if(!*web_x_frame_options) web_x_frame_options = NULL;
 
 #ifdef NETDATA_WITH_ZLIB
-    web_enable_gzip = config_get_boolean(CONFIG_SECTION_API, "enable gzip compression", web_enable_gzip);
+    web_enable_gzip = config_get_boolean(CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);
 
-    char *s = config_get(CONFIG_SECTION_API, "gzip compression strategy", "default");
+    char *s = config_get(CONFIG_SECTION_WEB, "gzip compression strategy", "default");
     if(!strcmp(s, "default"))
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
     else if(!strcmp(s, "filtered"))
@@ -99,7 +99,7 @@ void web_server_threading_selection(void) {
         web_gzip_strategy = Z_DEFAULT_STRATEGY;
     }
 
-    web_gzip_level = (int)config_get_number(CONFIG_SECTION_API, "gzip compression level", 3);
+    web_gzip_level = (int)config_get_number(CONFIG_SECTION_WEB, "gzip compression level", 3);
     if(web_gzip_level < 1) {
         error("Invalid compression level %d. Valid levels are 1 (fastest) to 9 (best ratio). Proceeding with level 1 (fastest compression).", web_gzip_level);
         web_gzip_level = 1;
@@ -367,40 +367,40 @@ static void backwards_compatible_config() {
 
     // move [global] options to the [api] section
     config_move(CONFIG_SECTION_GLOBAL, "bind socket to IP",
-                CONFIG_SECTION_API,    "bind to");
+                CONFIG_SECTION_WEB,    "bind to");
 
     config_move(CONFIG_SECTION_GLOBAL, "bind to",
-                CONFIG_SECTION_API,    "bind to");
+                CONFIG_SECTION_WEB,    "bind to");
 
     config_move(CONFIG_SECTION_GLOBAL, "port",
-                CONFIG_SECTION_API,    "default port");
+                CONFIG_SECTION_WEB,    "default port");
 
     config_move(CONFIG_SECTION_GLOBAL, "default port",
-                CONFIG_SECTION_API,    "default port");
+                CONFIG_SECTION_WEB,    "default port");
 
     config_move(CONFIG_SECTION_GLOBAL, "disconnect idle clients after seconds",
-                CONFIG_SECTION_API,    "disconnect idle clients after seconds");
+                CONFIG_SECTION_WEB,    "disconnect idle clients after seconds");
 
     config_move(CONFIG_SECTION_GLOBAL, "respect web browser do not track policy",
-                CONFIG_SECTION_API,    "respect do not track policy");
+                CONFIG_SECTION_WEB,    "respect do not track policy");
 
     config_move(CONFIG_SECTION_GLOBAL, "web x-frame-options header",
-                CONFIG_SECTION_API,    "x-frame-options response header");
+                CONFIG_SECTION_WEB,    "x-frame-options response header");
 
     config_move(CONFIG_SECTION_GLOBAL, "enable web responses gzip compression",
-                CONFIG_SECTION_API,    "enable gzip compression");
+                CONFIG_SECTION_WEB,    "enable gzip compression");
 
     config_move(CONFIG_SECTION_GLOBAL, "web compression strategy",
-                CONFIG_SECTION_API,    "gzip compression strategy");
+                CONFIG_SECTION_WEB,    "gzip compression strategy");
 
     config_move(CONFIG_SECTION_GLOBAL, "web compression level",
-                CONFIG_SECTION_API,    "gzip compression level");
+                CONFIG_SECTION_WEB,    "gzip compression level");
 
     config_move(CONFIG_SECTION_GLOBAL, "web files owner",
-                CONFIG_SECTION_API,    "web files owner");
+                CONFIG_SECTION_WEB,    "web files owner");
 
     config_move(CONFIG_SECTION_GLOBAL, "web files group",
-                CONFIG_SECTION_API,    "web files group");
+                CONFIG_SECTION_WEB,    "web files group");
 }
 
 static void get_netdata_configured_variables() {
@@ -592,7 +592,7 @@ int main(int argc, char **argv) {
                     help(0);
                     break;
                 case 'i':
-                    config_set(CONFIG_SECTION_API, "bind to", optarg);
+                    config_set(CONFIG_SECTION_WEB, "bind to", optarg);
                     break;
                 case 'P':
                     strncpy(pidfile, optarg, FILENAME_MAX);

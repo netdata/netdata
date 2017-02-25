@@ -4,7 +4,7 @@
 #define CONFIG_FILENAME "netdata.conf"
 
 #define CONFIG_SECTION_GLOBAL   "global"
-#define CONFIG_SECTION_API      "api"
+#define CONFIG_SECTION_WEB      "web"
 #define CONFIG_SECTION_PLUGINS  "plugins"
 #define CONFIG_SECTION_REGISTRY "registry"
 #define CONFIG_SECTION_HEALTH   "health"
