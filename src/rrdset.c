@@ -187,7 +187,7 @@ void rrdset_reset(RRDSET *st) {
     rrddim_foreach_read(rd, st) {
         rd->last_collected_time.tv_sec = 0;
         rd->last_collected_time.tv_usec = 0;
-        rd->counter = 0;
+        rd->collections_counter = 0;
         memset(rd->values, 0, rd->entries * sizeof(storage_number));
     }
 }
@@ -767,7 +767,7 @@ void rrdset_done(RRDSET *st) {
     st->collected_total = 0;
     rrddim_foreach_read(rd, st) {
         dimensions++;
-        if(likely(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED)))
+        if(likely(rd->updated))
             st->collected_total += rd->collected_value;
     }
 
@@ -778,7 +778,7 @@ void rrdset_done(RRDSET *st) {
     // at this stage we do not interpolate anything
     rrddim_foreach_read(rd, st) {
 
-        if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED))) {
+        if(unlikely(!rd->updated)) {
             rd->calculated_value = 0;
             continue;
         }
@@ -840,7 +840,7 @@ void rrdset_done(RRDSET *st) {
                 break;
 
             case RRD_ALGORITHM_INCREMENTAL:
-                if(unlikely(rd->counter <= 1)) {
+                if(unlikely(rd->collections_counter <= 1)) {
                     rd->calculated_value = 0;
                     continue;
                 }
@@ -880,7 +880,7 @@ void rrdset_done(RRDSET *st) {
                 break;
 
             case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
-                if(unlikely(rd->counter <= 1)) {
+                if(unlikely(rd->collections_counter <= 1)) {
                     rd->calculated_value = 0;
                     continue;
                 }
@@ -1064,7 +1064,7 @@ void rrdset_done(RRDSET *st) {
                 continue;
             }
 
-            if(likely(rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED) && rd->counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
+            if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 rd->values[st->current_entry] = pack_storage_number(new_value, storage_flags );
                 rd->last_stored_value = new_value;
 
@@ -1127,7 +1127,7 @@ void rrdset_done(RRDSET *st) {
     st->last_collected_total  = st->collected_total;
 
     rrddim_foreach_read(rd, st) {
-        if(unlikely(!rrddim_flag_check(rd, RRDDIM_FLAG_UPDATED)))
+        if(unlikely(!rd->updated))
             continue;
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
@@ -1159,7 +1159,7 @@ void rrdset_done(RRDSET *st) {
 
         rd->calculated_value = 0;
         rd->collected_value = 0;
-        rrddim_flag_clear(rd, RRDDIM_FLAG_UPDATED);
+        rd->updated = 0;
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
             debug(D_RRD_STATS, "%s/%s: END "

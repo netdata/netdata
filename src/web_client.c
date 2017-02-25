@@ -302,6 +302,7 @@ int mysendfile(struct web_client *w, char *filename) {
     for(s = filename; *s ;s++) {
         if( !isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
             debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
+            w->response.data->contenttype = CT_TEXT_HTML;
             buffer_sprintf(w->response.data, "Filename contains invalid characters: ");
             buffer_strcat_htmlescape(w->response.data, filename);
             return 400;
@@ -311,6 +312,7 @@ int mysendfile(struct web_client *w, char *filename) {
     // if the filename contains a .. refuse to serve it
     if(strstr(filename, "..") != 0) {
         debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
+        w->response.data->contenttype = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "Relative filenames are not supported: ");
         buffer_strcat_htmlescape(w->response.data, filename);
         return 400;
@@ -324,6 +326,7 @@ int mysendfile(struct web_client *w, char *filename) {
     struct stat stat;
     if(lstat(webfilename, &stat) != 0) {
         debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
+        w->response.data->contenttype = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
         buffer_strcat_htmlescape(w->response.data, webfilename);
         return 404;
@@ -332,6 +335,7 @@ int mysendfile(struct web_client *w, char *filename) {
     // check if the file is owned by expected user
     if(stat.st_uid != web_files_uid()) {
         error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, stat.st_uid, web_files_uid());
+        w->response.data->contenttype = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "Access to file is not permitted: ");
         buffer_strcat_htmlescape(w->response.data, webfilename);
         return 403;
@@ -340,6 +344,7 @@ int mysendfile(struct web_client *w, char *filename) {
     // check if the file is owned by expected group
     if(stat.st_gid != web_files_gid()) {
         error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, stat.st_gid, web_files_gid());
+        w->response.data->contenttype = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "Access to file is not permitted: ");
         buffer_strcat_htmlescape(w->response.data, webfilename);
         return 403;
@@ -352,6 +357,7 @@ int mysendfile(struct web_client *w, char *filename) {
 
     if((stat.st_mode & S_IFMT) != S_IFREG) {
         error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
+        w->response.data->contenttype = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "Access to file is not permitted: ");
         buffer_strcat_htmlescape(w->response.data, webfilename);
         return 403;
@@ -364,6 +370,7 @@ int mysendfile(struct web_client *w, char *filename) {
 
         if(errno == EBUSY || errno == EAGAIN) {
             error("%llu: File '%s' is busy, sending 307 Moved Temporarily to force retry.", w->id, webfilename);
+            w->response.data->contenttype = CT_TEXT_HTML;
             buffer_sprintf(w->response.header, "Location: /" WEB_PATH_FILE "/%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
             buffer_strcat_htmlescape(w->response.data, webfilename);
@@ -371,6 +378,7 @@ int mysendfile(struct web_client *w, char *filename) {
         }
         else {
             error("%llu: Cannot open file '%s'.", w->id, webfilename);
+            w->response.data->contenttype = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Cannot open file: ");
             buffer_strcat_htmlescape(w->response.data, webfilename);
             return 404;
@@ -575,6 +583,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
             return web_client_api_request_v1(host, w, url);
         else {
             buffer_flush(w->response.data);
+            w->response.data->contenttype = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Unsupported API version: ");
             buffer_strcat_htmlescape(w->response.data, tok);
             return 404;
@@ -1041,6 +1050,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     }
 
     buffer_flush(w->response.data);
+    w->response.data->contenttype = CT_TEXT_HTML;
     buffer_strcat(w->response.data, "This netdata does not maintain a database for host: ");
     buffer_strcat_htmlescape(w->response.data, tok?tok:"");
     return 404;
@@ -1143,6 +1153,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                 RRDSET *st = rrdset_find_byname(host, tok);
                 if(!st) st = rrdset_find(host, tok);
                 if(!st) {
+                    w->response.data->contenttype = CT_TEXT_HTML;
                     buffer_strcat(w->response.data, "Chart is not found: ");
                     buffer_strcat_htmlescape(w->response.data, tok);
                     debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
@@ -1156,6 +1167,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                 else
                     rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
 
+                w->response.data->contenttype = CT_TEXT_HTML;
                 buffer_sprintf(w->response.data, "Chart has now debug %s: ", rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
                 buffer_strcat_htmlescape(w->response.data, tok);
                 debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");

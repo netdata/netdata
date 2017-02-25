@@ -5,6 +5,7 @@ RRDHOST *localhost = NULL;
 
 pthread_rwlock_t rrd_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
+time_t rrdhost_free_orphan_time = 3600;
 
 // ----------------------------------------------------------------------------
 // RRDHOST index
@@ -20,7 +21,7 @@ avl_tree_lock rrdhost_root_index = {
         .rwlock = AVL_LOCK_INITIALIZER
 };
 
-RRDHOST *rrdhost_find(const char *guid, uint32_t hash) {
+RRDHOST *rrdhost_find_guid(const char *guid, uint32_t hash) {
     debug(D_RRDHOST, "Searching in index for host with guid '%s'", guid);
 
     RRDHOST tmp;
@@ -250,7 +251,7 @@ RRDHOST *rrdhost_find_or_create(
 ) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
-    RRDHOST *host = rrdhost_find(guid, 0);
+    RRDHOST *host = rrdhost_find_guid(guid, 0);
     if(!host) {
         host = rrdhost_create(
                 hostname
@@ -286,7 +287,28 @@ RRDHOST *rrdhost_find_or_create(
             error("Host '%s' has memory mode '%s', but the wanted one is '%s'.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
     }
 
+    rrdhost_cleanup_remote_stale(host);
+
     return host;
+}
+
+void rrdhost_cleanup_remote_stale(RRDHOST *protected) {
+    rrd_wrlock();
+
+    RRDHOST *h;
+    rrdhost_foreach_write(h) {
+        if(h != protected
+           && h != localhost
+           && !h->connected_senders
+           && h->senders_disconnected_time + rrdhost_free_orphan_time > now_realtime_sec()) {
+            info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", h->hostname, h->machine_guid);
+            rrdhost_save(h);
+            rrdhost_free(h);
+            break;
+        }
+    }
+
+    rrd_unlock();
 }
 
 // ----------------------------------------------------------------------------
