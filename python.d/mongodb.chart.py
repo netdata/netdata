@@ -6,6 +6,7 @@ from base import SimpleService
 from copy import deepcopy
 from datetime import datetime
 from sys import exc_info
+
 try:
     from pymongo import MongoClient, ASCENDING, DESCENDING
     from pymongo.errors import PyMongoError
@@ -19,17 +20,104 @@ priority = 60000
 retries = 60
 
 REPLSET_STATES = [
-        ('1', 'primary'),
-        ('8', 'down'),
-        ('2', 'secondary'),
-        ('3', 'recovering'),
-        ('5', 'startup2'),
-        ('4', 'fatal'),
-        ('7', 'arbiter'),
-        ('6', 'unknown'),
-        ('9', 'rollback'),
-        ('10', 'removed'),
-        ('0', 'startup')]
+    ('1', 'primary'),
+    ('8', 'down'),
+    ('2', 'secondary'),
+    ('3', 'recovering'),
+    ('5', 'startup2'),
+    ('4', 'fatal'),
+    ('7', 'arbiter'),
+    ('6', 'unknown'),
+    ('9', 'rollback'),
+    ('10', 'removed'),
+    ('0', 'startup')]
+
+
+def multiply_by_100(value):
+    return value * 100
+
+DEFAULT_METRICS = [
+    ('opcounters.delete', None, None),
+    ('opcounters.update', None, None),
+    ('opcounters.insert', None, None),
+    ('opcounters.query', None, None),
+    ('opcounters.getmore', None, None),
+    ('globalLock.activeClients.readers', 'activeClients_readers', None),
+    ('globalLock.activeClients.writers', 'activeClients_writers', None),
+    ('connections.available', 'connections_available', None),
+    ('connections.current', 'connections_current', None),
+    ('mem.mapped', None, None),
+    ('mem.resident', None, None),
+    ('mem.virtual', None, None),
+    ('globalLock.currentQueue.readers', 'currentQueue_readers', None),
+    ('globalLock.currentQueue.writers', 'currentQueue_writers', None),
+    ('asserts.msg', None, None),
+    ('asserts.regular', None, None),
+    ('asserts.user', None, None),
+    ('asserts.warning', None, None),
+    ('extra_info.page_faults', None, None),
+    ('metrics.record.moves', None, None),
+    ('backgroundFlushing.average_ms', None, multiply_by_100),
+    ('backgroundFlushing.last_ms', None, multiply_by_100),
+    ('backgroundFlushing.flushes', None, multiply_by_100),
+    ('metrics.cursor.timedOut', None, None),
+    ('metrics.cursor.open.total', 'cursor_total', None),
+    ('metrics.cursor.open.noTimeout', None, None),
+    ('cursors.timedOut', None, None),
+    ('cursors.totalOpen', 'cursor_total', None)
+]
+
+DUR = [
+    ('dur.commits', None, None),
+    ('dur.journaledMB', None, multiply_by_100)
+]
+
+WIREDTIGER = [
+    ('wiredTiger.concurrentTransactions.read.available', 'wiredTigerRead_available', None),
+    ('wiredTiger.concurrentTransactions.read.out', 'wiredTigerRead_out', None),
+    ('wiredTiger.concurrentTransactions.write.available', 'wiredTigerWrite_available', None),
+    ('wiredTiger.concurrentTransactions.write.out', 'wiredTigerWrite_out', None),
+    ('wiredTiger.cache.bytes currently in the cache', None, None),
+    ('wiredTiger.cache.tracked dirty bytes in the cache', None, None),
+    ('wiredTiger.cache.maximum bytes configured', None, None),
+    ('wiredTiger.cache.unmodified pages evicted', 'unmodified', None),
+    ('wiredTiger.cache.modified pages evicted', 'modified', None)
+]
+
+TCMALLOC = [
+    ('tcmalloc.generic.current_allocated_bytes', None, None),
+    ('tcmalloc.generic.heap_size', None, None),
+    ('tcmalloc.tcmalloc.central_cache_free_bytes', None, None),
+    ('tcmalloc.tcmalloc.current_total_thread_cache_bytes', None, None),
+    ('tcmalloc.tcmalloc.pageheap_free_bytes', None, None),
+    ('tcmalloc.tcmalloc.pageheap_unmapped_bytes', None, None),
+    ('tcmalloc.tcmalloc.thread_cache_free_bytes', None, None),
+    ('tcmalloc.tcmalloc.transfer_cache_free_bytes', None, None)
+]
+
+COMMANDS = [
+    ('metrics.commands.count.total', 'count_total', None),
+    ('metrics.commands.createIndexes.total', 'createIndexes_total', None),
+    ('metrics.commands.delete.total', 'delete_total', None),
+    ('metrics.commands.eval.total', 'eval_total', None),
+    ('metrics.commands.findAndModify.total', 'findAndModify_total', None),
+    ('metrics.commands.insert.total', 'insert_total', None),
+    ('metrics.commands.delete.total', 'delete_total', None),
+    ('metrics.commands.count.failed', 'count_failed', None),
+    ('metrics.commands.createIndexes.failed', 'createIndexes_failed', None),
+    ('metrics.commands.delete.failed', 'delete_failed', None),
+    ('metrics.commands.eval.failed', 'eval_failed', None),
+    ('metrics.commands.findAndModify.failed', 'findAndModify_failed', None),
+    ('metrics.commands.insert.failed', 'insert_failed', None),
+    ('metrics.commands.delete.failed', 'delete_failed', None)
+]
+
+DBSTATS = [
+        'dataSize',
+        'indexSize',
+        'storageSize',
+        'objects'
+]
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['read_operations', 'write_operations', 'active_clients', 'journaling_transactions',
@@ -43,16 +131,16 @@ CHARTS = {
         'options': [None, 'Received read requests', 'requests/s', 'throughput metrics',
                     'mongodb.read_operations', 'line'],
         'lines': [
-            ['readWriteOper_query', 'query', 'incremental'],
-            ['readWriteOper_getmore', 'getmore', 'incremental']
+            ['query', None, 'incremental'],
+            ['getmore', None, 'incremental']
         ]},
     'write_operations': {
         'options': [None, 'Received write requests', 'requests/s', 'throughput metrics',
                     'mongodb.write_operations', 'line'],
         'lines': [
-            ['readWriteOper_insert', 'insert', 'incremental'],
-            ['readWriteOper_update', 'update', 'incremental'],
-            ['readWriteOper_delete', 'delete', 'incremental']
+            ['insert', None, 'incremental'],
+            ['update', None, 'incremental'],
+            ['delete', None, 'incremental']
         ]},
     'active_clients': {
         'options': [None, 'Clients with read or write operations in progress or queued', 'clients',
@@ -60,126 +148,126 @@ CHARTS = {
         'lines': [
             ['activeClients_readers', 'readers', 'absolute'],
             ['activeClients_writers', 'writers', 'absolute']
-            ]},
+        ]},
     'journaling_transactions': {
         'options': [None, 'Transactions that have been written to the journal', 'commits',
                     'database performance', 'mongodb.journaling_transactions', 'line'],
         'lines': [
-            ['journalTrans_commits', 'commits', 'absolute']
-            ]},
+            ['commits', None, 'absolute']
+        ]},
     'journaling_volume': {
         'options': [None, 'Volume of data written to the journal', 'MB', 'database performance',
                     'mongodb.journaling_volume', 'line'],
         'lines': [
-            ['journalTrans_journaled', 'volume', 'absolute', 1, 100]
-            ]},
+            ['journaledMB', 'volume', 'absolute', 1, 100]
+        ]},
     'background_flush_average': {
         'options': [None, 'Average time taken by flushes to execute', 'ms', 'database performance',
                     'mongodb.background_flush_average', 'line'],
         'lines': [
-            ['background_flush_average', 'time', 'absolute', 1, 100]
-            ]},
+            ['average_ms', 'time', 'absolute', 1, 100]
+        ]},
     'background_flush_last': {
         'options': [None, 'Time taken by the last flush operation to execute', 'ms', 'database performance',
                     'mongodb.background_flush_last', 'line'],
         'lines': [
-            ['background_flush_last', 'time', 'absolute', 1, 100]
-            ]},
+            ['last_ms', 'time', 'absolute', 1, 100]
+        ]},
     'background_flush_rate': {
         'options': [None, 'Flushes rate', 'flushes', 'database performance', 'mongodb.background_flush_rate', 'line'],
         'lines': [
-            ['background_flush_rate', 'flushes', 'incremental', 1, 1]
-            ]},
+            ['flushes', 'flushes', 'incremental', 1, 1]
+        ]},
     'wiredtiger_read': {
         'options': [None, 'Read tickets in use and remaining', 'tickets', 'database performance',
                     'mongodb.wiredtiger_read', 'stacked'],
         'lines': [
             ['wiredTigerRead_available', 'available', 'absolute', 1, 1],
             ['wiredTigerRead_out', 'inuse', 'absolute', 1, 1]
-            ]},
+        ]},
     'wiredtiger_write': {
         'options': [None, 'Write tickets in use and remaining', 'tickets', 'database performance',
                     'mongodb.wiredtiger_write', 'stacked'],
         'lines': [
             ['wiredTigerWrite_available', 'available', 'absolute', 1, 1],
             ['wiredTigerWrite_out', 'inuse', 'absolute', 1, 1]
-            ]},
+        ]},
     'cursors': {
         'options': [None, 'Currently openned cursors, cursors with timeout disabled and timed out cursors',
                     'cursors', 'database performance', 'mongodb.cursors', 'stacked'],
         'lines': [
             ['cursor_total', 'openned', 'absolute', 1, 1],
-            ['cursor_noTimeout', 'notimeout', 'absolute', 1, 1],
-            ['cursor_timedOut', 'timedout', 'incremental', 1, 1]
-            ]},
+            ['noTimeout', None, 'absolute', 1, 1],
+            ['timedOut', None, 'incremental', 1, 1]
+        ]},
     'connections': {
         'options': [None, 'Currently connected clients and unused connections', 'connections',
                     'resource utilization', 'mongodb.connections', 'stacked'],
         'lines': [
             ['connections_available', 'unused', 'absolute', 1, 1],
             ['connections_current', 'connected', 'absolute', 1, 1]
-            ]},
+        ]},
     'memory': {
         'options': [None, 'Memory metrics', 'MB', 'resource utilization', 'mongodb.memory', 'stacked'],
         'lines': [
-            ['memory_virtual', 'virtual', 'absolute', 1, 1],
-            ['memory_resident', 'resident', 'absolute', 1, 1],
-            ['memory_nonmapped', 'nonmapped', 'absolute', 1, 1],
-            ['memory_mapped', 'mapped', 'absolute', 1, 1]
-            ]},
+            ['virtual', None, 'absolute', 1, 1],
+            ['resident', None, 'absolute', 1, 1],
+            ['nonmapped', None, 'absolute', 1, 1],
+            ['mapped', None, 'absolute', 1, 1]
+        ]},
     'page_faults': {
         'options': [None, 'Number of times MongoDB had to fetch data from disk', 'request/s',
                     'resource utilization', 'mongodb.page_faults', 'line'],
         'lines': [
-            ['page_faults', 'page_faults', 'incremental', 1, 1]
-            ]},
+            ['page_faults', None, 'incremental', 1, 1]
+        ]},
     'queued_requests': {
         'options': [None, 'Currently queued read and wrire requests', 'requests', 'resource saturation',
                     'mongodb.queued_requests', 'line'],
         'lines': [
             ['currentQueue_readers', 'readers', 'absolute', 1, 1],
             ['currentQueue_writers', 'writers', 'absolute', 1, 1]
-            ]},
+        ]},
     'record_moves': {
         'options': [None, 'Number of times documents had to be moved on-disk', 'number',
                     'resource saturation', 'mongodb.record_moves', 'line'],
         'lines': [
-            ['record_moves', 'moves', 'incremental', 1, 1]
-            ]},
+            ['moves', None, 'incremental', 1, 1]
+        ]},
     'asserts': {
         'options': [None, 'Number of message, warning, regular, corresponding to errors generated'
                           ' by users assertions raised', 'number', 'errors (asserts)', 'mongodb.asserts', 'line'],
         'lines': [
-            ['errors_msg', 'msg', 'incremental', 1, 1],
-            ['errors_warning', 'warning', 'incremental', 1, 1],
-            ['errors_regular', 'regular', 'incremental', 1, 1],
-            ['errors_user', 'user', 'incremental', 1, 1]
-            ]},
+            ['msg', None, 'incremental', 1, 1],
+            ['warning', None, 'incremental', 1, 1],
+            ['regular', None, 'incremental', 1, 1],
+            ['user', None, 'incremental', 1, 1]
+        ]},
     'wiredtiger_cache': {
         'options': [None, 'The percentage of the wiredTiger cache that is in use and cache with dirty bytes',
                     'percent', 'resource utilization', 'mongodb.wiredtiger_cache', 'stacked'],
         'lines': [
-            ['wiredTiger_bytes_in_cache', 'inuse', 'absolute', 1, 1000],
-            ['wiredTiger_dirty_in_cache', 'dirty', 'absolute', 1, 1000]
-            ]},
+            ['wiredTiger_percent_clean', 'inuse', 'absolute', 1, 1000],
+            ['wiredTiger_percent_dirty', 'dirty', 'absolute', 1, 1000]
+        ]},
     'wiredtiger_pages_evicted': {
         'options': [None, 'Pages evicted from the cache',
                     'pages', 'resource utilization', 'mongodb.wiredtiger_pages_evicted', 'stacked'],
         'lines': [
-            ['wiredTiger_unmodified_pages_evicted', 'unmodified', 'absolute', 1, 1],
-            ['wiredTiger_modified_pages_evicted', 'modified', 'absolute', 1, 1]
-            ]},
+            ['unmodified', None, 'absolute', 1, 1],
+            ['modified', None, 'absolute', 1, 1]
+        ]},
     'dbstats_objects': {
         'options': [None, 'Number of documents in the database among all the collections', 'documents',
                     'storage size metrics', 'mongodb.dbstats_objects', 'stacked'],
         'lines': [
-            ]},
+        ]},
     'tcmalloc_generic': {
         'options': [None, 'Tcmalloc generic metrics', 'MB', 'tcmalloc', 'mongodb.tcmalloc_generic', 'stacked'],
         'lines': [
             ['current_allocated_bytes', 'allocated', 'absolute', 1, 1048576],
             ['heap_size', 'heap_size', 'absolute', 1, 1048576]
-            ]},
+        ]},
     'tcmalloc_metrics': {
         'options': [None, 'Tcmalloc metrics', 'KB', 'tcmalloc', 'mongodb.tcmalloc_metrics', 'stacked'],
         'lines': [
@@ -189,7 +277,7 @@ CHARTS = {
             ['pageheap_unmapped_bytes', 'pageheap_unmapped', 'absolute', 1, 1024],
             ['thread_cache_free_bytes', 'thread_cache_free', 'absolute', 1, 1024],
             ['transfer_cache_free_bytes', 'transfer_cache_free', 'absolute', 1, 1024]
-            ]},
+        ]},
     'command_total_rate': {
         'options': [None, 'Commands total rate', 'commands/s', 'commands', 'mongodb.command_total_rate', 'stacked'],
         'lines': [
@@ -200,29 +288,35 @@ CHARTS = {
             ['findAndModify_total', 'findAndModify', 'incremental', 1, 1],
             ['insert_total', 'insert', 'incremental', 1, 1],
             ['update_total', 'update', 'incremental', 1, 1]
-            ]},
+        ]},
     'command_failed_rate': {
         'options': [None, 'Commands failed rate', 'commands/s', 'commands', 'mongodb.command_failed_rate', 'stacked'],
         'lines': [
             ['count_failed', 'count', 'incremental', 1, 1],
             ['createIndexes_failed', 'createIndexes', 'incremental', 1, 1],
-            ['delete_dailed', 'delete', 'incremental', 1, 1],
+            ['delete_failed', 'delete', 'incremental', 1, 1],
             ['eval_failed', 'eval', 'incremental', 1, 1],
             ['findAndModify_failed', 'findAndModify', 'incremental', 1, 1],
             ['insert_failed', 'insert', 'incremental', 1, 1],
             ['update_failed', 'update', 'incremental', 1, 1]
-            ]}
+        ]}
 }
 
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.order = ORDER[:]
+        self.definitions = deepcopy(CHARTS)
         self.user = self.configuration.get('user')
         self.password = self.configuration.get('pass')
         self.host = self.configuration.get('host', '127.0.0.1')
         self.port = self.configuration.get('port', 27017)
         self.timeout = self.configuration.get('timeout', 100)
+        self.metrics_to_collect = deepcopy(DEFAULT_METRICS)
+        self.connection = None
+        self.do_replica = None
+        self.databases = list()
 
     def check(self):
         if not PYMONGO:
@@ -233,70 +327,66 @@ class Service(SimpleService):
             self.error(error)
             return False
 
-        try:
-            self.databases = self.connection.database_names()
-        except PyMongoError as error:
-            self.databases = list()
-            self.info('Can\'t collect databases: %s' % str(error))
-
-        self.ss = dict()
-        for elem in ['dur', 'backgroundFlushing', 'wiredTiger', 'tcmalloc', 'repl']:
-            self.ss[elem] = in_server_status(elem, server_status)
-        for elem in ['commands', 'cursor']:
-            self.ss[elem] = in_server_status(elem, server_status['metrics'])
+        self.build_metrics_to_collect_(server_status)
 
         try:
             self._get_data()
         except (LookupError, SyntaxError, AttributeError):
-            self.error('Type: %s, error: %s' % (str(exc_info()[0]), str( exc_info()[1])))
+            self.error('Type: %s, error: %s' % (str(exc_info()[0]), str(exc_info()[1])))
             return False
         else:
             self.create_charts_(server_status)
             return True
 
+    def build_metrics_to_collect_(self, server_status):
+
+        self.do_replica = 'repl' in server_status
+        if 'dur' in server_status:
+            self.metrics_to_collect.extend(DUR)
+        if 'tcmalloc' in server_status:
+            self.metrics_to_collect.extend(TCMALLOC)
+        if 'commands' in server_status['metrics']:
+            self.metrics_to_collect.extend(COMMANDS)
+        if 'wiredTiger' in server_status:
+            self.metrics_to_collect.extend(WIREDTIGER)
+
     def create_charts_(self, server_status):
 
-        self.order = ORDER[:]
-        self.definitions = deepcopy(CHARTS)
-
-        if not self.ss['dur']:
+        if 'dur' not in server_status:
             self.order.remove('journaling_transactions')
             self.order.remove('journaling_volume')
 
-        if not self.ss['backgroundFlushing']:
+        if 'backgroundFlushing' not in server_status:
             self.order.remove('background_flush_average')
             self.order.remove('background_flush_last')
             self.order.remove('background_flush_rate')
 
-        if not self.ss['cursor']:
-            self.order.remove('cursors')
-
-        if not self.ss['wiredTiger']:
+        if 'wiredTiger' not in server_status:
             self.order.remove('wiredtiger_write')
             self.order.remove('wiredtiger_read')
             self.order.remove('wiredtiger_cache')
 
-        if not self.ss['tcmalloc']:
+        if 'tcmalloc' not in server_status:
             self.order.remove('tcmalloc_generic')
             self.order.remove('tcmalloc_metrics')
 
-        if not self.ss['commands']:
+        if 'commands' not in server_status['metrics']:
             self.order.remove('command_total_rate')
             self.order.remove('command_failed_rate')
 
         for dbase in self.databases:
             self.order.append('_'.join([dbase, 'dbstats']))
             self.definitions['_'.join([dbase, 'dbstats'])] = {
-                    'options': [None, '%s: size of all documents, indexes, extents' % dbase, 'KB',
-                                'storage size metrics', 'mongodb.dbstats', 'line'],
-                    'lines': [
-                             ['_'.join([dbase, 'dataSize']), 'documents', 'absolute', 1, 1024],
-                             ['_'.join([dbase, 'indexSize']), 'indexes', 'absolute', 1, 1024],
-                             ['_'.join([dbase, 'storageSize']), 'extents', 'absolute', 1, 1024]
-                      ]}
+                'options': [None, '%s: size of all documents, indexes, extents' % dbase, 'KB',
+                            'storage size metrics', 'mongodb.dbstats', 'line'],
+                'lines': [
+                    ['_'.join([dbase, 'dataSize']), 'documents', 'absolute', 1, 1024],
+                    ['_'.join([dbase, 'indexSize']), 'indexes', 'absolute', 1, 1024],
+                    ['_'.join([dbase, 'storageSize']), 'extents', 'absolute', 1, 1024]
+                ]}
             self.definitions['dbstats_objects']['lines'].append(['_'.join([dbase, 'objects']), dbase, 'absolute'])
 
-        if self.ss['repl']:
+        if self.do_replica:
             def create_lines(hosts, string):
                 lines = list()
                 for host in hosts:
@@ -324,24 +414,24 @@ class Service(SimpleService):
             # Create "heartbeat delay" chart
             self.order.append('heartbeat_delay')
             self.definitions['heartbeat_delay'] = {
-                       'options': [None, 'Latency between this node and replica set members (lastHeartbeatRecv)',
-                                   'seconds', 'replication', 'mongodb.replication_heartbeat_delay', 'stacked'],
-                       'lines': create_lines(other_hosts, 'heartbeat_lag')}
+                'options': [None, 'Latency between this node and replica set members (lastHeartbeatRecv)',
+                            'seconds', 'replication', 'mongodb.replication_heartbeat_delay', 'stacked'],
+                'lines': create_lines(other_hosts, 'heartbeat_lag')}
             # Create "optimedate delay" chart
             self.order.append('optimedate_delay')
             self.definitions['optimedate_delay'] = {
-                       'options': [None, '"optimeDate"(time when last entry from the oplog was applied)'
-                                         ' diff between all nodes',
-                                   'seconds', 'replication', 'mongodb.replication_optimedate_delay', 'stacked'],
-                       'lines': create_lines(all_hosts, 'optimedate')}
+                'options': [None, '"optimeDate"(time when last entry from the oplog was applied)'
+                                  ' diff between all nodes',
+                            'seconds', 'replication', 'mongodb.replication_optimedate_delay', 'stacked'],
+                'lines': create_lines(all_hosts, 'optimedate')}
             # Create "replica set members state" chart
             for host in all_hosts:
                 chart_name = '_'.join([host, 'state'])
                 self.order.append(chart_name)
                 self.definitions[chart_name] = {
-                       'options': [None, '%s state' % host, 'state',
-                                   'replication', 'mongodb.replication_state', 'line'],
-                       'lines': create_state_lines(REPLSET_STATES)}
+                    'options': [None, '%s state' % host, 'state',
+                                'replication', 'mongodb.replication_state', 'line'],
+                    'lines': create_state_lines(REPLSET_STATES)}
 
     def _get_raw_data(self):
         raw_data = dict()
@@ -377,7 +467,7 @@ class Service(SimpleService):
             return raw_data
 
     def get_replsetgetstatus_(self):
-        if not self.ss['repl']:
+        if not self.do_replica:
             return None
 
         raw_data = dict()
@@ -389,7 +479,7 @@ class Service(SimpleService):
             return raw_data
 
     def get_getreplicationinfo_(self):
-        if not (self.ss['repl'] and 'local' in self.databases):
+        if not (self.do_replica and 'local' in self.databases):
             return None
 
         raw_data = dict()
@@ -421,58 +511,32 @@ class Service(SimpleService):
         utc_now = datetime.utcnow()
 
         # serverStatus
-        to_netdata.update(update_dict_key(serverStatus['opcounters'], 'readWriteOper'))
-        to_netdata.update(update_dict_key(serverStatus['globalLock']['activeClients'], 'activeClients'))
-        to_netdata.update(update_dict_key(serverStatus['connections'], 'connections'))
-        to_netdata.update(update_dict_key(serverStatus['mem'], 'memory'))
-        to_netdata['memory_nonmapped'] = (serverStatus['mem']['virtual']
-                                          - serverStatus['mem'].get('mappedWithJournal', serverStatus['mem']['mapped']))
-        to_netdata.update(update_dict_key(serverStatus['globalLock']['currentQueue'], 'currentQueue'))
-        to_netdata.update(update_dict_key(serverStatus['asserts'], 'errors'))
-        to_netdata['page_faults'] = serverStatus['extra_info']['page_faults']
-        to_netdata['record_moves'] = serverStatus['metrics']['record']['moves']
+        for metric, new_name, function in self.metrics_to_collect:
+            temp = serverStatus
+            for key in metric.split('.'):
+                try:
+                    temp = temp[key]
+                except KeyError:
+                    break
 
-        if self.ss['dur']:
-            to_netdata['journalTrans_commits'] = serverStatus['dur']['commits']
-            to_netdata['journalTrans_journaled'] = int(serverStatus['dur']['journaledMB'] * 100)
+            if not isinstance(temp, dict):
+                to_netdata[new_name or key] = temp if not function else function(temp)
 
-        if self.ss['backgroundFlushing']:
-            to_netdata['background_flush_average'] = int(serverStatus['backgroundFlushing']['average_ms'] * 100)
-            to_netdata['background_flush_last'] = int(serverStatus['backgroundFlushing']['last_ms'] * 100)
-            to_netdata['background_flush_rate'] = serverStatus['backgroundFlushing']['flushes']
-
-        if self.ss['cursor']:
-            to_netdata['cursor_timedOut'] = serverStatus['metrics']['cursor']['timedOut']
-            to_netdata.update(update_dict_key(serverStatus['metrics']['cursor']['open'], 'cursor'))
-
-        if self.ss['wiredTiger']:
-            wired_tiger = serverStatus['wiredTiger']
-            to_netdata.update(update_dict_key(serverStatus['wiredTiger']['concurrentTransactions']['read'],
-                                              'wiredTigerRead'))
-            to_netdata.update(update_dict_key(serverStatus['wiredTiger']['concurrentTransactions']['write'],
-                                              'wiredTigerWrite'))
-            to_netdata['wiredTiger_bytes_in_cache'] = (int(wired_tiger['cache']['bytes currently in the cache']
-                                                           * 100 / wired_tiger['cache']['maximum bytes configured']
-                                                           * 1000))
-            to_netdata['wiredTiger_dirty_in_cache'] = (int(wired_tiger['cache']['tracked dirty bytes in the cache']
-                                                           * 100 / wired_tiger['cache']['maximum bytes configured']
-                                                           * 1000))
-            to_netdata['wiredTiger_unmodified_pages_evicted'] = wired_tiger['cache']['unmodified pages evicted']
-            to_netdata['wiredTiger_modified_pages_evicted'] = wired_tiger['cache']['modified pages evicted']
-
-        if self.ss['tcmalloc']:
-            to_netdata.update(serverStatus['tcmalloc']['generic'])
-            to_netdata.update(dict([(k, v) for k, v in serverStatus['tcmalloc']['tcmalloc'].items()
-                                    if int_or_float(v)]))
-
-        if self.ss['commands']:
-            for elem in ['count', 'createIndexes', 'delete', 'eval', 'findAndModify', 'insert', 'update']:
-                to_netdata.update(update_dict_key(serverStatus['metrics']['commands'][elem], elem))
+        to_netdata['nonmapped'] = to_netdata['virtual'] - serverStatus['mem'].get('mappedWithJournal',
+                                                                                  to_netdata['mapped'])
+        if to_netdata.get('maximum bytes configured'):
+            maximum = to_netdata['maximum bytes configured']
+            to_netdata['wiredTiger_percent_clean'] = int(to_netdata['bytes currently in the cache']
+                                                         * 100 / maximum * 1000)
+            to_netdata['wiredTiger_percent_dirty'] = int(to_netdata['tracked dirty bytes in the cache']
+                                                         * 100 / maximum * 1000)
 
         # dbStats
         if dbStats:
             for dbase in dbStats:
-                to_netdata.update(update_dict_key(dbStats[dbase], dbase))
+                for metric in DBSTATS:
+                    key = '_'.join([dbase, metric])
+                    to_netdata[key] = dbStats[dbase][metric]
 
         # replSetGetStatus
         if replSetGetStatus:
@@ -522,19 +586,11 @@ class Service(SimpleService):
         except PyMongoError as error:
             return None, None, str(error)
         else:
+            try:
+                self.databases = connection.database_names()
+            except PyMongoError as error:
+                self.info('Can\'t collect databases: %s' % str(error))
             return connection, server_status, None
-
-
-def update_dict_key(collection, string):
-    return dict([('_'.join([string, k]), int(round(v))) for k, v in collection.items() if int_or_float(v)])
-
-
-def int_or_float(value):
-    return isinstance(value, (int, float))
-
-
-def in_server_status(elem, server_status):
-    return elem in server_status
 
 
 def delta_calculation(delta, multiplier=1):
