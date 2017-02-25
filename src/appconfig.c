@@ -525,7 +525,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
         appconfig_wrlock(root);
         for(co = root->sections; co ; co = co->next) {
             if(!strcmp(co->name, CONFIG_SECTION_GLOBAL)
-               || !strcmp(co->name, CONFIG_SECTION_API)
+               || !strcmp(co->name, CONFIG_SECTION_WEB)
                || !strcmp(co->name, CONFIG_SECTION_PLUGINS)
                || !strcmp(co->name, CONFIG_SECTION_REGISTRY)
                || !strcmp(co->name, CONFIG_SECTION_HEALTH)

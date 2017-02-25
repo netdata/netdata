@@ -340,16 +340,16 @@ static inline int bind_to_one(const char *definition, int default_port, int list
 int create_listen_sockets(void) {
     shown_server_socket_error = 0;
 
-    listen_backlog = (int) config_get_number(CONFIG_SECTION_API, "listen backlog", LISTEN_BACKLOG);
+    listen_backlog = (int) config_get_number(CONFIG_SECTION_WEB, "listen backlog", LISTEN_BACKLOG);
 
-    listen_port = (int) config_get_number(CONFIG_SECTION_API, "default port", LISTEN_PORT);
+    listen_port = (int) config_get_number(CONFIG_SECTION_WEB, "default port", LISTEN_PORT);
     if(listen_port < 1 || listen_port > 65535) {
         error("Invalid listen port %d given. Defaulting to %d.", listen_port, LISTEN_PORT);
-        listen_port = (int) config_set_number(CONFIG_SECTION_API, "default port", LISTEN_PORT);
+        listen_port = (int) config_set_number(CONFIG_SECTION_WEB, "default port", LISTEN_PORT);
     }
     debug(D_OPTIONS, "Default listen port set to %d.", listen_port);
 
-    char *s = config_get(CONFIG_SECTION_API, "bind to", "*");
+    char *s = config_get(CONFIG_SECTION_WEB, "bind to", "*");
     while(*s) {
         char *e = s;
 

@@ -239,7 +239,7 @@ uid_t web_files_uid(void) {
     static uid_t owner_uid = 0;
 
     if(unlikely(!web_owner)) {
-        web_owner = config_get(CONFIG_SECTION_API, "web files owner", config_get(CONFIG_SECTION_GLOBAL, "run as user", ""));
+        web_owner = config_get(CONFIG_SECTION_WEB, "web files owner", config_get(CONFIG_SECTION_GLOBAL, "run as user", ""));
         if(!web_owner || !*web_owner)
             owner_uid = geteuid();
         else {
@@ -266,7 +266,7 @@ gid_t web_files_gid(void) {
     static gid_t owner_gid = 0;
 
     if(unlikely(!web_group)) {
-        web_group = config_get(CONFIG_SECTION_API, "web files group", config_get(CONFIG_SECTION_API, "web files owner", ""));
+        web_group = config_get(CONFIG_SECTION_WEB, "web files group", config_get(CONFIG_SECTION_WEB, "web files owner", ""));
         if(!web_group || !*web_group)
             owner_gid = getegid();
         else {
