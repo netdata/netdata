@@ -4,7 +4,6 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_config_DATA = \
-    aggregated_hosts.conf \
     apps_groups.conf \
     charts.d.conf \
     fping.conf \
@@ -12,6 +11,7 @@ dist_config_DATA = \
     python.d.conf \
     health_alarm_notify.conf \
     health_email_recipients.conf \
+    stream.conf \
     $(NULL)
 
 nodeconfigdir=$(configdir)/node.d

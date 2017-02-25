@@ -7,7 +7,7 @@ struct registry registry;
 
 // parse a GUID and re-generated to be always lower case
 // this is used as a protection against the variations of GUIDs
-int registry_regenerate_guid(const char *guid, char *result) {
+int regenerate_guid(const char *guid, char *result) {
     uuid_t uuid;
     if(unlikely(uuid_parse(guid, uuid) == -1)) {
         info("Registry: GUID '%s' is not a valid GUID.", guid);
@@ -18,7 +18,7 @@ int registry_regenerate_guid(const char *guid, char *result) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
         if(strcmp(guid, result))
-            info("Registry: source GUID '%s' and re-generated GUID '%s' differ!", guid, result);
+            info("GUID '%s' and re-generated GUID '%s' differ!", guid, result);
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
@@ -96,14 +96,14 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
     url = registry_fix_url(url, NULL);
 
     // make sure the person GUID is valid
-    if(registry_regenerate_guid(person_guid, pbuf) == -1) {
+    if(regenerate_guid(person_guid, pbuf) == -1) {
         info("Registry Request Verification: invalid person GUID, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
     }
     person_guid = pbuf;
 
     // make sure the machine GUID is valid
-    if(registry_regenerate_guid(machine_guid, mbuf) == -1) {
+    if(regenerate_guid(machine_guid, mbuf) == -1) {
         info("Registry Request Verification: invalid machine GUID, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
     }
@@ -226,7 +226,7 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
     if(!pu || !p || !m) return NULL;
 
     // make sure the machine GUID is valid
-    if(registry_regenerate_guid(request_machine, mbuf) == -1) {
+    if(regenerate_guid(request_machine, mbuf) == -1) {
         info("Registry Machine URLs request: invalid machine GUID, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, pu->url->url, request_machine);
         return NULL;
     }
@@ -288,7 +288,7 @@ char *registry_get_this_machine_guid(void) {
             error("Failed to read machine GUID from '%s'", registry.machine_guid_filename);
         else {
             buf[GUID_LEN] = '\0';
-            if(registry_regenerate_guid(buf, guid) == -1) {
+            if(regenerate_guid(buf, guid) == -1) {
                 error("Failed to validate machine GUID '%s' from '%s'. Ignoring it - this might mean this netdata will appear as duplicate in the registry.",
                         buf, registry.machine_guid_filename);
 

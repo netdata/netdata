@@ -2,6 +2,8 @@
 #define NETDATA_RRDPUSH_H
 
 extern int default_rrdpush_enabled;
+extern char *default_rrdpush_destination;
+extern char *default_rrdpush_api_key;
 
 extern int rrdpush_init();
 extern void rrdset_done_push(RRDSET *st);

@@ -705,6 +705,8 @@ int main(int argc, char **argv) {
     if(!config_loaded)
         config_load(NULL, 0);
 
+    // ------------------------------------------------------------------------
+    // initialize netdata
     {
         char *pmax = config_get(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for plugins", "1");
         if(pmax && *pmax)
@@ -756,6 +758,16 @@ int main(int argc, char **argv) {
 
         log_init();
         error_log_limit_unlimited();
+
+
+        // --------------------------------------------------------------------
+        // load stream.conf
+        {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "%s/stream.conf", netdata_configured_config_dir);
+            appconfig_load(&stream_config, filename, 0);
+        }
+
 
         // --------------------------------------------------------------------
         // setup process signals
@@ -851,15 +863,6 @@ int main(int argc, char **argv) {
 
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             create_listen_sockets();
-
-
-        // --------------------------------------------------------------------
-        // load the aggregated host configuration file
-        {
-            char filename[FILENAME_MAX + 1];
-            snprintfz(filename, FILENAME_MAX, "%s/aggregated_hosts.conf", netdata_configured_config_dir);
-            appconfig_load(&stream_config, filename, 0);
-        }
     }
 
     // initialize the log files
