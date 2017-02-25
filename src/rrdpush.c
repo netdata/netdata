@@ -211,19 +211,26 @@ void rrdpush_sender_thread_cleanup(RRDHOST *host) {
 
     host->rrdpush_connected = 0;
 
-    if(host->rrdpush_socket != -1) close(host->rrdpush_socket);
+    if(host->rrdpush_socket != -1) {
+        close(host->rrdpush_socket);
+        host->rrdpush_socket = -1;
+    }
 
     // close the pipe
-    if(host->rrdpush_pipe[PIPE_READ] != -1)  close(host->rrdpush_pipe[PIPE_READ]);
-    if(host->rrdpush_pipe[PIPE_WRITE] != -1) close(host->rrdpush_pipe[PIPE_WRITE]);
-    host->rrdpush_pipe[PIPE_READ] = -1;
-    host->rrdpush_pipe[PIPE_WRITE] = -1;
+    if(host->rrdpush_pipe[PIPE_READ] != -1) {
+        close(host->rrdpush_pipe[PIPE_READ]);
+        host->rrdpush_pipe[PIPE_READ] = -1;
+    }
+
+    if(host->rrdpush_pipe[PIPE_WRITE] != -1) {
+        close(host->rrdpush_pipe[PIPE_WRITE]);
+        host->rrdpush_pipe[PIPE_WRITE] = -1;
+    }
 
     buffer_free(host->rrdpush_buffer);
     host->rrdpush_buffer = NULL;
 
     host->rrdpush_spawn = 0;
-    host->rrdpush_enabled = 0;
 
     rrdpush_unlock(host);
 }
@@ -547,7 +554,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
         if(health_enabled == CONFIG_BOOLEAN_AUTO)
             host->health_enabled = 0;
 
-        if(host->rrdpush_enabled && host->rrdpush_spawn) {
+        if(host->rrdpush_spawn) {
             pthread_cancel(host->rrdpush_thread);
             rrdpush_sender_thread_cleanup(host);
         }
