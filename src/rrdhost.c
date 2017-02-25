@@ -202,18 +202,18 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     else {
         info("Host '%s' with guid '%s' initialized"
-                     ", os: %s"
-                     ", update every: %d"
-                     ", memory mode: %s"
-                     ", history entries: %d"
-                     ", streaming: %s"
-                     " to: '%s' (api key: '%s')"
-                     ", health: %s"
-                     ", cache_dir: '%s'"
-                     ", varlib_dir: '%s'"
-                     ", health_log: '%s'"
-                     ", alarms default handler: '%s'"
-                     ", alarms default recipient: '%s'"
+                     ", os %s"
+                     ", update every %d"
+                     ", memory mode %s"
+                     ", history entries %d"
+                     ", streaming %s"
+                     " (to '%s' with api key '%s')"
+                     ", health %s"
+                     ", cache_dir '%s'"
+                     ", varlib_dir '%s'"
+                     ", health_log '%s'"
+                     ", alarms default handler '%s'"
+                     ", alarms default recipient '%s'"
              , host->hostname
              , host->machine_guid
              , host->os
@@ -221,8 +221,8 @@ RRDHOST *rrdhost_create(const char *hostname,
              , rrd_memory_mode_name(host->rrd_memory_mode)
              , host->rrd_history_entries
              , host->rrdpush_enabled?"enabled":"disabled"
-             , host->rrdpush_destination
-             , host->rrdpush_api_key
+             , host->rrdpush_destination?host->rrdpush_destination:""
+             , host->rrdpush_api_key?host->rrdpush_api_key:""
              , host->health_enabled?"enabled":"disabled"
              , host->cache_dir
              , host->varlib_dir
