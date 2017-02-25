@@ -215,9 +215,14 @@ inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
     return entries;
 }
 
-static inline void timeval_align(struct timeval *tv, int update_every) {
+static inline void last_collected_time_align(struct timeval *tv, int update_every) {
     tv->tv_sec -= tv->tv_sec % update_every;
     tv->tv_usec = 500000;
+}
+
+static inline void last_updated_time_align(struct timeval *tv, int update_every) {
+    tv->tv_sec -= tv->tv_sec % update_every;
+    tv->tv_usec = 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -398,7 +403,8 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
 
             // make sure the database is aligned
             if(st->last_updated.tv_sec)
-                timeval_align(&st->last_updated, update_every);
+                last_updated_time_align(&st->last_updated, update_every);
+
 
             // make sure we have the right memory mode
             // even if we cleared the memory
@@ -543,15 +549,17 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
         if(unlikely(since_last_usec < 0)) {
             // oops! the database is in the future
-            error("Database for chart '%s' on host '%s' is %lld microseconds in the future.", st->id, st->rrdhost->hostname, -since_last_usec);
-            memcpy(&st->last_collected_time, &now, sizeof(struct timeval));
-            st->last_collected_time.tv_sec -= st->update_every;
+            error("Database for chart '%s' on host '%s' is %lld microseconds in the future. Adjusting it to current time.", st->id, st->rrdhost->hostname, -since_last_usec);
 
-            memcpy(&st->last_updated, &now, sizeof(struct timeval));
-            timeval_align(&st->last_updated, st->update_every);
-            st->last_updated.tv_sec -= st->update_every;
+            st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
+            st->last_collected_time.tv_usec = now.tv_usec;
+            last_collected_time_align(&st->last_collected_time, st->update_every);
 
-            microseconds = st->update_every * USEC_PER_SEC;
+            st->last_updated.tv_sec  = now.tv_sec - st->update_every;
+            st->last_updated.tv_usec = now.tv_usec;
+            last_updated_time_align(&st->last_updated, st->update_every);
+
+            microseconds    = st->update_every * USEC_PER_SEC;
             since_last_usec = st->update_every * USEC_PER_SEC;
         }
 
@@ -589,7 +597,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
 static inline void rrdset_init_last_collected_time(RRDSET *st) {
     now_realtime_timeval(&st->last_collected_time);
-    timeval_align(&st->last_collected_time, st->update_every);
+    last_collected_time_align(&st->last_collected_time, st->update_every);
 }
 
 static inline usec_t rrdset_update_last_collected_time(RRDSET *st) {
@@ -602,9 +610,9 @@ static inline usec_t rrdset_update_last_collected_time(RRDSET *st) {
 
 static inline void rrdset_init_last_updated_time(RRDSET *st) {
     // copy the last collected time to last updated time
-    memcpy(&st->last_updated, &st->last_collected_time, sizeof(struct timeval));
-    timeval_align(&st->last_updated, st->update_every);
-    st->last_updated.tv_usec = 0;
+    st->last_updated.tv_sec  = st->last_collected_time.tv_sec;
+    st->last_updated.tv_usec = st->last_collected_time.tv_usec;
+    last_updated_time_align(&st->last_updated, st->update_every);
 }
 
 static inline void rrdset_done_push_exclusive(RRDSET *st) {
