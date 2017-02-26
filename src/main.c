@@ -513,6 +513,9 @@ void set_global_environment() {
 
     // disable buffering for python plugins
     setenv("PYTHONUNBUFFERED", "1", 1);
+
+    // switch to standard locale for plugins
+    setenv("LC_ALL", "C", 1);
 }
 
 int main(int argc, char **argv) {
@@ -851,7 +854,13 @@ int main(int argc, char **argv) {
         // get the user we should run
 
         // IMPORTANT: this is required before web_files_uid()
-        user = config_get(CONFIG_SECTION_GLOBAL, "run as user"    , (getuid() == 0)?NETDATA_USER:"");
+        if(getuid() == 0) {
+            user = config_get(CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
+        }
+        else {
+            struct passwd *passwd = getpwuid(getuid());
+            user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
+        }
 
         // IMPORTANT: these have to run once, while single threaded
         web_files_uid(); // IMPORTANT: web_files_uid() before web_files_gid()
