@@ -39,7 +39,7 @@ netdata_SOURCES = \
 	dictionary.c dictionary.h \
 	eval.c eval.h \
 	global_statistics.c global_statistics.h \
-	health.c health.h \
+	health.c health.h health_log.c health_config.c health_json.c \
 	inlined.h \
 	log.c log.h \
 	main.c main.h \
@@ -65,10 +65,22 @@ netdata_SOURCES = \
 	registry_db.c \
 	registry_log.c \
 	rrd.c rrd.h \
+	rrddim.c \
+	rrdfamily.c \
+	rrdhost.c \
+	rrdset.c \
+	rrdcalc.c \
+	rrdcalctemplate.c \
+	rrdvar.c \
+	rrddimvar.c \
+	rrdsetvar.c \
 	rrd2json.c rrd2json.h \
+	rrdpush.c rrdpush.h \
 	storage_number.c storage_number.h \
 	unit_test.c unit_test.h \
 	url.c url.h \
+	web_api_old.c web_api_old.h \
+	web_api_v1.c web_api_v1.h \
 	web_buffer.c web_buffer.h \
 	web_buffer_svg.c web_buffer_svg.h \
 	web_client.c web_client.h \

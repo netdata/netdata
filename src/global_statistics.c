@@ -129,14 +129,14 @@ void global_statistics_charts(void) {
     getrusage(RUSAGE_THREAD, &thread);
     getrusage(RUSAGE_SELF, &me);
 
-    if (!stcpu_thread) stcpu_thread = rrdset_find("netdata.plugin_proc_cpu");
+    if (!stcpu_thread) stcpu_thread = rrdset_find_localhost("netdata.plugin_proc_cpu");
     if (!stcpu_thread) {
-        stcpu_thread = rrdset_create("netdata", "plugin_proc_cpu", NULL, "proc", NULL,
-                                     "NetData Proc Plugin CPU usage", "milliseconds/s", 132000, rrd_update_every,
-                                     RRDSET_TYPE_STACKED);
+        stcpu_thread = rrdset_create_localhost("netdata", "plugin_proc_cpu", NULL, "proc", NULL
+                                               , "NetData Proc Plugin CPU usage", "milliseconds/s", 132000
+                                               , localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRDDIM_INCREMENTAL);
-        rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+        rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
     } else rrdset_next(stcpu_thread);
 
     rrddim_set(stcpu_thread, "user", thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
@@ -145,13 +145,13 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    if (!stcpu) stcpu = rrdset_find("netdata.server_cpu");
+    if (!stcpu) stcpu = rrdset_find_localhost("netdata.server_cpu");
     if (!stcpu) {
-        stcpu = rrdset_create("netdata", "server_cpu", NULL, "netdata", NULL, "NetData CPU usage", "milliseconds/s",
-                              130000, rrd_update_every, RRDSET_TYPE_STACKED);
+        stcpu = rrdset_create_localhost("netdata", "server_cpu", NULL, "netdata", NULL, "NetData CPU usage"
+                                        , "milliseconds/s", 130000, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
-        rrddim_add(stcpu, "user", NULL, 1, 1000, RRDDIM_INCREMENTAL);
-        rrddim_add(stcpu, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+        rrddim_add(stcpu, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(stcpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
     } else rrdset_next(stcpu);
 
     rrddim_set(stcpu, "user", me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec);
@@ -160,12 +160,12 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    if (!stclients) stclients = rrdset_find("netdata.clients");
+    if (!stclients) stclients = rrdset_find_localhost("netdata.clients");
     if (!stclients) {
-        stclients = rrdset_create("netdata", "clients", NULL, "netdata", NULL, "NetData Web Clients",
-                                  "connected clients", 130200, rrd_update_every, RRDSET_TYPE_LINE);
+        stclients = rrdset_create_localhost("netdata", "clients", NULL, "netdata", NULL, "NetData Web Clients"
+                                            , "connected clients", 130200, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
-        rrddim_add(stclients, "clients", NULL, 1, 1, RRDDIM_ABSOLUTE);
+        rrddim_add(stclients, "clients", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     } else rrdset_next(stclients);
 
     rrddim_set(stclients, "clients", gs.connected_clients);
@@ -173,12 +173,12 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    if (!streqs) streqs = rrdset_find("netdata.requests");
+    if (!streqs) streqs = rrdset_find_localhost("netdata.requests");
     if (!streqs) {
-        streqs = rrdset_create("netdata", "requests", NULL, "netdata", NULL, "NetData Web Requests", "requests/s",
-                               130300, rrd_update_every, RRDSET_TYPE_LINE);
+        streqs = rrdset_create_localhost("netdata", "requests", NULL, "netdata", NULL, "NetData Web Requests"
+                                         , "requests/s", 130300, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
-        rrddim_add(streqs, "requests", NULL, 1, 1, RRDDIM_INCREMENTAL);
+        rrddim_add(streqs, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     } else rrdset_next(streqs);
 
     rrddim_set(streqs, "requests", (collected_number) gs.web_requests);
@@ -186,13 +186,13 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    if (!stbytes) stbytes = rrdset_find("netdata.net");
+    if (!stbytes) stbytes = rrdset_find_localhost("netdata.net");
     if (!stbytes) {
-        stbytes = rrdset_create("netdata", "net", NULL, "netdata", NULL, "NetData Network Traffic", "kilobits/s",
-                                130000, rrd_update_every, RRDSET_TYPE_AREA);
+        stbytes = rrdset_create_localhost("netdata", "net", NULL, "netdata", NULL, "NetData Network Traffic"
+                                          , "kilobits/s", 130000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
-        rrddim_add(stbytes, "in", NULL, 8, 1024, RRDDIM_INCREMENTAL);
-        rrddim_add(stbytes, "out", NULL, -8, 1024, RRDDIM_INCREMENTAL);
+        rrddim_add(stbytes, "in", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(stbytes, "out", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
     } else rrdset_next(stbytes);
 
     rrddim_set(stbytes, "in", (collected_number) gs.bytes_received);
@@ -201,13 +201,14 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    if (!stduration) stduration = rrdset_find("netdata.response_time");
+    if (!stduration) stduration = rrdset_find_localhost("netdata.response_time");
     if (!stduration) {
-        stduration = rrdset_create("netdata", "response_time", NULL, "netdata", NULL, "NetData API Response Time",
-                                   "ms/request", 130400, rrd_update_every, RRDSET_TYPE_LINE);
+        stduration = rrdset_create_localhost("netdata", "response_time", NULL, "netdata", NULL
+                                             , "NetData API Response Time", "ms/request", 130400, localhost->rrd_update_every
+                                             , RRDSET_TYPE_LINE);
 
-        rrddim_add(stduration, "average", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-        rrddim_add(stduration, "max", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+        rrddim_add(stduration, "average", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        rrddim_add(stduration, "max", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     } else rrdset_next(stduration);
 
     uint64_t gweb_usec = gs.web_usec;
@@ -232,13 +233,13 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    if (!stcompression) stcompression = rrdset_find("netdata.compression_ratio");
+    if (!stcompression) stcompression = rrdset_find_localhost("netdata.compression_ratio");
     if (!stcompression) {
-        stcompression = rrdset_create("netdata", "compression_ratio", NULL, "netdata", NULL,
-                                      "NetData API Responses Compression Savings Ratio", "percentage", 130500,
-                                      rrd_update_every, RRDSET_TYPE_LINE);
+        stcompression = rrdset_create_localhost("netdata", "compression_ratio", NULL, "netdata", NULL
+                                                , "NetData API Responses Compression Savings Ratio", "percentage"
+                                                , 130500, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
-        rrddim_add(stcompression, "savings", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+        rrddim_add(stcompression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     } else rrdset_next(stcompression);
 
     // since we don't lock here to read the global statistics

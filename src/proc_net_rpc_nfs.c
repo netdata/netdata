@@ -269,13 +269,14 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_net == 2) {
-        st = rrdset_find_bytype("nfs", "net");
+        st = rrdset_find_bytype_localhost("nfs", "net");
         if(!st) {
-            st = rrdset_create("nfs", "net", NULL, "network", NULL, "NFS Client Network", "operations/s", 5007, update_every, RRDSET_TYPE_STACKED);
-            st->isdetail = 1;
+            st = rrdset_create_localhost("nfs", "net", NULL, "network", NULL, "NFS Client Network", "operations/s", 5007
+                                         , update_every, RRDSET_TYPE_STACKED);
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "udp", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "tcp", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -291,14 +292,15 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_rpc == 2) {
-        st = rrdset_find_bytype("nfs", "rpc");
+        st = rrdset_find_bytype_localhost("nfs", "rpc");
         if(!st) {
-            st = rrdset_create("nfs", "rpc", NULL, "rpc", NULL, "NFS Client Remote Procedure Calls Statistics", "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            st = rrdset_create_localhost("nfs", "rpc", NULL, "rpc", NULL, "NFS Client Remote Procedure Calls Statistics"
+                                         , "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "calls", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "retransmits", NULL, -1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "auth_refresh", NULL, -1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "calls", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "retransmits", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "auth_refresh", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -312,12 +314,13 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(do_proc2 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfs", "proc2");
+        st = rrdset_find_bytype_localhost("nfs", "proc2");
         if(!st) {
-            st = rrdset_create("nfs", "proc2", NULL, "nfsv2rpc", NULL, "NFS v2 Client Remote Procedure Calls", "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create_localhost("nfs", "proc2", NULL, "nfsv2rpc", NULL, "NFS v2 Client Remote Procedure Calls"
+                                         , "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
 
             for(i = 0; nfs_proc2_values[i].present ; i++)
-                rrddim_add(st, nfs_proc2_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, nfs_proc2_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -331,12 +334,13 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(do_proc3 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfs", "proc3");
+        st = rrdset_find_bytype_localhost("nfs", "proc3");
         if(!st) {
-            st = rrdset_create("nfs", "proc3", NULL, "nfsv3rpc", NULL, "NFS v3 Client Remote Procedure Calls", "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create_localhost("nfs", "proc3", NULL, "nfsv3rpc", NULL, "NFS v3 Client Remote Procedure Calls"
+                                         , "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
 
             for(i = 0; nfs_proc3_values[i].present ; i++)
-                rrddim_add(st, nfs_proc3_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, nfs_proc3_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -350,12 +354,13 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
     if(do_proc4 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfs", "proc4");
+        st = rrdset_find_bytype_localhost("nfs", "proc4");
         if(!st) {
-            st = rrdset_create("nfs", "proc4", NULL, "nfsv4rpc", NULL, "NFS v4 Client Remote Procedure Calls", "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create_localhost("nfs", "proc4", NULL, "nfsv4rpc", NULL, "NFS v4 Client Remote Procedure Calls"
+                                         , "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
 
             for(i = 0; nfs_proc4_values[i].present ; i++)
-                rrddim_add(st, nfs_proc4_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, nfs_proc4_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 

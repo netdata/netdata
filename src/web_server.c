@@ -5,7 +5,8 @@ size_t listen_fds_count = 0;
 int listen_fds[MAX_LISTEN_FDS] = { [0 ... 99] = -1 };
 char *listen_fds_names[MAX_LISTEN_FDS] = { [0 ... 99] = NULL };
 int listen_port = LISTEN_PORT;
-int web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
+
+WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
 
 static int shown_server_socket_error = 0;
 
@@ -82,6 +83,29 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
     return fd;
 }
 #endif
+
+WEB_SERVER_MODE web_server_mode_id(const char *mode) {
+    if(!strcmp(mode, "none"))
+        return WEB_SERVER_MODE_NONE;
+    else if(!strcmp(mode, "single") || !strcmp(mode, "single-threaded"))
+        return WEB_SERVER_MODE_SINGLE_THREADED;
+    else // if(!strcmp(mode, "multi") || !strcmp(mode, "multi-threaded"))
+        return WEB_SERVER_MODE_MULTI_THREADED;
+}
+
+const char *web_server_mode_name(WEB_SERVER_MODE id) {
+    switch(id) {
+        case WEB_SERVER_MODE_NONE:
+            return "none";
+
+        case WEB_SERVER_MODE_SINGLE_THREADED:
+            return "single-threaded";
+
+        default:
+        case WEB_SERVER_MODE_MULTI_THREADED:
+            return "multi-threaded";
+    }
+}
 
 int create_listen_socket4(const char *ip, int port, int listen_backlog) {
     int sock;
@@ -316,22 +340,16 @@ static inline int bind_to_one(const char *definition, int default_port, int list
 int create_listen_sockets(void) {
     shown_server_socket_error = 0;
 
-    listen_backlog = (int) config_get_number("global", "http port listen backlog", LISTEN_BACKLOG);
+    listen_backlog = (int) config_get_number(CONFIG_SECTION_WEB, "listen backlog", LISTEN_BACKLOG);
 
-    if(config_exists("global", "bind socket to IP") && !config_exists("global", "bind to"))
-        config_rename("global", "bind socket to IP", "bind to");
-
-    if(config_exists("global", "port") && !config_exists("global", "default port"))
-        config_rename("global", "port", "default port");
-
-    listen_port = (int) config_get_number("global", "default port", LISTEN_PORT);
+    listen_port = (int) config_get_number(CONFIG_SECTION_WEB, "default port", LISTEN_PORT);
     if(listen_port < 1 || listen_port > 65535) {
         error("Invalid listen port %d given. Defaulting to %d.", listen_port, LISTEN_PORT);
-        listen_port = (int) config_set_number("global", "default port", LISTEN_PORT);
+        listen_port = (int) config_set_number(CONFIG_SECTION_WEB, "default port", LISTEN_PORT);
     }
     debug(D_OPTIONS, "Default listen port set to %d.", listen_port);
 
-    char *s = config_get("global", "bind to", "*");
+    char *s = config_get(CONFIG_SECTION_WEB, "bind to", "*");
     while(*s) {
         char *e = s;
 
@@ -614,7 +632,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 
                     if (w->mode != WEB_CLIENT_MODE_FILECOPY) {
                         debug(D_WEB_CLIENT, "%llu: Processing received data.", w->id);
-                        web_client_process(w);
+                        web_client_process_request(w);
                     }
                 }
 

@@ -19,10 +19,11 @@ void *cpuidlejitter_main(void *ptr) {
         sleep_ms = CPU_IDLEJITTER_SLEEP_TIME_MS;
     }
 
-    RRDSET *st = rrdset_find("system.idlejitter");
+    RRDSET *st = rrdset_find_localhost("system.idlejitter");
     if(!st) {
-        st = rrdset_create("system", "idlejitter", NULL, "processes", NULL, "CPU Idle Jitter", "microseconds lost/s", 9999, rrd_update_every, RRDSET_TYPE_LINE);
-        rrddim_add(st, "jitter", NULL, 1, 1, RRDDIM_ABSOLUTE);
+        st = rrdset_create_localhost("system", "idlejitter", NULL, "processes", NULL, "CPU Idle Jitter"
+                                     , "microseconds lost/s", 9999, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+        rrddim_add(st, "jitter", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     struct timeval before, after;
@@ -30,7 +31,9 @@ void *cpuidlejitter_main(void *ptr) {
     for(counter = 0; 1 ;counter++) {
         usec_t usec = 0, susec = 0;
 
-        while(susec < (rrd_update_every * USEC_PER_SEC)) {
+        if(netdata_exit) break;
+
+        while(susec < (localhost->rrd_update_every * USEC_PER_SEC)) {
 
             now_monotonic_timeval(&before);
             sleep_usec(sleep_ms * 1000);

@@ -199,12 +199,12 @@
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
 
-#include "plugin_tc.h"
-#include "plugins_d.h"
 #include "socket.h"
 #include "eval.h"
 #include "health.h"
 #include "rrd.h"
+#include "plugin_tc.h"
+#include "plugins_d.h"
 #include "rrd2json.h"
 #include "web_client.h"
 #include "web_server.h"
@@ -216,7 +216,11 @@
 #include "backends.h"
 #include "inlined.h"
 #include "adaptive_resortable_list.h"
+#include "rrdpush.h"
+#include "web_api_v1.h"
+#include "web_api_old.h"
 
+extern char *netdata_configured_hostname;
 extern char *netdata_configured_config_dir;
 extern char *netdata_configured_log_dir;
 extern char *netdata_configured_plugins_dir;

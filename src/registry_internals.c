@@ -7,7 +7,7 @@ struct registry registry;
 
 // parse a GUID and re-generated to be always lower case
 // this is used as a protection against the variations of GUIDs
-int registry_regenerate_guid(const char *guid, char *result) {
+int regenerate_guid(const char *guid, char *result) {
     uuid_t uuid;
     if(unlikely(uuid_parse(guid, uuid) == -1)) {
         info("Registry: GUID '%s' is not a valid GUID.", guid);
@@ -18,7 +18,7 @@ int registry_regenerate_guid(const char *guid, char *result) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
         if(strcmp(guid, result))
-            info("Registry: source GUID '%s' and re-generated GUID '%s' differ!", guid, result);
+            info("GUID '%s' and re-generated GUID '%s' differ!", guid, result);
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
@@ -96,14 +96,14 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
     url = registry_fix_url(url, NULL);
 
     // make sure the person GUID is valid
-    if(registry_regenerate_guid(person_guid, pbuf) == -1) {
+    if(regenerate_guid(person_guid, pbuf) == -1) {
         info("Registry Request Verification: invalid person GUID, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
     }
     person_guid = pbuf;
 
     // make sure the machine GUID is valid
-    if(registry_regenerate_guid(machine_guid, mbuf) == -1) {
+    if(regenerate_guid(machine_guid, mbuf) == -1) {
         info("Registry Request Verification: invalid machine GUID, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
     }
@@ -226,7 +226,7 @@ REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid
     if(!pu || !p || !m) return NULL;
 
     // make sure the machine GUID is valid
-    if(registry_regenerate_guid(request_machine, mbuf) == -1) {
+    if(regenerate_guid(request_machine, mbuf) == -1) {
         info("Registry Machine URLs request: invalid machine GUID, person: '%s', machine '%s', url '%s', request machine '%s'", p->guid, m->guid, pu->url->url, request_machine);
         return NULL;
     }
@@ -275,8 +275,10 @@ static inline int is_machine_guid_blacklisted(const char *guid) {
 }
 
 char *registry_get_this_machine_guid(void) {
-    if(likely(registry.machine_guid[0]))
-        return registry.machine_guid;
+    static char guid[GUID_LEN + 1] = "";
+
+    if(likely(guid[0]))
+        return guid;
 
     // read it from disk
     int fd = open(registry.machine_guid_filename, O_RDONLY);
@@ -286,38 +288,38 @@ char *registry_get_this_machine_guid(void) {
             error("Failed to read machine GUID from '%s'", registry.machine_guid_filename);
         else {
             buf[GUID_LEN] = '\0';
-            if(registry_regenerate_guid(buf, registry.machine_guid) == -1) {
+            if(regenerate_guid(buf, guid) == -1) {
                 error("Failed to validate machine GUID '%s' from '%s'. Ignoring it - this might mean this netdata will appear as duplicate in the registry.",
                         buf, registry.machine_guid_filename);
 
-                registry.machine_guid[0] = '\0';
+                guid[0] = '\0';
             }
-            else if(is_machine_guid_blacklisted(registry.machine_guid))
-                registry.machine_guid[0] = '\0';
+            else if(is_machine_guid_blacklisted(guid))
+                guid[0] = '\0';
         }
         close(fd);
     }
 
     // generate a new one?
-    if(!registry.machine_guid[0]) {
+    if(!guid[0]) {
         uuid_t uuid;
 
         uuid_generate_time(uuid);
-        uuid_unparse_lower(uuid, registry.machine_guid);
-        registry.machine_guid[GUID_LEN] = '\0';
+        uuid_unparse_lower(uuid, guid);
+        guid[GUID_LEN] = '\0';
 
         // save it
         fd = open(registry.machine_guid_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
         if(fd == -1)
             fatal("Cannot create unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
 
-        if(write(fd, registry.machine_guid, GUID_LEN) != GUID_LEN)
+        if(write(fd, guid, GUID_LEN) != GUID_LEN)
             fatal("Cannot write the unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
 
         close(fd);
     }
 
-    setenv("NETDATA_REGISTRY_UNIQUE_ID", registry.machine_guid, 1);
+    setenv("NETDATA_REGISTRY_UNIQUE_ID", guid, 1);
 
-    return registry.machine_guid;
+    return guid;
 }

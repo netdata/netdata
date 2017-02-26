@@ -14,8 +14,6 @@
 struct registry {
     int enabled;
 
-    char machine_guid[GUID_LEN + 1];
-
     // entries counters / statistics
     unsigned long long persons_count;
     unsigned long long machines_count;
@@ -61,7 +59,7 @@ struct registry {
     pthread_mutex_t lock;
 };
 
-extern int registry_regenerate_guid(const char *guid, char *result);
+extern int regenerate_guid(const char *guid, char *result);
 
 #include "registry_url.h"
 #include "registry_machine.h"
@@ -69,8 +67,6 @@ extern int registry_regenerate_guid(const char *guid, char *result);
 #include "registry.h"
 
 extern struct registry registry;
-
-extern char *registry_get_this_machine_guid(void);
 
 // REGISTRY LOW-LEVEL REQUESTS (in registry-internals.c)
 extern REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when);

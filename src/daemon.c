@@ -27,7 +27,7 @@ void sig_handler_save(int signo)
     if(signo) {
         error_log_limit_unlimited();
         info("Received signal %d to save the database...", signo);
-        rrdset_save_all();
+        rrdhost_save_all();
         error_log_limit_reset();
     }
 }
@@ -156,7 +156,7 @@ int become_user(const char *username, int pid_fd)
 }
 
 static void oom_score_adj(void) {
-    int score = (int)config_get_number("global", "OOM score", 1000);
+    int score = (int)config_get_number(CONFIG_SECTION_GLOBAL, "OOM score", 1000);
 
     int done = 0;
     int fd = open("/proc/self/oom_score_adj", O_WRONLY);
@@ -175,7 +175,7 @@ static void oom_score_adj(void) {
 
 static void process_nice_level(void) {
 #ifdef HAVE_NICE
-    int nice_level = (int)config_get_number("global", "process nice level", 19);
+    int nice_level = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process nice level", 19);
     if(nice(nice_level) == -1) error("Cannot set netdata CPU nice level to %d.", nice_level);
     else debug(D_SYSTEM, "Set netdata nice level to %d.", nice_level);
 #endif // HAVE_NICE
@@ -239,7 +239,7 @@ static void sched_setscheduler_set(void) {
         int found = 0;
 
         // read the configuration
-        name = config_get("global", "process scheduling policy", name);
+        name = config_get(CONFIG_SECTION_GLOBAL, "process scheduling policy", name);
         int i;
         for(i = 0 ; scheduler_defaults[i].name ; i++) {
             if(!strcmp(name, scheduler_defaults[i].name)) {
@@ -251,7 +251,7 @@ static void sched_setscheduler_set(void) {
                     return;
 
                 if(flags & SCHED_FLAG_PRIORITY_CONFIGURABLE)
-                    priority = (int)config_get_number("global", "process scheduling priority", priority);
+                    priority = (int)config_get_number(CONFIG_SECTION_GLOBAL, "process scheduling priority", priority);
 
 #ifdef HAVE_SCHED_GET_PRIORITY_MIN
                 if(priority < sched_get_priority_min(policy)) {

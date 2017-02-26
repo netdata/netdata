@@ -4,46 +4,52 @@ int registry_init(void) {
     char filename[FILENAME_MAX + 1];
 
     // registry enabled?
-    registry.enabled = config_get_boolean("registry", "enabled", 0);
+    if(web_server_mode != WEB_SERVER_MODE_NONE) {
+        registry.enabled = config_get_boolean(CONFIG_SECTION_REGISTRY, "enabled", 0);
+    }
+    else {
+        info("Registry is disabled - use the central netdata");
+        config_set_boolean(CONFIG_SECTION_REGISTRY, "enabled", 0);
+        registry.enabled = 0;
+    }
 
     // pathnames
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
-    registry.pathname = config_get("registry", "registry db directory", filename);
+    registry.pathname = config_get(CONFIG_SECTION_REGISTRY, "registry db directory", filename);
     if(mkdir(registry.pathname, 0770) == -1 && errno != EEXIST)
         fatal("Cannot create directory '%s'.", registry.pathname);
 
     // filenames
     snprintfz(filename, FILENAME_MAX, "%s/netdata.public.unique.id", registry.pathname);
-    registry.machine_guid_filename = config_get("registry", "netdata unique id file", filename);
-    registry_get_this_machine_guid();
+    registry.machine_guid_filename = config_get(CONFIG_SECTION_REGISTRY, "netdata unique id file", filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/registry.db", registry.pathname);
-    registry.db_filename = config_get("registry", "registry db file", filename);
+    registry.db_filename = config_get(CONFIG_SECTION_REGISTRY, "registry db file", filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/registry-log.db", registry.pathname);
-    registry.log_filename = config_get("registry", "registry log file", filename);
+    registry.log_filename = config_get(CONFIG_SECTION_REGISTRY, "registry log file", filename);
 
     // configuration options
-    registry.save_registry_every_entries = (unsigned long long)config_get_number("registry", "registry save db every new entries", 1000000);
-    registry.persons_expiration = config_get_number("registry", "registry expire idle persons days", 365) * 86400;
-    registry.registry_domain = config_get("registry", "registry domain", "");
-    registry.registry_to_announce = config_get("registry", "registry to announce", "https://registry.my-netdata.io");
-    registry.hostname = config_get("registry", "registry hostname", config_get("global", "hostname", localhost.hostname));
-    registry.verify_cookies_redirects = config_get_boolean("registry", "verify browser cookies support", 1);
+    registry.save_registry_every_entries = (unsigned long long)config_get_number(CONFIG_SECTION_REGISTRY, "registry save db every new entries", 1000000);
+    registry.persons_expiration = config_get_number(CONFIG_SECTION_REGISTRY, "registry expire idle persons days", 365) * 86400;
+    registry.registry_domain = config_get(CONFIG_SECTION_REGISTRY, "registry domain", "");
+    registry.registry_to_announce = config_get(CONFIG_SECTION_REGISTRY, "registry to announce", "https://registry.my-netdata.io");
+    registry.hostname = config_get(CONFIG_SECTION_REGISTRY, "registry hostname", config_get(CONFIG_SECTION_GLOBAL, "hostname", "localhost"));
+    registry.verify_cookies_redirects = config_get_boolean(CONFIG_SECTION_REGISTRY, "verify browser cookies support", 1);
 
     setenv("NETDATA_REGISTRY_HOSTNAME", registry.hostname, 1);
     setenv("NETDATA_REGISTRY_URL", registry.registry_to_announce, 1);
 
-    registry.max_url_length = (size_t)config_get_number("registry", "max URL length", 1024);
+    registry.max_url_length = (size_t)config_get_number(CONFIG_SECTION_REGISTRY, "max URL length", 1024);
     if(registry.max_url_length < 10) {
         registry.max_url_length = 10;
-        config_set_number("registry", "max URL length", (long long)registry.max_url_length);
+        config_set_number(CONFIG_SECTION_REGISTRY, "max URL length", (long long)registry.max_url_length);
     }
 
-    registry.max_name_length = (size_t)config_get_number("registry", "max URL name length", 50);
+    registry.max_name_length = (size_t)config_get_number(CONFIG_SECTION_REGISTRY, "max URL name length", 50);
     if(registry.max_name_length < 10) {
         registry.max_name_length = 10;
-        config_set_number("registry", "max URL name length", (long long)registry.max_name_length);
+        config_set_number(CONFIG_SECTION_REGISTRY, "max URL name length", (long long)registry.max_name_length);
     }
 
     // initialize entries counters

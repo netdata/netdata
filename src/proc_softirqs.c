@@ -128,8 +128,9 @@ int do_proc_softirqs(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    st = rrdset_find_bytype("system", "softirqs");
-    if(unlikely(!st)) st = rrdset_create("system", "softirqs", NULL, "softirqs", NULL, "System softirqs", "softirqs/s", 950, update_every, RRDSET_TYPE_STACKED);
+    st = rrdset_find_bytype_localhost("system", "softirqs");
+    if(unlikely(!st)) st = rrdset_create_localhost("system", "softirqs", NULL, "softirqs", NULL, "System softirqs"
+                                                   , "softirqs/s", 950, update_every, RRDSET_TYPE_STACKED);
     else rrdset_next(st);
 
     for(l = 0; l < lines ;l++) {
@@ -141,7 +142,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
         if(unlikely(!irr->rd || strncmp(irr->name, irr->rd->name, MAX_INTERRUPT_NAME) != 0)) {
             irr->rd = rrddim_find(st, irr->id);
             if(unlikely(!irr->rd))
-                irr->rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
+                irr->rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else
                 rrddim_set_name(st, irr->rd, irr->name);
 
@@ -163,7 +164,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
             char id[50+1];
             snprintfz(id, 50, "cpu%d_softirqs", c);
 
-            st = rrdset_find_bytype("cpu", id);
+            st = rrdset_find_bytype_localhost("cpu", id);
             if(unlikely(!st)) {
                 // find if everything is zero
                 unsigned long long core_sum = 0 ;
@@ -176,7 +177,8 @@ int do_proc_softirqs(int update_every, usec_t dt) {
 
                 char title[100+1];
                 snprintfz(title, 100, "CPU%d softirqs", c);
-                st = rrdset_create("cpu", id, NULL, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c, update_every, RRDSET_TYPE_STACKED);
+                st = rrdset_create_localhost("cpu", id, NULL, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c
+                                             , update_every, RRDSET_TYPE_STACKED);
             }
             else rrdset_next(st);
 
@@ -186,7 +188,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 if(unlikely(!irr->cpu[c].rd)) {
                     irr->cpu[c].rd = rrddim_find(st, irr->id);
                     if(unlikely(!irr->cpu[c].rd))
-                        irr->cpu[c].rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
+                        irr->cpu[c].rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     else
                         rrddim_set_name(st, irr->cpu[c].rd, irr->name);
                 }

@@ -184,23 +184,27 @@ int do_ipc(int update_every, usec_t dt) {
             return 1;
         }
 
-        arrays_max     = rrdvar_custom_host_variable_create(&localhost, "ipc.semaphores.arrays.max");
-        semaphores_max = rrdvar_custom_host_variable_create(&localhost, "ipc.semaphores.max");
+        arrays_max     = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.arrays.max");
+        semaphores_max = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.max");
 
         if(arrays_max)     rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
         if(semaphores_max) rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
 
         // create the charts
-        semaphores = rrdset_find("system.ipc_semaphores");
+        semaphores = rrdset_find_localhost("system.ipc_semaphores");
         if(!semaphores) {
-            semaphores = rrdset_create("system", "ipc_semaphores", NULL, "ipc semaphores", NULL, "IPC Semaphores", "semaphores", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-            rrddim_add(semaphores, "semaphores", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            semaphores = rrdset_create_localhost("system", "ipc_semaphores", NULL, "ipc semaphores", NULL
+                                                 , "IPC Semaphores", "semaphores", 1000, localhost->rrd_update_every
+                                                 , RRDSET_TYPE_AREA);
+            rrddim_add(semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        arrays = rrdset_find("system.ipc_semaphore_arrays");
+        arrays = rrdset_find_localhost("system.ipc_semaphore_arrays");
         if(!arrays) {
-            arrays = rrdset_create("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, rrd_update_every, RRDSET_TYPE_AREA);
-            rrddim_add(arrays, "arrays", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            arrays = rrdset_create_localhost("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL
+                                             , "IPC Semaphore Arrays", "arrays", 1000, localhost->rrd_update_every
+                                             , RRDSET_TYPE_AREA);
+            rrddim_add(arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
     }
 

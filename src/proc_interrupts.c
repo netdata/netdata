@@ -146,8 +146,9 @@ int do_proc_interrupts(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    st = rrdset_find_bytype("system", "interrupts");
-    if(unlikely(!st)) st = rrdset_create("system", "interrupts", NULL, "interrupts", NULL, "System interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_STACKED);
+    st = rrdset_find_bytype_localhost("system", "interrupts");
+    if(unlikely(!st)) st = rrdset_create_localhost("system", "interrupts", NULL, "interrupts", NULL, "System interrupts"
+                                                   , "interrupts/s", 1000, update_every, RRDSET_TYPE_STACKED);
     else rrdset_next(st);
 
     for(l = 0; l < lines ;l++) {
@@ -159,7 +160,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         if(unlikely(!irr->rd || strncmp(irr->rd->name, irr->name, MAX_INTERRUPT_NAME) != 0)) {
             irr->rd = rrddim_find(st, irr->id);
             if(unlikely(!irr->rd))
-                irr->rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
+                irr->rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else
                 rrddim_set_name(st, irr->rd, irr->name);
 
@@ -181,11 +182,12 @@ int do_proc_interrupts(int update_every, usec_t dt) {
             char id[50+1];
             snprintfz(id, 50, "cpu%d_interrupts", c);
 
-            st = rrdset_find_bytype("cpu", id);
+            st = rrdset_find_bytype_localhost("cpu", id);
             if(unlikely(!st)) {
                 char title[100+1];
                 snprintfz(title, 100, "CPU%d Interrupts", c);
-                st = rrdset_create("cpu", id, NULL, "interrupts", "cpu.interrupts", title, "interrupts/s", 1100 + c, update_every, RRDSET_TYPE_STACKED);
+                st = rrdset_create_localhost("cpu", id, NULL, "interrupts", "cpu.interrupts", title, "interrupts/s",
+                        1100 + c, update_every, RRDSET_TYPE_STACKED);
             }
             else rrdset_next(st);
 
@@ -195,7 +197,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 if(unlikely(!irr->cpu[c].rd)) {
                     irr->cpu[c].rd = rrddim_find(st, irr->id);
                     if(unlikely(!irr->cpu[c].rd))
-                        irr->cpu[c].rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRDDIM_INCREMENTAL);
+                        irr->cpu[c].rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     else
                         rrddim_set_name(st, irr->cpu[c].rd, irr->name);
                 }

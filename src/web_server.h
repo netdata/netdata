@@ -13,9 +13,17 @@
 #define MAX_LISTEN_FDS 100
 #endif
 
-#define WEB_SERVER_MODE_MULTI_THREADED 0
-#define WEB_SERVER_MODE_SINGLE_THREADED 1
-extern int web_server_mode;
+typedef enum web_server_mode {
+    WEB_SERVER_MODE_SINGLE_THREADED,
+    WEB_SERVER_MODE_MULTI_THREADED,
+    WEB_SERVER_MODE_NONE
+} WEB_SERVER_MODE;
+
+extern WEB_SERVER_MODE web_server_mode;
+
+extern WEB_SERVER_MODE web_server_mode_id(const char *mode);
+extern const char *web_server_mode_name(WEB_SERVER_MODE id);
+
 
 extern void *socket_listen_main_multi_threaded(void *ptr);
 extern void *socket_listen_main_single_threaded(void *ptr);
