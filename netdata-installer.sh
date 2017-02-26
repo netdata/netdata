@@ -723,7 +723,7 @@ if [ ${UID} -eq 0 ]
             # if we managed to setcap
             # but we fail to execute apps.plugin
             # trigger setuid to root
-            "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -v >/dev/null 2>&1
+            "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -t >/dev/null 2>&1
             setcap_ret=$?
         fi
     fi
