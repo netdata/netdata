@@ -64,6 +64,7 @@ static int
 
 static size_t
         global_iterations_counter = 1,
+        calls_counter = 0,
         file_counter = 0;
 
 
@@ -831,7 +832,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
 
     p->last_stat_collected_usec = p->stat_collected_usec;
     p->stat_collected_usec = now_monotonic_usec();
-    file_counter++;
+    calls_counter++;
 
     // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0));
     char *comm          = procfile_lineword(ff, 0, 1);
@@ -983,7 +984,7 @@ static inline int read_proc_pid_statm(struct pid_stat *p) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
 
-    file_counter++;
+    calls_counter++;
 
     p->statm_size           = str2kernel_uint_t(procfile_lineword(ff, 0, 0));
     p->statm_resident       = str2kernel_uint_t(procfile_lineword(ff, 0, 1));
@@ -1022,7 +1023,7 @@ static inline int read_proc_pid_io(struct pid_stat *p) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
 
-    file_counter++;
+    calls_counter++;
 
     p->last_io_collected_usec = p->io_collected_usec;
     p->io_collected_usec = now_monotonic_usec();
@@ -1098,7 +1099,7 @@ static inline int read_proc_stat() {
     last_collected_usec = collected_usec;
     collected_usec = now_monotonic_usec();
 
-    file_counter++;
+    calls_counter++;
 
     kernel_uint_t last;
 
@@ -1387,8 +1388,9 @@ static inline void make_all_pid_fds_negative(struct pid_stat *p) {
 }
 
 static inline void cleanup_negative_pid_fds(struct pid_stat *p) {
-    int *fd = p->fds, *end = &p->fds[p->fds_size];
-    while(fd < end) {
+    int *fd = p->fds, *fdend = &p->fds[p->fds_size];
+
+    while(fd < fdend) {
         if(unlikely(*fd < 0)) {
             file_descriptor_not_used(-(*fd));
             *fd++ = 0;
@@ -1429,7 +1431,7 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
             continue;
 
         // get its number
-        int fdid = (int)str2l(de->d_name);
+        int fdid = (int) str2l(de->d_name);
         if(unlikely(fdid < 0)) continue;
 
         // check if the fds array is small
@@ -1437,7 +1439,12 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
             // it is small, extend it
 
             if(unlikely(debug))
-                fprintf(stderr, "apps.plugin: extending fd memory slots for %s from %d to %d\n", p->comm, p->fds_size, fdid + MAX_SPARE_FDS);
+                fprintf(stderr
+                        , "apps.plugin: extending fd memory slots for %s from %d to %d\n"
+                        , p->comm
+                        , p->fds_size
+                        , fdid + MAX_SPARE_FDS
+                );
 
             p->fds = reallocz(p->fds, (fdid + MAX_SPARE_FDS) * sizeof(int));
 
@@ -1468,9 +1475,10 @@ static inline int read_pid_file_descriptors(struct pid_stat *p) {
             p->fds[fdid] = file_descriptor_find_or_add(linkname);
         }
 
-        // else make it positive again, we need it
-        // of course, the actual file may have changed, but we don't care so much
-        // FIXME: we could compare the inode as returned by readdir dirent structure
+            // else make it positive again, we need it
+            // of course, the actual file may have changed, but we don't care so much
+            // FIXME: we could compare the inode as returned by readdir dirent structure
+            // UPDATE: no we cannot use inodes - under /proc inodes don't change when the link is changed
 
         else
             p->fds[fdid] = -p->fds[fdid];
@@ -1952,10 +1960,11 @@ static void cleanup_exited_pids(void) {
             if(unlikely(debug && (p->keep || p->keeploops)))
                 fprintf(stderr, " > CLEANUP cannot keep exited process %d (%s) anymore - removing it.\n", p->pid, p->comm);
 
-            for(c = 0 ; c < p->fds_size ; c++) if(p->fds[c] > 0) {
-                file_descriptor_not_used(p->fds[c]);
-                p->fds[c] = 0;
-            }
+            for(c = 0; c < p->fds_size; c++)
+                if(p->fds[c] > 0) {
+                    file_descriptor_not_used(p->fds[c]);
+                    p->fds[c] = 0;
+                }
 
             pid_t r = p->pid;
             p = p->next;
@@ -2398,6 +2407,7 @@ static usec_t send_resource_usage_to_netdata() {
                         "DIMENSION user '' incremental 1 1000\n"
                         "DIMENSION system '' incremental 1 1000\n"
                         "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
+                        "DIMENSION calls '' incremental 1 1\n"
                         "DIMENSION files '' incremental 1 1\n"
                         "DIMENSION pids '' absolute 1 1\n"
                         "DIMENSION fds '' absolute 1 1\n"
@@ -2431,6 +2441,7 @@ static usec_t send_resource_usage_to_netdata() {
         "SET system = %llu\n"
         "END\n"
         "BEGIN netdata.apps_files %llu\n"
+        "SET calls = %zu\n"
         "SET files = %zu\n"
         "SET pids = %zu\n"
         "SET fds = %d\n"
@@ -2447,6 +2458,7 @@ static usec_t send_resource_usage_to_netdata() {
         , cpuuser
         , cpusyst
         , usec
+        , calls_counter
         , file_counter
         , all_pids_count
         , all_files_len
