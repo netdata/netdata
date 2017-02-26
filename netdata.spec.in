@@ -78,17 +78,16 @@ Summary:	Real-time performance monitoring, done right
 Name:		@PACKAGE_NAME@
 Version:	@PACKAGE_RPM_VERSION@
 Release:	1%{?dist}
-License:	GPL v3+
+License:	GPLv3+
 Group:		Applications/System
-Source0:	http://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
-URL:		http://my-netdata.io/
+Source0:	https://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
+URL:		http://my-netdata.io
 BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
 BuildRequires:	libuuid-devel
 Requires:	zlib
 Requires:	libuuid
-Requires(post): libcap
 
 # Packages can be found in the EPEL repo
 %if %{with nfacct}
