@@ -382,18 +382,18 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("system", "cpu", NULL, "cpu", "system.cpu", "Total CPU utilization", "percentage", 100, update_every, RRDSET_TYPE_STACKED);
 
-                    rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_add(st, "interrupt", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_hide(st, "idle");
                 }
                 else rrdset_next(st);
 
-                rrddim_set(st, "user", cp_time[0]);
                 rrddim_set(st, "nice", cp_time[1]);
                 rrddim_set(st, "system", cp_time[2]);
+                rrddim_set(st, "user", cp_time[0]);
                 rrddim_set(st, "interrupt", cp_time[3]);
                 rrddim_set(st, "idle", cp_time[4]);
                 rrdset_done(st);
@@ -425,18 +425,18 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                             st = rrdset_create_localhost("cpu", cpuid, NULL, "utilization", "cpu.cpu", "Core utilization",
                                                "percentage", 1000, update_every, RRDSET_TYPE_STACKED);
 
-                            rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                             rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                             rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                            rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                             rrddim_add(st, "interrupt", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                             rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                             rrddim_hide(st, "idle");
                         } else
                             rrdset_next(st);
 
-                        rrddim_set(st, "user", pcpu_cp_time[i * 5 + 0]);
                         rrddim_set(st, "nice", pcpu_cp_time[i * 5 + 1]);
                         rrddim_set(st, "system", pcpu_cp_time[i * 5 + 2]);
+                        rrddim_set(st, "user", pcpu_cp_time[i * 5 + 0]);
                         rrddim_set(st, "interrupt", pcpu_cp_time[i * 5 + 3]);
                         rrddim_set(st, "idle", pcpu_cp_time[i * 5 + 4]);
                         rrdset_done(st);
