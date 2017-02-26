@@ -128,6 +128,8 @@ static inline void pflines_free(pflines *fl) {
 // The procfile
 
 void procfile_close(procfile *ff) {
+    if(unlikely(!ff)) return;
+
     debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", procfile_filename(ff));
 
     if(likely(ff->lines)) pflines_free(ff->lines);

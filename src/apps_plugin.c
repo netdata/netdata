@@ -2902,6 +2902,22 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 // ----------------------------------------------------------------------------
 // parse command line arguments
 
+int check_proc_1_io() {
+    int ret = 0;
+
+    procfile *ff = procfile_open("/proc/1/io", NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    if(!ff) goto cleanup;
+
+    ff = procfile_readall(ff);
+    if(!ff) goto cleanup;
+
+    ret = 1;
+
+cleanup:
+    procfile_close(ff);
+    return ret;
+}
+
 static void parse_args(int argc, char **argv)
 {
     int i, freq = 0;
@@ -2918,6 +2934,15 @@ static void parse_args(int argc, char **argv)
 
         if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0) {
             printf("apps.plugin %s\n", VERSION);
+            exit(0);
+        }
+
+        if(strcmp("test-permissions", argv[i]) == 0 || strcmp("-t", argv[i]) == 0) {
+            if(!check_proc_1_io()) {
+                perror("Tried to read /proc/1/io and it failed");
+                exit(1);
+            }
+            printf("OK\n");
             exit(0);
         }
 
@@ -3093,8 +3118,6 @@ int main(int argc, char **argv) {
     // set the name for logging
     program_name = "apps.plugin";
 
-    info("started on pid %d", getpid());
-
     // disable syslog for apps.plugin
     error_log_syslog = 0;
 
@@ -3136,26 +3159,26 @@ int main(int argc, char **argv) {
 
     parse_args(argc, argv);
 
-    if(!check_capabilities()) {
-        if(!am_i_running_as_root()) {
-            uid_t uid = getuid(), euid = geteuid();
+    if(!check_capabilities() && !am_i_running_as_root() && !check_proc_1_io()) {
+        uid_t uid = getuid(), euid = geteuid();
 #ifdef HAVE_CAPABILITY
-            error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-                          "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
-                          "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
-                          "To enable setuid to root run: sudo chown root %s; sudo chmod 4755 %s; "
-                  , uid, euid, argv[0], argv[0], argv[0]
-            );
+        error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
+                      "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
+                      "To enable capabilities run: sudo setcap cap_dac_read_search,cap_sys_ptrace+ep %s; "
+                      "To enable setuid to root run: sudo chown root %s; sudo chmod 4755 %s; "
+              , uid, euid, argv[0], argv[0], argv[0]
+        );
 #else
-            error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-                          "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
-                          "Your system does not support capabilities. "
-                          "To enable setuid to root run: sudo chown root %s; sudo chmod 4755 %s; "
-                  , uid, euid, argv[0], argv[0]
-            );
+        error("apps.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
+                      "Without these, apps.plugin cannot report disk I/O utilization of other processes. "
+                      "Your system does not support capabilities. "
+                      "To enable setuid to root run: sudo chown root %s; sudo chmod 4755 %s; "
+              , uid, euid, argv[0], argv[0]
+        );
 #endif
-        }
     }
+
+    info("started on pid %d", getpid());
 
     all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);
     all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
