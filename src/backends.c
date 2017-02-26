@@ -1,12 +1,48 @@
 #include "common.h"
 
+// ----------------------------------------------------------------------------
+// How backends work in netdata:
+//
+// 1. There is an independent thread that runs at the required interval
+//    (for example, once every 10 seconds)
+//
+// 2. Every time it wakes, it calls the backend formatting functions to build
+//    a buffer of data. This is a very fast, memory only operation.
+//
+// 3. If the buffer already includes data, the new data are appended.
+//    If the buffer becomes too big, because the data cannot be sent, a
+//    log is written and the buffer is discarded.
+//
+// 4. Then it tries to send all the data. It blocks until all the data are sent
+//    or the socket returns an error.
+//    If the time required for this is above the interval, it starts skipping
+//    intervals, but the calculated values include the entire database, without
+//    gaps (it remembers the timestamps and continues from where it stopped).
+//
+// 5. repeats the above forever.
+//
+
 #define BACKEND_SOURCE_DATA_AS_COLLECTED 0x00000001
 #define BACKEND_SOURCE_DATA_AVERAGE      0x00000002
 #define BACKEND_SOURCE_DATA_SUM          0x00000004
 
-static inline calculated_number backend_calculate_value_from_stored_data(RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+
+// ----------------------------------------------------------------------------
+// helper functions for backends
+
+// calculate the SUM or AVERAGE of a dimension, for any timeframe
+// may return NAN if the database does not have any value in the give timeframe
+
+static inline calculated_number backend_calculate_value_from_stored_data(
+          RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , uint32_t options          // BACKEND_SOURCE_* bitmap
+) {
+    // find the edges of the rrd database for this chart
     time_t first_t = rrdset_first_entry_t(st);
-    time_t last_t = rrdset_last_entry_t(st);
+    time_t last_t  = rrdset_last_entry_t(st);
 
     if(unlikely(before < first_t || after > last_t))
         // the chart has not been updated in the wanted timeframe
@@ -21,7 +57,7 @@ static inline calculated_number backend_calculate_value_from_stored_data(RRDSET 
         after = first_t;
 
     if(unlikely(after > before))
-        // this can happen when the st->update_every > before - after
+        // this can happen when st->update_every > before - after
         before = after;
 
     if(unlikely(before > last_t))
@@ -35,14 +71,20 @@ static inline calculated_number backend_calculate_value_from_stored_data(RRDSET 
             slot, stop_now = 0;
 
     for(slot = start_at_slot; !stop_now ; slot--) {
+
         if(unlikely(slot < 0)) slot = st->entries - 1;
         if(unlikely(slot == stop_at_slot)) stop_now = 1;
 
         storage_number n = rd->values[slot];
-        if(unlikely(!does_storage_number_exist(n))) continue;
+
+        if(unlikely(!does_storage_number_exist(n))) {
+            // not collected
+            continue;
+        }
 
         calculated_number value = unpack_storage_number(n);
         sum += value;
+
         counter++;
     }
 
@@ -55,49 +97,189 @@ static inline calculated_number backend_calculate_value_from_stored_data(RRDSET 
     return sum / (calculated_number)counter;
 }
 
-static inline int format_dimension_collected_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+
+// discard a response received by a backend
+// after logging a simple of it to error.log
+
+static inline int discard_response(BUFFER *b, const char *backend) {
+    char sample[1024];
+    const char *s = buffer_tostring(b);
+    char *d = sample, *e = &sample[sizeof(sample) - 1];
+
+    for(; *s && d < e ;s++) {
+        char c = *s;
+        if(unlikely(!isprint(c))) c = ' ';
+        *d++ = c;
+    }
+    *d = '\0';
+
+    info("Received %zu bytes from %s backend. Ignoring them. Sample: '%s'", buffer_strlen(b), backend, sample);
+    buffer_flush(b);
+    return 0;
+}
+
+
+// ----------------------------------------------------------------------------
+// graphite backend
+
+static inline int format_dimension_collected_graphite_plaintext(
+          BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , uint32_t options          // BACKEND_SOURCE_* bitmap
+) {
     (void)host;
     (void)after;
     (void)before;
     (void)options;
-    buffer_sprintf(b, "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n", prefix, hostname, st->id, rd->id, rd->last_collected_value, (uint32_t)rd->last_collected_time.tv_sec);
+
+    buffer_sprintf(
+            b
+            , "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n"
+            , prefix
+            , hostname
+            , st->id
+            , rd->id
+            , rd->last_collected_value
+            , (uint32_t)rd->last_collected_time.tv_sec
+    );
+
     return 1;
 }
 
-static inline int format_dimension_stored_graphite_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline int format_dimension_stored_graphite_plaintext(
+          BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , uint32_t options          // BACKEND_SOURCE_* bitmap
+) {
     (void)host;
+
     calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
+
     if(!isnan(value)) {
-        buffer_sprintf(b, "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n", prefix, hostname, st->id, rd->id, value, (uint32_t) before);
+
+        buffer_sprintf(
+                b
+                , "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n"
+                , prefix
+                , hostname
+                , st->id
+                , rd->id
+                , value
+                , (uint32_t) before
+        );
+
         return 1;
     }
     return 0;
 }
 
-static inline int format_dimension_collected_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline int process_graphite_response(BUFFER *b) {
+    return discard_response(b, "graphite");
+}
+
+
+// ----------------------------------------------------------------------------
+// opentsdb backend
+
+static inline int format_dimension_collected_opentsdb_telnet(
+          BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , uint32_t options          // BACKEND_SOURCE_* bitmap
+) {
     (void)host;
     (void)after;
     (void)before;
     (void)options;
-    buffer_sprintf(b, "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t)rd->last_collected_time.tv_sec, rd->last_collected_value, hostname);
+
+    buffer_sprintf(
+            b
+            , "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s\n"
+            , prefix
+            , st->id
+            , rd->id
+            , (uint32_t)rd->last_collected_time.tv_sec
+            , rd->last_collected_value
+            , hostname
+    );
+
     return 1;
 }
 
-static inline int format_dimension_stored_opentsdb_telnet(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline int format_dimension_stored_opentsdb_telnet(
+          BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , uint32_t options          // BACKEND_SOURCE_* bitmap
+) {
     (void)host;
+
     calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
+
     if(!isnan(value)) {
-        buffer_sprintf(b, "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n", prefix, st->id, rd->id, (uint32_t) before, value, hostname);
+
+        buffer_sprintf(
+                b
+                , "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n"
+                , prefix
+                , st->id
+                , rd->id
+                , (uint32_t) before
+                , value
+                , hostname
+        );
+
         return 1;
     }
     return 0;
 }
 
-static inline int format_dimension_collected_json_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline int process_opentsdb_response(BUFFER *b) {
+    return discard_response(b, "opentsdb");
+}
+
+
+// ----------------------------------------------------------------------------
+// json backend
+
+static inline int format_dimension_collected_json_plaintext(
+          BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , uint32_t options          // BACKEND_SOURCE_* bitmap
+) {
     (void)host;
     (void)after;
     (void)before;
     (void)options;
+
     buffer_sprintf(b, "{"
         "\"prefix\":\"%s\","
         "\"hostname\":\"%s\","
@@ -116,7 +298,7 @@ static inline int format_dimension_collected_json_plaintext(BUFFER *b, const cha
         "\"timestamp\": %u}\n", 
             prefix,
             hostname,
-            
+
             st->id,
             st->name,
             st->family,
@@ -126,17 +308,29 @@ static inline int format_dimension_collected_json_plaintext(BUFFER *b, const cha
 
             rd->id,
             rd->name,
-            rd->last_collected_value, 
-            
+            rd->last_collected_value,
+
             (uint32_t)rd->last_collected_time.tv_sec
     );
 
     return 1;
 }
 
-static inline int format_dimension_stored_json_plaintext(BUFFER *b, const char *prefix, RRDHOST *host, const char *hostname, RRDSET *st, RRDDIM *rd, time_t after, time_t before, uint32_t options) {
+static inline int format_dimension_stored_json_plaintext(
+          BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , uint32_t options          // BACKEND_SOURCE_* bitmap
+) {
     (void)host;
+
     calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
+
     if(!isnan(value)) {
         buffer_sprintf(b, "{"
             "\"prefix\":\"%s\","
@@ -176,56 +370,13 @@ static inline int format_dimension_stored_json_plaintext(BUFFER *b, const char *
     return 0;
 }
 
-static inline int process_graphite_response(BUFFER *b) {
-    char sample[1024];
-    const char *s = buffer_tostring(b);
-    char *d = sample, *e = &sample[sizeof(sample) - 1];
-
-    for(; *s && d < e ;s++) {
-        char c = *s;
-        if(unlikely(!isprint(c))) c = ' ';
-        *d++ = c;
-    }
-    *d = '\0';
-
-    info("Received %zu bytes from graphite backend. Ignoring them. Sample: '%s'", buffer_strlen(b), sample);
-    buffer_flush(b);
-    return 0;
-}
-
 static inline int process_json_response(BUFFER *b) {
-    char sample[1024];
-    const char *s = buffer_tostring(b);
-    char *d = sample, *e = &sample[sizeof(sample) - 1];
-
-    for(; *s && d < e ;s++) {
-        char c = *s;
-        if(unlikely(!isprint(c))) c = ' ';
-        *d++ = c;
-    }
-    *d = '\0';
-
-    info("Received %zu bytes from json backend. Ignoring them. Sample: '%s'", buffer_strlen(b), sample);
-    buffer_flush(b);
-    return 0;
+    return discard_response(b, "json");
 }
 
-static inline int process_opentsdb_response(BUFFER *b) {
-    char sample[1024];
-    const char *s = buffer_tostring(b);
-    char *d = sample, *e = &sample[sizeof(sample) - 1];
 
-    for(; *s && d < e ;s++) {
-        char c = *s;
-        if(unlikely(!isprint(c))) c = ' ';
-        *d++ = c;
-    }
-    *d = '\0';
-
-    info("Received %zu bytes from opentsdb backend. Ignoring them. Sample: '%s'", buffer_strlen(b), sample);
-    buffer_flush(b);
-    return 0;
-}
+// ----------------------------------------------------------------------------
+// the backend thread
 
 void *backends_main(void *ptr) {
     int default_port = 0;
@@ -295,37 +446,37 @@ void *backends_main(void *ptr) {
     // select the backend type
 
     if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
+
         default_port = 2003;
+        backend_response_checker = process_graphite_response;
+
         if(options == BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_graphite_plaintext;
         else
             backend_request_formatter = format_dimension_stored_graphite_plaintext;
 
-        backend_response_checker = process_graphite_response;
     }
     else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+
         default_port = 4242;
+        backend_response_checker = process_opentsdb_response;
+
         if(options == BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_opentsdb_telnet;
         else
             backend_request_formatter = format_dimension_stored_opentsdb_telnet;
 
-        backend_response_checker = process_opentsdb_response;
     }
-    else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext"))
-    {
+    else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
+
         default_port = 5448;
+        backend_response_checker = process_json_response;
 
         if (options == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        {
             backend_request_formatter = format_dimension_collected_json_plaintext;
-        }
         else
-        {
             backend_request_formatter = format_dimension_stored_json_plaintext;
-        }
 
-        backend_response_checker = process_json_response;
     }
     else {
         error("Unknown backend type '%s'", type);
