@@ -11,6 +11,7 @@ dist_config_DATA = \
     python.d.conf \
     health_alarm_notify.conf \
     health_email_recipients.conf \
+    stream.conf \
     $(NULL)
 
 nodeconfigdir=$(configdir)/node.d

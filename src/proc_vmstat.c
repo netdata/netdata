@@ -25,10 +25,10 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     static unsigned long long pswpout = 0ULL;
 
     if(unlikely(!arl_base)) {
-        do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_ONDEMAND_ONDEMAND);
+        do_swapio = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "swap i/o", CONFIG_BOOLEAN_AUTO);
         do_io = config_get_boolean("plugin:proc:/proc/vmstat", "disk i/o", 1);
         do_pgfaults = config_get_boolean("plugin:proc:/proc/vmstat", "memory page faults", 1);
-        do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_ONDEMAND_ONDEMAND);
+        do_numa = config_get_boolean_ondemand("plugin:proc:/proc/vmstat", "system-wide numa metric summary", CONFIG_BOOLEAN_AUTO);
 
 
         arl_base = arl_create("vmstat", NULL, 60);
@@ -39,7 +39,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         arl_expect(arl_base, "pswpin", &pswpin);
         arl_expect(arl_base, "pswpout", &pswpout);
 
-        if(do_numa == CONFIG_ONDEMAND_YES || (do_numa == CONFIG_ONDEMAND_ONDEMAND && get_numa_node_count() >= 2)) {
+        if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO && get_numa_node_count() >= 2)) {
             arl_expect(arl_base, "numa_foreign", &numa_foreign);
             arl_expect(arl_base, "numa_hint_faults_local", &numa_hint_faults_local);
             arl_expect(arl_base, "numa_hint_faults", &numa_hint_faults);
@@ -56,7 +56,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             // when all the expected metrics are collected.
             // Also ARL will not parse their values.
             has_numa = 0;
-            do_numa = CONFIG_ONDEMAND_NO;
+            do_numa = CONFIG_BOOLEAN_NO;
         }
     }
 
@@ -87,15 +87,16 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(pswpin || pswpout || do_swapio == CONFIG_ONDEMAND_YES) {
-        do_swapio = CONFIG_ONDEMAND_YES;
+    if(pswpin || pswpout || do_swapio == CONFIG_BOOLEAN_YES) {
+        do_swapio = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_swapio = NULL;
         if(unlikely(!st_swapio)) {
-            st_swapio = rrdset_create("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
+            st_swapio = rrdset_create_localhost("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250
+                                                , update_every, RRDSET_TYPE_AREA);
 
-            rrddim_add(st_swapio, "in",  NULL, sysconf(_SC_PAGESIZE), 1024, RRDDIM_INCREMENTAL);
-            rrddim_add(st_swapio, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRDDIM_INCREMENTAL);
+            rrddim_add(st_swapio, "in",  NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_swapio, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_swapio);
 
@@ -109,10 +110,11 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     if(do_io) {
         static RRDSET *st_io = NULL;
         if(unlikely(!st_io)) {
-            st_io = rrdset_create("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150, update_every, RRDSET_TYPE_AREA);
+            st_io = rrdset_create_localhost("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150
+                                            , update_every, RRDSET_TYPE_AREA);
 
-            rrddim_add(st_io, "in",  NULL,  1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st_io, "out", NULL, -1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_io);
 
@@ -126,11 +128,12 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     if(do_pgfaults) {
         static RRDSET *st_pgfaults = NULL;
         if(unlikely(!st_pgfaults)) {
-            st_pgfaults = rrdset_create("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
-            st_pgfaults->isdetail = 1;
+            st_pgfaults = rrdset_create_localhost("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults"
+                                                  , "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
+            rrdset_flag_set(st_pgfaults, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st_pgfaults, "minor",  NULL,  1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_pgfaults, "minor",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_pgfaults);
 
@@ -149,27 +152,28 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         has_numa = (numa_local || numa_foreign || numa_interleave || numa_other || numa_pte_updates ||
                      numa_huge_pte_updates || numa_hint_faults || numa_hint_faults_local || numa_pages_migrated) ? 1 : 0;
 
-    if(do_numa == CONFIG_ONDEMAND_YES || (do_numa == CONFIG_ONDEMAND_ONDEMAND && has_numa)) {
-        do_numa = CONFIG_ONDEMAND_YES;
+    if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO && has_numa)) {
+        do_numa = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_numa = NULL;
         if(unlikely(!st_numa)) {
-            st_numa = rrdset_create("mem", "numa", NULL, "numa", NULL, "NUMA events", "events/s", 800, update_every, RRDSET_TYPE_LINE);
-            st_numa->isdetail = 1;
+            st_numa = rrdset_create_localhost("mem", "numa", NULL, "numa", NULL, "NUMA events", "events/s", 800
+                                              , update_every, RRDSET_TYPE_LINE);
+            rrdset_flag_set(st_numa, RRDSET_FLAG_DETAIL);
 
             // These depend on CONFIG_NUMA in the kernel.
-            rrddim_add(st_numa, "local", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st_numa, "foreign", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st_numa, "interleave", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st_numa, "other", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_numa, "local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "foreign", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "interleave", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "other", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             // The following stats depend on CONFIG_NUMA_BALANCING in the
             // kernel.
-            rrddim_add(st_numa, "pte updates", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st_numa, "huge pte updates", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st_numa, "hint faults", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st_numa, "hint faults local", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st_numa, "pages migrated", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st_numa, "pte updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "huge pte updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "hint faults", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "hint faults local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "pages migrated", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_numa);
 

@@ -79,7 +79,7 @@ void *proc_main(void *ptr) {
         pm->rd = NULL;
     }
 
-    usec_t step = rrd_update_every * USEC_PER_SEC;
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
 
@@ -97,7 +97,7 @@ void *proc_main(void *ptr) {
 
             debug(D_PROCNETDEV_LOOP, "PROC calling %s.", pm->name);
 
-            pm->enabled = !pm->func(rrd_update_every, hb_dt);
+            pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
             pm->duration = heartbeat_dt_usec(&hb) - duration;
             duration += pm->duration;
 
@@ -112,16 +112,18 @@ void *proc_main(void *ptr) {
             static RRDSET *st = NULL;
 
             if(unlikely(!st)) {
-                st = rrdset_find_bytype("netdata", "plugin_proc_modules");
+                st = rrdset_find_bytype_localhost("netdata", "plugin_proc_modules");
 
                 if(!st) {
-                    st = rrdset_create("netdata", "plugin_proc_modules", NULL, "proc", NULL, "NetData Proc Plugin Modules Durations", "milliseconds/run", 132001, rrd_update_every, RRDSET_TYPE_STACKED);
+                    st = rrdset_create_localhost("netdata", "plugin_proc_modules", NULL, "proc", NULL
+                                                 , "NetData Proc Plugin Modules Durations", "milliseconds/run", 132001
+                                                 , localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
                     for(i = 0 ; proc_modules[i].name ;i++) {
                         struct proc_module *pm = &proc_modules[i];
                         if(unlikely(!pm->enabled)) continue;
 
-                        pm->rd = rrddim_add(st, pm->dim, NULL, 1, 1000, RRDDIM_ABSOLUTE);
+                        pm->rd = rrddim_add(st, pm->dim, NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                     }
                 }
             }

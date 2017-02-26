@@ -77,12 +77,13 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    st = rrdset_find_bytype("system", "softnet_stat");
+    st = rrdset_find_bytype_localhost("system", "softnet_stat");
     if(unlikely(!st)) {
-        st = rrdset_create("system", "softnet_stat", NULL, "softnet_stat", NULL, "System softnet_stat", "events/s", 955, update_every, RRDSET_TYPE_LINE);
+        st = rrdset_create_localhost("system", "softnet_stat", NULL, "softnet_stat", NULL, "System softnet_stat"
+                                     , "events/s", 955, update_every, RRDSET_TYPE_LINE);
         for(w = 0; w < allocated_columns ;w++)
             if(unlikely(softnet_column_name(w)))
-                rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
     else rrdset_next(st);
 
@@ -97,15 +98,16 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
             char id[50+1];
             snprintfz(id, 50, "cpu%zu_softnet_stat", l);
 
-            st = rrdset_find_bytype("cpu", id);
+            st = rrdset_find_bytype_localhost("cpu", id);
             if(unlikely(!st)) {
                 char title[100+1];
                 snprintfz(title, 100, "CPU%zu softnet_stat", l);
 
-                st = rrdset_create("cpu", id, NULL, "softnet_stat", NULL, title, "events/s", 4101 + l, update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create_localhost("cpu", id, NULL, "softnet_stat", NULL, title, "events/s", 4101 + l
+                                             , update_every, RRDSET_TYPE_LINE);
                 for(w = 0; w < allocated_columns ;w++)
                     if(unlikely(softnet_column_name(w)))
-                        rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRDDIM_INCREMENTAL);
+                        rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 

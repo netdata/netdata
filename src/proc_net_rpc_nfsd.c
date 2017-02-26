@@ -492,13 +492,14 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_rc == 2) {
-        st = rrdset_find_bytype("nfsd", "readcache");
+        st = rrdset_find_bytype_localhost("nfsd", "readcache");
         if(!st) {
-            st = rrdset_create("nfsd", "readcache", NULL, "cache", NULL, "NFS Server Read Cache", "reads/s", 5000, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create_localhost("nfsd", "readcache", NULL, "cache", NULL, "NFS Server Read Cache", "reads/s"
+                                         , 5000, update_every, RRDSET_TYPE_STACKED);
 
-            rrddim_add(st, "hits", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "misses", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "nocache", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "hits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "nocache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -511,16 +512,17 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_fh == 2) {
-        st = rrdset_find_bytype("nfsd", "filehandles");
+        st = rrdset_find_bytype_localhost("nfsd", "filehandles");
         if(!st) {
-            st = rrdset_create("nfsd", "filehandles", NULL, "filehandles", NULL, "NFS Server File Handles", "handles/s", 5001, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            st = rrdset_create_localhost("nfsd", "filehandles", NULL, "filehandles", NULL, "NFS Server File Handles"
+                                         , "handles/s", 5001, update_every, RRDSET_TYPE_LINE);
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "stale", NULL, 1, 1, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "total_lookups", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "anonymous_lookups", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "dir_not_in_dcache", NULL, -1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "non_dir_not_in_dcache", NULL, -1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "stale", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "total_lookups", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "anonymous_lookups", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "dir_not_in_dcache", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "non_dir_not_in_dcache", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -535,12 +537,13 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_io == 2) {
-        st = rrdset_find_bytype("nfsd", "io");
+        st = rrdset_find_bytype_localhost("nfsd", "io");
         if(!st) {
-            st = rrdset_create("nfsd", "io", NULL, "io", NULL, "NFS Server I/O", "kilobytes/s", 5002, update_every, RRDSET_TYPE_AREA);
+            st = rrdset_create_localhost("nfsd", "io", NULL, "io", NULL, "NFS Server I/O", "kilobytes/s", 5002
+                                         , update_every, RRDSET_TYPE_AREA);
 
-            rrddim_add(st, "read", NULL, 1, 1000, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "write", NULL, -1, 1000, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "read", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "write", NULL, -1, 1000, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -552,42 +555,47 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_th == 2) {
-        st = rrdset_find_bytype("nfsd", "threads");
+        st = rrdset_find_bytype_localhost("nfsd", "threads");
         if(!st) {
-            st = rrdset_create("nfsd", "threads", NULL, "threads", NULL, "NFS Server Threads", "threads", 5003, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost("nfsd", "threads", NULL, "threads", NULL, "NFS Server Threads", "threads", 5003
+                                         , update_every, RRDSET_TYPE_LINE);
 
-            rrddim_add(st, "threads", NULL, 1, 1, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
         rrddim_set(st, "threads", th_threads);
         rrdset_done(st);
 
-        st = rrdset_find_bytype("nfsd", "threads_fullcnt");
+        st = rrdset_find_bytype_localhost("nfsd", "threads_fullcnt");
         if(!st) {
-            st = rrdset_create("nfsd", "threads_fullcnt", NULL, "threads", NULL, "NFS Server Threads Full Count", "ops/s", 5004, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost("nfsd", "threads_fullcnt", NULL, "threads", NULL
+                                         , "NFS Server Threads Full Count", "ops/s", 5004, update_every
+                                         , RRDSET_TYPE_LINE);
 
-            rrddim_add(st, "full_count", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "full_count", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
         rrddim_set(st, "full_count", th_fullcnt);
         rrdset_done(st);
 
-        st = rrdset_find_bytype("nfsd", "threads_histogram");
+        st = rrdset_find_bytype_localhost("nfsd", "threads_histogram");
         if(!st) {
-            st = rrdset_create("nfsd", "threads_histogram", NULL, "threads", NULL, "NFS Server Threads Usage Histogram", "percentage", 5005, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost("nfsd", "threads_histogram", NULL, "threads", NULL
+                                         , "NFS Server Threads Usage Histogram", "percentage", 5005, update_every
+                                         , RRDSET_TYPE_LINE);
 
-            rrddim_add(st, "0%-10%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "10%-20%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "20%-30%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "30%-40%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "40%-50%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "50%-60%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "60%-70%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "70%-80%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "80%-90%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
-            rrddim_add(st, "90%-100%", NULL, 1, 1000, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "0%-10%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "10%-20%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "20%-30%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "30%-40%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "40%-50%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "50%-60%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "60%-70%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "70%-80%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "80%-90%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st, "90%-100%", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
@@ -607,21 +615,22 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_ra == 2) {
-        st = rrdset_find_bytype("nfsd", "readahead");
+        st = rrdset_find_bytype_localhost("nfsd", "readahead");
         if(!st) {
-            st = rrdset_create("nfsd", "readahead", NULL, "readahead", NULL, "NFS Server Read Ahead Depth", "percentage", 5005, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create_localhost("nfsd", "readahead", NULL, "readahead", NULL, "NFS Server Read Ahead Depth"
+                                         , "percentage", 5005, update_every, RRDSET_TYPE_STACKED);
 
-            rrddim_add(st, "10%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "20%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "30%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "40%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "50%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "60%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "70%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "80%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "90%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "100%", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
-            rrddim_add(st, "misses", NULL, 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "10%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "20%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "30%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "40%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "50%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "60%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "70%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "80%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "90%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "100%", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rrddim_add(st, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
         }
         else rrdset_next(st);
 
@@ -645,13 +654,14 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_net == 2) {
-        st = rrdset_find_bytype("nfsd", "net");
+        st = rrdset_find_bytype_localhost("nfsd", "net");
         if(!st) {
-            st = rrdset_create("nfsd", "net", NULL, "network", NULL, "NFS Server Network Statistics", "packets/s", 5007, update_every, RRDSET_TYPE_STACKED);
-            st->isdetail = 1;
+            st = rrdset_create_localhost("nfsd", "net", NULL, "network", NULL, "NFS Server Network Statistics"
+                                         , "packets/s", 5007, update_every, RRDSET_TYPE_STACKED);
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "udp", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "tcp", NULL, 1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -667,14 +677,16 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_rpc == 2) {
-        st = rrdset_find_bytype("nfsd", "rpc");
+        st = rrdset_find_bytype_localhost("nfsd", "rpc");
         if(!st) {
-            st = rrdset_create("nfsd", "rpc", NULL, "rpc", NULL, "NFS Server Remote Procedure Calls Statistics", "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
-            st->isdetail = 1;
+            st = rrdset_create_localhost("nfsd", "rpc", NULL, "rpc", NULL
+                                         , "NFS Server Remote Procedure Calls Statistics", "calls/s", 5008, update_every
+                                         , RRDSET_TYPE_LINE);
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "calls", NULL, 1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "bad_format", NULL, -1, 1, RRDDIM_INCREMENTAL);
-            rrddim_add(st, "bad_auth", NULL, -1, 1, RRDDIM_INCREMENTAL);
+            rrddim_add(st, "calls", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "bad_format", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "bad_auth", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -691,12 +703,13 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc2 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfsd", "proc2");
+        st = rrdset_find_bytype_localhost("nfsd", "proc2");
         if(!st) {
-            st = rrdset_create("nfsd", "proc2", NULL, "nfsv2rpc", NULL, "NFS v2 Server Remote Procedure Calls", "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create_localhost("nfsd", "proc2", NULL, "nfsv2rpc", NULL, "NFS v2 Server Remote Procedure Calls"
+                                         , "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
 
             for(i = 0; nfsd_proc2_values[i].present ; i++)
-                rrddim_add(st, nfsd_proc2_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, nfsd_proc2_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -710,12 +723,13 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc3 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfsd", "proc3");
+        st = rrdset_find_bytype_localhost("nfsd", "proc3");
         if(!st) {
-            st = rrdset_create("nfsd", "proc3", NULL, "nfsv3rpc", NULL, "NFS v3 Server Remote Procedure Calls", "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create_localhost("nfsd", "proc3", NULL, "nfsv3rpc", NULL, "NFS v3 Server Remote Procedure Calls"
+                                         , "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
 
             for(i = 0; nfsd_proc3_values[i].present ; i++)
-                rrddim_add(st, nfsd_proc3_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, nfsd_proc3_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -729,12 +743,13 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc4 == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfsd", "proc4");
+        st = rrdset_find_bytype_localhost("nfsd", "proc4");
         if(!st) {
-            st = rrdset_create("nfsd", "proc4", NULL, "nfsv4rpc", NULL, "NFS v4 Server Remote Procedure Calls", "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create_localhost("nfsd", "proc4", NULL, "nfsv4rpc", NULL, "NFS v4 Server Remote Procedure Calls"
+                                         , "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
 
             for(i = 0; nfsd_proc4_values[i].present ; i++)
-                rrddim_add(st, nfsd_proc4_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, nfsd_proc4_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -748,12 +763,13 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     if(do_proc4ops == 2) {
         unsigned int i;
-        st = rrdset_find_bytype("nfsd", "proc4ops");
+        st = rrdset_find_bytype_localhost("nfsd", "proc4ops");
         if(!st) {
-            st = rrdset_create("nfsd", "proc4ops", NULL, "nfsv2ops", NULL, "NFS v4 Server Operations", "operations/s", 5012, update_every, RRDSET_TYPE_STACKED);
+            st = rrdset_create_localhost("nfsd", "proc4ops", NULL, "nfsv2ops", NULL, "NFS v4 Server Operations"
+                                         , "operations/s", 5012, update_every, RRDSET_TYPE_STACKED);
 
             for(i = 0; nfsd4_ops_values[i].present ; i++)
-                rrddim_add(st, nfsd4_ops_values[i].name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                rrddim_add(st, nfsd4_ops_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 

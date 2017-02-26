@@ -128,8 +128,8 @@ void *nfacct_main(void *ptr) {
         usec = dt_usec(&now, &last) - susec;
         debug(D_NFACCT_LOOP, "nfacct.plugin: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
 
-        if(usec < (rrd_update_every * 1000000ULL / 2ULL)) susec = (rrd_update_every * 1000000ULL) - usec;
-        else susec = rrd_update_every * 1000000ULL / 2ULL;
+        if(usec < (default_rrd_update_every * 1000000ULL / 2ULL)) susec = (default_rrd_update_every * 1000000ULL) - usec;
+        else susec = default_rrd_update_every * 1000000ULL / 2ULL;
 
 
         // --------------------------------------------------------------------
@@ -139,17 +139,17 @@ void *nfacct_main(void *ptr) {
 
             st = rrdset_find_bytype("netfilter", "nfacct_packets");
             if(!st) {
-                st = rrdset_create("netfilter", "nfacct_packets", NULL, "nfacct", NULL, "Netfilter Accounting Packets", "packets/s", 3206, rrd_update_every, RRDSET_TYPE_STACKED);
+                st = rrdset_create("netfilter", "nfacct_packets", NULL, "nfacct", NULL, "Netfilter Accounting Packets", "packets/s", 3206, default_rrd_update_every, RRDSET_TYPE_STACKED);
 
                 for(i = 0; i < nfacct_list->len ; i++)
-                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, default_rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
             for(i = 0; i < nfacct_list->len ; i++) {
                 RRDDIM *rd = rrddim_find(st, nfacct_list->data[i].name);
 
-                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, rrd_update_every, RRDDIM_INCREMENTAL);
+                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, default_rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
                 if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].pkts);
             }
 
@@ -159,17 +159,17 @@ void *nfacct_main(void *ptr) {
 
             st = rrdset_find_bytype("netfilter", "nfacct_bytes");
             if(!st) {
-                st = rrdset_create("netfilter", "nfacct_bytes", NULL, "nfacct", NULL, "Netfilter Accounting Bandwidth", "kilobytes/s", 3207, rrd_update_every, RRDSET_TYPE_STACKED);
+                st = rrdset_create("netfilter", "nfacct_bytes", NULL, "nfacct", NULL, "Netfilter Accounting Bandwidth", "kilobytes/s", 3207, default_rrd_update_every, RRDSET_TYPE_STACKED);
 
                 for(i = 0; i < nfacct_list->len ; i++)
-                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * default_rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(st);
 
             for(i = 0; i < nfacct_list->len ; i++) {
                 RRDDIM *rd = rrddim_find(st, nfacct_list->data[i].name);
 
-                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * rrd_update_every, RRDDIM_INCREMENTAL);
+                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * default_rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
                 if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].bytes);
             }
 

@@ -59,16 +59,16 @@
 #define RRDR_OPTION_NOT_ALIGNED     0x00001000 // do not align charts for persistant timeframes
 
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
-extern void rrd_stats_api_v1_charts(BUFFER *wb);
+extern void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb);
 
-extern void rrd_stats_api_v1_charts_allmetrics_shell(BUFFER *wb);
-extern void rrd_stats_api_v1_charts_allmetrics_prometheus(BUFFER *wb);
+extern void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb);
+extern void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb);
 
 extern unsigned long rrd_stats_one_json(RRDSET *st, char *options, BUFFER *wb);
 
 extern void rrd_stats_graph_json(RRDSET *st, char *options, BUFFER *wb);
 
-extern void rrd_stats_all_json(BUFFER *wb);
+extern void rrd_stats_all_json(RRDHOST *host, BUFFER *wb);
 
 extern time_t rrd_stats_json(int type, RRDSET *st, BUFFER *wb, long entries_to_show, long group, int group_method, time_t after, time_t before, int only_non_zero);
 

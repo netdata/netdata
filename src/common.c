@@ -8,6 +8,7 @@
 #    define MADV_DONTFORK INHERIT_NONE
 #endif /* __FreeBSD__ || __APPLE__*/
 
+char *netdata_configured_hostname    = NULL;
 char *netdata_configured_config_dir  = NULL;
 char *netdata_configured_log_dir     = NULL;
 char *netdata_configured_plugins_dir = NULL;

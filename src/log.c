@@ -1,7 +1,7 @@
 #include "common.h"
 
 const char *program_name = "";
-unsigned long long debug_flags = DEBUG;
+uint64_t debug_flags = DEBUG;
 
 int access_log_syslog = 1;
 int error_log_syslog = 1;
@@ -257,8 +257,8 @@ void info_int( const char *file, const char *function, const unsigned long line,
     log_date(stderr);
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: INFO: (%04lu@%-10.10s:%-15.15s):", program_name, line, file, function);
-    else            fprintf(stderr, "%s: INFO: ", program_name);
+    if(debug_flags) fprintf(stderr, "%s: INFO : (%04lu@%-10.10s:%-15.15s): ", program_name, line, file, function);
+    else            fprintf(stderr, "%s: INFO : ", program_name);
     vfprintf( stderr, fmt, args );
     va_end( args );
 

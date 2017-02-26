@@ -160,8 +160,10 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
 
         fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if(fd != -1) {
-            if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)timeout, sizeof(struct timeval)) < 0)
-                error("Failed to set timeout on the socket to ip '%s' port '%s'", hostBfr, servBfr);
+            if(timeout) {
+                if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
+                    error("Failed to set timeout on the socket to ip '%s' port '%s'", hostBfr, servBfr);
+            }
 
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
                 error("Failed to connect to '%s', port '%s'", hostBfr, servBfr);
@@ -176,4 +178,99 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
     freeaddrinfo(ai_head);
 
     return fd;
+}
+
+int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
+    int sock = -1;
+
+    const char *s = destination;
+    while(*s) {
+        const char *e = s;
+
+        // skip separators, moving both s(tart) and e(nd)
+        while(isspace(*e) || *e == ',') s = ++e;
+
+        // move e(nd) to the first separator
+        while(*e && !isspace(*e) && *e != ',') e++;
+
+        // is there anything?
+        if(!*s || s == e) break;
+
+        char buf[e - s + 1];
+        strncpyz(buf, s, e - s);
+        if(reconnects_counter) *reconnects_counter += 1;
+        sock = connect_to(buf, default_port, timeout);
+        if(sock != -1) {
+            if(connected_to && connected_to_size) {
+                strncpy(connected_to, buf, connected_to_size);
+                connected_to[connected_to_size - 1] = '\0';
+            }
+            break;
+        }
+        s = e;
+    }
+
+    return sock;
+}
+
+ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+    for(;;) {
+        struct pollfd fd = {
+                .fd = sockfd,
+                .events = POLLIN,
+                .revents = 0
+        };
+
+        errno = 0;
+        int retval = poll(&fd, 1, timeout * 1000);
+
+        if(retval == -1) {
+            // failed
+
+            if(errno == EINTR || errno == EAGAIN)
+                continue;
+
+            return -1;
+        }
+
+        if(!retval) {
+            // timeout
+            return 0;
+        }
+
+        if(fd.events & POLLIN) break;
+    }
+
+    return recv(sockfd, buf, len, flags);
+}
+
+ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+    for(;;) {
+        struct pollfd fd = {
+                .fd = sockfd,
+                .events = POLLOUT,
+                .revents = 0
+        };
+
+        errno = 0;
+        int retval = poll(&fd, 1, timeout * 1000);
+
+        if(retval == -1) {
+            // failed
+
+            if(errno == EINTR || errno == EAGAIN)
+                continue;
+
+            return -1;
+        }
+
+        if(!retval) {
+            // timeout
+            return 0;
+        }
+
+        if(fd.events & POLLOUT) break;
+    }
+
+    return send(sockfd, buf, len, flags);
 }

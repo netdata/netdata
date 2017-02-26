@@ -282,7 +282,7 @@ struct test test1 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_ABSOLUTE,    // algorithm
+        RRD_ALGORITHM_ABSOLUTE,    // algorithm
         10,                 // feed entries
         9,                  // result entries
         test1_feed,         // feed
@@ -318,7 +318,7 @@ struct test test2 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_ABSOLUTE,    // algorithm
+        RRD_ALGORITHM_ABSOLUTE,    // algorithm
         10,                 // feed entries
         9,                  // result entries
         test2_feed,         // feed
@@ -353,7 +353,7 @@ struct test test3 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         9,                  // result entries
         test3_feed,         // feed
@@ -388,7 +388,7 @@ struct test test4 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         9,                  // result entries
         test4_feed,         // feed
@@ -423,7 +423,7 @@ struct test test5 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         9,                  // result entries
         test5_feed,         // feed
@@ -464,7 +464,7 @@ struct test test6 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         16,                 // feed entries
         4,                  // result entries
         test6_feed,         // feed
@@ -499,7 +499,7 @@ struct test test7 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         18,                 // result entries
         test7_feed,         // feed
@@ -530,7 +530,7 @@ struct test test8 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_ABSOLUTE,    // algorithm
+        RRD_ALGORITHM_ABSOLUTE,    // algorithm
         6,                  // feed entries
         10,                 // result entries
         test8_feed,         // feed
@@ -571,7 +571,7 @@ struct test test9 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_ABSOLUTE,    // algorithm
+        RRD_ALGORITHM_ABSOLUTE,    // algorithm
         16,                 // feed entries
         4,                  // result entries
         test9_feed,         // feed
@@ -606,7 +606,7 @@ struct test test10 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         7,                  // result entries
         test10_feed,        // feed
@@ -649,7 +649,7 @@ struct test test11 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_PCENT_OVER_DIFF_TOTAL,   // algorithm
+        RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL,   // algorithm
         10,                 // feed entries
         9,                  // result entries
         test11_feed,        // feed
@@ -692,7 +692,7 @@ struct test test12 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_PCENT_OVER_DIFF_TOTAL,   // algorithm
+        RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL,   // algorithm
         10,                 // feed entries
         9,                  // result entries
         test12_feed,        // feed
@@ -727,7 +727,7 @@ struct test test13 = {
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_PCENT_OVER_DIFF_TOTAL,   // algorithm
+        RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL,   // algorithm
         10,                 // feed entries
         7,                  // result entries
         test13_feed,        // feed
@@ -762,7 +762,7 @@ struct test test14 = {
         30,                 // update_every
         8,                  // multiplier
         1000000000,         // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         8,                  // result entries
         test14_feed,        // feed
@@ -794,7 +794,7 @@ struct test test14b = {
         30,                 // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         8,                  // result entries
         test14b_feed,        // feed
@@ -826,7 +826,7 @@ struct test test14c = {
         30,                 // update_every
         1,                  // multiplier
         1,                  // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         9,                  // result entries
         test14c_feed,        // feed
@@ -869,7 +869,7 @@ struct test test15 = {
         1,                  // update_every
         8,                  // multiplier
         1024,               // divisor
-        RRDDIM_INCREMENTAL, // algorithm
+        RRD_ALGORITHM_INCREMENTAL, // algorithm
         10,                 // feed entries
         9,                  // result entries
         test15_feed,        // feed
@@ -884,21 +884,22 @@ int run_test(struct test *test)
 {
     fprintf(stderr, "\nRunning test '%s':\n%s\n", test->name, test->description);
 
-    rrd_memory_mode = RRD_MEMORY_MODE_RAM;
-    rrd_update_every = test->update_every;
+    default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    default_rrd_update_every = test->update_every;
 
     char name[101];
     snprintfz(name, 100, "unittest-%s", test->name);
 
     // create the chart
-    RRDSET *st = rrdset_create("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, test->update_every, RRDSET_TYPE_LINE);
+    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1
+                                         , test->update_every, RRDSET_TYPE_LINE);
     RRDDIM *rd = rrddim_add(st, "dim1", NULL, test->multiplier, test->divisor, test->algorithm);
     
     RRDDIM *rd2 = NULL;
     if(test->feed2)
         rd2 = rrddim_add(st, "dim2", NULL, test->multiplier, test->divisor, test->algorithm);
 
-    st->debug = 1;
+    rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
 
     // feed it with the test data
     time_t time_now = 0, time_start = now_realtime_sec();
@@ -977,15 +978,16 @@ int run_test(struct test *test)
 
 static int test_variable_renames(void) {
     fprintf(stderr, "Creating chart\n");
-    RRDSET *st = rrdset_create("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
+    RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", 1, 1
+                                         , RRDSET_TYPE_LINE);
     fprintf(stderr, "Created chart with id '%s', name '%s'\n", st->id, st->name);
 
     fprintf(stderr, "Creating dimension DIM1\n");
-    RRDDIM *rd1 = rrddim_add(st, "DIM1", NULL, 1, 1, RRDDIM_INCREMENTAL);
+    RRDDIM *rd1 = rrddim_add(st, "DIM1", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rd1->id, rd1->name);
 
     fprintf(stderr, "Creating dimension DIM2\n");
-    RRDDIM *rd2 = rrddim_add(st, "DIM2", NULL, 1, 1, RRDDIM_INCREMENTAL);
+    RRDDIM *rd2 = rrddim_add(st, "DIM2", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     fprintf(stderr, "Created dimension with id '%s', name '%s'\n", rd2->id, rd2->name);
 
     fprintf(stderr, "Renaming chart to CHARTNAME1\n");
@@ -1089,26 +1091,27 @@ int unit_test(long delay, long shift)
     snprintfz(name, 100, "unittest-%d-%ld-%ld", repeat, delay, shift);
 
     //debug_flags = 0xffffffff;
-    rrd_memory_mode = RRD_MEMORY_MODE_RAM;
-    rrd_update_every = 1;
+    default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    default_rrd_update_every = 1;
 
     int do_abs = 1;
     int do_inc = 1;
     int do_abst = 0;
     int do_absi = 0;
 
-    RRDSET *st = rrdset_create("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
-    st->debug = 1;
+    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1
+                                         , RRDSET_TYPE_LINE);
+    rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
 
     RRDDIM *rdabs = NULL;
     RRDDIM *rdinc = NULL;
     RRDDIM *rdabst = NULL;
     RRDDIM *rdabsi = NULL;
 
-    if(do_abs) rdabs = rrddim_add(st, "absolute", "absolute", 1, 1, RRDDIM_ABSOLUTE);
-    if(do_inc) rdinc = rrddim_add(st, "incremental", "incremental", 1, 1, RRDDIM_INCREMENTAL);
-    if(do_abst) rdabst = rrddim_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRDDIM_PCENT_OVER_ROW_TOTAL);
-    if(do_absi) rdabsi = rrddim_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRDDIM_PCENT_OVER_DIFF_TOTAL);
+    if(do_abs) rdabs = rrddim_add(st, "absolute", "absolute", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if(do_inc) rdinc = rrddim_add(st, "incremental", "incremental", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    if(do_abst) rdabst = rrddim_add(st, "percentage-of-absolute-row", "percentage-of-absolute-row", 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
+    if(do_absi) rdabsi = rrddim_add(st, "percentage-of-incremental-row", "percentage-of-incremental-row", 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
 
     long increment = 1000;
     collected_number i = 0;

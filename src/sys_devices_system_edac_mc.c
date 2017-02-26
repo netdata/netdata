@@ -76,11 +76,11 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
     struct mc *m;
 
     if(unlikely(do_ce == -1)) {
-        do_ce = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory correctable errors", CONFIG_ONDEMAND_ONDEMAND);
-        do_ue = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory uncorrectable errors", CONFIG_ONDEMAND_ONDEMAND);
+        do_ce = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory correctable errors", CONFIG_BOOLEAN_AUTO);
+        do_ue = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory uncorrectable errors", CONFIG_BOOLEAN_AUTO);
     }
 
-    if(do_ce != CONFIG_ONDEMAND_NO) {
+    if(do_ce != CONFIG_BOOLEAN_NO) {
         for(m = mc_root; m; m = m->next) {
             if(m->ce_count_filename) {
                 m->ce_updated = 0;
@@ -102,7 +102,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
         }
     }
 
-    if(do_ue != CONFIG_ONDEMAND_NO) {
+    if(do_ue != CONFIG_BOOLEAN_NO) {
         for(m = mc_root; m; m = m->next) {
             if(m->ue_count_filename) {
                 m->ue_updated = 0;
@@ -126,20 +126,20 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ce == CONFIG_ONDEMAND_YES || (do_ce == CONFIG_ONDEMAND_ONDEMAND && ce_sum > 0)) {
-        do_ce = CONFIG_ONDEMAND_YES;
+    if(do_ce == CONFIG_BOOLEAN_YES || (do_ce == CONFIG_BOOLEAN_AUTO && ce_sum > 0)) {
+        do_ce = CONFIG_BOOLEAN_YES;
 
         static RRDSET *ce_st = NULL;
 
         if(unlikely(!ce_st)) {
-            ce_st = rrdset_find("mem.ecc_ce");
+            ce_st = rrdset_find_localhost("mem.ecc_ce");
             if(unlikely(!ce_st))
-                ce_st = rrdset_create("mem", "ecc_ce", NULL, "ecc", NULL, "ECC Memory Correctable Errors", "errors",
-                        6600, update_every, RRDSET_TYPE_LINE);
+                ce_st = rrdset_create_localhost("mem", "ecc_ce", NULL, "ecc", NULL, "ECC Memory Correctable Errors"
+                                                , "errors", 6600, update_every, RRDSET_TYPE_LINE);
 
             for(m = mc_root; m; m = m->next)
                 if(m->ce_count_filename)
-                    m->ce_rd = rrddim_add(ce_st, m->name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    m->ce_rd = rrddim_add(ce_st, m->name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else
             rrdset_next(ce_st);
@@ -153,21 +153,21 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ue == CONFIG_ONDEMAND_YES || (do_ue == CONFIG_ONDEMAND_ONDEMAND && ue_sum > 0)) {
-        do_ue = CONFIG_ONDEMAND_YES;
+    if(do_ue == CONFIG_BOOLEAN_YES || (do_ue == CONFIG_BOOLEAN_AUTO && ue_sum > 0)) {
+        do_ue = CONFIG_BOOLEAN_YES;
 
         static RRDSET *ue_st = NULL;
 
         if(unlikely(!ue_st)) {
-            ue_st = rrdset_find("mem.ecc_ue");
+            ue_st = rrdset_find_localhost("mem.ecc_ue");
 
             if(unlikely(!ue_st))
-                ue_st = rrdset_create("mem", "ecc_ue", NULL, "ecc", NULL, "ECC Memory Uncorrectable Errors", "errors",
-                        6610, update_every, RRDSET_TYPE_LINE);
+                ue_st = rrdset_create_localhost("mem", "ecc_ue", NULL, "ecc", NULL, "ECC Memory Uncorrectable Errors"
+                                                , "errors", 6610, update_every, RRDSET_TYPE_LINE);
 
             for(m = mc_root; m; m = m->next)
                 if(m->ue_count_filename)
-                    m->ue_rd = rrddim_add(ue_st, m->name, NULL, 1, 1, RRDDIM_INCREMENTAL);
+                    m->ue_rd = rrddim_add(ue_st, m->name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else
             rrdset_next(ue_st);

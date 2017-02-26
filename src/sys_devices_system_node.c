@@ -72,10 +72,10 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
     struct node *m;
 
     if(unlikely(do_numastat == -1)) {
-        do_numastat = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/node", "enable per-node numa metrics", CONFIG_ONDEMAND_ONDEMAND);
+        do_numastat = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/node", "enable per-node numa metrics", CONFIG_BOOLEAN_AUTO);
     }
 
-    if(do_numastat == CONFIG_ONDEMAND_YES || (do_numastat == CONFIG_ONDEMAND_ONDEMAND && numa_node_count >= 2)) {
+    if(do_numastat == CONFIG_BOOLEAN_YES || (do_numastat == CONFIG_BOOLEAN_AUTO && numa_node_count >= 2)) {
         for(m = numa_root; m; m = m->next) {
             if(m->numastat_filename) {
                 if(unlikely(!m->numastat_ff)) {
@@ -92,13 +92,14 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
 
                 RRDSET *st = m->numastat_st;
                 if(unlikely(!st)) {
-                    st = rrdset_create("mem", m->name, NULL, "numa", NULL, "NUMA events", "events/s", 1000, update_every, RRDSET_TYPE_LINE);
-                    st->isdetail = 1;
+                    st = rrdset_create_localhost("mem", m->name, NULL, "numa", NULL, "NUMA events", "events/s", 1000
+                                                 , update_every, RRDSET_TYPE_LINE);
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(st, "local_node", "local", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "numa_foreign", "foreign", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "interleave_hit", "interleave", 1, 1, RRDDIM_INCREMENTAL);
-                    rrddim_add(st, "other_node", "other", 1, 1, RRDDIM_INCREMENTAL);
+                    rrddim_add(st, "local_node", "local", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "numa_foreign", "foreign", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "interleave_hit", "interleave", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "other_node", "other", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                     m->numastat_st = st;
                 }

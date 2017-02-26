@@ -90,15 +90,16 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    st = rrdset_find("mem.ksm");
+    st = rrdset_find_localhost("mem.ksm");
     if(!st) {
-        st = rrdset_create("mem", "ksm", NULL, "ksm", NULL, "Kernel Same Page Merging", "MB", 5000, update_every, RRDSET_TYPE_AREA);
+        st = rrdset_create_localhost("mem", "ksm", NULL, "ksm", NULL, "Kernel Same Page Merging", "MB", 5000
+                                     , update_every, RRDSET_TYPE_AREA);
 
-        rrddim_add(st, "shared", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(st, "unshared", NULL, -1, 1024 * 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(st, "sharing", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(st, "volatile", NULL, -1, 1024 * 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(st, "to_scan", "to scan", -1, 1024 * 1024, RRDDIM_ABSOLUTE);
+        rrddim_add(st, "shared", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+        rrddim_add(st, "unshared", NULL, -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+        rrddim_add(st, "sharing", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+        rrddim_add(st, "volatile", NULL, -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+        rrddim_add(st, "to_scan", "to scan", -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     }
     else rrdset_next(st);
 
@@ -109,12 +110,13 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     rrddim_set(st, "to_scan", pages_to_scan * page_size);
     rrdset_done(st);
 
-    st = rrdset_find("mem.ksm_savings");
+    st = rrdset_find_localhost("mem.ksm_savings");
     if(!st) {
-        st = rrdset_create("mem", "ksm_savings", NULL, "ksm", NULL, "Kernel Same Page Merging Savings", "MB", 5001, update_every, RRDSET_TYPE_AREA);
+        st = rrdset_create_localhost("mem", "ksm_savings", NULL, "ksm", NULL, "Kernel Same Page Merging Savings", "MB"
+                                     , 5001, update_every, RRDSET_TYPE_AREA);
 
-        rrddim_add(st, "savings", NULL, -1, 1024 * 1024, RRDDIM_ABSOLUTE);
-        rrddim_add(st, "offered", NULL, 1, 1024 * 1024, RRDDIM_ABSOLUTE);
+        rrddim_add(st, "savings", NULL, -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+        rrddim_add(st, "offered", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     }
     else rrdset_next(st);
 
@@ -122,11 +124,12 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     rrddim_set(st, "offered", offered * page_size);
     rrdset_done(st);
 
-    st = rrdset_find("mem.ksm_ratios");
+    st = rrdset_find_localhost("mem.ksm_ratios");
     if(!st) {
-        st = rrdset_create("mem", "ksm_ratios", NULL, "ksm", NULL, "Kernel Same Page Merging Effectiveness", "percentage", 5002, update_every, RRDSET_TYPE_LINE);
+        st = rrdset_create_localhost("mem", "ksm_ratios", NULL, "ksm", NULL, "Kernel Same Page Merging Effectiveness"
+                                     , "percentage", 5002, update_every, RRDSET_TYPE_LINE);
 
-        rrddim_add(st, "savings", NULL, 1, 10000, RRDDIM_ABSOLUTE);
+        rrddim_add(st, "savings", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
     }
     else rrdset_next(st);
 

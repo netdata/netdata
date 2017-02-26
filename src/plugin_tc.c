@@ -190,13 +190,13 @@ static inline void tc_device_commit(struct tc_device *d) {
     static int enable_new_interfaces = -1, enable_bytes = -1, enable_packets = -1, enable_dropped = -1, enable_tokens = -1, enable_ctokens = -1, enabled_all_classes_qdiscs = -1;
 
     if(unlikely(enable_new_interfaces == -1)) {
-        enable_new_interfaces      = config_get_boolean_ondemand("plugin:tc", "enable new interfaces detected at runtime", CONFIG_ONDEMAND_YES);
-        enable_bytes               = config_get_boolean_ondemand("plugin:tc", "enable traffic charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        enable_packets             = config_get_boolean_ondemand("plugin:tc", "enable packets charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        enable_dropped             = config_get_boolean_ondemand("plugin:tc", "enable dropped charts for all interfaces", CONFIG_ONDEMAND_ONDEMAND);
-        enable_tokens              = config_get_boolean_ondemand("plugin:tc", "enable tokens charts for all interfaces", CONFIG_ONDEMAND_NO);
-        enable_ctokens             = config_get_boolean_ondemand("plugin:tc", "enable ctokens charts for all interfaces", CONFIG_ONDEMAND_NO);
-        enabled_all_classes_qdiscs = config_get_boolean_ondemand("plugin:tc", "enable show all classes and qdiscs for all interfaces", CONFIG_ONDEMAND_NO);
+        enable_new_interfaces      = config_get_boolean_ondemand("plugin:tc", "enable new interfaces detected at runtime", CONFIG_BOOLEAN_YES);
+        enable_bytes               = config_get_boolean_ondemand("plugin:tc", "enable traffic charts for all interfaces", CONFIG_BOOLEAN_AUTO);
+        enable_packets             = config_get_boolean_ondemand("plugin:tc", "enable packets charts for all interfaces", CONFIG_BOOLEAN_AUTO);
+        enable_dropped             = config_get_boolean_ondemand("plugin:tc", "enable dropped charts for all interfaces", CONFIG_BOOLEAN_AUTO);
+        enable_tokens              = config_get_boolean_ondemand("plugin:tc", "enable tokens charts for all interfaces", CONFIG_BOOLEAN_NO);
+        enable_ctokens             = config_get_boolean_ondemand("plugin:tc", "enable ctokens charts for all interfaces", CONFIG_BOOLEAN_NO);
+        enabled_all_classes_qdiscs = config_get_boolean_ondemand("plugin:tc", "enable show all classes and qdiscs for all interfaces", CONFIG_BOOLEAN_NO);
     }
 
     if(unlikely(d->enabled == (char)-1)) {
@@ -370,11 +370,15 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // bytes
 
-    if(d->enabled_bytes == CONFIG_ONDEMAND_YES || (d->enabled_bytes == CONFIG_ONDEMAND_ONDEMAND && bytes_sum)) {
-        d->enabled_bytes = CONFIG_ONDEMAND_YES;
+    if(d->enabled_bytes == CONFIG_BOOLEAN_YES || (d->enabled_bytes == CONFIG_BOOLEAN_AUTO && bytes_sum)) {
+        d->enabled_bytes = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_bytes))
-            d->st_bytes = rrdset_create(RRD_TYPE_TC, d->id, d->name?d->name:d->id, d->family?d->family:d->id, RRD_TYPE_TC ".qos", "Class Usage", "kilobits/s", 7000, rrd_update_every, d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
+            d->st_bytes = rrdset_create_localhost(RRD_TYPE_TC, d->id, d->name ? d->name : d->id
+                                                  , d->family ? d->family : d->id, RRD_TYPE_TC ".qos", "Class Usage"
+                                                  , "kilobits/s", 7000, localhost->rrd_update_every
+                                                  , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE
+                                                                                  : RRDSET_TYPE_STACKED);
 
         else {
             rrdset_next(d->st_bytes);
@@ -388,7 +392,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_bytes))
-                c->rd_bytes = rrddim_add(d->st_bytes, c->id, c->name?c->name:c->id, 8, 1024, RRDDIM_INCREMENTAL);
+                c->rd_bytes = rrddim_add(d->st_bytes, c->id, c->name?c->name:c->id, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_bytes, c->rd_bytes, c->name);
 
@@ -400,8 +404,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // packets
 
-    if(d->enabled_packets == CONFIG_ONDEMAND_YES || (d->enabled_packets == CONFIG_ONDEMAND_ONDEMAND && packets_sum)) {
-        d->enabled_packets = CONFIG_ONDEMAND_YES;
+    if(d->enabled_packets == CONFIG_BOOLEAN_YES || (d->enabled_packets == CONFIG_BOOLEAN_AUTO && packets_sum)) {
+        d->enabled_packets = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_packets)) {
             char id[RRD_ID_LENGTH_MAX + 1];
@@ -409,7 +413,10 @@ static inline void tc_device_commit(struct tc_device *d) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_packets", d->id);
             snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", d->name?d->name:d->id);
 
-            d->st_packets = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_packets", "Class Packets", "packets/s", 7010, rrd_update_every, d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
+            d->st_packets = rrdset_create_localhost(RRD_TYPE_TC, id, name, d->family ? d->family : d->id
+                                                    , RRD_TYPE_TC ".qos_packets", "Class Packets", "packets/s", 7010
+                                                    , localhost->rrd_update_every, d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE
+                                                                                                      : RRDSET_TYPE_STACKED);
         }
         else {
             rrdset_next(d->st_packets);
@@ -428,7 +435,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_packets))
-                c->rd_packets = rrddim_add(d->st_packets, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_INCREMENTAL);
+                c->rd_packets = rrddim_add(d->st_packets, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_packets, c->rd_packets, c->name);
 
@@ -440,8 +447,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // dropped
 
-    if(d->enabled_dropped == CONFIG_ONDEMAND_YES || (d->enabled_dropped == CONFIG_ONDEMAND_ONDEMAND && dropped_sum)) {
-        d->enabled_dropped = CONFIG_ONDEMAND_YES;
+    if(d->enabled_dropped == CONFIG_BOOLEAN_YES || (d->enabled_dropped == CONFIG_BOOLEAN_AUTO && dropped_sum)) {
+        d->enabled_dropped = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_dropped)) {
             char id[RRD_ID_LENGTH_MAX + 1];
@@ -449,7 +456,11 @@ static inline void tc_device_commit(struct tc_device *d) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_dropped", d->id);
             snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", d->name?d->name:d->id);
 
-            d->st_dropped = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_dropped", "Class Dropped Packets", "packets/s", 7020, rrd_update_every, d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE : RRDSET_TYPE_STACKED);
+            d->st_dropped = rrdset_create_localhost(RRD_TYPE_TC, id, name, d->family ? d->family : d->id
+                                                    , RRD_TYPE_TC ".qos_dropped", "Class Dropped Packets", "packets/s"
+                                                    , 7020, localhost->rrd_update_every
+                                                    , d->enabled_all_classes_qdiscs ? RRDSET_TYPE_LINE
+                                                                                    : RRDSET_TYPE_STACKED);
         }
         else {
             rrdset_next(d->st_dropped);
@@ -468,7 +479,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_dropped))
-                c->rd_dropped = rrddim_add(d->st_dropped, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_INCREMENTAL);
+                c->rd_dropped = rrddim_add(d->st_dropped, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_dropped, c->rd_dropped, c->name);
 
@@ -480,8 +491,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // tokens
 
-    if(d->enabled_tokens == CONFIG_ONDEMAND_YES || (d->enabled_tokens == CONFIG_ONDEMAND_ONDEMAND && tokens_sum)) {
-        d->enabled_tokens = CONFIG_ONDEMAND_YES;
+    if(d->enabled_tokens == CONFIG_BOOLEAN_YES || (d->enabled_tokens == CONFIG_BOOLEAN_AUTO && tokens_sum)) {
+        d->enabled_tokens = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_tokens)) {
             char id[RRD_ID_LENGTH_MAX + 1];
@@ -489,7 +500,9 @@ static inline void tc_device_commit(struct tc_device *d) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_tokens", d->id);
             snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", d->name?d->name:d->id);
 
-            d->st_tokens = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_tokens", "Class Tokens", "tokens", 7030, rrd_update_every, RRDSET_TYPE_LINE);
+            d->st_tokens = rrdset_create_localhost(RRD_TYPE_TC, id, name, d->family ? d->family : d->id
+                                                   , RRD_TYPE_TC ".qos_tokens", "Class Tokens", "tokens", 7030
+                                                   , localhost->rrd_update_every, RRDSET_TYPE_LINE);
         }
         else {
             rrdset_next(d->st_tokens);
@@ -508,7 +521,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_tokens)) {
-                c->rd_tokens = rrddim_add(d->st_tokens, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_ABSOLUTE);
+                c->rd_tokens = rrddim_add(d->st_tokens, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_tokens, c->rd_tokens, c->name);
@@ -521,8 +534,8 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // ctokens
 
-    if(d->enabled_ctokens == CONFIG_ONDEMAND_YES || (d->enabled_ctokens == CONFIG_ONDEMAND_ONDEMAND && ctokens_sum)) {
-        d->enabled_ctokens = CONFIG_ONDEMAND_YES;
+    if(d->enabled_ctokens == CONFIG_BOOLEAN_YES || (d->enabled_ctokens == CONFIG_BOOLEAN_AUTO && ctokens_sum)) {
+        d->enabled_ctokens = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_ctokens)) {
             char id[RRD_ID_LENGTH_MAX + 1];
@@ -530,7 +543,9 @@ static inline void tc_device_commit(struct tc_device *d) {
             snprintfz(id, RRD_ID_LENGTH_MAX, "%s_ctokens", d->id);
             snprintfz(name, RRD_ID_LENGTH_MAX, "%s_ctokens", d->name?d->name:d->id);
 
-            d->st_ctokens = rrdset_create(RRD_TYPE_TC, id, name, d->family?d->family:d->id, RRD_TYPE_TC ".qos_ctokens", "Class cTokens", "ctokens", 7040, rrd_update_every, RRDSET_TYPE_LINE);
+            d->st_ctokens = rrdset_create_localhost(RRD_TYPE_TC, id, name, d->family ? d->family : d->id
+                                                    , RRD_TYPE_TC ".qos_ctokens", "Class cTokens", "ctokens", 7040
+                                                    , localhost->rrd_update_every, RRDSET_TYPE_LINE);
         }
         else {
             debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", d->name?d->name:d->id);
@@ -550,7 +565,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_ctokens))
-                c->rd_ctokens = rrddim_add(d->st_ctokens, c->id, c->name?c->name:c->id, 1, 1, RRDDIM_ABSOLUTE);
+                c->rd_ctokens = rrddim_add(d->st_ctokens, c->id, c->name?c->name:c->id, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_ctokens, c->rd_ctokens, c->name);
 
@@ -792,7 +807,7 @@ void *tc_main(void *ptr) {
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
 
-        snprintfz(buffer, TC_LINE_MAX, "exec %s %d", tc_script, rrd_update_every);
+        snprintfz(buffer, TC_LINE_MAX, "exec %s %d", tc_script, localhost->rrd_update_every);
         debug(D_TC_LOOP, "executing '%s'", buffer);
 
         fp = mypopen(buffer, (pid_t *)&tc_child_pid);
@@ -974,11 +989,13 @@ void *tc_main(void *ptr) {
                 // debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
                 getrusage(RUSAGE_THREAD, &thread);
 
-                if(unlikely(!stcpu)) stcpu = rrdset_find("netdata.plugin_tc_cpu");
+                if(unlikely(!stcpu)) stcpu = rrdset_find_localhost("netdata.plugin_tc_cpu");
                 if(unlikely(!stcpu)) {
-                    stcpu = rrdset_create("netdata", "plugin_tc_cpu", NULL, "tc.helper", NULL, "NetData TC CPU usage", "milliseconds/s", 135000, rrd_update_every, RRDSET_TYPE_STACKED);
-                    rrddim_add(stcpu, "user",  NULL,  1, 1000, RRDDIM_INCREMENTAL);
-                    rrddim_add(stcpu, "system", NULL, 1, 1000, RRDDIM_INCREMENTAL);
+                    stcpu = rrdset_create_localhost("netdata", "plugin_tc_cpu", NULL, "tc.helper", NULL
+                                                    , "NetData TC CPU usage", "milliseconds/s", 135000, localhost->rrd_update_every
+                                                    , RRDSET_TYPE_STACKED);
+                    rrddim_add(stcpu, "user",  NULL,  1, 1000, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(stcpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(stcpu);
 
@@ -986,10 +1003,12 @@ void *tc_main(void *ptr) {
                 rrddim_set(stcpu, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
                 rrdset_done(stcpu);
 
-                if(unlikely(!sttime)) stcpu = rrdset_find("netdata.plugin_tc_time");
+                if(unlikely(!sttime)) stcpu = rrdset_find_localhost("netdata.plugin_tc_time");
                 if(unlikely(!sttime)) {
-                    sttime = rrdset_create("netdata", "plugin_tc_time", NULL, "tc.helper", NULL, "NetData TC script execution", "milliseconds/run", 135001, rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(sttime, "run_time",  "run time",  1, 1, RRDDIM_ABSOLUTE);
+                    sttime = rrdset_create_localhost("netdata", "plugin_tc_time", NULL, "tc.helper", NULL
+                                                     , "NetData TC script execution", "milliseconds/run", 135001
+                                                     , localhost->rrd_update_every, RRDSET_TYPE_AREA);
+                    rrddim_add(sttime, "run_time",  "run time",  1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(sttime);
 
@@ -1037,7 +1056,7 @@ void *tc_main(void *ptr) {
             goto cleanup;
         }
 
-        sleep((unsigned int) rrd_update_every);
+        sleep((unsigned int) localhost->rrd_update_every);
     }
 
 cleanup:
