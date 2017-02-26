@@ -112,11 +112,30 @@ COMMANDS = [
     ('metrics.commands.delete.failed', 'delete_failed', None)
 ]
 
+LOCKS = [
+    ('locks.Collection.acquireCount.R', 'Collection_R', None),
+    ('locks.Collection.acquireCount.r', 'Collection_r', None),
+    ('locks.Collection.acquireCount.W', 'Collection_W', None),
+    ('locks.Collection.acquireCount.w', 'Collection_w', None),
+    ('locks.Database.acquireCount.R', 'Database_R', None),
+    ('locks.Database.acquireCount.r', 'Database_r', None),
+    ('locks.Database.acquireCount.W', 'Database_W', None),
+    ('locks.Database.acquireCount.w', 'Database_w', None),
+    ('locks.Global.acquireCount.R', 'Global_R', None),
+    ('locks.Global.acquireCount.r', 'Global_r', None),
+    ('locks.Global.acquireCount.W', 'Global_W', None),
+    ('locks.Global.acquireCount.w', 'Global_w', None),
+    ('locks.Metadata.acquireCount.R', 'Metadata_R', None),
+    ('locks.Metadata.acquireCount.w', 'Metadata_w', None),
+    ('locks.oplog.acquireCount.r', 'oplog_r', None),
+    ('locks.oplog.acquireCount.w', 'oplog_w', None)
+]
+
 DBSTATS = [
-        'dataSize',
-        'indexSize',
-        'storageSize',
-        'objects'
+    'dataSize',
+    'indexSize',
+    'storageSize',
+    'objects'
 ]
 
 # charts order (can be overridden if you want less charts, or different order)
@@ -124,6 +143,7 @@ ORDER = ['read_operations', 'write_operations', 'active_clients', 'journaling_tr
          'journaling_volume', 'background_flush_average', 'background_flush_last', 'background_flush_rate',
          'wiredtiger_read', 'wiredtiger_write', 'cursors', 'connections', 'memory', 'page_faults',
          'queued_requests', 'record_moves', 'wiredtiger_cache', 'wiredtiger_pages_evicted', 'asserts',
+         'locks_collection', 'locks_database', 'locks_global', 'locks_metadata', 'locks_oplog',
          'dbstats_objects', 'tcmalloc_generic', 'tcmalloc_metrics', 'command_total_rate', 'command_failed_rate']
 
 CHARTS = {
@@ -299,6 +319,47 @@ CHARTS = {
             ['findAndModify_failed', 'findAndModify', 'incremental', 1, 1],
             ['insert_failed', 'insert', 'incremental', 1, 1],
             ['update_failed', 'update', 'incremental', 1, 1]
+        ]},
+    'locks_collection': {
+        'options': [None, 'Collection lock. Number of times the lock was acquired in the specified mode',
+                    'locks', 'locks metrics', 'mongodb.locks_collection', 'stacked'],
+        'lines': [
+            ['Collection_R', 'shared', 'incremental'],
+            ['Collection_W', 'exclusive', 'incremental'],
+            ['Collection_r', 'intent_shared', 'incremental'],
+            ['Collection_w', 'intent_exclusive', 'incremental']
+        ]},
+    'locks_database': {
+        'options': [None, 'Database lock. Number of times the lock was acquired in the specified mode',
+                    'locks', 'locks metrics', 'mongodb.locks_database', 'stacked'],
+        'lines': [
+            ['Database_R', 'shared', 'incremental'],
+            ['Database_W', 'exclusive', 'incremental'],
+            ['Database_r', 'intent_shared', 'incremental'],
+            ['Database_w', 'intent_exclusive', 'incremental']
+        ]},
+    'locks_global': {
+        'options': [None, 'Global lock. Number of times the lock was acquired in the specified mode',
+                    'locks', 'locks metrics', 'mongodb.locks_global', 'stacked'],
+        'lines': [
+            ['Global_R', 'shared', 'incremental'],
+            ['Global_W', 'exclusive', 'incremental'],
+            ['Global_r', 'intent_shared', 'incremental'],
+            ['Global_w', 'intent_exclusive', 'incremental']
+        ]},
+    'locks_metadata': {
+        'options': [None, 'Metadata lock. Number of times the lock was acquired in the specified mode',
+                    'locks', 'locks metrics', 'mongodb.locks_metadata', 'stacked'],
+        'lines': [
+            ['Metadata_R', 'shared', 'incremental'],
+            ['Metadata_w', 'intent_exclusive', 'incremental']
+        ]},
+    'locks_oplog': {
+        'options': [None, 'Lock on the oplog. Number of times the lock was acquired in the specified mode',
+                    'locks', 'locks metrics', 'mongodb.locks_oplog', 'stacked'],
+        'lines': [
+            ['Metadata_r', 'intent_shared', 'incremental'],
+            ['Metadata_w', 'intent_exclusive', 'incremental']
         ]}
 }
 
@@ -349,6 +410,8 @@ class Service(SimpleService):
             self.metrics_to_collect.extend(COMMANDS)
         if 'wiredTiger' in server_status:
             self.metrics_to_collect.extend(WIREDTIGER)
+        if 'Collection' in server_status['locks']:
+            self.metrics_to_collect.extend(LOCKS)
 
     def create_charts_(self, server_status):
 
@@ -373,6 +436,15 @@ class Service(SimpleService):
         if 'commands' not in server_status['metrics']:
             self.order.remove('command_total_rate')
             self.order.remove('command_failed_rate')
+
+        if 'Collection' not in server_status['locks']:
+            self.order.remove('locks_collection')
+            self.order.remove('locks_database')
+            self.order.remove('locks_global')
+            self.order.remove('locks_metadata')
+
+        if 'oplog' not in server_status['locks']:
+            self.order.remove('locks_oplog')
 
         for dbase in self.databases:
             self.order.append('_'.join([dbase, 'dbstats']))
@@ -409,28 +481,28 @@ class Service(SimpleService):
                 self.order.append('oplog_window')
                 self.definitions['oplog_window'] = {
                     'options': [None, 'Interval of time between the oldest and the latest entries in the oplog',
-                                'seconds', 'replication', 'mongodb.oplog_window', 'line'],
+                                'seconds', 'replication and oplog', 'mongodb.oplog_window', 'line'],
                     'lines': [['timeDiff', 'window', 'absolute', 1, 1000]]}
             # Create "heartbeat delay" chart
             self.order.append('heartbeat_delay')
             self.definitions['heartbeat_delay'] = {
-                'options': [None, 'Latency between this node and replica set members (lastHeartbeatRecv)',
-                            'seconds', 'replication', 'mongodb.replication_heartbeat_delay', 'stacked'],
+                'options': [None, 'Time when last heartbeat was received'
+                                  ' from the replica set member (lastHeartbeatRecv)',
+                            'seconds ago', 'replication and oplog', 'mongodb.replication_heartbeat_delay', 'stacked'],
                 'lines': create_lines(other_hosts, 'heartbeat_lag')}
             # Create "optimedate delay" chart
             self.order.append('optimedate_delay')
             self.definitions['optimedate_delay'] = {
-                'options': [None, '"optimeDate"(time when last entry from the oplog was applied)'
-                                  ' diff between all nodes',
-                            'seconds', 'replication', 'mongodb.replication_optimedate_delay', 'stacked'],
+                'options': [None, 'Time when last entry from the oplog was applied (optimeDate)',
+                            'seconds ago', 'replication and oplog', 'mongodb.replication_optimedate_delay', 'stacked'],
                 'lines': create_lines(all_hosts, 'optimedate')}
             # Create "replica set members state" chart
             for host in all_hosts:
                 chart_name = '_'.join([host, 'state'])
                 self.order.append(chart_name)
                 self.definitions[chart_name] = {
-                    'options': [None, '%s state' % host, 'state',
-                                'replication', 'mongodb.replication_state', 'line'],
+                    'options': [None, 'Replica set member (%s) current state' % host, 'state',
+                                'replication and oplog', 'mongodb.replication_state', 'line'],
                     'lines': create_state_lines(REPLSET_STATES)}
 
     def _get_raw_data(self):
@@ -512,15 +584,15 @@ class Service(SimpleService):
 
         # serverStatus
         for metric, new_name, function in self.metrics_to_collect:
-            temp = serverStatus
+            value = serverStatus
             for key in metric.split('.'):
                 try:
-                    temp = temp[key]
+                    value = value[key]
                 except KeyError:
                     break
 
-            if not isinstance(temp, dict):
-                to_netdata[new_name or key] = temp if not function else function(temp)
+            if not isinstance(value, dict) and key:
+                to_netdata[new_name or key] = value if not function else function(value)
 
         to_netdata['nonmapped'] = to_netdata['virtual'] - serverStatus['mem'].get('mappedWithJournal',
                                                                                   to_netdata['mapped'])
