@@ -14,7 +14,7 @@ priority = 60000
 retries = 60
 
 ORDER = ['response_statuses', 'response_codes', 'bandwidth', 'response_time', 'requests_per_url', 'http_method',
-         'requests_per_ipproto', 'clients', 'clients_all']
+         'http_version', 'requests_per_ipproto', 'clients', 'clients_all']
 CHARTS = {
     'response_codes': {
         'options': [None, 'Response Codes', 'requests/s', 'responses', 'web_log.response_codes', 'stacked'],
@@ -57,6 +57,10 @@ CHARTS = {
         'lines': [
             ['GET', 'GET', 'incremental', 1, 1]
         ]},
+    'http_version': {
+        'options': [None, 'Requests Per HTTP Version', 'requests/s', 'http versions',
+                    'web_log.http_version', 'stacked'],
+        'lines': []},
     'requests_per_ipproto': {
         'options': [None, 'Requests Per IP Protocol', 'requests/s', 'ip protocols', 'web_log.requests_per_ipproto',
                     'stacked'],
@@ -234,7 +238,8 @@ class Service(LogService):
                               'method': r'[A-Z]+',
                               'bytes_sent': r'\d+|-'}
             optional_dict = {'resp_length': r'\d+',
-                             'resp_time': r'[\d.]+'}
+                             'resp_time': r'[\d.]+',
+                             'http_version': r'\d\.\d'}
 
             mandatory_values = set(mandatory_dict) - set(match_dict)
             if mandatory_values:
@@ -275,13 +280,15 @@ class Service(LogService):
         # 5. Bytes sent 6. Response length 7. Response process time
         acs_default = re.compile(r'(?P<address>[\da-f.:]+)'
                                  r' -.*?"(?P<method>[A-Z]+)'
-                                 r' (?P<url>.*?)"'
+                                 r' (?P<url>[^ ]+)'
+                                 r' [A-Z]+/(?P<http_version>\d\.\d)"'
                                  r' (?P<code>[1-9]\d{2})'
                                  r' (?P<bytes_sent>\d+|-)')
 
         acs_apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
                                            r' -.*?"(?P<method>[A-Z]+)'
-                                           r' (?P<url>.*?)"'
+                                           r' (?P<url>[^ ]+)'
+                                           r' [A-Z]+/(?P<http_version>\d\.\d)"'
                                            r' (?P<code>[1-9]\d{2})'
                                            r' (?P<bytes_sent>\d+|-)'
                                            r' (?P<resp_length>\d+)'
@@ -289,7 +296,8 @@ class Service(LogService):
 
         acs_apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
                                            r' -.*?"(?P<method>[A-Z]+)'
-                                           r' (?P<url>.*?)"'
+                                           r' (?P<url>[^ ]+)'
+                                           r' [A-Z]+/(?P<http_version>\d\.\d)"'
                                            r' (?P<code>[1-9]\d{2})'
                                            r' (?P<bytes_sent>\d+|-)'
                                            r' .*?'
@@ -299,7 +307,8 @@ class Service(LogService):
 
         acs_nginx_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
                                           r' -.*?"(?P<method>[A-Z]+)'
-                                          r' (?P<url>.*?)"'
+                                          r' (?P<url>[^ ]+)'
+                                          r' [A-Z]+/(?P<http_version>\d\.\d)"'
                                           r' (?P<code>[1-9]\d{2})'
                                           r' (?P<bytes_sent>\d+)'
                                           r' (?P<resp_length>\d+)'
@@ -307,7 +316,8 @@ class Service(LogService):
 
         acs_nginx_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
                                           r' -.*?"(?P<method>[A-Z]+)'
-                                          r' (?P<url>.*?)"'
+                                          r' (?P<url>[^ ]+)'
+                                          r' [A-Z]+/(?P<http_version>\d\.\d)"'
                                           r' (?P<code>[1-9]\d{2})'
                                           r' (?P<bytes_sent>\d+)'
                                           r' .*?'
@@ -369,6 +379,9 @@ class Service(LogService):
                                  ' "" "Requests Per HTTP Method" requests/s "http methods"' \
                                  ' web_log.http_method stacked 2 %s\n' \
                                  'DIMENSION GET GET incremental\n' % (job_name, self.update_every)
+        self.http_version_chart = 'CHART %s.http_version' \
+                                  ' "" "Requests Per HTTP Version" requests/s "http versions"' \
+                                  ' web_log.http_version stacked 3 %s\n' % (job_name, self.update_every)
 
         # Remove 'request_time' chart from ORDER if resp_time not in match_dict
         if 'resp_time' not in match_dict:
@@ -448,6 +461,9 @@ class Service(LogService):
                     self._get_data_per_url(match_dict['url'])
                 # requests per http method
                 self._get_data_http_method(match_dict['method'])
+                # requests per http version
+                if 'http_version' in match_dict:
+                    self._get_data_http_version(match_dict['http_version'])
                 # bandwidth sent
                 bytes_sent = match_dict['bytes_sent'] if '-' not in match_dict['bytes_sent'] else 0
                 self.data['bytes_sent'] += int(bytes_sent)
@@ -502,6 +518,20 @@ class Service(LogService):
             self.http_method_chart = self.add_new_dimension(method, [method, method, 'incremental'],
                                                             chart_string_copy, 'http_method')
         self.data[method] += 1
+
+    def _get_data_http_version(self, http_version):
+        """
+        :param http_version: str: METHOD from parsed line. Ex.: '1.1', '1.0'
+        :return:
+        Calls add_new_dimension method If the value is found for the first time
+        """
+        http_version_dim_id = http_version.replace('.', '_')
+        if http_version_dim_id not in self.data:
+            chart_string_copy = self.http_version_chart
+            self.http_version_chart = self.add_new_dimension(http_version_dim_id,
+                                                             [http_version_dim_id, http_version, 'incremental'],
+                                                             chart_string_copy, 'http_version')
+        self.data[http_version_dim_id] += 1
 
     def _get_data_per_url(self, url):
         """
