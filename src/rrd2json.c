@@ -122,12 +122,38 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb)
                     ",\n\t\"dimensions_count\": %zu"
                     ",\n\t\"alarms_count\": %zu"
                     ",\n\t\"rrd_memory_bytes\": %zu"
-                    "\n}\n"
+                    ",\n\t\"hosts_count\": %zu"
+                    ",\n\t\"hosts\": ["
                    , c
                    , dimensions
                    , alarms
                    , memory
+                   , rrd_hosts_available
     );
+
+    if(unlikely(rrd_hosts_available > 1)) {
+        rrd_rdlock();
+        RRDHOST *h;
+        rrdhost_foreach_read(h)
+            buffer_sprintf(wb,
+                    "%s\n\t\t{"
+                    "\n\t\t\t\"hostname\": \"%s\""
+                    "\n\t\t}"
+                    , (h != localhost)?",":""
+                    , h->hostname
+            );
+        rrd_unlock();
+    }
+    else {
+        buffer_sprintf(wb,
+                "\n\t\t{"
+                "\n\t\t\t\"hostname\": \"%s\""
+                "\n\t\t}"
+                , host->hostname
+        );
+    }
+
+    buffer_sprintf(wb, "\n\t]\n}\n");
 }
 
 // ----------------------------------------------------------------------------

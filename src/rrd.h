@@ -454,11 +454,14 @@ extern pthread_rwlock_t rrd_rwlock;
 
 // ----------------------------------------------------------------------------
 
+extern size_t rrd_hosts_available;
 extern time_t rrdhost_free_orphan_time;
 
 extern void rrd_init(char *hostname);
 
-extern RRDHOST *rrdhost_find_guid(const char *guid, uint32_t hash);
+extern RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash);
+extern RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash);
+
 extern RRDHOST *rrdhost_find_or_create(
         const char *hostname
         , const char *guid
