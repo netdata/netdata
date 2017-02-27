@@ -165,13 +165,15 @@ RRDHOST *rrdhost_create(const char *hostname,
             int r = mkdir(host->varlib_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", host->hostname, host->varlib_dir);
+       }
 
-            snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-            r = mkdir(filename, 0775);
-            if(r != 0 && errno != EEXIST)
-                error("Host '%s': cannot create directory '%s'", host->hostname, filename);
-        }
+    }
 
+    if(host->health_enabled) {
+        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
+        int r = mkdir(filename, 0775);
+        if(r != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", host->hostname, filename);
     }
 
     snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
