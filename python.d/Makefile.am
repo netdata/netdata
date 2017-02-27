@@ -25,6 +25,7 @@ dist_python_SCRIPTS = \
     isc_dhcpd.chart.py \
     mdstat.chart.py \
     memcached.chart.py \
+    mongodb.chart.py \
     mysql.chart.py \
     nginx.chart.py \
     ovpn_status_log.chart.py \
