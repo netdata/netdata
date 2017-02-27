@@ -7,6 +7,20 @@
 
 #include "common.h"
 
+// ----------------------------------------------------------------------------
+// per O/S configuration
+
+// the minimum PID of the system
+// this is also the pid of the init process
+#define INIT_PID 1
+
+// if the way apps.plugin will work, will read the entire process list,
+// including the resource utilization of each process, instantly
+// set this to 1
+// when set to 0, apps.plugin builds a sort list of processes, in order
+// to process children processes, before parent processes
+#define ALL_PIDS_ARE_READ_INSTANTLY 0
+
 
 // ----------------------------------------------------------------------------
 // string lengths
@@ -337,6 +351,7 @@ static struct pid_stat
 static size_t
         all_pids_count = 0;     // the number of processes running
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 // Another pre-allocated list of all possible pids.
 // We need it to pids and assign them a unique sortlist id, so that we
 // read parents before children. This is needed to prevent a situation where
@@ -344,7 +359,7 @@ static size_t
 // its parent has accumulated its resources.
 static pid_t
         *all_pids_sortlist = NULL;
-
+#endif
 
 // ----------------------------------------------------------------------------
 // file descriptor
@@ -788,7 +803,9 @@ cleanup:
     return 0;
 }
 
-static inline int read_proc_pid_ownership(struct pid_stat *p) {
+static inline int read_proc_pid_ownership(struct pid_stat *p, void *ptr) {
+    (void)ptr;
+
     if(unlikely(!p->stat_filename)) {
         error("pid %d does not have a stat_filename", p->pid);
         return 0;
@@ -809,7 +826,27 @@ static inline int read_proc_pid_ownership(struct pid_stat *p) {
     return 1;
 }
 
-static inline int read_proc_pid_stat(struct pid_stat *p) {
+// ----------------------------------------------------------------------------
+// macro to calculate the incremental rate of a value
+// each parameter is accessed only ONCE - so it is safe to pass function calls
+// or other macros as parameters
+
+#define incremental_rate(rate_variable, last_kernel_variable, new_kernel_value, collected_usec, last_collected_usec) { \
+        kernel_uint_t _new_tmp = new_kernel_value; \
+        rate_variable = (_new_tmp - last_kernel_variable) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec); \
+        last_kernel_variable = _new_tmp; \
+    }
+
+// the same macro for struct pid members
+#define pid_incremental_rate(type, var, value) \
+    incremental_rate(var, var##_raw, value, p->type##_collected_usec, p->last_##type##_collected_usec)
+
+
+// ----------------------------------------------------------------------------
+
+static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
+    (void)ptr;
+
     static procfile *ff = NULL;
 
     if(unlikely(!p->stat_filename)) {
@@ -861,37 +898,14 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
         assign_target_to_pid(p);
     }
 
-    kernel_uint_t last = p->minflt_raw;
-    p->minflt_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 9));
-    p->minflt = (p->minflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-
-    last = p->cminflt_raw;
-    p->cminflt_raw      = str2kernel_uint_t(procfile_lineword(ff, 0, 10));
-    p->cminflt = (p->cminflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-
-    last = p->majflt_raw;
-    p->majflt_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 11));
-    p->majflt = (p->majflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-
-    last = p->cmajflt_raw;
-    p->cmajflt_raw      = str2kernel_uint_t(procfile_lineword(ff, 0, 12));
-    p->cmajflt = (p->cmajflt_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-
-    last = p->utime_raw;
-    p->utime_raw        = str2kernel_uint_t(procfile_lineword(ff, 0, 13));
-    p->utime = (p->utime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-
-    last = p->stime_raw;
-    p->stime_raw        = str2kernel_uint_t(procfile_lineword(ff, 0, 14));
-    p->stime = (p->stime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-
-    last = p->cutime_raw;
-    p->cutime_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 15));
-    p->cutime = (p->cutime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-
-    last = p->cstime_raw;
-    p->cstime_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 16));
-    p->cstime = (p->cstime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+    pid_incremental_rate(stat, p->minflt,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
+    pid_incremental_rate(stat, p->cminflt, str2kernel_uint_t(procfile_lineword(ff, 0, 10)));
+    pid_incremental_rate(stat, p->majflt,  str2kernel_uint_t(procfile_lineword(ff, 0, 11)));
+    pid_incremental_rate(stat, p->cmajflt, str2kernel_uint_t(procfile_lineword(ff, 0, 12)));
+    pid_incremental_rate(stat, p->utime,   str2kernel_uint_t(procfile_lineword(ff, 0, 13)));
+    pid_incremental_rate(stat, p->stime,   str2kernel_uint_t(procfile_lineword(ff, 0, 14)));
+    pid_incremental_rate(stat, p->cutime,  str2kernel_uint_t(procfile_lineword(ff, 0, 15)));
+    pid_incremental_rate(stat, p->cstime,  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
 
     // p->priority      = str2kernel_uint_t(procfile_lineword(ff, 0, 17));
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
@@ -920,13 +934,9 @@ static inline int read_proc_pid_stat(struct pid_stat *p) {
     // p->delayacct_blkio_ticks = str2kernel_uint_t(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
-        last = p->gtime_raw;
-        p->gtime_raw        = str2kernel_uint_t(procfile_lineword(ff, 0, 42));
-        p->gtime = (p->gtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
-        last = p->cgtime_raw;
-        p->cgtime_raw       = str2kernel_uint_t(procfile_lineword(ff, 0, 43));
-        p->cgtime = (p->cgtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        pid_incremental_rate(stat, p->gtime,  str2kernel_uint_t(procfile_lineword(ff, 0, 42)));
+        pid_incremental_rate(stat, p->cgtime, str2kernel_uint_t(procfile_lineword(ff, 0, 43)));
 
         if (show_guest_time || p->gtime || p->cgtime) {
             p->utime -= (p->utime >= p->gtime) ? p->gtime : p->utime;
@@ -969,7 +979,9 @@ cleanup:
     return 0;
 }
 
-static inline int read_proc_pid_statm(struct pid_stat *p) {
+static inline int read_proc_pid_statm(struct pid_stat *p, void *ptr) {
+    (void)ptr;
+
     static procfile *ff = NULL;
 
     if(unlikely(!p->statm_filename)) {
@@ -1007,7 +1019,9 @@ cleanup:
     return 0;
 }
 
-static inline int read_proc_pid_io(struct pid_stat *p) {
+static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
+    (void)ptr;
+
     static procfile *ff = NULL;
 
     if(unlikely(!p->io_filename)) {
@@ -1028,35 +1042,13 @@ static inline int read_proc_pid_io(struct pid_stat *p) {
     p->last_io_collected_usec = p->io_collected_usec;
     p->io_collected_usec = now_monotonic_usec();
 
-    kernel_uint_t last;
-
-    last = p->io_logical_bytes_read_raw;
-    p->io_logical_bytes_read_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 1));
-    p->io_logical_bytes_read = (p->io_logical_bytes_read_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
-
-    last = p->io_logical_bytes_written_raw;
-    p->io_logical_bytes_written_raw = str2kernel_uint_t(procfile_lineword(ff, 1, 1));
-    p->io_logical_bytes_written = (p->io_logical_bytes_written_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
-
-    // last = p->io_read_calls_raw;
-    // p->io_read_calls_raw = str2kernel_uint_t(procfile_lineword(ff, 2, 1));
-    // p->io_read_calls = (p->io_read_calls_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
-
-    // last = p->io_write_calls_raw;
-    // p->io_write_calls_raw = str2kernel_uint_t(procfile_lineword(ff, 3, 1));
-    // p->io_write_calls = (p->io_write_calls_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
-
-    last = p->io_storage_bytes_read_raw;
-    p->io_storage_bytes_read_raw = str2kernel_uint_t(procfile_lineword(ff, 4, 1));
-    p->io_storage_bytes_read = (p->io_storage_bytes_read_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
-
-    last = p->io_storage_bytes_written_raw;
-    p->io_storage_bytes_written_raw = str2kernel_uint_t(procfile_lineword(ff, 5, 1));
-    p->io_storage_bytes_written = (p->io_storage_bytes_written_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
-
-    // last = p->io_cancelled_write_bytes_raw;
-    // p->io_cancelled_write_bytes_raw = str2kernel_uint_t(procfile_lineword(ff, 6, 1));
-    // p->io_cancelled_write_bytes = (p->io_cancelled_write_bytes_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (p->io_collected_usec - p->last_io_collected_usec);
+    pid_incremental_rate(io, p->io_logical_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 0,  1)));
+    pid_incremental_rate(io, p->io_logical_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 1,  1)));
+    // pid_incremental_rate(io, p->io_read_calls,               str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
+    // pid_incremental_rate(io, p->io_write_calls,              str2kernel_uint_t(procfile_lineword(ff, 3,  1)));
+    pid_incremental_rate(io, p->io_storage_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 4,  1)));
+    pid_incremental_rate(io, p->io_storage_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 5,  1)));
+    // pid_incremental_rate(io, p->io_cancelled_write_bytes,    str2kernel_uint_t(procfile_lineword(ff, 6,  1)));
 
     if(unlikely(global_iterations_counter == 1)) {
         p->io_logical_bytes_read        = 0;
@@ -1101,30 +1093,24 @@ static inline int read_proc_stat() {
 
     calls_counter++;
 
-    kernel_uint_t last;
+    // temporary - it is added global_ntime;
+    kernel_uint_t global_ntime = 0;
 
-    last = utime_raw;
-    utime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 1));
-    global_utime = (utime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
+    incremental_rate(global_utime, utime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  1)), collected_usec, last_collected_usec);
+    incremental_rate(global_ntime, ntime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  2)), collected_usec, last_collected_usec);
+    incremental_rate(global_stime, stime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  3)), collected_usec, last_collected_usec);
+    incremental_rate(global_gtime, gtime_raw, str2kernel_uint_t(procfile_lineword(ff, 0, 10)), collected_usec, last_collected_usec);
 
-    // nice time, on user time
-    last = ntime_raw;
-    ntime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 2));
-    global_utime += (ntime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
-
-    last = stime_raw;
-    stime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 3));
-    global_stime = (stime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
-
-    last = gtime_raw;
-    gtime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 10));
-    global_gtime = (gtime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
+    global_utime += global_ntime;
 
     if(enable_guest_charts) {
+        // temporary - it is added global_ntime;
+        kernel_uint_t global_gntime = 0;
+
         // guest nice time, on guest time
-        last = gntime_raw;
-        gntime_raw = str2kernel_uint_t(procfile_lineword(ff, 0, 11));
-        global_gtime += (gntime_raw - last) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec);
+        incremental_rate(global_gntime, gntime_raw, str2kernel_uint_t(procfile_lineword(ff, 0, 11)), collected_usec, last_collected_usec);
+
+        global_gtime += global_gntime;
 
         // remove guest time from user time
         global_utime -= (global_utime > global_gtime) ? global_gtime : global_utime;
@@ -1405,7 +1391,9 @@ static inline void zero_pid_fds(struct pid_stat *p, int first, int size) {
     while(fd < end) *fd++ = 0;
 }
 
-static inline int read_pid_file_descriptors(struct pid_stat *p) {
+static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
+    (void)ptr;
+
     if(unlikely(!p->fds_dirname)) {
         char dirname[FILENAME_MAX+1];
         snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", netdata_configured_host_prefix, p->pid);
@@ -1631,11 +1619,11 @@ static inline void process_exited_processes() {
         if(p->updated || !p->stat_collected_usec)
             continue;
 
-        kernel_uint_t utime  = (p->utime_raw + p->cutime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        kernel_uint_t stime  = (p->stime_raw + p->cstime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        kernel_uint_t gtime  = (p->gtime_raw + p->cgtime_raw)   * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        kernel_uint_t minflt = (p->minflt_raw + p->cminflt_raw) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
-        kernel_uint_t majflt = (p->majflt_raw + p->cmajflt_raw) * (1000000ULL * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t utime  = (p->utime_raw + p->cutime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t stime  = (p->stime_raw + p->cstime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t gtime  = (p->gtime_raw + p->cgtime_raw)   * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t minflt = (p->minflt_raw + p->cminflt_raw) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
+        kernel_uint_t majflt = (p->majflt_raw + p->cmajflt_raw) * (USEC_PER_SEC * RATES_DETAIL) / (p->stat_collected_usec - p->last_stat_collected_usec);
 
         if(utime + stime + gtime + minflt + majflt == 0)
             continue;
@@ -1796,9 +1784,9 @@ static int compar_pid(const void *pid1, const void *pid2) {
         return 1;
 }
 
-static inline int collect_data_for_pid(pid_t pid) {
-    if(unlikely(pid <= 0 || pid > pid_max)) {
-        error("Invalid pid %d read (expected 1 to %d). Ignoring process.", pid, pid_max);
+static inline int collect_data_for_pid(pid_t pid, void *ptr) {
+    if(unlikely(pid < INIT_PID || pid > pid_max)) {
+        error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, INIT_PID, pid_max);
         return 0;
     }
 
@@ -1811,11 +1799,11 @@ static inline int collect_data_for_pid(pid_t pid) {
     // --------------------------------------------------------------------
     // /proc/<pid>/stat
 
-    if(unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p))))
+    if(unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
         // there is no reason to proceed if we cannot get its status
         return 0;
 
-    read_proc_pid_ownership(p);
+    read_proc_pid_ownership(p, ptr);
 
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
@@ -1826,12 +1814,12 @@ static inline int collect_data_for_pid(pid_t pid) {
     // --------------------------------------------------------------------
     // /proc/<pid>/io
 
-    managed_log(p, PID_LOG_IO, read_proc_pid_io(p));
+    managed_log(p, PID_LOG_IO, read_proc_pid_io(p, ptr));
 
     // --------------------------------------------------------------------
     // /proc/<pid>/statm
 
-    if(unlikely(!managed_log(p, PID_LOG_STATM, read_proc_pid_statm(p))))
+    if(unlikely(!managed_log(p, PID_LOG_STATM, read_proc_pid_statm(p, ptr))))
         // there is no reason to proceed if we cannot get its memory status
         return 0;
 
@@ -1839,7 +1827,7 @@ static inline int collect_data_for_pid(pid_t pid) {
     // /proc/<pid>/fd
 
     if(enable_file_charts)
-            managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p));
+            managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p, ptr));
 
     // --------------------------------------------------------------------
     // done!
@@ -1867,9 +1855,12 @@ static int collect_data_for_all_processes(void) {
             p->children_count   = 0;
             p->parent           = NULL;
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
             all_pids_sortlist[slc++] = p->pid;
+#endif
         }
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         if(unlikely(slc != all_pids_count)) {
             error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are more.", all_pids_count);
             all_pids_count = slc;
@@ -1886,10 +1877,11 @@ static int collect_data_for_all_processes(void) {
 
             // we forward read all running processes
             // collect_data_for_pid() is smart enough,
-            // not to read the same pid twice per iterations
+            // not to read the same pid twice per iteration
             for(slc = 0; slc < all_pids_count; slc++)
-                collect_data_for_pid(all_pids_sortlist[slc]);
+                collect_data_for_pid(all_pids_sortlist[slc], NULL);
         }
+#endif
     }
 
     char dirname[FILENAME_MAX + 1];
@@ -1912,7 +1904,7 @@ static int collect_data_for_all_processes(void) {
         if(unlikely(endptr == de->d_name || *endptr != '\0'))
             continue;
 
-        collect_data_for_pid(pid);
+        collect_data_for_pid(pid, NULL);
     }
     closedir(dir);
 
@@ -2027,7 +2019,7 @@ static void apply_apps_groups_targets_inheritance(void) {
                     && p->parent
                     && p->parent->children_count
                     && (p->target == p->parent->target || !p->parent->target)
-                    && p->ppid != 1
+                    && p->ppid != INIT_PID
                 )) {
                 p->parent->children_count--;
                 p->merged = 1;
@@ -2049,8 +2041,8 @@ static void apply_apps_groups_targets_inheritance(void) {
     }
 
     // init goes always to default target
-    if(all_pids[1])
-        all_pids[1]->target = apps_groups_default_target;
+    if(all_pids[INIT_PID])
+        all_pids[INIT_PID]->target = apps_groups_default_target;
 
     // give a default target on all top level processes
     if(unlikely(debug)) loops++;
@@ -3180,7 +3172,10 @@ int main(int argc, char **argv) {
 
     info("started on pid %d", getpid());
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
     all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);
+#endif
+
     all_pids          = callocz(sizeof(struct pid_stat *), (size_t) pid_max);
 
     usec_t step = update_every * USEC_PER_SEC;
