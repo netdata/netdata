@@ -22,6 +22,7 @@ declare -A configs_signatures=(
   ['091572888425bc3b8b559c3c53367ec7']='apps_groups.conf'
   ['09264cec953ae1c4c2985e6446abb386']='health.d/mysql.conf'
   ['093540fdc2a228e976ce5d48a3adf9fc']='health.d/disks.conf'
+  ['0ad10fa896346202aee99384b0ec968d']='health.d/cpu.conf'
   ['0c5e0fa364d7bdf7c16e8459a0544572']='health.d/netfilter.conf'
   ['0cd4e1fb57497e4d4c2451a9e58f724d']='python.d/redis.conf'
   ['0d29fe9919a2975107db1f2583344e7a']='health.d/mdstat.conf'
