@@ -61,7 +61,11 @@ static int
         debug = 0,
         update_every = 1,
         enable_guest_charts = 0,
+#ifdef __FreeBSD__
+        enable_file_charts = 0,
+#else
         enable_file_charts = 1,
+#endif
         enable_users_charts = 1,
         enable_groups_charts = 1,
         include_exited_childs = 1;
