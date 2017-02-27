@@ -1,20 +1,9 @@
-%define contentdir %{_datadir}/netdata
-%if 0%{?suse_version}
-%define distro_post %service_add_post netdata.service
-%define distro_preun %service_del_preun netdata.service
-%define distro_postun %service_del_postun netdata.service
-%define distro_buildrequires BuildRequires:\ systemd-rpm-macros
-%else
-%define distro_post %systemd_post netdata.service
-%define distro_preun %systemd_preun netdata.service
-%define distro_postun %systemd_postun_with_restart netdata.service
-%define distro_buildrequires %{nil}
-%endif
+%global contentdir %{_datadir}/netdata
 
 # This is temporary and should eventually be resolved. This bypasses
 # the default rhel __os_install_post which throws a python compile
 # error.
-%define __os_install_post %{nil}
+%global __os_install_post %{nil}
 
 #
 # Conditional build:
@@ -26,33 +15,79 @@
 %undefine	with_systemd
 %endif
 
+%if %{with systemd}
+%if 0%{?suse_version}
+%global netdata_initd_buildrequires \
+BuildRequires: systemd-rpm-macros \
+%{nil}
+%global netdata_initd_requires \
+%{?systemd_requires} \
+%{nil}
+%global netdata_init_post %service_add_post netdata.service
+%global netdata_init_preun %service_del_preun netdata.service
+%global netdata_init_postun %service_del_postun netdata.service
+%else
+%global netdata_initd_buildrequires %{nil}
+%global netdata_initd_requires \
+Requires(preun):  systemd-units \
+Requires(postun): systemd-units \
+Requires(post):   systemd-units \
+%{nil}
+%global netdata_init_post %systemd_post netdata.service
+%global netdata_init_preun %systemd_preun netdata.service
+%global netdata_init_postun %systemd_postun_with_restart netdata.service
+%endif
+%else
+%global netdata_initd_buildrequires %{nil}
+%global netdata_initd_requires \
+Requires(post):   chkconfig \
+%{nil}
+%global netdata_init_post \
+/sbin/chkconfig --add netdata \
+%{nil}
+%global netdata_init_preun %{nil} \
+if [ $1 = 0 ]; then \
+        /sbin/service netdata stop > /dev/null 2>&1 \
+        /sbin/chkconfig --del netdata \
+fi \
+%{nil}
+%global netdata_init_postun %{nil} \
+if [ $1 != 0 ]; then \
+        /sbin/service netdata condrestart 2>&1 > /dev/null \
+fi \
+%{nil}
+%endif
+
+%if 0%{?_fedora}
+%global netdata_recommends \
+Recommends:	curl \
+Recommends:	iproute-tc \
+Recommends:	lm_sensors \
+Recommends:	nmap-ncat \
+Recommends:	nodejs \
+Recommends:	python \
+Recommends:	PyYAML \
+Recommends:	python2-PyMySQL \
+Recommends:	python2-psycopg2 \
+%{nil}
+%else
+%global netdata_recommends %{nil}
+%endif
+
 Summary:	Real-time performance monitoring, done right
 Name:		@PACKAGE_NAME@
 Version:	@PACKAGE_RPM_VERSION@
 Release:	1%{?dist}
-License:	GPL v3+
+License:	GPLv3+
 Group:		Applications/System
-Source0:	http://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
-URL:		http://my-netdata.io/
-%distro_buildrequires
-BuildRequires:	/usr/bin/autoconf
-BuildRequires:	/usr/bin/automake
+Source0:	https://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
+URL:		http://my-netdata.io
 BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
 BuildRequires:	libuuid-devel
 Requires:	zlib
 Requires:	libuuid
-Requires(post): libcap
-Recommends:	curl
-Recommends:	iproute-tc
-Recommends:	lm_sensors
-Recommends:	nmap-ncat
-Recommends:	nodejs
-Recommends:	python
-Recommends:	PyYAML
-Recommends:	python2-PyMySQL
-Recommends:	python2-psycopg2
 
 # Packages can be found in the EPEL repo
 %if %{with nfacct}
@@ -64,18 +99,11 @@ Requires: libnetfilter_acct
 
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
+Requires(post): libcap
 
-%if %{with systemd}
-%if 0%{?suse_version}
-%{?systemd_requires}
-%else
-Requires(preun):  systemd-units
-Requires(postun): systemd-units
-Requires(post):   systemd-units
-%endif
-%else
-Requires(post):   chkconfig
-%endif
+%{netdata_initd_buildrequires}
+%{netdata_recommends}
+%{netdata_initd_requires}
 
 %description
 netdata is the fastest way to visualize metrics. It is a resource
@@ -88,10 +116,9 @@ so that you can get insights of what is happening now and what just
 happened, on your systems and applications.
 
 %prep
-%setup -q
+%setup -q -n @PACKAGE_NAME@-@PACKAGE_VERSION@
 
 %build
-./autogen.sh
 %configure \
 	--with-zlib \
 	--with-math \
@@ -100,80 +127,43 @@ happened, on your systems and applications.
 %{__make} %{?_smp_mflags}
 
 %install
-rm -rf $RPM_BUILD_ROOT
-%{__make} %{?_smp_mflags} DESTDIR=$RPM_BUILD_ROOT install
+rm -rf "${RPM_BUILD_ROOT}"
+%{__make} %{?_smp_mflags} DESTDIR="${RPM_BUILD_ROOT}" install
 
-find $RPM_BUILD_ROOT -name .keep -delete
+find "${RPM_BUILD_ROOT}" -name .keep -delete
 
-install -m 644 -p system/netdata.conf $RPM_BUILD_ROOT%{_sysconfdir}/%{name}
-install -d $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
-install -m 644 -p system/netdata.logrotate $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/%{name}
+install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
+install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
 
 %if %{with systemd}
-install -d $RPM_BUILD_ROOT%{_unitdir}
-install -m 644 -p system/netdata.service $RPM_BUILD_ROOT%{_unitdir}/netdata.service
+install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
+install -m 644 -p system/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
 %else
 # install SYSV init stuff
-install -d $RPM_BUILD_ROOT/etc/rc.d/init.d
-install -m755 system/netdata-init-d \
-        $RPM_BUILD_ROOT/etc/rc.d/init.d/netdata
+install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"
+install -m 755 system/netdata-init-d \
+        "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
 %endif
 
-%if %{with systemd}
 %pre
-# Add the "netdata" user
-/usr/sbin/groupadd -r netdata 2> /dev/null || :
-/usr/sbin/useradd -c "netdata" -g netdata \
-        -s /sbin/nologin -r -d %{contentdir} netdata 2> /dev/null || :
-
-%post
-%distro_post
-setcap cap_dac_read_search,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/apps.plugin || chmod 1755 /usr/libexec/netdata/plugins.d/apps.plugin
-
-%preun
-%distro_preun
-
-%postun
-%distro_postun
-%else
-%pre
-# Add the "netdata" user
 getent group netdata >/dev/null || groupadd -r netdata
 getent group docker >/dev/null || groupadd -r docker
 getent passwd netdata >/dev/null || \
   useradd -r -g netdata -G docker -s /sbin/nologin \
     -d %{contentdir} -c "netdata" netdata
-exit 0
 
 %post
-setcap cap_dac_read,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/apps.plugin || chmod 1755 /usr/libexec/netdata/plugins.d/apps.plugin
-# Register the netdata service
-/sbin/chkconfig --add netdata
-# Only gets run on initial install (not upgrades or uninstalls)
-if [ $1 = 1 ]; then
-        # Start the netdata service
-        /sbin/service netdata start
-fi
-exit 0
+%{netdata_init_post}
 
 %preun
-# Only gets run on uninstall (not upgrades)
-if [ $1 = 0 ]; then
-        /sbin/service netdata stop > /dev/null 2>&1
-        /sbin/chkconfig --del netdata
-fi
-exit 0
+%{netdata_init_preun}
 
 %postun
-# Only gets run on upgrade (not uninstalls)
-if [ $1 != 0 ]; then
-        /sbin/service netdata condrestart 2>&1 > /dev/null
-fi
-exit 0
-%endif
+%{netdata_init_postun}
 
 %clean
-rm -rf $RPM_BUILD_ROOT
+rm -rf "${RPM_BUILD_ROOT}"
 
 %files
 %doc README.md
@@ -190,11 +180,10 @@ rm -rf $RPM_BUILD_ROOT
 
 # To be eventually moved to %%_defaultdocdir
 %{_sysconfdir}/%{name}/node.d/*.md
-
-%caps(cap_dac_read_search,cap_sys_ptrace=ep) %{_libexecdir}/%{name}/plugins.d/apps.plugin
-
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
+
+%caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0555,root,root) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/log/%{name}
