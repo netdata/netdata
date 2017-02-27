@@ -597,7 +597,42 @@
         var netdataRegistryCallback = function(machines_array) {
             var el = '';
             var a1 = '';
-            var found = 0;
+            var found = 0, hosted = 0;
+            var len, i, url, hostname, icon;
+
+            if(options.hosts.length > 1) {
+                el += '<li><a href="#" onClick="return false;" style="color: #666;" target="_blank">databases available on this host</a></li>';
+                a1 += '<li><a href="#" onClick="return false;"><i class="fa fa-info-circle" aria-hidden="true" style="color: #666;"></i></a></li>';
+
+                var base = document.location.origin.toString() + document.location.pathname.toString();
+                if(base.endsWith("/host/" + options.hostname + "/"))
+                    base = base.substring(0, base.length - ("/host/" + options.hostname + "/").toString().length);
+
+                if(base.endsWith("/"))
+                    base = base.substring(0, base.length - 1);
+
+                i = 0;
+                len = options.hosts.length;
+                while(len--) {
+                    hostname = options.hosts[i].hostname;
+                    if(i == 0) {
+                        url = base + "/";
+                        icon = "home";
+                    }
+                    else {
+                        url = base + "/host/" + hostname + "/";
+                        icon = "window-restore";
+                    }
+
+                    el += '<li id="registry_server_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '" onClick="return gotoHostedModalHandler(\'' + url + '\');">' + hostname + '</a></li>';
+                    a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fa fa-' + icon + '" aria-hidden="true" style="color: #999;"></i></a></li>';
+                    hosted++;
+                    i++;
+                }
+
+                el += '<li role="separator" class="divider"></li>';
+                a1 += '<li role="separator" class="divider"></li>';
+            }
 
             if(machines_array === null) {
                 var ret = loadLocalStorage("registryCallback");
@@ -616,7 +651,7 @@
                     return 0;
                 });
 
-                var len = machines.length;
+                len = machines.length;
                 while(len--) {
                     var u = machines[len];
                     found++;
@@ -705,6 +740,11 @@
             // since we play with hash
             // this is needed to reload the page
             location.reload();
+        }
+
+        function gotoHostedModalHandler(url) {
+            document.location = url + urlOptions.genHash();
+            return false;
         }
 
         var gotoServerValidateRemaining = 0;
@@ -878,6 +918,7 @@
             categories_idx: {},
             families: [],
             families_idx: {},
+            hosts: [],
 
             chartsPerRow: 0,
             // chartsMinWidth: 1450,
@@ -2256,6 +2297,9 @@
                         options.data = data;
                         options.version = data.version;
                         netdataDashboard.os = data.os;
+
+                        if(typeof data.hosts != 'undefined')
+                            options.hosts = data.hosts;
 
                         // update the dashboard hostname
                         document.getElementById('hostname').innerHTML = options.hostname;
