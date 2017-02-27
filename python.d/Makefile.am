@@ -8,6 +8,7 @@ include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_python_SCRIPTS = \
+    python-modules-installer.sh \
     $(NULL)
 
 dist_python_DATA = \
@@ -44,7 +45,6 @@ dist_python_DATA = \
     tomcat.chart.py \
     varnish.chart.py \
     web_log.chart.py \
-    python-modules-installer.sh \
     $(NULL)
 
 pythonmodulesdir=$(pythondir)/python_modules
