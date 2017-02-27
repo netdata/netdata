@@ -689,7 +689,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         return 404;
     }
 
-    if(!appconfig_get_boolean(&stream_config, key, "enabled", 1)) {
+    if(!appconfig_get_boolean(&stream_config, key, "enabled", 0)) {
         error("STREAM [receive from [%s]:%s]: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your API key is not permitted access.");
