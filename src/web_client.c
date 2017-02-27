@@ -1034,19 +1034,10 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 
         uint32_t hash = simple_hash(tok);
 
-        if(unlikely(hash == hash_localhost && !strcmp(tok, "localhost")))
-            return web_client_process_url(localhost, w, url);
+        host = rrdhost_find_by_hostname(tok, hash);
+        if(!host) host = rrdhost_find_by_guid(tok, hash);
 
-        rrd_rdlock();
-        RRDHOST *h;
-        rrdhost_foreach_read(h) {
-            if(unlikely((hash == h->hash_hostname && !strcmp(tok, h->hostname)) ||
-                        (hash == h->hash_machine_guid && !strcmp(tok, h->machine_guid)))) {
-                rrd_unlock();
-                return web_client_process_url(h, w, url);
-            }
-        }
-        rrd_unlock();
+        if(host) return web_client_process_url(host, w, url);
     }
 
     buffer_flush(w->response.data);

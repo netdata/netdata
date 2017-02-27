@@ -2,7 +2,7 @@
 #include "common.h"
 
 RRDHOST *localhost = NULL;
-
+size_t rrd_hosts_available = 0;
 pthread_rwlock_t rrd_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 time_t rrdhost_free_orphan_time = 3600;
@@ -21,7 +21,7 @@ avl_tree_lock rrdhost_root_index = {
         .rwlock = AVL_LOCK_INITIALIZER
 };
 
-RRDHOST *rrdhost_find_guid(const char *guid, uint32_t hash) {
+RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash) {
     debug(D_RRDHOST, "Searching in index for host with guid '%s'", guid);
 
     RRDHOST tmp;
@@ -29,6 +29,25 @@ RRDHOST *rrdhost_find_guid(const char *guid, uint32_t hash) {
     tmp.hash_machine_guid = (hash)?hash:simple_hash(tmp.machine_guid);
 
     return (RRDHOST *)avl_search_lock(&(rrdhost_root_index), (avl *) &tmp);
+}
+
+RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
+    if(unlikely(!strcmp(hostname, "localhost")))
+        return localhost;
+
+    if(unlikely(!hash)) hash = simple_hash(hostname);
+
+    rrd_rdlock();
+    RRDHOST *host;
+    rrdhost_foreach_read(host) {
+        if(unlikely((hash == host->hash_hostname && !strcmp(hostname, host->hostname)))) {
+            rrd_unlock();
+            return host;
+        }
+    }
+    rrd_unlock();
+
+    return NULL;
 }
 
 #define rrdhost_index_add(rrdhost) (RRDHOST *)avl_insert_lock(&(rrdhost_root_index), (avl *)(rrdhost))
@@ -232,6 +251,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         );
     }
 
+    rrd_hosts_available++;
     rrd_unlock();
 
     return host;
@@ -251,7 +271,7 @@ RRDHOST *rrdhost_find_or_create(
 ) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
-    RRDHOST *host = rrdhost_find_guid(guid, 0);
+    RRDHOST *host = rrdhost_find_by_guid(guid, 0);
     if(!host) {
         host = rrdhost_create(
                 hostname
@@ -432,7 +452,7 @@ void rrdhost_free(RRDHOST *host) {
     rrdhost_unlock(host);
     freez(host);
 
-    info("Host memory cleanup completed...");
+    rrd_hosts_available--;
 }
 
 void rrdhost_free_all(void) {
@@ -447,7 +467,7 @@ void rrdhost_free_all(void) {
 void rrdhost_save(RRDHOST *host) {
     if(!host) return;
 
-    info("Saving host '%s' database...", host->hostname);
+    info("Saving database of host '%s'...", host->hostname);
 
     RRDSET *st;
     RRDDIM *rd;
@@ -478,7 +498,7 @@ void rrdhost_save(RRDHOST *host) {
 }
 
 void rrdhost_save_all(void) {
-    info("Saving database...");
+    info("Saving database [%zu hosts(s)]...", rrd_hosts_available);
 
     rrd_rdlock();
 
