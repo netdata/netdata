@@ -4,6 +4,10 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
 dist_charts_SCRIPTS = \
+	$(NULL)
+
+dist_charts_DATA = \
+	README.md \
 	ap.chart.sh \
 	apcupsd.chart.sh \
 	apache.chart.sh \
@@ -23,8 +27,4 @@ dist_charts_SCRIPTS = \
 	sensors.chart.sh \
 	squid.chart.sh \
 	tomcat.chart.sh \
-	$(NULL)
-
-dist_charts_DATA = \
-	README.md \
 	$(NULL)
