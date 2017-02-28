@@ -116,8 +116,8 @@ class Service(SimpleService):
         # {Incoming Queries': [('RESERVED0', 8), ('A', 4557317680), ...],
         # ......
         for regex in self.regex_options:
-            rndc_stats.update({topic: [(desc, int(value)) for value, desc in self.regex_values.findall(body)]
-                               for topic, body in findall(regex, raw_data)})
+            rndc_stats.update(dict([(topic, [(desc, int(value)) for value, desc in self.regex_values.findall(body)])
+                               for topic, body in findall(regex, raw_data)]))
 
         nms = dict(rndc_stats.get('Name Server Statistics', []))
 
@@ -148,20 +148,20 @@ class Service(SimpleService):
         self.order = ['stats_size', 'bind_stats', 'incoming_q', 'outgoing_q']
         self.definitions = {
             'bind_stats': {
-                'options': [None, 'Name Server Statistics', 'stats', 'Name Server Statistics', 'bind_rndc.stats', 'line'],
+                'options': [None, 'Name Server Statistics', 'stats', 'name server statistics', 'bind_rndc.stats', 'line'],
                 'lines': [
                          ]},
             'incoming_q': {
-                'options': [None, 'Incoming queries', 'queries','Incoming queries', 'bind_rndc.incq', 'line'],
+                'options': [None, 'Incoming queries', 'queries','incoming queries', 'bind_rndc.incq', 'line'],
                 'lines': [
                         ]},
             'outgoing_q': {
-                'options': [None, 'Outgoing queries', 'queries','Outgoing queries', 'bind_rndc.outq', 'line'],
+                'options': [None, 'Outgoing queries', 'queries','outgoing queries', 'bind_rndc.outq', 'line'],
                 'lines': [
                         ]},
             'stats_size': {
                 'options': [None, '%s file size' % split(self.named_stats_path)[1].capitalize(), 'megabytes',
-                            '%s size' % split(self.named_stats_path)[1].capitalize(), 'bind_rndc.size', 'line'],
+                            '%s size' % split(self.named_stats_path)[1], 'bind_rndc.size', 'line'],
                 'lines': [
                          ["stats_size", None, "absolute", 1, 1048576]
                         ]}
