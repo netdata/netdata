@@ -234,14 +234,7 @@ void rrdset_free(RRDSET *st) {
     rrdhost_check_wrlock(st->rrdhost);  // make sure we have a write lock on the host
     rrdset_wrlock(st);                  // lock this RRDSET
 
-    // ------------------------------------------------------------------------
-    // free its children structures
-
-    while(st->variables)  rrdsetvar_free(st->variables);
-    while(st->alarms)     rrdsetcalc_unlink(st->alarms);
-    while(st->dimensions) rrddim_free(st, st->dimensions);
-
-    rrdfamily_free(st->rrdhost, st->rrdfamily);
+    // info("Removing chart '%s' ('%s')", st->id, st->name);
 
     // ------------------------------------------------------------------------
     // remove it from the indexes
@@ -250,6 +243,15 @@ void rrdset_free(RRDSET *st) {
         error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", st->id);
 
     rrdset_index_del_name(st->rrdhost, st);
+
+    // ------------------------------------------------------------------------
+    // free its children structures
+
+    while(st->variables)  rrdsetvar_free(st->variables);
+    while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+    while(st->dimensions) rrddim_free(st, st->dimensions);
+
+    rrdfamily_free(st->rrdhost, st->rrdfamily);
 
     // ------------------------------------------------------------------------
     // unlink it from the host
@@ -283,13 +285,42 @@ void rrdset_free(RRDSET *st) {
         freez(st);
 }
 
+void rrdset_save(RRDSET *st) {
+    RRDDIM *rd;
+
+    rrdset_check_rdlock(st);
+
+    // info("Saving chart '%s' ('%s')", st->id, st->name);
+
+    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+        debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
+        savememory(st->cache_filename, st, st->memsize);
+    }
+
+    rrddim_foreach_read(rd, st) {
+        if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
+            debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
+            savememory(rd->cache_filename, rd, rd->memsize);
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 // RRDSET - create a chart
 
-RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const char *name, const char *family
-                      , const char *context, const char *title, const char *units, long priority
-                      , int update_every, RRDSET_TYPE chart_type) {
-
+RRDSET *rrdset_create(
+          RRDHOST *host
+        , const char *type
+        , const char *id
+        , const char *name
+        , const char *family
+        , const char *context
+        , const char *title
+        , const char *units
+        , long priority
+        , int update_every
+        , RRDSET_TYPE chart_type
+) {
     if(!type || !type[0]) {
         fatal("Cannot create rrd stats without a type.");
         return NULL;
@@ -308,6 +339,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
 
     RRDSET *st = rrdset_find(host, fullid);
     if(st) {
+        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
         return st;
     }
@@ -449,6 +481,7 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
 
     rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
     rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
+    rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
 
     // if(!strcmp(st->id, "disk_util.dm-0")) {
     //     st->debug = 1;
@@ -501,6 +534,8 @@ RRDSET *rrdset_create(RRDHOST *host, const char *type, const char *id, const cha
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
+
+    rrdhost_cleanup(host);
 
     rrdhost_unlock(host);
 
@@ -676,6 +711,11 @@ void rrdset_done(RRDSET *st) {
     if(unlikely(rrd_delete_unupdated_dimensions) && !st->enabled)
         st->enabled = 1;
 */
+
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
+        error("Chart '%s' has the OBSOLETE flag set, but it is collected.", st->id);
+        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+    }
 
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut)) {

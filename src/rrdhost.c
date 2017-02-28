@@ -5,6 +5,7 @@ RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
 pthread_rwlock_t rrd_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
+time_t rrdset_free_obsolete_time = 3600;
 time_t rrdhost_free_orphan_time = 3600;
 
 // ----------------------------------------------------------------------------
@@ -315,18 +316,22 @@ RRDHOST *rrdhost_find_or_create(
 }
 
 void rrdhost_cleanup_remote_stale(RRDHOST *protected) {
+    time_t now = now_realtime_sec();
+
     rrd_wrlock();
 
     RRDHOST *h;
+
+restart_after_removal:
     rrdhost_foreach_write(h) {
         if(h != protected
            && h != localhost
            && !h->connected_senders
-           && h->senders_disconnected_time + rrdhost_free_orphan_time > now_realtime_sec()) {
+           && h->senders_disconnected_time + rrdhost_free_orphan_time < now) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", h->hostname, h->machine_guid);
             rrdhost_save(h);
             rrdhost_free(h);
-            break;
+            goto restart_after_removal;
         }
     }
 
@@ -337,6 +342,8 @@ void rrdhost_cleanup_remote_stale(RRDHOST *protected) {
 // RRDHOST global / startup initialization
 
 void rrd_init(char *hostname) {
+    rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
+
     health_init();
     registry_init();
     rrdpush_init();
@@ -472,7 +479,6 @@ void rrdhost_save(RRDHOST *host) {
     info("Saving database of host '%s'...", host->hostname);
 
     RRDSET *st;
-    RRDDIM *rd;
 
     // we get a write lock
     // to ensure only one thread is saving the database
@@ -480,19 +486,7 @@ void rrdhost_save(RRDHOST *host) {
 
     rrdset_foreach_write(st, host) {
         rrdset_rdlock(st);
-
-        if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
-            debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
-            savememory(st->cache_filename, st, st->memsize);
-        }
-
-        rrddim_foreach_read(rd, st) {
-            if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
-                debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
-                savememory(rd->cache_filename, rd, rd->memsize);
-            }
-        }
-
+        rrdset_save(st);
         rrdset_unlock(st);
     }
 
@@ -509,4 +503,27 @@ void rrdhost_save_all(void) {
         rrdhost_save(host);
 
     rrd_unlock();
+}
+
+void rrdhost_cleanup(RRDHOST *host) {
+    time_t now = now_realtime_sec();
+
+    RRDSET *st;
+
+restart_after_removal:
+    rrdset_foreach_write(st, host) {
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
+                    && st->last_accessed_time + rrdset_free_obsolete_time < now
+                    && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
+                    && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
+        )) {
+
+            rrdset_rdlock(st);
+            rrdset_save(st);
+            rrdset_unlock(st);
+
+            rrdset_free(st);
+            goto restart_after_removal;
+        }
+    }
 }

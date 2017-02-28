@@ -213,7 +213,8 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_ENABLED  = 1 << 0, // enables or disables a chart
     RRDSET_FLAG_DETAIL   = 1 << 1, // if set, the data set should be considered as a detail of another
                                    // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG    = 1 << 2  // enables or disables debugging for a chart
+    RRDSET_FLAG_DEBUG    = 1 << 2, // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE = 1 << 3  // this is marked by the collector/module as obsolete
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) ((st)->flags & flag)
@@ -276,7 +277,9 @@ struct rrdset {
 
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
-    size_t unused[10];
+
+    time_t last_accessed_time;                      // the last time this RRDSET has been accessed
+    size_t unused[9];
 
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons
@@ -540,6 +543,9 @@ extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
 
 extern void rrdset_done(RRDSET *st);
 
+// checks if the RRDSET should be offered to viewers
+#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions)
+
 // get the total duration in seconds of the round robin database
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
 
@@ -616,6 +622,9 @@ extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc);
 #define rrdset_index_add(host, st) (RRDSET *)avl_insert_lock(&((host)->rrdset_root_index), (avl *)(st))
 #define rrdset_index_del(host, st) (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index), (avl *)(st))
 extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
+
+extern void rrdset_save(RRDSET *st);
+extern void rrdhost_cleanup(RRDHOST *host);
 
 #endif /* NETDATA_RRD_INTERNALS */
 
