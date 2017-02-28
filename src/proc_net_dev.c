@@ -8,6 +8,7 @@ struct netdev {
     // flags
     int configured;
     int enabled;
+    int updated;
 
     int do_bandwidth;
     int do_packets;
@@ -67,26 +68,70 @@ struct netdev {
     struct netdev *next;
 };
 
-static struct netdev *netdev_root = NULL;
+static struct netdev *netdev_root = NULL, *netdev_last_used = NULL;
+
+static size_t netdev_added = 0, netdev_found = 0;
+
+static void netdev_free(struct netdev *d) {
+    if(d->st_bandwidth)  rrdset_flag_set(d->st_bandwidth,  RRDSET_FLAG_OBSOLETE);
+    if(d->st_packets)    rrdset_flag_set(d->st_packets,    RRDSET_FLAG_OBSOLETE);
+    if(d->st_errors)     rrdset_flag_set(d->st_errors,     RRDSET_FLAG_OBSOLETE);
+    if(d->st_drops)      rrdset_flag_set(d->st_drops,      RRDSET_FLAG_OBSOLETE);
+    if(d->st_fifo)       rrdset_flag_set(d->st_fifo,       RRDSET_FLAG_OBSOLETE);
+    if(d->st_compressed) rrdset_flag_set(d->st_compressed, RRDSET_FLAG_OBSOLETE);
+    if(d->st_events)     rrdset_flag_set(d->st_events,     RRDSET_FLAG_OBSOLETE);
+
+    freez(d->name);
+    freez(d);
+}
+
+static void netdev_cleanup() {
+    if(likely(netdev_found == netdev_added)) return;
+
+    struct netdev *d = netdev_root, *last = NULL;
+    while(d) {
+        if(unlikely(!d->updated)) {
+            // info("Removing network device '%s', linked after '%s'", d->name, last?last->name:"ROOT");
+
+            if(netdev_last_used == d)
+                netdev_last_used = last;
+
+            struct netdev *t = d;
+
+            if(d == netdev_root || !last)
+                netdev_root = d = d->next;
+
+            else
+                last->next = d = d->next;
+
+            t->next = NULL;
+            netdev_free(t);
+        }
+        else {
+            last = d;
+            d->updated = 0;
+            d = d->next;
+        }
+    }
+}
 
 static struct netdev *get_netdev(const char *name) {
-    static struct netdev *last = NULL;
     struct netdev *d;
 
     uint32_t hash = simple_hash(name);
 
     // search it, from the last position to the end
-    for(d = last ; d ; d = d->next) {
+    for(d = netdev_last_used ; d ; d = d->next) {
         if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
-            last = d->next;
+            netdev_last_used = d->next;
             return d;
         }
     }
 
     // search it from the beginning to the last position we used
-    for(d = netdev_root ; d != last ; d = d->next) {
+    for(d = netdev_root ; d != netdev_last_used ; d = d->next) {
         if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
-            last = d->next;
+            netdev_last_used = d->next;
             return d;
         }
     }
@@ -96,6 +141,7 @@ static struct netdev *get_netdev(const char *name) {
     d->name = strdupz(name);
     d->hash = simple_hash(d->name);
     d->len = strlen(d->name);
+    netdev_added++;
 
     // link it to the end
     if(netdev_root) {
@@ -142,12 +188,16 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
+    netdev_found = 0;
+
     size_t lines = procfile_lines(ff), l;
     for(l = 2; l < lines ;l++) {
         // require 17 words on each line
         if(unlikely(procfile_linewords(ff, l) < 17)) continue;
 
         struct netdev *d = get_netdev(procfile_lineword(ff, l, 0));
+        d->updated = 1;
+        netdev_found++;
 
         if(unlikely(!d->configured)) {
             // this is the first time we see this interface
@@ -223,19 +273,27 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_bandwidth == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_bandwidth)) {
-                d->st_bandwidth = rrdset_find_bytype_localhost("net", d->name);
 
-                if(!d->st_bandwidth)
-                    d->st_bandwidth = rrdset_create_localhost("net", d->name, NULL, d->name, "net.net", "Bandwidth"
-                                                              , "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
+                d->st_bandwidth = rrdset_create_localhost(
+                        "net"
+                        , d->name
+                        , NULL
+                        , d->name
+                        , "net.net"
+                        , "Bandwidth"
+                        , "kilobits/s"
+                        , 7000
+                        , update_every
+                        , RRDSET_TYPE_AREA
+                );
 
                 d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(d->st_bandwidth);
 
-            rrddim_set_by_pointer(d->st_bandwidth, d->rd_rbytes, d->rbytes);
-            rrddim_set_by_pointer(d->st_bandwidth, d->rd_tbytes, d->tbytes);
+            rrddim_set_by_pointer(d->st_bandwidth, d->rd_rbytes, (collected_number)d->rbytes);
+            rrddim_set_by_pointer(d->st_bandwidth, d->rd_tbytes, (collected_number)d->tbytes);
             rrdset_done(d->st_bandwidth);
         }
 
@@ -246,12 +304,20 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_packets == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_packets)) {
-                d->st_packets = rrdset_find_bytype_localhost("net_packets", d->name);
 
-                if(!d->st_packets)
-                    d->st_packets = rrdset_create_localhost("net_packets", d->name, NULL, d->name, "net.packets"
-                                                            , "Packets", "packets/s", 7001, update_every
-                                                            , RRDSET_TYPE_LINE);
+                d->st_packets = rrdset_create_localhost(
+                        "net_packets"
+                        , d->name
+                        , NULL
+                        , d->name
+                        , "net.packets"
+                        , "Packets"
+                        , "packets/s"
+                        , 7001
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+
                 rrdset_flag_set(d->st_packets, RRDSET_FLAG_DETAIL);
 
                 d->rd_rpackets = rrddim_add(d->st_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -260,9 +326,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
             else rrdset_next(d->st_packets);
 
-            rrddim_set_by_pointer(d->st_packets, d->rd_rpackets, d->rpackets);
-            rrddim_set_by_pointer(d->st_packets, d->rd_tpackets, d->tpackets);
-            rrddim_set_by_pointer(d->st_packets, d->rd_rmulticast, d->rmulticast);
+            rrddim_set_by_pointer(d->st_packets, d->rd_rpackets, (collected_number)d->rpackets);
+            rrddim_set_by_pointer(d->st_packets, d->rd_tpackets, (collected_number)d->tpackets);
+            rrddim_set_by_pointer(d->st_packets, d->rd_rmulticast, (collected_number)d->rmulticast);
             rrdset_done(d->st_packets);
         }
 
@@ -273,12 +339,19 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_errors == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_errors)) {
-                d->st_errors = rrdset_find_bytype_localhost("net_errors", d->name);
 
-                if(!d->st_errors)
-                    d->st_errors = rrdset_create_localhost("net_errors", d->name, NULL, d->name, "net.errors"
-                                                           , "Interface Errors", "errors/s", 7002, update_every
-                                                           , RRDSET_TYPE_LINE);
+                d->st_errors = rrdset_create_localhost(
+                        "net_errors"
+                        , d->name
+                        , NULL
+                        , d->name
+                        , "net.errors"
+                        , "Interface Errors"
+                        , "errors/s"
+                        , 7002
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
 
                 rrdset_flag_set(d->st_errors, RRDSET_FLAG_DETAIL);
 
@@ -287,8 +360,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
             else rrdset_next(d->st_errors);
 
-            rrddim_set_by_pointer(d->st_errors, d->rd_rerrors, d->rerrors);
-            rrddim_set_by_pointer(d->st_errors, d->rd_terrors, d->terrors);
+            rrddim_set_by_pointer(d->st_errors, d->rd_rerrors, (collected_number)d->rerrors);
+            rrddim_set_by_pointer(d->st_errors, d->rd_terrors, (collected_number)d->terrors);
             rrdset_done(d->st_errors);
         }
 
@@ -299,12 +372,19 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_drops == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_drops)) {
-                d->st_drops = rrdset_find_bytype_localhost("net_drops", d->name);
 
-                if(!d->st_drops)
-                    d->st_drops = rrdset_create_localhost("net_drops", d->name, NULL, d->name, "net.drops"
-                                                          , "Interface Drops", "drops/s", 7003, update_every
-                                                          , RRDSET_TYPE_LINE);
+                d->st_drops = rrdset_create_localhost(
+                        "net_drops"
+                        , d->name
+                        , NULL
+                        , d->name
+                        , "net.drops"
+                        , "Interface Drops"
+                        , "drops/s"
+                        , 7003
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
 
                 rrdset_flag_set(d->st_drops, RRDSET_FLAG_DETAIL);
 
@@ -313,8 +393,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
             else rrdset_next(d->st_drops);
 
-            rrddim_set_by_pointer(d->st_drops, d->rd_rdrops, d->rdrops);
-            rrddim_set_by_pointer(d->st_drops, d->rd_tdrops, d->tdrops);
+            rrddim_set_by_pointer(d->st_drops, d->rd_rdrops, (collected_number)d->rdrops);
+            rrddim_set_by_pointer(d->st_drops, d->rd_tdrops, (collected_number)d->tdrops);
             rrdset_done(d->st_drops);
         }
 
@@ -325,12 +405,19 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_fifo == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_fifo)) {
-                d->st_fifo = rrdset_find_bytype_localhost("net_fifo", d->name);
 
-                if(!d->st_fifo)
-                    d->st_fifo = rrdset_create_localhost("net_fifo", d->name, NULL, d->name, "net.fifo"
-                                                         , "Interface FIFO Buffer Errors", "errors", 7004, update_every
-                                                         , RRDSET_TYPE_LINE);
+                d->st_fifo = rrdset_create_localhost(
+                        "net_fifo"
+                        , d->name
+                        , NULL
+                        , d->name
+                        , "net.fifo"
+                        , "Interface FIFO Buffer Errors"
+                        , "errors"
+                        , 7004
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
 
                 rrdset_flag_set(d->st_fifo, RRDSET_FLAG_DETAIL);
 
@@ -339,8 +426,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
             else rrdset_next(d->st_fifo);
 
-            rrddim_set_by_pointer(d->st_fifo, d->rd_rfifo, d->rfifo);
-            rrddim_set_by_pointer(d->st_fifo, d->rd_tfifo, d->tfifo);
+            rrddim_set_by_pointer(d->st_fifo, d->rd_rfifo, (collected_number)d->rfifo);
+            rrddim_set_by_pointer(d->st_fifo, d->rd_tfifo, (collected_number)d->tfifo);
             rrdset_done(d->st_fifo);
         }
 
@@ -351,11 +438,19 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_compressed == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_compressed)) {
-                d->st_compressed = rrdset_find_bytype_localhost("net_compressed", d->name);
-                if(!d->st_compressed)
-                    d->st_compressed = rrdset_create_localhost("net_compressed", d->name, NULL, d->name
-                                                               , "net.compressed", "Compressed Packets", "packets/s"
-                                                               , 7005, update_every, RRDSET_TYPE_LINE);
+
+                d->st_compressed = rrdset_create_localhost(
+                        "net_compressed"
+                        , d->name
+                        , NULL
+                        , d->name
+                        , "net.compressed"
+                        , "Compressed Packets"
+                        , "packets/s"
+                        , 7005
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
 
                 rrdset_flag_set(d->st_compressed, RRDSET_FLAG_DETAIL);
 
@@ -364,8 +459,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
             else rrdset_next(d->st_compressed);
 
-            rrddim_set_by_pointer(d->st_compressed, d->rd_rcompressed, d->rcompressed);
-            rrddim_set_by_pointer(d->st_compressed, d->rd_tcompressed, d->tcompressed);
+            rrddim_set_by_pointer(d->st_compressed, d->rd_rcompressed, (collected_number)d->rcompressed);
+            rrddim_set_by_pointer(d->st_compressed, d->rd_tcompressed, (collected_number)d->tcompressed);
             rrdset_done(d->st_compressed);
         }
 
@@ -376,11 +471,19 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if(d->do_events == CONFIG_BOOLEAN_YES) {
             if(unlikely(!d->st_events)) {
-                d->st_events = rrdset_find_bytype_localhost("net_events", d->name);
-                if(!d->st_events)
-                    d->st_events = rrdset_create_localhost("net_events", d->name, NULL, d->name, "net.events"
-                                                           , "Network Interface Events", "events/s", 7006, update_every
-                                                           , RRDSET_TYPE_LINE);
+
+                d->st_events = rrdset_create_localhost(
+                        "net_events"
+                        , d->name
+                        , NULL
+                        , d->name
+                        , "net.events"
+                        , "Network Interface Events"
+                        , "events/s"
+                        , 7006
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
 
                 rrdset_flag_set(d->st_events, RRDSET_FLAG_DETAIL);
 
@@ -390,12 +493,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             }
             else rrdset_next(d->st_events);
 
-            rrddim_set_by_pointer(d->st_events, d->rd_rframe,      d->rframe);
-            rrddim_set_by_pointer(d->st_events, d->rd_tcollisions, d->tcollisions);
-            rrddim_set_by_pointer(d->st_events, d->rd_tcarrier,    d->tcarrier);
+            rrddim_set_by_pointer(d->st_events, d->rd_rframe,      (collected_number)d->rframe);
+            rrddim_set_by_pointer(d->st_events, d->rd_tcollisions, (collected_number)d->tcollisions);
+            rrddim_set_by_pointer(d->st_events, d->rd_tcarrier,    (collected_number)d->tcarrier);
             rrdset_done(d->st_events);
         }
     }
+
+    netdev_cleanup();
 
     return 0;
 }

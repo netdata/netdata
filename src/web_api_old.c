@@ -154,7 +154,9 @@ int web_client_api_old_data_request(RRDHOST *host, struct web_client *w, char *u
     debug(D_WEB_CLIENT_ACCESS, "%llu: Sending RRD data '%s' (id %s, %d lines, %d group, %d group_method, %ld after, %ld before).",
             w->id, st->name, st->id, lines, group_count, group_method, after, before);
 
-    time_t timestamp_in_data = rrd_stats_json(datasource_type, st, w->response.data, lines, group_count, group_method, (unsigned long)after, (unsigned long)before, nonzero);
+    time_t timestamp_in_data = rrdset2json_api_old(datasource_type, st, w->response.data, lines, group_count
+                                                   , group_method, (unsigned long) after, (unsigned long) before
+                                                   , nonzero);
 
     if(datasource_type == DATASOURCE_DATATABLE_JSONP) {
         if(timestamp_in_data > last_timestamp_in_data)
@@ -195,11 +197,12 @@ inline int web_client_api_old_graph_request(RRDHOST *host, struct web_client *w,
             buffer_flush(w->response.data);
             return mysendfile(w, tok);
         }
+        st->last_accessed_time = now_realtime_sec();
 
         debug(D_WEB_CLIENT_ACCESS, "%llu: Sending %s.json of RRD_STATS...", w->id, st->name);
         w->response.data->contenttype = CT_APPLICATION_JSON;
         buffer_flush(w->response.data);
-        rrd_stats_graph_json(st, url, w->response.data);
+        rrd_graph2json_api_old(st, url, w->response.data);
         return 200;
     }
 
@@ -215,7 +218,10 @@ inline int web_client_api_old_list_request(RRDHOST *host, struct web_client *w, 
     RRDSET *st;
 
     rrdhost_rdlock(host);
-    rrdset_foreach_read(st, host) buffer_sprintf(w->response.data, "%s\n", st->name);
+    rrdset_foreach_read(st, host) {
+        if(rrdset_is_available_for_viewers(st))
+            buffer_sprintf(w->response.data, "%s\n", st->name);
+    }
     rrdhost_unlock(host);
 
     return 200;
@@ -226,6 +232,6 @@ inline int web_client_api_old_all_json(RRDHOST *host, struct web_client *w, char
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
     buffer_flush(w->response.data);
-    rrd_stats_all_json(host, w->response.data);
+    rrd_all2json_api_old(host, w->response.data);
     return 200;
 }
