@@ -1003,7 +1003,7 @@ void *tc_main(void *ptr) {
                 rrddim_set(stcpu, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
                 rrdset_done(stcpu);
 
-                if(unlikely(!sttime)) stcpu = rrdset_find_localhost("netdata.plugin_tc_time");
+                if(unlikely(!sttime)) sttime = rrdset_find_localhost("netdata.plugin_tc_time");
                 if(unlikely(!sttime)) {
                     sttime = rrdset_create_localhost("netdata", "plugin_tc_time", NULL, "tc.helper", NULL
                                                      , "NetData TC script execution", "milliseconds/run", 135001

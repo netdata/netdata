@@ -466,8 +466,8 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 
         unsigned long i = procfile_linewords(ff, 0);
         if(unlikely(i == 0)) {
-            return;
             ca->updated = 0;
+            return;
         }
 
         // we may have 1 more CPU reported
@@ -2113,7 +2113,7 @@ void update_cgroup_charts(int update_every) {
                 );
 
                 for(i = 0; i < cg->cpuacct_usage.cpus; i++) {
-                    snprintfz(id, CHART_TITLE_MAX, "cpu%u", i);
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "cpu%u", i);
                     rrddim_add(cg->st_cpu_per_core, id, NULL, 100, 1000000000, RRD_ALGORITHM_INCREMENTAL);
                 }
             }
@@ -2121,7 +2121,7 @@ void update_cgroup_charts(int update_every) {
                 rrdset_next(cg->st_cpu_per_core);
 
             for(i = 0; i < cg->cpuacct_usage.cpus ;i++) {
-                snprintfz(id, CHART_TITLE_MAX, "cpu%u", i);
+                snprintfz(id, RRD_ID_LENGTH_MAX, "cpu%u", i);
                 rrddim_set(cg->st_cpu_per_core, id, cg->cpuacct_usage.cpu_percpu[i]);
             }
             rrdset_done(cg->st_cpu_per_core);
