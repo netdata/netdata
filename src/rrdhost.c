@@ -409,6 +409,10 @@ void rrdhost_free(RRDHOST *host) {
     info("Freeing all memory for host '%s'...", host->hostname);
 
     rrd_check_wrlock();     // make sure the RRDs are write locked
+
+    // stop a possibly running thread
+    rrdpush_sender_thread_stop(host);
+
     rrdhost_wrlock(host);   // lock this RRDHOST
 
     // ------------------------------------------------------------------------
@@ -446,8 +450,6 @@ void rrdhost_free(RRDHOST *host) {
 
     // ------------------------------------------------------------------------
     // free it
-
-    rrdpush_sender_thread_stop(host);
 
     freez(host->os);
     freez(host->cache_dir);
