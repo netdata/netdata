@@ -305,6 +305,26 @@ void rrdset_save(RRDSET *st) {
     }
 }
 
+void rrdset_delete(RRDSET *st) {
+    RRDDIM *rd;
+
+    rrdset_check_rdlock(st);
+
+    // info("Deleting chart '%s' ('%s')", st->id, st->name);
+
+    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+        debug(D_RRD_STATS, "Deleting stats '%s' to '%s'.", st->name, st->cache_filename);
+        unlink(st->cache_filename);
+    }
+
+    rrddim_foreach_read(rd, st) {
+        if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
+            debug(D_RRD_STATS, "Deleting dimension '%s' to '%s'.", rd->name, rd->cache_filename);
+            unlink(rd->cache_filename);
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 // RRDSET - create a chart
 
@@ -535,7 +555,7 @@ RRDSET *rrdset_create(
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
 
-    rrdhost_cleanup(host);
+    rrdhost_cleanup_obsolete(host);
 
     rrdhost_unlock(host);
 
