@@ -442,12 +442,18 @@ void *rrdpush_sender_thread(void *ptr) {
 cleanup:
     debug(D_WEB_CLIENT, "STREAM %s [send]: sending thread exits.", host->hostname);
 
+    if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
+        error("STREAM %s [send]: cannot set pthread cancel state to DISABLE.", host->hostname);
+
     rrdpush_lock(host);
     rrdhost_wrlock(host);
     rrdpush_sender_thread_cleanup_locked_all(host);
     rrdhost_unlock(host);
     rrdpush_unlock(host);
 
+    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+        error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
+    
     pthread_exit(NULL);
     return NULL;
 }
