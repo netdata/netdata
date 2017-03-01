@@ -219,6 +219,8 @@ static void rrdpush_sender_thread_cleanup_locked_all(RRDHOST *host) {
     host->rrdpush_buffer = NULL;
 
     host->rrdpush_spawn = 0;
+
+    rrdhost_flag_set(host, RRDHOST_ORPHAN);
 }
 
 void rrdpush_sender_thread_stop(RRDHOST *host) {
@@ -645,6 +647,7 @@ void rrdpush_sender_thread_spawn(RRDHOST *host) {
         else if(pthread_detach(host->rrdpush_thread))
             error("STREAM %s [send]: cannot request detach newly created thread.", host->hostname);
 
+        rrdhost_flag_clear(host, RRDHOST_ORPHAN);
         host->rrdpush_spawn = 1;
     }
 
