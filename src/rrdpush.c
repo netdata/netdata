@@ -453,7 +453,7 @@ cleanup:
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
-    
+
     pthread_exit(NULL);
     return NULL;
 }
