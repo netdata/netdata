@@ -51,6 +51,8 @@ static SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 
 static char *cgroups_rename_script = NULL;
 
+static int cgroups_check = 0;
+
 static uint32_t Read_hash = 0;
 static uint32_t Write_hash = 0;
 static uint32_t user_hash = 0;
@@ -407,12 +409,14 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
         ff = procfile_reopen(ff, cp->filename, NULL, PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) {
             cp->updated = 0;
+            cgroups_check = 1;
             return;
         }
 
         ff = procfile_readall(ff);
         if(unlikely(!ff)) {
             cp->updated = 0;
+            cgroups_check = 1;
             return;
         }
 
@@ -449,12 +453,14 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
         ff = procfile_reopen(ff, ca->filename, NULL, PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) {
             ca->updated = 0;
+            cgroups_check = 1;
             return;
         }
 
         ff = procfile_readall(ff);
         if(unlikely(!ff)) {
             ca->updated = 0;
+            cgroups_check = 1;
             return;
         }
 
@@ -509,12 +515,14 @@ static inline void cgroup_read_blkio(struct blkio *io) {
         ff = procfile_reopen(ff, io->filename, NULL, PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) {
             io->updated = 0;
+            cgroups_check = 1;
             return;
         }
 
         ff = procfile_readall(ff);
         if(unlikely(!ff)) {
             io->updated = 0;
+            cgroups_check = 1;
             return;
         }
 
@@ -580,12 +588,14 @@ static inline void cgroup_read_memory(struct memory *mem) {
         ff = procfile_reopen(ff, mem->filename_detailed, NULL, PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) {
             mem->updated_detailed = 0;
+            cgroups_check = 1;
             goto memory_next;
         }
 
         ff = procfile_readall(ff);
         if(unlikely(!ff)) {
             mem->updated_detailed = 0;
+            cgroups_check = 1;
             goto memory_next;
         }
 
@@ -2516,9 +2526,10 @@ void *cgroups_main(void *ptr) {
         // BEGIN -- the job to be done
 
         find_dt += hb_dt;
-        if(unlikely(find_dt >= find_every)) {
+        if(unlikely(find_dt >= find_every || cgroups_check)) {
             find_all_cgroups();
             find_dt = 0;
+            cgroups_check = 0;
         }
 
         read_all_cgroups(cgroup_root);
