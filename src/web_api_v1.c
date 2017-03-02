@@ -185,6 +185,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
+    st->last_accessed_time = now_realtime_sec();
     callback(st, w->response.data);
     return 200;
 
@@ -329,6 +330,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         ret = 200;
         goto cleanup;
     }
+    st->last_accessed_time = now_realtime_sec();
 
     RRDCALC *rc = NULL;
     if(alarm) {
@@ -462,18 +464,8 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
 
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
-            ret = rrd2value(st,
-                    w->response.data,
-                    &n,
-                    (dimensions) ? buffer_tostring(dimensions) : NULL,
-                    points,
-                    after,
-                    before,
-                    group,
-                    options,
-                    NULL,
-                    &latest_timestamp,
-                    &value_is_null);
+            ret = rrdset2value_api_v1(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL
+                                      , points, after, before, group, options, NULL, &latest_timestamp, &value_is_null);
 
         // if the value cannot be calculated, show empty badge
         if (ret != 200) {
@@ -613,6 +605,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         ret = 404;
         goto cleanup;
     }
+    st->last_accessed_time = now_realtime_sec();
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):0;
@@ -655,7 +648,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    ret = rrd2format(st, w->response.data, dimensions, format, points, after, before, group, options, &last_timestamp_in_data);
+    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, options
+                                 , &last_timestamp_in_data);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)

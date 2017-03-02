@@ -5,6 +5,7 @@ RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
 pthread_rwlock_t rrd_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
+time_t rrdset_free_obsolete_time = 3600;
 time_t rrdhost_free_orphan_time = 3600;
 
 // ----------------------------------------------------------------------------
@@ -118,6 +119,13 @@ RRDHOST *rrdhost_create(const char *hostname,
     avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
     avl_init_lock(&(host->rrdfamily_root_index),   rrdfamily_compare);
     avl_init_lock(&(host->variables_root_index),   rrdvar_compare);
+
+    if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete obsolete charts files", 1))
+        rrdhost_flag_set(host, RRDHOST_DELETE_OBSOLETE_FILES);
+
+    if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete orphan hosts files", 1) && !is_localhost)
+        rrdhost_flag_set(host, RRDHOST_DELETE_ORPHAN_FILES);
+
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -309,24 +317,33 @@ RRDHOST *rrdhost_find_or_create(
             error("Host '%s' has memory mode '%s', but the wanted one is '%s'.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
     }
 
-    rrdhost_cleanup_remote_stale(host);
+    rrdhost_cleanup_orphan(host);
 
     return host;
 }
 
-void rrdhost_cleanup_remote_stale(RRDHOST *protected) {
+void rrdhost_cleanup_orphan(RRDHOST *protected) {
+    time_t now = now_realtime_sec();
+
     rrd_wrlock();
 
-    RRDHOST *h;
-    rrdhost_foreach_write(h) {
-        if(h != protected
-           && h != localhost
-           && !h->connected_senders
-           && h->senders_disconnected_time + rrdhost_free_orphan_time > now_realtime_sec()) {
-            info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", h->hostname, h->machine_guid);
-            rrdhost_save(h);
-            rrdhost_free(h);
-            break;
+    RRDHOST *host;
+
+restart_after_removal:
+    rrdhost_foreach_write(host) {
+        if(host != protected
+           && host != localhost
+           && !host->connected_senders
+           && host->senders_disconnected_time + rrdhost_free_orphan_time < now) {
+            info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
+
+            if(rrdset_flag_check(host, RRDHOST_ORPHAN))
+                rrdhost_delete(host);
+            else
+                rrdhost_save(host);
+
+            rrdhost_free(host);
+            goto restart_after_removal;
         }
     }
 
@@ -337,6 +354,8 @@ void rrdhost_cleanup_remote_stale(RRDHOST *protected) {
 // RRDHOST global / startup initialization
 
 void rrd_init(char *hostname) {
+    rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
+
     health_init();
     registry_init();
     rrdpush_init();
@@ -402,6 +421,10 @@ void rrdhost_free(RRDHOST *host) {
     info("Freeing all memory for host '%s'...", host->hostname);
 
     rrd_check_wrlock();     // make sure the RRDs are write locked
+
+    // stop a possibly running thread
+    rrdpush_sender_thread_stop(host);
+
     rrdhost_wrlock(host);   // lock this RRDHOST
 
     // ------------------------------------------------------------------------
@@ -440,8 +463,6 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
-    rrdpush_sender_thread_stop(host);
-
     freez(host->os);
     freez(host->cache_dir);
     freez(host->varlib_dir);
@@ -472,7 +493,6 @@ void rrdhost_save(RRDHOST *host) {
     info("Saving database of host '%s'...", host->hostname);
 
     RRDSET *st;
-    RRDDIM *rd;
 
     // we get a write lock
     // to ensure only one thread is saving the database
@@ -480,19 +500,30 @@ void rrdhost_save(RRDHOST *host) {
 
     rrdset_foreach_write(st, host) {
         rrdset_rdlock(st);
+        rrdset_save(st);
+        rrdset_unlock(st);
+    }
 
-        if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
-            debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
-            savememory(st->cache_filename, st, st->memsize);
-        }
+    rrdhost_unlock(host);
+}
 
-        rrddim_foreach_read(rd, st) {
-            if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
-                debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
-                savememory(rd->cache_filename, rd, rd->memsize);
-            }
-        }
+// ----------------------------------------------------------------------------
+// RRDHOST - delete files
 
+void rrdhost_delete(RRDHOST *host) {
+    if(!host) return;
+
+    info("Deleting database of host '%s'...", host->hostname);
+
+    RRDSET *st;
+
+    // we get a write lock
+    // to ensure only one thread is saving the database
+    rrdhost_wrlock(host);
+
+    rrdset_foreach_write(st, host) {
+        rrdset_rdlock(st);
+        rrdset_delete(st);
         rrdset_unlock(st);
     }
 
@@ -509,4 +540,32 @@ void rrdhost_save_all(void) {
         rrdhost_save(host);
 
     rrd_unlock();
+}
+
+void rrdhost_cleanup_obsolete(RRDHOST *host) {
+    time_t now = now_realtime_sec();
+
+    RRDSET *st;
+
+restart_after_removal:
+    rrdset_foreach_write(st, host) {
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
+                    && st->last_accessed_time + rrdset_free_obsolete_time < now
+                    && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
+                    && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
+        )) {
+
+            rrdset_rdlock(st);
+
+            if(rrdhost_flag_check(host, RRDHOST_DELETE_OBSOLETE_FILES))
+                rrdset_delete(st);
+            else
+                rrdset_save(st);
+
+            rrdset_unlock(st);
+
+            rrdset_free(st);
+            goto restart_after_removal;
+        }
+    }
 }

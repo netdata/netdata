@@ -78,6 +78,7 @@ declare -A configs_signatures=(
   ['32fde0057c790964f2c743cb3c9aad29']='health.d/nginx.conf'
   ['33b135e28aeaef2b8224ba69a0fde245']='health.d/cpu.conf'
   ['343bc919a2fbc93f687f9d1339ec5f79']='health.d/net.conf'
+  ['35024ebd94542484c0866e6ee6b950cb']='health.d/net.conf'
   ['3634d5eddc46fb0d50cf47f370670c2c']='health.d/redis.conf'
   ['364b6e0081b116c9ec073b4d329a6dcc']='health_alarm_notify.conf'
   ['367d1463e520eb9dc89223bab161c6d1']='python.d/postgres.conf'
