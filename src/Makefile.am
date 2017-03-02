@@ -12,6 +12,7 @@ AM_CPPFLAGS = \
 	-DRUN_DIR="\"$(localstatedir)/run/netdata\"" \
 	-DWEB_DIR="\"$(webdir)\"" \
 	$(NULL)
+
 AM_CFLAGS = \
 	$(OPTIONAL_MATH_CFLAGS) \
 	$(OPTIONAL_NFACCT_CLFAGS) \
@@ -24,8 +25,9 @@ dist_cache_DATA = .keep
 dist_varlib_DATA = .keep
 dist_registry_DATA = .keep
 dist_log_DATA = .keep
+plugins_PROGRAMS =
 if !MACOS
-plugins_PROGRAMS = apps.plugin
+plugins_PROGRAMS += apps.plugin
 endif
 
 netdata_SOURCES = \
@@ -159,3 +161,14 @@ apps_plugin_LDADD = \
 	$(OPTIONAL_CAP_LIBS) \
 	$(NULL)
 
+if FREEIPMI
+plugins_PROGRAMS += freeipmi.plugin
+
+freeipmi_plugin_SOURCES = \
+	freeipmi_plugin.c \
+	$(NULL)
+
+freeipmi_plugin_LDADD = \
+    $(OPTIONAL_IPMIMONITORING_LIBS) \
+	$(NULL)
+endif

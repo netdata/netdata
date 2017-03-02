@@ -33,6 +33,9 @@ set(NETDATA_SOURCE_FILES
         src/global_statistics.h
         src/health.c
         src/health.h
+        src/health_config.c
+        src/health_json.c
+        src/health_log.c
         src/inlined.h
         src/ipc.c
         src/ipc.h
@@ -103,6 +106,19 @@ set(NETDATA_SOURCE_FILES
         src/rrd.h
         src/rrd2json.c
         src/rrd2json.h
+        src/rrd2json_api_old.c
+        src/rrd2json_api_old.h
+        src/rrdcalc.c
+        src/rrdcalctemplate.c
+        src/rrddim.c
+        src/rrddimvar.c
+        src/rrdfamily.c
+        src/rrdhost.c
+        src/rrdpush.c
+        src/rrdpush.h
+        src/rrdset.c
+        src/rrdsetvar.c
+        src/rrdvar.c
         src/simple_pattern.c
         src/simple_pattern.h
         src/socket.c src/socket.h
@@ -116,6 +132,10 @@ set(NETDATA_SOURCE_FILES
         src/unit_test.h
         src/url.c
         src/url.h
+        src/web_api_old.c
+        src/web_api_old.h
+        src/web_api_v1.c
+        src/web_api_v1.h
         src/web_buffer.c
         src/web_buffer.h
         src/web_buffer_svg.c
@@ -124,7 +144,7 @@ set(NETDATA_SOURCE_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        src/rrdhost.c src/rrdfamily.c src/rrdset.c src/rrddim.c src/health_log.c src/health_config.c src/health_json.c src/rrdcalc.c src/rrdcalctemplate.c src/rrdvar.c src/rrddimvar.c src/rrdsetvar.c src/rrdpush.c src/rrdpush.h src/web_api_old.c src/web_api_old.h src/web_api_v1.c src/web_api_v1.h src/rrd2json_api_old.c src/rrd2json_api_old.h)
+        )
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c
@@ -142,6 +162,9 @@ set(APPS_PLUGIN_SOURCE_FILES
         src/web_buffer.h
         config.h)
 
+set(FREEIPMI_PLUGIN_SOURCE_FILES
+        src/plugin_freeipmi.c)
+
 include_directories(AFTER .)
 
 add_definitions(-DHAVE_CONFIG_H -DCACHE_DIR="/var/cache/netdata" -DCONFIG_DIR="/etc/netdata" -DLOG_DIR="/var/log/netdata" -DPLUGINS_DIR="/usr/libexec/netdata" -DWEB_DIR="/usr/share/netdata" -DVARLIB_DIR="/var/lib/netdata")
@@ -151,3 +174,6 @@ target_link_libraries (netdata m z uuid ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(apps.plugin ${APPS_PLUGIN_SOURCE_FILES} src/inlined.h)
 target_link_libraries (apps.plugin m ${CMAKE_THREAD_LIBS_INIT})
+
+add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_SOURCE_FILES})
+target_link_libraries (freeipmi.plugin ipmimonitoring)
