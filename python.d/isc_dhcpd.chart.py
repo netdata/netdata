@@ -53,26 +53,26 @@ class Service(SimpleService):
             self.order = ['parse_time', 'leases_size', 'utilization', 'total']
             self.definitions = {'utilization':
                                     {'options':
-                                         [None, 'Pools utilization', 'used %', 'Utilization', 'isc_dhcpd.util', 'line'],
+                                         [None, 'Pools utilization', 'used %', 'utilization', 'isc_dhcpd.util', 'line'],
                                      'lines': []},
                                  'total':
                                    {'options':
-                                        [None, 'Total all pools', 'leases', 'Utilization', 'isc_dhcpd.total', 'line'],
+                                        [None, 'Total all pools', 'leases', 'utilization', 'isc_dhcpd.total', 'line'],
                                     'lines': [['total', 'leases', 'absolute']]},
                                'parse_time':
                                    {'options':
-                                        [None, 'Parse time', 'ms', 'Parse stats', 'isc_dhcpd.parse', 'line'],
+                                        [None, 'Parse time', 'ms', 'parse stats', 'isc_dhcpd.parse', 'line'],
                                     'lines': [['ptime', 'time', 'absolute']]},
                                'leases_size':
                                    {'options':
-                                        [None, 'dhcpd.leases file size', 'kilobytes', 'Parse stats', 'isc_dhcpd.lsize', 'line'],
+                                        [None, 'dhcpd.leases file size', 'kilobytes', 'parse stats', 'isc_dhcpd.lsize', 'line'],
                                     'lines': [['lsize', 'size', 'absolute']]}}
             # Creating dynamic charts
             for pool in self.pools:
                 self.definitions['utilization']['lines'].append([''.join(['ut_', pool]), pool, 'absolute'])
                 self.order.append(''.join(['leases_', pool]))
                 self.definitions[''.join(['leases_', pool])] = \
-                    {'options': [None, 'Active leases', 'leases', 'Pools', 'isc_dhcpd.lease', 'area'], 
+                    {'options': [None, 'Active leases', 'leases', 'pools', 'isc_dhcpd.lease', 'area'],
                      'lines': [[''.join(['le_', pool]), pool, 'absolute']]}
 
             self.info('Plugin was started succesfully')
@@ -93,13 +93,10 @@ class Service(SimpleService):
                 part2 = filterfalse(find_ends, dhcp_leases)
                 raw_result = dict(zip(part1, part2))
                 time_end = time()
-
                 file_parse_time = round((time_end - time_start) * 1000)
-
         except Exception as e:
             self.error("Failed to parse leases file:", str(e))
             return None
-
         else:
             result = (raw_result, file_parse_time)
             return result
@@ -119,16 +116,16 @@ class Service(SimpleService):
         active_leases = [k for k, v in all_leases.items() if is_binding_active(all_leases[k])]
 
         # Result: {pool: number of active bindings in pool, ...}
-        pools_count = {pool: len([lease for lease in active_leases if is_address_in(lease, pool)])
-                       for pool in self.pools}
+        pools_count = dict([(pool, len([lease for lease in active_leases if is_address_in(lease, pool)]))
+                       for pool in self.pools])
 
         # Result: {pool: number of host ip addresses in pool, ...}
-        pools_max = {pool: (2 ** (32 - int(pool.split('/')[1])) - 2)
-                     for pool in self.pools}
+        pools_max = dict([(pool, (2 ** (32 - int(pool.split('/')[1])) - 2))
+                     for pool in self.pools])
 
         # Result: {pool: % utilization, ....} (percent)
-        pools_util = {pool:int(round(float(pools_count[pool]) / pools_max[pool] * 100, 0))
-                      for pool in self.pools}
+        pools_util = dict([(pool, int(round(float(pools_count[pool]) / pools_max[pool] * 100, 0)))
+                      for pool in self.pools])
 
         # Bulding dicts to send to netdata
         final_count = dict([(''.join(['le_', k]), v) for k, v in pools_count.items()])
@@ -157,6 +154,7 @@ def find_lease(value):
 
 def find_ends(value):
     return value[2:6] != 'ends'
+
 
 def return_utf(s):
     # python2 returns "<type 'str'>" for simple strings
