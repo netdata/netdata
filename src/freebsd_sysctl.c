@@ -274,7 +274,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     char mntonname[MNAMELEN + 1];
 
     // NEEDED BY: do_uptime
-    struct timespec boot_time, cur_time;
+    struct timespec up_time;
 
     // --------------------------------------------------------------------
 
@@ -2181,11 +2181,7 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_uptime)) {
-        if (unlikely(GETSYSCTL("kern.boottime", boot_time))) {
-            do_uptime = 0;
-            error("DISABLED: system.uptime");
-        } else {
-            clock_gettime(CLOCK_REALTIME, &cur_time);
+            clock_gettime(CLOCK_UPTIME, &up_time);
             st = rrdset_find_localhost("system.uptime");
 
             if(unlikely(!st)) {
@@ -2194,9 +2190,8 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
             }
             else rrdset_next(st);
 
-            rrddim_set(st, "uptime", cur_time.tv_sec - boot_time.tv_sec);
+            rrddim_set(st, "uptime", up_time.tv_sec);
             rrdset_done(st);
-        }
     }
 
     return 0;
