@@ -78,6 +78,12 @@ AC_ARG_ENABLE(
 	[enable_plugin_nfacct="no"]
 )
 AC_ARG_ENABLE(
+	[plugin-freeipmi],
+	[AS_HELP_STRING([--enable-plugin-freeipmi], [freeipmi plugin, requires root])],
+	,
+	[enable_plugin_freeipmi="no"]
+)
+AC_ARG_ENABLE(
 	[pedantic],
 	[AS_HELP_STRING([--enable-pedantic], [enable pedantic compiler warnings])],
 	,
@@ -191,6 +197,19 @@ AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid settings])
 OPTIONAL_UUID_CLFAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
+if test "${enable_plugin_freeipmi}" = "yes"; then
+	PKG_CHECK_MODULES(
+		[IPMIMONITORING],
+		[libipmimonitoring],
+	)
+    test -z "${IPMIMONITORING_LIBS}" && AC_MSG_ERROR([ipmimonitoring required but not found. Try installing 'libipmimonitoring-dev' or 'libipmimonitoring-devel'])
+    freeipmi=yes
+    AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
+	OPTIONAL_IPMIMONITORING_CLFAGS="${IPMIMONITORING_CFLAGS}"
+	OPTIONAL_IPMIMONITORING_LIBS="${IPMIMONITORING_LIBS}"
+fi
+AM_CONDITIONAL([FREEIPMI], [test x$freeipmi = xyes])
+
 if test "${enable_plugin_nfacct}" = "yes"; then
 	PKG_CHECK_MODULES(
 		[NFACCT],
@@ -206,6 +225,7 @@ if test "${enable_plugin_nfacct}" = "yes"; then
 	OPTIONAL_NFACCT_CLFAGS="${NFACCT_CFLAGS} ${LIBMNL_CFLAGS}"
 	OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
 fi
+
 if test "${with_zlib}" = "yes"; then
 	PKG_CHECK_MODULES(
 		[ZLIB],
@@ -216,6 +236,7 @@ if test "${with_zlib}" = "yes"; then
 	OPTIONAL_ZLIB_CLFAGS="${ZLIB_CFLAGS}"
 	OPTIONAL_ZLIB_LIBS="${ZLIB_LIBS}"
 fi
+
 if test "${with_math}" = "yes"; then
 	test -z "${MATH_LIBS}" && AC_MSG_ERROR([math required but not found])
 	AC_DEFINE([STORAGE_WITH_MATH], [1], [math settings])
@@ -258,6 +279,8 @@ AC_SUBST([OPTIONAL_ZLIB_LIBS])
 AC_SUBST([OPTIONAL_UUID_CLFAGS])
 AC_SUBST([OPTIONAL_UUID_LIBS])
 AC_SUBST([OPTIONAL_CAP_LIBS])
+AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
+AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 
 AC_CONFIG_FILES([
 	Makefile
@@ -275,4 +298,4 @@ AC_CONFIG_FILES([
 AC_OUTPUT
 
 test "${with_math}" != "yes" && AC_MSG_WARN([You are building without math. math allows accurate calculations. It should be enabled.]) || :
-test "${with_zlib}" != "yes" && AC_MSG_WARN([You are building without zlib. zlib allows netdata to trasnfer a lot less data with web clients. It should be enabled.]) || :
+test "${with_zlib}" != "yes" && AC_MSG_WARN([You are building without zlib. zlib allows netdata to transfer a lot less data with web clients. It should be enabled.]) || :

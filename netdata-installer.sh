@@ -73,6 +73,7 @@ DONOTSTART=0
 DONOTWAIT=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
+NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
 
 usage() {
     netdata_banner "installer command line options"
@@ -96,6 +97,10 @@ Valid <installer options> are:
 
         Do not wait for the user to press ENTER.
         Start immediately building it.
+
+   --enable-plugin-freeipmi
+
+        Enable the FreeIPMI plugin.
 
    --zlib-is-really-here
    --libs-are-really-here
@@ -183,6 +188,10 @@ do
     elif [ "$1" = "--dont-wait" ]
         then
         DONOTWAIT=1
+        shift 1
+    elif [ "$1" = "--enable-plugin-freeipmi" ]
+        then
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --enable-plugin-freeipmi"
         shift 1
     elif [ "$1" = "--help" -o "$1" = "-h" ]
         then
@@ -402,7 +411,10 @@ run ./configure \
     --prefix="${NETDATA_PREFIX}/usr" \
     --sysconfdir="${NETDATA_PREFIX}/etc" \
     --localstatedir="${NETDATA_PREFIX}/var" \
-    --with-zlib --with-math --with-user=netdata \
+    --with-zlib \
+    --with-math \
+    --with-user=netdata \
+    ${NETDATA_CONFIGURE_OPTIONS} \
     CFLAGS="${CFLAGS}" || exit 1
 
 # remove the build_error hook
@@ -734,6 +746,13 @@ if [ ${UID} -eq 0 ]
         run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
         run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
     fi
+
+    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin" ]
+        then
+        run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
+        run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
+    fi
+
 else
     run chown "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_LOG_DIR}"
     run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_PREFIX}/usr/libexec/netdata"
@@ -1243,6 +1262,7 @@ force=0
 
 export PATH="\${PATH}:${PATH}"
 export CFLAGS="${CFLAGS}"
+export NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 
 INSTALL_UID="${UID}"
 if [ "\${INSTALL_UID}" != "\${UID}" ]
