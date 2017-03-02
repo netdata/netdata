@@ -213,7 +213,8 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_ENABLED  = 1 << 0, // enables or disables a chart
     RRDSET_FLAG_DETAIL   = 1 << 1, // if set, the data set should be considered as a detail of another
                                    // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG    = 1 << 2  // enables or disables debugging for a chart
+    RRDSET_FLAG_DEBUG    = 1 << 2, // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE = 1 << 3  // this is marked by the collector/module as obsolete
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) ((st)->flags & flag)
@@ -276,7 +277,9 @@ struct rrdset {
 
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
-    size_t unused[10];
+
+    time_t last_accessed_time;                      // the last time this RRDSET has been accessed
+    size_t unused[9];
 
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons
@@ -337,6 +340,22 @@ typedef struct rrdset RRDSET;
 
 
 // ----------------------------------------------------------------------------
+// RRDHOST flags
+// use this for configuration flags, not for state control
+// flags are set/unset in a manner that is not thread safe
+// and may lead to missing information.
+
+typedef enum rrdhost_flags {
+    RRDHOST_ORPHAN                 = 1 << 0, // this host is orphan
+    RRDHOST_DELETE_OBSOLETE_FILES  = 1 << 1, // delete files of obsolete charts
+    RRDHOST_DELETE_ORPHAN_FILES    = 1 << 2  // delete the entire host when orphan
+} RRDHOST_FLAGS;
+
+#define rrdhost_flag_check(host, flag) ((host)->flags & flag)
+#define rrdhost_flag_set(host, flag)   (host)->flags |= flag
+#define rrdhost_flag_clear(host, flag) (host)->flags &= ~flag
+
+// ----------------------------------------------------------------------------
 // RRD HOST
 
 struct rrdhost {
@@ -352,6 +371,9 @@ struct rrdhost {
     uint32_t hash_machine_guid;                     // the hash of the unique ID
 
     char *os;                                       // the O/S type of the host
+
+    uint32_t flags;                                 // flags about this RRDHOST
+
     int rrd_update_every;                           // the update frequency of the host
     int rrd_history_entries;                        // the number of history entries for the host's charts
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
@@ -521,9 +543,10 @@ extern RRDSET *rrdset_create(RRDHOST *host
 extern void rrdhost_free_all(void);
 extern void rrdhost_save_all(void);
 
-extern void rrdhost_cleanup_remote_stale(RRDHOST *protected);
+extern void rrdhost_cleanup_orphan(RRDHOST *protected);
 extern void rrdhost_free(RRDHOST *host);
 extern void rrdhost_save(RRDHOST *host);
+extern void rrdhost_delete(RRDHOST *host);
 
 extern RRDSET *rrdset_find(RRDHOST *host, const char *id);
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)
@@ -539,6 +562,9 @@ extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
 #define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
 extern void rrdset_done(RRDSET *st);
+
+// checks if the RRDSET should be offered to viewers
+#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions)
 
 // get the total duration in seconds of the round robin database
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
@@ -595,13 +621,10 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
 #ifdef NETDATA_RRD_INTERNALS
 
-extern void rrdset_free(RRDSET *st);
 extern avl_tree_lock rrdhost_root_index;
 
 extern char *rrdset_strncpyz_name(char *to, const char *from, size_t length);
 extern char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section);
-
-extern void rrdset_reset(RRDSET *st);
 
 extern void rrddim_free(RRDSET *st, RRDDIM *rd);
 
@@ -616,6 +639,13 @@ extern void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc);
 #define rrdset_index_add(host, st) (RRDSET *)avl_insert_lock(&((host)->rrdset_root_index), (avl *)(st))
 #define rrdset_index_del(host, st) (RRDSET *)avl_remove_lock(&((host)->rrdset_root_index), (avl *)(st))
 extern RRDSET *rrdset_index_del_name(RRDHOST *host, RRDSET *st);
+
+extern void rrdset_free(RRDSET *st);
+extern void rrdset_reset(RRDSET *st);
+extern void rrdset_save(RRDSET *st);
+extern void rrdset_delete(RRDSET *st);
+
+extern void rrdhost_cleanup_obsolete(RRDHOST *host);
 
 #endif /* NETDATA_RRD_INTERNALS */
 

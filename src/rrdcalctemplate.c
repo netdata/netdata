@@ -23,6 +23,8 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
 }
 
 inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
+    if(unlikely(!rt)) return;
+
     debug(D_HEALTH, "Health removing template '%s' of host '%s'", rt->name, host->hostname);
 
     if(host->templates == rt) {

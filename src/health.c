@@ -281,6 +281,16 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
+    if(unlikely(rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE))) {
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart has been marked as obsolete", rc->chart?rc->chart:"NOCHART", rc->name);
+        return 0;
+    }
+
+    if(unlikely(!rrdset_flag_check(rc->rrdset, RRDSET_FLAG_ENABLED))) {
+        debug(D_HEALTH, "Health not running alarm '%s.%s'. The chart is not enabled", rc->chart?rc->chart:"NOCHART", rc->name);
+        return 0;
+    }
+
     if(unlikely(!rc->rrdset->last_collected_time.tv_sec || rc->rrdset->counter_done < 2)) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. Chart is not fully collected yet.", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
@@ -398,18 +408,18 @@ void *health_main(void *ptr) {
                     /* time_t old_db_timestamp = rc->db_before; */
                     int value_is_null = 0;
 
-                    int ret = rrd2value(rc->rrdset
-                                        , wb
-                                        , &rc->value
-                                        , rc->dimensions
-                                        , 1
-                                        , rc->after
-                                        , rc->before
-                                        , rc->group
-                                        , rc->options
-                                        , &rc->db_after
-                                        , &rc->db_before
-                                        , &value_is_null
+                    int ret = rrdset2value_api_v1(rc->rrdset
+                                                  , wb
+                                                  , &rc->value
+                                                  , rc->dimensions
+                                                  , 1
+                                                  , rc->after
+                                                  , rc->before
+                                                  , rc->group
+                                                  , rc->options
+                                                  , &rc->db_after
+                                                  , &rc->db_before
+                                                  , &value_is_null
                     );
 
                     if(unlikely(ret != 200)) {

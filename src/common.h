@@ -206,6 +206,7 @@
 #include "plugin_tc.h"
 #include "plugins_d.h"
 #include "rrd2json.h"
+#include "rrd2json_api_old.h"
 #include "web_client.h"
 #include "web_server.h"
 #include "registry.h"
