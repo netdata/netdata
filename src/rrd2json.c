@@ -218,12 +218,11 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
                     }
 
                     // calculated_number n = (calculated_number)rd->last_collected_value * (calculated_number)(abs(rd->multiplier)) / (calculated_number)(abs(rd->divisor));
-                    // buffer_sprintf(wb, "%s.%s " CALCULATED_NUMBER_FORMAT " %llu\n", st->id, rd->id, n,
-                    //        (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
+                    // buffer_sprintf(wb, "%s.%s " CALCULATED_NUMBER_FORMAT " %llu\n", st->id, rd->id, n, timeval_msec(&rd->last_collected_time));
 
                     buffer_sprintf(wb, "%s_%s{instance=\"%s\"} " COLLECTED_NUMBER_FORMAT " %llu\n",
-                            chart, dimension, hostname, rd->last_collected_value,
-                            (unsigned long long)((rd->last_collected_time.tv_sec * 1000) + (rd->last_collected_time.tv_usec / 1000)));
+                            chart, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time)
+                    );
 
                 }
             }
