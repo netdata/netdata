@@ -885,7 +885,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
         sensor_type_str = _get_sensor_type_string (sensor_type);
 
-        printf ("%u, %s, %u, %s",
+        printf ("%d, %s, %d, %s",
                 record_id,
                 sensor_name,
                 sensor_number,
@@ -1218,7 +1218,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
         else
             sel_state_str = "N/A";
 
-        printf ("%u, %u, %s",
+        printf ("%d, %d, %s",
                 record_id,
                 record_type,
                 sel_state_str);
@@ -1342,7 +1342,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
             else
                 event_direction_str = "Deassertion";
 
-            printf (", %s, %s, %u, %s, %Xh, %Xh-%Xh-%Xh",
+            printf (", %s, %s, %d, %s, %Xh, %Xh-%Xh-%Xh",
                     sensor_name,
                     sensor_type_str,
                     sensor_number,
