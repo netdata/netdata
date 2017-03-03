@@ -201,13 +201,15 @@ if test ! "${enable_plugin_freeipmi}" = "no"; then
 	PKG_CHECK_MODULES(
 		[IPMIMONITORING],
 		[libipmimonitoring],
+		,
+		:
 	)
 	if test ! -z "${IPMIMONITORING_LIBS}"; then
 		enable_plugin_freeipmi="yes"
 		AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
 		OPTIONAL_IPMIMONITORING_CLFAGS="${IPMIMONITORING_CFLAGS}"
 		OPTIONAL_IPMIMONITORING_LIBS="${IPMIMONITORING_LIBS}"
-	elif "${enable_plugin_freeipmi}" = "yes"; then
+	elif test "${enable_plugin_freeipmi}" = "yes"; then
 		AC_MSG_ERROR([ipmimonitoring required but not found. Try installing 'libipmimonitoring-dev' or 'libipmimonitoring-devel'])
 	fi
 fi
