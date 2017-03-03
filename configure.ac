@@ -202,13 +202,12 @@ if test "${enable_plugin_freeipmi}" = "yes"; then
 		[IPMIMONITORING],
 		[libipmimonitoring],
 	)
-    test -z "${IPMIMONITORING_LIBS}" && AC_MSG_ERROR([ipmimonitoring required but not found. Try installing 'libipmimonitoring-dev' or 'libipmimonitoring-devel'])
-    freeipmi=yes
-    AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
+	test -z "${IPMIMONITORING_LIBS}" && AC_MSG_ERROR([ipmimonitoring required but not found. Try installing 'libipmimonitoring-dev' or 'libipmimonitoring-devel'])
+	AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
 	OPTIONAL_IPMIMONITORING_CLFAGS="${IPMIMONITORING_CFLAGS}"
 	OPTIONAL_IPMIMONITORING_LIBS="${IPMIMONITORING_LIBS}"
 fi
-AM_CONDITIONAL([FREEIPMI], [test x$freeipmi = xyes])
+AM_CONDITIONAL([FREEIPMI], [test x$enable_plugin_freeipmi = xyes])
 
 if test "${enable_plugin_nfacct}" = "yes"; then
 	PKG_CHECK_MODULES(

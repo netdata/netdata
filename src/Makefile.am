@@ -29,6 +29,9 @@ plugins_PROGRAMS =
 if !MACOS
 plugins_PROGRAMS += apps.plugin
 endif
+if FREEIPMI
+plugins_PROGRAMS += freeipmi.plugin
+endif
 
 netdata_SOURCES = \
 	appconfig.c appconfig.h \
@@ -161,14 +164,10 @@ apps_plugin_LDADD = \
 	$(OPTIONAL_CAP_LIBS) \
 	$(NULL)
 
-if FREEIPMI
-plugins_PROGRAMS += freeipmi.plugin
-
 freeipmi_plugin_SOURCES = \
 	freeipmi_plugin.c \
 	$(NULL)
 
 freeipmi_plugin_LDADD = \
-    $(OPTIONAL_IPMIMONITORING_LIBS) \
+	$(OPTIONAL_IPMIMONITORING_LIBS) \
 	$(NULL)
-endif
