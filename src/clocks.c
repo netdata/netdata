@@ -6,7 +6,7 @@ inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
     if(unlikely(gettimeofday(&tv, NULL) == -1))
         return -1;
     ts->tv_sec = tv.tv_sec;
-    ts->tv_nsec = tv.tv_usec * NSEC_PER_USEC;
+    ts->tv_nsec = (tv.tv_usec % USEC_PER_SEC) * NSEC_PER_USEC;
     return 0;
 }
 #endif
@@ -22,7 +22,7 @@ static inline usec_t now_usec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1))
         return 0;
-    return (usec_t)ts.tv_sec * USEC_PER_SEC + ts.tv_nsec / NSEC_PER_USEC;
+    return (usec_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
 }
 
 static inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
@@ -30,7 +30,7 @@ static inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     if(unlikely(clock_gettime(clk_id, &ts) == -1))
         return -1;
     tv->tv_sec = ts.tv_sec;
-    tv->tv_usec = ts.tv_nsec / NSEC_PER_USEC;
+    tv->tv_usec = (suseconds_t)((ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC);
     return 0;
 }
 
@@ -71,7 +71,11 @@ inline int now_boottime_timeval(struct timeval *tv) {
 }
 
 inline usec_t timeval_usec(struct timeval *tv) {
-    return (usec_t)tv->tv_sec * USEC_PER_SEC + tv->tv_usec;
+    return (usec_t)tv->tv_sec * USEC_PER_SEC + (tv->tv_usec % USEC_PER_SEC);
+}
+
+inline msec_t timeval_msec(struct timeval *tv) {
+    return (msec_t)tv->tv_sec * MSEC_PER_SEC + ((tv->tv_usec % USEC_PER_SEC) / MSEC_PER_SEC);
 }
 
 inline susec_t dt_usec_signed(struct timeval *now, struct timeval *old) {
