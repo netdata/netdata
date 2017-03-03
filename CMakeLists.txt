@@ -1,5 +1,5 @@
 
-# This file is only used for development (open netdata in Clion)
+# This file is only used for development (netdata in Clion)
 # It can build netdata, but you are on your own...
 
 cmake_minimum_required(VERSION 3.3)
@@ -154,16 +154,31 @@ set(APPS_PLUGIN_SOURCE_FILES
         src/avl.h
         src/common.c
         src/common.h
+        src/clocks.c
+        src/clocks.h
+        src/inlined.h
         src/log.c
         src/log.h
         src/procfile.c
         src/procfile.h
         src/web_buffer.c
         src/web_buffer.h
-        config.h)
+        config.h
+        )
 
 set(FREEIPMI_PLUGIN_SOURCE_FILES
-        src/plugin_freeipmi.c)
+        src/freeipmi_plugin.c
+        src/common.c
+        src/common.h
+        src/clocks.c
+        src/clocks.h
+        src/inlined.h
+        src/log.c
+        src/log.h
+        src/procfile.c
+        src/procfile.h
+        config.h
+        )
 
 include_directories(AFTER .)
 
