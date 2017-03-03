@@ -1,31 +1,20 @@
-/*****************************************************************************\
- *  $Id: ipmimonitoring-sensors.c,v 1.51 2016/11/02 23:46:24 chu11 Exp $
- *  $Id: ipmimonitoring-sel.c,v 1.51 2016/11/02 23:46:24 chu11 Exp $
- *****************************************************************************
+/*
+ *  netdata freeipmi.plugin
+ *  Copyright (C) 2017 Costa Tsaousis
+ *  GPL v3+
+ *
+ *  Based on:
+ *  ipmimonitoring-sensors.c,v 1.51 2016/11/02 23:46:24 chu11 Exp
+ *  ipmimonitoring-sel.c,v 1.51 2016/11/02 23:46:24 chu11 Exp
+ *
  *  Copyright (C) 2007-2015 Lawrence Livermore National Security, LLC.
  *  Copyright (C) 2006-2007 The Regents of the University of California.
  *  Produced at Lawrence Livermore National Laboratory (cf, DISCLAIMER).
  *  Written by Albert Chu <chu11@llnl.gov>
  *  UCRL-CODE-222073
- *
- *  This file is part of Ipmimonitoring, an IPMI sensor monitoring
- *  library.  For details, see http://www.llnl.gov/linux/.
- *
- *  Ipmimonitoring is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by the
- *  Free Software Foundation; either version 3 of the License, or (at your
- *  option) any later version.
- *
- *  Ipmimonitoring is distributed in the hope that it will be useful, but
- *  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- *  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- *  for more details.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with Ipmimonitoring.  If not, see <http://www.gnu.org/licenses/>.
-\*****************************************************************************/
+ */
 
-#include "config.h"
+#include "common.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -521,8 +510,7 @@ static void netdata_get_sensor(
 
         sn = calloc(1, sizeof(struct sensor));
         if(!sn) {
-            fprintf(stderr, "freeipmi.plugin: cannot allocate %zu bytes of memory.", sizeof(struct sensor));
-            exit(1);
+            fatal("cannot allocate %zu bytes of memory.", sizeof(struct sensor));
         }
 
         sn->record_id = record_id;
@@ -533,8 +521,7 @@ static void netdata_get_sensor(
         sn->sensor_reading_type = sensor_reading_type;
         sn->sensor_name = strdup(sensor_name);
         if(!sn->sensor_name) {
-            fprintf(stderr, "freeipmi.plugin: cannot allocate %zu bytes of memory.", strlen(sensor_name));
-            exit(1);
+            fatal("cannot allocate %zu bytes of memory.", strlen(sensor_name));
         }
 
         sn->next = sensors_root;
@@ -588,32 +575,13 @@ static void netdata_get_sel(
 }
 
 
-static unsigned long long now_realtime_usec() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000000ULL + tv.tv_usec;
+void netdata_cleanup_and_exit(int ret) {
+    exit(ret);
 }
 
 // END NETDATA CODE
 // ----------------------------------------------------------------------------
 
-
-/* This is an example of how to use the libipmimonitoring library to
- * read and monitor sensors.
- *
- * At the top of this file, you'll find a number of variables for
- * configuration of IPMI communication and what sensors you are
- * interested in monitoring.  Those variables are used in the
- * libipmimonitoring calls below.
- *
- * Hopefully this example will be sufficient to help anyone program
- * IPMI monitoring software for their environment.
- *
- * To compile, linking against the library should be sufficient for
- * most environments.  e.g.
- *
- * gcc -o freeipmi.plugin freeipmi_plugin.c -lipmimonitoring
- */
 
 static int
 _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
@@ -624,9 +592,8 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
     int sensor_count;
     int rv = -1;
 
-    if (!(ctx = ipmi_monitoring_ctx_create ()))
-    {
-        perror ("ipmi_monitoring_ctx_create:");
+    if (!(ctx = ipmi_monitoring_ctx_create ())) {
+        error("ipmi_monitoring_ctx_create()");
         goto cleanup;
     }
 
@@ -635,8 +602,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
         if (ipmi_monitoring_ctx_sdr_cache_directory (ctx,
                 sdr_cache_directory) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_ctx_sdr_cache_directory: %s\n",
+            error("ipmi_monitoring_ctx_sdr_cache_directory(): %s\n",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -648,8 +614,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
         if (ipmi_monitoring_ctx_sensor_config_file (ctx,
                 sensor_config_file) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_ctx_sensor_config_file: %s\n",
+            error( "ipmi_monitoring_ctx_sensor_config_file(): %s\n",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -658,8 +623,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
     {
         if (ipmi_monitoring_ctx_sensor_config_file (ctx, NULL) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_ctx_sensor_config_file: %s\n",
+            error( "ipmi_monitoring_ctx_sensor_config_file(): %s\n",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -705,8 +669,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_readings_by_record_id: %s\n",
+            error( "ipmi_monitoring_sensor_readings_by_record_id(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -722,8 +685,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_readings_by_record_id: %s\n",
+            error( "ipmi_monitoring_sensor_readings_by_record_id(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -739,8 +701,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_readings_by_sensor_type: %s\n",
+            error( "ipmi_monitoring_sensor_readings_by_sensor_type(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -777,48 +738,42 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
         if ((record_id = ipmi_monitoring_sensor_read_record_id (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_record_id: %s\n",
+            error( "ipmi_monitoring_sensor_read_record_id(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sensor_number = ipmi_monitoring_sensor_read_sensor_number (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_sensor_number: %s\n",
+            error( "ipmi_monitoring_sensor_read_sensor_number(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sensor_type = ipmi_monitoring_sensor_read_sensor_type (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_sensor_type: %s\n",
+            error( "ipmi_monitoring_sensor_read_sensor_type(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if (!(sensor_name = ipmi_monitoring_sensor_read_sensor_name (ctx)))
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_sensor_name: %s\n",
+            error( "ipmi_monitoring_sensor_read_sensor_name(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sensor_state = ipmi_monitoring_sensor_read_sensor_state (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_sensor_state: %s\n",
+            error( "ipmi_monitoring_sensor_read_sensor_state(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sensor_units = ipmi_monitoring_sensor_read_sensor_units (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_sensor_units: %s\n",
+            error( "ipmi_monitoring_sensor_read_sensor_units(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -826,23 +781,21 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 #ifdef NETDATA_COMMENTED
         if ((sensor_bitmask_type = ipmi_monitoring_sensor_read_sensor_bitmask_type (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_sensor_bitmask_type: %s\n",
+            error( "ipmi_monitoring_sensor_read_sensor_bitmask_type(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
         if ((sensor_bitmask = ipmi_monitoring_sensor_read_sensor_bitmask (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_sensor_bitmask: %s\n",
+            error(
+                   "ipmi_monitoring_sensor_read_sensor_bitmask(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if (!(sensor_bitmask_strings = ipmi_monitoring_sensor_read_sensor_bitmask_strings (ctx)))
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_sensor_bitmask_strings: %s\n",
+            error( "ipmi_monitoring_sensor_read_sensor_bitmask_strings(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -850,8 +803,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
         if ((sensor_reading_type = ipmi_monitoring_sensor_read_sensor_reading_type (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_sensor_reading_type: %s\n",
+            error( "ipmi_monitoring_sensor_read_sensor_reading_type(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -861,8 +813,7 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 #ifdef NETDATA_COMMENTED
         if ((event_reading_type_code = ipmi_monitoring_sensor_read_event_reading_type_code (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sensor_read_event_reading_type_code: %s\n",
+            error( "ipmi_monitoring_sensor_read_event_reading_type_code(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -985,25 +936,6 @@ _ipmimonitoring_sensors (struct ipmi_monitoring_ipmi_config *ipmi_config)
 }
 
 
-/* This is an example of how to use the libipmimonitoring library to
- * read and monitor the SEL.
- *
- * At the top of this file, you'll find a number of variables for
- * configuration of IPMI communication and what SEL records you are
- * interested in monitoring.  Those variables are used in the
- * libipmimonitoring calls below.
- *
- * Hopefully this example will be sufficient to help anyone program
- * IPMI monitoring software for their environment.
- *
- * To compile, linking against the library should be sufficient for
- * most environments.  e.g.
- *
- * gcc -o ipmimonitoring-sel ipmimonitoring-sel.c -lipmimonitoring
- */
-
-/* Communication Configuration - Initialize accordingly */
-
 static int
 _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 {
@@ -1015,7 +947,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
     if (!(ctx = ipmi_monitoring_ctx_create ()))
     {
-        perror ("ipmi_monitoring_ctx_create:");
+        error("ipmi_monitoring_ctx_create()");
         goto cleanup;
     }
 
@@ -1024,8 +956,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
         if (ipmi_monitoring_ctx_sdr_cache_directory (ctx,
                 sdr_cache_directory) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_ctx_sdr_cache_directory: %s\n",
+            error( "ipmi_monitoring_ctx_sdr_cache_directory(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -1037,8 +968,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
         if (ipmi_monitoring_ctx_sel_config_file (ctx,
                 sel_config_file) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_ctx_sel_config_file: %s\n",
+            error( "ipmi_monitoring_ctx_sel_config_file(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -1047,8 +977,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
     {
         if (ipmi_monitoring_ctx_sel_config_file (ctx, NULL) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_ctx_sel_config_file: %s\n",
+            error( "ipmi_monitoring_ctx_sel_config_file(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -1079,8 +1008,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sel_by_record_id: %s\n",
+            error( "ipmi_monitoring_sel_by_record_id(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -1096,8 +1024,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sel_by_sensor_type: %s\n",
+            error( "ipmi_monitoring_sel_by_sensor_type(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -1114,8 +1041,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sel_by_sensor_type: %s\n",
+            error( "ipmi_monitoring_sel_by_sensor_type(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -1131,8 +1057,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                 NULL,
                 NULL)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sel_by_record_id: %s\n",
+            error( "ipmi_monitoring_sel_by_record_id(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -1172,32 +1097,28 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
         if ((record_id = ipmi_monitoring_sel_read_record_id (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sel_read_record_id: %s\n",
+            error( "ipmi_monitoring_sel_read_record_id(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((record_type = ipmi_monitoring_sel_read_record_type (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sel_read_record_type: %s\n",
+            error( "ipmi_monitoring_sel_read_record_type(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((record_type_class = ipmi_monitoring_sel_read_record_type_class (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sel_read_record_type_class: %s\n",
+            error( "ipmi_monitoring_sel_read_record_type_class(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
 
         if ((sel_state = ipmi_monitoring_sel_read_sel_state (ctx)) < 0)
         {
-            fprintf (stderr,
-                    "ipmi_monitoring_sel_read_sel_state: %s\n",
+            error( "ipmi_monitoring_sel_read_sel_state(): %s",
                     ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
@@ -1229,8 +1150,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
             if (ipmi_monitoring_sel_read_timestamp (ctx, &timestamp) < 0)
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_timestamp: %s\n",
+                error( "ipmi_monitoring_sel_read_timestamp(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
@@ -1259,40 +1179,35 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
             if (!(sensor_name = ipmi_monitoring_sel_read_sensor_name (ctx)))
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_sensor_name: %s\n",
+                error( "ipmi_monitoring_sel_read_sensor_name(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((sensor_type = ipmi_monitoring_sel_read_sensor_type (ctx)) < 0)
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_sensor_type: %s\n",
+                error( "ipmi_monitoring_sel_read_sensor_type(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((sensor_number = ipmi_monitoring_sel_read_sensor_number (ctx)) < 0)
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_sensor_number: %s\n",
+                error( "ipmi_monitoring_sel_read_sensor_number(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((event_direction = ipmi_monitoring_sel_read_event_direction (ctx)) < 0)
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_event_direction: %s\n",
+                error( "ipmi_monitoring_sel_read_event_direction(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((event_type_code = ipmi_monitoring_sel_read_event_type_code (ctx)) < 0)
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_event_type_code: %s\n",
+                error( "ipmi_monitoring_sel_read_event_type_code(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
@@ -1302,32 +1217,28 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
                     &event_data2,
                     &event_data3) < 0)
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_event_data: %s\n",
+                error( "ipmi_monitoring_sel_read_event_data(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((event_offset_type = ipmi_monitoring_sel_read_event_offset_type (ctx)) < 0)
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_event_offset_type: %s\n",
+                error( "ipmi_monitoring_sel_read_event_offset_type(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if ((event_offset = ipmi_monitoring_sel_read_event_offset (ctx)) < 0)
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_event_offset: %s\n",
+                error( "ipmi_monitoring_sel_read_event_offset(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
 
             if (!(event_offset_string = ipmi_monitoring_sel_read_event_offset_string (ctx)))
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_event_offset_string: %s\n",
+                error( "ipmi_monitoring_sel_read_event_offset_string(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
@@ -1369,8 +1280,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
             {
                 if ((manufacturer_id = ipmi_monitoring_sel_read_manufacturer_id (ctx)) < 0)
                 {
-                    fprintf (stderr,
-                            "ipmi_monitoring_sel_read_manufacturer_id: %s\n",
+                    error( "ipmi_monitoring_sel_read_manufacturer_id(): %s",
                             ipmi_monitoring_ctx_errormsg (ctx));
                     goto cleanup;
                 }
@@ -1380,8 +1290,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 
             if ((oem_data_len = ipmi_monitoring_sel_read_oem_data (ctx, oem_data, 1024)) < 0)
             {
-                fprintf (stderr,
-                        "ipmi_monitoring_sel_read_oem_data: %s\n",
+                error( "ipmi_monitoring_sel_read_oem_data(): %s",
                         ipmi_monitoring_ctx_errormsg (ctx));
                 goto cleanup;
             }
@@ -1409,6 +1318,7 @@ _ipmimonitoring_sel (struct ipmi_monitoring_ipmi_config *ipmi_config)
 // MAIN PROGRAM FOR NETDATA PLUGIN
 
 int ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config) {
+    errno = 0;
 
     if (_ipmimonitoring_sensors(ipmi_config) < 0) return -1;
     if (_ipmimonitoring_sel    (ipmi_config) < 0) return -2;
@@ -1425,10 +1335,9 @@ int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
 
         // measure the time a data collection needs
         unsigned long long start = now_realtime_usec();
-        if(ipmi_collect_data(ipmi_config) < 0) {
-            fprintf(stderr, "freeipmi.plugin: data collection failed.\n");
-            exit(1);
-        }
+        if(ipmi_collect_data(ipmi_config) < 0)
+            fatal("freeipmi.plugin: data collection failed.");
+
         unsigned long long end = now_realtime_usec();
 
         if(debug) fprintf(stderr, "freeipmi.plugin: data collection speed was %llu usec\n", end - start);
@@ -1438,7 +1347,7 @@ int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
 
         // wait the same time
         // to avoid flooding the IPMI processor with requests
-        usleep(end - start);
+        sleep_usec(end - start);
     }
 
     // so, we assume it needed 3x the time
@@ -1449,8 +1358,21 @@ int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
 }
 
 int main (int argc, char **argv) {
-    struct ipmi_monitoring_ipmi_config ipmi_config;
 
+    // ------------------------------------------------------------------------
+    // initialization of netdata plugin
+
+    program_name = "freeipmi.plugin";
+
+    // disable syslog
+    error_log_syslog = 0;
+
+    // set errors flood protection to 100 logs per hour
+    error_log_errors_per_period = 100;
+    error_log_throttle_period = 3600;
+
+
+    // ------------------------------------------------------------------------
     // parse command line parameters
 
     int i, freq = 0;
@@ -1467,18 +1389,65 @@ int main (int argc, char **argv) {
             debug = 1;
             continue;
         }
+        else if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
+            fprintf(stderr,
+                    "\n"
+                    "netdata freeipmi.plugin " VERSION "\n"
+                    "Usage:\n"
+                    "\n"
+                    "  freeipmi.plugin [OPTIONS]\n"
+                    "\n"
+                    "Available options:\n"
+                    "  NUMBER, sets the data collection frequency\n"
+                    "  debug, enables verbose output\n"
+                    "  hostname X, sets the remote host to connect to\n"
+                    "  username X, sets the username to authenticate at the remote host\n"
+                    "  password X, sets the password to authenticate at the remote host\n"
+                    "  sdr-cache-dir X, sets the directory to save SDR cache files\n"
+                    "  sensor-config-file X, set the filename to read sensor configuration\n"
+            );
+            exit(1);
+        }
+        else if(i < argc && strcmp("hostname", argv[i]) == 0) {
+            hostname = argv[++i];
+            if(debug) fprintf(stderr, "freeipmi.plugin: hostname set to '%s'\n", hostname);
+            continue;
+        }
+        else if(i < argc && strcmp("username", argv[i]) == 0) {
+            username = argv[++i];
+            if(debug) fprintf(stderr, "freeipmi.plugin: username set to '%s'\n", username);
+            continue;
+        }
+        else if(i < argc && strcmp("password", argv[i]) == 0) {
+            password = argv[++i];
+            if(debug) fprintf(stderr, "freeipmi.plugin: password set to '%s'\n", password);
+            continue;
+        }
+        else if(i < argc && strcmp("sdr-cache-dir", argv[i]) == 0) {
+            sdr_cache_directory = argv[++i];
+            if(debug) fprintf(stderr, "freeipmi.plugin: SDR cache directory set to '%s'\n", sdr_cache_directory);
+            continue;
+        }
+        else if(i < argc && strcmp("sensor-config-file", argv[i]) == 0) {
+            sensor_config_file = argv[++i];
+            if(debug) fprintf(stderr, "freeipmi.plugin: sensor config file set to '%s'\n", sensor_config_file);
+            continue;
+        }
 
-        fprintf(stderr, "freeipmi.plugin: ignoring parameter '%s'\n", argv[i]);
+        error("freeipmi.plugin: ignoring parameter '%s'", argv[i]);
     }
 
     if(freq > 0 && freq < netdata_update_every)
         netdata_update_every = freq;
 
     else if(freq)
-        fprintf(stderr, "freeipmi.plugin: update frequency %d seconds is too small for IPMI. Using %d", freq, netdata_update_every);
+        error("update frequency %d seconds is too small for IPMI. Using %d.", freq, netdata_update_every);
 
 
+    // ------------------------------------------------------------------------
     // initialize IPMI
+
+    struct ipmi_monitoring_ipmi_config ipmi_config;
 
     if(debug) fprintf(stderr, "freeipmi.plugin: calling _init_ipmi_config()\n");
 
@@ -1486,67 +1455,61 @@ int main (int argc, char **argv) {
 
     if(debug) fprintf(stderr, "freeipmi.plugin: calling ipmi_monitoring_init()\n");
 
-    if(ipmi_monitoring_init(ipmimonitoring_init_flags, &errnum) < 0) {
-        fprintf(stderr, "ipmi_monitoring_init: %s\n", ipmi_monitoring_ctx_strerror(errnum));
-        exit(1);
-    }
+    if(ipmi_monitoring_init(ipmimonitoring_init_flags, &errnum) < 0)
+        fatal("ipmi_monitoring_init: %s", ipmi_monitoring_ctx_strerror(errnum));
 
     if(debug) fprintf(stderr, "freeipmi.plugin: detecting IPMI minimum update frequency...\n");
     freq = ipmi_detect_speed_secs(&ipmi_config);
     if(debug) fprintf(stderr, "freeipmi.plugin: IPMI minimum update frequency was calculated to %d seconds.\n", freq);
 
     if(netdata_update_every < freq) {
-        fprintf(stderr, "freeipmi.plugin: enforcing minimum data collection frequency, calculated to %d seconds.\n", freq);
+        info("enforcing minimum data collection frequency, calculated to %d seconds.", freq);
         netdata_update_every = freq;
     }
 
+
+    // ------------------------------------------------------------------------
     // the main loop
+
     if(debug) fprintf(stderr, "freeipmi.plugin: starting data collection\n");
 
+    time_t started_t = now_monotonic_sec();
+
     size_t iteration = 0;
-    unsigned long long step = netdata_update_every * 1000000ULL;
-    unsigned long long now = now_realtime_usec();
-    unsigned long long next = now - (now % step) + step;
-    while(1) {
-        unsigned long long last = now;
-        now = now_realtime_usec();
+    usec_t step = netdata_update_every * USEC_PER_SEC;
+
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    for(iteration = 0; 1 ; iteration++) {
+        usec_t dt = heartbeat_next(&hb, step);
+
         if(debug && iteration)
             fprintf(stderr, "freeipmi.plugin: iteration %zu, dt %llu usec, sensors collected %zu, sensors sent to netdata %zu \n"
                     , iteration
-                    , now - last
+                    , dt
                     , netdata_sensors_collected
                     , netdata_sensors_updated
             );
 
-        while(now < next) {
-            if(debug) fprintf(stderr, "freeipmi.plugin: sleeping for %llu usec\n", next - now);
-            usleep(next - now);
-            now = now_realtime_usec();
-        }
-        next = now - (now % step) + step;
-
         netdata_mark_as_not_updated();
 
         if(debug) fprintf(stderr, "freeipmi.plugin: calling ipmi_collect_data()\n");
-        if(ipmi_collect_data(&ipmi_config) < 0) {
-            fprintf(stderr, "freeipmi.plugin: data collection failed.\n");
-            exit(1);
-        }
+        if(ipmi_collect_data(&ipmi_config) < 0)
+            fatal("data collection failed.");
 
         if(debug) fprintf(stderr, "freeipmi.plugin: calling send_metrics_to_netdata()\n");
         send_metrics_to_netdata();
         fflush(stdout);
 
-        iteration++;
+        // restart check (14400 seconds)
+        if(now_monotonic_sec() - started_t > 14400) exit(0);
     }
-    exit(0);
 }
 
 #else // !HAVE_FREEIPMI
 
 int main(int argc, char **argv) {
-    fprintf(stderr, "freeipmi.plugin: not compiled.");
-    exit(1);
+    fatal("freeipmi.plugin is not compiled.");
 }
 
-#endif
+#endif // !HAVE_FREEIPMI

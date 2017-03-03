@@ -99,8 +99,10 @@ Valid <installer options> are:
         Start immediately building it.
 
    --enable-plugin-freeipmi
+   --disable-plugin-freeipmi
 
-        Enable the FreeIPMI plugin.
+        Enable/disable the FreeIPMI plugin.
+        Default: enable it when libipmimonitoring is available.
 
    --zlib-is-really-here
    --libs-are-really-here
@@ -192,6 +194,10 @@ do
     elif [ "$1" = "--enable-plugin-freeipmi" ]
         then
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --enable-plugin-freeipmi"
+        shift 1
+    elif [ "$1" = "--disable-plugin-freeipmi" ]
+        then
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --disable-plugin-freeipmi"
         shift 1
     elif [ "$1" = "--help" -o "$1" = "-h" ]
         then

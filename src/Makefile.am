@@ -155,8 +155,8 @@ apps_plugin_SOURCES = \
 
 if FREEBSD
 apps_plugin_SOURCES += \
-       plugin_freebsd.h \
-       $(NULL)
+	plugin_freebsd.h \
+	$(NULL)
 endif
 
 apps_plugin_LDADD = \
@@ -166,6 +166,11 @@ apps_plugin_LDADD = \
 
 freeipmi_plugin_SOURCES = \
 	freeipmi_plugin.c \
+	clocks.c clocks.h \
+	common.c common.h \
+	inlined.h \
+	log.c log.h \
+	procfile.c procfile.h \
 	$(NULL)
 
 freeipmi_plugin_LDADD = \
