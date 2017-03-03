@@ -12,14 +12,12 @@ struct timespec {
 typedef int clockid_t;
 #endif
 
+typedef unsigned long long nsec_t;
+typedef unsigned long long msec_t;
 typedef unsigned long long usec_t;
 typedef long long susec_t;
 
 typedef usec_t heartbeat_t;
-
-#ifndef HAVE_CLOCK_GETTIME
-int clock_gettime(clockid_t clk_id, struct timespec *ts);
-#endif
 
 /* Linux value is as good as any other */
 #ifndef CLOCK_REALTIME
@@ -32,18 +30,30 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts);
 #endif
 
 #ifndef CLOCK_BOOTTIME
-/* fallback to CLOCK_MONOTONIC if not available */
+
+#ifdef CLOCK_UPTIME
+/* CLOCK_BOOTTIME falls back to CLOCK_UPTIME on FreeBSD */
+#define CLOCK_BOOTTIME CLOCK_UPTIME
+#else // CLOCK_UPTIME
+/* CLOCK_BOOTTIME falls back to CLOCK_MONOTONIC */
 #define CLOCK_BOOTTIME  CLOCK_MONOTONIC
-#else
+#endif // CLOCK_UPTIME
+
+#else // CLOCK_BOOTTIME
+
 #ifdef HAVE_CLOCK_GETTIME
 #define CLOCK_BOOTTIME_IS_AVAILABLE 1 // required for /proc/uptime
-#endif
-#endif
+#endif // HAVE_CLOCK_GETTIME
+
+#endif // CLOCK_BOOTTIME
+
+#define NSEC_PER_MSEC   1000000ULL
 
 #define NSEC_PER_SEC    1000000000ULL
-#define NSEC_PER_MSEC   1000000ULL
 #define NSEC_PER_USEC   1000ULL
+
 #define USEC_PER_SEC    1000000ULL
+#define MSEC_PER_SEC    1000ULL
 
 #ifndef HAVE_CLOCK_GETTIME
 /* Fallback function for POSIX.1-2001 clock_gettime() function.
@@ -94,6 +104,8 @@ extern usec_t now_boottime_usec(void);
 
 
 extern usec_t timeval_usec(struct timeval *ts);
+extern msec_t timeval_msec(struct timeval *tv);
+
 extern usec_t dt_usec(struct timeval *now, struct timeval *old);
 extern susec_t dt_usec_signed(struct timeval *now, struct timeval *old);
 
