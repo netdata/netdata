@@ -262,16 +262,18 @@ class Service(SimpleService):
                 self.connection = psycopg2.connect(**params)
                 self.connection.set_isolation_level(extensions.ISOLATION_LEVEL_AUTOCOMMIT)
                 self.connection.set_session(readonly=True)
-            except OperationalError:
-                return False
-        return True
+            except OperationalError as error:
+                return False, str(error)
+        return True, True
 
     def check(self):
         if not PSYCOPG2:
             self.error('\'python-psycopg2\' module is needed to use postgres.chart.py')
             return False
-        if not self._connect():
-            self.error('Can\'t connect to %s' % str(self.configuration))
+        result, error = self._connect()
+        if not result:
+            conf = dict([(k, (lambda k, v: v if k != 'password' else '*****')(k, v)) for k, v in self.configuration.items()])
+            self.error('Failed to connect to %s. Error: %s' % (str(conf), error))
             return False
         try:
             cursor = self.connection.cursor()
@@ -307,7 +309,8 @@ class Service(SimpleService):
             add_database_lock_chart_(order=self.order, definitions=self.definitions, database_name=database_name)
 
     def _get_data(self):
-        if self._connect():
+        result, error = self._connect()
+        if result:
             cursor = self.connection.cursor(cursor_factory=DictCursor)
             try:
                 self.data.update(self.locks_zeroed)
