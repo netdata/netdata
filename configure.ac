@@ -81,7 +81,7 @@ AC_ARG_ENABLE(
 	[plugin-freeipmi],
 	[AS_HELP_STRING([--enable-plugin-freeipmi], [freeipmi plugin, requires root])],
 	,
-	[enable_plugin_freeipmi="no"]
+	[enable_plugin_freeipmi="detect"]
 )
 AC_ARG_ENABLE(
 	[pedantic],
@@ -197,15 +197,19 @@ AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid settings])
 OPTIONAL_UUID_CLFAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
-if test "${enable_plugin_freeipmi}" = "yes"; then
+if test ! "${enable_plugin_freeipmi}" = "no"; then
 	PKG_CHECK_MODULES(
 		[IPMIMONITORING],
 		[libipmimonitoring],
 	)
-	test -z "${IPMIMONITORING_LIBS}" && AC_MSG_ERROR([ipmimonitoring required but not found. Try installing 'libipmimonitoring-dev' or 'libipmimonitoring-devel'])
-	AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
-	OPTIONAL_IPMIMONITORING_CLFAGS="${IPMIMONITORING_CFLAGS}"
-	OPTIONAL_IPMIMONITORING_LIBS="${IPMIMONITORING_LIBS}"
+	if test ! -z "${IPMIMONITORING_LIBS}"; then
+		enable_plugin_freeipmi="yes"
+		AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
+		OPTIONAL_IPMIMONITORING_CLFAGS="${IPMIMONITORING_CFLAGS}"
+		OPTIONAL_IPMIMONITORING_LIBS="${IPMIMONITORING_LIBS}"
+	elif "${enable_plugin_freeipmi}" = "yes"; then
+		AC_MSG_ERROR([ipmimonitoring required but not found. Try installing 'libipmimonitoring-dev' or 'libipmimonitoring-devel'])
+	fi
 fi
 AM_CONDITIONAL([FREEIPMI], [test x$enable_plugin_freeipmi = xyes])
 
