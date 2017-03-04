@@ -202,14 +202,18 @@ CC="${PTHREAD_CC}"
 # -----------------------------------------------------------------------------
 # memory allocation library
 
+AC_MSG_CHECKING([for memory allocator])
 TS_CHECK_JEMALLOC
 if test "$has_jemalloc" = "1"; then
 	AC_DEFINE([ENABLE_JEMALLOC], [1], [compile and link with jemalloc])
+	AC_MSG_RESULT([jemalloc])
 else
 	TS_CHECK_TCMALLOC
 	if test "$has_tcmalloc" = "1"; then
 		AC_DEFINE([ENABLE_TCMALLOC], [1], [compile and link with tcmalloc])
+		AC_MSG_RESULT([tcmalloc])
 	else
+		AC_MSG_RESULT([system])
 		AC_C_MALLOPT
 		AC_C_MALLINFO
 	fi
@@ -228,13 +232,18 @@ if test -z "${MATH_LIBS}"; then
 		[MATH_LIBS="-lm"]
 	)
 fi
+test "${with_math}" = "yes" -a -z "${MATH_LIBS}" && AC_MSG_ERROR([math required but not found])
 
-if test "${with_math}" = "yes"; then
-	test -z "${MATH_LIBS}" && AC_MSG_ERROR([math required but not found])
+AC_MSG_CHECKING([if libm should be used])
+if test "${with_math}" != "no"; then
+	with_math="yes"
 	AC_DEFINE([STORAGE_WITH_MATH], [1], [math usability])
 	OPTIONAL_MATH_CFLAGS="${MATH_CFLAGS}"
 	OPTIONAL_MATH_LIBS="${MATH_LIBS}"
+else
+	with_math="no"
 fi
+AC_MSG_RESULT([${with_math}])
 
 
 # -----------------------------------------------------------------------------
@@ -247,11 +256,17 @@ PKG_CHECK_MODULES(
 	[have_zlib=no]
 )
 test "${with_zlib}" = "yes" -a "${have_zlib}" != "yes" && AC_MSG_ERROR([zlib required but not found. Try installing 'zlib1g-dev' or 'zlib-devel'.])
-if test "${with_zlib}" = "yes"; then
+
+AC_MSG_CHECKING([if zlib should be used])
+if test "${with_zlib}" != "no"; then
+	with_zlib="yes"
 	AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib usability])
 	OPTIONAL_ZLIB_CLFAGS="${ZLIB_CFLAGS}"
 	OPTIONAL_ZLIB_LIBS="${ZLIB_LIBS}"
+else
+	with_zlib="no"
 fi
+AC_MSG_RESULT([${with_zlib}])
 
 
 # -----------------------------------------------------------------------------
@@ -297,9 +312,9 @@ AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
 AC_MSG_CHECKING([if apps.plugin should be enabled])
 if test "${build_target}" != "macos"; then
-    enable_plugin_apps="yes"
+	enable_plugin_apps="yes"
 else
-    enable_plugin_apps="no"
+	enable_plugin_apps="no"
 fi
 AC_MSG_RESULT([${enable_plugin_apps}])
 AM_CONDITIONAL([ENABLE_PLUGIN_APPS], [test "${enable_plugin_apps}" = "yes"])
