@@ -28,14 +28,9 @@ PACKAGE_RPM_VERSION="VERSION_NUMBER"
 AC_SUBST([PACKAGE_RPM_VERSION])
 AC_SUBST([PACKAGE_RPM_RELEASE])
 
-# fails on centos6
-#AX_CHECK_ENABLE_DEBUG()
 
-AX_GCC_FUNC_ATTRIBUTE(returns_nonnull)
-AX_GCC_FUNC_ATTRIBUTE(malloc)
-AX_GCC_FUNC_ATTRIBUTE(noreturn)
-AX_GCC_FUNC_ATTRIBUTE(format)
-AX_GCC_FUNC_ATTRIBUTE(warn_unused_result)
+# -----------------------------------------------------------------------------
+# autoconf initialization
 
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADERS([config.h])
@@ -47,29 +42,10 @@ AC_PROG_CC
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
-AC_CHECK_FUNCS_ONCE(accept4)
-AC_CHECK_TYPES([struct timespec, clockid_t], [], [], [[#include <time.h>]])
-AC_SEARCH_LIBS([clock_gettime], [rt posix4])
-AC_CHECK_FUNCS([clock_gettime])
-AC_CHECK_FUNCS([sched_setscheduler sched_get_priority_min sched_get_priority_max nice])
 
-# Check system type
-case "$host_os" in
-freebsd*)
-	build_target=freebsd
-	;;
-darwin*)
-	build_target=macos
-	LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
-	;;
-*)
-	build_target=linux
-	;;
-esac
 
-AM_CONDITIONAL([FREEBSD], [test x$build_target = xfreebsd])
-AM_CONDITIONAL([MACOS], [test x$build_target = xmacos])
-AM_CONDITIONAL([LINUX], [test x$build_target = xlinux])
+# -----------------------------------------------------------------------------
+# configurable options
 
 AC_ARG_ENABLE(
 	[plugin-nfacct],
@@ -96,6 +72,12 @@ AC_ARG_WITH(
 	[webdir="\$(pkgdatadir)/web"]
 )
 AC_ARG_WITH(
+	[cap],
+	[AS_HELP_STRING([--with-cap], [build with libcap])],
+	,
+	[with_cap="detect"]
+)
+AC_ARG_WITH(
 	[zlib],
 	[AS_HELP_STRING([--with-zlib], [build with zlib])],
 	,
@@ -120,23 +102,24 @@ AC_ARG_ENABLE(
 	[enable_x86_sse="yes"]
 )
 
-ACX_PTHREAD(, [AC_MSG_ERROR([Cannot initialize pthread environment])])
-LIBS="${PTHREAD_LIBS} ${LIBS}"
-CFLAGS="${CFLAGS} ${PTHREAD_CFLAGS}"
-CC="${PTHREAD_CC}"
 
-TS_CHECK_JEMALLOC
-if test "$has_jemalloc" = "1"; then
-	AC_DEFINE([ENABLE_JEMALLOC], [1], [compile and link with jemalloc])
-else
-	TS_CHECK_TCMALLOC
-	if test "$has_tcmalloc" = "1"; then
-		AC_DEFINE([ENABLE_TCMALLOC], [1], [compile and link with tcmalloc])
-	else
-		AC_C_MALLOPT
-		AC_C_MALLINFO
-	fi
-fi
+# -----------------------------------------------------------------------------
+# netdata required checks
+
+# fails on centos6
+#AX_CHECK_ENABLE_DEBUG()
+
+AX_GCC_FUNC_ATTRIBUTE(returns_nonnull)
+AX_GCC_FUNC_ATTRIBUTE(malloc)
+AX_GCC_FUNC_ATTRIBUTE(noreturn)
+AX_GCC_FUNC_ATTRIBUTE(format)
+AX_GCC_FUNC_ATTRIBUTE(warn_unused_result)
+
+AC_CHECK_FUNCS_ONCE(accept4)
+AC_CHECK_TYPES([struct timespec, clockid_t], [], [], [[#include <time.h>]])
+AC_SEARCH_LIBS([clock_gettime], [rt posix4])
+AC_CHECK_FUNCS([clock_gettime])
+AC_CHECK_FUNCS([sched_setscheduler sched_get_priority_min sched_get_priority_max nice])
 
 AC_TYPE_INT8_T
 AC_TYPE_INT16_T
@@ -155,18 +138,33 @@ AC_CHECK_SIZEOF([void *])
 AC_CANONICAL_HOST
 AC_HEADER_MAJOR
 AC_HEADER_RESOLV
+
 AC_CHECK_HEADERS_ONCE([sys/prctl.h])
 
-AC_CHECK_LIB([cap], [cap_get_proc, cap_set_proc],
-	[AC_CHECK_HEADER(
-		[sys/capability.h],
-		[
-			CAP_LIBS=-lcap
- 			AC_DEFINE([HAVE_CAPABILITY], [1], [libcap usability])
- 		]
-	)]
-)
-OPTIONAL_CAP_LIBS="${CAP_LIBS}"
+
+# -----------------------------------------------------------------------------
+# operating system detection
+
+case "$host_os" in
+freebsd*)
+	build_target=freebsd
+	;;
+darwin*)
+	build_target=macos
+	LDFLAGS="${LDFLAGS} -framework CoreFoundation -framework IOKit"
+	;;
+*)
+	build_target=linux
+	;;
+esac
+
+AM_CONDITIONAL([FREEBSD], [test x$build_target = xfreebsd])
+AM_CONDITIONAL([MACOS], [test x$build_target = xmacos])
+AM_CONDITIONAL([LINUX], [test x$build_target = xlinux])
+
+
+# -----------------------------------------------------------------------------
+# compiler options
 
 AC_ARG_VAR([SSE_CANDIDATE], [C compiler flags for SSE])
 AS_CASE([$host_cpu],
@@ -178,6 +176,49 @@ if test "${SSE_CANDIDATE}" = "yes" -a "${enable_x86_sse}" = "yes"; then
 	AX_CHECK_COMPILE_FLAG($opt, [CFLAGS="$CFLAGS $opt"], [])
 fi
 
+if test "${GCC}" = "yes"; then
+	AC_DEFINE_UNQUOTED([likely(x)], [__builtin_expect(!!(x), 1)], [gcc branch optimization])
+	AC_DEFINE_UNQUOTED([unlikely(x)], [__builtin_expect(!!(x), 0)], [gcc branch optimization])
+else
+	AC_DEFINE_UNQUOTED([likely(x)], [(x)], [gcc branch optimization])
+	AC_DEFINE_UNQUOTED([unlikely(x)], [(x)], [gcc branch optimization])
+fi
+
+if test "${enable_pedantic}" = "yes"; then
+	enable_strict="yes"
+	CFLAGS="${CFLAGS} -pedantic -Wall -Wextra -Wno-long-long"
+fi
+
+
+# -----------------------------------------------------------------------------
+# pthreads
+
+ACX_PTHREAD(, [AC_MSG_ERROR([Cannot initialize pthread environment])])
+LIBS="${PTHREAD_LIBS} ${LIBS}"
+CFLAGS="${CFLAGS} ${PTHREAD_CFLAGS}"
+CC="${PTHREAD_CC}"
+
+
+# -----------------------------------------------------------------------------
+# memory allocation library
+
+TS_CHECK_JEMALLOC
+if test "$has_jemalloc" = "1"; then
+	AC_DEFINE([ENABLE_JEMALLOC], [1], [compile and link with jemalloc])
+else
+	TS_CHECK_TCMALLOC
+	if test "$has_tcmalloc" = "1"; then
+		AC_DEFINE([ENABLE_TCMALLOC], [1], [compile and link with tcmalloc])
+	else
+		AC_C_MALLOPT
+		AC_C_MALLINFO
+	fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# libm
+
 AC_ARG_VAR([MATH_CFLAGS], [C compiler flags for math])
 AC_ARG_VAR([MATH_LIBS], [linker flags for math])
 if test -z "${MATH_LIBS}"; then
@@ -188,32 +229,93 @@ if test -z "${MATH_LIBS}"; then
 	)
 fi
 
+if test "${with_math}" = "yes"; then
+	test -z "${MATH_LIBS}" && AC_MSG_ERROR([math required but not found])
+	AC_DEFINE([STORAGE_WITH_MATH], [1], [math settings])
+	OPTIONAL_MATH_CFLAGS="${MATH_CFLAGS}"
+	OPTIONAL_MATH_LIBS="${MATH_LIBS}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# zlib
+
+if test "${with_zlib}" = "yes"; then
+	PKG_CHECK_MODULES(
+		[ZLIB],
+		[zlib],
+	)
+	test -z "${ZLIB_LIBS}" && AC_MSG_ERROR([zlib required but not found. Try installing 'zlib1g-dev' or 'zlib-devel'.])
+	AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib settings])
+	OPTIONAL_ZLIB_CLFAGS="${ZLIB_CFLAGS}"
+	OPTIONAL_ZLIB_LIBS="${ZLIB_LIBS}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# libuuid
+
 PKG_CHECK_MODULES(
 	[UUID],
 	[uuid],
+	[have_uuid=yes],
+	[have_uuid=no]
 )
-test -z "${UUID_LIBS}" && AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'libuuid-devel'.])
-AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid settings])
+test "${have_uuid}" = "no" && AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'libuuid-devel'.])
+AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
 OPTIONAL_UUID_CLFAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
-if test ! "${enable_plugin_freeipmi}" = "no"; then
+
+# -----------------------------------------------------------------------------
+# libcap
+
+if test "${with_cap}" != "no"; then
+	PKG_CHECK_MODULES(
+		[CAP],
+		[libcap],
+		[have_cap=yes],
+		[have_cap=no]
+	)
+fi
+test "${have_cap}" = "no" -a "${with_cap}" = "yes" && AC_MSG_ERROR([libcap required but not found.])
+if test "${have_cap}" = "yes"; then
+	AC_DEFINE([HAVE_CAPABILITY], [1], [libcap usability])
+	OPTIONAL_CAP_CLFAGS="${CAP_CFLAGS}"
+	OPTIONAL_CAP_LIBS="${CAP_LIBS}"
+fi
+AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${have_cap}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
+# apps.plugin
+
+AM_CONDITIONAL([ENABLE_PLUGIN_APPS], [test "${build_target}" != "macos"])
+
+
+# -----------------------------------------------------------------------------
+# freeipmi.plugin - libipmimonitoring
+
+if test "${enable_plugin_freeipmi}" != "no"; then
 	PKG_CHECK_MODULES(
 		[IPMIMONITORING],
 		[libipmimonitoring],
-		,
-		:
+		[have_ipmimonitoring=yes],
+		[have_ipmimonitoring=no]
 	)
-	if test ! -z "${IPMIMONITORING_LIBS}"; then
-		enable_plugin_freeipmi="yes"
-		AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
-		OPTIONAL_IPMIMONITORING_CLFAGS="${IPMIMONITORING_CFLAGS}"
-		OPTIONAL_IPMIMONITORING_LIBS="${IPMIMONITORING_LIBS}"
-	elif test "${enable_plugin_freeipmi}" = "yes"; then
-		AC_MSG_ERROR([ipmimonitoring required but not found. Try installing 'libipmimonitoring-dev' or 'libipmimonitoring-devel'])
-	fi
 fi
-AM_CONDITIONAL([FREEIPMI], [test x$enable_plugin_freeipmi = xyes])
+test "${have_ipmimonitoring}" = "no" -a "${enable_plugin_freeipmi}" = "yes" && \
+	AC_MSG_ERROR([ipmimonitoring required but not found. Try installing 'libipmimonitoring-dev' or 'libipmimonitoring-devel'])
+if test "${have_ipmimonitoring}" = "yes"; then
+	AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
+	OPTIONAL_IPMIMONITORING_CLFAGS="${IPMIMONITORING_CFLAGS}"
+	OPTIONAL_IPMIMONITORING_LIBS="${IPMIMONITORING_LIBS}"
+fi
+AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${have_ipmimonitoring}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
+# nfacct.plugin - libmnl, libnetfilter_acct
 
 if test "${enable_plugin_nfacct}" = "yes"; then
 	PKG_CHECK_MODULES(
@@ -231,36 +333,8 @@ if test "${enable_plugin_nfacct}" = "yes"; then
 	OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
 fi
 
-if test "${with_zlib}" = "yes"; then
-	PKG_CHECK_MODULES(
-		[ZLIB],
-		[zlib],
-	)
-	test -z "${ZLIB_LIBS}" && AC_MSG_ERROR([zlib required but not found. Try installing 'zlib1g-dev' or 'zlib-devel'.])
-	AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib settings])
-	OPTIONAL_ZLIB_CLFAGS="${ZLIB_CFLAGS}"
-	OPTIONAL_ZLIB_LIBS="${ZLIB_LIBS}"
-fi
 
-if test "${with_math}" = "yes"; then
-	test -z "${MATH_LIBS}" && AC_MSG_ERROR([math required but not found])
-	AC_DEFINE([STORAGE_WITH_MATH], [1], [math settings])
-	OPTIONAL_MATH_CFLAGS="${MATH_CFLAGS}"
-	OPTIONAL_MATH_LIBS="${MATH_LIBS}"
-fi
-
-if test "${GCC}" = "yes"; then
-	AC_DEFINE_UNQUOTED([likely(x)], [__builtin_expect(!!(x), 1)], [gcc branch optimization])
-	AC_DEFINE_UNQUOTED([unlikely(x)], [__builtin_expect(!!(x), 0)], [gcc branch optimization])
-else
-	AC_DEFINE_UNQUOTED([likely(x)], [(x)], [gcc branch optimization])
-	AC_DEFINE_UNQUOTED([unlikely(x)], [(x)], [gcc branch optimization])
-fi
-
-if test "${enable_pedantic}" = "yes"; then
-	enable_strict="yes"
-	CFLAGS="${CFLAGS} -pedantic -Wall -Wextra -Wno-long-long"
-fi
+# -----------------------------------------------------------------------------
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
@@ -283,6 +357,7 @@ AC_SUBST([OPTIONAL_ZLIB_CLFAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
 AC_SUBST([OPTIONAL_UUID_CLFAGS])
 AC_SUBST([OPTIONAL_UUID_LIBS])
+AC_SUBST([OPTIONAL_CAP_CFLAGS])
 AC_SUBST([OPTIONAL_CAP_LIBS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])

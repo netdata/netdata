@@ -26,10 +26,12 @@ dist_varlib_DATA = .keep
 dist_registry_DATA = .keep
 dist_log_DATA = .keep
 plugins_PROGRAMS =
-if !MACOS
+
+if ENABLE_PLUGIN_APPS
 plugins_PROGRAMS += apps.plugin
 endif
-if FREEIPMI
+
+if ENABLE_PLUGIN_FREEIPMI
 plugins_PROGRAMS += freeipmi.plugin
 endif
 
