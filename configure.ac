@@ -296,7 +296,7 @@ PKG_CHECK_MODULES(
             [have_libcap=no]
         )],
         [have_libcap=no]
-    )]
+    )],
     [have_libcap=no]
 )
 test "${with_libcap}" = "yes" -a "${have_libcap}" != "yes" && AC_MSG_ERROR([libcap required but not found.])
