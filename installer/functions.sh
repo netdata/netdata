@@ -265,8 +265,8 @@ iscontainer() {
 
     # /proc/1/sched exposes the host's pid of our init !
     # http://stackoverflow.com/a/37016302
-    local pid=$( cat /proc/1/sched | head -n 1 | { IFS='(),#:' read name pid th threads; echo $pid; } )
-    local p=$(( pid + 0 ))
+    local pid=$( cat /proc/1/sched 2>/dev/null | head -n 1 | { IFS='(),#:' read name pid th threads; echo $pid; } )
+    pid=$(( pid + 0 ))
     [ ${pid} -ne 1 ] && return 0
 
     # lxc sets environment variable 'container'
