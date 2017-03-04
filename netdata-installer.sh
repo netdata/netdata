@@ -131,7 +131,7 @@ For the plugins, you will at least need:
 USAGE
 }
 
-md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null)"
+md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
 get_git_config_signatures() {
     local x s file md5
 
@@ -147,7 +147,7 @@ get_git_config_signatures() {
             for c in $(git log --follow "conf.d/${x}" | grep ^commit | cut -d ' ' -f 2)
             do
                     git checkout ${c} "conf.d/${x}" || continue
-                    s="$(cat "conf.d/${x}" | md5sum | cut -d ' ' -f 1)"
+                    s="$(cat "conf.d/${x}" | ${md5sum} | cut -d ' ' -f 1)"
                     echo >>configs.signatures.tmp "${s}:${x}"
                     echo "    ${s}"
             done
