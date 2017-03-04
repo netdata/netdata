@@ -12,11 +12,14 @@ AM_CPPFLAGS = \
 	-DRUN_DIR="\"$(localstatedir)/run/netdata\"" \
 	-DWEB_DIR="\"$(webdir)\"" \
 	$(NULL)
+
 AM_CFLAGS = \
 	$(OPTIONAL_MATH_CFLAGS) \
 	$(OPTIONAL_NFACCT_CLFAGS) \
 	$(OPTIONAL_ZLIB_CFLAGS) \
 	$(OPTIONAL_UUID_CFLAGS) \
+	$(OPTIONAL_LIBCAP_CFLAGS) \
+	$(OPTIONAL_IPMIMONITORING_CFLAGS)\
 	$(NULL)
 
 sbin_PROGRAMS = netdata
@@ -24,8 +27,14 @@ dist_cache_DATA = .keep
 dist_varlib_DATA = .keep
 dist_registry_DATA = .keep
 dist_log_DATA = .keep
-if !MACOS
-plugins_PROGRAMS = apps.plugin
+plugins_PROGRAMS =
+
+if ENABLE_PLUGIN_APPS
+plugins_PROGRAMS += apps.plugin
+endif
+
+if ENABLE_PLUGIN_FREEIPMI
+plugins_PROGRAMS += freeipmi.plugin
 endif
 
 netdata_SOURCES = \
@@ -150,12 +159,24 @@ apps_plugin_SOURCES = \
 
 if FREEBSD
 apps_plugin_SOURCES += \
-       plugin_freebsd.h \
-       $(NULL)
+	plugin_freebsd.h \
+	$(NULL)
 endif
 
 apps_plugin_LDADD = \
 	$(OPTIONAL_MATH_LIBS) \
-	$(OPTIONAL_CAP_LIBS) \
+	$(OPTIONAL_LIBCAP_LIBS) \
 	$(NULL)
 
+freeipmi_plugin_SOURCES = \
+	freeipmi_plugin.c \
+	clocks.c clocks.h \
+	common.c common.h \
+	inlined.h \
+	log.c log.h \
+	procfile.c procfile.h \
+	$(NULL)
+
+freeipmi_plugin_LDADD = \
+	$(OPTIONAL_IPMIMONITORING_LIBS) \
+	$(NULL)
