@@ -235,7 +235,7 @@ fi
 test "${with_math}" = "yes" -a -z "${MATH_LIBS}" && AC_MSG_ERROR([math required but not found])
 
 AC_MSG_CHECKING([if libm should be used])
-if test "${with_math}" != "no"; then
+if test "${with_math}" != "no" -a ! -z "${MATH_LIBS}"; then
     with_math="yes"
     AC_DEFINE([STORAGE_WITH_MATH], [1], [math usability])
     OPTIONAL_MATH_CFLAGS="${MATH_CFLAGS}"
@@ -258,7 +258,7 @@ PKG_CHECK_MODULES(
 test "${with_zlib}" = "yes" -a "${have_zlib}" != "yes" && AC_MSG_ERROR([zlib required but not found. Try installing 'zlib1g-dev' or 'zlib-devel'.])
 
 AC_MSG_CHECKING([if zlib should be used])
-if test "${with_zlib}" != "no"; then
+if test "${with_zlib}" != "no" -a "${have_zlib}" = "yes"; then
     with_zlib="yes"
     AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib usability])
     OPTIONAL_ZLIB_CLFAGS="${ZLIB_CFLAGS}"
@@ -302,7 +302,7 @@ PKG_CHECK_MODULES(
 test "${with_libcap}" = "yes" -a "${have_libcap}" != "yes" && AC_MSG_ERROR([libcap required but not found.])
 
 AC_MSG_CHECKING([if libcap should be used])
-if test "${with_libcap}" != "no"; then
+if test "${with_libcap}" != "no" -a "${have_libcap}" = "yes"; then
     with_libcap="yes"
     AC_DEFINE([HAVE_CAPABILITY], [1], [libcap usability])
     OPTIONAL_LIBCAP_CLFAGS="${LIBCAP_CFLAGS}"
