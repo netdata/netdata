@@ -49,7 +49,7 @@ umask 002
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
 
-processors=$(grep ^processor </proc/cpuinfo 2>/dev/null | wc -l)
+processors=$(cat /proc/cpuinfo 2>/dev/null | grep ^processor | wc -l)
 [ $(( processors )) -lt 1 ] && processors=1
 
 # you can set CFLAGS before running installer
@@ -131,7 +131,7 @@ For the plugins, you will at least need:
 USAGE
 }
 
-md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null)"
+md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
 get_git_config_signatures() {
     local x s file md5
 
@@ -147,7 +147,7 @@ get_git_config_signatures() {
             for c in $(git log --follow "conf.d/${x}" | grep ^commit | cut -d ' ' -f 2)
             do
                     git checkout ${c} "conf.d/${x}" || continue
-                    s="$(cat "conf.d/${x}" | md5sum | cut -d ' ' -f 1)"
+                    s="$(cat "conf.d/${x}" | ${md5sum} | cut -d ' ' -f 1)"
                     echo >>configs.signatures.tmp "${s}:${x}"
                     echo "    ${s}"
             done
@@ -720,7 +720,13 @@ run chmod 755 "${NETDATA_LOG_DIR}"
 
 if [ ${UID} -eq 0 ]
     then
-    run chown "${NETDATA_USER}:root" "${NETDATA_LOG_DIR}"
+    # find the admin group
+    admin_group=
+    test -z "${admin_group}" && getent group root >/dev/null 2>&1 && admin_group="root"
+    test -z "${admin_group}" && getent group daemon >/dev/null 2>&1 && admin_group="daemon"
+    test -z "${admin_group}" && admin_group="${NETDATA_USER}"
+
+    run chown "${NETDATA_USER}:${admin_group}" "${NETDATA_LOG_DIR}"
     run chown -R root "${NETDATA_PREFIX}/usr/libexec/netdata"
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
