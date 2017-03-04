@@ -72,10 +72,10 @@ AC_ARG_WITH(
 	[webdir="\$(pkgdatadir)/web"]
 )
 AC_ARG_WITH(
-	[cap],
-	[AS_HELP_STRING([--with-cap], [build with libcap])],
+	[libcap],
+	[AS_HELP_STRING([--with-libcap], [build with libcap])],
 	,
-	[with_cap="detect"]
+	[with_libcap="detect"]
 )
 AC_ARG_WITH(
 	[zlib],
@@ -109,11 +109,11 @@ AC_ARG_ENABLE(
 # fails on centos6
 #AX_CHECK_ENABLE_DEBUG()
 
-AX_GCC_FUNC_ATTRIBUTE(returns_nonnull)
-AX_GCC_FUNC_ATTRIBUTE(malloc)
-AX_GCC_FUNC_ATTRIBUTE(noreturn)
-AX_GCC_FUNC_ATTRIBUTE(format)
-AX_GCC_FUNC_ATTRIBUTE(warn_unused_result)
+AX_GCC_FUNC_ATTRIBUTE([returns_nonnull])
+AX_GCC_FUNC_ATTRIBUTE([malloc])
+AX_GCC_FUNC_ATTRIBUTE([noreturn])
+AX_GCC_FUNC_ATTRIBUTE([format])
+AX_GCC_FUNC_ATTRIBUTE([warn_unused_result])
 
 AC_CHECK_FUNCS_ONCE(accept4)
 AC_CHECK_TYPES([struct timespec, clockid_t], [], [], [[#include <time.h>]])
@@ -158,9 +158,9 @@ darwin*)
 	;;
 esac
 
-AM_CONDITIONAL([FREEBSD], [test x$build_target = xfreebsd])
-AM_CONDITIONAL([MACOS], [test x$build_target = xmacos])
-AM_CONDITIONAL([LINUX], [test x$build_target = xlinux])
+AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
+AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
+AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
 
 
 # -----------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fi
 
 if test "${with_math}" = "yes"; then
 	test -z "${MATH_LIBS}" && AC_MSG_ERROR([math required but not found])
-	AC_DEFINE([STORAGE_WITH_MATH], [1], [math settings])
+	AC_DEFINE([STORAGE_WITH_MATH], [1], [math usability])
 	OPTIONAL_MATH_CFLAGS="${MATH_CFLAGS}"
 	OPTIONAL_MATH_LIBS="${MATH_LIBS}"
 fi
@@ -240,13 +240,15 @@ fi
 # -----------------------------------------------------------------------------
 # zlib
 
+PKG_CHECK_MODULES(
+	[ZLIB],
+	[zlib],
+	[have_zlib=yes],
+	[have_zlib=no]
+)
+test "${with_zlib}" = "yes" -a "${have_zlib}" != "yes" && AC_MSG_ERROR([zlib required but not found. Try installing 'zlib1g-dev' or 'zlib-devel'.])
 if test "${with_zlib}" = "yes"; then
-	PKG_CHECK_MODULES(
-		[ZLIB],
-		[zlib],
-	)
-	test -z "${ZLIB_LIBS}" && AC_MSG_ERROR([zlib required but not found. Try installing 'zlib1g-dev' or 'zlib-devel'.])
-	AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib settings])
+	AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib usability])
 	OPTIONAL_ZLIB_CLFAGS="${ZLIB_CFLAGS}"
 	OPTIONAL_ZLIB_LIBS="${ZLIB_LIBS}"
 fi
@@ -259,9 +261,8 @@ PKG_CHECK_MODULES(
 	[UUID],
 	[uuid],
 	[have_uuid=yes],
-	[have_uuid=no]
+	[AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'libuuid-devel'.])]
 )
-test "${have_uuid}" = "no" && AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'libuuid-devel'.])
 AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
 OPTIONAL_UUID_CLFAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
@@ -270,68 +271,98 @@ OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 # -----------------------------------------------------------------------------
 # libcap
 
-if test "${with_cap}" != "no"; then
-	PKG_CHECK_MODULES(
-		[CAP],
-		[libcap],
-		[have_cap=yes],
-		[have_cap=no]
-	)
-fi
-test "${have_cap}" = "no" -a "${with_cap}" = "yes" && AC_MSG_ERROR([libcap required but not found.])
-if test "${have_cap}" = "yes"; then
+PKG_CHECK_MODULES(
+	[LIBCAP],
+	[libcap],
+	[have_libcap=yes],
+	[have_libcap=no]
+)
+test "${with_libcap}" = "yes" -a "${have_libcap}" != "yes" && AC_MSG_ERROR([libcap required but not found.])
+
+AC_MSG_CHECKING([if libcap should be used])
+if test "${with_libcap}" != "no"; then
+	with_libcap="yes"
 	AC_DEFINE([HAVE_CAPABILITY], [1], [libcap usability])
-	OPTIONAL_CAP_CLFAGS="${CAP_CFLAGS}"
-	OPTIONAL_CAP_LIBS="${CAP_LIBS}"
+	OPTIONAL_LIBCAP_CLFAGS="${LIBCAP_CFLAGS}"
+	OPTIONAL_LIBCAP_LIBS="${LIBCAP_LIBS}"
+else
+	with_libcap="no"
 fi
-AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${have_cap}" = "yes"])
+AC_MSG_RESULT([${with_libcap}])
+AM_CONDITIONAL([ENABLE_CAPABILITY], [test "${with_libcap}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
 # apps.plugin
 
-AM_CONDITIONAL([ENABLE_PLUGIN_APPS], [test "${build_target}" != "macos"])
+AC_MSG_CHECKING([if apps.plugin should be enabled])
+if test "${build_target}" != "macos"; then
+    enable_plugin_apps="yes"
+else
+    enable_plugin_apps="no"
+fi
+AC_MSG_RESULT([${enable_plugin_apps}])
+AM_CONDITIONAL([ENABLE_PLUGIN_APPS], [test "${enable_plugin_apps}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
 # freeipmi.plugin - libipmimonitoring
 
-if test "${enable_plugin_freeipmi}" != "no"; then
-	PKG_CHECK_MODULES(
-		[IPMIMONITORING],
-		[libipmimonitoring],
-		[have_ipmimonitoring=yes],
-		[have_ipmimonitoring=no]
-	)
-fi
-test "${have_ipmimonitoring}" = "no" -a "${enable_plugin_freeipmi}" = "yes" && \
+PKG_CHECK_MODULES(
+	[IPMIMONITORING],
+	[libipmimonitoring],
+	[have_ipmimonitoring=yes],
+	[have_ipmimonitoring=no]
+)
+test "${enable_plugin_freeipmi}" = "yes" -a "${have_ipmimonitoring}" != "yes" && \
 	AC_MSG_ERROR([ipmimonitoring required but not found. Try installing 'libipmimonitoring-dev' or 'libipmimonitoring-devel'])
-if test "${have_ipmimonitoring}" = "yes"; then
+
+AC_MSG_CHECKING([if freeipmi.plugin should be enabled])
+if test "${enable_plugin_freeipmi}" != "no" -a "${have_ipmimonitoring}" = "yes"; then
+	enable_plugin_freeipmi="yes"
 	AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
 	OPTIONAL_IPMIMONITORING_CLFAGS="${IPMIMONITORING_CFLAGS}"
 	OPTIONAL_IPMIMONITORING_LIBS="${IPMIMONITORING_LIBS}"
+else
+	enable_plugin_freeipmi="no"
 fi
-AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${have_ipmimonitoring}" = "yes"])
+AC_MSG_RESULT([${enable_plugin_freeipmi}])
+AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
 # nfacct.plugin - libmnl, libnetfilter_acct
 
-if test "${enable_plugin_nfacct}" = "yes"; then
-	PKG_CHECK_MODULES(
-		[NFACCT],
-		[libnetfilter_acct],
-	)
-	PKG_CHECK_MODULES(
-		[LIBMNL],
-		[libmnl],
-	)
-	test -z "${NFACCT_LIBS}" && AC_MSG_ERROR([netfilter_acct required but not found])
-	test -z "${LIBMNL_LIBS}" && AC_MSG_ERROR([libmnl required but not found. Try installing 'libmnl-dev' or 'libmnl-devel'])
-	AC_DEFINE([INTERNAL_PLUGIN_NFACCT], [1], [nfacct plugin settings])
+PKG_CHECK_MODULES(
+	[NFACCT],
+	[libnetfilter_acct],
+	[have_libnetfilter_acct=yes],
+	[have_libnetfilter_acct=no]
+)
+PKG_CHECK_MODULES(
+	[LIBMNL],
+	[libmnl],
+	[have_libmnl=yes],
+	[have_libmnl=no]
+)
+
+test "${enable_plugin_nfacct}" = "yes" -a "${have_libnetfilter_acct}" != "yes" && \
+	AC_MSG_ERROR([netfilter_acct required but not found])
+
+test "${enable_plugin_nfacct}" = "yes" -a "${have_libmnl}" != "yes" && \
+	AC_MSG_ERROR([libmnl required but not found. Try installing 'libmnl-dev' or 'libmnl-devel'])
+
+AC_MSG_CHECKING([if nfacct.plugin should be enabled])
+if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes" -a "${have_libmnl}" = "yes"; then
+	enable_plugin_nfacct="yes"
+	AC_DEFINE([INTERNAL_PLUGIN_NFACCT], [1], [nfacct plugin usability])
 	OPTIONAL_NFACCT_CLFAGS="${NFACCT_CFLAGS} ${LIBMNL_CFLAGS}"
 	OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
+else
+	enable_plugin_nfacct="no"
 fi
+AC_MSG_RESULT([${enable_plugin_nfacct}])
+AM_CONDITIONAL([ENABLE_PLUGIN_NFACCT], [test "${enable_plugin_nfacct}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
@@ -357,8 +388,8 @@ AC_SUBST([OPTIONAL_ZLIB_CLFAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
 AC_SUBST([OPTIONAL_UUID_CLFAGS])
 AC_SUBST([OPTIONAL_UUID_LIBS])
-AC_SUBST([OPTIONAL_CAP_CFLAGS])
-AC_SUBST([OPTIONAL_CAP_LIBS])
+AC_SUBST([OPTIONAL_LIBCAP_CFLAGS])
+AC_SUBST([OPTIONAL_LIBCAP_LIBS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 

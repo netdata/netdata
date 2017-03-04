@@ -163,7 +163,7 @@ endif
 
 apps_plugin_LDADD = \
 	$(OPTIONAL_MATH_LIBS) \
-	$(OPTIONAL_CAP_LIBS) \
+	$(OPTIONAL_LIBCAP_LIBS) \
 	$(NULL)
 
 freeipmi_plugin_SOURCES = \
