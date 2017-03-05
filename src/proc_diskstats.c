@@ -61,7 +61,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     // not found
     // create a new disk structure
-    d = (struct disk *)mallocz(sizeof(struct disk));
+    d = (struct disk *)callocz(1, sizeof(struct disk));
 
     d->disk = strdupz(disk);
     d->major = major;
