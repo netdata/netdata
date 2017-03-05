@@ -149,6 +149,7 @@ declare -A configs_signatures=(
   ['5829812db29598db5857c9f433e96fef']='python.d/apache.conf'
   ['58e835b7176865ec5a6f59f7aba832bf']='health.d/named.conf'
   ['5b917d894bb6a755d59264e9d48e9d56']='fping.conf'
+  ['5bbef0708f5eff4d4a53aaf35fc48a62']='health.d/disks.conf'
   ['5bf51bb24fb41db9b1e448bd060d3f8c']='apps_groups.conf'
   ['5da15d6e17a15213a720749045e5d419']='health.d/disks.conf'
   ['5e6fd588ef6934cf04ddb5e662aa02ea']='health.d/postgres.conf'
