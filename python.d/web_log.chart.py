@@ -82,6 +82,8 @@ CHARTS = {
 
 NAMED_URL_PATTERN = namedtuple('URL_PATTERN', ['description', 'pattern'])
 
+DET_RESP_AGGR = ['', '_1xx', '_2xx', '_3xx', '_4xx', '_5xx', '_Other']
+
 
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
@@ -94,7 +96,7 @@ class Service(LogService):
         """
         LogService.__init__(self, configuration=configuration, name=name)
         # Variables from module configuration file
-        self.type = self.configuration.get('type', 'web_access')
+        self.log_type = self.configuration.get('type', 'web_access')
         self.log_path = self.configuration.get('path')
         self.url_pattern = self.configuration.get('categories')  # dict
         self.custom_log_format = self.configuration.get('custom_log_format')  # dict
@@ -145,9 +147,10 @@ class Service(LogService):
                 self.error(str(error))
                 return False
 
-        if self.type == 'web_access':
+        if self.log_type == 'web_access':
             self.unique_all_time = list()  # sorted list of unique IPs
             self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
+            self.detailed_response_aggregate = self.configuration.get('detailed_response_aggregate', True)
             self.all_time = self.configuration.get('all_time', True)
 
             # Custom_log_format or predefined log format.
@@ -206,7 +209,7 @@ class Service(LogService):
          ("resp_length" is integer or "-", "resp_time" is integer or float)
 
         """
-        if not is_dict(self.custom_log_format):
+        if not hasattr(self.custom_log_format, 'keys'):
             return find_regex_return(msg='Custom log: "custom_log_format" is not a <dict>')
 
         pattern = self.custom_log_format.get('pattern')
@@ -244,7 +247,7 @@ class Service(LogService):
             mandatory_values = set(mandatory_dict) - set(match_dict)
             if mandatory_values:
                 return find_regex_return(msg='Custom log: search OK but some mandatory keys (%s) are missing'
-                                         % list(mandatory_values))
+                                             % list(mandatory_values))
             else:
                 for key in mandatory_dict:
                     if not re.search(mandatory_dict[key], match_dict[key]):
@@ -355,6 +358,7 @@ class Service(LogService):
         1. 'time_response' chart is removed if there is no 'resp_time' in match_dict.
         2. Other stuff is just remove/add chart depending on yes/no in conf
         """
+
         def find_job_name(override_name, name):
             """
             :param override_name: str: 'name' var from configuration file
@@ -372,16 +376,14 @@ class Service(LogService):
         self.definitions = deepcopy(CHARTS)
 
         job_name = find_job_name(self.override_name, self.name)
-        self.detailed_chart = 'CHART %s.detailed_response_codes ""' \
-                              ' "Detailed Response Codes" requests/s responses' \
-                              ' web_log.detailed_response_codes stacked 1 %s\n' % (job_name, self.update_every)
+
         self.http_method_chart = 'CHART %s.http_method' \
                                  ' "" "Requests Per HTTP Method" requests/s "http methods"' \
-                                 ' web_log.http_method stacked 2 %s\n' \
+                                 ' web_log.http_method stacked 11 %s\n' \
                                  'DIMENSION GET GET incremental\n' % (job_name, self.update_every)
         self.http_version_chart = 'CHART %s.http_version' \
                                   ' "" "Requests Per HTTP Version" requests/s "http versions"' \
-                                  ' web_log.http_version stacked 3 %s\n' % (job_name, self.update_every)
+                                  ' web_log.http_version stacked 12 %s\n' % (job_name, self.update_every)
 
         # Remove 'request_time' chart from ORDER if resp_time not in match_dict
         if 'resp_time' not in match_dict:
@@ -391,11 +393,25 @@ class Service(LogService):
             self.order.remove('clients_all')
         # Add 'detailed_response_codes' chart if specified in the configuration
         if self.detailed_response_codes:
-            self.order.append('detailed_response_codes')
-            self.definitions['detailed_response_codes'] = {'options': [None, 'Detailed Response Codes', 'requests/s',
-                                                                       'responses', 'web_log.detailed_response_codes',
-                                                                       'stacked'],
-                                                           'lines': []}
+            self.detailed_chart = list()
+            for prio, add_to_dim in enumerate(DET_RESP_AGGR):
+                self.detailed_chart.append('CHART %s.detailed_response_codes%s ""'
+                                           ' "Detailed Response Codes %s" requests/s responses'
+                                           ' web_log.detailed_response_codes%s stacked %s %s\n'
+                                           % (job_name, add_to_dim, add_to_dim[1:], add_to_dim,
+                                              str(prio), self.update_every))
+
+            codes = DET_RESP_AGGR[:1] if self.detailed_response_aggregate else DET_RESP_AGGR[1:]
+            for code in codes:
+                self.order.append('detailed_response_codes%s' % code)
+                self.definitions['detailed_response_codes%s' % code] = {'options':
+                                                                        [None,
+                                                                         'Detailed Response Codes %s' % code[1:],
+                                                                         'requests/s',
+                                                                         'responses',
+                                                                         'web_log.detailed_response_codes%s' % code,
+                                                                         'stacked'],
+                                                                        'lines': []}
 
         # Add 'requests_per_url' chart if specified in the configuration
         if self.url_pattern:
@@ -481,10 +497,10 @@ class Service(LogService):
                 # unique clients ips
                 if address_not_in_pool(self.unique_all_time, match_dict['address'],
                                        self.data['unique_tot_ipv4'] + self.data['unique_tot_ipv6']):
-                        self.data['unique_tot_' + proto] += 1
+                    self.data['unique_tot_' + proto] += 1
                 if address_not_in_pool(unique_current, match_dict['address'], ip_address_counter['unique_cur_ip']):
-                        self.data['unique_cur_' + proto] += 1
-                        ip_address_counter['unique_cur_ip'] += 1
+                    self.data['unique_cur_' + proto] += 1
+                    ip_address_counter['unique_cur_ip'] += 1
             else:
                 self.data['unmatched'] += 1
 
@@ -502,9 +518,16 @@ class Service(LogService):
         Calls add_new_dimension method If the value is found for the first time
         """
         if code not in self.data:
-            chart_string_copy = self.detailed_chart
-            self.detailed_chart = self.add_new_dimension(code, [code, code, 'incremental'],
-                                                         chart_string_copy, 'detailed_response_codes')
+            if self.detailed_response_aggregate:
+                chart_string_copy = self.detailed_chart[0]
+                self.detailed_chart[0] = self.add_new_dimension(code, [code, code, 'incremental'],
+                                                                chart_string_copy, 'detailed_response_codes')
+            else:
+                code_index = int(code[0]) if int(code[0]) < 6 else 6
+                chart_string_copy = self.detailed_chart[code_index]
+                chart_name = 'detailed_response_codes' + DET_RESP_AGGR[code_index]
+                self.detailed_chart[code_index] = self.add_new_dimension(code, [code, code, 'incremental'],
+                                                                         chart_string_copy, chart_name)
         self.data[code] += 1
 
     def _get_data_http_method(self, method):
@@ -602,7 +625,7 @@ def check_req_per_url_pattern(string, url_pattern):
     :return: list of named tuples or None:
      We need to make sure all patterns are valid regular expressions
     """
-    if not is_dict(url_pattern):
+    if not hasattr(url_pattern, 'keys'):
         return None
 
     result = list()
@@ -628,17 +651,3 @@ def check_req_per_url_pattern(string, url_pattern):
             result.append(NAMED_URL_PATTERN(description='_'.join([string, dimension]), pattern=valid_pattern))
 
     return result or None
-
-
-def is_dict(obj):
-    """
-    :param obj: dict:
-    :return: True or False
-    obj can be <dict> or <OrderedDict>
-    """
-    try:
-        obj.keys()
-    except AttributeError:
-        return False
-    else:
-        return True
