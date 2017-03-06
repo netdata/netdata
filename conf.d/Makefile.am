@@ -43,6 +43,7 @@ dist_pythonconfig_DATA = \
     python.d/mongodb.conf \
     python.d/mysql.conf \
     python.d/nginx.conf \
+    python.d/nsd.conf \
     python.d/ovpn_status_log.conf \
     python.d/phpfpm.conf \
     python.d/postfix.conf \

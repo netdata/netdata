@@ -33,6 +33,7 @@ dist_python_DATA = \
     mongodb.chart.py \
     mysql.chart.py \
     nginx.chart.py \
+    nsd.chart.py \
     ovpn_status_log.chart.py \
     phpfpm.chart.py \
     postfix.chart.py \
