@@ -249,9 +249,9 @@ static int netdata_do_sel = 1;
 static size_t netdata_sensors_updated = 0;
 static size_t netdata_sensors_collected = 0;
 static size_t netdata_sel_events = 0;
-static size_t netdata_sensors_state_nominal = 0;
-static size_t netdata_sensors_state_warning = 0;
-static size_t netdata_sensors_state_critical = 0;
+static size_t netdata_sensors_states_nominal = 0;
+static size_t netdata_sensors_states_warning = 0;
+static size_t netdata_sensors_states_critical = 0;
 
 struct sensor {
     int record_id;
@@ -284,9 +284,9 @@ static void netdata_mark_as_not_updated() {
     netdata_sensors_collected = 0;
     netdata_sel_events = 0;
 
-    netdata_sensors_state_nominal = 0;
-    netdata_sensors_state_warning = 0;
-    netdata_sensors_state_critical = 0;
+    netdata_sensors_states_nominal = 0;
+    netdata_sensors_states_warning = 0;
+    netdata_sensors_states_critical = 0;
 }
 
 static void send_chart_to_netdata_for_units(int units) {
@@ -467,7 +467,7 @@ static void send_metrics_to_netdata_for_units(int units) {
 }
 
 static void send_metrics_to_netdata() {
-    static int sel_chart_generated = 0, sensors_state_chart_generated = 0;
+    static int sel_chart_generated = 0, sensors_states_chart_generated = 0;
     struct sensor *sn;
 
     if(netdata_do_sel && !sel_chart_generated) {
@@ -479,9 +479,9 @@ static void send_metrics_to_netdata() {
         printf("DIMENSION events '' absolute 1 1\n");
     }
 
-    if(!sensors_state_chart_generated) {
-        sensors_state_chart_generated = 1;
-        printf("CHART ipmi.sensors_state '' 'IPMI Sensors State' 'sensors' 'sensors' ipmi.sensors_state stacked %d %d\n"
+    if(!sensors_states_chart_generated) {
+        sensors_states_chart_generated = 1;
+        printf("CHART ipmi.sensors_states '' 'IPMI Sensors State' 'sensors' 'states' ipmi.sensors_states stacked %d %d\n"
                , netdata_priority + 1
                , netdata_update_every
         );
@@ -505,14 +505,14 @@ static void send_metrics_to_netdata() {
     }
 
     printf(
-           "BEGIN ipmi.sensors_state\n"
+           "BEGIN ipmi.sensors_states\n"
            "SET nominal = %zu\n"
            "SET warning = %zu\n"
            "SET critical = %zu\n"
            "END\n"
-           , netdata_sensors_state_nominal
-           , netdata_sensors_state_warning
-           , netdata_sensors_state_critical
+           , netdata_sensors_states_nominal
+           , netdata_sensors_states_warning
+           , netdata_sensors_states_critical
     );
 
     // send metrics to netdata
@@ -592,15 +592,15 @@ static void netdata_get_sensor(
 
     switch(sensor_state) {
         case IPMI_MONITORING_STATE_NOMINAL:
-            netdata_sensors_state_nominal++;
+            netdata_sensors_states_nominal++;
             break;
 
         case IPMI_MONITORING_STATE_WARNING:
-            netdata_sensors_state_warning++;
+            netdata_sensors_states_warning++;
             break;
 
         case IPMI_MONITORING_STATE_CRITICAL:
-            netdata_sensors_state_critical++;
+            netdata_sensors_states_critical++;
             break;
 
         default:
