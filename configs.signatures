@@ -191,6 +191,7 @@ declare -A configs_signatures=(
   ['707a63f53f4b32e01d134ae90ba94aad']='health_alarm_notify.conf'
   ['707a63f53f4b32e01d134ae90ba94aad']='health_email_recipients.conf'
   ['70d82dabecb09a1da4684f293abef0c9']='health_alarm_notify.conf'
+  ['7120cba2f55b1c0a97a0e10d4f6ef751']='health.d/ipmi.conf'
   ['729b3e24a72f7d566fd429617d51a21b']='health.d/web_log.conf'
   ['73125ae64d5c6e9361944cd9bd14844e']='python.d/exim.conf'
   ['731a1fcfe9b2da1b9d685056a59541b8']='python.d/hddtemp.conf'
