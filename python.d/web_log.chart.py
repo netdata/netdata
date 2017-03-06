@@ -315,7 +315,7 @@ class Service(LogService):
                                           r' (?P<code>[1-9]\d{2})'
                                           r' (?P<bytes_sent>\d+)'
                                           r' (?P<resp_length>\d+)'
-                                          r' (?P<resp_time>\d\.\d+) ')
+                                          r' (?P<resp_time>\d+\.\d+) ')
 
         acs_nginx_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
                                           r' -.*?"(?P<method>[A-Z]+)'
@@ -325,7 +325,7 @@ class Service(LogService):
                                           r' (?P<bytes_sent>\d+)'
                                           r' .*?'
                                           r' (?P<resp_length>\d+)'
-                                          r' (?P<resp_time>\d\.\d+)')
+                                          r' (?P<resp_time>\d+\.\d+)')
 
         def func_usec(time):
             return time
