@@ -3,11 +3,14 @@
 
 #include <sys/sysctl.h>
 
-#define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
-
 void *freebsd_main(void *ptr);
 
-extern int do_freebsd_sysctl(int update_every, usec_t dt);
+extern int freebsd_plugin_init();
+
+extern int do_vm_loadavg(int update_every, usec_t dt);
+extern int do_freebsd_sysctl_old(int update_every, usec_t dt);
+
+#define GETSYSCTL(name, var) getsysctl(name, &(var), sizeof(var))
 
 static inline int getsysctl(const char *name, void *ptr, size_t len)
 {

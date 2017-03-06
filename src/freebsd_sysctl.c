@@ -1,42 +1,30 @@
 #include "common.h"
 
-// NEEDED BY: struct vmtotal, struct vmmeter
 #include <sys/vmmeter.h>
-// NEEDED BY: struct devstat
 #include <sys/devicestat.h>
-// NEEDED BY: struct xswdev
+#include <sys/mount.h>
 #include <vm/vm_param.h>
-// NEEDED BY: struct semid_kernel, struct shmid_kernel, struct msqid_kernel
+
 #define _KERNEL
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/msg.h>
 #undef _KERNEL
-// NEEDED BY: struct sysctl_netisr_workstream, struct sysctl_netisr_work
+
 #include <net/netisr.h>
-// NEEDED BY: struct ifaddrs, getifaddrs()
 #include <net/if.h>
 #include <ifaddrs.h>
-// NEEDED BY do_tcp...
-#include <netinet/tcp_var.h>
-#include <netinet/tcp_fsm.h>
-// NEEDED BY do_udp..., do_ip...
-#include <netinet/ip_var.h>
-// NEEDED BY do_udp...
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-// NEEDED BY do_icmp...
+
 #include <netinet/ip.h>
+#include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp_var.h>
-// NEEDED BY do_ip6...
 #include <netinet6/ip6_var.h>
-// NEEDED BY do_icmp6...
 #include <netinet/icmp6.h>
-// NEEDED BY do_space, do_inodes
-#include <sys/mount.h>
-// NEEDED BY do_uptime
-#include <time.h>
+#include <netinet/tcp_var.h>
+#include <netinet/tcp_fsm.h>
+#include <netinet/udp.h>
+#include <netinet/udp_var.h>
 
 #define KILO_FACTOR 1024
 #define MEGA_FACTOR 1048576     // 1024 * 1024
@@ -44,16 +32,33 @@
 
 #define MAX_INT_DIGITS 10 // maximum number of digits for int
 
+int system_pagesize = PAGE_SIZE;
+
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
-
-// FreeBSD calculates load averages once every 5 seconds
-#define MIN_LOADAVG_UPDATE_EVERY 5
 
 // NEEDED BY: do_bandwidth
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
-int do_freebsd_sysctl(int update_every, usec_t dt) {
+// FreeBSD plugin initialization
+int freebsd_plugin_init()
+{
+    if (system_pagesize = getpagesize() <= 0) {
+        error("FREEBSD: can't get system page size");
+        return 1;
+    }
+
+    return 0;
+}
+
+// FreeBSD calculates load averages once every 5 seconds
+#define MIN_LOADAVG_UPDATE_EVERY 5
+
+int do_vm_loadavg(int update_every, usec_t dt){
+
+}
+
+int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
         do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
@@ -124,7 +129,6 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
     RRDSET *st;
     RRDDIM *rd;
 
-    int system_pagesize = getpagesize(); // wouldn't it be better to get value directly from hw.pagesize?
     int i, n;
     void *p;
     int common_error = 0;
