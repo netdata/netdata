@@ -1495,7 +1495,7 @@ int main (int argc, char **argv) {
         error("freeipmi.plugin: ignoring parameter '%s'", argv[i]);
     }
 
-    if(freq > 0 && freq < netdata_update_every)
+    if(freq > netdata_update_every)
         netdata_update_every = freq;
 
     else if(freq)
