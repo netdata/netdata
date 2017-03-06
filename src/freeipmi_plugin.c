@@ -36,20 +36,20 @@
 char *hostname = NULL;
 
 /* In-band Communication Configuration */
-int driver_type = IPMI_MONITORING_DRIVER_TYPE_KCS; /* or -1 for default */
+int driver_type = -1; // IPMI_MONITORING_DRIVER_TYPE_KCS; /* or -1 for default */
 int disable_auto_probe = 0;     /* probe for in-band device */
 unsigned int driver_address = 0; /* not used if probing */
 unsigned int register_spacing = 0; /* not used if probing */
 char *driver_device = NULL;     /* not used if probing */
 
 /* Out-of-band Communication Configuration */
-int protocol_version = IPMI_MONITORING_PROTOCOL_VERSION_1_5; /* or -1 for default */
+int protocol_version = -1; //IPMI_MONITORING_PROTOCOL_VERSION_1_5; /* or -1 for default */
 char *username = "foousername";
 char *password = "foopassword";
 unsigned char *k_g = NULL;
 unsigned int k_g_len = 0;
-int privilege_level = IPMI_MONITORING_PRIVILEGE_LEVEL_USER; /* or -1 for default */
-int authentication_type = IPMI_MONITORING_AUTHENTICATION_TYPE_MD5; /* or -1 for default */
+int privilege_level = -1; // IPMI_MONITORING_PRIVILEGE_LEVEL_USER; /* or -1 for default */
+int authentication_type = -1; // IPMI_MONITORING_AUTHENTICATION_TYPE_MD5; /* or -1 for default */
 int cipher_suite_id = 0;        /* or -1 for default */
 int session_timeout = 0;        /* 0 for default */
 int retransmission_timeout = 0; /* 0 for default */
@@ -244,10 +244,14 @@ static int debug = 0;
 
 static int netdata_update_every = 5;
 static int netdata_priority = 90000;
+static int netdata_do_sel = 1;
 
 static size_t netdata_sensors_updated = 0;
 static size_t netdata_sensors_collected = 0;
 static size_t netdata_sel_events = 0;
+static size_t netdata_sensors_state_nominal = 0;
+static size_t netdata_sensors_state_warning = 0;
+static size_t netdata_sensors_state_critical = 0;
 
 struct sensor {
     int record_id;
@@ -279,6 +283,10 @@ static void netdata_mark_as_not_updated() {
     netdata_sensors_updated = 0;
     netdata_sensors_collected = 0;
     netdata_sel_events = 0;
+
+    netdata_sensors_state_nominal = 0;
+    netdata_sensors_state_warning = 0;
+    netdata_sensors_state_critical = 0;
 }
 
 static void send_chart_to_netdata_for_units(int units) {
@@ -287,49 +295,49 @@ static void send_chart_to_netdata_for_units(int units) {
     switch(units) {
         case IPMI_MONITORING_SENSOR_UNITS_CELSIUS:
             printf("CHART ipmi.temperatures_c '' 'System Celcius Temperatures read by IPMI' 'Celcius' 'temperatures' 'ipmi.temperatures_c' 'line' %d %d\n"
-                   , netdata_priority
+                   , netdata_priority + 10
                    , netdata_update_every
             );
             break;
 
         case IPMI_MONITORING_SENSOR_UNITS_FAHRENHEIT:
             printf("CHART ipmi.temperatures_f '' 'System Fahrenheit Temperatures read by IPMI' 'Fahrenheit' 'temperatures' 'ipmi.temperatures_f' 'line' %d %d\n"
-                   , netdata_priority
+                   , netdata_priority + 11
                    , netdata_update_every
             );
             break;
 
         case IPMI_MONITORING_SENSOR_UNITS_VOLTS:
             printf("CHART ipmi.volts '' 'System Voltages read by IPMI' 'Volts' 'voltages' 'ipmi.voltages' 'line' %d %d\n"
-                   , netdata_priority
+                   , netdata_priority + 12
                    , netdata_update_every
             );
             break;
 
         case IPMI_MONITORING_SENSOR_UNITS_AMPS:
             printf("CHART ipmi.amps '' 'System Current read by IPMI' 'Amps' 'current' 'ipmi.amps' 'line' %d %d\n"
-                   , netdata_priority
+                   , netdata_priority + 13
                    , netdata_update_every
             );
             break;
 
         case IPMI_MONITORING_SENSOR_UNITS_RPM:
             printf("CHART ipmi.rpm '' 'System Fans read by IPMI' 'RPM' 'fans' 'ipmi.rpm' 'line' %d %d\n"
-                   , netdata_priority
+                   , netdata_priority + 14
                    , netdata_update_every
             );
             break;
 
         case IPMI_MONITORING_SENSOR_UNITS_WATTS:
             printf("CHART ipmi.watts '' 'System Power read by IPMI' 'Watts' 'power' 'ipmi.watts' 'line' %d %d\n"
-                   , netdata_priority
+                   , netdata_priority + 5
                    , netdata_update_every
             );
             break;
 
         case IPMI_MONITORING_SENSOR_UNITS_PERCENT:
             printf("CHART ipmi.percent '' 'System Metrics read by IPMI' '%%' 'other' 'ipmi.percent' 'line' %d %d\n"
-                   , netdata_priority
+                   , netdata_priority + 15
                    , netdata_update_every
             );
             break;
@@ -459,15 +467,27 @@ static void send_metrics_to_netdata_for_units(int units) {
 }
 
 static void send_metrics_to_netdata() {
-    static int sel_chart_generated = 0;
+    static int sel_chart_generated = 0, sensors_state_chart_generated = 0;
     struct sensor *sn;
 
-    if(!sel_chart_generated) {
-        printf("CHART ipmi.events '' 'IPMI Events' 'events' 'events' 'ipmi.sel' 'area' %d %d\n"
-               , netdata_priority
+    if(netdata_do_sel && !sel_chart_generated) {
+        sel_chart_generated = 1;
+        printf("CHART ipmi.events '' 'IPMI Events' 'events' 'events' ipmi.sel area %d %d\n"
+               , netdata_priority + 2
                , netdata_update_every
         );
         printf("DIMENSION events '' absolute 1 1\n");
+    }
+
+    if(!sensors_state_chart_generated) {
+        sensors_state_chart_generated = 1;
+        printf("CHART ipmi.sensors_state '' 'IPMI Sensors State' 'sensors' 'sensors' ipmi.sensors_state stacked %d %d\n"
+               , netdata_priority + 1
+               , netdata_update_every
+        );
+        printf("DIMENSION nominal '' absolute 1 1\n");
+        printf("DIMENSION critical '' absolute 1 1\n");
+        printf("DIMENSION warning '' absolute 1 1\n");
     }
 
     // generate the CHART/DIMENSION lines, if we have to
@@ -475,7 +495,25 @@ static void send_metrics_to_netdata() {
         if(sn->updated && !sn->exposed && !sn->ignore)
             send_chart_to_netdata_for_units(sn->sensor_units);
 
-    printf("BEGIN ipmi.events\nSET events = %zu\nEND\n", netdata_sel_events);
+    if(netdata_do_sel) {
+        printf(
+                "BEGIN ipmi.events\n"
+                "SET events = %zu\n"
+                "END\n"
+                , netdata_sel_events
+        );
+    }
+
+    printf(
+           "BEGIN ipmi.sensors_state\n"
+           "SET nominal = %zu\n"
+           "SET warning = %zu\n"
+           "SET critical = %zu\n"
+           "END\n"
+           , netdata_sensors_state_nominal
+           , netdata_sensors_state_warning
+           , netdata_sensors_state_critical
+    );
 
     // send metrics to netdata
     for(sn = sensors_root; sn; sn = sn->next)
@@ -552,14 +590,22 @@ static void netdata_get_sensor(
             break;
     }
 
-/*    switch(sensor_state) {
+    switch(sensor_state) {
         case IPMI_MONITORING_STATE_NOMINAL:
+            netdata_sensors_state_nominal++;
+            break;
+
         case IPMI_MONITORING_STATE_WARNING:
+            netdata_sensors_state_warning++;
+            break;
+
         case IPMI_MONITORING_STATE_CRITICAL:
+            netdata_sensors_state_critical++;
+            break;
+
         default:
             break;
     }
-*/
 }
 
 static void netdata_get_sel(
@@ -1321,7 +1367,10 @@ int ipmi_collect_data(struct ipmi_monitoring_ipmi_config *ipmi_config) {
     errno = 0;
 
     if (_ipmimonitoring_sensors(ipmi_config) < 0) return -1;
-    if (_ipmimonitoring_sel    (ipmi_config) < 0) return -2;
+
+    if(netdata_do_sel) {
+        if(_ipmimonitoring_sel(ipmi_config) < 0) return -2;
+    }
 
     return 0;
 }
@@ -1350,11 +1399,11 @@ int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
         sleep_usec(end - start);
     }
 
-    // so, we assume it needed 3x the time
+    // so, we assume it needed 2x the time
     // we find the average in microseconds
     // and we round-up to the closest second
 
-    return (( total * 3 / checks / 1000000 ) + 1);
+    return (( total * 2 / checks / 1000000 ) + 1);
 }
 
 int main (int argc, char **argv) {
@@ -1409,17 +1458,26 @@ int main (int argc, char **argv) {
             exit(1);
         }
         else if(i < argc && strcmp("hostname", argv[i]) == 0) {
-            hostname = argv[++i];
+            hostname = strdupz(argv[++i]);
+            char *s = argv[i];
+            // mask it be hidden from the process tree
+            while(*s) *s++ = 'x';
             if(debug) fprintf(stderr, "freeipmi.plugin: hostname set to '%s'\n", hostname);
             continue;
         }
         else if(i < argc && strcmp("username", argv[i]) == 0) {
-            username = argv[++i];
+            username = strdupz(argv[++i]);
+            char *s = argv[i];
+            // mask it be hidden from the process tree
+            while(*s) *s++ = 'x';
             if(debug) fprintf(stderr, "freeipmi.plugin: username set to '%s'\n", username);
             continue;
         }
         else if(i < argc && strcmp("password", argv[i]) == 0) {
-            password = argv[++i];
+            password = strdupz(argv[++i]);
+            char *s = argv[i];
+            // mask it be hidden from the process tree
+            while(*s) *s++ = 'x';
             if(debug) fprintf(stderr, "freeipmi.plugin: password set to '%s'\n", password);
             continue;
         }
