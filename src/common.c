@@ -1104,7 +1104,7 @@ long get_system_cpus(void) {
     #ifdef __APPLE__
         int32_t tmp_processors;
 
-        if (unlikely(GETSYSCTL("hw.logicalcpu", tmp_processors))) {
+        if (unlikely(GETSYSCTL_BY_NAME("hw.logicalcpu", tmp_processors))) {
             error("Assuming system has %d processors.", processors);
         } else {
             processors = tmp_processors;
@@ -1114,7 +1114,7 @@ long get_system_cpus(void) {
     #elif __FreeBSD__
         int32_t tmp_processors;
 
-        if (unlikely(GETSYSCTL("hw.ncpu", tmp_processors))) {
+        if (unlikely(GETSYSCTL_BY_NAME("hw.ncpu", tmp_processors))) {
             error("Assuming system has %d processors.", processors);
         } else {
             processors = tmp_processors;
@@ -1166,7 +1166,7 @@ pid_t get_system_pid_max(void) {
     #elif __FreeBSD__
         int32_t tmp_pid_max;
 
-        if (unlikely(GETSYSCTL("kern.pid_max", tmp_pid_max))) {
+        if (unlikely(GETSYSCTL_BY_NAME("kern.pid_max", tmp_pid_max))) {
             pid_max = 99999;
             error("Assuming system's maximum pid is %d.", pid_max);
         } else {

@@ -13,13 +13,13 @@ static struct freebsd_module {
 
 } freebsd_modules[] = {
 
-        { .name = "freebsd_old", .dim = "freebsd_old", .func = do_freebsd_sysctl_old },
+        { .name = "freebsd_old", .dim = "freebsd_old", .enabled = 1, .func = do_freebsd_sysctl_old },
 
         // system metrics
-        { .name = "vm.loadavg", .dim = "loadavg", .func = do_vm_loadavg },
+        { .name = "load average", .dim = "loadavg", .enabled = 1, .func = do_vm_loadavg },
 
         // the terminator of this array
-        { .name = NULL, .dim = NULL, .func = NULL }
+        { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
 };
 
 void *freebsd_main(void *ptr) {
@@ -44,7 +44,7 @@ void *freebsd_main(void *ptr) {
     for(i = 0 ; freebsd_modules[i].name ;i++) {
         struct freebsd_module *pm = &freebsd_modules[i];
 
-        pm->enabled = config_get_boolean("plugin:freebsd", pm->name, 1);
+        pm->enabled = config_get_boolean("plugin:freebsd", pm->name, pm->enabled);
         pm->duration = 0ULL;
         pm->rd = NULL;
     }
