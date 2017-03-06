@@ -34,16 +34,11 @@
 
 int system_pagesize = PAGE_SIZE;
 
-// NEEDED BY: do_disk_io
-#define RRD_TYPE_DISK "disk"
-
-// NEEDED BY: do_bandwidth
-#define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
-
 // FreeBSD plugin initialization
 int freebsd_plugin_init()
 {
-    if (system_pagesize = getpagesize() <= 0) {
+    system_pagesize = getpagesize();
+    if (system_pagesize <= 0) {
         error("FREEBSD: can't get system page size");
         return 1;
     }
@@ -55,12 +50,55 @@ int freebsd_plugin_init()
 #define MIN_LOADAVG_UPDATE_EVERY 5
 
 int do_vm_loadavg(int update_every, usec_t dt){
+    static usec_t next_loadavg_dt = 0;
+    static int mib[2] = {0,0};
+    struct loadavg sysload;
+    static RRDSET *st = NULL;
+    static RRDDIM *rdload1 = NULL, *rdload2 = NULL, *rdload3 = NULL;
 
+    if (next_loadavg_dt <= dt) {
+        if (unlikely(GETSYSCTL_SIMPLE("vm.loadavg", mib, sysload))) {
+            error("DISABLED: system.load");
+            return 1;
+        } else if (unlikely(!st)) {
+            st = rrdset_create_localhost("system",
+                                         "load",
+                                         NULL,
+                                         "load",
+                                         NULL,
+                                         "System Load Average",
+                                         "load",
+                                         100,
+                                         (update_every < MIN_LOADAVG_UPDATE_EVERY) ?
+                                         MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE
+            );
+            rdload1 = rrddim_add(st, "load1", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rdload2 = rrddim_add(st, "load5", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rdload3 = rrddim_add(st, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rdload1, (collected_number) ((double)sysload.ldavg[0] / sysload.fscale * 1000));
+        rrddim_set_by_pointer(st, rdload2, (collected_number) ((double)sysload.ldavg[1] / sysload.fscale * 1000));
+        rrddim_set_by_pointer(st, rdload3, (collected_number) ((double)sysload.ldavg[2] / sysload.fscale * 1000));
+        rrdset_done(st);
+
+        next_loadavg_dt = st->update_every * USEC_PER_SEC;
+    }
+    else next_loadavg_dt -= dt;
+
+    return 0;
 }
+
+// NEEDED BY: do_disk_io
+#define RRD_TYPE_DISK "disk"
+
+// NEEDED BY: do_bandwidth
+#define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
-        do_loadavg = -1, do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
+        do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
@@ -80,7 +118,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         do_context              = config_get_boolean("plugin:freebsd:sysctl", "context switches", 1);
         do_forks                = config_get_boolean("plugin:freebsd:sysctl", "processes started", 1);
         do_processes            = config_get_boolean("plugin:freebsd:sysctl", "processes running", 1);
-        do_loadavg              = config_get_boolean("plugin:freebsd:sysctl", "enable load average", 1);
         do_all_processes        = config_get_boolean("plugin:freebsd:sysctl", "enable total processes", 1);
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
         do_swap                 = config_get_boolean("plugin:freebsd:sysctl", "system swap", 1);
@@ -134,10 +171,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     int common_error = 0;
     size_t size;
     char title[4096 + 1];
-
-    // NEEDED BY: do_loadavg
-    static usec_t next_loadavg_dt = 0;
-    struct loadavg sysload;
 
     // NEEDED BY: do_cpu, do_cpu_cores
     long cp_time[CPUSTATES];
@@ -282,37 +315,8 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if (next_loadavg_dt <= dt) {
-        if (likely(do_loadavg)) {
-            if (unlikely(GETSYSCTL("vm.loadavg", sysload))) {
-                do_loadavg = 0;
-                error("DISABLED: system.load");
-            } else {
-
-                st = rrdset_find_bytype_localhost("system", "load");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "load", NULL, "load", NULL, "System Load Average", "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE);
-                    rrddim_add(st, "load1", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                    rrddim_add(st, "load5", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                    rrddim_add(st, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "load1", (collected_number) ((double)sysload.ldavg[0] / sysload.fscale * 1000));
-                rrddim_set(st, "load5", (collected_number) ((double)sysload.ldavg[1] / sysload.fscale * 1000));
-                rrddim_set(st, "load15", (collected_number) ((double)sysload.ldavg[2] / sysload.fscale * 1000));
-                rrdset_done(st);
-
-                next_loadavg_dt = st->update_every * USEC_PER_SEC;
-            }
-        }
-    }
-    else next_loadavg_dt -= dt;
-
-    // --------------------------------------------------------------------
-
     if (likely(do_all_processes | do_processes | do_committed)) {
-        if (unlikely(GETSYSCTL("vm.vmtotal", vmtotal_data))) {
+        if (unlikely(GETSYSCTL_BY_NAME("vm.vmtotal", vmtotal_data))) {
             do_all_processes = 0;
             error("DISABLED: system.active_processes");
             do_processes = 0;
@@ -377,7 +381,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
             do_cpu = 0;
             error("DISABLED: system.cpu");
         } else {
-            if (unlikely(GETSYSCTL("kern.cp_time", cp_time))) {
+            if (unlikely(GETSYSCTL_BY_NAME("kern.cp_time", cp_time))) {
                 do_cpu = 0;
                 error("DISABLED: system.cpu");
             } else {
@@ -413,12 +417,12 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
             do_cpu_cores = 0;
             error("DISABLED: cpu.cpuXX");
         } else {
-            if (unlikely(GETSYSCTL("kern.smp.cpus", ncpus))) {
+            if (unlikely(GETSYSCTL_BY_NAME("kern.smp.cpus", ncpus))) {
                 do_cpu_cores = 0;
                 error("DISABLED: cpu.cpuXX");
             } else {
                 pcpu_cp_time = reallocz(pcpu_cp_time, sizeof(cp_time) * ncpus);
-                if (unlikely(getsysctl("kern.cp_times", pcpu_cp_time, sizeof(cp_time) * ncpus))) {
+                if (unlikely(getsysctl_by_name("kern.cp_times", pcpu_cp_time, sizeof(cp_time) * ncpus))) {
                     do_cpu_cores = 0;
                     error("DISABLED: cpu.cpuXX");
                 } else {
@@ -460,7 +464,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         } else {
             nintr = intrcnt_size / sizeof(u_long);
             intrcnt = reallocz(intrcnt, nintr * sizeof(u_long));
-            if (unlikely(getsysctl("hw.intrcnt", intrcnt, nintr * sizeof(u_long)))){
+            if (unlikely(getsysctl_by_name("hw.intrcnt", intrcnt, nintr * sizeof(u_long)))){
                 do_interrupts = 0;
                 error("DISABLED: system.intr");
             } else {
@@ -483,7 +487,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
                 size = nintr * (MAXCOMLEN +1);
                 intrnames = reallocz(intrnames, size);
-                if (unlikely(getsysctl("hw.intrnames", intrnames, size))) {
+                if (unlikely(getsysctl_by_name("hw.intrnames", intrnames, size))) {
                     do_interrupts = 0;
                     error("DISABLED: system.intr");
                 } else {
@@ -512,7 +516,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_dev_intr)) {
-        if (unlikely(GETSYSCTL("vm.stats.sys.v_intr", u_int_data))) {
+        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.sys.v_intr", u_int_data))) {
             do_dev_intr = 0;
             error("DISABLED: system.dev_intr");
         } else {
@@ -533,7 +537,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_soft_intr)) {
-        if (unlikely(GETSYSCTL("vm.stats.sys.v_soft", u_int_data))) {
+        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.sys.v_soft", u_int_data))) {
             do_soft_intr = 0;
             error("DISABLED: system.dev_intr");
         } else {
@@ -554,7 +558,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_context)) {
-        if (unlikely(GETSYSCTL("vm.stats.sys.v_swtch", u_int_data))) {
+        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.sys.v_swtch", u_int_data))) {
             do_context = 0;
             error("DISABLED: system.ctxt");
         } else {
@@ -575,7 +579,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_forks)) {
-        if (unlikely(GETSYSCTL("vm.stats.vm.v_forks", u_int_data))) {
+        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.vm.v_forks", u_int_data))) {
             do_forks = 0;
             error("DISABLED: system.forks");
         } else {
@@ -597,12 +601,13 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_disk_io)) {
-        if (unlikely(GETSYSCTL("kern.devstat.numdevs", numdevs))) {
+        if (unlikely(GETSYSCTL_BY_NAME("kern.devstat.numdevs", numdevs))) {
             do_disk_io = 0;
             error("DISABLED: disk.io");
         } else {
             devstat_data = reallocz(devstat_data, sizeof(long) + sizeof(struct devstat) * numdevs); // there is generation number before devstat structures
-            if (unlikely(getsysctl("kern.devstat.all", devstat_data, sizeof(long) + sizeof(struct devstat) * numdevs))) {
+            if (unlikely(
+                    getsysctl_by_name("kern.devstat.all", devstat_data, sizeof(long) + sizeof(struct devstat) * numdevs))) {
                 do_disk_io = 0;
                 error("DISABLED: disk.io");
             } else {
@@ -822,14 +827,14 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_ram)) {
-        if (unlikely(GETSYSCTL("vm.stats.vm.v_active_count",    vmmeter_data.v_active_count) ||
-                     GETSYSCTL("vm.stats.vm.v_inactive_count",  vmmeter_data.v_inactive_count) ||
-                     GETSYSCTL("vm.stats.vm.v_wire_count",      vmmeter_data.v_wire_count) ||
+        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.vm.v_active_count",    vmmeter_data.v_active_count) ||
+                     GETSYSCTL_BY_NAME("vm.stats.vm.v_inactive_count",  vmmeter_data.v_inactive_count) ||
+                     GETSYSCTL_BY_NAME("vm.stats.vm.v_wire_count",      vmmeter_data.v_wire_count) ||
 #if __FreeBSD_version < 1200016
-                     GETSYSCTL("vm.stats.vm.v_cache_count",     vmmeter_data.v_cache_count) ||
+                     GETSYSCTL_BY_NAME("vm.stats.vm.v_cache_count",     vmmeter_data.v_cache_count) ||
 #endif
-                     GETSYSCTL("vfs.bufspace",                  vfs_bufspace_count) ||
-                     GETSYSCTL("vm.stats.vm.v_free_count",      vmmeter_data.v_free_count))) {
+                     GETSYSCTL_BY_NAME("vfs.bufspace",                  vfs_bufspace_count) ||
+                     GETSYSCTL_BY_NAME("vm.stats.vm.v_free_count",      vmmeter_data.v_free_count))) {
             do_ram = 0;
             error("DISABLED: system.ram");
         } else {
@@ -863,7 +868,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_swapio)) {
-        if (unlikely(GETSYSCTL("vm.stats.vm.v_swappgsin", vmmeter_data.v_swappgsin) || GETSYSCTL("vm.stats.vm.v_swappgsout", vmmeter_data.v_swappgsout))) {
+        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.vm.v_swappgsin", vmmeter_data.v_swappgsin) || GETSYSCTL_BY_NAME("vm.stats.vm.v_swappgsout", vmmeter_data.v_swappgsout))) {
             do_swapio = 0;
             error("DISABLED: system.swapio");
         } else {
@@ -885,11 +890,11 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_pgfaults)) {
-        if (unlikely(GETSYSCTL("vm.stats.vm.v_vm_faults",   vmmeter_data.v_vm_faults) ||
-                     GETSYSCTL("vm.stats.vm.v_io_faults",   vmmeter_data.v_io_faults) ||
-                     GETSYSCTL("vm.stats.vm.v_cow_faults",  vmmeter_data.v_cow_faults) ||
-                     GETSYSCTL("vm.stats.vm.v_cow_optim",   vmmeter_data.v_cow_optim) ||
-                     GETSYSCTL("vm.stats.vm.v_intrans",     vmmeter_data.v_intrans))) {
+        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.vm.v_vm_faults",   vmmeter_data.v_vm_faults) ||
+                     GETSYSCTL_BY_NAME("vm.stats.vm.v_io_faults",   vmmeter_data.v_io_faults) ||
+                     GETSYSCTL_BY_NAME("vm.stats.vm.v_cow_faults",  vmmeter_data.v_cow_faults) ||
+                     GETSYSCTL_BY_NAME("vm.stats.vm.v_cow_optim",   vmmeter_data.v_cow_optim) ||
+                     GETSYSCTL_BY_NAME("vm.stats.vm.v_intrans",     vmmeter_data.v_intrans))) {
             do_pgfaults = 0;
             error("DISABLED: mem.pgfaults");
         } else {
@@ -918,13 +923,13 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_ipc_semaphores)) {
-        if (unlikely(GETSYSCTL("kern.ipc.semmni", ipc_sem.semmni))) {
+        if (unlikely(GETSYSCTL_BY_NAME("kern.ipc.semmni", ipc_sem.semmni))) {
             do_ipc_semaphores = 0;
             error("DISABLED: system.ipc_semaphores");
             error("DISABLED: system.ipc_semaphore_arrays");
         } else {
             ipc_sem_data = reallocz(ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni);
-            if (unlikely(getsysctl("kern.ipc.sema", ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni))) {
+            if (unlikely(getsysctl_by_name("kern.ipc.sema", ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni))) {
                 do_ipc_semaphores = 0;
                 error("DISABLED: system.ipc_semaphores");
                 error("DISABLED: system.ipc_semaphore_arrays");
@@ -966,13 +971,14 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_ipc_shared_mem)) {
-        if (unlikely(GETSYSCTL("kern.ipc.shmmni", ipc_shm.shmmni))) {
+        if (unlikely(GETSYSCTL_BY_NAME("kern.ipc.shmmni", ipc_shm.shmmni))) {
             do_ipc_shared_mem = 0;
             error("DISABLED: system.ipc_shared_mem_segs");
             error("DISABLED: system.ipc_shared_mem_size");
         } else {
             ipc_shm_data = reallocz(ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni);
-            if (unlikely(getsysctl("kern.ipc.shmsegs", ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni))) {
+            if (unlikely(
+                    getsysctl_by_name("kern.ipc.shmsegs", ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni))) {
                 do_ipc_shared_mem = 0;
                 error("DISABLED: system.ipc_shared_mem_segs");
                 error("DISABLED: system.ipc_shared_mem_size");
@@ -1014,14 +1020,15 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_ipc_msg_queues)) {
-        if (unlikely(GETSYSCTL("kern.ipc.msgmni", ipc_msq.msgmni))) {
+        if (unlikely(GETSYSCTL_BY_NAME("kern.ipc.msgmni", ipc_msq.msgmni))) {
             do_ipc_msg_queues = 0;
             error("DISABLED: system.ipc_msq_queues");
             error("DISABLED: system.ipc_msq_messages");
             error("DISABLED: system.ipc_msq_size");
         } else {
             ipc_msq_data = reallocz(ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni);
-            if (unlikely(getsysctl("kern.ipc.msqids", ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni))) {
+            if (unlikely(
+                    getsysctl_by_name("kern.ipc.msqids", ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni))) {
                 do_ipc_msg_queues = 0;
                 error("DISABLED: system.ipc_msq_queues");
                 error("DISABLED: system.ipc_msq_messages");
@@ -1081,7 +1088,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_netisr || do_netisr_per_core)) {
-        if (unlikely(GETSYSCTL("kern.smp.cpus", ncpus))) {
+        if (unlikely(GETSYSCTL_BY_NAME("kern.smp.cpus", ncpus))) {
             common_error = 1;
         } else if (unlikely(sysctlbyname("net.isr.workstream", NULL, &netisr_workstream_size, NULL, 0) == -1)) {
             error("FREEBSD: sysctl(net.isr.workstream...) failed: %s", strerror(errno));
@@ -1092,12 +1099,14 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         } else {
             num_netisr_workstreams = netisr_workstream_size / sizeof(struct sysctl_netisr_workstream);
             netisr_workstream = reallocz(netisr_workstream, num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream));
-            if (unlikely(getsysctl("net.isr.workstream", netisr_workstream, num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream)))){
+            if (unlikely(getsysctl_by_name("net.isr.workstream", netisr_workstream,
+                                           num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream)))){
                 common_error = 1;
             } else {
                 num_netisr_works = netisr_work_size / sizeof(struct sysctl_netisr_work);
                 netisr_work = reallocz(netisr_work, num_netisr_works * sizeof(struct sysctl_netisr_work));
-                if (unlikely(getsysctl("net.isr.work", netisr_work, num_netisr_works * sizeof(struct sysctl_netisr_work)))){
+                if (unlikely(getsysctl_by_name("net.isr.work", netisr_work,
+                                               num_netisr_works * sizeof(struct sysctl_netisr_work)))){
                     common_error = 1;
                 }
             }
@@ -1326,7 +1335,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
     if (likely(do_tcp_sockets)) {
-        if (unlikely(GETSYSCTL("net.inet.tcp.states", tcps_states))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet.tcp.states", tcps_states))) {
             do_tcp_sockets = 0;
             error("DISABLED: ipv4.tcpsock");
         } else {
@@ -1350,7 +1359,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
     if (likely(do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo || do_tcpext_syscookies || do_ecn)) {
-        if (unlikely(GETSYSCTL("net.inet.tcp.stats", tcpstat))){
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet.tcp.stats", tcpstat))){
             do_tcp_packets = 0;
             error("DISABLED: ipv4.tcppackets");
             do_tcp_errors = 0;
@@ -1524,7 +1533,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
     if (likely(do_udp_packets || do_udp_errors)) {
-        if (unlikely(GETSYSCTL("net.inet.udp.stats", udpstat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet.udp.stats", udpstat))) {
             do_udp_packets = 0;
             error("DISABLED: ipv4.udppackets");
             do_udp_errors = 0;
@@ -1576,7 +1585,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_icmp_packets || do_icmpmsg)) {
-        if (unlikely(GETSYSCTL("net.inet.icmp.stats", icmpstat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet.icmp.stats", icmpstat))) {
             do_icmp_packets = 0;
             error("DISABLED: ipv4.icmp");
             error("DISABLED: ipv4.icmp_errors");
@@ -1658,7 +1667,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // see also http://net-snmp.sourceforge.net/docs/mibs/ip.html
     if (likely(do_ip_packets || do_ip_fragsout || do_ip_fragsin || do_ip_errors)) {
-        if (unlikely(GETSYSCTL("net.inet.ip.stats", ipstat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet.ip.stats", ipstat))) {
             do_ip_packets = 0;
             error("DISABLED: ipv4.packets");
             do_ip_fragsout = 0;
@@ -1766,7 +1775,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_ip6_packets || do_ip6_fragsout || do_ip6_fragsin || do_ip6_errors)) {
-        if (unlikely(GETSYSCTL("net.inet6.ip6.stats", ip6stat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet6.ip6.stats", ip6stat))) {
             do_ip6_packets = 0;
             error("DISABLED: ipv6.packets");
             do_ip6_fragsout = 0;
@@ -1898,7 +1907,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_icmp6 || do_icmp6_redir || do_icmp6_errors || do_icmp6_echos || do_icmp6_router || do_icmp6_neighbor || do_icmp6_types)) {
-        if (unlikely(GETSYSCTL("net.inet6.icmp6.stats", icmp6stat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet6.icmp6.stats", icmp6stat))) {
             do_icmp6 = 0;
             error("DISABLED: ipv6.icmp");
         } else {
