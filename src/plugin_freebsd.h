@@ -8,6 +8,7 @@ void *freebsd_main(void *ptr);
 extern int freebsd_plugin_init();
 
 extern int do_vm_loadavg(int update_every, usec_t dt);
+extern int do_vm_vmtotal(int update_every, usec_t dt);
 extern int do_freebsd_sysctl_old(int update_every, usec_t dt);
 
 #define GETSYSCTL_MIB(name, mib) getsysctl_mib(name, mib, sizeof(mib)/sizeof(int))

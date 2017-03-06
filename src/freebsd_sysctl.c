@@ -51,41 +51,160 @@ int freebsd_plugin_init()
 
 int do_vm_loadavg(int update_every, usec_t dt){
     static usec_t next_loadavg_dt = 0;
-    static int mib[2] = {0,0};
-    struct loadavg sysload;
-    static RRDSET *st = NULL;
-    static RRDDIM *rdload1 = NULL, *rdload2 = NULL, *rdload3 = NULL;
 
     if (next_loadavg_dt <= dt) {
+        static int mib[2] = {0,0};
+        struct loadavg sysload;
+
         if (unlikely(GETSYSCTL_SIMPLE("vm.loadavg", mib, sysload))) {
-            error("DISABLED: system.load");
+            error("DISABLED: system.load chart");
+            error("DISABLED: vm.loadavg module");
             return 1;
-        } else if (unlikely(!st)) {
-            st = rrdset_create_localhost("system",
-                                         "load",
-                                         NULL,
-                                         "load",
-                                         NULL,
-                                         "System Load Average",
-                                         "load",
-                                         100,
-                                         (update_every < MIN_LOADAVG_UPDATE_EVERY) ?
-                                         MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE
-            );
-            rdload1 = rrddim_add(st, "load1", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-            rdload2 = rrddim_add(st, "load5", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-            rdload3 = rrddim_add(st, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        } else {
+            static RRDSET *st = NULL;
+            static RRDDIM *rd_load1 = NULL, *rd_load2 = NULL, *rd_load3 = NULL;
+
+            if (unlikely(!st)) {
+                st = rrdset_create_localhost("system",
+                                             "load",
+                                             NULL,
+                                             "load",
+                                             NULL,
+                                             "System Load Average",
+                                             "load",
+                                             100,
+                                             (update_every < MIN_LOADAVG_UPDATE_EVERY) ?
+                                             MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE
+                );
+                rd_load1 = rrddim_add(st, "load1", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                rd_load2 = rrddim_add(st, "load5", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                rd_load3 = rrddim_add(st, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            } else
+                rrdset_next(st);
+
+            rrddim_set_by_pointer(st, rd_load1, (collected_number) ((double) sysload.ldavg[0] / sysload.fscale * 1000));
+            rrddim_set_by_pointer(st, rd_load2, (collected_number) ((double) sysload.ldavg[1] / sysload.fscale * 1000));
+            rrddim_set_by_pointer(st, rd_load3, (collected_number) ((double) sysload.ldavg[2] / sysload.fscale * 1000));
+            rrdset_done(st);
+
+            next_loadavg_dt = st->update_every * USEC_PER_SEC;
         }
-        else rrdset_next(st);
-
-        rrddim_set_by_pointer(st, rdload1, (collected_number) ((double)sysload.ldavg[0] / sysload.fscale * 1000));
-        rrddim_set_by_pointer(st, rdload2, (collected_number) ((double)sysload.ldavg[1] / sysload.fscale * 1000));
-        rrddim_set_by_pointer(st, rdload3, (collected_number) ((double)sysload.ldavg[2] / sysload.fscale * 1000));
-        rrdset_done(st);
-
-        next_loadavg_dt = st->update_every * USEC_PER_SEC;
     }
-    else next_loadavg_dt -= dt;
+    else
+        next_loadavg_dt -= dt;
+
+    return 0;
+}
+
+int do_vm_vmtotal(int update_every, usec_t dt) {
+    static int do_all_processes = -1, do_processes = -1, do_committed = -1;
+
+    if (unlikely(do_all_processes == -1)) {
+        do_all_processes = config_get_boolean("plugin:freebsd:vm.vmtotal", "enable total processes", 1);
+        do_processes = config_get_boolean("plugin:freebsd:vm.vmtotal", "processes running", 1);
+        do_committed = config_get_boolean("plugin:freebsd:vm.vmtotal", "committed memory", 1);
+    }
+
+    if (likely(do_all_processes | do_processes | do_committed)) {
+        static int mib[2] = {0, 0};
+        struct vmtotal vmtotal_data;
+
+        if (unlikely(GETSYSCTL_SIMPLE("vm.vmtotal", mib, vmtotal_data))) {
+            do_all_processes = 0;
+            error("DISABLED: system.active_processes chart");
+            do_processes = 0;
+            error("DISABLED: system.processes chart");
+            do_committed = 0;
+            error("DISABLED: mem.committed chart");
+            error("DISABLED: vm.vmtotal module");
+            return 1;
+        } else {
+            if (likely(do_all_processes)) {
+                static RRDSET *st = NULL;
+                static RRDDIM *rd = NULL;
+
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("system",
+                                                 "active_processes",
+                                                 NULL,
+                                                 "processes",
+                                                 NULL,
+                                                 "System Active Processes",
+                                                 "processes",
+                                                 750,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
+                    );
+                    rd = rrddim_add(st, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd, (vmtotal_data.t_rq + vmtotal_data.t_dw + vmtotal_data.t_pw + vmtotal_data.t_sl + vmtotal_data.t_sw));
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_processes)) {
+                static RRDSET *st = NULL;
+                static RRDDIM *rd_running = NULL, *rd_blocked = NULL;
+
+                st = rrdset_find_bytype_localhost("system", "processes");
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("system",
+                                                 "processes",
+                                                 NULL,
+                                                 "processes",
+                                                 NULL,
+                                                 "System Processes",
+                                                 "processes",
+                                                 600,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
+                    );
+
+                    rd_running = rrddim_add(st, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rd_blocked = rrddim_add(st, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd_running, vmtotal_data.t_rq);
+                rrddim_set_by_pointer(st, rd_blocked, (vmtotal_data.t_dw + vmtotal_data.t_pw));
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_committed)) {
+                static RRDSET *st = NULL;
+                static RRDDIM *rd = NULL;
+
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("mem",
+                                                 "committed",
+                                                 NULL,
+                                                 "system",
+                                                 NULL,
+                                                 "Committed (Allocated) Memory",
+                                                 "MB",
+                                                 5000,
+                                                 update_every,
+                                                 RRDSET_TYPE_AREA
+                    );
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+                    rd = rrddim_add(st, "Committed_AS", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                }
+                else rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd, vmtotal_data.t_rm);
+                rrdset_done(st);
+            }
+        }
+    } else {
+        error("DISABLED: vm.vmtotal module");
+        return 1;
+    }
 
     return 0;
 }
@@ -97,9 +216,8 @@ int do_vm_loadavg(int update_every, usec_t dt){
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
-    static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1,
-        do_all_processes = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
-        do_pgfaults = -1, do_committed = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
+    static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
+        do_pgfaults = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
         do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
@@ -117,14 +235,11 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         do_soft_intr            = config_get_boolean("plugin:freebsd:sysctl", "software interrupts", 1);
         do_context              = config_get_boolean("plugin:freebsd:sysctl", "context switches", 1);
         do_forks                = config_get_boolean("plugin:freebsd:sysctl", "processes started", 1);
-        do_processes            = config_get_boolean("plugin:freebsd:sysctl", "processes running", 1);
-        do_all_processes        = config_get_boolean("plugin:freebsd:sysctl", "enable total processes", 1);
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
         do_swap                 = config_get_boolean("plugin:freebsd:sysctl", "system swap", 1);
         do_ram                  = config_get_boolean("plugin:freebsd:sysctl", "system ram", 1);
         do_swapio               = config_get_boolean("plugin:freebsd:sysctl", "swap i/o", 1);
         do_pgfaults             = config_get_boolean("plugin:freebsd:sysctl", "memory page faults", 1);
-        do_committed            = config_get_boolean("plugin:freebsd:sysctl", "committed memory", 1);
         do_ipc_semaphores       = config_get_boolean("plugin:freebsd:sysctl", "ipc semaphores", 1);
         do_ipc_shared_mem       = config_get_boolean("plugin:freebsd:sysctl", "ipc shared memory", 1);
         do_ipc_msg_queues       = config_get_boolean("plugin:freebsd:sysctl", "ipc message queues", 1);
@@ -181,9 +296,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     // NEEDED BY: do_cpu_cores
     static long *pcpu_cp_time = NULL;
     char cpuid[MAX_INT_DIGITS + 1];
-
-    // NEEDED BY: do_all_processes, do_processes
-    struct vmtotal vmtotal_data;
 
     // NEEDED BY: do_context, do_forks
     u_int u_int_data;
@@ -312,66 +424,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // NEEDED BY: do_uptime
     struct timespec up_time;
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_all_processes | do_processes | do_committed)) {
-        if (unlikely(GETSYSCTL_BY_NAME("vm.vmtotal", vmtotal_data))) {
-            do_all_processes = 0;
-            error("DISABLED: system.active_processes");
-            do_processes = 0;
-            error("DISABLED: system.processes");
-            do_committed = 0;
-            error("DISABLED: mem.committed");
-        } else {
-            if (likely(do_all_processes)) {
-
-                st = rrdset_find_bytype_localhost("system", "active_processes");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "active_processes", NULL, "processes", NULL, "System Active Processes", "processes", 750, update_every, RRDSET_TYPE_LINE);
-                    rrddim_add(st, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "active", (vmtotal_data.t_rq + vmtotal_data.t_dw + vmtotal_data.t_pw + vmtotal_data.t_sl + vmtotal_data.t_sw));
-                rrdset_done(st);
-            }
-
-            // --------------------------------------------------------------------
-
-            if (likely(do_processes)) {
-
-                st = rrdset_find_bytype_localhost("system", "processes");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "processes", NULL, "processes", NULL, "System Processes", "processes", 600, update_every, RRDSET_TYPE_LINE);
-
-                    rrddim_add(st, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    rrddim_add(st, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "running", vmtotal_data.t_rq);
-                rrddim_set(st, "blocked", (vmtotal_data.t_dw + vmtotal_data.t_pw));
-                rrdset_done(st);
-            }
-
-            // --------------------------------------------------------------------
-
-            if (likely(do_committed)) {
-                st = rrdset_find_localhost("mem.committed");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("mem", "committed", NULL, "system", NULL, "Committed (Allocated) Memory", "MB", 5000, update_every, RRDSET_TYPE_AREA);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
-                    rrddim_add(st, "Committed_AS", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "Committed_AS", vmtotal_data.t_rm);
-                rrdset_done(st);
-            }
-        }
-    }
 
     // --------------------------------------------------------------------
 

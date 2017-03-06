@@ -16,7 +16,8 @@ static struct freebsd_module {
         { .name = "freebsd_old", .dim = "freebsd_old", .enabled = 1, .func = do_freebsd_sysctl_old },
 
         // system metrics
-        { .name = "load average", .dim = "loadavg", .enabled = 1, .func = do_vm_loadavg },
+        { .name = "vm.loadavg", .dim = "loadavg", .enabled = 1, .func = do_vm_loadavg },
+        { .name = "vm.vmtotal", .dim = "vmtotal", .enabled = 1, .func = do_vm_vmtotal },
 
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
