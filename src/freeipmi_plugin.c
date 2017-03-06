@@ -1438,6 +1438,14 @@ int main (int argc, char **argv) {
             debug = 1;
             continue;
         }
+        else if(strcmp("sel", argv[i]) == 0) {
+            netdata_do_sel = 1;
+            continue;
+        }
+        else if(strcmp("no-sel", argv[i]) == 0) {
+            netdata_do_sel = 0;
+            continue;
+        }
         else if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "\n"
@@ -1449,6 +1457,8 @@ int main (int argc, char **argv) {
                     "Available options:\n"
                     "  NUMBER, sets the data collection frequency\n"
                     "  debug, enables verbose output\n"
+                    "  sel, enable SEL collection (it is on by default)\n"
+                    "  no-sel, disable SEL collection\n"
                     "  hostname X, sets the remote host to connect to\n"
                     "  username X, sets the username to authenticate at the remote host\n"
                     "  password X, sets the password to authenticate at the remote host\n"
