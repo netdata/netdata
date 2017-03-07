@@ -481,7 +481,7 @@ static void send_metrics_to_netdata() {
 
     if(!sensors_states_chart_generated) {
         sensors_states_chart_generated = 1;
-        printf("CHART ipmi.sensors_states '' 'IPMI Sensors State' 'sensors' 'states' ipmi.sensors_states stacked %d %d\n"
+        printf("CHART ipmi.sensors_states '' 'IPMI Sensors State' 'sensors' 'states' ipmi.sensors_states line %d %d\n"
                , netdata_priority + 1
                , netdata_update_every
         );
