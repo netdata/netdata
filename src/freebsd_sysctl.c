@@ -34,7 +34,9 @@
 
 int system_pagesize = PAGE_SIZE;
 
+// --------------------------------------------------------------------------------------------------------------------
 // FreeBSD plugin initialization
+
 int freebsd_plugin_init()
 {
     system_pagesize = getpagesize();
@@ -45,6 +47,9 @@ int freebsd_plugin_init()
 
     return 0;
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// vm.loadavg
 
 // FreeBSD calculates load averages once every 5 seconds
 #define MIN_LOADAVG_UPDATE_EVERY 5
@@ -61,6 +66,9 @@ int do_vm_loadavg(int update_every, usec_t dt){
             error("DISABLED: vm.loadavg module");
             return 1;
         } else {
+
+            // --------------------------------------------------------------------
+
             static RRDSET *st = NULL;
             static RRDDIM *rd_load1 = NULL, *rd_load2 = NULL, *rd_load3 = NULL;
 
@@ -96,6 +104,9 @@ int do_vm_loadavg(int update_every, usec_t dt){
     return 0;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// vm.vmtotal
+
 int do_vm_vmtotal(int update_every, usec_t dt) {
     static int do_all_processes = -1, do_processes = -1, do_committed = -1;
 
@@ -119,6 +130,9 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
             error("DISABLED: vm.vmtotal module");
             return 1;
         } else {
+
+            // --------------------------------------------------------------------
+
             if (likely(do_all_processes)) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd = NULL;
@@ -209,6 +223,61 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
     return 0;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// kern.cp_time
+
+int do_kern_cp_time(int update_every, usec_t dt) {
+    if (unlikely(CPUSTATES != 5)) {
+        error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
+        error("DISABLED: system.cpu chart");
+        error("DISABLED: kern.cp_time module");
+        return 1;
+    } else {
+        static int mib[2] = {0, 0};
+        long cp_time[CPUSTATES];
+
+        if (unlikely(GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time))) {
+            error("DISABLED: system.cpu chart");
+            error("DISABLED: kern.cp_time module");
+            return 1;
+        } else {
+            static RRDSET *st = NULL;
+            static RRDDIM *rd_nice = NULL, *rd_system = NULL, *rd_user = NULL, *rd_interrupt = NULL, *rd_idle = NULL;
+
+            if (unlikely(!st)) {
+                st = rrdset_create_localhost("system",
+                                             "cpu",
+                                             NULL,
+                                             "cpu",
+                                             "system.cpu",
+                                             "Total CPU utilization",
+                                             "percentage",
+                                             100, update_every,
+                                             RRDSET_TYPE_STACKED
+                );
+
+                rd_nice = rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rd_system = rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rd_user = rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rd_interrupt = rrddim_add(st, "interrupt", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rd_idle = rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rrddim_hide(st, "idle");
+            }
+            else rrdset_next(st);
+
+            rrddim_set_by_pointer(st, rd_nice, cp_time[1]);
+            rrddim_set_by_pointer(st, rd_system, cp_time[2]);
+            rrddim_set_by_pointer(st, rd_user, cp_time[0]);
+            rrddim_set_by_pointer(st, rd_interrupt, cp_time[3]);
+            rrddim_set_by_pointer(st, rd_idle, cp_time[4]);
+            rrdset_done(st);
+        }
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// old sources
+
 // NEEDED BY: do_disk_io
 #define RRD_TYPE_DISK "disk"
 
@@ -216,7 +285,7 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
-    static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
+    static int do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
@@ -227,8 +296,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         do_icmp6 = -1, do_icmp6_redir = -1, do_icmp6_errors = -1, do_icmp6_echos = -1, do_icmp6_router = -1,
         do_icmp6_neighbor = -1, do_icmp6_types = -1, do_space = -1, do_inodes = -1, do_uptime = -1;
 
-    if (unlikely(do_cpu == -1)) {
-        do_cpu                  = config_get_boolean("plugin:freebsd:sysctl", "cpu utilization", 1);
+    if (unlikely(do_uptime == -1)) {
         do_cpu_cores            = config_get_boolean("plugin:freebsd:sysctl", "per cpu core utilization", 1);
         do_interrupts           = config_get_boolean("plugin:freebsd:sysctl", "cpu interrupts", 1);
         do_dev_intr             = config_get_boolean("plugin:freebsd:sysctl", "device interrupts", 1);
@@ -287,7 +355,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     size_t size;
     char title[4096 + 1];
 
-    // NEEDED BY: do_cpu, do_cpu_cores
+    // NEEDED BY: do_cpu_cores
     long cp_time[CPUSTATES];
 
     // NEEDED BY: du_cpu_cores, do_netisr, do_netisr_per_core
@@ -424,42 +492,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // NEEDED BY: do_uptime
     struct timespec up_time;
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_cpu)) {
-        if (unlikely(CPUSTATES != 5)) {
-            error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
-            do_cpu = 0;
-            error("DISABLED: system.cpu");
-        } else {
-            if (unlikely(GETSYSCTL_BY_NAME("kern.cp_time", cp_time))) {
-                do_cpu = 0;
-                error("DISABLED: system.cpu");
-            } else {
-
-                st = rrdset_find_bytype_localhost("system", "cpu");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "cpu", NULL, "cpu", "system.cpu", "Total CPU utilization", "percentage", 100, update_every, RRDSET_TYPE_STACKED);
-
-                    rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "interrupt", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_hide(st, "idle");
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "nice", cp_time[1]);
-                rrddim_set(st, "system", cp_time[2]);
-                rrddim_set(st, "user", cp_time[0]);
-                rrddim_set(st, "interrupt", cp_time[3]);
-                rrddim_set(st, "idle", cp_time[4]);
-                rrdset_done(st);
-            }
-        }
-    }
 
     // --------------------------------------------------------------------
 
