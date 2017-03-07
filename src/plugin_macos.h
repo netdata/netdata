@@ -3,7 +3,7 @@
 
 void *macos_main(void *ptr);
 
-#define GETSYSCTL_BY_NAME(name, var) getsysctl(name, &(var), sizeof(var))
+#define GETSYSCTL_BY_NAME(name, var) getsysctl_by_name(name, &(var), sizeof(var))
 
 extern int getsysctl_by_name(const char *name, void *ptr, size_t len);
 
