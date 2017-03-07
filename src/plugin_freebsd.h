@@ -10,6 +10,7 @@ extern int freebsd_plugin_init();
 extern int do_vm_loadavg(int update_every, usec_t dt);
 extern int do_vm_vmtotal(int update_every, usec_t dt);
 extern int do_kern_cp_time(int update_every, usec_t dt);
+extern int do_kern_cp_times(int update_every, usec_t dt);
 extern int do_freebsd_sysctl_old(int update_every, usec_t dt);
 
 #define GETSYSCTL_MIB(name, mib) getsysctl_mib(name, mib, sizeof(mib)/sizeof(int))
@@ -30,6 +31,7 @@ static inline int getsysctl_mib(const char *name, int *mib, size_t len)
 }
 
 #define GETSYSCTL_SIMPLE(name, mib, var) getsysctl_simple(name, mib, sizeof(mib)/sizeof(int), &(var), sizeof(var))
+#define GETSYSCTL_WSIZE(name, mib, var, size) getsysctl_simple(name, mib, sizeof(mib)/sizeof(int), var, size)
 
 static inline int getsysctl_simple(const char *name, int *mib, size_t miblen, void *ptr, size_t len)
 {
