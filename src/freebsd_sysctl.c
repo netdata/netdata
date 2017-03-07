@@ -26,6 +26,9 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
+// --------------------------------------------------------------------------------------------------------------------
+// common definitions and variables
+
 #define KILO_FACTOR 1024
 #define MEGA_FACTOR 1048576     // 1024 * 1024
 #define GIGA_FACTOR 1073741824  // 1024 * 1024 * 1024
@@ -33,6 +36,7 @@
 #define MAX_INT_DIGITS 10 // maximum number of digits for int
 
 int system_pagesize = PAGE_SIZE;
+int number_of_cpus = 1;
 
 // --------------------------------------------------------------------------------------------------------------------
 // FreeBSD plugin initialization
@@ -42,6 +46,16 @@ int freebsd_plugin_init()
     system_pagesize = getpagesize();
     if (system_pagesize <= 0) {
         error("FREEBSD: can't get system page size");
+        return 1;
+    }
+
+    if (unlikely(GETSYSCTL_BY_NAME("kern.smp.cpus", number_of_cpus))) {
+        error("FREEBSD: can't get number of cpus");
+        return 1;
+    }
+
+    if (unlikely(!number_of_cpus)) {
+        error("FREEBSD: wrong number of cpus");
         return 1;
     }
 
@@ -111,9 +125,9 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
     static int do_all_processes = -1, do_processes = -1, do_committed = -1;
 
     if (unlikely(do_all_processes == -1)) {
-        do_all_processes = config_get_boolean("plugin:freebsd:vm.vmtotal", "enable total processes", 1);
-        do_processes = config_get_boolean("plugin:freebsd:vm.vmtotal", "processes running", 1);
-        do_committed = config_get_boolean("plugin:freebsd:vm.vmtotal", "committed memory", 1);
+        do_all_processes    = config_get_boolean("plugin:freebsd:vm.vmtotal", "enable total processes", 1);
+        do_processes        = config_get_boolean("plugin:freebsd:vm.vmtotal", "processes running", 1);
+        do_committed        = config_get_boolean("plugin:freebsd:vm.vmtotal", "committed memory", 1);
     }
 
     if (likely(do_all_processes | do_processes | do_committed)) {
@@ -256,11 +270,11 @@ int do_kern_cp_time(int update_every, usec_t dt) {
                                              RRDSET_TYPE_STACKED
                 );
 
-                rd_nice = rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                rd_system = rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                rd_user = rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                rd_interrupt = rrddim_add(st, "interrupt", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                rd_idle = rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rd_nice         = rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rd_system       = rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rd_user         = rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rd_interrupt    = rrddim_add(st, "interrupt", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                rd_idle         = rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                 rrddim_hide(st, "idle");
             }
             else rrdset_next(st);
@@ -271,6 +285,78 @@ int do_kern_cp_time(int update_every, usec_t dt) {
             rrddim_set_by_pointer(st, rd_interrupt, cp_time[3]);
             rrddim_set_by_pointer(st, rd_idle, cp_time[4]);
             rrdset_done(st);
+        }
+    }
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// kern.cp_times
+
+int do_kern_cp_times(int update_every, usec_t dt) {
+    if (unlikely(CPUSTATES != 5)) {
+        error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
+        error("DISABLED: cpu.cpuXX charts");
+        error("DISABLED: kern.cp_times module");
+        return 1;
+    } else {
+        static int mib[2] = {0, 0};
+        long cp_time[CPUSTATES];
+        static long *pcpu_cp_time = NULL;
+
+        pcpu_cp_time = reallocz(pcpu_cp_time, sizeof(cp_time) * number_of_cpus);
+        if (unlikely(GETSYSCTL_WSIZE("kern.cp_times", mib, pcpu_cp_time, sizeof(cp_time) * number_of_cpus))) {
+            error("DISABLED: cpu.cpuXX charts");
+            error("DISABLED: kern.cp_times module");
+            return 1;
+        } else {
+            int i;
+            static struct cpu_chart {
+                char cpuid[MAX_INT_DIGITS + 4];
+                RRDSET *st;
+                RRDDIM *rd_user;
+                RRDDIM *rd_nice;
+                RRDDIM *rd_system;
+                RRDDIM *rd_interrupt;
+                RRDDIM *rd_idle;
+            } *all_cpu_charts = NULL;
+
+            all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * number_of_cpus);
+
+            for (i = 0; i < number_of_cpus; i++) {
+                if (unlikely(!all_cpu_charts[i].st)) {
+                    snprintfz(all_cpu_charts[i].cpuid, MAX_INT_DIGITS, "cpu%d", i);
+                    all_cpu_charts[i].st = rrdset_create_localhost("cpu",
+                                                               all_cpu_charts[i].cpuid,
+                                                              NULL,
+                                                              "utilization",
+                                                              "cpu.cpu",
+                                                              "Core utilization",
+                                                              "percentage",
+                                                              1000,
+                                                              update_every,
+                                                              RRDSET_TYPE_STACKED
+                    );
+
+                    all_cpu_charts[i].rd_nice       = rrddim_add(all_cpu_charts[i].st, "nice", NULL, 1, 1,
+                                                                 RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    all_cpu_charts[i].rd_system     = rrddim_add(all_cpu_charts[i].st, "system", NULL, 1, 1,
+                                                                 RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    all_cpu_charts[i].rd_user       = rrddim_add(all_cpu_charts[i].st, "user", NULL, 1, 1,
+                                                                 RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    all_cpu_charts[i].rd_interrupt  = rrddim_add(all_cpu_charts[i].st, "interrupt", NULL, 1, 1,
+                                                                 RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    all_cpu_charts[i].rd_idle       = rrddim_add(all_cpu_charts[i].st, "idle", NULL, 1, 1,
+                                                                 RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_hide(all_cpu_charts[i].st, "idle");
+                } else rrdset_next(all_cpu_charts[i].st);
+
+                rrddim_set_by_pointer(all_cpu_charts[i].st, all_cpu_charts[i].rd_nice, pcpu_cp_time[i * 5 + 1]);
+                rrddim_set_by_pointer(all_cpu_charts[i].st, all_cpu_charts[i].rd_system, pcpu_cp_time[i * 5 + 2]);
+                rrddim_set_by_pointer(all_cpu_charts[i].st, all_cpu_charts[i].rd_user, pcpu_cp_time[i * 5 + 0]);
+                rrddim_set_by_pointer(all_cpu_charts[i].st, all_cpu_charts[i].rd_interrupt, pcpu_cp_time[i * 5 + 3]);
+                rrddim_set_by_pointer(all_cpu_charts[i].st, all_cpu_charts[i].rd_idle, pcpu_cp_time[i * 5 + 4]);
+                rrdset_done(all_cpu_charts[i].st);
+            }
         }
     }
 }
@@ -349,21 +435,12 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     RRDSET *st;
     RRDDIM *rd;
 
+    int ncpus;
     int i, n;
     void *p;
     int common_error = 0;
     size_t size;
     char title[4096 + 1];
-
-    // NEEDED BY: do_cpu_cores
-    long cp_time[CPUSTATES];
-
-    // NEEDED BY: du_cpu_cores, do_netisr, do_netisr_per_core
-    int ncpus;
-
-    // NEEDED BY: do_cpu_cores
-    static long *pcpu_cp_time = NULL;
-    char cpuid[MAX_INT_DIGITS + 1];
 
     // NEEDED BY: do_context, do_forks
     u_int u_int_data;
@@ -492,51 +569,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // NEEDED BY: do_uptime
     struct timespec up_time;
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_cpu_cores)) {
-        if (unlikely(CPUSTATES != 5)) {
-            error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
-            do_cpu_cores = 0;
-            error("DISABLED: cpu.cpuXX");
-        } else {
-            if (unlikely(GETSYSCTL_BY_NAME("kern.smp.cpus", ncpus))) {
-                do_cpu_cores = 0;
-                error("DISABLED: cpu.cpuXX");
-            } else {
-                pcpu_cp_time = reallocz(pcpu_cp_time, sizeof(cp_time) * ncpus);
-                if (unlikely(getsysctl_by_name("kern.cp_times", pcpu_cp_time, sizeof(cp_time) * ncpus))) {
-                    do_cpu_cores = 0;
-                    error("DISABLED: cpu.cpuXX");
-                } else {
-                    for (i = 0; i < ncpus; i++) {
-                        snprintfz(cpuid, MAX_INT_DIGITS, "cpu%d", i);
-                        st = rrdset_find_bytype_localhost("cpu", cpuid);
-                        if (unlikely(!st)) {
-                            st = rrdset_create_localhost("cpu", cpuid, NULL, "utilization", "cpu.cpu", "Core utilization",
-                                               "percentage", 1000, update_every, RRDSET_TYPE_STACKED);
-
-                            rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                            rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                            rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                            rrddim_add(st, "interrupt", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                            rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                            rrddim_hide(st, "idle");
-                        } else
-                            rrdset_next(st);
-
-                        rrddim_set(st, "nice", pcpu_cp_time[i * 5 + 1]);
-                        rrddim_set(st, "system", pcpu_cp_time[i * 5 + 2]);
-                        rrddim_set(st, "user", pcpu_cp_time[i * 5 + 0]);
-                        rrddim_set(st, "interrupt", pcpu_cp_time[i * 5 + 3]);
-                        rrddim_set(st, "idle", pcpu_cp_time[i * 5 + 4]);
-                        rrdset_done(st);
-                }
-                }
-            }
-        }
-    }
 
     // --------------------------------------------------------------------
 
