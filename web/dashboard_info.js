@@ -85,6 +85,12 @@ netdataDashboard.menu = {
         info: 'Readings of the configured system sensors.'
     },
 
+    'ipmi': {
+        title: 'IPMI',
+        icon: '<i class="fa fa-leaf" aria-hidden="true"></i>',
+        info: 'The Intelligent Platform Management Interface (IPMI) is a set of computer interface specifications for an autonomous computer subsystem that provides management and monitoring capabilities independently of the host system\'s CPU, firmware (BIOS or UEFI) and operating system.'
+    },
+
     'nfsd': {
         title: 'NFS Server',
         icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
