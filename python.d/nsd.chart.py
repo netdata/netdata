@@ -19,54 +19,54 @@ CHARTS = {
         'options': [
             None, "queries", 'queries/s', 'queries', 'nsd.queries', 'line'],
         'lines': [
-            ['num.queries', 'queries', 'incremental'],]},
+            ['num_queries', 'queries', 'incremental'],]},
     'zones': {
         'options': [
             None, "zones", 'zones', 'zones', 'nsd.zones', 'stacked'],
         'lines': [
-            ['zone.master', 'master', 'absolute'],
-            ['zone.slave', 'slave', 'absolute'],]},
+            ['zone_master', 'master', 'absolute'],
+            ['zone_slave', 'slave', 'absolute'],]},
     'protocol': {
         'options': [
             None, "protocol", 'queries/s', 'protocol', 'nsd.protocols', 'stacked'],
         'lines': [
-            ['num.udp', 'udp', 'incremental'],
-            ['num.udp6', 'udp6', 'incremental'],
-            ['num.tcp', 'tcp', 'incremental'],
-            ['num.tcp6', 'tcp6', 'incremental'],]},
+            ['num_udp', 'udp', 'incremental'],
+            ['num_udp6', 'udp6', 'incremental'],
+            ['num_tcp', 'tcp', 'incremental'],
+            ['num_tcp6', 'tcp6', 'incremental'],]},
     'type': {
         'options': [
             None, "query type", 'queries/s', 'query type', 'nsd.type', 'stacked'],
         'lines': [
-            ['num.type.A', 'A', 'incremental'],
-            ['num.type.NS', 'NS', 'incremental'],
-            ['num.type.CNAME', 'CNAME', 'incremental'],
-            ['num.type.SOA', 'SOA', 'incremental'],
-            ['num.type.PTR', 'PTR', 'incremental'],
-            ['num.type,HINFO', 'HINFO', 'incremental'],
-            ['num.type.MX', 'MX', 'incremental'],
-            ['num.type.NAPTR', 'NAPTR', 'incremental'],
-            ['num.type.TXT', 'TXT', 'incremental'],
-            ['num.type.AAAA', 'AAAA', 'incremental'],
-            ['num.type.SRV', 'SRV', 'incremental'],
-            ['num.type.TYPE255', 'ANY', 'incremental'],]},
+            ['num_type_A', 'A', 'incremental'],
+            ['num_type_NS', 'NS', 'incremental'],
+            ['num_type_CNAME', 'CNAME', 'incremental'],
+            ['num_type_SOA', 'SOA', 'incremental'],
+            ['num_type_PTR', 'PTR', 'incremental'],
+            ['num_type_HINFO', 'HINFO', 'incremental'],
+            ['num_type_MX', 'MX', 'incremental'],
+            ['num_type_NAPTR', 'NAPTR', 'incremental'],
+            ['num_type_TXT', 'TXT', 'incremental'],
+            ['num_type_AAAA', 'AAAA', 'incremental'],
+            ['num_type_SRV', 'SRV', 'incremental'],
+            ['num_type_TYPE255', 'ANY', 'incremental'],]},
     'transfer': {
         'options': [
             None, "transfer", 'queries/s', 'transfer', 'nsd.transfer', 'stacked'],
         'lines': [
-            ['num.opcode.NOTIFY', 'NOTIFY', 'incremental'],
-            ['num.type.TYPE252', 'AXFR', 'incremental'],]},
+            ['num_opcode_NOTIFY', 'NOTIFY', 'incremental'],
+            ['num_type_TYPE252', 'AXFR', 'incremental'],]},
     'rcode': {
         'options': [
             None, "return code", 'queries/s', 'return code', 'nsd.rcode', 'stacked'],
         'lines': [
-            ['num.rcode.NOERROR', 'NOERROR', 'incremental'],
-            ['num.rcode.FORMERR', 'FORMERR', 'incremental'],
-            ['num.rcode.SERVFAIL', 'SERVFAIL', 'incremental'],
-            ['num.rcode.NXDOMAIN', 'NXDOMAIN', 'incremental'],
-            ['num.rcode.NOTIMP', 'NOTIMP', 'incremental'],
-            ['num.rcode.REFUSED', 'REFUSED', 'incremental'],
-            ['num.rcode.YXDOMAIN', 'YXDOMAIN', 'incremental'],]}
+            ['num_rcode_NOERROR', 'NOERROR', 'incremental'],
+            ['num_rcode_FORMERR', 'FORMERR', 'incremental'],
+            ['num_rcode_SERVFAIL', 'SERVFAIL', 'incremental'],
+            ['num_rcode_NXDOMAIN', 'NXDOMAIN', 'incremental'],
+            ['num_rcode_NOTIMP', 'NOTIMP', 'incremental'],
+            ['num_rcode_REFUSED', 'REFUSED', 'incremental'],
+            ['num_rcode_YXDOMAIN', 'YXDOMAIN', 'incremental'],]}
 }
 
 
@@ -80,13 +80,14 @@ class Service(ExecutableService):
         self.regex = re.compile(r'([A-Za-z0-9.]+)=(\d+)')
 
     def _get_data(self):
-        try:
-            lines = self._get_raw_data()
-            r = self.regex
-            stats = {k: int(v) for k, v in r.findall(''.join(lines))}
-            stats.setdefault('num.opcode.NOTIFY', 0)
-            stats.setdefault('num.type.TYPE252', 0)
-            stats.setdefault('num.type.TYPE255', 0)
-            return stats
-        except Exception:
+        lines = self._get_raw_data()
+        if not lines:
             return None
+
+        r = self.regex
+        stats = dict((k.replace('.', '_'), int(v))
+                     for k, v in r.findall(''.join(lines)))
+        stats.setdefault('num.opcode.NOTIFY', 0)
+        stats.setdefault('num.type.TYPE252', 0)
+        stats.setdefault('num.type.TYPE255', 0)
+        return stats
