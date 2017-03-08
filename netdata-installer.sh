@@ -577,6 +577,7 @@ NETDATA_ADDED_TO_NGINX=0
 NETDATA_ADDED_TO_VARNISH=0
 NETDATA_ADDED_TO_HAPROXY=0
 NETDATA_ADDED_TO_ADM=0
+NETDATA_ADDED_TO_NSD=0
 if [ ${UID} -eq 0 ]
     then
     portable_add_group netdata
@@ -586,6 +587,7 @@ if [ ${UID} -eq 0 ]
     portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
     portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
     portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
+    portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
     run_ok
 else
     run_failed "The installer does not run as root."
@@ -1236,6 +1238,15 @@ if [ $? -eq 0 -a "${NETDATA_ADDED_TO_ADM}" = "1" ]
     echo "You may also want to remove the netdata user from the adm group"
     echo "by running:"
     echo "   gpasswd -d netdata adm"
+fi
+
+getent group nsd > /dev/null
+if [ $? -eq 0 -a "${NETDATA_ADDED_TO_NSD}" = "1" ]
+    then
+    echo
+    echo "You may also want to remove the netdata user from the nsd group"
+    echo "by running:"
+    echo "   gpasswd -d netdata nsd"
 fi
 
 
