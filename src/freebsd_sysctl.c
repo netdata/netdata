@@ -523,6 +523,45 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// vm.stats.sys.v_soft
+
+int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
+    static int mib[4] = {0, 0, 0, 0};
+    u_int soft_intr_number;
+
+    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_soft", mib, soft_intr_number))) {
+        error("DISABLED: system.dev_intr chart");
+        error("DISABLED: vm.stats.sys.v_soft module");
+        return 1;
+    } else {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("system",
+                                         "soft_intr",
+                                         NULL,
+                                         "interrupts",
+                                         NULL,
+                                         "Software Interrupts",
+                                         "interrupts/s",
+                                         1100,
+                                         update_every,
+                                         RRDSET_TYPE_LINE
+            );
+
+            rd = rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd, soft_intr_number);
+        rrdset_done(st);
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 // NEEDED BY: do_disk_io
@@ -534,7 +573,7 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     static int do_context = -1, do_forks = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
-        do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
+        do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
         do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
         do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1,
@@ -544,7 +583,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         do_icmp6_neighbor = -1, do_icmp6_types = -1, do_space = -1, do_inodes = -1, do_uptime = -1;
 
     if (unlikely(do_uptime == -1)) {
-        do_soft_intr            = config_get_boolean("plugin:freebsd:sysctl", "software interrupts", 1);
         do_context              = config_get_boolean("plugin:freebsd:sysctl", "context switches", 1);
         do_forks                = config_get_boolean("plugin:freebsd:sysctl", "processes started", 1);
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
@@ -720,27 +758,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // NEEDED BY: do_uptime
     struct timespec up_time;
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_soft_intr)) {
-        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.sys.v_soft", u_int_data))) {
-            do_soft_intr = 0;
-            error("DISABLED: system.dev_intr");
-        } else {
-
-            st = rrdset_find_bytype_localhost("system", "soft_intr");
-            if (unlikely(!st)) {
-                st = rrdset_create_localhost("system", "soft_intr", NULL, "interrupts", NULL, "Software Interrupts", "interrupts/s", 1100, update_every, RRDSET_TYPE_LINE);
-
-                rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "interrupts", u_int_data);
-            rrdset_done(st);
-        }
-    }
 
     // --------------------------------------------------------------------
 
