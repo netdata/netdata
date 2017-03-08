@@ -13,6 +13,7 @@ extern int do_kern_cp_time(int update_every, usec_t dt);
 extern int do_kern_cp_times(int update_every, usec_t dt);
 extern int do_hw_intcnt(int update_every, usec_t dt);
 extern int do_vm_stats_sys_v_intr(int update_every, usec_t dt);
+extern int do_vm_stats_sys_v_soft(int update_every, usec_t dt);
 extern int do_freebsd_sysctl_old(int update_every, usec_t dt);
 
 #define GETSYSCTL_MIB(name, mib) getsysctl_mib(name, mib, sizeof(mib)/sizeof(int))
