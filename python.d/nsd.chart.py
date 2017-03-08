@@ -87,7 +87,7 @@ class Service(ExecutableService):
         r = self.regex
         stats = dict((k.replace('.', '_'), int(v))
                      for k, v in r.findall(''.join(lines)))
-        stats.setdefault('num.opcode.NOTIFY', 0)
-        stats.setdefault('num.type.TYPE252', 0)
-        stats.setdefault('num.type.TYPE255', 0)
+        stats.setdefault('num_opcode_NOTIFY', 0)
+        stats.setdefault('num_type_TYPE252', 0)
+        stats.setdefault('num_type_TYPE255', 0)
         return stats
