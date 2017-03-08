@@ -72,7 +72,7 @@ int do_vm_loadavg(int update_every, usec_t dt){
     static usec_t next_loadavg_dt = 0;
 
     if (next_loadavg_dt <= dt) {
-        static int mib[2] = {0,0};
+        static int mib[2] = {0, 0};
         struct loadavg sysload;
 
         if (unlikely(GETSYSCTL_SIMPLE("vm.loadavg", mib, sysload))) {
@@ -255,6 +255,9 @@ int do_kern_cp_time(int update_every, usec_t dt) {
             error("DISABLED: kern.cp_time module");
             return 1;
         } else {
+
+            // --------------------------------------------------------------------
+
             static RRDSET *st = NULL;
             static RRDDIM *rd_nice = NULL, *rd_system = NULL, *rd_user = NULL, *rd_interrupt = NULL, *rd_idle = NULL;
 
@@ -287,6 +290,8 @@ int do_kern_cp_time(int update_every, usec_t dt) {
             rrdset_done(st);
         }
     }
+
+    return 0;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -309,6 +314,9 @@ int do_kern_cp_times(int update_every, usec_t dt) {
             error("DISABLED: kern.cp_times module");
             return 1;
         } else {
+
+            // --------------------------------------------------------------------
+
             int i;
             static struct cpu_chart {
                 char cpuid[MAX_INT_DIGITS + 4];
@@ -359,6 +367,159 @@ int do_kern_cp_times(int update_every, usec_t dt) {
             }
         }
     }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// hw.intrcnt
+
+int do_hw_intcnt(int update_every, usec_t dt) {
+    static int mib_hw_intrcnt[2] = {0, 0};
+    size_t intrcnt_size;
+    int i;
+
+    if (unlikely(GETSYSCTL_SIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt_size))) {
+        error("DISABLED: system.intr chart");
+        error("DISABLED: system.interrupts chart");
+        error("DISABLED: hw.intrcnt module");
+        return 1;
+    } else {
+        unsigned long nintr = 0;
+        static unsigned long *intrcnt = NULL;
+        unsigned long long totalintr = 0;
+
+        nintr = intrcnt_size / sizeof(u_long);
+        intrcnt = reallocz(intrcnt, nintr * sizeof(u_long));
+        if (unlikely(GETSYSCTL_WSIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt, nintr * sizeof(u_long)))) {
+            error("DISABLED: system.intr chart");
+            error("DISABLED: system.interrupts chart");
+            error("DISABLED: hw.intrcnt module");
+            return 1;
+        } else {
+            for (i = 0; i < nintr; i++)
+                totalintr += intrcnt[i];
+
+            // --------------------------------------------------------------------
+
+            static RRDSET *st_intr = NULL;
+            static RRDDIM *rd_intr = NULL;
+
+            if (unlikely(!st_intr)) {
+                st_intr = rrdset_create_localhost("system",
+                                             "intr",
+                                             NULL,
+                                             "interrupts",
+                                             NULL,
+                                             "Total Hardware Interrupts",
+                                             "interrupts/s",
+                                             900,
+                                             update_every,
+                                             RRDSET_TYPE_LINE
+                );
+                rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
+
+                rd_intr = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            } else
+                rrdset_next(st_intr);
+
+            rrddim_set_by_pointer(st_intr, rd_intr, totalintr);
+            rrdset_done(st_intr);
+
+            // --------------------------------------------------------------------
+
+            size_t size;
+            static int mib_hw_intrnames[2] = {0, 0};
+            static char *intrnames = NULL;
+
+            size = nintr * (MAXCOMLEN + 1);
+            intrnames = reallocz(intrnames, size);
+            if (unlikely(GETSYSCTL_WSIZE("hw.intrnames", mib_hw_intrnames, intrnames, size))) {
+                error("DISABLED: system.intr chart");
+                error("DISABLED: system.interrupts chart");
+                error("DISABLED: hw.intrcnt module");
+                return 1;
+            } else {
+
+                // --------------------------------------------------------------------
+
+                static RRDSET *st_interrupts = NULL;
+                RRDDIM *rd_interrupts = NULL;
+                void *p;
+
+                if (unlikely(!st_interrupts))
+                    st_interrupts = rrdset_create_localhost("system",
+                                                 "interrupts",
+                                                 NULL,
+                                                 "interrupts",
+                                                 NULL,
+                                                 "System interrupts",
+                                                 "interrupts/s",
+                                                 1000,
+                                                 update_every,
+                                                 RRDSET_TYPE_STACKED
+                    );
+                else
+                    rrdset_next(st_interrupts);
+
+                for (i = 0; i < nintr; i++) {
+                    p = intrnames + i * (MAXCOMLEN + 1);
+                    if (unlikely((intrcnt[i] != 0) && (*(char *) p != 0))) {
+                        rd_interrupts = rrddim_find(st_interrupts, p);
+                        if (unlikely(!rd_interrupts))
+                            rd_interrupts = rrddim_add(st_interrupts, p, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                        rrddim_set_by_pointer(st_interrupts, rd_interrupts, intrcnt[i]);
+                    }
+                }
+                rrdset_done(st_interrupts);
+            }
+        }
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// vm.stats.sys.v_intr
+
+int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
+    static int mib[4] = {0, 0, 0, 0};
+    u_int int_number;
+
+    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_intr", mib, int_number))) {
+        error("DISABLED: system.dev_intr chart");
+        error("DISABLED: vm.stats.sys.v_intr module");
+        return 1;
+    } else {
+
+        // --------------------------------------------------------------------
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+
+        st = rrdset_find_bytype_localhost("system", "dev_intr");
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("system",
+                                         "dev_intr",
+                                         NULL,
+                                         "interrupts",
+                                         NULL,
+                                         "Device Interrupts",
+                                         "interrupts/s",
+                                         1000,
+                                         update_every,
+                                         RRDSET_TYPE_LINE
+            );
+
+            rd = rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd, int_number);
+        rrdset_done(st);
+    }
+
+    return 0;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -371,9 +532,9 @@ int do_kern_cp_times(int update_every, usec_t dt) {
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
-    static int do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
+    static int do_context = -1, do_forks = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
-        do_dev_intr = -1, do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
+        do_soft_intr = -1, do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
         do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
         do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1,
@@ -383,9 +544,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         do_icmp6_neighbor = -1, do_icmp6_types = -1, do_space = -1, do_inodes = -1, do_uptime = -1;
 
     if (unlikely(do_uptime == -1)) {
-        do_cpu_cores            = config_get_boolean("plugin:freebsd:sysctl", "per cpu core utilization", 1);
-        do_interrupts           = config_get_boolean("plugin:freebsd:sysctl", "cpu interrupts", 1);
-        do_dev_intr             = config_get_boolean("plugin:freebsd:sysctl", "device interrupts", 1);
         do_soft_intr            = config_get_boolean("plugin:freebsd:sysctl", "software interrupts", 1);
         do_context              = config_get_boolean("plugin:freebsd:sysctl", "context switches", 1);
         do_forks                = config_get_boolean("plugin:freebsd:sysctl", "processes started", 1);
@@ -444,13 +602,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // NEEDED BY: do_context, do_forks
     u_int u_int_data;
-
-    // NEEDED BY: do_interrupts
-    size_t intrcnt_size;
-    unsigned long nintr = 0;
-    static unsigned long *intrcnt = NULL;
-    static char *intrnames = NULL;
-    unsigned long long totalintr = 0;
 
     // NEEDED BY: do_disk_io
     #define BINTIME_SCALE 5.42101086242752217003726400434970855712890625e-17 // this is 1000/2^64
@@ -569,86 +720,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // NEEDED BY: do_uptime
     struct timespec up_time;
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_interrupts)) {
-        if (unlikely(sysctlbyname("hw.intrcnt", NULL, &intrcnt_size, NULL, 0) == -1)) {
-            error("FREEBSD: sysctl(hw.intrcnt...) failed: %s", strerror(errno));
-            do_interrupts = 0;
-            error("DISABLED: system.intr");
-        } else {
-            nintr = intrcnt_size / sizeof(u_long);
-            intrcnt = reallocz(intrcnt, nintr * sizeof(u_long));
-            if (unlikely(getsysctl_by_name("hw.intrcnt", intrcnt, nintr * sizeof(u_long)))){
-                do_interrupts = 0;
-                error("DISABLED: system.intr");
-            } else {
-                for (i = 0; i < nintr; i++)
-                    totalintr += intrcnt[i];
-
-                st = rrdset_find_bytype_localhost("system", "intr");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "intr", NULL, "interrupts", NULL, "Total Hardware Interrupts", "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
-                    rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "interrupts", totalintr);
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                size = nintr * (MAXCOMLEN +1);
-                intrnames = reallocz(intrnames, size);
-                if (unlikely(getsysctl_by_name("hw.intrnames", intrnames, size))) {
-                    do_interrupts = 0;
-                    error("DISABLED: system.intr");
-                } else {
-                    st = rrdset_find_bytype_localhost("system", "interrupts");
-                    if (unlikely(!st))
-                        st = rrdset_create_localhost("system", "interrupts", NULL, "interrupts", NULL, "System interrupts", "interrupts/s",
-                                           1000, update_every, RRDSET_TYPE_STACKED);
-                    else
-                        rrdset_next(st);
-
-                    for (i = 0; i < nintr; i++) {
-                        p = intrnames + i * (MAXCOMLEN + 1);
-                        if (unlikely((intrcnt[i] != 0) && (*(char*)p != 0))) {
-                            rd = rrddim_find(st, p);
-                            if (unlikely(!rd))
-                                rd = rrddim_add(st, p, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                            rrddim_set_by_pointer(st, rd, intrcnt[i]);
-                        }
-                    }
-                    rrdset_done(st);
-                }
-            }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_dev_intr)) {
-        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.sys.v_intr", u_int_data))) {
-            do_dev_intr = 0;
-            error("DISABLED: system.dev_intr");
-        } else {
-
-            st = rrdset_find_bytype_localhost("system", "dev_intr");
-            if (unlikely(!st)) {
-                st = rrdset_create_localhost("system", "dev_intr", NULL, "interrupts", NULL, "Device Interrupts", "interrupts/s", 1000, update_every, RRDSET_TYPE_LINE);
-
-                rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "interrupts", u_int_data);
-            rrdset_done(st);
-        }
-    }
 
     // --------------------------------------------------------------------
 

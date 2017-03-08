@@ -11,6 +11,8 @@ extern int do_vm_loadavg(int update_every, usec_t dt);
 extern int do_vm_vmtotal(int update_every, usec_t dt);
 extern int do_kern_cp_time(int update_every, usec_t dt);
 extern int do_kern_cp_times(int update_every, usec_t dt);
+extern int do_hw_intcnt(int update_every, usec_t dt);
+extern int do_vm_stats_sys_v_intr(int update_every, usec_t dt);
 extern int do_freebsd_sysctl_old(int update_every, usec_t dt);
 
 #define GETSYSCTL_MIB(name, mib) getsysctl_mib(name, mib, sizeof(mib)/sizeof(int))
@@ -68,7 +70,7 @@ static inline int getsysctl(const char *name, int *mib, size_t miblen, void *ptr
         error("FREEBSD: sysctl(%s...) failed: %s", name, strerror(errno));
         return 1;
     }
-    if (unlikely(nlen != *len)) {
+    if (unlikely(ptr != NULL && nlen != *len)) {
         error("FREEBSD: sysctl(%s...) expected %lu, got %lu", name, (unsigned long)*len, (unsigned long)nlen);
         return 1;
     }
