@@ -323,6 +323,74 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
 
 // ----------------------------------------------------------------------------
 
+void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
+    rrdhost_rdlock(host);
+
+    buffer_strcat(wb, "{");
+
+    size_t chart_counter = 0;
+    size_t dimension_counter = 0;
+
+    // for each chart
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        if(rrdset_is_available_for_viewers(st)) {
+            rrdset_rdlock(st);
+
+            buffer_sprintf(wb, "%s\n"
+                    "\t\"%s\": {\n"
+                    "\t\t\"name\":\"%s\",\n"
+                    "\t\t\"context\":\"%s\",\n"
+                    "\t\t\"units\":\"%s\",\n"
+                    "\t\t\"last_updated\": %ld,\n"
+                    "\t\t\"dimensions\": {"
+                    , chart_counter?",":""
+                    , st->id
+                    , st->name
+                    , st->context
+                    , st->units
+                    , rrdset_last_entry_t(st)
+            );
+
+            chart_counter++;
+            dimension_counter = 0;
+
+            // for each dimension
+            RRDDIM *rd;
+            rrddim_foreach_read(rd, st) {
+                if(rd->collections_counter) {
+
+                    buffer_sprintf(wb, "%s\n"
+                            "\t\t\t\"%s\": {\n"
+                            "\t\t\t\t\"name\": \"%s\",\n"
+                            "\t\t\t\t\"value\": "
+                            , dimension_counter?",":""
+                            , rd->id
+                            , rd->name
+                    );
+
+                    if(isnan(rd->last_stored_value))
+                        buffer_strcat(wb, "null");
+                    else
+                        buffer_sprintf(wb, CALCULATED_NUMBER_FORMAT, rd->last_stored_value);
+
+                    buffer_strcat(wb, "\n\t\t\t}");
+
+                    dimension_counter++;
+                }
+            }
+
+            buffer_strcat(wb, "\n\t\t}\n\t}");
+            rrdset_unlock(st);
+        }
+    }
+
+    buffer_strcat(wb, "\n}");
+    rrdhost_unlock(host);
+}
+
+// ----------------------------------------------------------------------------
+
 // RRDR dimension options
 #define RRDR_EMPTY      0x01 // the dimension contains / the value is empty (null)
 #define RRDR_RESET      0x02 // the dimension contains / the value is reset
