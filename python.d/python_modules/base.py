@@ -67,6 +67,7 @@ class SimpleService(threading.Thread):
         self.__first_run = True
         self.order = []
         self.definitions = {}
+        self._data_from_check = dict()
         if configuration is None:
             self.error("BaseService: no configuration parameters supplied. Cannot create Service.")
             raise RuntimeError
@@ -391,7 +392,7 @@ class SimpleService(threading.Thread):
         Create charts
         :return: boolean
         """
-        data = self._get_data()
+        data = self._data_from_check or self._get_data()
         if data is None:
             self.debug("failed to receive data during create().")
             return False
@@ -437,7 +438,8 @@ class SimpleService(threading.Thread):
 
         return updated
 
-    def find_binary(self, binary):
+    @staticmethod
+    def find_binary(binary):
         try:
             if isinstance(binary, str):
                 binary = os.path.basename(binary)
@@ -857,63 +859,74 @@ class LogService(SimpleService):
 
 
 class ExecutableService(SimpleService):
-    bad_substrings = ('&', '|', ';', '>', '<')
 
     def __init__(self, configuration=None, name=None):
-        self.command = ""
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.command = None
 
     def _get_raw_data(self):
         """
         Get raw data from executed command
-        :return: str
+        :return: <list>
         """
         try:
             p = Popen(self.command, stdout=PIPE, stderr=PIPE)
-        except Exception as e:
-            self.error("Executing command", self.command, "resulted in error:", str(e))
+        except Exception as error:
+            self.error("Executing command", self.command, "resulted in error:", str(error))
             return None
-        data = []
+        data = list()
         for line in p.stdout.readlines():
-            data.append(str(line.decode()))
+            data.append(line.decode())
 
-        if len(data) == 0:
-            self.error("No data collected.")
-            return None
-
-        return data
+        return data or None
 
     def check(self):
         """
         Parse basic configuration, check if command is whitelisted and is returning values
-        :return: boolean
+        :return: <boolean>
         """
-        if self.name is not None or self.name != str(None):
-            self.name = ""
-        else:
-            self.name = str(self.name)
-        try:
-            self.command = str(self.configuration['command'])
-        except (KeyError, TypeError):
-            self.info("No command specified. Using: '" + self.command + "'")
-	# Splitting self.command on every space so subprocess.Popen reads it properly
-        self.command = self.command.split(' ')
+        # Preference: 1. "command" from configuration file 2. "command" from plugin (if specified)
+        if 'command' in self.configuration:
+            self.command = self.configuration['command']
 
-        for arg in self.command[1:]:
-            if any(st in arg for st in self.bad_substrings):
-                self.error("Bad command argument:" + " ".join(self.command[1:]))
-                return False
-
-        # test command and search for it in /usr/sbin or /sbin when failed
-        base = self.command[0].split('/')[-1]
-        if self._get_raw_data() is None:
-            for prefix in ['/sbin/', '/usr/sbin/']:
-                self.command[0] = prefix + base
-                if os.path.isfile(self.command[0]):
-                    break
-
-        if self._get_data() is None or len(self._get_data()) == 0:
-            self.error("Command", self.command, "returned no data")
+        # "command" must be: 1.not None 2. type <str>
+        if not (self.command and isinstance(self.command, str)):
+            self.error('Command is not defined or command type is not <str>')
             return False
 
-        return True
+        # Split "command" into: 1. command <str> 2. options <list>
+        command, opts = self.command.split()[0], self.command.split()[1:]
+
+        # Check for "bad" symbols in options. No pipes, redirects etc. TODO: what is missing?
+        bad_opts = set(''.join(opts)) & set(['&', '|', ';', '>', '<'])
+        if bad_opts:
+            self.error("Bad command argument(s): %s" % bad_opts)
+            return False
+
+        # Find absolute path ('echo' => '/bin/echo')
+        if '/' not in command:
+            command = self.find_binary(command)
+            if not command:
+                self.error('Can\'t locate "%s" binary in PATH(%s)' % (self.command, PATH))
+                return False
+        # Check if binary exist and executable
+        else:
+            if not (os.path.isfile(command) and os.access(command, os.X_OK)):
+                self.error('"%s" is not a file or not executable' % command)
+                return False
+
+        self.command = [command] + opts if opts else [command]
+
+        try:
+            data = self._get_data()
+        except Exception as error:
+            self.error('_get_data() failed. Command: %s. Error: %s' % (self.command, error))
+            return False
+
+        if isinstance(data, dict) and data:
+            # We need this for create() method. No reason to execute get_data() again if result is not empty dict()
+            self._data_from_check = data
+            return True
+        else:
+            self.error("Command", str(self.command), "returned no data")
+            return False
