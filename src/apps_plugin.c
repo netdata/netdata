@@ -90,7 +90,8 @@ static int
 static size_t
         global_iterations_counter = 1,
         calls_counter = 0,
-        file_counter = 0;
+        file_counter = 0,
+        targets_assignment_counter = 0;
 
 
 // ----------------------------------------------------------------------------
@@ -749,6 +750,8 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
 }
 
 static inline void assign_target_to_pid(struct pid_stat *p) {
+    targets_assignment_counter++;
+
     uint32_t hash = simple_hash(p->comm);
     size_t pclen  = strlen(p->comm);
 
@@ -2651,12 +2654,13 @@ static usec_t send_resource_usage_to_netdata() {
                 , "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
                         "DIMENSION user '' incremental 1 1000\n"
                         "DIMENSION system '' incremental 1 1000\n"
-                        "CHART netdata.apps_files '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_files line 140001 %1$d\n"
+                        "CHART netdata.apps_sizes '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_sizes line 140001 %1$d\n"
                         "DIMENSION calls '' incremental 1 1\n"
                         "DIMENSION files '' incremental 1 1\n"
                         "DIMENSION pids '' absolute 1 1\n"
                         "DIMENSION fds '' absolute 1 1\n"
                         "DIMENSION targets '' absolute 1 1\n"
+                        "DIMENSION new_pids 'new pids' incremental 1 1\n"
                         "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
                         "DIMENSION utime '' absolute 1 %2$llu\n"
                         "DIMENSION stime '' absolute 1 %2$llu\n"
@@ -2685,12 +2689,13 @@ static usec_t send_resource_usage_to_netdata() {
         "SET user = %llu\n"
         "SET system = %llu\n"
         "END\n"
-        "BEGIN netdata.apps_files %llu\n"
+        "BEGIN netdata.apps_sizes %llu\n"
         "SET calls = %zu\n"
         "SET files = %zu\n"
         "SET pids = %zu\n"
         "SET fds = %d\n"
         "SET targets = %zu\n"
+        "SET new_pids = %zu\n"
         "END\n"
         "BEGIN netdata.apps_fix %llu\n"
         "SET utime = %u\n"
@@ -2708,6 +2713,7 @@ static usec_t send_resource_usage_to_netdata() {
         , all_pids_count
         , all_files_len
         , apps_groups_targets_count
+        , targets_assignment_counter
         , usec
         , (unsigned int)(utime_fix_ratio   * 100 * RATES_DETAIL)
         , (unsigned int)(stime_fix_ratio   * 100 * RATES_DETAIL)
@@ -3097,20 +3103,6 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
 
-#ifndef __FreeBSD__
-    fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
-    }
-
-    fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'kilobytes/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
-    for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
-    }
-#endif
-
 #ifdef __FreeBSD__
     fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'blocks/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
@@ -3131,6 +3123,18 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 
     fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'kilobytes/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+    }
+
+    fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
+    }
+
+    fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'kilobytes/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);

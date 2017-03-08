@@ -22,12 +22,13 @@ static inline void mountinfo_reload(int force) {
     }
 }
 
-// Data to be stored in DICTIONARY mount_points used by do_disk_space_stats().
+// Data to be stored in DICTIONARY dict_mountpoints used by do_disk_space_stats().
 // This DICTIONARY is used to lookup the settings of the mount point on each iteration.
 struct mount_point_metadata {
     int do_space;
     int do_inodes;
     int shown_error;
+    int updated;
 
     size_t collected; // the number of times this has been collected
 
@@ -42,16 +43,50 @@ struct mount_point_metadata {
     RRDDIM *rd_inodes_reserved;
 };
 
+static DICTIONARY *dict_mountpoints = NULL;
+
+#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE); st = NULL; } } while(st)
+
+int mount_point_cleanup(void *entry, void *data) {
+    (void)data;
+
+    struct mount_point_metadata *mp = (struct mount_point_metadata *)entry;
+    if(!mp) return 0;
+
+    if(likely(mp->updated)) {
+        mp->updated = 0;
+        return 0;
+    }
+
+    if(likely(mp->collected)) {
+        mp->collected = 0;
+        mp->updated = 0;
+        mp->shown_error = 0;
+
+        mp->rd_space_avail = NULL;
+        mp->rd_space_used = NULL;
+        mp->rd_space_reserved = NULL;
+
+        mp->rd_inodes_avail = NULL;
+        mp->rd_inodes_used = NULL;
+        mp->rd_inodes_reserved = NULL;
+
+        rrdset_obsolete_and_pointer_null(mp->st_space);
+        rrdset_obsolete_and_pointer_null(mp->st_inodes);
+    }
+
+    return 0;
+}
+
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     const char *family = mi->mount_point;
     const char *disk = mi->persistent_id;
 
-    static DICTIONARY *mount_points = NULL;
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
     static SIMPLE_PATTERN *excluded_filesystems = NULL;
     int do_space, do_inodes;
 
-    if(unlikely(!mount_points)) {
+    if(unlikely(!dict_mountpoints)) {
         SIMPLE_PREFIX_MODE mode = SIMPLE_PATTERN_EXACT;
 
         if(config_move("plugin:proc:/proc/diskstats", "exclude space metrics on paths", CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths") != -1) {
@@ -69,10 +104,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 SIMPLE_PATTERN_EXACT
         );
 
-        mount_points = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+        dict_mountpoints = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
     }
 
-    struct mount_point_metadata *m = dictionary_get(mount_points, mi->mount_point);
+    struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
     if(unlikely(!m)) {
         char var_name[4096 + 1];
         snprintfz(var_name, 4096, "plugin:proc:diskspace:%s", mi->mount_point);
@@ -97,6 +132,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .do_space = do_space,
                 .do_inodes = do_inodes,
                 .shown_error = 0,
+                .updated = 0,
 
                 .collected = 0,
 
@@ -111,8 +147,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                 .rd_inodes_reserved = NULL
         };
 
-        m = dictionary_set(mount_points, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
+        m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
+
+    m->updated = 1;
 
     if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
         return;
@@ -304,6 +342,8 @@ void *proc_diskspace_main(void *ptr) {
         }
 
         if(unlikely(netdata_exit)) break;
+
+        dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
 
         if(vdo_cpu_netdata) {
             static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
