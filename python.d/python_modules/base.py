@@ -18,20 +18,29 @@
 # using ".encode()" in one thread can block other threads as well (only in python2)
 
 import time
-# import sys
 import os
 import socket
 import select
+import threading
+import msg
+import ssl
+from subprocess import Popen, PIPE
+from sys import exc_info
+
 try:
     import urllib.request as urllib2
 except ImportError:
     import urllib2
 
-from subprocess import Popen, PIPE
-
-import threading
-import msg
-import ssl
+try:
+    import MySQLdb
+    PYMYSQL = True
+except ImportError:
+    try:
+        import pymysql as MySQLdb
+        PYMYSQL = True
+    except ImportError:
+        PYMYSQL = False
 
 try:
     PATH = os.getenv('PATH').split(':')
@@ -930,3 +939,129 @@ class ExecutableService(SimpleService):
         else:
             self.error("Command", str(self.command), "returned no data")
             return False
+
+
+class MySQLService(SimpleService):
+
+    def __init__(self, configuration=None, name=None):
+        SimpleService.__init__(self, configuration=configuration, name=name)
+        self.__connection = None
+        self.conn_properties = dict()
+        self.queries = dict()
+
+    def __connect(self):
+        try:
+            connection = MySQLdb.connect(connect_timeout=self.update_every, **self.conn_properties)
+        except (MySQLdb.MySQLError, TypeError) as error:
+            return None, str(error)
+        else:
+            return connection, None
+
+    def check(self):
+        def get_connection_properties(conf):
+            properties = dict()
+            if 'user' in conf and conf['user']:
+                properties['user'] = conf['user']
+            if 'pass' in conf and conf['pass']:
+                properties['passwd'] = conf['pass']
+            if 'socket' in conf and conf['socket']:
+                properties['unix_socket'] = conf['socket']
+            elif 'host' in conf and conf['host']:
+                properties['host'] = conf['host']
+                properties['port'] = int(conf['port']) if conf.get('port') else 3306
+            elif 'my.cnf' in conf and conf['my.cnf']:
+                properties['read_default_file'] = conf['my.cnf']
+
+            return properties or None
+
+        def is_valid_queries_dict(raw_queries, log_error):
+            """
+            :param raw_queries: dict:
+            :param log_error: function:
+            :return: dict or None
+
+            raw_queries is valid when: type <dict> and not empty after is_valid_query(for all queries)
+            """
+            def is_valid_query(query):
+                return all([isinstance(query, str),
+                            query.startswith(('SELECT', 'select', 'SHOW', 'show'))])
+
+            if isinstance(raw_queries, dict) and raw_queries:
+                valid_queries = dict([(n, q) for n, q in raw_queries.items() if is_valid_query(q)])
+                bad_queries = set(raw_queries) - set(valid_queries)
+
+                if bad_queries:
+                    log_error('Removed query(s): %s' % bad_queries)
+                return valid_queries
+            else:
+                log_error('Unsupported "queries" format. Must be not empty <dict>')
+                return None
+
+        if not PYMYSQL:
+            self.error('MySQLdb or PyMySQL module is needed to use mysql.chart.py plugin')
+            return False
+
+        # Check if "self.queries" exist, not empty and all queries are in valid format
+        self.queries = is_valid_queries_dict(self.queries, self.error)
+        if not self.queries:
+            return None
+
+        # Get connection properties
+        self.conn_properties = get_connection_properties(self.configuration)
+        if not self.conn_properties:
+            self.error('Connection properties are missing')
+            return False
+
+        # Create connection to the database
+        self.__connection, error = self.__connect()
+        if error:
+            self.error('Can\'t establish connection to MySQL: %s' % error)
+            return False
+
+        try:
+            data = self._get_data() 
+        except Exception as error:
+            self.error('_get_data() failed. Error: %s' % error)
+            return False
+
+        if isinstance(data, dict) and data:
+            # We need this for create() method
+            self._data_from_check = data
+            return True
+        else:
+            self.error("_get_data() returned no data or type is not <dict>")
+            return False
+    
+    def _get_raw_data(self, description=None):
+        """
+        Get raw data from MySQL server
+        :return: dict: fetchall() or (fetchall(), description)
+        """
+
+        if not self.__connection:
+            self.__connection, error = self.__connect()
+            if error:
+                return None
+
+        raw_data = dict()
+        try:
+            with self.__connection as cursor:
+                for name, query in self.queries.items():
+                    try:
+                        cursor.execute(query)
+                    except (MySQLdb.ProgrammingError, MySQLdb.OperationalError) as error:
+                        if exc_info()[0] == MySQLdb.OperationalError and 'denied' not in str(error):
+                            raise RuntimeError
+                        self.error('Removed query: %s[%s]. Error: %s'
+                                   % (name, query, error))
+                        self.queries.pop(name)
+                        continue
+                    else:
+                        raw_data[name] = (cursor.fetchall(), cursor.description) if description else cursor.fetchall()
+            self.__connection.commit()
+        except (MySQLdb.MySQLError, RuntimeError, TypeError, AttributeError):
+            self.__connection.close()
+            self.__connection = None
+            return None
+        else:
+            return raw_data or None
