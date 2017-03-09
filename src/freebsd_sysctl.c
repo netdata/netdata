@@ -896,11 +896,98 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// kern.ipc.sem
+
+int do_kern_ipc_sem(int update_every, usec_t dt) {
+    static int mib_semmni[3] = {0, 0, 0}, mib_sema[3] = {0, 0, 0};
+    struct ipc_sem {
+        int semmni;
+        collected_number sets;
+        collected_number semaphores;
+    } ipc_sem = {0, 0, 0};
+
+    if (unlikely(GETSYSCTL_SIMPLE("kern.ipc.semmni", mib_semmni, ipc_sem.semmni))) {
+        error("DISABLED: system.ipc_semaphores chart");
+        error("DISABLED: system.ipc_semaphore_arrays chart");
+        error("DISABLED: kern.ipc.sem module");
+        return 1;
+    } else {
+        static struct semid_kernel *ipc_sem_data = NULL;
+
+        ipc_sem_data = reallocz(ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni);
+        if (unlikely(GETSYSCTL_WSIZE("kern.ipc.sema", mib_sema, ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni))) {
+            error("DISABLED: system.ipc_semaphores chart");
+            error("DISABLED: system.ipc_semaphore_arrays chart");
+            error("DISABLED: kern.ipc.sem module");
+            return 1;
+        } else {
+            int i;
+
+            for (i = 0; i < ipc_sem.semmni; i++) {
+                if (unlikely(ipc_sem_data[i].u.sem_perm.mode & SEM_ALLOC)) {
+                    ipc_sem.sets += 1;
+                    ipc_sem.semaphores += ipc_sem_data[i].u.sem_nsems;
+                }
+            }
+
+            // --------------------------------------------------------------------
+
+            static RRDSET *st_semaphores = NULL, *st_semaphore_arrays = NULL;
+            static RRDDIM *rd_semaphores = NULL, *rd_semaphore_arrays = NULL;
+
+            if (unlikely(!st_semaphores)) {
+                st_semaphores = rrdset_create_localhost("system",
+                                                        "ipc_semaphores",
+                                                        NULL,
+                                                        "ipc semaphores",
+                                                        NULL,
+                                                        "IPC Semaphores",
+                                                        "semaphores",
+                                                        1000,
+                                                        localhost->rrd_update_every,
+                                                        RRDSET_TYPE_AREA
+                );
+
+                rd_semaphores = rrddim_add(st_semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(st_semaphores);
+
+            rrddim_set_by_pointer(st_semaphores, rd_semaphores, ipc_sem.semaphores);
+            rrdset_done(st_semaphores);
+
+            // --------------------------------------------------------------------
+
+            if (unlikely(!st_semaphore_arrays)) {
+                st_semaphore_arrays = rrdset_create_localhost("system",
+                                                              "ipc_semaphore_arrays",
+                                                              NULL,
+                                                              "ipc semaphores",
+                                                              NULL,
+                                                              "IPC Semaphore Arrays",
+                                                              "arrays",
+                                                              1000,
+                                                              localhost->rrd_update_every,
+                                                              RRDSET_TYPE_AREA
+                );
+
+                rd_semaphore_arrays = rrddim_add(st_semaphore_arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(st_semaphore_arrays);
+
+            rrddim_set_by_pointer(st_semaphore_arrays, rd_semaphore_arrays, ipc_sem.sets);
+            rrdset_done(st_semaphore_arrays);
+        }
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     static int do_disk_io = -1,
-        do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
+        do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
         do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
@@ -912,7 +999,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     if (unlikely(do_uptime == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_ipc_semaphores       = config_get_boolean("plugin:freebsd:sysctl", "ipc semaphores", 1);
         do_ipc_shared_mem       = config_get_boolean("plugin:freebsd:sysctl", "ipc shared memory", 1);
         do_ipc_msg_queues       = config_get_boolean("plugin:freebsd:sysctl", "ipc message queues", 1);
         do_netisr               = config_get_boolean("plugin:freebsd:sysctl", "netisr", 1);
@@ -981,17 +1067,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         collected_number duration_write_ms;
         collected_number busy_time_ms;
     } prev_dstat;
-
-    // NEEDED BY: do_swapio, do_ram
-    struct vmmeter vmmeter_data;
-
-    // NEEDED BY: do_ipc_semaphores
-    struct ipc_sem {
-        int semmni;
-        collected_number sets;
-        collected_number semaphores;
-    } ipc_sem = {0, 0, 0};
-    static struct semid_kernel *ipc_sem_data = NULL;
 
     // NEEDED BY: do_ipc_shared_mem
     struct ipc_shm {
@@ -1241,54 +1316,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
                 rrddim_set(st, "in", total_disk_kbytes_read);
                 rrddim_set(st, "out", total_disk_kbytes_write);
-                rrdset_done(st);
-            }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_ipc_semaphores)) {
-        if (unlikely(GETSYSCTL_BY_NAME("kern.ipc.semmni", ipc_sem.semmni))) {
-            do_ipc_semaphores = 0;
-            error("DISABLED: system.ipc_semaphores");
-            error("DISABLED: system.ipc_semaphore_arrays");
-        } else {
-            ipc_sem_data = reallocz(ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni);
-            if (unlikely(getsysctl_by_name("kern.ipc.sema", ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni))) {
-                do_ipc_semaphores = 0;
-                error("DISABLED: system.ipc_semaphores");
-                error("DISABLED: system.ipc_semaphore_arrays");
-            } else {
-                for (i = 0; i < ipc_sem.semmni; i++) {
-                    if (unlikely(ipc_sem_data[i].u.sem_perm.mode & SEM_ALLOC)) {
-                        ipc_sem.sets += 1;
-                        ipc_sem.semaphores += ipc_sem_data[i].u.sem_nsems;
-                    }
-                }
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_localhost("system.ipc_semaphores");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_semaphores", NULL, "ipc semaphores", NULL, "IPC Semaphores", "semaphores", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "semaphores", ipc_sem.semaphores);
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_localhost("system.ipc_semaphore_arrays");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL, "IPC Semaphore Arrays", "arrays", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "arrays", ipc_sem.sets);
                 rrdset_done(st);
             }
         }
