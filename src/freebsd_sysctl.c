@@ -729,23 +729,19 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 // system.ram
 
 int do_system_ram(int update_every, usec_t dt) {
-    static int mib_v_active_count[4] = {0, 0, 0, 0};
-    static int mib_v_inactive_count[4] = {0, 0, 0, 0};
-    static int mib_v_wire_count[4] = {0, 0, 0, 0};
-    static int mib_v_cache_count[4] = {0, 0, 0, 0};
-    static int mib_vfs_bufspace[2] = {0, 0};
-    static int mib_v_free_count[4] = {0, 0, 0, 0};
+    static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
+               mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
     struct vmmeter vmmeter_data;
     int vfs_bufspace_count;
 
-    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_active_count",   mib_v_active_count,   vmmeter_data.v_active_count) ||
-                 GETSYSCTL_SIMPLE("vm.stats.vm.v_inactive_count", mib_v_inactive_count, vmmeter_data.v_inactive_count) ||
-                 GETSYSCTL_SIMPLE("vm.stats.vm.v_wire_count",     mib_v_wire_count,     vmmeter_data.v_wire_count) ||
+    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_active_count",   mib_active_count,   vmmeter_data.v_active_count) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_inactive_count", mib_inactive_count, vmmeter_data.v_inactive_count) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_wire_count",     mib_wire_count,     vmmeter_data.v_wire_count) ||
 #if __FreeBSD_version < 1200016
-                 GETSYSCTL_SIMPLE("vm.stats.vm.v_cache_count",    mib_v_cache_count,    vmmeter_data.v_cache_count) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_cache_count",    mib_cache_count,    vmmeter_data.v_cache_count) ||
 #endif
                  GETSYSCTL_SIMPLE("vfs.bufspace",                 mib_vfs_bufspace,     vfs_bufspace_count) ||
-                 GETSYSCTL_SIMPLE("vm.stats.vm.v_free_count",     mib_v_free_count,     vmmeter_data.v_free_count))) {
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_free_count",     mib_free_count,     vmmeter_data.v_free_count))) {
         error("DISABLED: system.ram chart");
         error("DISABLED: System.ram module");
         return 1;
@@ -800,8 +796,7 @@ int do_system_ram(int update_every, usec_t dt) {
 // vm.stats.vm.v_swappgs
 
 int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
-    static int mib_swappgsin[4] = {0, 0, 0, 0};
-    static int mib_swappgsout[4] = {0, 0, 0, 0};
+    static int mib_swappgsin[4] = {0, 0, 0, 0}, mib_swappgsout[4] = {0, 0, 0, 0};
     struct vmmeter vmmeter_data;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsin", mib_swappgsin, vmmeter_data.v_swappgsin) ||
@@ -843,17 +838,69 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// vm.stats.vm.v_pgfaults
+
+int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
+    static int mib_vm_faults[4] = {0, 0, 0, 0}, mib_io_faults[4] = {0, 0, 0, 0}, mib_cow_faults[4] = {0, 0, 0, 0},
+               mib_cow_optim[4] = {0, 0, 0, 0}, mib_intrans[4] = {0, 0, 0, 0};
+    struct vmmeter vmmeter_data;
+
+    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_vm_faults",  mib_vm_faults,  vmmeter_data.v_vm_faults) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_io_faults",  mib_io_faults,  vmmeter_data.v_io_faults) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_cow_faults", mib_cow_faults, vmmeter_data.v_cow_faults) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_cow_optim",  mib_cow_optim,  vmmeter_data.v_cow_optim) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_intrans",    mib_intrans,    vmmeter_data.v_intrans))) {
+        error("DISABLED: mem.pgfaults chart");
+        error("DISABLED: vm.stats.vm.v_pgfaults module");
+        return 1;
+    } else {
+
+        // --------------------------------------------------------------------
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_memory = NULL, *rd_io_requiring = NULL, *rd_cow = NULL,
+                      *rd_cow_optimized = NULL, *rd_in_transit = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("mem",
+                                         "pgfaults",
+                                         NULL,
+                                         "system",
+                                         NULL,
+                                         "Memory Page Faults",
+                                         "page faults/s",
+                                         500,
+                                         update_every,
+                                         RRDSET_TYPE_LINE
+            );
+
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd_memory        = rrddim_add(st, "memory",        NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_io_requiring  = rrddim_add(st, "io_requiring",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_cow           = rrddim_add(st, "cow",           NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_cow_optimized = rrddim_add(st, "cow_optimized", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_in_transit    = rrddim_add(st, "in_transit",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_memory,        vmmeter_data.v_vm_faults);
+        rrddim_set_by_pointer(st, rd_io_requiring,  vmmeter_data.v_io_faults);
+        rrddim_set_by_pointer(st, rd_cow,           vmmeter_data.v_cow_faults);
+        rrddim_set_by_pointer(st, rd_cow_optimized, vmmeter_data.v_cow_optim);
+        rrddim_set_by_pointer(st, rd_in_transit,    vmmeter_data.v_intrans);
+        rrdset_done(st);
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
-
-// NEEDED BY: do_disk_io
-#define RRD_TYPE_DISK "disk"
-
-// NEEDED BY: do_bandwidth
-#define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     static int do_disk_io = -1,
-        do_pgfaults = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
+        do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
         do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
@@ -865,7 +912,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     if (unlikely(do_uptime == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_pgfaults             = config_get_boolean("plugin:freebsd:sysctl", "memory page faults", 1);
         do_ipc_semaphores       = config_get_boolean("plugin:freebsd:sysctl", "ipc semaphores", 1);
         do_ipc_shared_mem       = config_get_boolean("plugin:freebsd:sysctl", "ipc shared memory", 1);
         do_ipc_msg_queues       = config_get_boolean("plugin:freebsd:sysctl", "ipc message queues", 1);
@@ -914,10 +960,8 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     size_t size;
     char title[4096 + 1];
 
-    // NEEDED BY: do_context, do_forks
-    u_int u_int_data;
-
     // NEEDED BY: do_disk_io
+    #define RRD_TYPE_DISK "disk"
     #define BINTIME_SCALE 5.42101086242752217003726400434970855712890625e-17 // this is 1000/2^64
     int numdevs;
     static void *devstat_data = NULL;
@@ -982,6 +1026,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     char netstat_cpuid[21]; // no more than 4 digits expected
 
     // NEEDED BY: do_bandwidth
+    #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
     struct ifaddrs *ifa, *ifap;
     struct iftot {
         u_long  ift_ibytes;
@@ -1198,39 +1243,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
                 rrddim_set(st, "out", total_disk_kbytes_write);
                 rrdset_done(st);
             }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_pgfaults)) {
-        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.vm.v_vm_faults",   vmmeter_data.v_vm_faults) ||
-                     GETSYSCTL_BY_NAME("vm.stats.vm.v_io_faults",   vmmeter_data.v_io_faults) ||
-                     GETSYSCTL_BY_NAME("vm.stats.vm.v_cow_faults",  vmmeter_data.v_cow_faults) ||
-                     GETSYSCTL_BY_NAME("vm.stats.vm.v_cow_optim",   vmmeter_data.v_cow_optim) ||
-                     GETSYSCTL_BY_NAME("vm.stats.vm.v_intrans",     vmmeter_data.v_intrans))) {
-            do_pgfaults = 0;
-            error("DISABLED: mem.pgfaults");
-        } else {
-            st = rrdset_find_localhost("mem.pgfaults");
-            if (unlikely(!st)) {
-                st = rrdset_create_localhost("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults", "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
-                rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
-                rrddim_add(st, "memory", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "io_requiring", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "cow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "cow_optimized", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "in_transit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "memory", vmmeter_data.v_vm_faults);
-            rrddim_set(st, "io_requiring", vmmeter_data.v_io_faults);
-            rrddim_set(st, "cow", vmmeter_data.v_cow_faults);
-            rrddim_set(st, "cow_optimized", vmmeter_data.v_cow_optim);
-            rrddim_set(st, "in_transit", vmmeter_data.v_intrans);
-            rrdset_done(st);
         }
     }
 
