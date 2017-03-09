@@ -797,6 +797,52 @@ int do_system_ram(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// vm.stats.vm.v_swappgs
+
+int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
+    static int mib_swappgsin[4] = {0, 0, 0, 0};
+    static int mib_swappgsout[4] = {0, 0, 0, 0};
+    struct vmmeter vmmeter_data;
+
+    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsin", mib_swappgsin, vmmeter_data.v_swappgsin) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsout", mib_swappgsout, vmmeter_data.v_swappgsout))) {
+        error("DISABLED: system.swapio chart");
+        error("DISABLED: vm.stats.vm.v_swappgs module");
+        return 1;
+    } else {
+
+        // --------------------------------------------------------------------
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("system",
+                                         "swapio",
+                                         NULL,
+                                         "swap",
+                                         NULL,
+                                         "Swap I/O",
+                                         "kilobytes/s",
+                                         250,
+                                         update_every,
+                                         RRDSET_TYPE_AREA
+            );
+
+            rd_in = rrddim_add(st, "in",  NULL, system_pagesize, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st, "out", NULL, -system_pagesize, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_in, vmmeter_data.v_swappgsin);
+        rrddim_set_by_pointer(st, rd_out, vmmeter_data.v_swappgsout);
+        rrdset_done(st);
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 // NEEDED BY: do_disk_io
@@ -806,7 +852,7 @@ int do_system_ram(int update_every, usec_t dt) {
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
-    static int do_disk_io = -1, do_swapio = -1,
+    static int do_disk_io = -1,
         do_pgfaults = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
@@ -819,7 +865,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     if (unlikely(do_uptime == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_swapio               = config_get_boolean("plugin:freebsd:sysctl", "swap i/o", 1);
         do_pgfaults             = config_get_boolean("plugin:freebsd:sysctl", "memory page faults", 1);
         do_ipc_semaphores       = config_get_boolean("plugin:freebsd:sysctl", "ipc semaphores", 1);
         do_ipc_shared_mem       = config_get_boolean("plugin:freebsd:sysctl", "ipc shared memory", 1);
@@ -1153,28 +1198,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
                 rrddim_set(st, "out", total_disk_kbytes_write);
                 rrdset_done(st);
             }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_swapio)) {
-        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.vm.v_swappgsin", vmmeter_data.v_swappgsin) || GETSYSCTL_BY_NAME("vm.stats.vm.v_swappgsout", vmmeter_data.v_swappgsout))) {
-            do_swapio = 0;
-            error("DISABLED: system.swapio");
-        } else {
-            st = rrdset_find_localhost("system.swapio");
-            if (unlikely(!st)) {
-                st = rrdset_create_localhost("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250, update_every, RRDSET_TYPE_AREA);
-
-                rrddim_add(st, "in",  NULL, system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "out", NULL, -system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "in", vmmeter_data.v_swappgsin);
-            rrddim_set(st, "out", vmmeter_data.v_swappgsout);
-            rrdset_done(st);
         }
     }
 
