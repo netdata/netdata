@@ -20,10 +20,11 @@ static struct freebsd_module {
         { .name = "vm.vmtotal", .dim = "vmtotal", .enabled = 1, .func = do_vm_vmtotal },
         { .name = "kern.cp_time", .dim = "cp_time", .enabled = 1, .func = do_kern_cp_time },
         { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },
-        { .name = "hw.intrcnt", .dim = "hw_intrcnt", .enabled = 1, .func = do_hw_intcnt },
-        { .name = "vm.stats.sys.v_intr", .dim = "dev_intrcnt", .enabled = 1, .func = do_vm_stats_sys_v_intr },
-        { .name = "vm.stats.sys.v_soft", .dim = "dev_intrcnt", .enabled = 1, .func = do_vm_stats_sys_v_soft },
-        { .name = "vm.stats.sys.v_swtch", .dim = "dev_intrcnt", .enabled = 1, .func = do_vm_stats_sys_v_swtch },
+        { .name = "hw.intrcnt", .dim = "hw_intr", .enabled = 1, .func = do_hw_intcnt },
+        { .name = "vm.stats.sys.v_intr", .dim = "dev_intr", .enabled = 1, .func = do_vm_stats_sys_v_intr },
+        { .name = "vm.stats.sys.v_soft", .dim = "soft_intr", .enabled = 1, .func = do_vm_stats_sys_v_soft },
+        { .name = "vm.stats.sys.v_swtch", .dim = "context_swtch", .enabled = 1, .func = do_vm_stats_sys_v_swtch },
+        { .name = "vm.stats.vm.v_forks", .dim = "forks", .enabled = 1, .func = do_vm_stats_sys_v_forks },
 
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
