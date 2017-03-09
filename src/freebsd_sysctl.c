@@ -576,7 +576,6 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
-        st = rrdset_find_bytype_localhost("system", "ctxt");
         if (unlikely(!st)) {
             st = rrdset_create_localhost("system",
                                          "ctxt",
@@ -602,6 +601,47 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// vm.stats.vm.v_forks
+
+int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
+    static int mib[4] = {0, 0, 0, 0};
+    u_int forks_number;
+
+    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_forks", mib, forks_number))) {
+        error("DISABLED: system.forks chart");
+        error("DISABLED: vm.stats.sys.v_swtch module");
+        return 1;
+    } else {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("system",
+                                         "forks",
+                                         NULL,
+                                         "processes",
+                                         NULL,
+                                         "Started Processes",
+                                         "processes/s",
+                                         700,
+                                         update_every,
+                                         RRDSET_TYPE_LINE
+            );
+
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd = rrddim_add(st, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd, forks_number);
+        rrdset_done(st);
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 // NEEDED BY: do_disk_io
@@ -611,7 +651,7 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
-    static int do_forks = -1, do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
+    static int do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
@@ -623,7 +663,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         do_icmp6_neighbor = -1, do_icmp6_types = -1, do_space = -1, do_inodes = -1, do_uptime = -1;
 
     if (unlikely(do_uptime == -1)) {
-        do_forks                = config_get_boolean("plugin:freebsd:sysctl", "processes started", 1);
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
         do_swap                 = config_get_boolean("plugin:freebsd:sysctl", "system swap", 1);
         do_ram                  = config_get_boolean("plugin:freebsd:sysctl", "system ram", 1);
@@ -797,28 +836,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // NEEDED BY: do_uptime
     struct timespec up_time;
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_forks)) {
-        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.vm.v_forks", u_int_data))) {
-            do_forks = 0;
-            error("DISABLED: system.forks");
-        } else {
-
-            st = rrdset_find_bytype_localhost("system", "forks");
-            if (unlikely(!st)) {
-                st = rrdset_create_localhost("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s", 700, update_every, RRDSET_TYPE_LINE);
-                rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
-                rrddim_add(st, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "started", u_int_data);
-            rrdset_done(st);
-        }
-    }
 
     // --------------------------------------------------------------------
 
