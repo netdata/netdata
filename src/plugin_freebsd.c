@@ -29,6 +29,7 @@ static struct freebsd_module {
         { .name = "vm.stats.vm.v_swappgs", .dim = "swap_io", .enabled = 1, .func = do_vm_stats_sys_v_swappgs },
         { .name = "kern.ipc.sem", .dim = "semaphores", .enabled = 1, .func = do_kern_ipc_sem },
         { .name = "kern.ipc.shm", .dim = "shared_memory", .enabled = 1, .func = do_kern_ipc_shm },
+        { .name = "kern.ipc.msq", .dim = "message_queues", .enabled = 1, .func = do_kern_ipc_msq },
 
         // CPU metrics
         { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },

@@ -22,6 +22,7 @@ extern int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt);
 extern int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt);
 extern int do_kern_ipc_sem(int update_every, usec_t dt);
 extern int do_kern_ipc_shm(int update_every, usec_t dt);
+extern int do_kern_ipc_msq(int update_every, usec_t dt);
 
 extern int do_freebsd_sysctl_old(int update_every, usec_t dt);
 
