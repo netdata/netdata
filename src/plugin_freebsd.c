@@ -25,6 +25,7 @@ static struct freebsd_module {
         { .name = "vm.stats.sys.v_soft", .dim = "soft_intr", .enabled = 1, .func = do_vm_stats_sys_v_soft },
         { .name = "vm.stats.sys.v_swtch", .dim = "context_swtch", .enabled = 1, .func = do_vm_stats_sys_v_swtch },
         { .name = "vm.stats.vm.v_forks", .dim = "forks", .enabled = 1, .func = do_vm_stats_sys_v_forks },
+        { .name = "vm.swap_info", .dim = "swap", .enabled = 1, .func = do_vm_swap_info },
 
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }

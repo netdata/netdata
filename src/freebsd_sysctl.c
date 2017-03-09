@@ -534,6 +534,9 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
         error("DISABLED: vm.stats.sys.v_soft module");
         return 1;
     } else {
+
+        // --------------------------------------------------------------------
+
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
@@ -573,6 +576,9 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
         error("DISABLED: vm.stats.sys.v_swtch module");
         return 1;
     } else {
+
+        // --------------------------------------------------------------------
+
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
@@ -612,6 +618,9 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
         error("DISABLED: vm.stats.sys.v_swtch module");
         return 1;
     } else {
+
+        // --------------------------------------------------------------------
+
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
@@ -642,6 +651,81 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// vm.swap_info
+
+int do_vm_swap_info(int update_every, usec_t dt) {
+    static int mib[3] = {0, 0, 0};
+
+    if (unlikely(getsysctl_mib("vm.swap_info", mib, 2))) {
+        error("DISABLED: system.swap chart");
+        error("DISABLED: vm.swap_info module");
+        return 1;
+    } else {
+        int i;
+        struct xswdev xsw;
+        struct total_xsw {
+            collected_number bytes_used;
+            collected_number bytes_total;
+        } total_xsw = {0, 0};
+
+        for (i = 0; ; i++) {
+            size_t size;
+
+            mib[2] = i;
+            size = sizeof(xsw);
+            if (unlikely(sysctl(mib, 3, &xsw, &size, NULL, 0) == -1 )) {
+                if (unlikely(errno != ENOENT)) {
+                    error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
+                    error("DISABLED: system.swap chart");
+                    error("DISABLED: vm.swap_info module");
+                    return 1;
+                } else {
+                    if (unlikely(size != sizeof(xsw))) {
+                        error("FREEBSD: sysctl(%s...) expected %lu, got %lu", "vm.swap_info", (unsigned long)sizeof(xsw), (unsigned long)size);
+                        error("DISABLED: system.swap chart");
+                        error("DISABLED: vm.swap_info module");
+                        return 1;
+                    } else break;
+                }
+            }
+            total_xsw.bytes_used += xsw.xsw_used;
+            total_xsw.bytes_total += xsw.xsw_nblks;
+        }
+
+        // --------------------------------------------------------------------
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_free = NULL, *rd_used = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("system",
+                                         "swap",
+                                         NULL,
+                                         "swap",
+                                         NULL,
+                                         "System Swap",
+                                         "MB",
+                                         201,
+                                         update_every,
+                                         RRDSET_TYPE_STACKED
+            );
+
+            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+            rd_free = rrddim_add(st, "free",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+            rd_used = rrddim_add(st, "used",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_free, total_xsw.bytes_total - total_xsw.bytes_used);
+        rrddim_set_by_pointer(st, rd_used, total_xsw.bytes_used);
+        rrdset_done(st);
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 // NEEDED BY: do_disk_io
@@ -651,7 +735,7 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
-    static int do_disk_io = -1, do_swap = -1, do_ram = -1, do_swapio = -1,
+    static int do_disk_io = -1, do_ram = -1, do_swapio = -1,
         do_pgfaults = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
@@ -664,7 +748,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     if (unlikely(do_uptime == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_swap                 = config_get_boolean("plugin:freebsd:sysctl", "system swap", 1);
         do_ram                  = config_get_boolean("plugin:freebsd:sysctl", "system ram", 1);
         do_swapio               = config_get_boolean("plugin:freebsd:sysctl", "swap i/o", 1);
         do_pgfaults             = config_get_boolean("plugin:freebsd:sysctl", "memory page faults", 1);
@@ -739,15 +822,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         collected_number duration_write_ms;
         collected_number busy_time_ms;
     } prev_dstat;
-
-    // NEEDED BY: do_swap
-    size_t mibsize;
-    int mib[3]; // CTL_MAXNAME = 24 maximum mib components (sysctl.h)
-    struct xswdev xsw;
-    struct total_xsw {
-        collected_number bytes_used;
-        collected_number bytes_total;
-    } total_xsw = {0, 0};
 
     // NEEDED BY: do_swapio, do_ram
     struct vmmeter vmmeter_data;
@@ -1010,54 +1084,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
                 rrddim_set(st, "in", total_disk_kbytes_read);
                 rrddim_set(st, "out", total_disk_kbytes_write);
-                rrdset_done(st);
-            }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-
-    if (likely(do_swap)) {
-        mibsize = sizeof mib / sizeof mib[0];
-        if (unlikely(sysctlnametomib("vm.swap_info", mib, &mibsize) == -1)) {
-            error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
-            do_swap = 0;
-            error("DISABLED: system.swap");
-        } else {
-            for (i = 0; ; i++) {
-                mib[mibsize] = i;
-                size = sizeof(xsw);
-                if (unlikely(sysctl(mib, mibsize + 1, &xsw, &size, NULL, 0) == -1 )) {
-                    if (unlikely(errno != ENOENT)) {
-                        error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
-                        do_swap = 0;
-                        error("DISABLED: system.swap");
-                    } else {
-                        if (unlikely(size != sizeof(xsw))) {
-                            error("FREEBSD: sysctl(%s...) expected %lu, got %lu", "vm.swap_info", (unsigned long)sizeof(xsw), (unsigned long)size);
-                            do_swap = 0;
-                            error("DISABLED: system.swap");
-                        } else break;
-                    }
-                }
-                total_xsw.bytes_used += xsw.xsw_used;
-                total_xsw.bytes_total += xsw.xsw_nblks;
-            }
-
-            if (likely(do_swap)) {
-                st = rrdset_find_localhost("system.swap");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every, RRDSET_TYPE_STACKED);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
-                    rrddim_add(st, "free",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                    rrddim_add(st, "used",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "used", total_xsw.bytes_used);
-                rrddim_set(st, "free", total_xsw.bytes_total - total_xsw.bytes_used);
                 rrdset_done(st);
             }
         }
