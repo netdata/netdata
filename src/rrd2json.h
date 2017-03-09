@@ -33,9 +33,11 @@
 
 #define ALLMETRICS_FORMAT_SHELL "shell"
 #define ALLMETRICS_FORMAT_PROMETHEUS "prometheus"
+#define ALLMETRICS_FORMAT_JSON "json"
 
 #define ALLMETRICS_SHELL 1
 #define ALLMETRICS_PROMETHEUS 2
+#define ALLMETRICS_JSON 3
 
 #define GROUP_UNDEFINED         0
 #define GROUP_AVERAGE           1
@@ -61,6 +63,7 @@
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb);
 
+extern void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb);
 extern void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb);
 extern void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb);
 
