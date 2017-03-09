@@ -23,6 +23,7 @@ static struct freebsd_module {
         { .name = "hw.intrcnt", .dim = "hw_intrcnt", .enabled = 1, .func = do_hw_intcnt },
         { .name = "vm.stats.sys.v_intr", .dim = "dev_intrcnt", .enabled = 1, .func = do_vm_stats_sys_v_intr },
         { .name = "vm.stats.sys.v_soft", .dim = "dev_intrcnt", .enabled = 1, .func = do_vm_stats_sys_v_soft },
+        { .name = "vm.stats.sys.v_swtch", .dim = "dev_intrcnt", .enabled = 1, .func = do_vm_stats_sys_v_swtch },
 
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
