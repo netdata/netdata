@@ -19,7 +19,6 @@ static struct freebsd_module {
         { .name = "vm.loadavg", .dim = "loadavg", .enabled = 1, .func = do_vm_loadavg },
         { .name = "vm.vmtotal", .dim = "vmtotal", .enabled = 1, .func = do_vm_vmtotal },
         { .name = "kern.cp_time", .dim = "cp_time", .enabled = 1, .func = do_kern_cp_time },
-        { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },
         { .name = "hw.intrcnt", .dim = "hw_intr", .enabled = 1, .func = do_hw_intcnt },
         { .name = "vm.stats.sys.v_intr", .dim = "dev_intr", .enabled = 1, .func = do_vm_stats_sys_v_intr },
         { .name = "vm.stats.sys.v_soft", .dim = "soft_intr", .enabled = 1, .func = do_vm_stats_sys_v_soft },
@@ -28,6 +27,12 @@ static struct freebsd_module {
         { .name = "vm.swap_info", .dim = "swap", .enabled = 1, .func = do_vm_swap_info },
         { .name = "system.ram", .dim = "system_ram", .enabled = 1, .func = do_system_ram },
         { .name = "vm.stats.vm.v_swappgs", .dim = "swap_io", .enabled = 1, .func = do_vm_stats_sys_v_swappgs },
+
+        // CPU metrics
+        { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },
+
+        // memory metrics
+        { .name = "vm.stats.vm.v_pgfaults", .dim = "pgfaults", .enabled = 1, .func = do_vm_stats_sys_v_pgfaults },
 
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
