@@ -1071,11 +1071,128 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// kern.ipc.msq
+
+int do_kern_ipc_msq(int update_every, usec_t dt) {
+    static int mib_msgmni[3] = {0, 0, 0}, mib_msqids[3] = {0, 0, 0};
+    struct ipc_msq {
+        int msgmni;
+        collected_number queues;
+        collected_number messages;
+        collected_number usedsize;
+        collected_number allocsize;
+    } ipc_msq = {0, 0, 0, 0, 0};
+
+    if (unlikely(GETSYSCTL_SIMPLE("kern.ipc.msgmni", mib_msgmni, ipc_msq.msgmni))) {
+        error("DISABLED: system.ipc_msq_queues chart");
+        error("DISABLED: system.ipc_msq_messages chart");
+        error("DISABLED: system.ipc_msq_size chart");
+        error("DISABLED: kern.ipc.msg module");
+        return 1;
+    } else {
+        static struct msqid_kernel *ipc_msq_data = NULL;
+
+        ipc_msq_data = reallocz(ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni);
+        if (unlikely(
+                GETSYSCTL_WSIZE("kern.ipc.msqids", mib_msqids, ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni))) {
+            error("DISABLED: system.ipc_msq_queues chart");
+            error("DISABLED: system.ipc_msq_messages chart");
+            error("DISABLED: system.ipc_msq_size chart");
+            error("DISABLED: kern.ipc.msg module");
+            return 1;
+        } else {
+            int i;
+
+            for (i = 0; i < ipc_msq.msgmni; i++) {
+                if (unlikely(ipc_msq_data[i].u.msg_qbytes != 0)) {
+                    ipc_msq.queues += 1;
+                    ipc_msq.messages += ipc_msq_data[i].u.msg_qnum;
+                    ipc_msq.usedsize += ipc_msq_data[i].u.msg_cbytes;
+                    ipc_msq.allocsize += ipc_msq_data[i].u.msg_qbytes;
+                }
+            }
+
+            // --------------------------------------------------------------------
+
+            static RRDSET *st_queues = NULL, *st_messages = NULL, *st_size = NULL;
+            static RRDDIM *rd_queues = NULL, *rd_messages = NULL, *rd_allocated = NULL, *rd_used = NULL;
+
+            if (unlikely(!st_queues)) {
+                st_queues = rrdset_create_localhost("system",
+                                                    "ipc_msq_queues",
+                                                    NULL,
+                                                    "ipc message queues",
+                                                    NULL,
+                                                    "Number of IPC Message Queues",
+                                                    "queues",
+                                                    990,
+                                                    localhost->rrd_update_every,
+                                                    RRDSET_TYPE_AREA
+                );
+
+                rd_queues = rrddim_add(st_queues, "queues", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(st_queues);
+
+            rrddim_set_by_pointer(st_queues, rd_queues, ipc_msq.queues);
+            rrdset_done(st_queues);
+
+            // --------------------------------------------------------------------
+
+            if (unlikely(!st_messages)) {
+                st_messages = rrdset_create_localhost("system",
+                                                      "ipc_msq_messages",
+                                                      NULL,
+                                                      "ipc message queues",
+                                                      NULL,
+                                                      "Number of Messages in IPC Message Queues",
+                                                      "messages",
+                                                      1000,
+                                                      localhost->rrd_update_every,
+                                                      RRDSET_TYPE_AREA
+                );
+
+                rd_messages = rrddim_add(st_messages, "messages", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(st_messages);
+
+            rrddim_set_by_pointer(st_messages, rd_messages, ipc_msq.messages);
+            rrdset_done(st_messages);
+
+            // --------------------------------------------------------------------
+
+            if (unlikely(!st_size)) {
+                st_size = rrdset_create_localhost("system",
+                                             "ipc_msq_size",
+                                             NULL,
+                                             "ipc message queues",
+                                             NULL,
+                                             "Size of IPC Message Queues",
+                                             "bytes",
+                                             1100,
+                                             localhost->rrd_update_every,
+                                             RRDSET_TYPE_LINE
+                );
+
+                rd_allocated = rrddim_add(st_size, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_used = rrddim_add(st_size, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(st_size);
+
+            rrddim_set_by_pointer(st_size, rd_allocated, ipc_msq.allocsize);
+            rrddim_set_by_pointer(st_size, rd_used, ipc_msq.usedsize);
+            rrdset_done(st_size);
+        }
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     static int do_disk_io = -1,
-        do_ipc_msg_queues = -1,
         do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
         do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
@@ -1087,7 +1204,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     if (unlikely(do_uptime == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_ipc_msg_queues       = config_get_boolean("plugin:freebsd:sysctl", "ipc message queues", 1);
         do_netisr               = config_get_boolean("plugin:freebsd:sysctl", "netisr", 1);
         do_netisr_per_core      = config_get_boolean("plugin:freebsd:sysctl", "netisr per core", 1);
         do_bandwidth            = config_get_boolean("plugin:freebsd:sysctl", "bandwidth", 1);
@@ -1154,16 +1270,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         collected_number duration_write_ms;
         collected_number busy_time_ms;
     } prev_dstat;
-
-    // NEEDED BY: do_ipc_msg_queues
-    struct ipc_msq {
-        int msgmni;
-        collected_number queues;
-        collected_number messages;
-        collected_number usedsize;
-        collected_number allocsize;
-    } ipc_msq = {0, 0, 0, 0, 0};
-    static struct msqid_kernel *ipc_msq_data = NULL;
 
     // NEEDED BY: do_netisr, do_netisr_per_core
     size_t netisr_workstream_size;
@@ -1396,74 +1502,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
                 rrddim_set(st, "in", total_disk_kbytes_read);
                 rrddim_set(st, "out", total_disk_kbytes_write);
                 rrdset_done(st);
-            }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_ipc_msg_queues)) {
-        if (unlikely(GETSYSCTL_BY_NAME("kern.ipc.msgmni", ipc_msq.msgmni))) {
-            do_ipc_msg_queues = 0;
-            error("DISABLED: system.ipc_msq_queues");
-            error("DISABLED: system.ipc_msq_messages");
-            error("DISABLED: system.ipc_msq_size");
-        } else {
-            ipc_msq_data = reallocz(ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni);
-            if (unlikely(
-                    getsysctl_by_name("kern.ipc.msqids", ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni))) {
-                do_ipc_msg_queues = 0;
-                error("DISABLED: system.ipc_msq_queues");
-                error("DISABLED: system.ipc_msq_messages");
-                error("DISABLED: system.ipc_msq_size");
-            } else {
-                for (i = 0; i < ipc_msq.msgmni; i++) {
-                    if (unlikely(ipc_msq_data[i].u.msg_qbytes != 0)) {
-                        ipc_msq.queues += 1;
-                        ipc_msq.messages += ipc_msq_data[i].u.msg_qnum;
-                        ipc_msq.usedsize += ipc_msq_data[i].u.msg_cbytes;
-                        ipc_msq.allocsize += ipc_msq_data[i].u.msg_qbytes;
-                    }
-                }
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_localhost("system.ipc_msq_queues");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_msq_queues", NULL, "ipc message queues", NULL, "Number of IPC Message Queues", "queues", 990, localhost->rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "queues", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "queues", ipc_msq.queues);
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_localhost("system.ipc_msq_messages");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_msq_messages", NULL, "ipc message queues", NULL, "Number of Messages in IPC Message Queues", "messages", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "messages", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "messages", ipc_msq.messages);
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_localhost("system.ipc_msq_size");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_msq_size", NULL, "ipc message queues", NULL, "Size of IPC Message Queues", "bytes", 1100, localhost->rrd_update_every, RRDSET_TYPE_LINE);
-                    rrddim_add(st, "allocated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    rrddim_add(st, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "allocated", ipc_msq.allocsize);
-                rrddim_set(st, "used", ipc_msq.usedsize);
-                rrdset_done(st);
-
             }
         }
     }
