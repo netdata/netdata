@@ -983,11 +983,99 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// kern.ipc.shm
+
+int do_kern_ipc_shm(int update_every, usec_t dt) {
+    static int mib_shmmni[3] = {0, 0, 0}, mib_shmsegs[3] = {0, 0, 0};
+    struct ipc_shm {
+        u_long shmmni;
+        collected_number segs;
+        collected_number segsize;
+    } ipc_shm = {0, 0, 0};
+
+    if (unlikely(GETSYSCTL_SIMPLE("kern.ipc.shmmni", mib_shmmni, ipc_shm.shmmni))) {
+        error("DISABLED: system.ipc_shared_mem_segs chart");
+        error("DISABLED: system.ipc_shared_mem_size chart");
+        error("DISABLED: kern.ipc.shmmodule");
+        return 1;
+    } else {
+        static struct shmid_kernel *ipc_shm_data = NULL;
+
+        ipc_shm_data = reallocz(ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni);
+        if (unlikely(
+                GETSYSCTL_WSIZE("kern.ipc.shmsegs", mib_shmsegs, ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni))) {
+            error("DISABLED: system.ipc_shared_mem_segs chart");
+            error("DISABLED: system.ipc_shared_mem_size chart");
+            error("DISABLED: kern.ipc.shmmodule");
+            return 1;
+        } else {
+            int i;
+
+            for (i = 0; i < ipc_shm.shmmni; i++) {
+                if (unlikely(ipc_shm_data[i].u.shm_perm.mode & 0x0800)) {
+                    ipc_shm.segs += 1;
+                    ipc_shm.segsize += ipc_shm_data[i].u.shm_segsz;
+                }
+            }
+
+            // --------------------------------------------------------------------
+
+            static RRDSET *st_segs = NULL, *st_size = NULL;
+            static RRDDIM *rd_segments = NULL, *rd_allocated = NULL;
+
+            if (unlikely(!st_segs)) {
+                st_segs = rrdset_create_localhost("system",
+                                             "ipc_shared_mem_segs",
+                                             NULL,
+                                             "ipc shared memory",
+                                             NULL,
+                                             "IPC Shared Memory Segments",
+                                             "segments",
+                                             1000,
+                                             localhost->rrd_update_every,
+                                             RRDSET_TYPE_AREA
+                );
+
+                rd_segments = rrddim_add(st_segs, "segments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(st_segs);
+
+            rrddim_set_by_pointer(st_segs, rd_segments, ipc_shm.segs);
+            rrdset_done(st_segs);
+
+            // --------------------------------------------------------------------
+
+            if (unlikely(!st_size)) {
+                st_size = rrdset_create_localhost("system",
+                                             "ipc_shared_mem_size",
+                                             NULL,
+                                             "ipc shared memory",
+                                             NULL,
+                                             "IPC Shared Memory Segments Size",
+                                             "kilobytes",
+                                             1000,
+                                             localhost->rrd_update_every,
+                                             RRDSET_TYPE_AREA
+                );
+
+                rd_allocated = rrddim_add(st_size, "allocated", NULL, 1, KILO_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(st_size);
+
+            rrddim_set_by_pointer(st_size, rd_allocated, ipc_shm.segsize);
+            rrdset_done(st_size);
+        }
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     static int do_disk_io = -1,
-        do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
+        do_ipc_msg_queues = -1,
         do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
         do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
@@ -999,7 +1087,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     if (unlikely(do_uptime == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_ipc_shared_mem       = config_get_boolean("plugin:freebsd:sysctl", "ipc shared memory", 1);
         do_ipc_msg_queues       = config_get_boolean("plugin:freebsd:sysctl", "ipc message queues", 1);
         do_netisr               = config_get_boolean("plugin:freebsd:sysctl", "netisr", 1);
         do_netisr_per_core      = config_get_boolean("plugin:freebsd:sysctl", "netisr per core", 1);
@@ -1067,14 +1154,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         collected_number duration_write_ms;
         collected_number busy_time_ms;
     } prev_dstat;
-
-    // NEEDED BY: do_ipc_shared_mem
-    struct ipc_shm {
-        u_long shmmni;
-        collected_number segs;
-        collected_number segsize;
-    } ipc_shm = {0, 0, 0};
-    static struct shmid_kernel *ipc_shm_data = NULL;
 
     // NEEDED BY: do_ipc_msg_queues
     struct ipc_msq {
@@ -1316,55 +1395,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
                 rrddim_set(st, "in", total_disk_kbytes_read);
                 rrddim_set(st, "out", total_disk_kbytes_write);
-                rrdset_done(st);
-            }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_ipc_shared_mem)) {
-        if (unlikely(GETSYSCTL_BY_NAME("kern.ipc.shmmni", ipc_shm.shmmni))) {
-            do_ipc_shared_mem = 0;
-            error("DISABLED: system.ipc_shared_mem_segs");
-            error("DISABLED: system.ipc_shared_mem_size");
-        } else {
-            ipc_shm_data = reallocz(ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni);
-            if (unlikely(
-                    getsysctl_by_name("kern.ipc.shmsegs", ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni))) {
-                do_ipc_shared_mem = 0;
-                error("DISABLED: system.ipc_shared_mem_segs");
-                error("DISABLED: system.ipc_shared_mem_size");
-            } else {
-                for (i = 0; i < ipc_shm.shmmni; i++) {
-                    if (unlikely(ipc_shm_data[i].u.shm_perm.mode & 0x0800)) {
-                        ipc_shm.segs += 1;
-                        ipc_shm.segsize += ipc_shm_data[i].u.shm_segsz;
-                    }
-                }
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_localhost("system.ipc_shared_mem_segs");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_shared_mem_segs", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments", "segments", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "segments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "segments", ipc_shm.segs);
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_localhost("system.ipc_shared_mem_size");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipc_shared_mem_size", NULL, "ipc shared memory", NULL, "IPC Shared Memory Segments Size", "kilobytes", 1000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
-                    rrddim_add(st, "allocated", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "allocated", ipc_shm.segsize);
                 rrdset_done(st);
             }
         }
