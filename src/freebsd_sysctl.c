@@ -1225,11 +1225,178 @@ int do_uptime(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// net.isr
+
+int do_net_isr(int update_every, usec_t dt) {
+    static int do_netisr = -1, do_netisr_per_core = -1;
+
+    if (unlikely(do_netisr == -1)) {
+        do_netisr = config_get_boolean("plugin:freebsd:sysctl", "netisr", 1);
+        do_netisr_per_core = config_get_boolean("plugin:freebsd:sysctl", "netisr per core", 1);
+    }
+
+    static int mib_workstream[3] = {0, 0, 0}, mib_work[3] = {0, 0, 0};
+    int common_error = 0;
+    int i, n;
+    size_t netisr_workstream_size, netisr_work_size;
+    unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
+    static struct sysctl_netisr_workstream *netisr_workstream = NULL;
+    static struct sysctl_netisr_work *netisr_work = NULL;
+    static struct netisr_stats {
+        collected_number dispatched;
+        collected_number hybrid_dispatched;
+        collected_number qdrops;
+        collected_number queued;
+    } *netisr_stats = NULL;
+
+    if (likely(do_netisr || do_netisr_per_core)) {
+        if (unlikely(GETSYSCTL_SIZE("net.isr.workstream", mib_workstream, netisr_workstream_size))) {
+            common_error = 1;
+        } else if (unlikely(GETSYSCTL_SIZE("net.isr.work", mib_work, netisr_work_size))) {
+            common_error = 1;
+        } else {
+            num_netisr_workstreams = netisr_workstream_size / sizeof(struct sysctl_netisr_workstream);
+            netisr_workstream = reallocz(netisr_workstream, num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream));
+            if (unlikely(GETSYSCTL_WSIZE("net.isr.workstream", mib_workstream, netisr_workstream,
+                                           num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream)))){
+                common_error = 1;
+            } else {
+                num_netisr_works = netisr_work_size / sizeof(struct sysctl_netisr_work);
+                netisr_work = reallocz(netisr_work, num_netisr_works * sizeof(struct sysctl_netisr_work));
+                if (unlikely(GETSYSCTL_WSIZE("net.isr.work", mib_work, netisr_work,
+                                               num_netisr_works * sizeof(struct sysctl_netisr_work)))){
+                    common_error = 1;
+                }
+            }
+        }
+        if (unlikely(common_error)) {
+            do_netisr = 0;
+            error("DISABLED: system.softnet_stat chart");
+            do_netisr_per_core = 0;
+            error("DISABLED: system.cpuX_softnet_stat chart");
+            common_error = 0;
+            error("DISABLED: net.isr module");
+            return 1;
+        } else {
+            netisr_stats = reallocz(netisr_stats, (number_of_cpus + 1) * sizeof(struct netisr_stats));
+            bzero(netisr_stats, (number_of_cpus + 1) * sizeof(struct netisr_stats));
+            for (i = 0; i < num_netisr_workstreams; i++) {
+                for (n = 0; n < num_netisr_works; n++) {
+                    if (netisr_workstream[i].snws_wsid == netisr_work[n].snw_wsid) {
+                        netisr_stats[netisr_workstream[i].snws_cpu].dispatched += netisr_work[n].snw_dispatched;
+                        netisr_stats[netisr_workstream[i].snws_cpu].hybrid_dispatched += netisr_work[n].snw_hybrid_dispatched;
+                        netisr_stats[netisr_workstream[i].snws_cpu].qdrops += netisr_work[n].snw_qdrops;
+                        netisr_stats[netisr_workstream[i].snws_cpu].queued += netisr_work[n].snw_queued;
+                    }
+                }
+            }
+            for (i = 0; i < number_of_cpus; i++) {
+                netisr_stats[number_of_cpus].dispatched += netisr_stats[i].dispatched;
+                netisr_stats[number_of_cpus].hybrid_dispatched += netisr_stats[i].hybrid_dispatched;
+                netisr_stats[number_of_cpus].qdrops += netisr_stats[i].qdrops;
+                netisr_stats[number_of_cpus].queued += netisr_stats[i].queued;
+            }
+        }
+    } else {
+        error("DISABLED: net.isr module");
+        return 1;
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_netisr)) {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_dispatched = NULL, *rd_hybrid_dispatched = NULL, *rd_qdrops = NULL, *rd_queued = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("system",
+                                         "softnet_stat",
+                                         NULL,
+                                         "softnet_stat",
+                                         NULL,
+                                         "System softnet_stat",
+                                         "events/s",
+                                         955,
+                                         update_every,
+                                         RRDSET_TYPE_LINE
+            );
+
+            rd_dispatched        = rrddim_add(st, "dispatched",        NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_hybrid_dispatched = rrddim_add(st, "hybrid_dispatched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_qdrops            = rrddim_add(st, "qdrops",            NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_queued            = rrddim_add(st, "queued",            NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_dispatched,        netisr_stats[number_of_cpus].dispatched);
+        rrddim_set_by_pointer(st, rd_hybrid_dispatched, netisr_stats[number_of_cpus].hybrid_dispatched);
+        rrddim_set_by_pointer(st, rd_qdrops,            netisr_stats[number_of_cpus].qdrops);
+        rrddim_set_by_pointer(st, rd_queued,            netisr_stats[number_of_cpus].queued);
+        rrdset_done(st);
+    }
+
+    // --------------------------------------------------------------------
+
+    if (likely(do_netisr_per_core)) {
+        static struct softnet_chart {
+            char netisr_cpuid[MAX_INT_DIGITS + 17];
+            RRDSET *st;
+            RRDDIM *rd_dispatched;
+            RRDDIM *rd_hybrid_dispatched;
+            RRDDIM *rd_qdrops;
+            RRDDIM *rd_queued;
+        } *all_softnet_charts = NULL;
+
+        all_softnet_charts = reallocz(all_softnet_charts, sizeof(struct softnet_chart) * number_of_cpus);
+
+        for (i = 0; i < number_of_cpus ;i++) {
+            snprintfz(all_softnet_charts[i].netisr_cpuid, MAX_INT_DIGITS + 17, "cpu%d_softnet_stat", i);
+
+            if (unlikely(!all_softnet_charts[i].st)) {
+                all_softnet_charts[i].st = rrdset_create_localhost("cpu",
+                                                                   all_softnet_charts[i].netisr_cpuid,
+                                                                   NULL,
+                                                                   "softnet_stat",
+                                                                   NULL,
+                                                                   "Per CPU netisr statistics",
+                                                                   "events/s",
+                                                                   1101 + i,
+                                                                   update_every,
+                                                                   RRDSET_TYPE_LINE
+                );
+
+                all_softnet_charts[i].rd_dispatched        = rrddim_add(all_softnet_charts[i].st, "dispatched",
+                                                                NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                all_softnet_charts[i].rd_hybrid_dispatched = rrddim_add(all_softnet_charts[i].st, "hybrid_dispatched",
+                                                                NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                all_softnet_charts[i].rd_qdrops            = rrddim_add(all_softnet_charts[i].st, "qdrops",
+                                                                NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                all_softnet_charts[i].rd_queued            = rrddim_add(all_softnet_charts[i].st, "queued",
+                                                                NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            else rrdset_next(all_softnet_charts[i].st);
+
+            rrddim_set_by_pointer(all_softnet_charts[i].st, all_softnet_charts[i].rd_dispatched,
+                                  netisr_stats[i].dispatched);
+            rrddim_set_by_pointer(all_softnet_charts[i].st, all_softnet_charts[i].rd_hybrid_dispatched,
+                                  netisr_stats[i].hybrid_dispatched);
+            rrddim_set_by_pointer(all_softnet_charts[i].st, all_softnet_charts[i].rd_qdrops,
+                                  netisr_stats[i].qdrops);
+            rrddim_set_by_pointer(all_softnet_charts[i].st, all_softnet_charts[i].rd_queued,
+                                  netisr_stats[i].queued);
+            rrdset_done(all_softnet_charts[i].st);
+        }
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     static int do_disk_io = -1,
-        do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
+        do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
         do_ecn = -1, do_tcpext_syscookies = -1, do_tcpext_ofo = -1, do_tcpext_connaborts = -1,
         do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1,
@@ -1240,8 +1407,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     if (unlikely(do_disk_io == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_netisr               = config_get_boolean("plugin:freebsd:sysctl", "netisr", 1);
-        do_netisr_per_core      = config_get_boolean("plugin:freebsd:sysctl", "netisr per core", 1);
         do_bandwidth            = config_get_boolean("plugin:freebsd:sysctl", "bandwidth", 1);
         do_tcp_sockets          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 TCP connections", 1);
         do_tcp_packets          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 TCP packets", 1);
@@ -1276,9 +1441,7 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     RRDSET *st;
 
-    int ncpus;
-    int i, n;
-    int common_error = 0;
+    int i;
     char title[4096 + 1];
 
     // NEEDED BY: do_disk_io
@@ -1302,20 +1465,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         collected_number duration_write_ms;
         collected_number busy_time_ms;
     } prev_dstat;
-
-    // NEEDED BY: do_netisr, do_netisr_per_core
-    size_t netisr_workstream_size;
-    size_t netisr_work_size;
-    unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
-    static struct sysctl_netisr_workstream *netisr_workstream = NULL;
-    static struct sysctl_netisr_work *netisr_work = NULL;
-    static struct netisr_stats {
-        collected_number dispatched;
-        collected_number hybrid_dispatched;
-        collected_number qdrops;
-        collected_number queued;
-    } *netisr_stats = NULL;
-    char netstat_cpuid[21]; // no more than 4 digits expected
 
     // NEEDED BY: do_bandwidth
     #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
@@ -1532,104 +1681,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
                 rrddim_set(st, "out", total_disk_kbytes_write);
                 rrdset_done(st);
             }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_netisr || do_netisr_per_core)) {
-        if (unlikely(GETSYSCTL_BY_NAME("kern.smp.cpus", ncpus))) {
-            common_error = 1;
-        } else if (unlikely(sysctlbyname("net.isr.workstream", NULL, &netisr_workstream_size, NULL, 0) == -1)) {
-            error("FREEBSD: sysctl(net.isr.workstream...) failed: %s", strerror(errno));
-            common_error = 1;
-        } else if (unlikely(sysctlbyname("net.isr.work", NULL, &netisr_work_size, NULL, 0) == -1)) {
-            error("FREEBSD: sysctl(net.isr.work...) failed: %s", strerror(errno));
-            common_error = 1;
-        } else {
-            num_netisr_workstreams = netisr_workstream_size / sizeof(struct sysctl_netisr_workstream);
-            netisr_workstream = reallocz(netisr_workstream, num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream));
-            if (unlikely(getsysctl_by_name("net.isr.workstream", netisr_workstream,
-                                           num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream)))){
-                common_error = 1;
-            } else {
-                num_netisr_works = netisr_work_size / sizeof(struct sysctl_netisr_work);
-                netisr_work = reallocz(netisr_work, num_netisr_works * sizeof(struct sysctl_netisr_work));
-                if (unlikely(getsysctl_by_name("net.isr.work", netisr_work,
-                                               num_netisr_works * sizeof(struct sysctl_netisr_work)))){
-                    common_error = 1;
-                }
-            }
-        }
-        if (unlikely(common_error)) {
-            do_netisr = 0;
-            error("DISABLED: system.softnet_stat");
-            do_netisr_per_core = 0;
-            error("DISABLED: system.cpuX_softnet_stat");
-            common_error = 0;
-        } else {
-            netisr_stats = reallocz(netisr_stats, (ncpus + 1) * sizeof(struct netisr_stats));
-            bzero(netisr_stats, (ncpus + 1) * sizeof(struct netisr_stats));
-            for (i = 0; i < num_netisr_workstreams; i++) {
-                for (n = 0; n < num_netisr_works; n++) {
-                    if (netisr_workstream[i].snws_wsid == netisr_work[n].snw_wsid) {
-                        netisr_stats[netisr_workstream[i].snws_cpu].dispatched += netisr_work[n].snw_dispatched;
-                        netisr_stats[netisr_workstream[i].snws_cpu].hybrid_dispatched += netisr_work[n].snw_hybrid_dispatched;
-                        netisr_stats[netisr_workstream[i].snws_cpu].qdrops += netisr_work[n].snw_qdrops;
-                        netisr_stats[netisr_workstream[i].snws_cpu].queued += netisr_work[n].snw_queued;
-                    }
-                }
-            }
-            for (i = 0; i < ncpus; i++) {
-                netisr_stats[ncpus].dispatched += netisr_stats[i].dispatched;
-                netisr_stats[ncpus].hybrid_dispatched += netisr_stats[i].hybrid_dispatched;
-                netisr_stats[ncpus].qdrops += netisr_stats[i].qdrops;
-                netisr_stats[ncpus].queued += netisr_stats[i].queued;
-            }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_netisr)) {
-        st = rrdset_find_bytype_localhost("system", "softnet_stat");
-        if (unlikely(!st)) {
-            st = rrdset_create_localhost("system", "softnet_stat", NULL, "softnet_stat", NULL, "System softnet_stat", "events/s", 955, update_every, RRDSET_TYPE_LINE);
-            rrddim_add(st, "dispatched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "hybrid_dispatched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "qdrops", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-        else rrdset_next(st);
-
-        rrddim_set(st, "dispatched", netisr_stats[ncpus].dispatched);
-        rrddim_set(st, "hybrid_dispatched", netisr_stats[ncpus].hybrid_dispatched);
-        rrddim_set(st, "qdrops", netisr_stats[ncpus].qdrops);
-        rrddim_set(st, "queued", netisr_stats[ncpus].queued);
-        rrdset_done(st);
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_netisr_per_core)) {
-        for (i = 0; i < ncpus ;i++) {
-            snprintfz(netstat_cpuid, 21, "cpu%d_softnet_stat", i);
-
-            st = rrdset_find_bytype_localhost("cpu", netstat_cpuid);
-            if (unlikely(!st)) {
-                st = rrdset_create_localhost("cpu", netstat_cpuid, NULL, "softnet_stat", NULL, "Per CPU netisr statistics", "events/s", 1101 + i, update_every, RRDSET_TYPE_LINE);
-                rrddim_add(st, "dispatched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "hybrid_dispatched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "qdrops", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "dispatched", netisr_stats[i].dispatched);
-            rrddim_set(st, "hybrid_dispatched", netisr_stats[i].hybrid_dispatched);
-            rrddim_set(st, "qdrops", netisr_stats[i].qdrops);
-            rrddim_set(st, "queued", netisr_stats[i].queued);
-            rrdset_done(st);
         }
     }
 
