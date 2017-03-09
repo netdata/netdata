@@ -18,6 +18,7 @@ extern int do_vm_stats_sys_v_swtch(int update_every, usec_t dt);
 extern int do_vm_stats_sys_v_forks(int update_every, usec_t dt);
 extern int do_vm_swap_info(int update_every, usec_t dt);
 extern int do_system_ram(int update_every, usec_t dt);
+extern int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt);
 
 extern int do_freebsd_sysctl_old(int update_every, usec_t dt);
 

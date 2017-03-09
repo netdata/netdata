@@ -27,6 +27,7 @@ static struct freebsd_module {
         { .name = "vm.stats.vm.v_forks", .dim = "forks", .enabled = 1, .func = do_vm_stats_sys_v_forks },
         { .name = "vm.swap_info", .dim = "swap", .enabled = 1, .func = do_vm_swap_info },
         { .name = "system.ram", .dim = "system_ram", .enabled = 1, .func = do_system_ram },
+        { .name = "vm.stats.vm.v_swappgs", .dim = "swap_io", .enabled = 1, .func = do_vm_stats_sys_v_swappgs },
 
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
