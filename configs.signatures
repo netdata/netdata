@@ -232,6 +232,7 @@ declare -A configs_signatures=(
   ['846ce94bfeeb90c0dc6a89e8d25f1a68']='health.d/named.conf'
   ['8490f690d97adacc4e2096df82e7e8a5']='charts.d/cpufreq.conf'
   ['871bbeea33b83ea9755600b6d574919c']='python.d/web_log.conf'
+  ['87224d2f2b87646f3c0d38cc1eb30112']='python.d/nsd.conf'
   ['8810140ce9c09af1d18b9602c4003904']='health_alarm_notify.conf'
   ['88f77865f75c9fb61c97d700bd4561ee']='python.d/mysql.conf'
   ['8989b5e2f4ef9cd278ef58be0fae4074']='health.d/disks.conf'
