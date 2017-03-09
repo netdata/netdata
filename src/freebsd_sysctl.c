@@ -1189,6 +1189,42 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// uptime
+
+int do_uptime(int update_every, usec_t dt) {
+    struct timespec up_time;
+
+    clock_gettime(CLOCK_UPTIME, &up_time);
+
+    // --------------------------------------------------------------------
+
+    static RRDSET *st = NULL;
+    static RRDDIM *rd = NULL;
+
+    if(unlikely(!st)) {
+        st = rrdset_create_localhost("system",
+                                     "uptime",
+                                     NULL,
+                                     "uptime",
+                                     NULL,
+                                     "System Uptime",
+                                     "seconds",
+                                     1000,
+                                     update_every,
+                                     RRDSET_TYPE_LINE
+        );
+
+        rd = rrddim_add(st, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+    else rrdset_next(st);
+
+    rrddim_set_by_pointer(st, rd, up_time.tv_sec);
+    rrdset_done(st);
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
@@ -1200,9 +1236,9 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
         do_ip6_packets = -1, do_ip6_fragsout = -1, do_ip6_fragsin = -1, do_ip6_errors = -1,
         do_icmp6 = -1, do_icmp6_redir = -1, do_icmp6_errors = -1, do_icmp6_echos = -1, do_icmp6_router = -1,
-        do_icmp6_neighbor = -1, do_icmp6_types = -1, do_space = -1, do_inodes = -1, do_uptime = -1;
+        do_icmp6_neighbor = -1, do_icmp6_types = -1, do_space = -1, do_inodes = -1;
 
-    if (unlikely(do_uptime == -1)) {
+    if (unlikely(do_disk_io == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
         do_netisr               = config_get_boolean("plugin:freebsd:sysctl", "netisr", 1);
         do_netisr_per_core      = config_get_boolean("plugin:freebsd:sysctl", "netisr per core", 1);
@@ -1236,17 +1272,13 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         do_icmp6_types          = config_get_boolean_ondemand("plugin:freebsd:sysctl", "icmp types", CONFIG_BOOLEAN_AUTO);
         do_space                = config_get_boolean("plugin:freebsd:sysctl", "space usage for all disks", 1);
         do_inodes               = config_get_boolean("plugin:freebsd:sysctl", "inodes usage for all disks", 1);
-        do_uptime               = config_get_boolean("plugin:freebsd:sysctl", "system uptime", 1);
     }
 
     RRDSET *st;
-    RRDDIM *rd;
 
     int ncpus;
     int i, n;
-    void *p;
     int common_error = 0;
-    size_t size;
     char title[4096 + 1];
 
     // NEEDED BY: do_disk_io
@@ -1324,9 +1356,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     struct statfs *mntbuf;
     int mntsize;
     char mntonname[MNAMELEN + 1];
-
-    // NEEDED BY: do_uptime
-    struct timespec up_time;
 
     // --------------------------------------------------------------------
 
@@ -2610,22 +2639,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
                 }
             }
         }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_uptime)) {
-            clock_gettime(CLOCK_UPTIME, &up_time);
-            st = rrdset_find_localhost("system.uptime");
-
-            if(unlikely(!st)) {
-                st = rrdset_create_localhost("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000, update_every, RRDSET_TYPE_LINE);
-                rrddim_add(st, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "uptime", up_time.tv_sec);
-            rrdset_done(st);
     }
 
     return 0;

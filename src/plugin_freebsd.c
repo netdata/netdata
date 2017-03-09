@@ -30,6 +30,7 @@ static struct freebsd_module {
         { .name = "kern.ipc.sem", .dim = "semaphores", .enabled = 1, .func = do_kern_ipc_sem },
         { .name = "kern.ipc.shm", .dim = "shared_memory", .enabled = 1, .func = do_kern_ipc_shm },
         { .name = "kern.ipc.msq", .dim = "message_queues", .enabled = 1, .func = do_kern_ipc_msq },
+        { .name = "uptime", .dim = "uptime", .enabled = 1, .func = do_uptime },
 
         // CPU metrics
         { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },
