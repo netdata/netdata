@@ -425,12 +425,14 @@ class Service(MySQLService):
             if 'Threads_created' in to_netdata and 'Connections' in to_netdata:
                 to_netdata['Thread_cache_misses'] = round(int(to_netdata['Threads_created']) / float(to_netdata['Connections']) * 10000)
 
-        if 'slave_status' in raw_data and raw_data['slave_status'][0]:
-            slave_raw_data = dict(zip([e[0] for e in raw_data['slave_status'][1]], raw_data['slave_status'][0][0]))
-
-            for key, function in SLAVE_STATS:
-                if key in slave_raw_data:
-                    to_netdata[key] = function(slave_raw_data[key])
+        if 'slave_status' in raw_data:
+            if raw_data['slave_status'][0]:
+                slave_raw_data = dict(zip([e[0] for e in raw_data['slave_status'][1]], raw_data['slave_status'][0][0]))
+                for key, function in SLAVE_STATS:
+                    if key in slave_raw_data:
+                       to_netdata[key] = function(slave_raw_data[key])
+            else:
+                self.queries.pop('slave_status')
 
         return to_netdata or None
 
