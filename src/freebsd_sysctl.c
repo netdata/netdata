@@ -726,6 +726,77 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// system.ram
+
+int do_system_ram(int update_every, usec_t dt) {
+    static int mib_v_active_count[4] = {0, 0, 0, 0};
+    static int mib_v_inactive_count[4] = {0, 0, 0, 0};
+    static int mib_v_wire_count[4] = {0, 0, 0, 0};
+    static int mib_v_cache_count[4] = {0, 0, 0, 0};
+    static int mib_vfs_bufspace[2] = {0, 0};
+    static int mib_v_free_count[4] = {0, 0, 0, 0};
+    struct vmmeter vmmeter_data;
+    int vfs_bufspace_count;
+
+    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_active_count",   mib_v_active_count,   vmmeter_data.v_active_count) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_inactive_count", mib_v_inactive_count, vmmeter_data.v_inactive_count) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_wire_count",     mib_v_wire_count,     vmmeter_data.v_wire_count) ||
+#if __FreeBSD_version < 1200016
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_cache_count",    mib_v_cache_count,    vmmeter_data.v_cache_count) ||
+#endif
+                 GETSYSCTL_SIMPLE("vfs.bufspace",                 mib_vfs_bufspace,     vfs_bufspace_count) ||
+                 GETSYSCTL_SIMPLE("vm.stats.vm.v_free_count",     mib_v_free_count,     vmmeter_data.v_free_count))) {
+        error("DISABLED: system.ram chart");
+        error("DISABLED: System.ram module");
+        return 1;
+    } else {
+
+        // --------------------------------------------------------------------
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_free = NULL, *rd_active = NULL, *rd_inactive = NULL,
+                      *rd_wired = NULL, *rd_cache = NULL, *rd_buffers = NULL;
+
+        st = rrdset_find_localhost("system.ram");
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("system",
+                                         "ram",
+                                         NULL,
+                                         "ram",
+                                         NULL,
+                                         "System RAM",
+                                         "MB",
+                                         200,
+                                         update_every,
+                                         RRDSET_TYPE_STACKED
+            );
+
+            rd_free     = rrddim_add(st, "free",     NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+            rd_active   = rrddim_add(st, "active",   NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+            rd_inactive = rrddim_add(st, "inactive", NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+            rd_wired    = rrddim_add(st, "wired",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+#if __FreeBSD_version < 1200016
+            rd_cache    = rrddim_add(st, "cache",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+#endif
+            rd_buffers  = rrddim_add(st, "buffers",  NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_free,     vmmeter_data.v_free_count);
+        rrddim_set_by_pointer(st, rd_active,   vmmeter_data.v_active_count);
+        rrddim_set_by_pointer(st, rd_inactive, vmmeter_data.v_inactive_count);
+        rrddim_set_by_pointer(st, rd_wired,    vmmeter_data.v_wire_count);
+#if __FreeBSD_version < 1200016
+        rrddim_set_by_pointer(st, rd_cache,    vmmeter_data.v_cache_count);
+#endif
+        rrddim_set_by_pointer(st, rd_buffers,  vfs_bufspace_count);
+        rrdset_done(st);
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 // NEEDED BY: do_disk_io
@@ -735,7 +806,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
-    static int do_disk_io = -1, do_ram = -1, do_swapio = -1,
+    static int do_disk_io = -1, do_swapio = -1,
         do_pgfaults = -1, do_ipc_semaphores = -1, do_ipc_shared_mem = -1, do_ipc_msg_queues = -1,
         do_netisr = -1, do_netisr_per_core = -1, do_bandwidth = -1,
         do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
@@ -748,7 +819,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     if (unlikely(do_uptime == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_ram                  = config_get_boolean("plugin:freebsd:sysctl", "system ram", 1);
         do_swapio               = config_get_boolean("plugin:freebsd:sysctl", "swap i/o", 1);
         do_pgfaults             = config_get_boolean("plugin:freebsd:sysctl", "memory page faults", 1);
         do_ipc_semaphores       = config_get_boolean("plugin:freebsd:sysctl", "ipc semaphores", 1);
@@ -825,9 +895,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // NEEDED BY: do_swapio, do_ram
     struct vmmeter vmmeter_data;
-
-    // NEEDED BY: do_ram
-    int vfs_bufspace_count;
 
     // NEEDED BY: do_ipc_semaphores
     struct ipc_sem {
@@ -1086,47 +1153,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
                 rrddim_set(st, "out", total_disk_kbytes_write);
                 rrdset_done(st);
             }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_ram)) {
-        if (unlikely(GETSYSCTL_BY_NAME("vm.stats.vm.v_active_count",    vmmeter_data.v_active_count) ||
-                     GETSYSCTL_BY_NAME("vm.stats.vm.v_inactive_count",  vmmeter_data.v_inactive_count) ||
-                     GETSYSCTL_BY_NAME("vm.stats.vm.v_wire_count",      vmmeter_data.v_wire_count) ||
-#if __FreeBSD_version < 1200016
-                     GETSYSCTL_BY_NAME("vm.stats.vm.v_cache_count",     vmmeter_data.v_cache_count) ||
-#endif
-                     GETSYSCTL_BY_NAME("vfs.bufspace",                  vfs_bufspace_count) ||
-                     GETSYSCTL_BY_NAME("vm.stats.vm.v_free_count",      vmmeter_data.v_free_count))) {
-            do_ram = 0;
-            error("DISABLED: system.ram");
-        } else {
-            st = rrdset_find_localhost("system.ram");
-            if (unlikely(!st)) {
-                st = rrdset_create_localhost("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every, RRDSET_TYPE_STACKED);
-
-                rrddim_add(st, "active",    NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                rrddim_add(st, "inactive",  NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                rrddim_add(st, "wired",     NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-#if __FreeBSD_version < 1200016
-                rrddim_add(st, "cache",     NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-#endif
-                rrddim_add(st, "buffers",   NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                rrddim_add(st, "free",      NULL, system_pagesize, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "active",    vmmeter_data.v_active_count);
-            rrddim_set(st, "inactive",  vmmeter_data.v_inactive_count);
-            rrddim_set(st, "wired",     vmmeter_data.v_wire_count);
-#if __FreeBSD_version < 1200016
-            rrddim_set(st, "cache",     vmmeter_data.v_cache_count);
-#endif
-            rrddim_set(st, "buffers",   vfs_bufspace_count);
-            rrddim_set(st, "free",      vmmeter_data.v_free_count);
-            rrdset_done(st);
         }
     }
 
