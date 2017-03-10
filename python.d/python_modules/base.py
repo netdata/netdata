@@ -947,7 +947,7 @@ class MySQLService(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.__connection = None
         self.conn_properties = dict()
-        self.queries = dict()
+        self.queries = self.configuration.get('queries', dict())
 
     def __connect(self):
         try:
@@ -986,7 +986,7 @@ class MySQLService(SimpleService):
                 return all([isinstance(query, str),
                             query.startswith(('SELECT', 'select', 'SHOW', 'show'))])
 
-            if isinstance(raw_queries, dict) and raw_queries:
+            if hasattr(raw_queries, 'keys') and raw_queries:
                 valid_queries = dict([(n, q) for n, q in raw_queries.items() if is_valid_query(q)])
                 bad_queries = set(raw_queries) - set(valid_queries)
 
