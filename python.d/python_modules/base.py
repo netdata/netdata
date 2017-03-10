@@ -1050,7 +1050,7 @@ class MySQLService(SimpleService):
                     try:
                         cursor.execute(query)
                     except (MySQLdb.ProgrammingError, MySQLdb.OperationalError) as error:
-                        if exc_info()[0] == MySQLdb.OperationalError and 'denied' not in str(error):
+                        if self.__is_error_critical(err_class=exc_info()[0], err_text=str(error)):
                             raise RuntimeError
                         self.error('Removed query: %s[%s]. Error: %s'
                                    % (name, query, error))
@@ -1065,3 +1065,10 @@ class MySQLService(SimpleService):
             return None
         else:
             return raw_data or None
+
+    @staticmethod
+    def __is_error_critical(err_class, err_text):
+        def in_not_in(value):
+            return value[1:] in err_text if value[0] == '+' else value[1:] not in err_text
+
+        return err_class == MySQLdb.OperationalError and all([in_not_in('-denied'), in_not_in('-Unknown column')])
