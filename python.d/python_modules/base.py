@@ -947,7 +947,8 @@ class MySQLService(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.__connection = None
         self.conn_properties = dict()
-        self.queries = self.configuration.get('queries', dict())
+        self.__queries = self.configuration.get('queries', dict())
+        self.queries = dict()
 
     def __connect(self):
         try:
@@ -1001,6 +1002,8 @@ class MySQLService(SimpleService):
             self.error('MySQLdb or PyMySQL module is needed to use mysql.chart.py plugin')
             return False
 
+        # Preference: 1. "queries" from the configuration file 2. "queries" from the module
+        self.queries = self.__queries or self.queries
         # Check if "self.queries" exist, not empty and all queries are in valid format
         self.queries = is_valid_queries_dict(self.queries, self.error)
         if not self.queries:
@@ -1044,9 +1047,10 @@ class MySQLService(SimpleService):
                 return None
 
         raw_data = dict()
+        queries = dict(self.queries)
         try:
             with self.__connection as cursor:
-                for name, query in self.queries.items():
+                for name, query in queries.items():
                     try:
                         cursor.execute(query)
                     except (MySQLdb.ProgrammingError, MySQLdb.OperationalError) as error:
@@ -1068,7 +1072,5 @@ class MySQLService(SimpleService):
 
     @staticmethod
     def __is_error_critical(err_class, err_text):
-        def in_not_in(value):
-            return value[1:] in err_text if value[0] == '+' else value[1:] not in err_text
-
-        return err_class == MySQLdb.OperationalError and all([in_not_in('-denied'), in_not_in('-Unknown column')])
+        return err_class == MySQLdb.OperationalError and all(['denied' not in err_text,
+                                                              'Unknown column' not in err_text])
