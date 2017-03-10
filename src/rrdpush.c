@@ -33,7 +33,7 @@ int rrdpush_init() {
     default_rrdpush_enabled     = appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enabled", default_rrdpush_enabled);
     default_rrdpush_destination = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "destination", "");
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
-    rrdhost_free_orphan_time    = appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "free orphan hosts after seconds", rrdhost_free_orphan_time);
+    rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
         error("STREAM [send]: cannot enable sending thread - information is missing.");
