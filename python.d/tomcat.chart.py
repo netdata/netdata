@@ -51,10 +51,6 @@ class Service(UrlService):
         self.definitions = CHARTS
 
     def check(self):
-        if not self.url.endswith('manager/status?XML=true'):
-            self.error('Bad url(%s). Must be http://<ip.address>:<port>/manager/status?XML=true' % self.url)
-            return False
-
         netloc = urlparse(self.url).netloc.rpartition(':')
         if netloc[1] == ':': port = netloc[2]
         else: port = 80
