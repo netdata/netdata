@@ -13,8 +13,8 @@ AC_DEFUN([AC_C_LTO],
       ]])],
    [ac_cv_c_lto=yes],
    [ac_cv_c_lto=no],
-   [ac_cv_c_lto=no])])
-if test $ac_cv_c_lto = yes; then
+   [ac_cv_c_lto=${ac_cv_c_lto_cross_compile}])])
+if test "${ac_cv_c_lto}" = "yes"; then
   AC_DEFINE([HAVE_LTO], 1,
            [Define to 1 if -flto works.])
 fi

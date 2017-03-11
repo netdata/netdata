@@ -405,9 +405,11 @@ fi
 if test "${have_lto}" = "yes"; then
     oCFLAGS="${CFLAGS}"
     CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CLFAGS} ${OPTIONAL_NFACCT_CLFAGS} ${OPTIONAL_ZLIB_CLFAGS} ${OPTIONAL_UUID_CLFAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS}"
+    ac_cv_c_lto_cross_compile="${enable_lto}"
+    test "${ac_cv_c_lto_cross_compile}" != "yes" && ac_cv_c_lto_cross_compile="no"
     AC_C_LTO
     CFLAGS="${oCFLAGS}"
-    test "${ac_cv_c_lto}" = "no" && have_lto="no"
+    test "${ac_cv_c_lto}" != "yes" && have_lto="no"
 fi
 test "${enable_lto}" = "yes" -a "${have_lto}" != "yes" && \
     AC_MSG_ERROR([LTO is required but is not available.])
