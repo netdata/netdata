@@ -1,4 +1,4 @@
-# netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Coverity Scan Build Status](https://scan.coverity.com/projects/9140/badge.svg)](https://scan.coverity.com/projects/firehol-netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=firehol/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/firehol/netdata/badges/gpa.svg)](https://codeclimate.com/github/firehol/netdata) [![Docker Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg)](https://hub.docker.com/r/titpetric/netdata/) [![Twitter Follow](https://img.shields.io/twitter/follow/linuxnetdata.svg?style=social&label=netdata%20on%20twitter)](https://twitter.com/linuxnetdata)
+# netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Coverity Scan Build Status](https://scan.coverity.com/projects/9140/badge.svg)](https://scan.coverity.com/projects/firehol-netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=firehol/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/firehol/netdata/badges/gpa.svg)](https://codeclimate.com/github/firehol/netdata)
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
@@ -10,12 +10,16 @@ _netdata is **fast** and **efficient**, designed to permanently run on all syste
 (**physical** & **virtual** servers, **containers**, **IoT** devices), without
 disrupting their core function._
 
+netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
+
+[![Twitter Follow](https://img.shields.io/twitter/follow/linuxnetdata.svg?style=social&label=New%20-%20stay%20in%20touch%20-%20follow%20netdata%20on%20twitter)](https://twitter.com/linuxnetdata)
+
 ---
 
 ## User base
 
 *Since May 16th 2016 (the date the [global public netdata registry](https://github.com/firehol/netdata/wiki/mynetdata-menu-item) was released):*<br/>
-[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Docker Pulls](https://img.shields.io/docker/pulls/titpetric/netdata.svg)](https://hub.docker.com/r/titpetric/netdata/)
 
 *in the last 24 hours:*<br/>
 [![New Users Today](http://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
@@ -60,6 +64,7 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
    with just 1% CPU utilization of a single core, a few MB of RAM and no disk I/O at all
    
  - **Sophisticated alarming**<br/>
+   hundreds of alarms, **out of the box**!<br/>
    supports dynamic thresholds, hysteresis, alarm templates,
    multiple role-based notification methods (such as email, slack.com,
    pushover.net, pushbullet.com, telegram.org, twilio.com, messagebird.com)
@@ -89,8 +94,12 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
  - **scales to infinity**<br/>
    requiring minimal central resources
    
- - **back-ends supported**<br/>
-   can archive its metrics on `graphite` or `opentsdb`, in the same or lower detail
+ - **several operating modes**<br/>
+   autonomous host monitoring, headless data collector, forwarding proxy, store and forward proxy, central multi-host monitoring, in all possible configurations.
+   Each node may have different metrics retention policy and run with or without health monitoring.
+   
+ - **time-series back-ends supported**<br/>
+   can archive its metrics on `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower detail
    (lower: to prevent it from congesting these servers due to the amount of data collected)
 
 ![netdata](https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif)
@@ -99,7 +108,7 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
 
 ## What does it monitor?
 
-netdata monitors several thousands of metrics per device.
+netdata collects several thousands of metrics per device.
 All these metrics are collected and visualized in real-time.
 
 > _Almost all metrics are auto-detected, without any configuration._
@@ -107,13 +116,13 @@ All these metrics are collected and visualized in real-time.
 This is a list of what it currently monitors:
 
 - **CPU**<br/>
-  usage, interrupts, softirqs, frequency, total and per core
+  usage, interrupts, softirqs, frequency, total and per core, CPU states
 
 - **Memory**<br/>
   RAM, swap and kernel memory usage, KSM (Kernel Samepage Merging), NUMA
 
 - **Disks**<br/>
-  per disk: I/O, operations, backlog, utilization, space
+  per disk: I/O, operations, backlog, utilization, space, software RAID (md)
 
    ![sda](https://cloud.githubusercontent.com/assets/2662304/14093195/c882bbf4-f554-11e5-8863-1788d643d2c0.gif)
 
@@ -189,6 +198,9 @@ This is a list of what it currently monitors:
 - **Tomcat**<br/>
   accesses, threads, free memory, volume
 
+- **web server log files**<br/>
+  extracting in real-time, web server performance metrics and applying several health checks
+
 - **mySQL databases**<br/>
   multiple servers, each showing: bandwidth, queries/s, handlers, locks, issues,
   tmp operations, connections, binlog metrics, threads, innodb metrics, and more
@@ -201,11 +213,20 @@ This is a list of what it currently monitors:
 - **Redis databases**<br/>
   multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves
 
+- **mongodb**<br/>
+  operations, clients, transactions, cursors, connections, asserts, locks, etc
+
 - **memcached databases**<br/>
   multiple servers, each showing: bandwidth, connections, items
 
+- **elasticsearch**<br/>
+  search and index performance, latency, timings, cluster statistics, threads statistics, etc
+
 - **ISC Bind name servers**<br/>
   multiple servers, each showing: clients, requests, queries, updates, failures and several per view metrics
+
+- **NSD name servers**<br/>
+  queries, zones, protocols, query types, transfers, etc.
 
 - **Postfix email servers**<br/>
   message queue (entries, size)
@@ -215,14 +236,26 @@ This is a list of what it currently monitors:
 
 - **Dovecot** POP3/IMAP servers<br/>
 
+- **ISC dhcpd**<br/>
+  pools utilization, leases, etc.
+
 - **IPFS**<br/>
   bandwidth, peers
 
 - **Squid proxy servers**<br/>
   multiple servers, each showing: clients bandwidth and requests, servers bandwidth and requests
 
+- **HAproxy**<br/>
+  bandwidth, sessions, backends, etc
+
+- **varnish**<br/>
+  threads, sessions, hits, objects, backends, etc
+
+- **OpenVPN**<br/>
+  status per tunnel
+
 - **Hardware sensors**<br/>
-  temperature, voltage, fans, power, humidity
+  `lm_sensors` and `IPMI`: temperature, voltage, fans, power, humidity
 
 - **NUT and APC UPSes**<br/>
   load, charge, battery voltage, temperature, utility metrics, output metrics
@@ -232,6 +265,9 @@ This is a list of what it currently monitors:
 
 - **hddtemp**<br/>
   disk temperatures
+
+- **smartd**<br/>
+  disk S.M.A.R.T. values
 
 - **SNMP devices**<br/>
   can be monitored too (although you will need to configure these)

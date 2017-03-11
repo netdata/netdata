@@ -230,6 +230,7 @@ struct option_def options[] = {
     { 't', "The internal clock of netdata.",              "seconds",     "1"},
     { 'u', "Run as user.",                                "username",    "netdata"},
     { 'v', "Print netdata version and exit.",             NULL,          NULL},
+    { 'V', "Print netdata version and exit.",             NULL,          NULL},
     { 'W', "See Advanced options below.",                 "options",     NULL},
 };
 
@@ -614,6 +615,7 @@ int main(int argc, char **argv) {
                     config_set(CONFIG_SECTION_GLOBAL, "run as user", optarg);
                     break;
                 case 'v':
+                case 'V':
                     printf("%s %s\n", program_name, program_version);
                     return 0;
                 case 'W':
