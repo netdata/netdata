@@ -1,6 +1,8 @@
 #ifndef NETDATA_STORAGE_NUMBER_H
 #define NETDATA_STORAGE_NUMBER_H
 
+#include <stdint.h>
+
 typedef long double calculated_number;
 #define CALCULATED_NUMBER_FORMAT "%0.7Lf"
 //typedef long long calculated_number;
