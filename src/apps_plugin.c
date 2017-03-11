@@ -3199,7 +3199,7 @@ static void parse_args(int argc, char **argv)
             }
         }
 
-        if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0) {
+        if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
             printf("apps.plugin %s\n", VERSION);
             exit(0);
         }
@@ -3269,7 +3269,7 @@ static void parse_args(int argc, char **argv)
                     "\n"
                     " This program is a data collector plugin for netdata.\n"
                     "\n"
-                    " Valid command line options:\n"
+                    " Available command line options:\n"
                     "\n"
                     " SECONDS           set the data collection frequency\n"
                     "\n"
@@ -3292,7 +3292,7 @@ static void parse_args(int argc, char **argv)
                     "                   apps_groups.conf\n"
                     "                   (default NAME=groups)\n"
                     "\n"
-                    " version           print program version and exit\n"
+                    " version or -v or -V print program version and exit\n"
                     "\n"
                     , VERSION
             );

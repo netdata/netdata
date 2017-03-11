@@ -1434,7 +1434,11 @@ int main (int argc, char **argv) {
             }
         }
 
-        if(strcmp("debug", argv[i]) == 0) {
+        if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
+            printf("freeipmi.plugin %s\n", VERSION);
+            exit(0);
+        }
+        else if(strcmp("debug", argv[i]) == 0) {
             debug = 1;
             continue;
         }
@@ -1449,21 +1453,55 @@ int main (int argc, char **argv) {
         else if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "\n"
-                    "netdata freeipmi.plugin " VERSION "\n"
-                    "Usage:\n"
+                    " netdata freeipmi.plugin %s\n"
+                    " Copyright (C) 2016-2017 Costa Tsaousis <costa@tsaousis.gr>\n"
+                    " Released under GNU General Public License v3 or later.\n"
+                    " All rights reserved.\n"
                     "\n"
-                    "  freeipmi.plugin [OPTIONS]\n"
+                    " This program is a data collector plugin for netdata.\n"
                     "\n"
-                    "Available options:\n"
-                    "  NUMBER, sets the data collection frequency\n"
-                    "  debug, enables verbose output\n"
-                    "  sel, enable SEL collection (it is on by default)\n"
-                    "  no-sel, disable SEL collection\n"
-                    "  hostname X, sets the remote host to connect to\n"
-                    "  username X, sets the username to authenticate at the remote host\n"
-                    "  password X, sets the password to authenticate at the remote host\n"
-                    "  sdr-cache-dir X, sets the directory to save SDR cache files\n"
-                    "  sensor-config-file X, set the filename to read sensor configuration\n"
+                    " Available command line options:\n"
+                    "\n"
+                    "  SECONDS                 data collection frequency\n"
+                    "                          minimum: %d\n"
+                    "\n"
+                    "  debug                   enable verbose output\n"
+                    "                          default: disabled\n"
+                    "\n"
+                    "  sel\n"
+                    "  no-sel                  enable/disable SEL collection\n"
+                    "                          default: %s\n"
+                    "\n"
+                    "  hostname HOST\n"
+                    "  username USER\n"
+                    "  password PASS           connect to remote IPMI host\n"
+                    "                          default: local IPMI processor\n"
+                    "\n"
+                    "  sdr-cache-dir PATH      directory for SDR cache files\n"
+                    "                          default: %s\n"
+                    "\n"
+                    "  sensor-config-file FILE filename to read sensor configuration\n"
+                    "                          default: %s\n"
+                    "\n"
+                    "  -v\n"
+                    "  -V\n"
+                    "  version                 print version and exit\n"
+                    "\n"
+                    " Linux kernel module for IPMI is CPU hungry.\n"
+                    " On Linux run this to lower kipmiN CPU utilization:\n"
+                    " # echo 10 > /sys/module/ipmi_si/parameters/kipmid_max_busy_us\n"
+                    "\n"
+                    " or create: /etc/modprobe.d/ipmi.conf with these contents:\n"
+                    " options ipmi_si kipmid_max_busy_us=10\n"
+                    "\n"
+                    " For more information:\n"
+                    " https://github.com/firehol/netdata/wiki/monitoring-IPMI\n"
+                    "\n"
+                    , VERSION
+                    , netdata_update_every
+                    , netdata_do_sel?"enabled":"disabled"
+                    , sdr_cache_directory?sdr_cache_directory:"system default"
+                    , sensor_config_file?sensor_config_file:"system default"
             );
             exit(1);
         }
