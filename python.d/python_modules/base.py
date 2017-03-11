@@ -946,20 +946,21 @@ class MySQLService(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.__connection = None
-        self.conn_properties = dict()
+        self.__conn_properties = dict()
+        self.extra_conn_properties = dict()
         self.__queries = self.configuration.get('queries', dict())
         self.queries = dict()
 
     def __connect(self):
         try:
-            connection = MySQLdb.connect(connect_timeout=self.update_every, **self.conn_properties)
-        except (MySQLdb.MySQLError, TypeError) as error:
+            connection = MySQLdb.connect(connect_timeout=self.update_every, **self.__conn_properties)
+        except (MySQLdb.MySQLError, TypeError, AttributeError) as error:
             return None, str(error)
         else:
             return connection, None
 
     def check(self):
-        def get_connection_properties(conf):
+        def get_connection_properties(conf, extra_conf):
             properties = dict()
             if 'user' in conf and conf['user']:
                 properties['user'] = conf['user']
@@ -969,9 +970,11 @@ class MySQLService(SimpleService):
                 properties['unix_socket'] = conf['socket']
             elif 'host' in conf and conf['host']:
                 properties['host'] = conf['host']
-                properties['port'] = int(conf['port']) if conf.get('port') else 3306
+                properties['port'] = int(conf.get('port', 3306))
             elif 'my.cnf' in conf and conf['my.cnf']:
                 properties['read_default_file'] = conf['my.cnf']
+            if isinstance(extra_conf, dict) and extra_conf:
+                properties.update(extra_conf)
 
             return properties or None
 
@@ -1010,8 +1013,8 @@ class MySQLService(SimpleService):
             return None
 
         # Get connection properties
-        self.conn_properties = get_connection_properties(self.configuration)
-        if not self.conn_properties:
+        self.__conn_properties = get_connection_properties(self.configuration, self.extra_conn_properties)
+        if not self.__conn_properties:
             self.error('Connection properties are missing')
             return False
 
