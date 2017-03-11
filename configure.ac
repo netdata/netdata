@@ -101,6 +101,12 @@ AC_ARG_ENABLE(
     ,
     [enable_x86_sse="yes"]
 )
+AC_ARG_ENABLE(
+    [lto],
+    [AS_HELP_STRING([--disable-lto], [Link Time Optimizations @<:@default enabled@:>@])],
+    ,
+    [enable_lto="detect"]
+)
 
 
 # -----------------------------------------------------------------------------
@@ -145,6 +151,7 @@ AC_CHECK_HEADERS_ONCE([sys/prctl.h])
 # -----------------------------------------------------------------------------
 # operating system detection
 
+AC_MSG_CHECKING([operating system])
 case "$host_os" in
 freebsd*)
     build_target=freebsd
@@ -161,6 +168,7 @@ esac
 AM_CONDITIONAL([FREEBSD], [test "${build_target}" = "freebsd"])
 AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
+AC_MSG_RESULT([${build_target}])
 
 
 # -----------------------------------------------------------------------------
@@ -173,8 +181,23 @@ AS_CASE([$host_cpu],
 AC_SUBST([SSE_CANDIDATE])
 if test "${SSE_CANDIDATE}" = "yes" -a "${enable_x86_sse}" = "yes"; then
     opt="-msse2 -mfpmath=sse"
-    AX_CHECK_COMPILE_FLAG($opt, [CFLAGS="$CFLAGS $opt"], [])
+    AX_CHECK_COMPILE_FLAG(${opt}, [CFLAGS="${CFLAGS} ${opt}"], [])
 fi
+
+if test "${enable_lto}" != "no"; then
+    opt="-flto"
+    AX_CHECK_COMPILE_FLAG(${opt}, [have_lto=yes], [have_lto=no])
+fi
+test "${enable_lto}" = "yes" -a "${have_lto}" != "yes" && \
+    AC_MSG_ERROR([LTO is required but is not available.])
+AC_MSG_CHECKING([if LTO should be enabled])
+if test "${enable_lto}" != "no" -a "${have_lto}" = "yes"; then
+    enable_lto="yes"
+    CFLAGS="${CFLAGS} -flto"
+else
+    enable_lto="no"
+fi
+AC_MSG_RESULT([${enable_lto}])
 
 if test "${GCC}" = "yes"; then
     AC_DEFINE_UNQUOTED([likely(x)], [__builtin_expect(!!(x), 1)], [gcc branch optimization])

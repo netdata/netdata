@@ -104,6 +104,12 @@ Valid <installer options> are:
         Enable/disable the FreeIPMI plugin.
         Default: enable it when libipmimonitoring is available.
 
+   --enable-lto
+   --disable-lto
+
+        Enable/disable Link-Time-Optimization
+        Default: enabled
+
    --zlib-is-really-here
    --libs-are-really-here
 
@@ -198,6 +204,14 @@ do
     elif [ "$1" = "--disable-plugin-freeipmi" ]
         then
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --disable-plugin-freeipmi"
+        shift 1
+    elif [ "$1" = "--enable-lto" ]
+        then
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --enable-lto"
+        shift 1
+    elif [ "$1" = "--disable-lto" ]
+        then
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --disable-lto"
         shift 1
     elif [ "$1" = "--help" -o "$1" = "-h" ]
         then
