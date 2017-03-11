@@ -27,8 +27,13 @@ static inline usec_t now_usec(clockid_t clk_id) {
 
 static inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
-    if(unlikely(clock_gettime(clk_id, &ts) == -1))
+
+    if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
+        tv->tv_sec = 0;
+        tv->tv_usec = 0;
         return -1;
+    }
+
     tv->tv_sec = ts.tv_sec;
     tv->tv_usec = (suseconds_t)((ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC);
     return 0;
