@@ -172,6 +172,15 @@ AC_MSG_RESULT([${build_target}])
 
 
 # -----------------------------------------------------------------------------
+# pthreads
+
+ACX_PTHREAD(, [AC_MSG_ERROR([Cannot initialize pthread environment])])
+LIBS="${PTHREAD_LIBS} ${LIBS}"
+CFLAGS="${CFLAGS} ${PTHREAD_CFLAGS}"
+CC="${PTHREAD_CC}"
+
+
+# -----------------------------------------------------------------------------
 # compiler options
 
 AC_ARG_VAR([SSE_CANDIDATE], [C compiler flags for SSE])
@@ -211,15 +220,6 @@ if test "${enable_pedantic}" = "yes"; then
     enable_strict="yes"
     CFLAGS="${CFLAGS} -pedantic -Wall -Wextra -Wno-long-long"
 fi
-
-
-# -----------------------------------------------------------------------------
-# pthreads
-
-ACX_PTHREAD(, [AC_MSG_ERROR([Cannot initialize pthread environment])])
-LIBS="${PTHREAD_LIBS} ${LIBS}"
-CFLAGS="${CFLAGS} ${PTHREAD_CFLAGS}"
-CC="${PTHREAD_CC}"
 
 
 # -----------------------------------------------------------------------------
