@@ -256,21 +256,6 @@ if test "${SSE_CANDIDATE}" = "yes" -a "${enable_x86_sse}" = "yes"; then
     AX_CHECK_COMPILE_FLAG(${opt}, [CFLAGS="${CFLAGS} ${opt}"], [])
 fi
 
-if test "${enable_lto}" != "no"; then
-    opt="-flto"
-    AX_CHECK_COMPILE_FLAG(${opt}, [have_lto=yes], [have_lto=no])
-fi
-test "${enable_lto}" = "yes" -a "${have_lto}" != "yes" && \
-    AC_MSG_ERROR([LTO is required but is not available.])
-AC_MSG_CHECKING([if LTO should be enabled])
-if test "${enable_lto}" != "no" -a "${have_lto}" = "yes"; then
-    enable_lto="yes"
-    CFLAGS="${CFLAGS} -flto"
-else
-    enable_lto="no"
-fi
-AC_MSG_RESULT([${enable_lto}])
-
 if test "${GCC}" = "yes"; then
     AC_DEFINE_UNQUOTED([likely(x)], [__builtin_expect(!!(x), 1)], [gcc branch optimization])
     AC_DEFINE_UNQUOTED([unlikely(x)], [__builtin_expect(!!(x), 0)], [gcc branch optimization])
@@ -408,6 +393,32 @@ else
 fi
 AC_MSG_RESULT([${enable_plugin_nfacct}])
 AM_CONDITIONAL([ENABLE_PLUGIN_NFACCT], [test "${enable_plugin_nfacct}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
+# Link-Time-Optimization
+
+if test "${enable_lto}" != "no"; then
+    opt="-flto"
+    AX_CHECK_COMPILE_FLAG(${opt}, [have_lto=yes], [have_lto=no])
+fi
+if test "${have_lto}" = "yes"; then
+    oCFLAGS="${CFLAGS}"
+    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CLFAGS} ${OPTIONAL_NFACCT_CLFAGS} ${OPTIONAL_ZLIB_CLFAGS} ${OPTIONAL_UUID_CLFAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS}"
+    AC_C_LTO
+    CFLAGS="${oCFLAGS}"
+    test "${ac_cv_c_lto}" = "no" && have_lto="no"
+fi
+test "${enable_lto}" = "yes" -a "${have_lto}" != "yes" && \
+    AC_MSG_ERROR([LTO is required but is not available.])
+AC_MSG_CHECKING([if LTO should be enabled])
+if test "${enable_lto}" != "no" -a "${have_lto}" = "yes"; then
+    enable_lto="yes"
+    CFLAGS="${CFLAGS} -flto"
+else
+    enable_lto="no"
+fi
+AC_MSG_RESULT([${enable_lto}])
 
 
 # -----------------------------------------------------------------------------
