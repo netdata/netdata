@@ -208,7 +208,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
     time_t now = now_realtime_sec();
 
-    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && ae->unique_id >= stop_at_id ; ae = ae->next) {
@@ -228,13 +228,13 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     // remember this for the next iteration
     stop_at_id = first_waiting;
 
-    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     if(host->health_log.count <= host->health_log.max)
         return;
 
     // cleanup excess entries in the log
-    pthread_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
     ALARM_ENTRY *last = NULL;
     unsigned int count = host->health_log.max * 2 / 3;
@@ -256,7 +256,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
         host->health_log.count--;
     }
 
-    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
 static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {

@@ -38,74 +38,120 @@ plugins_PROGRAMS += freeipmi.plugin
 endif
 
 netdata_SOURCES = \
-	appconfig.c appconfig.h \
-	adaptive_resortable_list.c adaptive_resortable_list.h \
-	avl.c avl.h \
-	backends.c backends.h \
-	clocks.c clocks.h \
-	common.c common.h \
-	daemon.c daemon.h \
-	dictionary.c dictionary.h \
-	eval.c eval.h \
-	global_statistics.c global_statistics.h \
-	health.c health.h health_log.c health_config.c health_json.c \
+	adaptive_resortable_list.c \
+	adaptive_resortable_list.h \
+	appconfig.c \
+	appconfig.h \
+	avl.c \
+	avl.h \
+	backends.c \
+	backends.h \
+	clocks.c \
+	clocks.h \
+	common.c \
+	common.h \
+	daemon.c \
+	daemon.h \
+	dictionary.c \
+	dictionary.h \
+	eval.c \
+	eval.h \
+	global_statistics.c \
+	global_statistics.h \
+	health.c \
+	health.h \
+	health_config.c \
+	health_json.c \
+	health_log.c \
 	inlined.h \
-	log.c log.h \
-	main.c main.h \
-	plugin_checks.c plugin_checks.h \
-	plugin_idlejitter.c plugin_idlejitter.h \
-	plugin_nfacct.c plugin_nfacct.h \
-	plugin_tc.c plugin_tc.h \
-	plugins_d.c plugins_d.h \
-	popen.c popen.h \
-	socket.c socket.h \
-	simple_pattern.c simple_pattern.h \
-	sys_fs_cgroup.c \
-	sys_devices_system_edac_mc.c \
-	sys_devices_system_node.c \
-	procfile.c procfile.h \
-	proc_self_mountinfo.c proc_self_mountinfo.h \
-	registry.c registry.h \
-	registry_internals.c registry_internals.h \
-	registry_url.c registry_url.h \
-	registry_person.c registry_person.h \
-	registry_machine.c registry_machine.h \
-	registry_init.c \
+	locks.h \
+	log.c \
+	log.h \
+	main.c \
+	main.h \
+	plugin_checks.c \
+	plugin_checks.h \
+	plugin_idlejitter.c \
+	plugin_idlejitter.h \
+	plugin_nfacct.c \
+	plugin_nfacct.h \
+	plugin_tc.c \
+	plugin_tc.h \
+	plugins_d.c \
+	plugins_d.h \
+	popen.c \
+	popen.h \
+	proc_self_mountinfo.c \
+	proc_self_mountinfo.h \
+	procfile.c \
+	procfile.h \
+	registry.c \
+	registry.h \
 	registry_db.c \
+	registry_init.c \
+	registry_internals.c \
+	registry_internals.h \
 	registry_log.c \
-	rrd.c rrd.h \
-	rrddim.c \
-	rrdfamily.c \
-	rrdhost.c \
-	rrdset.c \
+	registry_machine.c \
+	registry_machine.h \
+	registry_person.c \
+	registry_person.h \
+	registry_url.c \
+	registry_url.h \
+	rrd.c \
+	rrd.h \
+	rrd2json.c \
+	rrd2json.h \
+	rrd2json_api_old.c \
+	rrd2json_api_old.h \
 	rrdcalc.c \
 	rrdcalctemplate.c \
-	rrdvar.c \
+	rrddim.c \
 	rrddimvar.c \
+	rrdfamily.c \
+	rrdhost.c \
+	rrdpush.c \
+	rrdpush.h \
+	rrdset.c \
 	rrdsetvar.c \
-	rrd2json.c rrd2json.h \
-	rrd2json_api_old.c rrd2json_api_old.h \
-	rrdpush.c rrdpush.h \
-	storage_number.c storage_number.h \
-	unit_test.c unit_test.h \
+	rrdvar.c \
+	simple_pattern.c \
+	simple_pattern.h \
+	socket.c \
+	socket.h \
+	storage_number.c \
+	storage_number.h \
+	sys_devices_system_edac_mc.c \
+	sys_devices_system_node.c \
+	sys_fs_cgroup.c \
+	unit_test.c \
+	unit_test.h \
 	url.c url.h \
-	web_api_old.c web_api_old.h \
-	web_api_v1.c web_api_v1.h \
-	web_buffer.c web_buffer.h \
-	web_buffer_svg.c web_buffer_svg.h \
-	web_client.c web_client.h \
-	web_server.c web_server.h \
+	web_api_old.c \
+	web_api_old.h \
+	web_api_v1.c \
+	web_api_v1.h \
+	web_buffer.c \
+	web_buffer.h \
+	web_buffer_svg.c \
+	web_buffer_svg.h \
+	web_client.c \
+	web_client.h \
+	web_server.c \
+	web_server.h \
 	$(NULL)
 
 if FREEBSD
 netdata_SOURCES += \
-	plugin_freebsd.c plugin_freebsd.h \
+	plugin_freebsd.c \
+	plugin_freebsd.h \
 	freebsd_sysctl.c \
 	$(NULL)
 else
 if MACOS
 netdata_SOURCES += \
-	plugin_macos.c plugin_macos.h \
+	plugin_macos.c \
+	plugin_macos.h \
 	macos_sysctl.c \
 	macos_mach_smi.c \
 	macos_fw.c \
@@ -113,8 +159,10 @@ netdata_SOURCES += \
 else
 netdata_SOURCES += \
 	ipc.c ipc.h \
-	plugin_proc.c plugin_proc.h \
-	plugin_proc_diskspace.c plugin_proc_diskspace.h \
+	plugin_proc.c \
+	plugin_proc.h \
+	plugin_proc_diskspace.c \
+	plugin_proc_diskspace.h \
 	proc_diskstats.c \
 	proc_interrupts.c \
 	proc_softirqs.c \

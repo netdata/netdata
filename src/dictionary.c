@@ -31,21 +31,21 @@ static inline void NETDATA_DICTIONARY_STATS_ENTRIES_MINUS1(DICTIONARY *dict) {
 static inline void dictionary_read_lock(DICTIONARY *dict) {
     if(likely(dict->rwlock)) {
         // debug(D_DICTIONARY, "Dictionary READ lock");
-        pthread_rwlock_rdlock(dict->rwlock);
+        netdata_rwlock_rdlock(dict->rwlock);
     }
 }
 
 static inline void dictionary_write_lock(DICTIONARY *dict) {
     if(likely(dict->rwlock)) {
         // debug(D_DICTIONARY, "Dictionary WRITE lock");
-        pthread_rwlock_wrlock(dict->rwlock);
+        netdata_rwlock_wrlock(dict->rwlock);
     }
 }
 
 static inline void dictionary_unlock(DICTIONARY *dict) {
     if(likely(dict->rwlock)) {
         // debug(D_DICTIONARY, "Dictionary UNLOCK lock");
-        pthread_rwlock_unlock(dict->rwlock);
+        netdata_rwlock_unlock(dict->rwlock);
     }
 }
 
@@ -135,8 +135,8 @@ DICTIONARY *dictionary_create(uint8_t flags) {
         dict->stats = callocz(1, sizeof(struct dictionary_stats));
 
     if(!(flags & DICTIONARY_FLAG_SINGLE_THREADED)) {
-        dict->rwlock = callocz(1, sizeof(pthread_rwlock_t));
-        pthread_rwlock_init(dict->rwlock, NULL);
+        dict->rwlock = callocz(1, sizeof(netdata_rwlock_t));
+        netdata_rwlock_init(dict->rwlock);
     }
 
     avl_init(&dict->values_index, name_value_compare);
@@ -158,8 +158,10 @@ void dictionary_destroy(DICTIONARY *dict) {
     if(dict->stats)
         freez(dict->stats);
 
-    if(dict->rwlock)
+    if(dict->rwlock) {
+        netdata_rwlock_destroy(dict->rwlock);
         freez(dict->rwlock);
+    }
 
     freez(dict);
 }

@@ -24,7 +24,7 @@ typedef struct dictionary {
     uint8_t flags;
 
     struct dictionary_stats *stats;
-    pthread_rwlock_t *rwlock;
+    netdata_rwlock_t *rwlock;
 } DICTIONARY;
 
 #define DICTIONARY_FLAG_DEFAULT                 0x00000000

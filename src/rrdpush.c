@@ -59,8 +59,8 @@ int rrdpush_init() {
 // this is for the first iterations of each chart
 static unsigned int remote_clock_resync_iterations = 60;
 
-#define rrdpush_lock(host) pthread_mutex_lock(&((host)->rrdpush_mutex))
-#define rrdpush_unlock(host) pthread_mutex_unlock(&((host)->rrdpush_mutex))
+#define rrdpush_lock(host) netdata_mutex_lock(&((host)->rrdpush_mutex))
+#define rrdpush_unlock(host) netdata_mutex_unlock(&((host)->rrdpush_mutex))
 
 // checks if the current chart definition has been sent
 static inline int need_to_send_chart_definition(RRDSET *st) {

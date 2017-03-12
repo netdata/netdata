@@ -68,7 +68,7 @@ int registry_init(void) {
     registry.machines_urls_memory = 0;
 
     // initialize locks
-    pthread_mutex_init(&registry.lock, NULL);
+    netdata_mutex_init(&registry.lock);
 
     // create dictionaries
     registry.persons = dictionary_create(DICTIONARY_FLAGS);

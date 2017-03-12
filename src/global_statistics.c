@@ -10,14 +10,14 @@ volatile struct global_statistics global_statistics = {
         .compressed_content_size = 0
 };
 
-pthread_mutex_t global_statistics_mutex = PTHREAD_MUTEX_INITIALIZER;
+netdata_mutex_t global_statistics_mutex = NETDATA_MUTEX_INITIALIZER;
 
 inline void global_statistics_lock(void) {
-    pthread_mutex_lock(&global_statistics_mutex);
+    netdata_mutex_lock(&global_statistics_mutex);
 }
 
 inline void global_statistics_unlock(void) {
-    pthread_mutex_unlock(&global_statistics_mutex);
+    netdata_mutex_unlock(&global_statistics_mutex);
 }
 
 void finished_web_request_statistics(uint64_t dt,
