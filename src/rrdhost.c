@@ -380,7 +380,7 @@ void rrd_init(char *hostname) {
 // RRDHOST - lock validations
 // there are only used when NETDATA_INTERNAL_CHECKS is set
 
-void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
+void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
     debug(D_RRDHOST, "Checking read lock on host '%s'", host->hostname);
 
     int ret = netdata_rwlock_trywrlock(&host->rrdhost_rwlock);
@@ -388,7 +388,7 @@ void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *funct
         fatal("RRDHOST '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }
 
-void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
+void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
     debug(D_RRDHOST, "Checking write lock on host '%s'", host->hostname);
 
     int ret = netdata_rwlock_tryrdlock(&host->rrdhost_rwlock);
@@ -396,7 +396,7 @@ void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *funct
         fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }
 
-void rrd_check_rdlock_int(const char *file, const char *function, const unsigned long line) {
+void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line) {
     debug(D_RRDHOST, "Checking read lock on all RRDs");
 
     int ret = netdata_rwlock_trywrlock(&rrd_rwlock);
@@ -404,7 +404,7 @@ void rrd_check_rdlock_int(const char *file, const char *function, const unsigned
         fatal("RRDs should be read-locked, but it are not, at function %s() at line %lu of file '%s'", function, line, file);
 }
 
-void rrd_check_wrlock_int(const char *file, const char *function, const unsigned long line) {
+void __rrd_check_wrlock(const char *file, const char *function, const unsigned long line) {
     debug(D_RRDHOST, "Checking write lock on all RRDs");
 
     int ret = netdata_rwlock_tryrdlock(&rrd_rwlock);
