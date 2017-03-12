@@ -41,12 +41,12 @@ static inline int netdata_mutex_init_debug( const char *file, const char *functi
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(0x%p) from %lu@%s, %s()", mutex, line, file, function);
     }
 
     int ret = __netdata_mutex_init(mutex);
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(0x%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -56,12 +56,12 @@ static inline int netdata_mutex_lock_debug( const char *file, const char *functi
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(0x%p) from %lu@%s, %s()", mutex, line, file, function);
     }
 
     int ret = __netdata_mutex_lock(mutex);
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(0x%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -71,12 +71,12 @@ static inline int netdata_mutex_trylock_debug( const char *file, const char *fun
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(0x%p) from %lu@%s, %s()", mutex, line, file, function);
     }
 
     int ret = __netdata_mutex_trylock(mutex);
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(0x%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -86,12 +86,12 @@ static inline int netdata_mutex_unlock_debug( const char *file, const char *func
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(0x%p) from %lu@%s, %s()", mutex, line, file, function);
     }
 
     int ret = __netdata_mutex_unlock(mutex);
 
-    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -171,12 +171,12 @@ static inline int netdata_rwlock_destroy_debug( const char *file, const char *fu
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_destroy() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_destroy(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
     }
 
     int ret = __netdata_rwlock_destroy(rwlock);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_destroy() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_destroy(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -186,12 +186,12 @@ static inline int netdata_rwlock_init_debug( const char *file, const char *funct
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_init() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_init(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
     }
 
     int ret = __netdata_rwlock_init(rwlock);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_init() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_init(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -201,12 +201,12 @@ static inline int netdata_rwlock_rdlock_debug( const char *file, const char *fun
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_rdlock() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_rdlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
     }
 
     int ret = __netdata_rwlock_rdlock(rwlock);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_rdlock() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_rdlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -216,12 +216,12 @@ static inline int netdata_rwlock_wrlock_debug( const char *file, const char *fun
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
     }
 
     int ret = __netdata_rwlock_wrlock(rwlock);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_wrlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -231,12 +231,12 @@ static inline int netdata_rwlock_unlock_debug( const char *file, const char *fun
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_unlock() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_unlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
     }
 
     int ret = __netdata_rwlock_unlock(rwlock);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_unlock() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_unlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -246,12 +246,12 @@ static inline int netdata_rwlock_tryrdlock_debug( const char *file, const char *
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_tryrdlock() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_tryrdlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
     }
 
     int ret = __netdata_rwlock_tryrdlock(rwlock);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_tryrdlock() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_tryrdlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
@@ -261,12 +261,12 @@ static inline int netdata_rwlock_trywrlock_debug( const char *file, const char *
 
     if(unlikely(debug_flags & D_LOCKS)) {
         start = now_boottime_usec();
-        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_trywrlock() from %lu@%s, %s()", line, file, function);
+        debug(D_LOCKS, "RW_LOCK: netdata_rwlock_trywrlock(0x%p) from %lu@%s, %s()", rwlock, line, file, function);
     }
 
     int ret = __netdata_rwlock_trywrlock(rwlock);
 
-    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_trywrlock() = %d in %llu usec, from %lu@%s, %s()", ret, now_boottime_usec() - start, line, file, function);
+    debug(D_LOCKS, "RW_LOCK: netdata_rwlock_trywrlock(0x%p) = %d in %llu usec, from %lu@%s, %s()", rwlock, ret, now_boottime_usec() - start, line, file, function);
 
     return ret;
 }
