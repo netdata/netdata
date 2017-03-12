@@ -168,10 +168,11 @@
 // ----------------------------------------------------------------------------
 // netdata include files
 
-#include "simple_pattern.h"
-#include "avl.h"
 #include "clocks.h"
 #include "log.h"
+#include "locks.h"
+#include "simple_pattern.h"
+#include "avl.h"
 #include "global_statistics.h"
 #include "storage_number.h"
 #include "web_buffer.h"

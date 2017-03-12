@@ -13,9 +13,9 @@
 // #define AVL_LOCK_WITH_MUTEX 1
 
 #ifdef AVL_LOCK_WITH_MUTEX
-#define AVL_LOCK_INITIALIZER PTHREAD_MUTEX_INITIALIZER
+#define AVL_LOCK_INITIALIZER NETDATA_MUTEX_INITIALIZER
 #else /* AVL_LOCK_WITH_MUTEX */
-#define AVL_LOCK_INITIALIZER PTHREAD_RWLOCK_INITIALIZER
+#define AVL_LOCK_INITIALIZER NETDATA_RWLOCK_INITIALIZER
 #endif /* AVL_LOCK_WITH_MUTEX */
 
 #else /* AVL_WITHOUT_PTHREADS */
@@ -41,9 +41,9 @@ typedef struct avl_tree_lock {
 
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
-    pthread_mutex_t mutex;
+    netdata_mutex_t mutex;
 #else /* AVL_LOCK_WITH_MUTEX */
-    pthread_rwlock_t rwlock;
+    netdata_rwlock_t rwlock;
 #endif /* AVL_LOCK_WITH_MUTEX */
 #endif /* AVL_WITHOUT_PTHREADS */
 } avl_tree_lock;

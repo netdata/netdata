@@ -56,7 +56,7 @@ struct registry {
 
     avl_tree registry_urls_root_index;
 
-    pthread_mutex_t lock;
+    netdata_mutex_t lock;
 };
 
 extern int regenerate_guid(const char *guid, char *result);

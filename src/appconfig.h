@@ -18,7 +18,7 @@
 
 struct config {
     struct section *sections;
-    pthread_mutex_t mutex;
+    netdata_mutex_t mutex;
     avl_tree_lock index;
 };
 
