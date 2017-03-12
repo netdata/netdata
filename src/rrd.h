@@ -499,20 +499,20 @@ extern RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_api_key
 );
 
-#ifdef NETDATA_INTERNAL_CHECKS
-extern void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-extern void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-extern void rrdset_check_rdlock_int(RRDSET *st, const char *file, const char *function, const unsigned long line);
-extern void rrdset_check_wrlock_int(RRDSET *st, const char *file, const char *function, const unsigned long line);
-extern void rrd_check_rdlock_int(const char *file, const char *function, const unsigned long line);
-extern void rrd_check_wrlock_int(const char *file, const char *function, const unsigned long line);
+#if defined(NETDATA_INTERNAL_CHECKS) && defined(NETDATA_VERIFY_LOCKS)
+extern void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
+extern void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
+extern void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
+extern void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
+extern void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
+extern void __rrd_check_wrlock(const char *file, const char *function, const unsigned long line);
 
-#define rrdhost_check_rdlock(host) rrdhost_check_rdlock_int(host, __FILE__, __FUNCTION__, __LINE__)
-#define rrdhost_check_wrlock(host) rrdhost_check_wrlock_int(host, __FILE__, __FUNCTION__, __LINE__)
-#define rrdset_check_rdlock(st) rrdset_check_rdlock_int(st, __FILE__, __FUNCTION__, __LINE__)
-#define rrdset_check_wrlock(st) rrdset_check_wrlock_int(st, __FILE__, __FUNCTION__, __LINE__)
-#define rrd_check_rdlock() rrd_check_rdlock_int(__FILE__, __FUNCTION__, __LINE__)
-#define rrd_check_wrlock() rrd_check_wrlock_int(__FILE__, __FUNCTION__, __LINE__)
+#define rrdhost_check_rdlock(host) __rrdhost_check_rdlock(host, __FILE__, __FUNCTION__, __LINE__)
+#define rrdhost_check_wrlock(host) __rrdhost_check_wrlock(host, __FILE__, __FUNCTION__, __LINE__)
+#define rrdset_check_rdlock(st) __rrdset_check_rdlock(st, __FILE__, __FUNCTION__, __LINE__)
+#define rrdset_check_wrlock(st) __rrdset_check_wrlock(st, __FILE__, __FUNCTION__, __LINE__)
+#define rrd_check_rdlock() __rrd_check_rdlock(__FILE__, __FUNCTION__, __LINE__)
+#define rrd_check_wrlock() __rrd_check_wrlock(__FILE__, __FUNCTION__, __LINE__)
 
 #else
 #define rrdhost_check_rdlock(host) (void)0
