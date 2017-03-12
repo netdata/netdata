@@ -143,19 +143,26 @@ value_string="${19}"        # friendly value (with units)
 old_value_string="${20}"    # friendly old value (with units)
 
 # -----------------------------------------------------------------------------
+# find a suitable hostname to use, if netdata did not supply a hostname
+
+[ -z "${host}" ] && host="${NETDATA_HOSTNAME}"
+[ -z "${host}" ] && host="${NETDATA_REGISTRY_HOSTNAME}"
+[ -z "${host}" ] && host="$(hostname 2>/dev/null)"
+
+# -----------------------------------------------------------------------------
 # screen statuses we don't need to send a notification
 
 # don't do anything if this is not WARNING, CRITICAL or CLEAR
 if [ "${status}" != "WARNING" -a "${status}" != "CRITICAL" -a "${status}" != "CLEAR" ]
 then
-    info "not sending notification for ${status} on '${chart}.${name}'"
+    info "not sending notification for ${status} of '${host}.${chart}.${name}'"
     exit 1
 fi
 
 # don't do anything if this is CLEAR, but it was not WARNING or CRITICAL
 if [ "${old_status}" != "WARNING" -a "${old_status}" != "CRITICAL" -a "${status}" = "CLEAR" ]
 then
-    info "not sending notification for ${status} on '${chart}.${name}' (last status was ${old_status})"
+    info "not sending notification for ${status} of '${host}.${chart}.${name}' (last status was ${old_status})"
     exit 1
 fi
 
@@ -532,15 +539,8 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PD}"             != "YES" \
     ]
     then
-    fatal "All notification methods are disabled. Not sending notification to '${roles}' for '${name}' = '${value}' of chart '${chart}' for status '${status}'."
+    fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
 fi
-
-# -----------------------------------------------------------------------------
-# find a suitable hostname to use, if netdata did not supply a hostname
-
-[ -z "${host}" ] && host="${NETDATA_HOSTNAME}"
-[ -z "${host}" ] && host="${NETDATA_REGISTRY_HOSTNAME}"
-[ -z "${host}" ] && host="$(hostname 2>/dev/null)"
 
 # -----------------------------------------------------------------------------
 # get the date the alarm happened
@@ -803,10 +803,10 @@ send_pd() {
             retval=$?
             if [ ${retval} -eq 0 ]
                 then
-                    info "sent pagerduty.com notification using service key ${PD_SERVICE_KEY::-26}....: ${d}"
+                    info "sent pagerduty.com notification for host ${host} ${chart}.${name} using service key ${PD_SERVICE_KEY::-26}....: ${d}"
                     sent=$((sent + 1))
                 else
-                    error "failed to send pagerduty.com notification using service key ${PD_SERVICE_KEY::-26}.... (error code ${retval}): ${d}"
+                    error "failed to send pagerduty.com notification for ${host} ${chart}.${name} using service key ${PD_SERVICE_KEY::-26}.... (error code ${retval}): ${d}"
             fi
         done
 
