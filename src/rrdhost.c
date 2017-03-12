@@ -302,8 +302,8 @@ RRDHOST *rrdhost_find_or_create(
 
         if(strcmp(host->hostname, hostname)) {
             char *t = host->hostname;
-            char *n = strdupz(hostname);
-            host->hostname = n;
+            host->hostname = strdupz(hostname);
+            host->hash_hostname = simple_hash(host->hostname);
             freez(t);
         }
 
