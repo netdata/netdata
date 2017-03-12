@@ -91,8 +91,9 @@ RRDHOST *rrdhost_create(const char *hostname,
         char *rrdpush_api_key,
         int is_localhost
 ) {
-
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
+
+    rrd_check_wrlock();
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
@@ -208,8 +209,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     // ------------------------------------------------------------------------
     // link it and add it to the index
 
-    rrd_wrlock();
-
     if(is_localhost) {
         host->next = localhost;
         localhost = host;
@@ -262,7 +261,6 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
 
     rrd_hosts_available++;
-    rrd_unlock();
 
     return host;
 }
@@ -281,6 +279,7 @@ RRDHOST *rrdhost_find_or_create(
 ) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
+    rrd_wrlock();
     RRDHOST *host = rrdhost_find_by_guid(guid, 0);
     if(!host) {
         host = rrdhost_create(
@@ -316,10 +315,22 @@ RRDHOST *rrdhost_find_or_create(
         if(host->rrd_memory_mode != mode)
             error("Host '%s' has memory mode '%s', but the wanted one is '%s'.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
     }
+    rrd_unlock();
 
     rrdhost_cleanup_orphan(host);
 
     return host;
+}
+
+static inline int rrdhost_should_be_deleted(RRDHOST *host, RRDHOST *protected, time_t now) {
+    if(host != protected
+       && host != localhost
+       && !host->connected_senders
+       && host->senders_disconnected_time
+       && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
+        return 1;
+
+    return 0;
 }
 
 void rrdhost_cleanup_orphan(RRDHOST *protected) {
@@ -331,10 +342,7 @@ void rrdhost_cleanup_orphan(RRDHOST *protected) {
 
 restart_after_removal:
     rrdhost_foreach_write(host) {
-        if(host != protected
-           && host != localhost
-           && !host->connected_senders
-           && host->senders_disconnected_time + rrdhost_free_orphan_time < now) {
+        if(rrdhost_should_be_deleted(host, protected, now)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
 
             if(rrdset_flag_check(host, RRDHOST_ORPHAN))
@@ -361,6 +369,7 @@ void rrd_init(char *hostname) {
     rrdpush_init();
 
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
+    rrd_wrlock();
     localhost = rrdhost_create(
             hostname
             , registry_get_this_machine_guid()
@@ -374,6 +383,7 @@ void rrd_init(char *hostname) {
             , default_rrdpush_api_key
             , 1
     );
+    rrd_unlock();
 }
 
 // ----------------------------------------------------------------------------
