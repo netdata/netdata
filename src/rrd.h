@@ -273,7 +273,7 @@ struct rrdset {
     char *cache_dir;                                // the directory to store dimensions
     char cache_filename[FILENAME_MAX+1];            // the filename to store this set
 
-    pthread_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
+    netdata_rwlock_t rrdset_rwlock;                 // protects dimensions linked list
 
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
@@ -325,9 +325,10 @@ struct rrdset {
 };
 typedef struct rrdset RRDSET;
 
-#define rrdset_rdlock(st) pthread_rwlock_rdlock(&((st)->rrdset_rwlock))
-#define rrdset_wrlock(st) pthread_rwlock_wrlock(&((st)->rrdset_rwlock))
-#define rrdset_unlock(st) pthread_rwlock_unlock(&((st)->rrdset_rwlock))
+#define rrdset_rdlock(st) netdata_rwlock_rdlock(&((st)->rrdset_rwlock))
+#define rrdset_wrlock(st) netdata_rwlock_wrlock(&((st)->rrdset_rwlock))
+#define rrdset_unlock(st) netdata_rwlock_unlock(&((st)->rrdset_rwlock))
+
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -393,7 +394,7 @@ struct rrdhost {
     volatile int rrdpush_error_shown:1;             // 1 when we have logged a communication error
     int rrdpush_socket;                             // the fd of the socket to the remote host, or -1
     pthread_t rrdpush_thread;                       // the sender thread
-    pthread_mutex_t rrdpush_mutex;                  // exclusive access to rrdpush_buffer
+    netdata_mutex_t rrdpush_mutex;                  // exclusive access to rrdpush_buffer
     int rrdpush_pipe[2];                            // collector to sender thread communication
     BUFFER *rrdpush_buffer;                         // collector fills it, sender sends them
 
@@ -439,7 +440,7 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // locks
 
-    pthread_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
+    netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
 
     avl_tree_lock rrdset_root_index;                // the host's charts index (by id)
     avl_tree_lock rrdset_root_index_name;           // the host's charts index (by name)
@@ -452,9 +453,9 @@ struct rrdhost {
 typedef struct rrdhost RRDHOST;
 extern RRDHOST *localhost;
 
-#define rrdhost_rdlock(h) pthread_rwlock_rdlock(&((h)->rrdhost_rwlock))
-#define rrdhost_wrlock(h) pthread_rwlock_wrlock(&((h)->rrdhost_rwlock))
-#define rrdhost_unlock(h) pthread_rwlock_unlock(&((h)->rrdhost_rwlock))
+#define rrdhost_rdlock(host) netdata_rwlock_rdlock(&((host)->rrdhost_rwlock))
+#define rrdhost_wrlock(host) netdata_rwlock_wrlock(&((host)->rrdhost_rwlock))
+#define rrdhost_unlock(host) netdata_rwlock_unlock(&((host)->rrdhost_rwlock))
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -469,10 +470,11 @@ extern RRDHOST *localhost;
 // ----------------------------------------------------------------------------
 // global lock for all RRDHOSTs
 
-extern pthread_rwlock_t rrd_rwlock;
-#define rrd_rdlock() pthread_rwlock_rdlock(&rrd_rwlock)
-#define rrd_wrlock() pthread_rwlock_wrlock(&rrd_rwlock)
-#define rrd_unlock() pthread_rwlock_unlock(&rrd_rwlock)
+extern netdata_rwlock_t rrd_rwlock;
+
+#define rrd_rdlock() netdata_rwlock_rdlock(&rrd_rwlock)
+#define rrd_wrlock() netdata_rwlock_wrlock(&rrd_rwlock)
+#define rrd_unlock() netdata_rwlock_unlock(&rrd_rwlock)
 
 // ----------------------------------------------------------------------------
 

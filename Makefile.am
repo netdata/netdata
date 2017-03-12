@@ -23,8 +23,18 @@ EXTRA_DIST = \
 	.eslintignore \
 	.eslintrc \
 	.travis \
-	m4/ax_check_enable_debug.m4 \
-	m4/ax_c_statement_expressions.m4 \
+	m4/jemalloc.m4 \
+    m4/ax_c___atomic.m4 \
+    m4/ax_check_enable_debug.m4 \
+    m4/ax_c_mallinfo.m4 \
+    m4/ax_gcc_func_attribute.m4 \
+    m4/ax_check_compile_flag.m4 \
+    m4/ax_c_statement_expressions.m4 \
+    m4/ax_pthread.m4 \
+    m4/ax_c_lto.m4 \
+    m4/ax_c_mallopt.m4 \
+    m4/tcmalloc.m4 \
+    m4/ax_c__generic.m4 \
 	autogen.sh \
 	README.md \
 	LICENSE.md \
@@ -48,6 +58,8 @@ SUBDIRS = \
 dist_noinst_DATA= \
 	diagrams/config.puml \
 	diagrams/registry.puml \
+	diagrams/netdata-for-ephemeral-nodes.xml \
+	diagrams/netdata-proxies-example.xml \
 	configs.signatures \
 	Dockerfile \
 	netdata.spec \

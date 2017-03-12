@@ -36,7 +36,7 @@ struct section {
     struct config_option *values;
     avl_tree_lock values_index;
 
-    pthread_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
+    netdata_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
                             // readers are protected using the rwlock in avl_tree_lock
 };
 
@@ -44,7 +44,7 @@ static int appconfig_section_compare(void *a, void *b);
 
 struct config netdata_config = {
         .sections = NULL,
-        .mutex = PTHREAD_MUTEX_INITIALIZER,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
             { NULL, appconfig_section_compare },
             AVL_LOCK_INITIALIZER
@@ -53,7 +53,7 @@ struct config netdata_config = {
 
 struct config stream_config = {
         .sections = NULL,
-        .mutex = PTHREAD_MUTEX_INITIALIZER,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
         .index = {
                 { NULL, appconfig_section_compare },
                 AVL_LOCK_INITIALIZER
@@ -64,19 +64,19 @@ struct config stream_config = {
 // locking
 
 static inline void appconfig_wrlock(struct config *root) {
-    pthread_mutex_lock(&root->mutex);
+    netdata_mutex_lock(&root->mutex);
 }
 
 static inline void appconfig_unlock(struct config *root) {
-    pthread_mutex_unlock(&root->mutex);
+    netdata_mutex_unlock(&root->mutex);
 }
 
 static inline void config_section_wrlock(struct section *co) {
-    pthread_mutex_lock(&co->mutex);
+    netdata_mutex_lock(&co->mutex);
 }
 
 static inline void config_section_unlock(struct section *co) {
-    pthread_mutex_unlock(&co->mutex);
+    netdata_mutex_unlock(&co->mutex);
 }
 
 

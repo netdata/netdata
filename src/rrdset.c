@@ -6,7 +6,7 @@
 void rrdset_check_rdlock_int(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);
 
-    int ret = pthread_rwlock_trywrlock(&st->rrdset_rwlock);
+    int ret = netdata_rwlock_trywrlock(&st->rrdset_rwlock);
     if(ret == 0)
         fatal("RRDSET '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", st->id, function, line, file);
 }
@@ -14,7 +14,7 @@ void rrdset_check_rdlock_int(RRDSET *st, const char *file, const char *function,
 void rrdset_check_wrlock_int(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking write lock on chart '%s'", st->id);
 
-    int ret = pthread_rwlock_tryrdlock(&st->rrdset_rwlock);
+    int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
     if(ret == 0)
         fatal("RRDSET '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", st->id, function, line, file);
 }
@@ -274,6 +274,8 @@ void rrdset_free(RRDSET *st) {
     // ------------------------------------------------------------------------
     // free it
 
+    netdata_rwlock_destroy(&st->rrdset_rwlock);
+
     // free directly allocated members
     freez(st->config_section);
 
@@ -328,6 +330,17 @@ void rrdset_delete(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // RRDSET - create a chart
 
+static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
+    RRDSET *st = rrdset_find(host, fullid);
+    if(unlikely(st)) {
+        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+        debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
+        return st;
+    }
+
+    return NULL;
+}
+
 RRDSET *rrdset_create(
           RRDHOST *host
         , const char *type
@@ -357,10 +370,14 @@ RRDSET *rrdset_create(
     char fullid[RRD_ID_LENGTH_MAX + 1];
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
-    RRDSET *st = rrdset_find(host, fullid);
+    RRDSET *st = rrdset_find_on_create(host, fullid);
+    if(st) return st;
+
+    rrdhost_wrlock(host);
+
+    st = rrdset_find_on_create(host, fullid);
     if(st) {
-        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-        debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
+        rrdhost_unlock(host);
         return st;
     }
 
@@ -406,7 +423,7 @@ RRDSET *rrdset_create(
             memset(&st->avlname, 0, sizeof(avl));
             memset(&st->variables_root_index, 0, sizeof(avl_tree_lock));
             memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
-            memset(&st->rrdset_rwlock, 0, sizeof(pthread_rwlock_t));
+            memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
 
             st->name = NULL;
             st->type = NULL;
@@ -522,8 +539,7 @@ RRDSET *rrdset_create(
     avl_init_lock(&st->dimensions_index, rrddim_compare);
     avl_init_lock(&st->variables_root_index, rrdvar_compare);
 
-    pthread_rwlock_init(&st->rrdset_rwlock, NULL);
-    rrdhost_wrlock(host);
+    netdata_rwlock_init(&st->rrdset_rwlock);
 
     if(name && *name) rrdset_set_name(st, name);
     else rrdset_set_name(st, id);
@@ -1250,8 +1266,8 @@ void rrdset_done(RRDSET *st) {
             RRDDIM *last;
             // there is dimension to free
             // upgrade our read lock to a write lock
-            pthread_rwlock_unlock(&st->rrdset_rwlock);
-            pthread_rwlock_wrlock(&st->rrdset_rwlock);
+            rrdset_unlock(st);
+            rrdset_wrlock(st);
 
             for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
                 // remove it only it is not updated in rrd_delete_unupdated_dimensions seconds

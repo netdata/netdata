@@ -144,7 +144,7 @@ set(NETDATA_SOURCE_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        )
+        src/locks.h)
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c

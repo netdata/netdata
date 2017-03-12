@@ -272,7 +272,7 @@ netdata.processors.snmp = {
                         if(__DEBUG === true)
                             netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + " = " + varbinds[i].value);
 
-                        if(varbinds[i].type === net_snmp.ObjectType.OctetString)
+                        if(varbinds[i].type === net_snmp.ObjectType.OctetString && service.snmp_oids_index[varbinds[i].oid].type !== 'title')
                             value = parseFloat(varbinds[i].value) * 1000;
                         else
                             value = varbinds[i].value;

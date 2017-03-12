@@ -10,11 +10,11 @@
 // REGISTRY concurrency locking
 
 static inline void registry_lock(void) {
-    pthread_mutex_lock(&registry.lock);
+    netdata_mutex_lock(&registry.lock);
 }
 
 static inline void registry_unlock(void) {
-    pthread_mutex_unlock(&registry.lock);
+    netdata_mutex_unlock(&registry.lock);
 }
 
 
