@@ -325,10 +325,6 @@ struct rrdset {
 };
 typedef struct rrdset RRDSET;
 
-#define rrdset_rdlock(st) pthread_rwlock_rdlock(&((st)->rrdset_rwlock))
-#define rrdset_wrlock(st) pthread_rwlock_wrlock(&((st)->rrdset_rwlock))
-#define rrdset_unlock(st) pthread_rwlock_unlock(&((st)->rrdset_rwlock))
-
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
 
@@ -452,9 +448,21 @@ struct rrdhost {
 typedef struct rrdhost RRDHOST;
 extern RRDHOST *localhost;
 
-#define rrdhost_rdlock(h) pthread_rwlock_rdlock(&((h)->rrdhost_rwlock))
-#define rrdhost_wrlock(h) pthread_rwlock_wrlock(&((h)->rrdhost_rwlock))
-#define rrdhost_unlock(h) pthread_rwlock_unlock(&((h)->rrdhost_rwlock))
+static inline void rrdhost_rdlock(RRDHOST *host) {
+    if(unlikely(pthread_rwlock_rdlock(&host->rrdhost_rwlock) != 0))
+        error("Cannot obtain read lock on host '%s'", host->hostname);
+}
+
+static inline void rrdhost_wrlock(RRDHOST *host) {
+    if(unlikely(pthread_rwlock_wrlock(&host->rrdhost_rwlock) != 0))
+        error("Cannot obtain write lock on host '%s'", host->hostname);
+}
+
+static inline void rrdhost_unlock(RRDHOST *host) {
+    if(unlikely(pthread_rwlock_unlock(&host->rrdhost_rwlock) != 0))
+        error("Cannot unlock host '%s'", host->hostname);
+}
+
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -470,9 +478,36 @@ extern RRDHOST *localhost;
 // global lock for all RRDHOSTs
 
 extern pthread_rwlock_t rrd_rwlock;
-#define rrd_rdlock() pthread_rwlock_rdlock(&rrd_rwlock)
-#define rrd_wrlock() pthread_rwlock_wrlock(&rrd_rwlock)
-#define rrd_unlock() pthread_rwlock_unlock(&rrd_rwlock)
+
+static inline void rrd_rdlock() {
+    if(unlikely(pthread_rwlock_rdlock(&rrd_rwlock) != 0))
+        error("Cannot read lock the RRD database.");
+}
+
+static inline void rrd_wrlock() {
+    if(unlikely(pthread_rwlock_wrlock(&rrd_rwlock) != 0))
+        error("Cannot write lock the RRD database.");
+}
+
+static inline void rrd_unlock() {
+    if(unlikely(pthread_rwlock_unlock(&rrd_rwlock) != 0))
+        error("Cannot unlock the RRD database.");
+}
+
+static inline void rrdset_rdlock(RRDSET *st) {
+    if(unlikely(pthread_rwlock_rdlock(&st->rrdset_rwlock) != 0))
+        error("Cannot read lock RRDSET '%s' of host '%s'", st->id, st->rrdhost->hostname);
+}
+
+static inline void rrdset_wrlock(RRDSET *st) {
+    if(unlikely(pthread_rwlock_wrlock(&st->rrdset_rwlock) != 0))
+        error("Cannot write lock RRDSET '%s' of host '%s'", st->id, st->rrdhost->hostname);
+}
+
+static inline void rrdset_unlock(RRDSET *st) {
+    if(unlikely(pthread_rwlock_unlock(&st->rrdset_rwlock) != 0))
+        error("Cannot unlock RRDSET '%s' of host '%s'", st->id, st->rrdhost->hostname);
+}
 
 // ----------------------------------------------------------------------------
 
