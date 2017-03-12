@@ -129,7 +129,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
     size_t line = 0, len = 0;
     ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
 
-    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
@@ -297,7 +297,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
         }
     }
 
-    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     freez(buf);
 
@@ -404,14 +404,14 @@ inline void health_alarm_log(
         ae->non_clear_duration += ae->duration;
 
     // link it
-    pthread_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
     ae->next = host->health_log.alarms;
     host->health_log.alarms = ae;
     host->health_log.count++;
-    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     // match previous alarms
-    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t != ae && t->alarm_id == ae->alarm_id) {
@@ -431,7 +431,7 @@ inline void health_alarm_log(
             break;
         }
     }
-    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     health_alarm_log_save(host, ae);
 }
@@ -453,7 +453,7 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
 inline void health_alarm_log_free(RRDHOST *host) {
     rrdhost_check_wrlock(host);
 
-    pthread_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
     ALARM_ENTRY *ae;
     while((ae = host->health_log.alarms)) {
@@ -461,5 +461,5 @@ inline void health_alarm_log_free(RRDHOST *host) {
         health_alarm_log_free_one_nochecks_nounlink(ae);
     }
 
-    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }

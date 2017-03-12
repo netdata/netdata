@@ -3,7 +3,7 @@
 
 RRDHOST *localhost = NULL;
 size_t rrd_hosts_available = 0;
-pthread_rwlock_t rrd_rwlock = PTHREAD_RWLOCK_INITIALIZER;
+netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
 time_t rrdset_free_obsolete_time = 3600;
 time_t rrdhost_free_orphan_time = 3600;
@@ -108,8 +108,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrdpush_pipe[1] = -1;
     host->rrdpush_socket  = -1;
 
-    pthread_mutex_init(&host->rrdpush_mutex, NULL);
-    pthread_rwlock_init(&host->rrdhost_rwlock, NULL);
+    netdata_mutex_init(&host->rrdpush_mutex);
+    netdata_rwlock_init(&host->rrdhost_rwlock);
 
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
@@ -144,7 +144,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     else
         host->health_log.max = (unsigned int)n;
 
-    pthread_rwlock_init(&(host->health_log.alarm_log_rwlock), NULL);
+    netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
 
     char filename[FILENAME_MAX + 1];
 
@@ -383,7 +383,7 @@ void rrd_init(char *hostname) {
 void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
     debug(D_RRDHOST, "Checking read lock on host '%s'", host->hostname);
 
-    int ret = pthread_rwlock_trywrlock(&host->rrdhost_rwlock);
+    int ret = netdata_rwlock_trywrlock(&host->rrdhost_rwlock);
     if(ret == 0)
         fatal("RRDHOST '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }
@@ -391,7 +391,7 @@ void rrdhost_check_rdlock_int(RRDHOST *host, const char *file, const char *funct
 void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *function, const unsigned long line) {
     debug(D_RRDHOST, "Checking write lock on host '%s'", host->hostname);
 
-    int ret = pthread_rwlock_tryrdlock(&host->rrdhost_rwlock);
+    int ret = netdata_rwlock_tryrdlock(&host->rrdhost_rwlock);
     if(ret == 0)
         fatal("RRDHOST '%s' should be write-locked, but it is not, at function %s() at line %lu of file '%s'", host->hostname, function, line, file);
 }
@@ -399,7 +399,7 @@ void rrdhost_check_wrlock_int(RRDHOST *host, const char *file, const char *funct
 void rrd_check_rdlock_int(const char *file, const char *function, const unsigned long line) {
     debug(D_RRDHOST, "Checking read lock on all RRDs");
 
-    int ret = pthread_rwlock_trywrlock(&rrd_rwlock);
+    int ret = netdata_rwlock_trywrlock(&rrd_rwlock);
     if(ret == 0)
         fatal("RRDs should be read-locked, but it are not, at function %s() at line %lu of file '%s'", function, line, file);
 }
@@ -407,7 +407,7 @@ void rrd_check_rdlock_int(const char *file, const char *function, const unsigned
 void rrd_check_wrlock_int(const char *file, const char *function, const unsigned long line) {
     debug(D_RRDHOST, "Checking write lock on all RRDs");
 
-    int ret = pthread_rwlock_tryrdlock(&rrd_rwlock);
+    int ret = netdata_rwlock_tryrdlock(&rrd_rwlock);
     if(ret == 0)
         fatal("RRDs should be write-locked, but it are not, at function %s() at line %lu of file '%s'", function, line, file);
 }
@@ -473,6 +473,8 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->health_log_filename);
     freez(host->hostname);
     rrdhost_unlock(host);
+    netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_destroy(&host->rrdhost_rwlock);
     freez(host);
 
     rrd_hosts_available--;

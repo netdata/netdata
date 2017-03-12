@@ -85,7 +85,7 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
 }
 
 void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after) {
-    pthread_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     buffer_strcat(wb, "[");
 
@@ -101,7 +101,7 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after) {
 
     buffer_strcat(wb, "\n]\n");
 
-    pthread_rwlock_unlock(&host->health_log.alarm_log_rwlock);
+    netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
 static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {
