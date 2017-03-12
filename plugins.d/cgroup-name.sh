@@ -98,6 +98,8 @@ if [ -z "${NAME}" ]
     then
     if [[ "${CGROUP}" =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]
         then
+        # docker containers
+
         DOCKERID="$( echo "${CGROUP}" | sed "s|^.*docker[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|" )"
         # echo "DOCKERID=${DOCKERID}"
 
@@ -117,6 +119,11 @@ if [ -z "${NAME}" ]
                 info "docker container '${DOCKERID}' is named '${NAME}'"
             fi
         fi
+    elif [[ "${CGROUP}" =~ machine.slice_machine.*-qemu ]]
+        then
+        # libvirtd / qemu virtual machines
+
+        NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
     fi
 
     [ -z "${NAME}" ] && NAME="${CGROUP}"
