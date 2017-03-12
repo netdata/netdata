@@ -328,6 +328,17 @@ void rrdset_delete(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // RRDSET - create a chart
 
+static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
+    RRDSET *st = rrdset_find(host, fullid);
+    if(unlikely(st)) {
+        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+        debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
+        return st;
+    }
+
+    return NULL;
+}
+
 RRDSET *rrdset_create(
           RRDHOST *host
         , const char *type
@@ -357,10 +368,14 @@ RRDSET *rrdset_create(
     char fullid[RRD_ID_LENGTH_MAX + 1];
     snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
 
-    RRDSET *st = rrdset_find(host, fullid);
+    RRDSET *st = rrdset_find_on_create(host, fullid);
+    if(st) return st;
+
+    rrdhost_wrlock(host);
+
+    st = rrdset_find_on_create(host, fullid);
     if(st) {
-        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-        debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
+        rrdhost_unlock(host);
         return st;
     }
 
@@ -523,7 +538,6 @@ RRDSET *rrdset_create(
     avl_init_lock(&st->variables_root_index, rrdvar_compare);
 
     pthread_rwlock_init(&st->rrdset_rwlock, NULL);
-    rrdhost_wrlock(host);
 
     if(name && *name) rrdset_set_name(st, name);
     else rrdset_set_name(st, id);
@@ -1250,8 +1264,8 @@ void rrdset_done(RRDSET *st) {
             RRDDIM *last;
             // there is dimension to free
             // upgrade our read lock to a write lock
-            pthread_rwlock_unlock(&st->rrdset_rwlock);
-            pthread_rwlock_wrlock(&st->rrdset_rwlock);
+            rrdset_unlock(st);
+            rrdset_wrlock(st);
 
             for( rd = st->dimensions, last = NULL ; likely(rd) ; ) {
                 // remove it only it is not updated in rrd_delete_unupdated_dimensions seconds

@@ -315,9 +315,11 @@ int avl_traverse(avl_tree *t, int (*callback)(void *entry, void *data), void *da
 void avl_read_lock(avl_tree_lock *t) {
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
-    pthread_mutex_lock(&t->mutex);
+    if(unlikely(pthread_mutex_lock(&t->mutex) != 0))
+        error("Cannot get mutex of an AVL");
 #else
-    pthread_rwlock_rdlock(&t->rwlock);
+    if(unlikely(pthread_rwlock_rdlock(&t->rwlock) != 0))
+        error("Cannot get read lock of an AVL");
 #endif
 #endif /* AVL_WITHOUT_PTHREADS */
 }
@@ -325,9 +327,11 @@ void avl_read_lock(avl_tree_lock *t) {
 void avl_write_lock(avl_tree_lock *t) {
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
-    pthread_mutex_lock(&t->mutex);
+    if(unlikely(pthread_mutex_lock(&t->mutex) != 0)
+        error("Cannot get mutex of an AVL");
 #else
-    pthread_rwlock_wrlock(&t->rwlock);
+    if(unlikely(pthread_rwlock_wrlock(&t->rwlock) != 0))
+        error("Cannot write lock an AVL.");
 #endif
 #endif /* AVL_WITHOUT_PTHREADS */
 }
@@ -335,9 +339,11 @@ void avl_write_lock(avl_tree_lock *t) {
 void avl_unlock(avl_tree_lock *t) {
 #ifndef AVL_WITHOUT_PTHREADS
 #ifdef AVL_LOCK_WITH_MUTEX
-    pthread_mutex_unlock(&t->mutex);
+    if(unlikely(pthread_mutex_unlock(&t->mutex) != 0))
+        error("Cannot unlock mutex of an AVL");
 #else
-    pthread_rwlock_unlock(&t->rwlock);
+    if(unlikely(pthread_rwlock_unlock(&t->rwlock) != 0))
+        error("Cannot unlock an AVL");
 #endif
 #endif /* AVL_WITHOUT_PTHREADS */
 }
