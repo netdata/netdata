@@ -3,7 +3,7 @@
 
 #define RRD_DEFAULT_GAP_INTERPOLATIONS 1
 
-void rrdset_check_rdlock_int(RRDSET *st, const char *file, const char *function, const unsigned long line) {
+void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);
 
     int ret = netdata_rwlock_trywrlock(&st->rrdset_rwlock);
@@ -11,7 +11,7 @@ void rrdset_check_rdlock_int(RRDSET *st, const char *file, const char *function,
         fatal("RRDSET '%s' should be read-locked, but it is not, at function %s() at line %lu of file '%s'", st->id, function, line, file);
 }
 
-void rrdset_check_wrlock_int(RRDSET *st, const char *file, const char *function, const unsigned long line) {
+void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking write lock on chart '%s'", st->id);
 
     int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
