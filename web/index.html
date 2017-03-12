@@ -601,6 +601,8 @@
             var len, i, url, hostname, icon;
 
             if(options.hosts.length > 1) {
+                // there are mirrored hosts here
+
                 el += '<li><a href="#" onClick="return false;" style="color: #666;" target="_blank">databases available on this host</a></li>';
                 a1 += '<li><a href="#" onClick="return false;"><i class="fa fa-info-circle" aria-hidden="true" style="color: #666;"></i></a></li>';
 
@@ -611,11 +613,19 @@
                 if(base.endsWith("/"))
                     base = base.substring(0, base.length - 1);
 
+                var master = options.hosts[0].hostname;
+                var sorted = options.hosts.sort(function(a, b) {
+                    if(a.hostname === master) return -1;
+                    if(a.hostname === b.hostname) return 0;
+                    else if(a.hostname > b.hostname) return 1;
+                    return -1;
+                });
+
                 i = 0;
-                len = options.hosts.length;
+                len = sorted.length;
                 while(len--) {
-                    hostname = options.hosts[i].hostname;
-                    if(i == 0) {
+                    hostname = sorted[i].hostname;
+                    if(hostname == master) {
                         url = base + "/";
                         icon = "home";
                     }
