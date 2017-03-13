@@ -366,7 +366,10 @@ static void backwards_compatible_config() {
         web_server_mode = (mode)?WEB_SERVER_MODE_MULTI_THREADED:WEB_SERVER_MODE_SINGLE_THREADED;
     }
 
-    // move [global] options to the [api] section
+    // move [global] options to the [web] section
+    config_move(CONFIG_SECTION_GLOBAL, "http port listen backlog",
+                CONFIG_SECTION_WEB,    "listen backlog");
+
     config_move(CONFIG_SECTION_GLOBAL, "bind socket to IP",
                 CONFIG_SECTION_WEB,    "bind to");
 
@@ -412,7 +415,7 @@ static void get_netdata_configured_variables() {
 
     char buf[HOSTNAME_MAX + 1];
     if(gethostname(buf, HOSTNAME_MAX) == -1)
-        error("WARNING: Cannot get machine hostname.");
+        error("Cannot get machine hostname.");
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
     debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
