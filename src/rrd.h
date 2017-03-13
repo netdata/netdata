@@ -376,7 +376,7 @@ struct rrdhost {
     uint32_t flags;                                 // flags about this RRDHOST
 
     int rrd_update_every;                           // the update frequency of the host
-    int rrd_history_entries;                        // the number of history entries for the host's charts
+    long rrd_history_entries;                       // the number of history entries for the host's charts
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
 
     char *cache_dir;                                // the directory to save RRD cache files
@@ -491,7 +491,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , const char *guid
         , const char *os
         , int update_every
-        , int history
+        , long history
         , RRD_MEMORY_MODE mode
         , int health_enabled
         , int rrdpush_enabled

@@ -142,7 +142,7 @@ void rrd_all2json_api_old(RRDHOST *host, BUFFER *wb)
     buffer_sprintf(wb, "\n\t],\n"
                     "\t\"hostname\": \"%s\",\n"
                     "\t\"update_every\": %d,\n"
-                    "\t\"history\": %d,\n"
+                    "\t\"history\": %ld,\n"
                     "\t\"memory\": %lu\n"
                     "}\n"
                    , host->hostname

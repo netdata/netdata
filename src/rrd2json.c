@@ -78,25 +78,30 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrd_stats_api_v1_chart_with_data(st, wb, NULL, NULL);
 }
 
-void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb)
-{
+void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb) {
+    static char *custom_dashboard_info_js_filename = NULL;
     size_t c, dimensions = 0, memory = 0, alarms = 0;
     RRDSET *st;
 
     time_t now = now_realtime_sec();
+
+    if(unlikely(!custom_dashboard_info_js_filename))
+        custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
 
     buffer_sprintf(wb, "{\n"
            "\t\"hostname\": \"%s\""
         ",\n\t\"version\": \"%s\""
         ",\n\t\"os\": \"%s\""
         ",\n\t\"update_every\": %d"
-        ",\n\t\"history\": %d"
+        ",\n\t\"history\": %ld"
+        ",\n\t\"custom_info\": \"%s\""
         ",\n\t\"charts\": {"
         , host->hostname
         , program_version
         , host->os
         , host->rrd_update_every
         , host->rrd_history_entries
+        , custom_dashboard_info_js_filename
         );
 
     c = 0;

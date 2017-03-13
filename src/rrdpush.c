@@ -522,7 +522,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %d, memory mode = %s, health %s"
+    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s"
          , hostname
          , client_ip
          , client_port
@@ -583,12 +583,11 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed updates %zu).", host->hostname, client_ip, client_port, count);
 
     rrdhost_wrlock(host);
+    host->senders_disconnected_time = now_realtime_sec();
     host->connected_senders--;
     if(!host->connected_senders) {
         if(health_enabled == CONFIG_BOOLEAN_AUTO)
             host->health_enabled = 0;
-
-        host->senders_disconnected_time = now_realtime_sec();
     }
     rrdhost_unlock(host);
 
