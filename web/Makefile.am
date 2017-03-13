@@ -11,6 +11,7 @@ dist_web_DATA = \
 	dashboard.html \
 	dashboard.js \
 	dashboard_info.js \
+	dashboard_info_custom_example.js \
 	dashboard.css \
 	dashboard.slate.css \
 	favicon.ico \

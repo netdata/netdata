@@ -992,6 +992,14 @@
 
         // ----------------------------------------------------------------------------
 
+        // user editable information
+        var customDashboard = {
+            menu: {},
+            submenu: {},
+            context: {}
+        };
+
+        // netdata standard information
         var netdataDashboard = {
             sparklines_registry: {},
             os: 'unknown',
@@ -1163,12 +1171,16 @@
                     chart.menu = chart.type;
                     if(parts.length > 2 && parts[1] === 'cache')
                         chart.menu_pattern = tmp + '_' + parts[1];
+                    else if(parts.length > 1)
+                        chart.menu_pattern = tmp;
                     break;
 
                 case 'bind':
                     chart.menu = chart.type;
                     if(parts.length > 2 && parts[1] === 'rndc')
                         chart.menu_pattern = tmp + '_' + parts[1];
+                    else if(parts.length > 1)
+                        chart.menu_pattern = tmp;
                     break;
 
                 case 'cgroup':
@@ -1183,12 +1195,16 @@
                     chart.menu = chart.type;
                     if(parts.length > 2 && parts[1] === 'dhcpd')
                         chart.menu_pattern = tmp + '_' + parts[1];
+                    else if(parts.length > 1)
+                        chart.menu_pattern = tmp;
                     break;
 
                 case 'ovpn':
                     chart.menu = chart.type;
                     if(parts.length > 3 && parts[1] === 'status' && parts[2] === 'log')
                         chart.menu_pattern = tmp + '_' + parts[1];
+                    else if(parts.length > 1)
+                        chart.menu_pattern = tmp;
                     break;
 
                 case 'smartd':
@@ -1196,28 +1212,8 @@
                     chart.menu = chart.type;
                     if(parts.length > 2 && parts[1] === 'log')
                         chart.menu_pattern = tmp + '_' + parts[1];
-                    break;
-
-                case 'dovecot':
-                case 'exim':
-                case 'hddtemp':
-                case 'ipfs':
-                case 'memcached':
-                case 'mysql':
-                case 'named':
-                case 'nginx':
-                case 'nut':
-                case 'phpfpm':
-                case 'postfix':
-                case 'postgres':
-                case 'redis':
-                case 'retroshare':
-                case 'smawebbox':
-                case 'snmp':
-                case 'squid':
-                case 'tomcat':
-                    chart.menu = chart.type;
-                    chart.menu_pattern = tmp;
+                    else if(parts.length > 1)
+                        chart.menu_pattern = tmp;
                     break;
 
                 case 'tc':
@@ -1248,6 +1244,8 @@
 
                 default:
                     chart.menu = chart.type;
+                    if(parts.length > 1)
+                        chart.menu_pattern = tmp;
                     break;
             }
 
@@ -2288,6 +2286,43 @@
                 document.getElementById('alarms_count_badge').innerHTML = '';
         }
 
+        function initializeDynamicDashboardWithData(data) {
+            if(data !== null) {
+                options.hostname = data.hostname;
+                options.data = data;
+                options.version = data.version;
+                netdataDashboard.os = data.os;
+
+                if(typeof data.hosts != 'undefined')
+                    options.hosts = data.hosts;
+
+                // update the dashboard hostname
+                document.getElementById('hostname').innerHTML = options.hostname;
+                document.getElementById('hostname').href = NETDATA.serverDefault;
+                document.getElementById('netdataVersion').innerHTML = options.version;
+
+                // update the dashboard title
+                document.title = options.hostname + ' netdata dashboard';
+
+                // close the splash screen
+                $("#loadOverlay").css("display","none");
+
+                // create a chart_by_name index
+                data.charts_by_name = {};
+                var charts = data.charts;
+                var x;
+                for(x in charts) {
+                    if(!charts.hasOwnProperty(x)) continue;
+
+                    var chart = charts[x];
+                    data.charts_by_name[chart.name] = chart;
+                }
+
+                // render all charts
+                renderChartsAndMenu(data);
+            }
+        }
+
         function initializeDynamicDashboard(netdata_url) {
             if(typeof netdata_url === 'undefined' || netdata_url === null)
                 netdata_url = NETDATA.serverDefault;
@@ -2302,39 +2337,16 @@
 
                 // download all the charts the server knows
                 NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
-                    if(data !== null) {
-                        options.hostname = data.hostname;
-                        options.data = data;
-                        options.version = data.version;
-                        netdataDashboard.os = data.os;
-
-                        if(typeof data.hosts != 'undefined')
-                            options.hosts = data.hosts;
-
-                        // update the dashboard hostname
-                        document.getElementById('hostname').innerHTML = options.hostname;
-                        document.getElementById('hostname').href = NETDATA.serverDefault;
-                        document.getElementById('netdataVersion').innerHTML = options.version;
-
-                        // update the dashboard title
-                        document.title = options.hostname + ' netdata dashboard';
-
-                        // close the splash screen
-                        $("#loadOverlay").css("display","none");
-
-                        // create a chart_by_name index
-                        data.charts_by_name = {};
-                        var charts = data.charts;
-                        var x;
-                        for(x in charts) {
-                            if(!charts.hasOwnProperty(x)) continue;
-
-                            var chart = charts[x];
-                            data.charts_by_name[chart.name] = chart;
+                    if(data != null) {
+                        if(typeof data.custom_info !== 'undefined' && data.custom_info !== "") {
+                            loadJs(data.custom_info, function () {
+                                $.extend(true, netdataDashboard, customDashboard);
+                                initializeDynamicDashboardWithData(data);
+                            });
                         }
-
-                        // render all charts
-                        renderChartsAndMenu(data);
+                        else {
+                            initializeDynamicDashboardWithData(data);
+                        }
                     }
                 });
             });
