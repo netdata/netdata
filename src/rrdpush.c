@@ -583,12 +583,11 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed updates %zu).", host->hostname, client_ip, client_port, count);
 
     rrdhost_wrlock(host);
+    host->senders_disconnected_time = now_realtime_sec();
     host->connected_senders--;
     if(!host->connected_senders) {
         if(health_enabled == CONFIG_BOOLEAN_AUTO)
             host->health_enabled = 0;
-
-        host->senders_disconnected_time = now_realtime_sec();
     }
     rrdhost_unlock(host);
 
