@@ -62,6 +62,7 @@ class Service(SimpleService):
                 return data
             else:
                 self.alert("accurate method failed, falling back")
+                self.accurate_exists = False
 
 
         for name, paths in self.assignment.items():
