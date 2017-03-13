@@ -522,7 +522,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %d, memory mode = %s, health %s"
+    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s"
          , hostname
          , client_ip
          , client_port

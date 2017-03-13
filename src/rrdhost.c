@@ -83,7 +83,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         const char *guid,
         const char *os,
         int update_every,
-        int entries,
+        long entries,
         RRD_MEMORY_MODE memory_mode,
         int health_enabled,
         int rrdpush_enabled,
@@ -98,7 +98,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
     host->rrd_update_every    = update_every;
-    host->rrd_history_entries = entries;
+    host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->rrd_memory_mode     = memory_mode;
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
     host->rrdpush_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key);
@@ -233,7 +233,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                      ", os %s"
                      ", update every %d"
                      ", memory mode %s"
-                     ", history entries %d"
+                     ", history entries %ld"
                      ", streaming %s"
                      " (to '%s' with api key '%s')"
                      ", health %s"
@@ -270,7 +270,7 @@ RRDHOST *rrdhost_find_or_create(
         , const char *guid
         , const char *os
         , int update_every
-        , int history
+        , long history
         , RRD_MEMORY_MODE mode
         , int health_enabled
         , int rrdpush_enabled
@@ -310,7 +310,7 @@ RRDHOST *rrdhost_find_or_create(
             error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds.", host->hostname, host->rrd_update_every, update_every);
 
         if(host->rrd_history_entries != history)
-            error("Host '%s' has history of %d entries, but the wanted one is %d entries.", host->hostname, host->rrd_history_entries, history);
+            error("Host '%s' has history of %ld entries, but the wanted one is %ld entries.", host->hostname, host->rrd_history_entries, history);
 
         if(host->rrd_memory_mode != mode)
             error("Host '%s' has memory mode '%s', but the wanted one is '%s'.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
