@@ -25,6 +25,7 @@ extern int do_kern_ipc_shm(int update_every, usec_t dt);
 extern int do_kern_ipc_msq(int update_every, usec_t dt);
 extern int do_uptime(int update_every, usec_t dt);
 extern int do_net_isr(int update_every, usec_t dt);
+extern int do_net_inet_tcp_states(int update_every, usec_t dt);
 
 extern int do_freebsd_sysctl_old(int update_every, usec_t dt);
 

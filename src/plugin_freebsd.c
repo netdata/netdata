@@ -32,6 +32,7 @@ static struct freebsd_module {
         { .name = "kern.ipc.msq", .dim = "message_queues", .enabled = 1, .func = do_kern_ipc_msq },
         { .name = "uptime", .dim = "uptime", .enabled = 1, .func = do_uptime },
         { .name = "net.isr", .dim = "net_isr", .enabled = 1, .func = do_net_isr },
+        { .name = "net.inet.tcp.states", .dim = "tcp_states", .enabled = 1, .func = do_net_inet_tcp_states },
 
         // CPU metrics
         { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },
