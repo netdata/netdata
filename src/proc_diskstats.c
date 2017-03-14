@@ -6,6 +6,9 @@
 #define DISK_TYPE_PARTITION 2
 #define DISK_TYPE_CONTAINER 3
 
+#define CONFIG_SECTION_DISKSTATS "plugin:proc:/proc/diskstats"
+#define DELAULT_EXLUDED_DISKS "loop* ram*"
+
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc)
     unsigned long major;
@@ -88,7 +91,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // get the default path for finding info about the block device
     if(unlikely(!path_find_block_device[0])) {
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
-        snprintfz(path_find_block_device, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get block device infos", buffer));
+        snprintfz(path_find_block_device, FILENAME_MAX, "%s", config_get(CONFIG_SECTION_DISKSTATS, "path to get block device infos", buffer));
     }
 
     // find if it is a partition
@@ -142,11 +145,11 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 
     if(unlikely(!path_to_get_hw_sector_size[0])) {
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/queue/hw_sector_size");
-        snprintfz(path_to_get_hw_sector_size, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size", buffer));
+        snprintfz(path_to_get_hw_sector_size, FILENAME_MAX, "%s", config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size", buffer));
     }
     if(unlikely(!path_to_get_hw_sector_size_partitions[0])) {
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/subsystem/%s/../queue/hw_sector_size");
-        snprintfz(path_to_get_hw_sector_size_partitions, FILENAME_MAX, "%s", config_get("plugin:proc:/proc/diskstats", "path to get h/w sector size for partitions", buffer));
+        snprintfz(path_to_get_hw_sector_size_partitions, FILENAME_MAX, "%s", config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size for partitions", buffer));
     }
 
     {
@@ -205,7 +208,7 @@ static inline int is_major_enabled(int major) {
     if(major_configs[major] == -1) {
         char buffer[CONFIG_MAX_NAME + 1];
         snprintfz(buffer, CONFIG_MAX_NAME, "performance metrics for disks with major %d", major);
-        major_configs[major] = (char)config_get_boolean("plugin:proc:/proc/diskstats", buffer, 1);
+        major_configs[major] = (char)config_get_boolean(CONFIG_SECTION_DISKSTATS, buffer, 1);
     }
 
     return (int)major_configs[major];
@@ -227,19 +230,18 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 globals_initialized = 0;
 
     if(unlikely(!globals_initialized)) {
-        global_enable_new_disks_detected_at_runtime = config_get_boolean("plugin:proc:/proc/diskstats", "enable new disks detected at runtime", global_enable_new_disks_detected_at_runtime);
+        global_enable_new_disks_detected_at_runtime = config_get_boolean(CONFIG_SECTION_DISKSTATS, "enable new disks detected at runtime", global_enable_new_disks_detected_at_runtime);
+        global_enable_performance_for_physical_disks = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for physical disks", global_enable_performance_for_physical_disks);
+        global_enable_performance_for_virtual_disks = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for virtual disks", global_enable_performance_for_virtual_disks);
+        global_enable_performance_for_partitions = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for partitions", global_enable_performance_for_partitions);
 
-        global_enable_performance_for_physical_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for physical disks", global_enable_performance_for_physical_disks);
-        global_enable_performance_for_virtual_disks = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for virtual disks", global_enable_performance_for_virtual_disks);
-        global_enable_performance_for_partitions = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "performance metrics for partitions", global_enable_performance_for_partitions);
-
-        global_do_io      = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "bandwidth for all disks", global_do_io);
-        global_do_ops     = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "operations for all disks", global_do_ops);
-        global_do_mops    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "merged operations for all disks", global_do_mops);
-        global_do_iotime  = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "i/o time for all disks", global_do_iotime);
-        global_do_qops    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "queued operations for all disks", global_do_qops);
-        global_do_util    = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "utilization percentage for all disks", global_do_util);
-        global_do_backlog = config_get_boolean_ondemand("plugin:proc:/proc/diskstats", "backlog for all disks", global_do_backlog);
+        global_do_io      = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "bandwidth for all disks", global_do_io);
+        global_do_ops     = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "operations for all disks", global_do_ops);
+        global_do_mops    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "merged operations for all disks", global_do_mops);
+        global_do_iotime  = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "i/o time for all disks", global_do_iotime);
+        global_do_qops    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "queued operations for all disks", global_do_qops);
+        global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "utilization percentage for all disks", global_do_util);
+        global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "backlog for all disks", global_do_backlog);
 
         globals_initialized = 1;
     }
@@ -249,7 +251,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/diskstats");
-        ff = procfile_open(config_get("plugin:proc:/proc/diskstats", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(config_get(CONFIG_SECTION_DISKSTATS, "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
     }
     if(unlikely(!ff)) return 0;
 
@@ -344,10 +346,26 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // Check the configuration for the device
 
         if(unlikely(!d->configured)) {
+            d->configured = 1;
+
+            static SIMPLE_PATTERN *excluded_disks = NULL;
+
+            if(unlikely(!excluded_disks)) {
+                excluded_disks = simple_pattern_create(
+                        config_get(CONFIG_SECTION_DISKSTATS, "exclude disks", DELAULT_EXLUDED_DISKS),
+                        SIMPLE_PATTERN_EXACT
+                );
+            }
+
+            int def_enable = global_enable_new_disks_detected_at_runtime;
+
+            if(def_enable != CONFIG_BOOLEAN_NO && simple_pattern_matches(excluded_disks, disk))
+                def_enable = CONFIG_BOOLEAN_NO;
+
             char var_name[4096 + 1];
             snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", disk);
 
-            int def_enable = config_get_boolean_ondemand(var_name, "enable", global_enable_new_disks_detected_at_runtime);
+            def_enable = config_get_boolean_ondemand(var_name, "enable", def_enable);
             if(unlikely(def_enable == CONFIG_BOOLEAN_NO)) {
                 // the user does not want any metrics for this disk
                 d->do_io = CONFIG_BOOLEAN_NO;
@@ -420,8 +438,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 d->do_util    = config_get_boolean_ondemand(var_name, "utilization percentage", ddo_util);
                 d->do_backlog = config_get_boolean_ondemand(var_name, "backlog", ddo_backlog);
             }
-
-            d->configured = 1;
         }
 
         // --------------------------------------------------------------------------
