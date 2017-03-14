@@ -5789,7 +5789,7 @@ var NETDATA = window.NETDATA || {};
             var len = generateGradient.length;
             while(len--) {
                 var pcent = generateGradient[len];
-                var color = self.data('gauge-gradient-percent-color-' + pcent.toString()) || false;
+                var color = self.attr('data-gauge-gradient-percent-color-' + pcent.toString()) || false;
                 if(color !== false) {
                     var a = [];
                     a[0] = pcent / 100;
