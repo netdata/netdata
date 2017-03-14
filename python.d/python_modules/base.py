@@ -28,6 +28,11 @@ from subprocess import Popen, PIPE
 from sys import exc_info
 
 try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse
+
+try:
     import urllib.request as urllib2
 except ImportError:
     import urllib2
@@ -462,109 +467,78 @@ class SimpleService(threading.Thread):
 
 
 class UrlService(SimpleService):
-    # TODO add support for https connections
     def __init__(self, configuration=None, name=None):
-        self.url = ""
-        self.user = None
-        self.password = None
-        self.proxies = {}
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.url = self.configuration.get('url')
+        self.user = self.configuration.get('user')
+        self.password = self.configuration.get('pass')
+        self.ss_cert = self.configuration.get('ss_cert')
 
     def __add_openers(self):
-        # TODO add error handling
-        if self.ss_cert:
-            try:
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                self.opener = urllib2.build_opener(urllib2.HTTPSHandler(context=ctx))
-            except Exception as error:
-                self.error(str(error))
-                self.opener = urllib2.build_opener()
-        else:
-            self.opener = urllib2.build_opener()
+        def self_signed_cert(ss_cert):
+            if ss_cert:
+                try:
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    return urllib2.build_opener(urllib2.HTTPSHandler(context=ctx))
+                except AttributeError:
+                    return None
+            else:
+                return None
 
-        # Proxy handling
-        # TODO currently self.proxies isn't parsed from configuration file
-        # if len(self.proxies) > 0:
-        #     for proxy in self.proxies:
-        #         url = proxy['url']
-        #         # TODO test this:
-        #         if "user" in proxy and "pass" in proxy:
-        #             if url.lower().startswith('https://'):
-        #                 url = 'https://' + proxy['user'] + ':' + proxy['pass'] + '@' + url[8:]
-        #             else:
-        #                 url = 'http://' + proxy['user'] + ':' + proxy['pass'] + '@' + url[7:]
-        #         # FIXME move proxy auth to sth like this:
-        #         #     passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
-        #         #     passman.add_password(None, url, proxy['user'], proxy['password'])
-        #         #     opener.add_handler(urllib2.HTTPBasicAuthHandler(passman))
-        #
-        #         if url.lower().startswith('https://'):
-        #             opener.add_handler(urllib2.ProxyHandler({'https': url}))
-        #         else:
-        #             opener.add_handler(urllib2.ProxyHandler({'https': url}))
+        self.opener = self_signed_cert(self.ss_cert) or urllib2.build_opener()
 
         # HTTP Basic Auth
-        if self.user is not None and self.password is not None:
+        if self.user and self.password:
+            url_parse = urlparse(self.url)
+            top_level_url = '://'.join([url_parse.scheme, url_parse.netloc])
             passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
-            passman.add_password(None, self.url, self.user, self.password)
+            passman.add_password(None, top_level_url, self.user, self.password)
             self.opener.add_handler(urllib2.HTTPBasicAuthHandler(passman))
             self.debug("Enabling HTTP basic auth")
 
-        #urllib2.install_opener(opener)
-
-    def _get_raw_data(self):
+    def _get_raw_data(self, custom_url=None):
         """
         Get raw data from http request
         :return: str
         """
-        raw = None
+        raw_data = None
+        f = None
         try:
-            f = self.opener.open(self.url, timeout=self.update_every * 2)
-            # f = urllib2.urlopen(self.url, timeout=self.update_every * 2)
-        except Exception as e:
-            self.error(str(e))
+            f = self.opener.open(custom_url or self.url, timeout=self.update_every * 2)
+            raw_data = f.read().decode('utf-8', 'ignore')
+        except Exception as error:
+            self.error('Url: %s. Error: %s' %(custom_url or self.url, str(error)))
             return None
-
-        try:
-            raw = f.read().decode('utf-8', 'ignore')
-        except Exception as e:
-            self.error(str(e))
         finally:
-            f.close()
-        return raw
+            if f is not None: f.close()
+
+        return raw_data or None
 
     def check(self):
         """
         Format configuration data and try to connect to server
         :return: boolean
         """
-        if self.name is None or self.name == str(None):
-            self.name = 'local'
-            self.chart_name += "_" + self.name
-        else:
-            self.name = str(self.name)
-        try:
-            self.url = str(self.configuration['url'])
-        except (KeyError, TypeError):
-            pass
-        try:
-            self.user = str(self.configuration['user'])
-        except (KeyError, TypeError):
-            pass
-        try:
-            self.password = str(self.configuration['pass'])
-        except (KeyError, TypeError):
-            pass
-        self.ss_cert = self.configuration.get('ss_cert')
+        if not (self.url and isinstance(self.url, str)):
+            self.error('URL is not defined or type is not <str>')
+            return False
+
         self.__add_openers()
 
-        test = self._get_data()
-        if test is None or len(test) == 0:
+        try:
+            data = self._get_data()
+        except Exception as error:
+            self.error('_get_data() failed. Url: %s. Error: %s' % (self.url, error))
             return False
-        else:
+
+        if isinstance(data, dict) and data:
+            self._data_from_check = data
             return True
+        else:
+            self.error("_get_data() returned no data or type is not <dict>")
+            return False
 
 
 class SocketService(SimpleService):
