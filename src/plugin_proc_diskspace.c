@@ -1,6 +1,6 @@
 #include "common.h"
 
-#define DELAULT_EXLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/*"
+#define DELAULT_EXLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS ""
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
