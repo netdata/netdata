@@ -1392,6 +1392,49 @@ int do_net_isr(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// net.inet.tcp.states
+
+int do_net_inet_tcp_states(int update_every, usec_t dt) {
+    static int mib[4] = {0, 0, 0, 0};
+    uint64_t tcps_states[TCP_NSTATES];
+
+    // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
+    if (unlikely(GETSYSCTL_SIMPLE("net.inet.tcp.states", mib, tcps_states))) {
+        error("DISABLED: ipv4.tcpsock chart");
+        error("DISABLED: net.inet.tcp.states module");
+        return 1;
+    } else {
+
+        // --------------------------------------------------------------------
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("ipv4",
+                                         "tcpsock",
+                                         NULL,
+                                         "tcp",
+                                         NULL,
+                                         "IPv4 TCP Connections",
+                                         "active connections",
+                                         2500,
+                                         update_every,
+                                         RRDSET_TYPE_LINE
+            );
+
+            rd = rrddim_add(st, "CurrEstab", "connections", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        } else
+            rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd, tcps_states[TCPS_ESTABLISHED]);
+        rrdset_done(st);
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
@@ -1476,7 +1519,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
 
     // NEEDED BY: do_tcp...
     struct tcpstat tcpstat;
-    uint64_t tcps_states[TCP_NSTATES];
 
     // NEEDED BY: do_udp...
     struct udpstat udpstat;
@@ -1829,30 +1871,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
             }
 
             freeifaddrs(ifap);
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
-    if (likely(do_tcp_sockets)) {
-        if (unlikely(GETSYSCTL_BY_NAME("net.inet.tcp.states", tcps_states))) {
-            do_tcp_sockets = 0;
-            error("DISABLED: ipv4.tcpsock");
-        } else {
-            if (likely(do_tcp_sockets)) {
-                st = rrdset_find_localhost("ipv4.tcpsock");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "tcpsock", NULL, "tcp", NULL, "IPv4 TCP Connections",
-                                       "active connections", 2500, update_every, RRDSET_TYPE_LINE);
-
-                    rrddim_add(st, "CurrEstab", "connections", 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st);
-
-                rrddim_set(st, "CurrEstab", tcps_states[TCPS_ESTABLISHED]);
-                rrdset_done(st);
-            }
         }
     }
 
