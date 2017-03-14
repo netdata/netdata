@@ -37,6 +37,7 @@ static struct freebsd_module {
         { .name = "net.inet.tcp.states", .dim = "tcp_states", .enabled = 1, .func = do_net_inet_tcp_states },
         { .name = "net.inet.tcp.stats",  .dim = "tcp_stats",  .enabled = 1, .func = do_net_inet_tcp_stats },
         { .name = "net.inet.udp.stats",  .dim = "udp_stats",  .enabled = 1, .func = do_net_inet_udp_stats },
+        { .name = "net.inet.icmp.stats",  .dim = "icmp_stats",  .enabled = 1, .func = do_net_inet_icmp_stats },
 
         // CPU metrics
         { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },

@@ -1454,11 +1454,11 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                                                            CONFIG_BOOLEAN_AUTO);
     }
 
-    static int mib[4] = {0, 0, 0, 0};
-    struct tcpstat tcpstat;
-
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
     if (likely(do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo || do_tcpext_syncookies || do_ecn)) {
+        static int mib[4] = {0, 0, 0, 0};
+        struct tcpstat tcpstat;
+
         if (unlikely(GETSYSCTL_SIMPLE("net.inet.tcp.stats", mib, tcpstat))) {
             do_tcp_packets = 0;
             error("DISABLED: ipv4.tcppackets chart");
@@ -1739,11 +1739,11 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
         do_udp_errors  = config_get_boolean("plugin:freebsd:sysctl", "ipv4 UDP errors", 1);
     }
 
-    static int mib[4] = {0, 0, 0, 0};
-    struct udpstat udpstat;
-
     // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
     if (likely(do_udp_packets || do_udp_errors)) {
+        static int mib[4] = {0, 0, 0, 0};
+        struct udpstat udpstat;
+
         if (unlikely(GETSYSCTL_SIMPLE("net.inet.udp.stats", mib, udpstat))) {
             do_udp_packets = 0;
             error("DISABLED: ipv4.udppackets chart");
@@ -1829,12 +1829,136 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// net.inet.icmp.stats
+
+int do_net_inet_icmp_stats(int update_every, usec_t dt) {
+    static int do_icmp_packets = -1, do_icmp_errors = -1, do_icmpmsg = -1;
+
+    if (unlikely(do_icmp_packets == -1)) {
+        do_icmp_packets         = config_get_boolean("plugin:freebsd:sysctl", "ipv4 ICMP packets", 1);
+        do_icmp_errors          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 ICMP errors", 1);
+        do_icmpmsg              = config_get_boolean("plugin:freebsd:sysctl", "ipv4 ICMP messages", 1);
+    }
+
+    if (likely(do_icmp_packets || do_icmp_errors || do_icmpmsg)) {
+        static int mib[4] = {0, 0, 0, 0};
+        struct icmpstat icmpstat;
+        int i;
+        struct icmp_total {
+            u_long  msgs_in;
+            u_long  msgs_out;
+        } icmp_total = {0, 0};
+
+        if (unlikely(GETSYSCTL_SIMPLE("net.inet.icmp.stats", mib, icmpstat))) {
+            do_icmp_packets = 0;
+            error("DISABLED: ipv4.icmp chart");
+            do_icmp_errors = 0;
+            error("DISABLED: ipv4.icmp_errors chart");
+            do_icmpmsg = 0;
+            error("DISABLED: ipv4.icmpmsg chart");
+            error("DISABLED: net.inet.icmp.stats module");
+            return 1;
+        } else {
+            for (i = 0; i <= ICMP_MAXTYPE; i++) {
+                icmp_total.msgs_in += icmpstat.icps_inhist[i];
+                icmp_total.msgs_out += icmpstat.icps_outhist[i];
+            }
+            icmp_total.msgs_in += icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort;
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_icmp_packets)) {
+                static RRDSET *st = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("ipv4",
+                                                 "icmp",
+                                                 NULL,
+                                                 "icmp",
+                                                 NULL,
+                                                 "IPv4 ICMP Packets",
+                                                 "packets/s",
+                                                 2602,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
+                    );
+
+                    rd_in  = rrddim_add(st, "InMsgs",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st, "OutMsgs", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd_in,  icmp_total.msgs_in);
+                rrddim_set_by_pointer(st, rd_out, icmp_total.msgs_out);
+
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_icmp_errors)) {
+                static RRDSET *st = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL, *rd_in_csum = NULL;
+
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("ipv4", "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors",
+                                                 "packets/s",
+                                                 2603, update_every, RRDSET_TYPE_LINE);
+
+                    rd_in      = rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out     = rrddim_add(st, "OutErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in_csum = rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd_in,      icmpstat.icps_badcode + icmpstat.icps_badlen +
+                                                      icmpstat.icps_checksum + icmpstat.icps_tooshort);
+                rrddim_set_by_pointer(st, rd_out,     icmpstat.icps_error);
+                rrddim_set_by_pointer(st, rd_in_csum, icmpstat.icps_checksum);
+
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_icmpmsg)) {
+                static RRDSET *st = NULL;
+                static RRDDIM *rd_in_reps = NULL, *rd_out_reps = NULL, *rd_in = NULL, *rd_out = NULL;
+
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages",
+                                                 "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
+
+                    rd_in_reps  = rrddim_add(st, "InEchoReps",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out_reps = rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in       = rrddim_add(st, "InEchos",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out      = rrddim_add(st, "OutEchos",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd_in_reps, icmpstat.icps_inhist[ICMP_ECHOREPLY]);
+                rrddim_set_by_pointer(st, rd_out_reps, icmpstat.icps_outhist[ICMP_ECHOREPLY]);
+                rrddim_set_by_pointer(st, rd_in, icmpstat.icps_inhist[ICMP_ECHO]);
+                rrddim_set_by_pointer(st, rd_out, icmpstat.icps_outhist[ICMP_ECHO]);
+
+                rrdset_done(st);
+            }
+        }
+    } else {
+        error("DISABLED: net.inet.icmp.stats module");
+        return 1;
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     static int do_disk_io = -1,
         do_bandwidth = -1,
-        do_icmp_packets = -1, do_icmpmsg = -1,
         do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
         do_ip6_packets = -1, do_ip6_fragsout = -1, do_ip6_fragsin = -1, do_ip6_errors = -1,
         do_icmp6 = -1, do_icmp6_redir = -1, do_icmp6_errors = -1, do_icmp6_echos = -1, do_icmp6_router = -1,
@@ -1843,8 +1967,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
     if (unlikely(do_disk_io == -1)) {
         do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
         do_bandwidth            = config_get_boolean("plugin:freebsd:sysctl", "bandwidth", 1);
-        do_icmp_packets         = config_get_boolean("plugin:freebsd:sysctl", "ipv4 ICMP packets", 1);
-        do_icmpmsg              = config_get_boolean("plugin:freebsd:sysctl", "ipv4 ICMP messages", 1);
         do_ip_packets           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 packets", 1);
         do_ip_fragsout          = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments sent", 1);
         do_ip_fragsin           = config_get_boolean("plugin:freebsd:sysctl", "ipv4 fragments assembly", 1);
@@ -1898,13 +2020,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         u_long  ift_ibytes;
         u_long  ift_obytes;
     } iftot = {0, 0};
-
-    // NEEDED BY: do_icmp...
-    struct icmpstat icmpstat;
-    struct icmp_total {
-        u_long  msgs_in;
-        u_long  msgs_out;
-    } icmp_total = {0, 0};
 
     // NEEDED BY: do_ip...
     struct ipstat ipstat;
@@ -2247,87 +2362,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
             }
 
             freeifaddrs(ifap);
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_icmp_packets || do_icmpmsg)) {
-        if (unlikely(GETSYSCTL_BY_NAME("net.inet.icmp.stats", icmpstat))) {
-            do_icmp_packets = 0;
-            error("DISABLED: ipv4.icmp");
-            error("DISABLED: ipv4.icmp_errors");
-            do_icmpmsg = 0;
-            error("DISABLED: ipv4.icmpmsg");
-        } else {
-            for (i = 0; i <= ICMP_MAXTYPE; i++) {
-                icmp_total.msgs_in += icmpstat.icps_inhist[i];
-                icmp_total.msgs_out += icmpstat.icps_outhist[i];
-            }
-            icmp_total.msgs_in += icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort;
-
-            // --------------------------------------------------------------------
-
-            if (likely(do_icmp_packets)) {
-                st = rrdset_find_localhost("ipv4.icmp");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "icmp", NULL, "icmp", NULL, "IPv4 ICMP Packets", "packets/s",
-                                       2602,
-                                       update_every, RRDSET_TYPE_LINE);
-
-                    rrddim_add(st, "InMsgs", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutMsgs", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
-
-                rrddim_set(st, "InMsgs", icmp_total.msgs_in);
-                rrddim_set(st, "OutMsgs", icmp_total.msgs_out);
-
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_localhost("ipv4.icmp_errors");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors",
-                                       "packets/s",
-                                       2603, update_every, RRDSET_TYPE_LINE);
-
-                    rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
-
-                rrddim_set(st, "InErrors", icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort);
-                rrddim_set(st, "OutErrors", icmpstat.icps_error);
-                rrddim_set(st, "InCsumErrors", icmpstat.icps_checksum);
-
-                rrdset_done(st);
-            }
-
-            // --------------------------------------------------------------------
-
-            if (likely(do_icmpmsg)) {
-                st = rrdset_find_localhost("ipv4.icmpmsg");
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages",
-                                       "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
-
-                    rrddim_add(st, "InEchoReps", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "InEchos", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutEchos", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
-
-                    rrddim_set(st, "InEchoReps", icmpstat.icps_inhist[ICMP_ECHOREPLY]);
-                    rrddim_set(st, "OutEchoReps", icmpstat.icps_outhist[ICMP_ECHOREPLY]);
-                    rrddim_set(st, "InEchos", icmpstat.icps_inhist[ICMP_ECHO]);
-                    rrddim_set(st, "OutEchos", icmpstat.icps_outhist[ICMP_ECHO]);
-
-                rrdset_done(st);
-            }
         }
     }
 
