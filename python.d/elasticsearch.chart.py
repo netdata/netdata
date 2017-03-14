@@ -3,14 +3,14 @@
 # Author: l2isbad
 
 from base import UrlService
-from requests import get
-from socket import gethostbyname
+from socket import gethostbyname, gaierror
 try:
         from queue import Queue
 except ImportError:
         from Queue import Queue
 from threading import Thread
 from collections import namedtuple
+from json import loads
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -294,30 +294,33 @@ class Service(UrlService):
         self.order = ORDER
         self.definitions = CHARTS
         self.host = self.configuration.get('host')
-        self.port = self.configuration.get('port')
-        self.user = self.configuration.get('user')
-        self.password = self.configuration.get('pass')
+        self.port = self.configuration.get('port', 9200)
+        self.scheme = self.configuration.get('scheme', 'http')
         self.latency = dict()
         self.methods = list()
-        self.auth = self.user and self.password
 
     def check(self):
         # We can't start if <host> AND <port> not specified
-        if not all([self.host, self.port]):
+        if not all([self.host, self.port, isinstance(self.host, str), isinstance(self.port, (str, int))]):
+            self.error('Host is not defined in the module configuration file')
             return False
 
         # It as a bad idea to use hostname.
         # Hostname -> ip address
         try:
             self.host = gethostbyname(self.host)
-        except Exception as error:
+        except gaierror as error:
             self.error(str(error))
             return False
 
+        scheme = 'http' if self.scheme else 'https'
+        # Add handlers (auth, self signed cert accept)
+        self.url = '%s://%s:%s' % (scheme, self.host, self.port)
+        self._UrlService__add_openers()
         # Create URL for every Elasticsearch API
-        url_node_stats = 'http://%s:%s/_nodes/_local/stats' % (self.host, self.port)
-        url_cluster_health = 'http://%s:%s/_cluster/health' % (self.host, self.port)
-        url_cluster_stats = 'http://%s:%s/_cluster/stats' % (self.host, self.port)
+        url_node_stats = '%s://%s:%s/_nodes/_local/stats' % (scheme, self.host, self.port)
+        url_cluster_health = '%s://%s:%s/_cluster/health' % (scheme, self.host, self.port)
+        url_cluster_stats = '%s://%s:%s/_cluster/stats' % (scheme, self.host, self.port)
 
         # Create list of enabled API calls
         user_choice = [bool(self.configuration.get('node_stats', True)),
@@ -329,13 +332,15 @@ class Service(UrlService):
                          METHODS(get_data_function=self._get_cluster_stats_, url=url_cluster_stats)]
 
         # Remove disabled API calls from 'avail methods'
-        self.methods = [avail_methods[_] for _ in range(len(avail_methods)) if user_choice[_]]
+        self.methods = [avail_methods[e[0]] for e in enumerate(avail_methods) if user_choice[e[0]]]
 
         # Run _get_data for ALL active API calls. 
         api_check_result = dict()
+        data_from_check = dict()
         for method in self.methods:
             try:
-                api_check_result[method.url] = (bool(method.get_data_function(None, method.url)))
+                api_check_result[method.url] = method.get_data_function(None, method.url)
+                data_from_check.update(api_check_result[method.url] or dict())
             except KeyError as error:
                 self.error('Failed to parse %s. Error: %s'  % (method.url, str(error)))
                 return False
@@ -343,24 +348,10 @@ class Service(UrlService):
         # We can start ONLY if all active API calls returned NOT None
         if not all(api_check_result.values()):
             self.error('Plugin could not get data from all APIs')
-            self.error('%s' % api_check_result)
             return False
         else:
-            self.info('%s' % api_check_result)
-            self.info('Plugin was started successfully')
-
+            self._data_from_check = data_from_check
             return True
-
-    def _get_raw_data(self, url):
-        try:
-            if not self.auth:
-                raw_data = get(url)
-            else:
-                raw_data = get(url, auth=(self.user, self.password))
-        except Exception:
-            return None
-
-        return raw_data
 
     def _get_data(self):
         threads = list()
@@ -384,12 +375,12 @@ class Service(UrlService):
         :return: dict
         """
 
-        data = self._get_raw_data(url)
+        raw_data = self._get_raw_data(url)
 
-        if not data:
+        if not raw_data:
             return queue.put(dict()) if queue else None
         else:
-            data = data.json() if hasattr(data.json, '__call__') else data.json
+            data = loads(raw_data)
 
             to_netdata = fetch_data_(raw_data=data, metrics_list=HEALTH_STATS)
 
@@ -406,12 +397,12 @@ class Service(UrlService):
         :return: dict
         """
 
-        data = self._get_raw_data(url)
+        raw_data = self._get_raw_data(url)
 
-        if not data:
+        if not raw_data:
             return queue.put(dict()) if queue else None
         else:
-            data = data.json() if hasattr(data.json, '__call__') else data.json
+            data = loads(raw_data)
 
             to_netdata = fetch_data_(raw_data=data, metrics_list=CLUSTER_STATS)
 
@@ -423,12 +414,12 @@ class Service(UrlService):
         :return: dict
         """
 
-        data = self._get_raw_data(url)
+        raw_data = self._get_raw_data(url)
 
-        if not data:
+        if not raw_data:
             return queue.put(dict()) if queue else None
         else:
-            data = data.json() if hasattr(data.json, '__call__') else data.json
+            data = loads(raw_data)
 
             node = list(data['nodes'].keys())[0]
             to_netdata = fetch_data_(raw_data=data['nodes'][node], metrics_list=NODE_STATS)
