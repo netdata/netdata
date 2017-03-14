@@ -177,7 +177,6 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_running = NULL, *rd_blocked = NULL;
 
-                st = rrdset_find_bytype_localhost("system", "processes");
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("system",
                                                  "processes",
@@ -334,15 +333,15 @@ int do_kern_cp_times(int update_every, usec_t dt) {
                 if (unlikely(!all_cpu_charts[i].st)) {
                     snprintfz(all_cpu_charts[i].cpuid, MAX_INT_DIGITS, "cpu%d", i);
                     all_cpu_charts[i].st = rrdset_create_localhost("cpu",
-                                                               all_cpu_charts[i].cpuid,
-                                                              NULL,
-                                                              "utilization",
-                                                              "cpu.cpu",
-                                                              "Core utilization",
-                                                              "percentage",
-                                                              1000,
-                                                              update_every,
-                                                              RRDSET_TYPE_STACKED
+                                                                   all_cpu_charts[i].cpuid,
+                                                                   NULL,
+                                                                   "utilization",
+                                                                   "cpu.cpu",
+                                                                   "Core utilization",
+                                                                   "percentage",
+                                                                   1000,
+                                                                   update_every,
+                                                                   RRDSET_TYPE_STACKED
                     );
 
                     all_cpu_charts[i].rd_nice       = rrddim_add(all_cpu_charts[i].st, "nice", NULL, 1, 1,
@@ -407,15 +406,15 @@ int do_hw_intcnt(int update_every, usec_t dt) {
 
             if (unlikely(!st_intr)) {
                 st_intr = rrdset_create_localhost("system",
-                                             "intr",
-                                             NULL,
-                                             "interrupts",
-                                             NULL,
-                                             "Total Hardware Interrupts",
-                                             "interrupts/s",
-                                             900,
-                                             update_every,
-                                             RRDSET_TYPE_LINE
+                                                  "intr",
+                                                  NULL,
+                                                  "interrupts",
+                                                  NULL,
+                                                  "Total Hardware Interrupts",
+                                                  "interrupts/s",
+                                                  900,
+                                                  update_every,
+                                                  RRDSET_TYPE_LINE
                 );
                 rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
 
@@ -449,15 +448,15 @@ int do_hw_intcnt(int update_every, usec_t dt) {
 
                 if (unlikely(!st_interrupts))
                     st_interrupts = rrdset_create_localhost("system",
-                                                 "interrupts",
-                                                 NULL,
-                                                 "interrupts",
-                                                 NULL,
-                                                 "System interrupts",
-                                                 "interrupts/s",
-                                                 1000,
-                                                 update_every,
-                                                 RRDSET_TYPE_STACKED
+                                                            "interrupts",
+                                                            NULL,
+                                                            "interrupts",
+                                                            NULL,
+                                                            "System interrupts",
+                                                            "interrupts/s",
+                                                            1000,
+                                                            update_every,
+                                                            RRDSET_TYPE_STACKED
                     );
                 else
                     rrdset_next(st_interrupts);
@@ -497,7 +496,6 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
         static RRDSET *st = NULL;
         static RRDDIM *rd = NULL;
 
-        st = rrdset_find_bytype_localhost("system", "dev_intr");
         if (unlikely(!st)) {
             st = rrdset_create_localhost("system",
                                          "dev_intr",
@@ -1486,23 +1484,23 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4",
-                                                         "tcppackets",
-                                                         NULL,
-                                                         "tcp",
-                                                         NULL,
-                                                         "IPv4 TCP Packets",
-                                                         "packets/s",
-                                                         2600,
-                                                         update_every,
-                                                         RRDSET_TYPE_LINE
+                                                 "tcppackets",
+                                                 NULL,
+                                                 "tcp",
+                                                 NULL,
+                                                 "IPv4 TCP Packets",
+                                                 "packets/s",
+                                                 2600,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
                     );
 
-                    rd_in_segs  = rrddim_add(st, "InSegs", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out_segs = rrddim_add(st, "OutSegs", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in_segs  = rrddim_add(st, "InSegs",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out_segs = rrddim_add(st, "OutSegs", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
-                rrddim_set_by_pointer(st, rd_in_segs, tcpstat.tcps_rcvtotal);
+                rrddim_set_by_pointer(st, rd_in_segs,  tcpstat.tcps_rcvtotal);
                 rrddim_set_by_pointer(st, rd_out_segs, tcpstat.tcps_sndtotal);
                 rrdset_done(st);
             }
@@ -1515,15 +1513,15 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4",
-                                                        "tcperrors",
-                                                        NULL,
-                                                        "tcp",
-                                                        NULL,
-                                                        "IPv4 TCP Errors",
-                                                        "packets/s",
-                                                        2700,
-                                                        update_every,
-                                                        RRDSET_TYPE_LINE
+                                                 "tcperrors",
+                                                 NULL,
+                                                 "tcp",
+                                                 NULL,
+                                                 "IPv4 TCP Errors",
+                                                 "packets/s",
+                                                 2700,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
                     );
 
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
@@ -1536,7 +1534,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
 #if __FreeBSD__ >= 11
                 rrddim_set_by_pointer(st, rd_in_errs,      tcpstat.tcps_rcvbadoff + tcpstat.tcps_rcvreassfull +
-                                                                  tcpstat.tcps_rcvshort);
+                                                           tcpstat.tcps_rcvshort);
 #else
                 rrddim_set_by_pointer(st, rd_in_errs,      tcpstat.tcps_rcvbadoff + tcpstat.tcps_rcvshort);
 #endif
@@ -1554,15 +1552,15 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4",
-                                                           "tcphandshake",
-                                                           NULL,
-                                                           "tcp",
-                                                           NULL,
-                                                           "IPv4 TCP Handshake Issues",
-                                                           "events/s",
-                                                           2900,
-                                                           update_every,
-                                                           RRDSET_TYPE_LINE
+                                                 "tcphandshake",
+                                                 NULL,
+                                                 "tcp",
+                                                 NULL,
+                                                 "IPv4 TCP Handshake Issues",
+                                                 "events/s",
+                                                 2900,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
                     );
 
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
@@ -1592,15 +1590,15 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4",
-                                                            "tcpconnaborts",
-                                                            NULL,
-                                                            "tcp",
-                                                            NULL,
-                                                            "TCP Connection Aborts",
-                                                            "connections/s",
-                                                            3010,
-                                                            update_every,
-                                                            RRDSET_TYPE_LINE
+                                                 "tcpconnaborts",
+                                                 NULL,
+                                                 "tcp",
+                                                 NULL,
+                                                 "TCP Connection Aborts",
+                                                 "connections/s",
+                                                 3010,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
                     );
 
                     rd_on_data    = rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1629,15 +1627,15 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4",
-                                                           "tcpofo",
-                                                           NULL,
-                                                           "tcp",
-                                                           NULL,
-                                                           "TCP Out-Of-Order Queue",
-                                                           "packets/s",
-                                                           3050,
-                                                           update_every,
-                                                           RRDSET_TYPE_LINE
+                                                 "tcpofo",
+                                                 NULL,
+                                                 "tcp",
+                                                 NULL,
+                                                 "TCP Out-Of-Order Queue",
+                                                 "packets/s",
+                                                 3050,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
                     );
 
                     rd_ofo_queue = rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1658,15 +1656,15 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4",
-                                                            "tcpsyncookies",
-                                                            NULL,
-                                                            "tcp",
-                                                            NULL,
-                                                            "TCP SYN Cookies",
-                                                            "packets/s",
-                                                            3100,
-                                                            update_every,
-                                                            RRDSET_TYPE_LINE
+                                                 "tcpsyncookies",
+                                                 NULL,
+                                                 "tcp",
+                                                 NULL,
+                                                 "TCP SYN Cookies",
+                                                 "packets/s",
+                                                 3100,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
                     );
 
                     rd_recv   = rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1691,15 +1689,15 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost("ipv4",
-                                                     "ecnpkts",
-                                                     NULL,
-                                                     "ecn",
-                                                     NULL,
-                                                     "IPv4 ECN Statistics",
-                                                     "packets/s",
-                                                     8700,
-                                                     update_every,
-                                                     RRDSET_TYPE_LINE
+                                                 "ecnpkts",
+                                                 NULL,
+                                                 "ecn",
+                                                 NULL,
+                                                 "IPv4 ECN Statistics",
+                                                 "packets/s",
+                                                 8700,
+                                                 update_every,
+                                                 RRDSET_TYPE_LINE
                     );
 
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
@@ -1713,7 +1711,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                 rrddim_set_by_pointer(st, rd_ce,     tcpstat.tcps_ecn_ce);
                 rrddim_set_by_pointer(st, rd_no_ect, tcpstat.tcps_ecn_ce - (tcpstat.tcps_ecn_ect0 +
-                                                                                tcpstat.tcps_ecn_ect1));
+                                                                            tcpstat.tcps_ecn_ect1));
                 rrddim_set_by_pointer(st, rd_ect0,   tcpstat.tcps_ecn_ect0);
                 rrddim_set_by_pointer(st, rd_ect1,   tcpstat.tcps_ecn_ect1);
                 rrdset_done(st);
@@ -1812,11 +1810,11 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
                 } else
                     rrdset_next(st);
 
-                rrddim_set_by_pointer(st, rd_in_errors, udpstat.udps_hdrops + udpstat.udps_badlen);
-                rrddim_set_by_pointer(st, rd_no_ports, udpstat.udps_noport);
+                rrddim_set_by_pointer(st, rd_in_errors,       udpstat.udps_hdrops + udpstat.udps_badlen);
+                rrddim_set_by_pointer(st, rd_no_ports,        udpstat.udps_noport);
                 rrddim_set_by_pointer(st, rd_recv_buf_errors, udpstat.udps_fullsock);
-                rrddim_set_by_pointer(st, rd_in_csum_errors, udpstat.udps_badsum + udpstat.udps_nosum);
-                rrddim_set_by_pointer(st, rd_ignored_multi, udpstat.udps_filtermcast);
+                rrddim_set_by_pointer(st, rd_in_csum_errors,  udpstat.udps_badsum + udpstat.udps_nosum);
+                rrddim_set_by_pointer(st, rd_ignored_multi,   udpstat.udps_filtermcast);
                 rrdset_done(st);
             }
         }
@@ -2234,9 +2232,9 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                 } else
                     rrdset_next(st);
 
-                rrddim_set_by_pointer(st, rd_ok, ip6stat.ip6s_fragmented);
+                rrddim_set_by_pointer(st, rd_ok,     ip6stat.ip6s_fragmented);
                 rrddim_set_by_pointer(st, rd_failed, ip6stat.ip6s_cantfrag);
-                rrddim_set_by_pointer(st, rd_all, ip6stat.ip6s_ofragments);
+                rrddim_set_by_pointer(st, rd_all,    ip6stat.ip6s_ofragments);
                 rrdset_done(st);
             }
 
@@ -2682,11 +2680,11 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                 } else
                     rrdset_next(st);
 
-                rrddim_set_by_pointer(st, rd_in_1, icmp6stat.icp6s_inhist[1]);
-                rrddim_set_by_pointer(st, rd_in_128, icmp6stat.icp6s_inhist[128]);
-                rrddim_set_by_pointer(st, rd_in_129, icmp6stat.icp6s_inhist[129]);
-                rrddim_set_by_pointer(st, rd_in_136, icmp6stat.icp6s_inhist[136]);
-                rrddim_set_by_pointer(st, rd_out_1, icmp6stat.icp6s_outhist[1]);
+                rrddim_set_by_pointer(st, rd_in_1,    icmp6stat.icp6s_inhist[1]);
+                rrddim_set_by_pointer(st, rd_in_128,  icmp6stat.icp6s_inhist[128]);
+                rrddim_set_by_pointer(st, rd_in_129,  icmp6stat.icp6s_inhist[129]);
+                rrddim_set_by_pointer(st, rd_in_136,  icmp6stat.icp6s_inhist[136]);
+                rrddim_set_by_pointer(st, rd_out_1,   icmp6stat.icp6s_outhist[1]);
                 rrddim_set_by_pointer(st, rd_out_128, icmp6stat.icp6s_outhist[128]);
                 rrddim_set_by_pointer(st, rd_out_129, icmp6stat.icp6s_outhist[129]);
                 rrddim_set_by_pointer(st, rd_out_133, icmp6stat.icp6s_outhist[133]);
