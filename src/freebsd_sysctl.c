@@ -2719,13 +2719,13 @@ int do_getmntinfo(int update_every, usec_t dt) {
 #define DELAULT_EXLUDED_PATHS "/proc/*"
 // taken from gnulib/mountlist.c and shortened to FreeBSD related fstypes
 #define DEFAULT_EXCLUDED_FILESYSTEMS "autofs procfs subfs devfs none"
-#define CONFIG_SECTION_DISKSPACE "plugin:freebsd:getmntinfo"
+#define CONFIG_SECTION_GETMNTINFO "plugin:freebsd:getmntinfo"
 
     static int do_space = -1, do_inodes = -1;
 
     if (unlikely(do_space == -1)) {
-        do_space  = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks",  CONFIG_BOOLEAN_AUTO);
-        do_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
+        do_space  = config_get_boolean_ondemand(CONFIG_SECTION_GETMNTINFO, "space usage for all disks",  CONFIG_BOOLEAN_AUTO);
+        do_inodes = config_get_boolean_ondemand(CONFIG_SECTION_GETMNTINFO, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
     }
 
     if (likely(do_space || do_inodes)) {
@@ -2767,13 +2767,13 @@ int do_getmntinfo(int update_every, usec_t dt) {
             if(unlikely(!mount_points)) {
 
                 excluded_mountpoints = simple_pattern_create(
-                        config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths",
+                        config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on paths",
                                    DELAULT_EXLUDED_PATHS),
                         SIMPLE_PATTERN_EXACT
                 );
 
                 excluded_filesystems = simple_pattern_create(
-                        config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems",
+                        config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on filesystems",
                                    DEFAULT_EXCLUDED_FILESYSTEMS),
                         SIMPLE_PATTERN_EXACT
                 );
@@ -2789,7 +2789,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                 struct mount_point_metadata *m = dictionary_get(mount_points, mntbuf[i].f_mntonname);
                 if(unlikely(!m)) {
                     char var_name[4096 + 1];
-                    snprintfz(var_name, 4096, "plugin:freebsd:getmntinfo:%s", mntbuf[i].f_mntonname);
+                    snprintfz(var_name, 4096, "%s:%s", CONFIG_SECTION_GETMNTINFO, mntbuf[i].f_mntonname);
 
                     def_space = do_space;
                     def_inodes = do_space;
@@ -2915,21 +2915,427 @@ int do_getmntinfo(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// old sources
+// getifaddrs
 
-int do_freebsd_sysctl_old(int update_every, usec_t dt) {
-    static int do_disk_io = -1, do_bandwidth = -1;
+int do_getifaddrs(int update_every, usec_t dt) {
+
+#define DELAULT_EXLUDED_INTERFACES "lo*"
+#define CONFIG_SECTION_GETIFADDRS "plugin:freebsd:getifaddrs"
+
+    static int do_bandwidth_ipv4 = -1, do_bandwidth_ipv6 = -1, do_bandwidth = -1, do_packets = -1,
+               do_errors = -1, do_drops = -1, do_events = -1;
+
+    if (unlikely(do_bandwidth_ipv4 == -1)) {
+        do_bandwidth_ipv4 = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total bandwidth for ipv4 interfaces",
+                                                        CONFIG_BOOLEAN_AUTO);
+        do_bandwidth_ipv6 = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "total bandwidth for ipv6 interfaces",
+                                                        CONFIG_BOOLEAN_AUTO);
+        do_bandwidth      = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "bandwidth for all interfaces",
+                                                        CONFIG_BOOLEAN_AUTO);
+        do_packets        = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "packets for all interfaces",
+                                                        CONFIG_BOOLEAN_AUTO);
+        do_errors         = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "errors for all interfaces",
+                                                        CONFIG_BOOLEAN_AUTO);
+        do_drops          = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "drops for all interfaces",
+                                                        CONFIG_BOOLEAN_AUTO);
+        do_events         = config_get_boolean_ondemand(CONFIG_SECTION_GETIFADDRS, "collisions for all interfaces",
+                                                        CONFIG_BOOLEAN_AUTO);
+    }
+
+    if (likely(do_bandwidth_ipv4 || do_bandwidth_ipv6 || do_bandwidth || do_packets || do_errors ||
+               do_drops || do_events)) {
+        struct ifaddrs *ifap;
+
+        if (unlikely(getifaddrs(&ifap))) {
+            error("FREEBSD: getifaddrs() failed");
+            do_bandwidth_ipv4 = 0;
+            error("DISABLED: system.ipv4 chart");
+            do_bandwidth_ipv6 = 0;
+            error("DISABLED: system.ipv6 chart");
+            do_bandwidth = 0;
+            error("DISABLED: net.* charts");
+            do_packets = 0;
+            error("DISABLED: net_packets.* charts");
+            do_errors = 0;
+            error("DISABLED: net_errors.* charts");
+            do_drops = 0;
+            error("DISABLED: net_drops.* charts");
+            do_events = 0;
+            error("DISABLED: net_events.* charts");
+            error("DISABLED: getifaddrs module");
+            return 1;
+        } else {
+            #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
+            struct ifaddrs *ifa;
+            struct iftot {
+                u_long  ift_ibytes;
+                u_long  ift_obytes;
+            } iftot = {0, 0};
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_bandwidth_ipv4)) {
+                iftot.ift_ibytes = iftot.ift_obytes = 0;
+                for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+                    if (ifa->ifa_addr->sa_family != AF_INET)
+                        continue;
+                    iftot.ift_ibytes += IFA_DATA(ibytes);
+                    iftot.ift_obytes += IFA_DATA(obytes);
+                }
+
+                static RRDSET *st = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("system",
+                                                 "ipv4",
+                                                 NULL,
+                                                 "network",
+                                                 NULL,
+                                                 "IPv4 Bandwidth",
+                                                 "kilobits/s",
+                                                 500,
+                                                 update_every,
+                                                 RRDSET_TYPE_AREA
+                    );
+
+                    rd_in  = rrddim_add(st, "InOctets",  "received", 8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st, "OutOctets", "sent",    -8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd_in,  iftot.ift_ibytes);
+                rrddim_set_by_pointer(st, rd_out, iftot.ift_obytes);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            if (likely(do_bandwidth_ipv6)) {
+                iftot.ift_ibytes = iftot.ift_obytes = 0;
+                for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+                    if (ifa->ifa_addr->sa_family != AF_INET6)
+                        continue;
+                    iftot.ift_ibytes += IFA_DATA(ibytes);
+                    iftot.ift_obytes += IFA_DATA(obytes);
+                }
+
+                static RRDSET *st = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+                if (unlikely(!st)) {
+                    st = rrdset_create_localhost("system",
+                                                 "ipv6",
+                                                 NULL,
+                                                 "network",
+                                                 NULL,
+                                                 "IPv6 Bandwidth",
+                                                 "kilobits/s",
+                                                 500,
+                                                 update_every,
+                                                 RRDSET_TYPE_AREA
+                    );
+
+                    rd_in  = rrddim_add(st, "received", NULL,  8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st, "sent",     NULL, -8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+                } else
+                    rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd_in,  iftot.ift_ibytes);
+                rrddim_set_by_pointer(st, rd_out, iftot.ift_obytes);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
+            // Data to be stored in DICTIONARY interfaces.
+            // This DICTIONARY is used to lookup the settings of the interfaces on each iteration.
+            struct interfaces_metadata {
+                int do_bandwidth;
+                int do_packets;
+                int do_errors;
+                int do_drops;
+                int do_events;
+
+                RRDSET *st_bandwidth;
+                RRDDIM *rd_bandwidth_in;
+                RRDDIM *rd_bandwidth_out;
+
+                RRDSET *st_packets;
+                RRDDIM *rd_packets_in;
+                RRDDIM *rd_packets_out;
+                RRDDIM *rd_packets_m_in;
+                RRDDIM *rd_packets_m_out;
+
+                RRDSET *st_errors;
+                RRDDIM *rd_errors_in;
+                RRDDIM *rd_errors_out;
+
+                RRDSET *st_drops;
+                RRDDIM *rd_drops_in;
+                RRDDIM *rd_drops_out;
+
+                RRDSET *st_events;
+                RRDDIM *rd_events_coll;
+            };
+            static DICTIONARY *interfaces = NULL;
+            static SIMPLE_PATTERN *excluded_interfaces = NULL;
+
+            if(unlikely(!interfaces)) {
+
+                excluded_interfaces = simple_pattern_create(
+                        config_get(CONFIG_SECTION_GETIFADDRS, "disable by default interfaces matching",
+                                   DELAULT_EXLUDED_INTERFACES)
+                        , SIMPLE_PATTERN_EXACT
+                );
+
+                interfaces = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+            }
+
+            for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+                if (ifa->ifa_addr->sa_family != AF_LINK)
+                    continue;
+
+                int def_bandwidth, def_packets, def_errors, def_drops, def_events,
+                    iter_bandwidth, iter_packets, iter_errors, iter_drops, iter_events;
+
+                struct interfaces_metadata *ifm = dictionary_get(interfaces, ifa->ifa_name);
+                if(unlikely(!ifm)) {
+                    char var_name[4096 + 1];
+                    snprintfz(var_name, 4096, "%s:%s", CONFIG_SECTION_GETIFADDRS, ifa->ifa_name);
+
+                    def_bandwidth = do_bandwidth;
+                    def_packets   = do_packets;
+                    def_errors    = do_errors;
+                    def_drops     = do_drops;
+                    def_events    = do_events;
+
+                    if(unlikely(simple_pattern_matches(excluded_interfaces, ifa->ifa_name))) {
+                        def_bandwidth = CONFIG_BOOLEAN_NO;
+                        def_packets   = CONFIG_BOOLEAN_NO;
+                        def_errors    = CONFIG_BOOLEAN_NO;
+                        def_drops     = CONFIG_BOOLEAN_NO;
+                        def_events    = CONFIG_BOOLEAN_NO;
+                    }
+
+                    iter_bandwidth = config_get_boolean_ondemand(var_name, "bandwidth", def_bandwidth);
+                    iter_packets   = config_get_boolean_ondemand(var_name, "packets",   def_packets);
+                    iter_errors    = config_get_boolean_ondemand(var_name, "errors",    def_errors);
+                    iter_drops     = config_get_boolean_ondemand(var_name, "drops",     def_drops);
+                    iter_events    = config_get_boolean_ondemand(var_name, "events",    def_events);
+
+                    struct interfaces_metadata ifmp = {
+                            .do_bandwidth = iter_bandwidth,
+                            .do_packets   = iter_packets,
+                            .do_errors    = iter_errors,
+                            .do_drops     = iter_drops,
+                            .do_events    = iter_events,
+
+                            .st_bandwidth = NULL,
+                            .rd_bandwidth_in = NULL,
+                            .rd_bandwidth_out = NULL,
+
+                            .st_packets = NULL,
+                            .rd_packets_in = NULL,
+                            .rd_packets_out = NULL,
+                            .rd_packets_m_in = NULL,
+                            .rd_packets_m_out = NULL,
+
+                            .st_errors = NULL,
+                            .rd_errors_in = NULL,
+                            .rd_errors_out = NULL,
+
+                            .st_drops = NULL,
+                            .rd_drops_in = NULL,
+                            .rd_drops_out = NULL,
+
+                            .st_events = NULL,
+                            .rd_events_coll = NULL,
+                    };
+
+                    ifm = dictionary_set(interfaces, ifa->ifa_name, &ifmp, sizeof(struct interfaces_metadata));
+                }
+
+                // --------------------------------------------------------------------
+
+                if (ifm->do_bandwidth == CONFIG_BOOLEAN_YES || (ifm->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
+                        (IFA_DATA(ibytes) || IFA_DATA(obytes)))) {
+                    if (unlikely(!ifm->st_bandwidth)) {
+                        ifm->st_bandwidth = rrdset_create_localhost("net",
+                                                                    ifa->ifa_name,
+                                                                    NULL,
+                                                                    ifa->ifa_name,
+                                                                    "net.net",
+                                                                    "Bandwidth",
+                                                                    "kilobits/s",
+                                                                    7000,
+                                                                    update_every,
+                                                                    RRDSET_TYPE_AREA
+                        );
+
+                        ifm->rd_bandwidth_in  = rrddim_add(ifm->st_bandwidth, "received", NULL,  8, KILO_FACTOR,
+                                                           RRD_ALGORITHM_INCREMENTAL);
+                        ifm->rd_bandwidth_out = rrddim_add(ifm->st_bandwidth, "sent",     NULL, -8, KILO_FACTOR,
+                                                           RRD_ALGORITHM_INCREMENTAL);
+                    } else
+                        rrdset_next(ifm->st_bandwidth);
+
+                    rrddim_set_by_pointer(ifm->st_bandwidth, ifm->rd_bandwidth_in,  IFA_DATA(ibytes));
+                    rrddim_set_by_pointer(ifm->st_bandwidth, ifm->rd_bandwidth_out, IFA_DATA(obytes));
+                    rrdset_done(ifm->st_bandwidth);
+                }
+
+                // --------------------------------------------------------------------
+
+                if (ifm->do_packets == CONFIG_BOOLEAN_YES || (ifm->do_packets == CONFIG_BOOLEAN_AUTO &&
+                        (IFA_DATA(ipackets) || IFA_DATA(opackets) || IFA_DATA(imcasts) || IFA_DATA(omcasts)))) {
+                    if (unlikely(!ifm->st_packets)) {
+                        ifm->st_packets = rrdset_create_localhost("net_packets",
+                                                                  ifa->ifa_name,
+                                                                  NULL,
+                                                                  ifa->ifa_name,
+                                                                  "net.packets",
+                                                                  "Packets",
+                                                                  "packets/s",
+                                                                  7001,
+                                                                  update_every,
+                                                                  RRDSET_TYPE_LINE
+                        );
+
+                        rrdset_flag_set(ifm->st_packets, RRDSET_FLAG_DETAIL);
+
+                        ifm->rd_packets_in    = rrddim_add(ifm->st_packets, "received",           NULL,  1, 1,
+                                                           RRD_ALGORITHM_INCREMENTAL);
+                        ifm->rd_packets_out   = rrddim_add(ifm->st_packets, "sent",               NULL, -1, 1,
+                                                           RRD_ALGORITHM_INCREMENTAL);
+                        ifm->rd_packets_m_in  = rrddim_add(ifm->st_packets, "multicast_received", NULL,  1, 1,
+                                                           RRD_ALGORITHM_INCREMENTAL);
+                        ifm->rd_packets_m_out = rrddim_add(ifm->st_packets, "multicast_sent",     NULL, -1, 1,
+                                                           RRD_ALGORITHM_INCREMENTAL);
+                    } else
+                        rrdset_next(ifm->st_packets);
+
+                    rrddim_set_by_pointer(ifm->st_packets, ifm->rd_packets_in,    IFA_DATA(ipackets));
+                    rrddim_set_by_pointer(ifm->st_packets, ifm->rd_packets_out,   IFA_DATA(opackets));
+                    rrddim_set_by_pointer(ifm->st_packets, ifm->rd_packets_m_in,  IFA_DATA(imcasts));
+                    rrddim_set_by_pointer(ifm->st_packets, ifm->rd_packets_m_out, IFA_DATA(omcasts));
+                    rrdset_done(ifm->st_packets);
+                }
+
+                // --------------------------------------------------------------------
+
+                if (ifm->do_errors == CONFIG_BOOLEAN_YES || (ifm->do_errors == CONFIG_BOOLEAN_AUTO &&
+                        (IFA_DATA(ierrors) || IFA_DATA(oerrors)))) {
+                    if (unlikely(!ifm->st_errors)) {
+                        ifm->st_errors = rrdset_create_localhost("net_errors",
+                                                                 ifa->ifa_name,
+                                                                 NULL,
+                                                                 ifa->ifa_name,
+                                                                 "net.errors",
+                                                                 "Interface Errors",
+                                                                 "errors/s",
+                                                                 7002,
+                                                                 update_every,
+                                                                 RRDSET_TYPE_LINE
+                        );
+
+                        rrdset_flag_set(ifm->st_errors, RRDSET_FLAG_DETAIL);
+
+                        ifm->rd_errors_in  = rrddim_add(ifm->st_errors, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                        ifm->rd_errors_out = rrddim_add(ifm->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    } else
+                        rrdset_next(ifm->st_errors);
+
+                    rrddim_set_by_pointer(ifm->st_errors, ifm->rd_errors_in,  IFA_DATA(ierrors));
+                    rrddim_set_by_pointer(ifm->st_errors, ifm->rd_errors_out, IFA_DATA(oerrors));
+                    rrdset_done(ifm->st_errors);
+                }
+                // --------------------------------------------------------------------
+
+                if (ifm->do_drops == CONFIG_BOOLEAN_YES || (ifm->do_drops == CONFIG_BOOLEAN_AUTO &&
+                        (IFA_DATA(iqdrops) || IFA_DATA(oqdrops)))) {
+                    if (unlikely(!ifm->st_drops)) {
+                        ifm->st_drops = rrdset_create_localhost("net_drops",
+                                                                ifa->ifa_name,
+                                                                NULL,
+                                                                ifa->ifa_name,
+                                                                "net.drops",
+                                                                "Interface Drops",
+                                                                "drops/s",
+                                                                7003,
+                                                                update_every,
+                                                                RRDSET_TYPE_LINE
+                        );
+
+                        rrdset_flag_set(ifm->st_drops, RRDSET_FLAG_DETAIL);
+
+                        ifm->rd_drops_in  = rrddim_add(ifm->st_drops, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+#if __FreeBSD__ >= 11
+                        ifm->rd_drops_out = rrddim_add(ifm->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+#endif
+                    } else
+                        rrdset_next(ifm->st_drops);
+
+                    rrddim_set_by_pointer(ifm->st_drops, ifm->rd_drops_in,  IFA_DATA(iqdrops));
+#if __FreeBSD__ >= 11
+                    rrddim_set_by_pointer(ifm->st_drops, ifm->rd_drops_out, IFA_DATA(oqdrops));
+#endif
+                    rrdset_done(ifm->st_drops);
+                }
+
+                // --------------------------------------------------------------------
+
+                if (ifm->do_events == CONFIG_BOOLEAN_YES || (ifm->do_events == CONFIG_BOOLEAN_AUTO &&
+                                                             IFA_DATA(collisions))) {
+                    if (unlikely(!ifm->st_events)) {
+                        ifm->st_events = rrdset_create_localhost("net_events",
+                                                                 ifa->ifa_name,
+                                                                 NULL,
+                                                                 ifa->ifa_name,
+                                                                 "net.events",
+                                                                 "Network Interface Events",
+                                                                 "events/s",
+                                                                 7006,
+                                                                 update_every,
+                                                                 RRDSET_TYPE_LINE
+                        );
+
+                        rrdset_flag_set(ifm->st_events, RRDSET_FLAG_DETAIL);
+
+                        ifm->rd_events_coll = rrddim_add(ifm->st_events, "collisions", NULL, -1, 1,
+                                                         RRD_ALGORITHM_INCREMENTAL);
+                    } else
+                        rrdset_next(ifm->st_events);
+
+                    rrddim_set_by_pointer(ifm->st_events, ifm->rd_events_coll, IFA_DATA(collisions));
+                    rrdset_done(ifm->st_events);
+                }
+            }
+
+            freeifaddrs(ifap);
+        }
+    } else {
+        error("DISABLED: getifaddrs module");
+        return 1;
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// kern.devstat
+
+int do_kern_devstat(int update_every, usec_t dt) {
+    static int do_disk_io = -1;
 
     if (unlikely(do_disk_io == -1)) {
-        do_disk_io = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_bandwidth = config_get_boolean("plugin:freebsd:sysctl", "bandwidth", 1);
+        do_disk_io = config_get_boolean("plugin:freebsd:kern.devstat", "stats for all disks", 1);
     }
 
     RRDSET *st;
 
     int i;
 
-    // NEEDED BY: do_disk_io
     #define RRD_TYPE_DISK "disk"
     #define BINTIME_SCALE 5.42101086242752217003726400434970855712890625e-17 // this is 1000/2^64
     int numdevs;
@@ -2950,14 +3356,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         collected_number duration_write_ms;
         collected_number busy_time_ms;
     } prev_dstat;
-
-    // NEEDED BY: do_bandwidth
-    #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
-    struct ifaddrs *ifa, *ifap;
-    struct iftot {
-        u_long  ift_ibytes;
-        u_long  ift_obytes;
-    } iftot = {0, 0};
 
     // --------------------------------------------------------------------
 
@@ -3134,154 +3532,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
                 rrddim_set(st, "out", total_disk_kbytes_write);
                 rrdset_done(st);
             }
-        }
-    }
-
-    // --------------------------------------------------------------------
-
-    if (likely(do_bandwidth)) {
-        if (unlikely(getifaddrs(&ifap))) {
-            error("FREEBSD: getifaddrs()");
-            do_bandwidth = 0;
-            error("DISABLED: system.ipv4");
-        } else {
-            iftot.ift_ibytes = iftot.ift_obytes = 0;
-            for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-                if (ifa->ifa_addr->sa_family != AF_INET)
-                        continue;
-                iftot.ift_ibytes += IFA_DATA(ibytes);
-                iftot.ift_obytes += IFA_DATA(obytes);
-            }
-
-            st = rrdset_find_localhost("system.ipv4");
-            if (unlikely(!st)) {
-                st = rrdset_create_localhost("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
-
-                rrddim_add(st, "InOctets", "received", 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "OutOctets", "sent", -8, 1024, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "InOctets", iftot.ift_ibytes);
-            rrddim_set(st, "OutOctets", iftot.ift_obytes);
-            rrdset_done(st);
-
-            // --------------------------------------------------------------------
-
-            iftot.ift_ibytes = iftot.ift_obytes = 0;
-            for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-                if (ifa->ifa_addr->sa_family != AF_INET6)
-                        continue;
-                iftot.ift_ibytes += IFA_DATA(ibytes);
-                iftot.ift_obytes += IFA_DATA(obytes);
-            }
-
-            st = rrdset_find_localhost("system.ipv6");
-            if (unlikely(!st)) {
-                st = rrdset_create_localhost("system", "ipv6", NULL, "network", NULL, "IPv6 Bandwidth", "kilobits/s", 500, update_every, RRDSET_TYPE_AREA);
-
-                rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
-            }
-            else rrdset_next(st);
-
-            rrddim_set(st, "sent", iftot.ift_obytes);
-            rrddim_set(st, "received", iftot.ift_ibytes);
-            rrdset_done(st);
-
-            for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-                if (ifa->ifa_addr->sa_family != AF_LINK)
-                        continue;
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_bytype_localhost("net", ifa->ifa_name);
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("net", ifa->ifa_name, NULL, ifa->ifa_name, "net.net", "Bandwidth", "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
-
-                    rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "received", IFA_DATA(ibytes));
-                rrddim_set(st, "sent", IFA_DATA(obytes));
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_bytype_localhost("net_packets", ifa->ifa_name);
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("net_packets", ifa->ifa_name, NULL, ifa->ifa_name, "net.packets", "Packets", "packets/s", 7001, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
-                    rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "multicast_received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "multicast_sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "received", IFA_DATA(ipackets));
-                rrddim_set(st, "sent", IFA_DATA(opackets));
-                rrddim_set(st, "multicast_received", IFA_DATA(imcasts));
-                rrddim_set(st, "multicast_sent", IFA_DATA(omcasts));
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_bytype_localhost("net_errors", ifa->ifa_name);
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("net_errors", ifa->ifa_name, NULL, ifa->ifa_name, "net.errors", "Interface Errors", "errors/s", 7002, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
-                    rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "inbound", IFA_DATA(ierrors));
-                rrddim_set(st, "outbound", IFA_DATA(oerrors));
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_bytype_localhost("net_drops", ifa->ifa_name);
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("net_drops", ifa->ifa_name, NULL, ifa->ifa_name, "net.drops", "Interface Drops", "drops/s", 7003, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
-                    rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-#if __FreeBSD__ >= 11
-                    rrddim_add(st, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-#endif
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "inbound", IFA_DATA(iqdrops));
-#if __FreeBSD__ >= 11
-                rrddim_set(st, "outbound", IFA_DATA(oqdrops));
-#endif
-                rrdset_done(st);
-
-                // --------------------------------------------------------------------
-
-                st = rrdset_find_bytype_localhost("net_events", ifa->ifa_name);
-                if (unlikely(!st)) {
-                    st = rrdset_create_localhost("net_events", ifa->ifa_name, NULL, ifa->ifa_name, "net.events", "Network Interface Events", "events/s", 7006, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
-
-                    rrddim_add(st, "frames", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "carrier", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-                else rrdset_next(st);
-
-                rrddim_set(st, "collisions", IFA_DATA(collisions));
-                rrdset_done(st);
-            }
-
-            freeifaddrs(ifap);
         }
     }
 
