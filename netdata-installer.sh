@@ -507,6 +507,24 @@ then
     fi
 fi
 
+config_signature_matches() {
+    local md5="${1}" file="${2}"
+
+    if [ "${BASH_VERSINFO[0]}" -ge "4" ]
+        then
+        [ "${configs_signatures[${md5}]}" = "${file}" ] && return 0
+        return 1
+    fi
+
+    if [ -f "configs.signatures" ]
+        then
+        grep "\['${md5}'\]='${file}'" "configs.signatures" >/dev/null
+        return $?
+    fi
+
+    return 1
+}
+
 # backup user configurations
 installer_backup_suffix="${PID}.${RANDOM}"
 for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
@@ -534,19 +552,13 @@ do
                 cp "conf.d/${f}" "${x}.orig"
             fi
 
-            if [ "${BASH_VERSINFO[0]}" -ge "4" ]
-            then
-                if [ "${configs_signatures[${md5}]}" = "${f}" ]
+            if config_signature_matches "${md5}" "${f}"
                 then
-                    # it is a stock version - don't keep it
-                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version."
-                else
-                    # edited by user - keep it
-                    echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} has been edited by user${TPUT_RESET}. Keeping it."
-                    run cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
-                fi
+                # it is a stock version - don't keep it
+                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' is stock version."
             else
-                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}cannot be checked for custom edits${TPUT_RESET}. Keeping it."
+                # edited by user - keep it
+                echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} has been edited by user${TPUT_RESET}. Keeping it."
                 run cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
             fi
         fi
