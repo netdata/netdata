@@ -2702,22 +2702,222 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// getmntinfo
+
+int do_getmntinfo(int update_every, usec_t dt) {
+
+#define DELAULT_EXLUDED_PATHS "/proc/*"
+// taken from gnulib/mountlist.c and shortened to FreeBSD related fstypes
+#define DEFAULT_EXCLUDED_FILESYSTEMS "autofs procfs subfs devfs none"
+#define CONFIG_SECTION_DISKSPACE "plugin:freebsd:getmntinfo"
+
+    static int do_space = -1, do_inodes = -1;
+
+    if (unlikely(do_space == -1)) {
+        do_space  = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks",  CONFIG_BOOLEAN_AUTO);
+        do_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
+    }
+
+    if (likely(do_space || do_inodes)) {
+        struct statfs *mntbuf;
+        int mntsize;
+
+        // there is no mount info in sysctl MIBs
+        if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
+            error("FREEBSD: getmntinfo() failed");
+            do_space = 0;
+            error("DISABLED: disk_space.* charts");
+            do_inodes = 0;
+            error("DISABLED: disk_inodes.* charts");
+            error("DISABLED: getmntinfo module");
+            return 1;
+        } else {
+            // Data to be stored in DICTIONARY mount_points.
+            // This DICTIONARY is used to lookup the settings of the mount point on each iteration.
+            struct mount_point_metadata {
+                int do_space;
+                int do_inodes;
+
+                size_t collected; // the number of times this has been collected
+
+                RRDSET *st_space;
+                RRDDIM *rd_space_used;
+                RRDDIM *rd_space_avail;
+                RRDDIM *rd_space_reserved;
+
+                RRDSET *st_inodes;
+                RRDDIM *rd_inodes_used;
+                RRDDIM *rd_inodes_avail;
+            };
+            static DICTIONARY *mount_points = NULL;
+            static SIMPLE_PATTERN *excluded_mountpoints = NULL;
+            static SIMPLE_PATTERN *excluded_filesystems = NULL;
+            int i;
+
+            if(unlikely(!mount_points)) {
+
+                excluded_mountpoints = simple_pattern_create(
+                        config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths",
+                                   DELAULT_EXLUDED_PATHS),
+                        SIMPLE_PATTERN_EXACT
+                );
+
+                excluded_filesystems = simple_pattern_create(
+                        config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems",
+                                   DEFAULT_EXCLUDED_FILESYSTEMS),
+                        SIMPLE_PATTERN_EXACT
+                );
+
+                mount_points = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+            }
+
+            for (i = 0; i < mntsize; i++) {
+
+                char title[4096 + 1];
+                int def_space, def_inodes, iter_space, iter_inodes;
+
+                struct mount_point_metadata *m = dictionary_get(mount_points, mntbuf[i].f_mntonname);
+                if(unlikely(!m)) {
+                    char var_name[4096 + 1];
+                    snprintfz(var_name, 4096, "plugin:freebsd:getmntinfo:%s", mntbuf[i].f_mntonname);
+
+                    def_space = do_space;
+                    def_inodes = do_space;
+
+                    if(unlikely(simple_pattern_matches(excluded_mountpoints, mntbuf[i].f_mntonname))) {
+                        def_space = CONFIG_BOOLEAN_NO;
+                        def_inodes = CONFIG_BOOLEAN_NO;
+                    }
+
+                    if(unlikely(simple_pattern_matches(excluded_filesystems, mntbuf[i].f_fstypename))) {
+                        def_space = CONFIG_BOOLEAN_NO;
+                        def_inodes = CONFIG_BOOLEAN_NO;
+                    }
+
+                    iter_space  = config_get_boolean_ondemand(var_name, "space usage",  def_space);
+                    iter_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
+
+                    struct mount_point_metadata mp = {
+                            .do_space = iter_space,
+                            .do_inodes = iter_inodes,
+
+                            .collected = 0,
+
+                            .st_space = NULL,
+                            .rd_space_avail = NULL,
+                            .rd_space_used = NULL,
+                            .rd_space_reserved = NULL,
+
+                            .st_inodes = NULL,
+                            .rd_inodes_avail = NULL,
+                            .rd_inodes_used = NULL,
+                    };
+
+                    m = dictionary_set(mount_points, mntbuf[i].f_mntonname, &mp, sizeof(struct mount_point_metadata));
+                }
+
+                if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
+                    continue;
+
+                if(unlikely(mntbuf[i].f_flags & MNT_RDONLY && !m->collected))
+                    continue;
+
+                // --------------------------------------------------------------------------
+
+                int rendered = 0;
+
+                if (m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO && (mntbuf[i].f_blocks > 2))) {
+                    if (unlikely(!m->st_space)) {
+                        snprintfz(title, 4096, "Disk Space Usage for %s [%s]",
+                                  mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
+                        m->st_space = rrdset_create_localhost("disk_space",
+                                                              mntbuf[i].f_mntonname,
+                                                              NULL,
+                                                              mntbuf[i].f_mntonname,
+                                                              "disk.space",
+                                                              title,
+                                                              "GB",
+                                                              2023,
+                                                              update_every,
+                                                              RRDSET_TYPE_STACKED
+                        );
+
+                        m->rd_space_avail    = rrddim_add(m->st_space, "avail", NULL,
+                                                          mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                        m->rd_space_used     = rrddim_add(m->st_space, "used", NULL,
+                                                          mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                        m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root",
+                                                          mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+                    } else
+                        rrdset_next(m->st_space);
+
+                    rrddim_set_by_pointer(m->st_space, m->rd_space_avail,    (collected_number) mntbuf[i].f_bavail);
+                    rrddim_set_by_pointer(m->st_space, m->rd_space_used,     (collected_number) (mntbuf[i].f_blocks -
+                                                                                                 mntbuf[i].f_bfree));
+                    rrddim_set_by_pointer(m->st_space, m->rd_space_reserved, (collected_number) (mntbuf[i].f_bfree -
+                                                                                                 mntbuf[i].f_bavail));
+                    rrdset_done(m->st_space);
+
+                    rendered++;
+                }
+
+                // --------------------------------------------------------------------------
+
+                if (m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO && (mntbuf[i].f_files > 1))) {
+                    if (unlikely(!m->st_inodes)) {
+                        snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]",
+                                  mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
+                        m->st_inodes = rrdset_create_localhost("disk_inodes",
+                                                               mntbuf[i].f_mntonname,
+                                                               NULL,
+                                                               mntbuf[i].f_mntonname,
+                                                               "disk.inodes",
+                                                               title,
+                                                               "Inodes",
+                                                               2024,
+                                                               update_every,
+                                                               RRDSET_TYPE_STACKED
+                        );
+
+                        m->rd_inodes_avail = rrddim_add(m->st_inodes, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                        m->rd_inodes_used  = rrddim_add(m->st_inodes, "used",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    } else
+                        rrdset_next(m->st_inodes);
+
+                    rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_avail, (collected_number) mntbuf[i].f_ffree);
+                    rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_used,  (collected_number) (mntbuf[i].f_files -
+                                                                                                mntbuf[i].f_ffree));
+                    rrdset_done(m->st_inodes);
+
+                    rendered++;
+                }
+
+                if(likely(rendered))
+                    m->collected++;
+            }
+        }
+    } else {
+        error("DISABLED: getmntinfo module");
+        return 1;
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // old sources
 
 int do_freebsd_sysctl_old(int update_every, usec_t dt) {
-    static int do_disk_io = -1, do_bandwidth = -1, do_space = -1, do_inodes = -1;
+    static int do_disk_io = -1, do_bandwidth = -1;
 
     if (unlikely(do_disk_io == -1)) {
-        do_disk_io              = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
-        do_bandwidth            = config_get_boolean("plugin:freebsd:sysctl", "bandwidth", 1);
-        do_space                = config_get_boolean("plugin:freebsd:sysctl", "space usage for all disks", 1);
-        do_inodes               = config_get_boolean("plugin:freebsd:sysctl", "inodes usage for all disks", 1);
+        do_disk_io = config_get_boolean("plugin:freebsd:sysctl", "stats for all disks", 1);
+        do_bandwidth = config_get_boolean("plugin:freebsd:sysctl", "bandwidth", 1);
     }
 
     RRDSET *st;
 
     int i;
-    char title[4096 + 1];
 
     // NEEDED BY: do_disk_io
     #define RRD_TYPE_DISK "disk"
@@ -2748,11 +2948,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
         u_long  ift_ibytes;
         u_long  ift_obytes;
     } iftot = {0, 0};
-
-    // NEEDED BY: do_space, do_inodes
-    struct statfs *mntbuf;
-    int mntsize;
-    char mntonname[MNAMELEN + 1];
 
     // --------------------------------------------------------------------
 
@@ -3077,74 +3272,6 @@ int do_freebsd_sysctl_old(int update_every, usec_t dt) {
             }
 
             freeifaddrs(ifap);
-        }
-    }
-
-    // --------------------------------------------------------------------------
-
-    if (likely(do_space || do_inodes)) {
-        // there is no mount info in sysctl MIBs
-        if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
-            error("FREEBSD: getmntinfo() failed");
-            do_space = 0;
-            error("DISABLED: disk_space.X");
-            do_inodes = 0;
-            error("DISABLED: disk_inodes.X");
-        } else {
-            for (i = 0; i < mntsize; i++) {
-                if (mntbuf[i].f_flags == MNT_RDONLY ||
-                        mntbuf[i].f_blocks == 0 ||
-                        // taken from gnulib/mountlist.c and shortened to FreeBSD related fstypes
-                        strcmp(mntbuf[i].f_fstypename, "autofs") == 0 ||
-                        strcmp(mntbuf[i].f_fstypename, "procfs") == 0 ||
-                        strcmp(mntbuf[i].f_fstypename, "subfs") == 0 ||
-                        strcmp(mntbuf[i].f_fstypename, "devfs") == 0 ||
-                        strcmp(mntbuf[i].f_fstypename, "none") == 0)
-                    continue;
-
-                // --------------------------------------------------------------------------
-
-                if (likely(do_space)) {
-                    st = rrdset_find_bytype_localhost("disk_space", mntbuf[i].f_mntonname);
-                    if (unlikely(!st)) {
-                        snprintfz(title, 4096, "Disk Space Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
-                        st = rrdset_create_localhost("disk_space", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.space", title, "GB", 2023,
-                                           update_every,
-                                           RRDSET_TYPE_STACKED);
-
-                        rrddim_add(st, "avail", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                        rrddim_add(st, "used", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                        rrddim_add(st, "reserved_for_root", "reserved for root", mntbuf[i].f_bsize, GIGA_FACTOR,
-                                RRD_ALGORITHM_ABSOLUTE);
-                    } else
-                        rrdset_next(st);
-
-                    rrddim_set(st, "avail", (collected_number) mntbuf[i].f_bavail);
-                    rrddim_set(st, "used", (collected_number) (mntbuf[i].f_blocks - mntbuf[i].f_bfree));
-                    rrddim_set(st, "reserved_for_root", (collected_number) (mntbuf[i].f_bfree - mntbuf[i].f_bavail));
-                    rrdset_done(st);
-                }
-
-                // --------------------------------------------------------------------------
-
-                if (likely(do_inodes)) {
-                    st = rrdset_find_bytype_localhost("disk_inodes", mntbuf[i].f_mntonname);
-                    if (unlikely(!st)) {
-                        snprintfz(title, 4096, "Disk Files (inodes) Usage for %s [%s]", mntbuf[i].f_mntonname, mntbuf[i].f_mntfromname);
-                        st = rrdset_create_localhost("disk_inodes", mntbuf[i].f_mntonname, NULL, mntbuf[i].f_mntonname, "disk.inodes", title, "Inodes", 2024,
-                                           update_every, RRDSET_TYPE_STACKED);
-
-                        rrddim_add(st, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                        rrddim_add(st, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                        rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    } else
-                        rrdset_next(st);
-
-                    rrddim_set(st, "avail", (collected_number) mntbuf[i].f_ffree);
-                    rrddim_set(st, "used", (collected_number) (mntbuf[i].f_files - mntbuf[i].f_ffree));
-                    rrdset_done(st);
-                }
-            }
         }
     }
 

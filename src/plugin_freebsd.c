@@ -33,6 +33,12 @@ static struct freebsd_module {
         { .name = "uptime",       .dim = "uptime",         .enabled = 1, .func = do_uptime },
         { .name = "net.isr",      .dim = "net_isr",        .enabled = 1, .func = do_net_isr },
 
+        // CPU metrics
+        { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },
+
+        // memory metrics
+        { .name = "vm.stats.vm.v_pgfaults", .dim = "pgfaults", .enabled = 1, .func = do_vm_stats_sys_v_pgfaults },
+
         // network metrics
         { .name = "net.inet.tcp.states",   .dim = "tcp_states",  .enabled = 1, .func = do_net_inet_tcp_states },
         { .name = "net.inet.tcp.stats",    .dim = "tcp_stats",   .enabled = 1, .func = do_net_inet_tcp_stats },
@@ -42,11 +48,8 @@ static struct freebsd_module {
         { .name = "net.inet6.ip6.stats",   .dim = "ip6_stats",   .enabled = 1, .func = do_net_inet6_ip6_stats },
         { .name = "net.inet6.icmp6.stats", .dim = "icmp6_stats", .enabled = 1, .func = do_net_inet6_icmp6_stats },
 
-        // CPU metrics
-        { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },
-
-        // memory metrics
-        { .name = "vm.stats.vm.v_pgfaults", .dim = "pgfaults", .enabled = 1, .func = do_vm_stats_sys_v_pgfaults },
+        // disk metrics
+        { .name = "getmntinfo", .dim = "getmntinfo", .enabled = 1, .func = do_getmntinfo },
 
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
