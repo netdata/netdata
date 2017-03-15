@@ -32,9 +32,9 @@ extern int do_net_inet_icmp_stats(int update_every, usec_t dt);
 extern int do_net_inet_ip_stats(int update_every, usec_t dt);
 extern int do_net_inet6_ip6_stats(int update_every, usec_t dt);
 extern int do_net_inet6_icmp6_stats(int update_every, usec_t dt);
+extern int do_getifaddrs(int update_every, usec_t dt);
 extern int do_getmntinfo(int update_every, usec_t dt);
-
-extern int do_freebsd_sysctl_old(int update_every, usec_t dt);
+extern int do_kern_devstat(int update_every, usec_t dt);
 
 #define GETSYSCTL_MIB(name, mib) getsysctl_mib(name, mib, sizeof(mib)/sizeof(int))
 

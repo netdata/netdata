@@ -13,8 +13,6 @@ static struct freebsd_module {
 
 } freebsd_modules[] = {
 
-        { .name = "freebsd_old", .dim = "freebsd_old", .enabled = 1, .func = do_freebsd_sysctl_old },
-
         // system metrics
         { .name = "vm.loadavg",   .dim = "loadavg", .enabled = 1, .func = do_vm_loadavg },
         { .name = "vm.vmtotal",   .dim = "vmtotal", .enabled = 1, .func = do_vm_vmtotal },
@@ -48,8 +46,12 @@ static struct freebsd_module {
         { .name = "net.inet6.ip6.stats",   .dim = "ip6_stats",   .enabled = 1, .func = do_net_inet6_ip6_stats },
         { .name = "net.inet6.icmp6.stats", .dim = "icmp6_stats", .enabled = 1, .func = do_net_inet6_icmp6_stats },
 
+        // network interfaces metrics
+        { .name = "getifaddrs",   .dim = "getifaddrs",   .enabled = 1, .func = do_getifaddrs },
+
         // disk metrics
-        { .name = "getmntinfo", .dim = "getmntinfo", .enabled = 1, .func = do_getmntinfo },
+        { .name = "getmntinfo",   .dim = "getmntinfo",   .enabled = 1, .func = do_getmntinfo },
+        { .name = "kern.devstat", .dim = "kern_devstat", .enabled = 1, .func = do_kern_devstat },
 
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
