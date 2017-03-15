@@ -148,6 +148,7 @@ void read_cgroup_plugin_configuration() {
     enabled_cgroup_patterns = simple_pattern_create(
             config_get("plugin:cgroups", "enable by default cgroups matching",
                     " /system.slice/docker-*.scope "
+                    " /qemu.slice/*.scope "                // #1949
                     " !*.mount "
                     " !*.partition "
                     " !*.scope "
@@ -159,18 +160,18 @@ void read_cgroup_plugin_configuration() {
                     " !/docker "
                     " !/libvirt "
                     " !/lxc "
-                    " !/lxc/*/ns "         //  #1397
+                    " !/lxc/*/ns "                         //  #1397
                     " !/machine "
                     " !/qemu "
                     " !/system "
                     " !/systemd "
                     " !/user "
-                    " * "                  // enable anything else
+                    " * "                                  // enable anything else
             ), SIMPLE_PATTERN_EXACT);
 
     enabled_cgroup_paths = simple_pattern_create(
             config_get("plugin:cgroups", "search for cgroups in subpaths matching",
-                    " !*-qemu "            //  #345
+                    " !*-qemu "                           //  #345
                     " !/init.scope "
                     " !/system "
                     " !/systemd "
@@ -184,6 +185,7 @@ void read_cgroup_plugin_configuration() {
 
     enabled_cgroup_renames = simple_pattern_create(
             config_get("plugin:cgroups", "run script to rename cgroups matching",
+                    " /qemu.slice/*.scope "                // #1949
                     " *docker* "
                     " *lxc* "
                     " !/ "
