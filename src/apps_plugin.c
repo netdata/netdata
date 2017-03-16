@@ -1162,7 +1162,7 @@ static inline int read_proc_stat() {
         error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
         goto cleanup;
     }
-    if (unlikely(GETSYSCTL("kern.cp_time", cp_time))) goto cleanup;
+    if (unlikely(GETSYSCTL_BY_NAME("kern.cp_time", cp_time))) goto cleanup;
 #else
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
