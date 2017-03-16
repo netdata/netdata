@@ -129,11 +129,19 @@ void global_statistics_charts(void) {
     getrusage(RUSAGE_THREAD, &thread);
     getrusage(RUSAGE_SELF, &me);
 
+#ifdef __FreeBSD__
+    if (!stcpu_thread) stcpu_thread = rrdset_find_localhost("netdata.plugin_freebsd_cpu");
+    if (!stcpu_thread) {
+        stcpu_thread = rrdset_create_localhost("netdata", "plugin_freebsd_cpu", NULL, "freebsd", NULL
+                                               , "NetData FreeBSD Plugin CPU usage", "milliseconds/s", 132000
+                                               , localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+#else
     if (!stcpu_thread) stcpu_thread = rrdset_find_localhost("netdata.plugin_proc_cpu");
     if (!stcpu_thread) {
         stcpu_thread = rrdset_create_localhost("netdata", "plugin_proc_cpu", NULL, "proc", NULL
                                                , "NetData Proc Plugin CPU usage", "milliseconds/s", 132000
                                                , localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+#endif
 
         rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);

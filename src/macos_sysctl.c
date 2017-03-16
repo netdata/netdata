@@ -210,7 +210,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
     if (next_loadavg_dt <= dt) {
         if (likely(do_loadavg)) {
-            if (unlikely(GETSYSCTL("vm.loadavg", sysload))) {
+            if (unlikely(GETSYSCTL_BY_NAME("vm.loadavg", sysload))) {
                 do_loadavg = 0;
                 error("DISABLED: system.load");
             } else {
@@ -240,7 +240,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_swap)) {
-        if (unlikely(GETSYSCTL("vm.swapusage", swap_usage))) {
+        if (unlikely(GETSYSCTL_BY_NAME("vm.swapusage", swap_usage))) {
             do_swap = 0;
             error("DISABLED: system.swap");
         } else {
@@ -315,7 +315,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
     if (likely(do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo || do_tcpext_syscookies || do_ecn)) {
-        if (unlikely(GETSYSCTL("net.inet.tcp.stats", tcpstat))){
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet.tcp.stats", tcpstat))){
             do_tcp_packets = 0;
             error("DISABLED: ipv4.tcppackets");
             do_tcp_errors = 0;
@@ -480,7 +480,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
     // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
     if (likely(do_udp_packets || do_udp_errors)) {
-        if (unlikely(GETSYSCTL("net.inet.udp.stats", udpstat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet.udp.stats", udpstat))) {
             do_udp_packets = 0;
             error("DISABLED: ipv4.udppackets");
             do_udp_errors = 0;
@@ -532,7 +532,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_icmp_packets || do_icmpmsg)) {
-        if (unlikely(GETSYSCTL("net.inet.icmp.stats", icmpstat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet.icmp.stats", icmpstat))) {
             do_icmp_packets = 0;
             error("DISABLED: ipv4.icmp");
             error("DISABLED: ipv4.icmp_errors");
@@ -612,7 +612,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
     // see also http://net-snmp.sourceforge.net/docs/mibs/ip.html
     if (likely(do_ip_packets || do_ip_fragsout || do_ip_fragsin || do_ip_errors)) {
-        if (unlikely(GETSYSCTL("net.inet.ip.stats", ipstat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet.ip.stats", ipstat))) {
             do_ip_packets = 0;
             error("DISABLED: ipv4.packets");
             do_ip_fragsout = 0;
@@ -718,7 +718,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_ip6_packets || do_ip6_fragsout || do_ip6_fragsin || do_ip6_errors)) {
-        if (unlikely(GETSYSCTL("net.inet6.ip6.stats", ip6stat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet6.ip6.stats", ip6stat))) {
             do_ip6_packets = 0;
             error("DISABLED: ipv6.packets");
             do_ip6_fragsout = 0;
@@ -850,7 +850,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_icmp6 || do_icmp6_redir || do_icmp6_errors || do_icmp6_echos || do_icmp6_router || do_icmp6_neighbor || do_icmp6_types)) {
-        if (unlikely(GETSYSCTL("net.inet6.icmp6.stats", icmp6stat))) {
+        if (unlikely(GETSYSCTL_BY_NAME("net.inet6.icmp6.stats", icmp6stat))) {
             do_icmp6 = 0;
             error("DISABLED: ipv6.icmp");
         } else {
@@ -1073,7 +1073,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if (likely(do_uptime)) {
-        if (unlikely(GETSYSCTL("kern.boottime", boot_time))) {
+        if (unlikely(GETSYSCTL_BY_NAME("kern.boottime", boot_time))) {
             do_uptime = 0;
             error("DISABLED: system.uptime");
         } else {
@@ -1095,7 +1095,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     return 0;
 }
 
-int getsysctl(const char *name, void *ptr, size_t len)
+int getsysctl_by_name(const char *name, void *ptr, size_t len)
 {
     size_t nlen = len;
 
