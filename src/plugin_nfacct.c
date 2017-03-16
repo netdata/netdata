@@ -32,10 +32,7 @@ static inline void nfacct_list_grow() {
         info("nfacct.plugin: increasing nfacct_list to size %d", size);
 
         nfacct_list = reallocz(nfacct_list, sizeof(struct nfacct_list) + (sizeof(struct mynfacct) * size));
-
-        nfacct_list->data[len].rd_bytes = NULL;
-        nfacct_list->data[len].rd_packets = NULL;
-        nfacct_list->data[len].updated = 0;
+        memset(&nfacct_list->data[len], 0, sizeof(struct mynfacct));
 
         nfacct_list->size = size;
         nfacct_list->len = len;
