@@ -51,11 +51,11 @@ AC_ARG_ENABLE(
     [plugin-nfacct],
     [AS_HELP_STRING([--enable-plugin-nfacct], [enable nfacct plugin, requires root])],
     ,
-    [enable_plugin_nfacct="no"]
+    [enable_plugin_nfacct="detect"]
 )
 AC_ARG_ENABLE(
     [plugin-freeipmi],
-    [AS_HELP_STRING([--enable-plugin-freeipmi], [freeipmi plugin, requires root])],
+    [AS_HELP_STRING([--enable-plugin-freeipmi], [enable freeipmi plugin])],
     ,
     [enable_plugin_freeipmi="detect"]
 )

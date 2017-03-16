@@ -8,6 +8,12 @@ struct mynfacct {
     const char *name;
     uint64_t pkts;
     uint64_t bytes;
+
+    RRDDIM *rd_bytes;
+    RRDDIM *rd_packets;
+
+    int updated;
+
     struct nfacct *nfacct;
 };
 
@@ -18,7 +24,7 @@ struct nfacct_list {
 } *nfacct_list = NULL;
 
 static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
-    if(data) {};
+    (void)data;
 
     if(!nfacct_list || nfacct_list->len == nfacct_list->size) {
         int size = (nfacct_list) ? nfacct_list->size : 0;
@@ -30,12 +36,16 @@ static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
         nfacct_list = reallocz(nfacct_list, sizeof(struct nfacct_list) + (sizeof(struct mynfacct) * size));
 
         nfacct_list->data[len].nfacct = nfacct_alloc();
-        if(!nfacct_list->data[size - 1].nfacct) {
+        if(!nfacct_list->data[len].nfacct) {
             error("nfacct.plugin: nfacct_alloc() failed.");
             free(nfacct_list);
             nfacct_list = NULL;
             return MNL_CB_OK;
         }
+
+        nfacct_list->data[len].rd_bytes = NULL;
+        nfacct_list->data[len].rd_packets = NULL;
+        nfacct_list->data[len].updated = 0;
 
         nfacct_list->size = size;
         nfacct_list->len = len;
@@ -49,6 +59,7 @@ static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
     nfacct_list->data[nfacct_list->len].name  = nfacct_attr_get_str(nfacct_list->data[nfacct_list->len].nfacct, NFACCT_ATTR_NAME);
     nfacct_list->data[nfacct_list->len].pkts  = nfacct_attr_get_u64(nfacct_list->data[nfacct_list->len].nfacct, NFACCT_ATTR_PKTS);
     nfacct_list->data[nfacct_list->len].bytes = nfacct_attr_get_u64(nfacct_list->data[nfacct_list->len].nfacct, NFACCT_ATTR_BYTES);
+    nfacct_list->data[nfacct_list->len].updated = 1;
 
     nfacct_list->len++;
     return MNL_CB_OK;
@@ -70,7 +81,7 @@ void *nfacct_main(void *ptr) {
     struct nlmsghdr *nlh = NULL;
     unsigned int seq = 0, portid = 0;
 
-    seq = now_realtime_sec() - 1;
+    seq = (unsigned int)now_realtime_sec() - 1;
 
     nl  = mnl_socket_open(NETLINK_NETFILTER);
     if(!nl) {
@@ -86,20 +97,26 @@ void *nfacct_main(void *ptr) {
 
     // ------------------------------------------------------------------------
 
-    struct timeval last, now;
-    usec_t usec = 0, susec = 0;
-    RRDSET *st = NULL;
-
-    now_realtime_timeval(&last);
+    RRDSET *st_bytes = NULL, *st_packets = NULL;
 
     // ------------------------------------------------------------------------
 
-    while(1) {
+    int update_every = (int)config_get_number("plugin:nfacct", "update every", localhost->rrd_update_every);
+    if(update_every < localhost->rrd_update_every)
+        update_every = localhost->rrd_update_every;
+
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    for(;;) {
+        heartbeat_dt_usec(&hb);
+        heartbeat_next(&hb, step);
+
         if(unlikely(netdata_exit)) break;
 
         seq++;
 
-        nlh = nfacct_nlmsg_build_hdr(buf, NFNL_MSG_ACCT_GET, NLM_F_DUMP, seq);
+        nlh = nfacct_nlmsg_build_hdr(buf, NFNL_MSG_ACCT_GET, NLM_F_DUMP, (uint32_t)seq);
         if(!nlh) {
             error("nfacct.plugin: nfacct_nlmsg_build_hdr() failed");
             goto cleanup;
@@ -112,76 +129,107 @@ void *nfacct_main(void *ptr) {
 
         if(nfacct_list) nfacct_list->len = 0;
 
-        int ret;
+        ssize_t ret;
         while((ret = mnl_socket_recvfrom(nl, buf, sizeof(buf))) > 0) {
-            if((ret = mnl_cb_run(buf, ret, seq, portid, nfacct_callback, NULL)) <= 0) break;
+            if((ret = mnl_cb_run(buf, (size_t)ret, seq, portid, nfacct_callback, NULL)) <= 0) break;
         }
 
         if (ret == -1) {
-            error("nfacct.plugin: error communicating with kernel.");
+            error("nfacct.plugin: error communicating with kernel. NFACCT plugin can only work when netdata runs as root.");
             goto cleanup;
         }
-
-        // --------------------------------------------------------------------
-
-        now_realtime_timeval(&now);
-        usec = dt_usec(&now, &last) - susec;
-        debug(D_NFACCT_LOOP, "nfacct.plugin: last loop took %llu usec (worked for %llu, sleeped for %llu).", usec + susec, usec, susec);
-
-        if(usec < (default_rrd_update_every * 1000000ULL / 2ULL)) susec = (default_rrd_update_every * 1000000ULL) - usec;
-        else susec = default_rrd_update_every * 1000000ULL / 2ULL;
-
 
         // --------------------------------------------------------------------
 
         if(nfacct_list && nfacct_list->len) {
             int i;
 
-            st = rrdset_find_bytype("netfilter", "nfacct_packets");
-            if(!st) {
-                st = rrdset_create("netfilter", "nfacct_packets", NULL, "nfacct", NULL, "Netfilter Accounting Packets", "packets/s", 3206, default_rrd_update_every, RRDSET_TYPE_STACKED);
-
-                for(i = 0; i < nfacct_list->len ; i++)
-                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, default_rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
+            if(!st_packets) {
+                st_packets = rrdset_create_localhost(
+                        "netfilter"
+                        , "nfacct_packets"
+                        , NULL
+                        , "nfacct"
+                        , NULL
+                        , "Netfilter Accounting Packets"
+                        , "packets/s"
+                        , 3206
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
             }
-            else rrdset_next(st);
+            else rrdset_next(st_packets);
 
             for(i = 0; i < nfacct_list->len ; i++) {
-                RRDDIM *rd = rrddim_find(st, nfacct_list->data[i].name);
+                if(nfacct_list->data[i].updated) {
+                    if(unlikely(!nfacct_list->data[i].rd_packets))
+                        nfacct_list->data[i].rd_packets = rrddim_add(
+                                st_packets
+                                , nfacct_list->data[i].name
+                                , NULL
+                                , 1
+                                , update_every
+                                , RRD_ALGORITHM_INCREMENTAL
+                        );
 
-                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, default_rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
-                if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].pkts);
+                    rrddim_set_by_pointer(
+                            st_packets
+                            , nfacct_list->data[i].rd_packets
+                            , (collected_number)nfacct_list->data[i].pkts
+                    );
+                }
             }
 
-            rrdset_done(st);
+            rrdset_done(st_packets);
 
             // ----------------------------------------------------------------
 
-            st = rrdset_find_bytype("netfilter", "nfacct_bytes");
-            if(!st) {
-                st = rrdset_create("netfilter", "nfacct_bytes", NULL, "nfacct", NULL, "Netfilter Accounting Bandwidth", "kilobytes/s", 3207, default_rrd_update_every, RRDSET_TYPE_STACKED);
-
-                for(i = 0; i < nfacct_list->len ; i++)
-                    rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * default_rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
+            st_bytes = rrdset_find_bytype_localhost("netfilter", "nfacct_bytes");
+            if(!st_bytes) {
+                st_bytes = rrdset_create_localhost(
+                        "netfilter"
+                        , "nfacct_bytes"
+                        , NULL
+                        , "nfacct"
+                        , NULL
+                        , "Netfilter Accounting Bandwidth"
+                        , "kilobytes/s"
+                        , 3207
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
             }
-            else rrdset_next(st);
+            else rrdset_next(st_bytes);
 
             for(i = 0; i < nfacct_list->len ; i++) {
-                RRDDIM *rd = rrddim_find(st, nfacct_list->data[i].name);
+                if(nfacct_list->data[i].updated) {
+                    if(unlikely(!nfacct_list->data[i].rd_bytes))
+                        nfacct_list->data[i].rd_bytes = rrddim_add(
+                                st_bytes
+                                , nfacct_list->data[i].name
+                                , NULL
+                                , 1
+                                , 1000 * update_every
+                                , RRD_ALGORITHM_INCREMENTAL
+                        );
 
-                if(!rd) rd = rrddim_add(st, nfacct_list->data[i].name, NULL, 1, 1000 * default_rrd_update_every, RRD_ALGORITHM_INCREMENTAL);
-                if(rd) rrddim_set_by_pointer(st, rd, nfacct_list->data[i].bytes);
+                    rrddim_set_by_pointer(
+                            st_bytes
+                            , nfacct_list->data[i].rd_bytes
+                            , (collected_number)nfacct_list->data[i].bytes
+                    );
+                }
             }
 
-            rrdset_done(st);
+            rrdset_done(st_bytes);
+
+
+            // ----------------------------------------------------------------
+            // prepare for the next loop
+
+            for(i = 0; i < nfacct_list->len ; i++)
+                nfacct_list->data[i].updated = 0;
         }
-
-        // --------------------------------------------------------------------
-
-        usleep(susec);
-
-        // copy current to last
-        memmove(&last, &now, sizeof(struct timeval));
     }
 
 cleanup:
