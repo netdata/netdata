@@ -14,44 +14,44 @@ static struct freebsd_module {
 } freebsd_modules[] = {
 
         // system metrics
-        { .name = "vm.loadavg",   .dim = "loadavg", .enabled = 1, .func = do_vm_loadavg },
-        { .name = "vm.vmtotal",   .dim = "vmtotal", .enabled = 1, .func = do_vm_vmtotal },
-        { .name = "kern.cp_time", .dim = "cp_time", .enabled = 1, .func = do_kern_cp_time },
-        { .name = "hw.intrcnt",   .dim = "hw_intr", .enabled = 1, .func = do_hw_intcnt },
-        { .name = "vm.stats.sys.v_intr",   .dim = "dev_intr",      .enabled = 1, .func = do_vm_stats_sys_v_intr },
-        { .name = "vm.stats.sys.v_soft",   .dim = "soft_intr",     .enabled = 1, .func = do_vm_stats_sys_v_soft },
-        { .name = "vm.stats.sys.v_swtch",  .dim = "context_swtch", .enabled = 1, .func = do_vm_stats_sys_v_swtch },
-        { .name = "vm.stats.vm.v_forks",   .dim = "forks",         .enabled = 1, .func = do_vm_stats_sys_v_forks },
-        { .name = "vm.swap_info", .dim = "swap",       .enabled = 1, .func = do_vm_swap_info },
-        { .name = "system.ram",   .dim = "system_ram", .enabled = 1, .func = do_system_ram },
-        { .name = "vm.stats.vm.v_swappgs", .dim = "swap_io",       .enabled = 1, .func = do_vm_stats_sys_v_swappgs },
-        { .name = "kern.ipc.sem", .dim = "semaphores",     .enabled = 1, .func = do_kern_ipc_sem },
-        { .name = "kern.ipc.shm", .dim = "shared_memory",  .enabled = 1, .func = do_kern_ipc_shm },
-        { .name = "kern.ipc.msq", .dim = "message_queues", .enabled = 1, .func = do_kern_ipc_msq },
-        { .name = "uptime",       .dim = "uptime",         .enabled = 1, .func = do_uptime },
-        { .name = "net.isr",      .dim = "net_isr",        .enabled = 1, .func = do_net_isr },
-
-        // CPU metrics
-        { .name = "kern.cp_times", .dim = "cp_times", .enabled = 1, .func = do_kern_cp_times },
+        { .name = "kern.cp_time",          .dim = "cp_time",        .enabled = 1, .func = do_kern_cp_time },
+        { .name = "vm.loadavg",            .dim = "loadavg",        .enabled = 1, .func = do_vm_loadavg },
+        { .name = "system.ram",            .dim = "system_ram",     .enabled = 1, .func = do_system_ram },
+        { .name = "vm.swap_info",          .dim = "swap",           .enabled = 1, .func = do_vm_swap_info },
+        { .name = "vm.stats.vm.v_swappgs", .dim = "swap_io",        .enabled = 1, .func = do_vm_stats_sys_v_swappgs },
+        { .name = "vm.vmtotal",            .dim = "vmtotal",        .enabled = 1, .func = do_vm_vmtotal },
+        { .name = "vm.stats.vm.v_forks",   .dim = "forks",          .enabled = 1, .func = do_vm_stats_sys_v_forks },
+        { .name = "vm.stats.sys.v_swtch",  .dim = "context_swtch",  .enabled = 1, .func = do_vm_stats_sys_v_swtch },
+        { .name = "hw.intrcnt",            .dim = "hw_intr",        .enabled = 1, .func = do_hw_intcnt },
+        { .name = "vm.stats.sys.v_intr",   .dim = "dev_intr",       .enabled = 1, .func = do_vm_stats_sys_v_intr },
+        { .name = "vm.stats.sys.v_soft",   .dim = "soft_intr",      .enabled = 1, .func = do_vm_stats_sys_v_soft },
+        { .name = "net.isr",               .dim = "net_isr",        .enabled = 1, .func = do_net_isr },
+        { .name = "kern.ipc.sem",          .dim = "semaphores",     .enabled = 1, .func = do_kern_ipc_sem },
+        { .name = "kern.ipc.shm",          .dim = "shared_memory",  .enabled = 1, .func = do_kern_ipc_shm },
+        { .name = "kern.ipc.msq",          .dim = "message_queues", .enabled = 1, .func = do_kern_ipc_msq },
+        { .name = "uptime",                .dim = "uptime",         .enabled = 1, .func = do_uptime },
 
         // memory metrics
-        { .name = "vm.stats.vm.v_pgfaults", .dim = "pgfaults", .enabled = 1, .func = do_vm_stats_sys_v_pgfaults },
+        { .name = "vm.stats.vm.v_pgfaults", .dim = "pgfaults",      .enabled = 1, .func = do_vm_stats_sys_v_pgfaults },
 
-        // network metrics
-        { .name = "net.inet.tcp.states",   .dim = "tcp_states",  .enabled = 1, .func = do_net_inet_tcp_states },
-        { .name = "net.inet.tcp.stats",    .dim = "tcp_stats",   .enabled = 1, .func = do_net_inet_tcp_stats },
-        { .name = "net.inet.udp.stats",    .dim = "udp_stats",   .enabled = 1, .func = do_net_inet_udp_stats },
-        { .name = "net.inet.icmp.stats",   .dim = "icmp_stats",  .enabled = 1, .func = do_net_inet_icmp_stats },
-        { .name = "net.inet.ip.stats",     .dim = "ip_stats",    .enabled = 1, .func = do_net_inet_ip_stats },
-        { .name = "net.inet6.ip6.stats",   .dim = "ip6_stats",   .enabled = 1, .func = do_net_inet6_ip6_stats },
-        { .name = "net.inet6.icmp6.stats", .dim = "icmp6_stats", .enabled = 1, .func = do_net_inet6_icmp6_stats },
-
-        // network interfaces metrics
-        { .name = "getifaddrs",   .dim = "getifaddrs",   .enabled = 1, .func = do_getifaddrs },
+        // CPU metrics
+        { .name = "kern.cp_times",         .dim = "cp_times",       .enabled = 1, .func = do_kern_cp_times },
 
         // disk metrics
-        { .name = "getmntinfo",   .dim = "getmntinfo",   .enabled = 1, .func = do_getmntinfo },
-        { .name = "kern.devstat", .dim = "kern_devstat", .enabled = 1, .func = do_kern_devstat },
+        { .name = "kern.devstat",          .dim = "kern_devstat",   .enabled = 1, .func = do_kern_devstat },
+        { .name = "getmntinfo",            .dim = "getmntinfo",     .enabled = 1, .func = do_getmntinfo },
+
+        // network metrics
+        { .name = "net.inet.tcp.states",   .dim = "tcp_states",     .enabled = 1, .func = do_net_inet_tcp_states },
+        { .name = "net.inet.tcp.stats",    .dim = "tcp_stats",      .enabled = 1, .func = do_net_inet_tcp_stats },
+        { .name = "net.inet.udp.stats",    .dim = "udp_stats",      .enabled = 1, .func = do_net_inet_udp_stats },
+        { .name = "net.inet.icmp.stats",   .dim = "icmp_stats",     .enabled = 1, .func = do_net_inet_icmp_stats },
+        { .name = "net.inet.ip.stats",     .dim = "ip_stats",       .enabled = 1, .func = do_net_inet_ip_stats },
+        { .name = "net.inet6.ip6.stats",   .dim = "ip6_stats",      .enabled = 1, .func = do_net_inet6_ip6_stats },
+        { .name = "net.inet6.icmp6.stats", .dim = "icmp6_stats",    .enabled = 1, .func = do_net_inet6_icmp6_stats },
+
+        // network interfaces metrics
+        { .name = "getifaddrs",            .dim = "getifaddrs",   .enabled = 1, .func = do_getifaddrs },
 
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
