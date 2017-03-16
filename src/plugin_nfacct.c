@@ -6,6 +6,8 @@
 
 struct mynfacct {
     const char *name;
+    uint32_t hash;
+
     uint64_t pkts;
     uint64_t bytes;
 
@@ -13,8 +15,6 @@ struct mynfacct {
     RRDDIM *rd_packets;
 
     int updated;
-
-    struct nfacct *nfacct;
 };
 
 struct nfacct_list {
@@ -23,9 +23,7 @@ struct nfacct_list {
     struct mynfacct data[];
 } *nfacct_list = NULL;
 
-static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
-    (void)data;
-
+static inline void nfacct_list_grow() {
     if(!nfacct_list || nfacct_list->len == nfacct_list->size) {
         int size = (nfacct_list) ? nfacct_list->size : 0;
         int len = (nfacct_list) ? nfacct_list->len : 0;
@@ -35,14 +33,6 @@ static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
 
         nfacct_list = reallocz(nfacct_list, sizeof(struct nfacct_list) + (sizeof(struct mynfacct) * size));
 
-        nfacct_list->data[len].nfacct = nfacct_alloc();
-        if(!nfacct_list->data[len].nfacct) {
-            error("nfacct.plugin: nfacct_alloc() failed.");
-            free(nfacct_list);
-            nfacct_list = NULL;
-            return MNL_CB_OK;
-        }
-
         nfacct_list->data[len].rd_bytes = NULL;
         nfacct_list->data[len].rd_packets = NULL;
         nfacct_list->data[len].updated = 0;
@@ -50,16 +40,48 @@ static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
         nfacct_list->size = size;
         nfacct_list->len = len;
     }
+}
 
-    if(nfacct_nlmsg_parse_payload(nlh, nfacct_list->data[nfacct_list->len].nfacct) < 0) {
+static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
+    (void)data;
+
+    static struct nfacct *nfacct = NULL;
+
+    if(unlikely(!nfacct)) {
+        nfacct = nfacct_alloc();
+        if(!nfacct) {
+            error("nfacct.plugin: nfacct_alloc() failed.");
+            return MNL_CB_OK;
+        }
+    }
+
+    if(nfacct_nlmsg_parse_payload(nlh, nfacct) < 0) {
         error("nfacct.plugin: nfacct_nlmsg_parse_payload() failed.");
         return MNL_CB_OK;
     }
 
-    nfacct_list->data[nfacct_list->len].name  = nfacct_attr_get_str(nfacct_list->data[nfacct_list->len].nfacct, NFACCT_ATTR_NAME);
-    nfacct_list->data[nfacct_list->len].pkts  = nfacct_attr_get_u64(nfacct_list->data[nfacct_list->len].nfacct, NFACCT_ATTR_PKTS);
-    nfacct_list->data[nfacct_list->len].bytes = nfacct_attr_get_u64(nfacct_list->data[nfacct_list->len].nfacct, NFACCT_ATTR_BYTES);
-    nfacct_list->data[nfacct_list->len].updated = 1;
+    const char *name = nfacct_attr_get_str(nfacct, NFACCT_ATTR_NAME);
+    uint32_t hash = simple_hash(name);
+
+    int i;
+    struct mynfacct *mynfacct = NULL;
+    for(i = 0; i < nfacct_list->len; i++) {
+        if(nfacct_list->data[i].hash == hash && !strcmp(nfacct_list->data[i].name, name)) {
+            mynfacct = &nfacct_list->data[i];
+            break;
+        }
+    }
+
+    if(!mynfacct) {
+        nfacct_list_grow();
+        mynfacct = &nfacct_list->data[nfacct_list->len++];
+        mynfacct->name = name;
+        mynfacct->hash = hash;
+    }
+
+    mynfacct->pkts  = nfacct_attr_get_u64(nfacct, NFACCT_ATTR_PKTS);
+    mynfacct->bytes = nfacct_attr_get_u64(nfacct, NFACCT_ATTR_BYTES);
+    mynfacct->updated = 1;
 
     nfacct_list->len++;
     return MNL_CB_OK;
@@ -126,8 +148,6 @@ void *nfacct_main(void *ptr) {
             error("nfacct.plugin: mnl_socket_send");
             goto cleanup;
         }
-
-        if(nfacct_list) nfacct_list->len = 0;
 
         ssize_t ret;
         while((ret = mnl_socket_recvfrom(nl, buf, sizeof(buf))) > 0) {
