@@ -307,12 +307,6 @@ If no configuration is given, module will attempt to connect to dovecot using un
 
 Module monitor elasticsearch performance and health metrics
 
-**Requirements:**
- * python `requests` package.
-
-You need to install it manually. (python-requests or python3-requests depending on the version of python).
-
-
 It produces:
 
 1. **Search performance** charts:
@@ -990,33 +984,6 @@ Without configuration, module attempts to connect to `http://localhost/stub_stat
 
 ---
 
-# nginx_log
-
-Module monitors nginx access log and produces only one chart:
-
-1. **nginx status codes** in requests/s
- * 2xx
- * 3xx
- * 4xx
- * 5xx
-
-### configuration
-
-Sample for two vhosts:
-
-```yaml
-site_A:
-  path: '/var/log/nginx/access-A.log'
-
-site_B:
-  name: 'local'
-  path: '/var/log/nginx/access-B.log'
-```
-
-When no configuration file is found, module tries to parse `/var/log/nginx/access.log` file.
-
----
-
 # nsd
 
 Module uses the `nsd-control stats_noreset` command to provide `nsd` statistics.
@@ -1159,6 +1126,75 @@ It produces only two charts:
  * size
 
 Configuration is not needed.
+
+---
+
+# postgres
+
+Module monitors one or more postgres servers.
+
+**Requirements:**
+
+ * `python-psycopg2` package. You have to install to manually.
+
+Following charts are drawn:
+
+1. **Database size** MB
+ * size
+
+2. **Current Backend Processes** processes
+ * active
+
+3. **Write-Ahead Logging Statistics** files/s
+ * total
+ * ready
+ * done
+
+4. **Checkpoints** writes/s
+ * scheduled
+ * requested
+ 
+5. **Current connections to db** count
+ * connections
+ 
+6. **Tuples returned from db** tuples/s
+ * sequential
+ * bitmap
+
+7. **Tuple reads from db** reads/s
+ * disk
+ * cache
+
+8. **Transactions on db** transactions/s
+ * commited
+ * rolled back
+
+9. **Tuples written to db** writes/s
+ * inserted
+ * updated
+ * deleted
+ * conflicts
+
+10. **Locks on db** count per type
+ * locks
+ 
+### configuration
+
+```yaml
+socket:
+  name         : 'socket'
+  user         : 'postgres'
+  database     : 'postgres'
+
+tcp:
+  name         : 'tcp'
+  user         : 'postgres'
+  database     : 'postgres'
+  host         : 'localhost'
+  port         : 5432
+```
+
+When no configuration file is found, module tries to connect to TCP/IP socket: `localhost:5432`.
 
 ---
 
