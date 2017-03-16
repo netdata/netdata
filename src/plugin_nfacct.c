@@ -4,8 +4,8 @@
 #include <libmnl/libmnl.h>
 #include <libnetfilter_acct/libnetfilter_acct.h>
 
-struct mynfacct {
-    const char *name;
+struct nfacct_data {
+    char *name;
     uint32_t hash;
 
     uint64_t pkts;
@@ -15,75 +15,58 @@ struct mynfacct {
     RRDDIM *rd_packets;
 
     int updated;
+
+    struct nfacct_data *next;
 };
 
-struct nfacct_list {
-    int size;
-    int len;
-    struct mynfacct data[];
-} *nfacct_list = NULL;
+static struct nfacct_list {
+    struct nfacct *nfacct_buffer;
+    struct nfacct_data *nfacct_metrics;
+} nfacct_root = {
+        .nfacct_buffer = NULL,
+        .nfacct_metrics = NULL
+};
 
-static inline void nfacct_list_grow() {
-    if(!nfacct_list || nfacct_list->len == nfacct_list->size) {
-        int size = (nfacct_list) ? nfacct_list->size : 0;
-        int len = (nfacct_list) ? nfacct_list->len : 0;
-        size++;
-
-        info("nfacct.plugin: increasing nfacct_list to size %d", size);
-
-        nfacct_list = reallocz(nfacct_list, sizeof(struct nfacct_list) + (sizeof(struct mynfacct) * size));
-        memset(&nfacct_list->data[len], 0, sizeof(struct mynfacct));
-
-        nfacct_list->size = size;
-        nfacct_list->len = len;
+static inline struct nfacct_data *nfacct_data_get(const char *name, uint32_t hash) {
+    struct nfacct_data *d = NULL, *last = NULL;
+    for(d = nfacct_root.nfacct_metrics; d ; last = d, d = d->next) {
+        if(unlikely(d->hash == hash && !strcmp(d->name, name)))
+            return d;
     }
+
+    d = callocz(1, sizeof(struct nfacct_data));
+    d->name = strdupz(name);
+    d->hash = hash;
+
+    if(!last) {
+        d->next = nfacct_root.nfacct_metrics;
+        nfacct_root.nfacct_metrics = d;
+    }
+    else {
+        d->next = last->next;
+        last->next = d;
+    }
+
+    return d;
 }
 
 static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
     (void)data;
 
-    static struct nfacct *nfacct = NULL;
-
-    if(unlikely(!nfacct)) {
-        nfacct = nfacct_alloc();
-        if(!nfacct) {
-            error("nfacct.plugin: nfacct_alloc() failed.");
-            return MNL_CB_OK;
-        }
-
-        if(unlikely(!nfacct_list))
-            nfacct_list_grow();
-    }
-
-    if(nfacct_nlmsg_parse_payload(nlh, nfacct) < 0) {
+    if(nfacct_nlmsg_parse_payload(nlh, nfacct_root.nfacct_buffer) < 0) {
         error("nfacct.plugin: nfacct_nlmsg_parse_payload() failed.");
         return MNL_CB_OK;
     }
 
-    const char *name = nfacct_attr_get_str(nfacct, NFACCT_ATTR_NAME);
+    const char *name = nfacct_attr_get_str(nfacct_root.nfacct_buffer, NFACCT_ATTR_NAME);
     uint32_t hash = simple_hash(name);
 
-    int i;
-    struct mynfacct *mynfacct = NULL;
-    for(i = 0; i < nfacct_list->len; i++) {
-        if(nfacct_list->data[i].hash == hash && !strcmp(nfacct_list->data[i].name, name)) {
-            mynfacct = &nfacct_list->data[i];
-            break;
-        }
-    }
+    struct nfacct_data *d = nfacct_data_get(name, hash);
 
-    if(!mynfacct) {
-        nfacct_list_grow();
-        mynfacct = &nfacct_list->data[nfacct_list->len++];
-        mynfacct->name = name;
-        mynfacct->hash = hash;
-    }
+    d->pkts  = nfacct_attr_get_u64(nfacct_root.nfacct_buffer, NFACCT_ATTR_PKTS);
+    d->bytes = nfacct_attr_get_u64(nfacct_root.nfacct_buffer, NFACCT_ATTR_BYTES);
+    d->updated = 1;
 
-    mynfacct->pkts  = nfacct_attr_get_u64(nfacct, NFACCT_ATTR_PKTS);
-    mynfacct->bytes = nfacct_attr_get_u64(nfacct, NFACCT_ATTR_BYTES);
-    mynfacct->updated = 1;
-
-    nfacct_list->len++;
     return MNL_CB_OK;
 }
 
@@ -97,6 +80,10 @@ void *nfacct_main(void *ptr) {
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("nfacct.plugin: Cannot set pthread cancel state to ENABLE.");
+
+    nfacct_root.nfacct_buffer = nfacct_alloc();
+    if(!nfacct_root.nfacct_buffer)
+        fatal("nfacct.plugin: nfacct_alloc() failed.");
 
     char buf[MNL_SOCKET_BUFFER_SIZE];
     struct mnl_socket *nl = NULL;
@@ -161,8 +148,8 @@ void *nfacct_main(void *ptr) {
 
         // --------------------------------------------------------------------
 
-        if(nfacct_list && nfacct_list->len) {
-            int i;
+        if(nfacct_root.nfacct_metrics) {
+            struct nfacct_data *d;
 
             if(!st_packets) {
                 st_packets = rrdset_create_localhost(
@@ -180,12 +167,12 @@ void *nfacct_main(void *ptr) {
             }
             else rrdset_next(st_packets);
 
-            for(i = 0; i < nfacct_list->len ; i++) {
-                if(nfacct_list->data[i].updated) {
-                    if(unlikely(!nfacct_list->data[i].rd_packets))
-                        nfacct_list->data[i].rd_packets = rrddim_add(
+            for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
+                if(likely(d->updated)) {
+                    if(unlikely(!d->rd_packets))
+                        d->rd_packets = rrddim_add(
                                 st_packets
-                                , nfacct_list->data[i].name
+                                , d->name
                                 , NULL
                                 , 1
                                 , update_every
@@ -194,8 +181,8 @@ void *nfacct_main(void *ptr) {
 
                     rrddim_set_by_pointer(
                             st_packets
-                            , nfacct_list->data[i].rd_packets
-                            , (collected_number)nfacct_list->data[i].pkts
+                            , d->rd_packets
+                            , (collected_number)d->pkts
                     );
                 }
             }
@@ -221,12 +208,12 @@ void *nfacct_main(void *ptr) {
             }
             else rrdset_next(st_bytes);
 
-            for(i = 0; i < nfacct_list->len ; i++) {
-                if(nfacct_list->data[i].updated) {
-                    if(unlikely(!nfacct_list->data[i].rd_bytes))
-                        nfacct_list->data[i].rd_bytes = rrddim_add(
+            for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
+                if(likely(d->updated)) {
+                    if(unlikely(!d->rd_bytes))
+                        d->rd_bytes = rrddim_add(
                                 st_bytes
-                                , nfacct_list->data[i].name
+                                , d->name
                                 , NULL
                                 , 1
                                 , 1000 * update_every
@@ -235,8 +222,8 @@ void *nfacct_main(void *ptr) {
 
                     rrddim_set_by_pointer(
                             st_bytes
-                            , nfacct_list->data[i].rd_bytes
-                            , (collected_number)nfacct_list->data[i].bytes
+                            , d->rd_bytes
+                            , (collected_number)d->bytes
                     );
                 }
             }
@@ -247,8 +234,8 @@ void *nfacct_main(void *ptr) {
             // ----------------------------------------------------------------
             // prepare for the next loop
 
-            for(i = 0; i < nfacct_list->len ; i++)
-                nfacct_list->data[i].updated = 0;
+            for(d = nfacct_root.nfacct_metrics; d ; d = d->next)
+                d->updated = 0;
         }
     }
 
