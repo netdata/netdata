@@ -1313,9 +1313,9 @@ int do_freebsd_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "collisions", IFA_DATA(collisions));
                 rrdset_done(st);
             }
-
-            freeifaddrs(ifap);
         }
+
+        freeifaddrs(ifap);
     }
 
     // --------------------------------------------------------------------
