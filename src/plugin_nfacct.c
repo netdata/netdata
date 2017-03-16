@@ -53,6 +53,9 @@ static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
             error("nfacct.plugin: nfacct_alloc() failed.");
             return MNL_CB_OK;
         }
+
+        if(unlikely(!nfacct_list))
+            nfacct_list_grow();
     }
 
     if(nfacct_nlmsg_parse_payload(nlh, nfacct) < 0) {
