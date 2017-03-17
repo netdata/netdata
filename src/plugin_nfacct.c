@@ -432,7 +432,7 @@ static void nfstat_send_metrics() {
         if(!st_expect) {
             st_expect = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
-                    , RRD_TYPE_NET_STAT_CONNTRACK "_search"
+                    , RRD_TYPE_NET_STAT_CONNTRACK "_expect"
                     , NULL
                     , RRD_TYPE_NET_STAT_CONNTRACK
                     , NULL
