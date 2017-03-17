@@ -13,6 +13,9 @@
 #ifdef HAVE_LINUX_NETFILTER_NFNETLINK_CONNTRACK_H
 #define DO_NFSTAT 1
 
+#define RRD_TYPE_NET_STAT_NETFILTER "netfilter"
+#define RRD_TYPE_NET_STAT_CONNTRACK "netlink" // FIXME: should be "conntrack" when merged with the /proc plugin
+
 #include <linux/netfilter/nfnetlink_conntrack.h>
 
 static struct {
@@ -174,9 +177,6 @@ static int nfstat_collect() {
 
     return 0;
 }
-
-#define RRD_TYPE_NET_STAT_NETFILTER "netfilter2"
-#define RRD_TYPE_NET_STAT_CONNTRACK "conntrack2"
 
 static void nfstat_send_metrics() {
 
