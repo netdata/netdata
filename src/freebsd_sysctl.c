@@ -3458,7 +3458,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                 dstat = devstat_data + sizeof(long); // skip generation number
 
                 for (i = 0; i < numdevs; i++) {
-                    if (unlikely(!do_system_io)) {
+                    if (likely(do_system_io)) {
                         if (((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_DIRECT) || ((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_STORARRAY)) {
                             total_disk_kbytes_read += dstat[i].bytes[DEVSTAT_READ] / KILO_FACTOR;
                             total_disk_kbytes_write += dstat[i].bytes[DEVSTAT_WRITE] / KILO_FACTOR;
@@ -3864,11 +3864,10 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                 // --------------------------------------------------------------------
 
-                if (unlikely(!do_system_io)) {
+                if (likely(do_system_io)) {
                     static RRDSET *st = NULL;
                     static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-                    st = rrdset_find_bytype_localhost("system", "io");
                     if (unlikely(!st)) {
                         st = rrdset_create_localhost("system",
                                                      "io",
