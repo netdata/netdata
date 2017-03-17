@@ -27,9 +27,14 @@ static struct {
     struct nfgenmsg *nfh;
     unsigned int seq;
     uint32_t portid;
+
     struct nlattr *tb[CTA_STATS_MAX+1];
     const char *attr2name[CTA_STATS_MAX+1];
     kernel_uint_t metrics[CTA_STATS_MAX+1];
+
+    struct nlattr *tb_exp[CTA_STATS_EXP_MAX+1];
+    const char *attr2name_exp[CTA_STATS_EXP_MAX+1];
+    kernel_uint_t metrics_exp[CTA_STATS_EXP_MAX+1];
 } nfstat_root = {
         .update_every = 1,
         .buf = NULL,
@@ -55,7 +60,14 @@ static struct {
                 [CTA_STATS_ERROR]	       = "icmp_error",
                 [CTA_STATS_SEARCH_RESTART] = "search_restart",
         },
-        .metrics = {}
+        .metrics = {},
+        .tb_exp = {},
+        .attr2name_exp = {
+                [CTA_STATS_EXP_NEW]	       = "new",
+                [CTA_STATS_EXP_CREATE]	   = "created",
+                [CTA_STATS_EXP_DELETE]	   = "deleted",
+        },
+        .metrics_exp = {}
 };
 
 
@@ -91,6 +103,23 @@ static void nfstat_cleanup() {
     freez(nfstat_root.buf);
     nfstat_root.buf = NULL;
     nfstat_root.buf_size = 0;
+}
+
+static struct nlmsghdr * nfct_mnl_nlmsghdr_put(char *buf, uint16_t subsys, uint16_t type, uint8_t family, uint32_t seq) {
+    struct nlmsghdr *nlh;
+    struct nfgenmsg *nfh;
+
+    nlh = mnl_nlmsg_put_header(buf);
+    nlh->nlmsg_type = (subsys << 8) | type;
+    nlh->nlmsg_flags = NLM_F_REQUEST|NLM_F_DUMP;
+    nlh->nlmsg_seq = seq;
+
+    nfh = mnl_nlmsg_put_extra_header(nlh, sizeof(struct nfgenmsg));
+    nfh->nfgen_family = family;
+    nfh->version = NFNETLINK_V0;
+    nfh->res_id = 0;
+
+    return nlh;
 }
 
 static int nfct_stats_attr_cb(const struct nlattr *attr, void *data) {
@@ -131,23 +160,14 @@ static int nfstat_callback(const struct nlmsghdr *nlh, void *data) {
     return MNL_CB_OK;
 }
 
-static int nfstat_collect() {
-    int i;
-
+static int nfstat_collect_conntrack() {
     // zero all metrics - we will sum the metrics of all CPUs later
+    int i;
     for (i = 0; i < CTA_STATS_MAX+1; i++)
         nfstat_root.metrics[i] = 0;
 
     // prepare the request
-    nfstat_root.nlh = mnl_nlmsg_put_header(nfstat_root.buf);
-    nfstat_root.nlh->nlmsg_type = (NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_GET_STATS_CPU;
-    nfstat_root.nlh->nlmsg_flags = NLM_F_REQUEST|NLM_F_DUMP;
-    nfstat_root.nlh->nlmsg_seq = nfstat_root.seq++;
-
-    nfstat_root.nfh = mnl_nlmsg_put_extra_header(nfstat_root.nlh, sizeof(struct nfgenmsg));
-    nfstat_root.nfh->nfgen_family = AF_UNSPEC;
-    nfstat_root.nfh->version = NFNETLINK_V0;
-    nfstat_root.nfh->res_id = 0;
+    nfstat_root.nlh = nfct_mnl_nlmsghdr_put(nfstat_root.buf, NFNL_SUBSYS_CTNETLINK, IPCTNL_MSG_CT_GET_STATS_CPU, AF_UNSPEC, nfstat_root.seq);
 
     // send the request
     if(mnl_socket_sendto(nfstat_root.mnl, nfstat_root.nlh, nfstat_root.nlh->nlmsg_len) < 0) {
@@ -174,6 +194,90 @@ static int nfstat_collect() {
         error("NFSTAT: error communicating with kernel. This plugin can only work when netdata runs as root.");
         return 1;
     }
+
+    return 0;
+}
+
+static int nfexp_stats_attr_cb(const struct nlattr *attr, void *data)
+{
+    const struct nlattr **tb = data;
+    int type = mnl_attr_get_type(attr);
+
+    if (mnl_attr_type_valid(attr, CTA_STATS_EXP_MAX) < 0)
+        return MNL_CB_OK;
+
+    if (mnl_attr_validate(attr, MNL_TYPE_U32) < 0) {
+        error("NFSTAT EXP: mnl_attr_validate() failed");
+        return MNL_CB_ERROR;
+    }
+
+    tb[type] = attr;
+    return MNL_CB_OK;
+}
+
+static int nfstat_callback_exp(const struct nlmsghdr *nlh, void *data) {
+    (void)data;
+
+    struct nfgenmsg *nfg = mnl_nlmsg_get_payload(nlh);
+
+    mnl_attr_parse(nlh, sizeof(*nfg), nfexp_stats_attr_cb, nfstat_root.tb_exp);
+
+    int i;
+    for (i = 0; i < CTA_STATS_EXP_MAX+1; i++) {
+        if (nfstat_root.tb_exp[i]) {
+            nfstat_root.metrics_exp[i] += ntohl(mnl_attr_get_u32(nfstat_root.tb_exp[i]));
+        }
+    }
+
+    return MNL_CB_OK;
+}
+
+static int nfstat_collect_conntrack_expectations() {
+    // zero all metrics - we will sum the metrics of all CPUs later
+    int i;
+    for (i = 0; i < CTA_STATS_EXP_MAX+1; i++)
+        nfstat_root.metrics_exp[i] = 0;
+
+    // prepare the request
+    nfstat_root.nlh = nfct_mnl_nlmsghdr_put(nfstat_root.buf, NFNL_SUBSYS_CTNETLINK_EXP, IPCTNL_MSG_EXP_GET_STATS_CPU, AF_UNSPEC, nfstat_root.seq);
+
+    // send the request
+    if(mnl_socket_sendto(nfstat_root.mnl, nfstat_root.nlh, nfstat_root.nlh->nlmsg_len) < 0) {
+        error("NFSTAT: mnl_socket_sendto() failed");
+        return 1;
+    }
+
+    // get the reply
+    ssize_t ret;
+    while ((ret = mnl_socket_recvfrom(nfstat_root.mnl, nfstat_root.buf, nfstat_root.buf_size)) > 0) {
+        if(mnl_cb_run(
+                nfstat_root.buf
+                , (size_t)ret
+                , nfstat_root.nlh->nlmsg_seq
+                , nfstat_root.portid
+                , nfstat_callback_exp
+                , NULL
+        ) <= MNL_CB_STOP)
+            break;
+    }
+
+    // verify we run without issues
+    if (ret == -1) {
+        error("NFSTAT: error communicating with kernel. This plugin can only work when netdata runs as root.");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int nfstat_collect() {
+    nfstat_root.seq++;
+
+    if(nfstat_collect_conntrack())
+        return 1;
+
+    if(nfstat_collect_conntrack_expectations())
+        return 1;
 
     return 0;
 }
@@ -318,6 +422,42 @@ static void nfstat_send_metrics() {
 
         rrdset_done(st_errors);
     }
+
+    // ----------------------------------------------------------------
+
+    {
+        static RRDSET *st_expect = NULL;
+        static RRDDIM *rd_new = NULL, *rd_created = NULL, *rd_deleted = NULL;
+
+        if(!st_expect) {
+            st_expect = rrdset_create_localhost(
+                    RRD_TYPE_NET_STAT_NETFILTER
+                    , RRD_TYPE_NET_STAT_CONNTRACK "_search"
+                    , NULL
+                    , RRD_TYPE_NET_STAT_CONNTRACK
+                    , NULL
+                    , "Connection Tracker Expectations"
+                    , "expectations/s"
+                    , 3003
+                    , nfstat_root.update_every
+                    , RRDSET_TYPE_LINE
+            );
+            rrdset_flag_set(st_expect, RRDSET_FLAG_DETAIL);
+
+            rd_created = rrddim_add(st_expect, nfstat_root.attr2name_exp[CTA_STATS_EXP_CREATE], NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_deleted = rrddim_add(st_expect, nfstat_root.attr2name_exp[CTA_STATS_EXP_DELETE], NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_new = rrddim_add(st_expect, nfstat_root.attr2name_exp[CTA_STATS_EXP_NEW], NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_expect);
+
+        rrddim_set_by_pointer(st_expect, rd_created, (collected_number) nfstat_root.metrics_exp[CTA_STATS_EXP_CREATE]);
+        rrddim_set_by_pointer(st_expect, rd_deleted, (collected_number) nfstat_root.metrics_exp[CTA_STATS_EXP_DELETE]);
+        rrddim_set_by_pointer(st_expect, rd_new, (collected_number) nfstat_root.metrics_exp[CTA_STATS_EXP_NEW]);
+
+        rrdset_done(st_expect);
+    }
+
 }
 
 #endif // HAVE_LINUX_NETFILTER_NFNETLINK_CONNTRACK_H
