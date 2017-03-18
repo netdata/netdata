@@ -1354,7 +1354,7 @@ if [ -t 2 ]
 else
     # we are headless
     # create a temporary file for the log
-    tmp=\$(mktemp /tmp/netdata-updater-log-XXXXXX.log)
+    tmp=\$(mktemp /tmp/netdata-updater.log.XXXXXX)
     # open fd 3 and send it to tmp
     exec 3>\${tmp}
 fi
