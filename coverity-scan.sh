@@ -18,6 +18,9 @@ covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
 	echo "The command ${covbuild} is not executable. Save command the full filename of cov-build in .coverity-build" && \
 	exit 1
 
+version="$(cat config.h | grep "^#define PACKAGE_VERSION" | cut -d '"' -f 2)"
+echo >&2 "Working on netdata version: ${version}"
+
 echo >&2 "Cleaning up old builds..."
 make clean || exit 1
 
@@ -34,6 +37,6 @@ tar czvf netdata-coverity-analysis.tgz cov-int || exit 1
 curl --form token="${token}" \
   --form email=costa@tsaousis.gr \
   --form file=@netdata-coverity-analysis.tgz \
-  --form version="1.6.0rc1" \
-  --form description="Description" \
+  --form version="${version}" \
+  --form description="netdata, real-time performance monitoring, done right." \
   https://scan.coverity.com/builds?project=firehol%2Fnetdata

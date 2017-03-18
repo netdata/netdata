@@ -81,6 +81,7 @@ static void netdev_free(struct netdev *d) {
     if(d->st_compressed) rrdset_flag_set(d->st_compressed, RRDSET_FLAG_OBSOLETE);
     if(d->st_events)     rrdset_flag_set(d->st_events,     RRDSET_FLAG_OBSOLETE);
 
+    netdev_added--;
     freez(d->name);
     freez(d);
 }
@@ -88,6 +89,7 @@ static void netdev_free(struct netdev *d) {
 static void netdev_cleanup() {
     if(likely(netdev_found == netdev_added)) return;
 
+    netdev_added = 0;
     struct netdev *d = netdev_root, *last = NULL;
     while(d) {
         if(unlikely(!d->updated)) {
@@ -108,6 +110,7 @@ static void netdev_cleanup() {
             netdev_free(t);
         }
         else {
+            netdev_added++;
             last = d;
             d->updated = 0;
             d = d->next;
