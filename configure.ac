@@ -55,7 +55,7 @@ AC_ARG_ENABLE(
 )
 AC_ARG_ENABLE(
     [plugin-freeipmi],
-    [AS_HELP_STRING([--enable-plugin-freeipmi], [freeipmi plugin, requires root])],
+    [AS_HELP_STRING([--enable-plugin-freeipmi], [enable freeipmi plugin])],
     ,
     [enable_plugin_freeipmi="detect"]
 )
@@ -363,18 +363,33 @@ AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "ye
 # -----------------------------------------------------------------------------
 # nfacct.plugin - libmnl, libnetfilter_acct
 
+AC_CHECK_HEADERS_ONCE([linux/netfilter/nfnetlink_conntrack.h])
+
 PKG_CHECK_MODULES(
     [NFACCT],
     [libnetfilter_acct],
     [have_libnetfilter_acct=yes],
     [have_libnetfilter_acct=no]
 )
+
+if test "${have_libnetfilter_acct}" = "yes"; then
+    AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
+    OPTIONAL_NFACCT_CLFAGS="${OPTIONAL_NFACCT_CLFAGS} ${NFACCT_CFLAGS}"
+    OPTIONAL_NFACCT_LIBS="${OPTIONAL_NFACCT_LIBS} ${NFACCT_LIBS}"
+fi
+
 PKG_CHECK_MODULES(
     [LIBMNL],
     [libmnl],
     [have_libmnl=yes],
     [have_libmnl=no]
 )
+
+if test "${have_libmnl}" = "yes"; then
+    AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
+    OPTIONAL_NFACCT_CLFAGS="${OPTIONAL_NFACCT_CLFAGS} ${LIBMNL_CFLAGS}"
+    OPTIONAL_NFACCT_LIBS="${OPTIONAL_NFACCT_LIBS} ${LIBMNL_LIBS}"
+fi
 
 test "${enable_plugin_nfacct}" = "yes" -a "${have_libnetfilter_acct}" != "yes" && \
     AC_MSG_ERROR([netfilter_acct required but not found])
