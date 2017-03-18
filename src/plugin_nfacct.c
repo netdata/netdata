@@ -5,6 +5,11 @@
 #ifdef HAVE_LIBMNL
 #include <libmnl/libmnl.h>
 
+static inline size_t mnl_buffer_size() {
+    long s = MNL_SOCKET_BUFFER_SIZE;
+    if(s <= 0) return 8192;
+    return (size_t)s;
+}
 
 // ----------------------------------------------------------------------------
 // DO_NFSTAT - collect netfilter connection tracker statistics via netlink
@@ -74,7 +79,7 @@ static struct {
 static int nfstat_init(int update_every) {
     nfstat_root.update_every = update_every;
 
-    nfstat_root.buf_size = (size_t)MNL_SOCKET_BUFFER_SIZE;
+    nfstat_root.buf_size = mnl_buffer_size();
     nfstat_root.buf = mallocz(nfstat_root.buf_size);
 
     nfstat_root.mnl  = mnl_socket_open(NETLINK_NETFILTER);
@@ -534,7 +539,7 @@ static inline struct nfacct_data *nfacct_data_get(const char *name, uint32_t has
 static int nfacct_init(int update_every) {
     nfacct_root.update_every = update_every;
 
-    nfacct_root.buf_size = (size_t)MNL_SOCKET_BUFFER_SIZE;
+    nfacct_root.buf_size = mnl_buffer_size();
     nfacct_root.buf = mallocz(nfacct_root.buf_size);
 
     nfacct_root.nfacct_buffer = nfacct_alloc();
