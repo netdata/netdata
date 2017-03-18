@@ -1441,11 +1441,11 @@ REINSTALL
             echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
             echo >&2
             echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh /etc/cron.daily/netdata-updater.sh${TPUT_RESET}"
-        elif [ -d "/etc/periodic/daily" -a ! -f "/etc/periodic/daily/netdata-updater.sh" ]
+        elif [ -d "/etc/periodic/daily" -a ! -f "/etc/periodic/daily/netdata-updater" ]
             then
             echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
             echo >&2
-            echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh /etc/periodic/daily/netdata-updater.sh${TPUT_RESET}"
+            echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh /etc/periodic/daily/netdata-updater${TPUT_RESET}"
         fi
     fi
 elif [ -f "netdata-updater.sh" ]
