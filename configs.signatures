@@ -87,6 +87,7 @@ declare -A configs_signatures=(
   ['373160658e7d5f1a129de397b9347365']='health.d/entropy.conf'
   ['373c1276dc9e65884ff2b26e1f08afe7']='health.d/named.conf'
   ['3798445a7faaf45c7a8047908678e690']='python.d/varnish.conf'
+  ['37bc2b50ade9f334da4775dfea59f785']='python.d.conf'
   ['3848172053221b95279ba9bf789cd4e0']='health.d/apache.conf'
   ['3866efafd38e161136428d0f818cac43']='health.d/net.conf'
   ['38d1bf04fe9901481dd6febcc0404a86']='python.d.conf'
