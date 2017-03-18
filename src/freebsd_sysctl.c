@@ -330,7 +330,7 @@ int do_kern_cp_times(int update_every, usec_t dt) {
 
             if(unlikely(number_of_cpus > old_number_of_cpus)) {
                 all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * number_of_cpus);
-                memset(&all_cpu_charts[old_number_of_cpus], 0, sizeof(struct softnet_chart) * (number_of_cpus - old_number_of_cpus));
+                memset(&all_cpu_charts[old_number_of_cpus], 0, sizeof(struct cpu_chart) * (number_of_cpus - old_number_of_cpus));
                 old_number_of_cpus = number_of_cpus;
             }
 
