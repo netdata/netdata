@@ -286,9 +286,9 @@ static inline int format_dimension_collected_json_plaintext(
 
         "\"chart_id\":\"%s\","
         "\"chart_name\":\"%s\","
-        "\"family\":\"%s\","
-        "\"context\": \"%s\","
-        "\"type\":\"%s\","
+        "\"chart_family\":\"%s\","
+        "\"chart_context\": \"%s\","
+        "\"chart_type\":\"%s\","
         "\"units\": \"%s\","
 
         "\"id\":\"%s\","
@@ -338,9 +338,9 @@ static inline int format_dimension_stored_json_plaintext(
 
             "\"chart_id\":\"%s\","
             "\"chart_name\":\"%s\","
-            "\"family\":\"%s\","
-            "\"context\": \"%s\","
-            "\"type\":\"%s\","
+            "\"chart_family\":\"%s\","
+            "\"chart_context\": \"%s\","
+            "\"chart_type\":\"%s\","
             "\"units\": \"%s\","
 
             "\"id\":\"%s\","
