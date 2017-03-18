@@ -372,24 +372,12 @@ PKG_CHECK_MODULES(
     [have_libnetfilter_acct=no]
 )
 
-if test "${have_libnetfilter_acct}" = "yes"; then
-    AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
-    OPTIONAL_NFACCT_CLFAGS="${OPTIONAL_NFACCT_CLFAGS} ${NFACCT_CFLAGS}"
-    OPTIONAL_NFACCT_LIBS="${OPTIONAL_NFACCT_LIBS} ${NFACCT_LIBS}"
-fi
-
 PKG_CHECK_MODULES(
     [LIBMNL],
     [libmnl],
     [have_libmnl=yes],
     [have_libmnl=no]
 )
-
-if test "${have_libmnl}" = "yes"; then
-    AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
-    OPTIONAL_NFACCT_CLFAGS="${OPTIONAL_NFACCT_CLFAGS} ${LIBMNL_CFLAGS}"
-    OPTIONAL_NFACCT_LIBS="${OPTIONAL_NFACCT_LIBS} ${LIBMNL_LIBS}"
-fi
 
 test "${enable_plugin_nfacct}" = "yes" -a "${have_libnetfilter_acct}" != "yes" && \
     AC_MSG_ERROR([netfilter_acct required but not found])
@@ -400,6 +388,8 @@ test "${enable_plugin_nfacct}" = "yes" -a "${have_libmnl}" != "yes" && \
 AC_MSG_CHECKING([if nfacct.plugin should be enabled])
 if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes" -a "${have_libmnl}" = "yes"; then
     enable_plugin_nfacct="yes"
+    AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
+    AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
     AC_DEFINE([INTERNAL_PLUGIN_NFACCT], [1], [nfacct plugin usability])
     OPTIONAL_NFACCT_CLFAGS="${NFACCT_CFLAGS} ${LIBMNL_CFLAGS}"
     OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
