@@ -326,8 +326,13 @@ int do_kern_cp_times(int update_every, usec_t dt) {
                 RRDDIM *rd_interrupt;
                 RRDDIM *rd_idle;
             } *all_cpu_charts = NULL;
+            static int old_number_of_cpus = 0;
 
-            all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * number_of_cpus);
+            if(unlikely(number_of_cpus > old_number_of_cpus)) {
+                all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * number_of_cpus);
+                memset(&all_cpu_charts[old_number_of_cpus], 0, sizeof(struct cpu_chart) * (number_of_cpus - old_number_of_cpus));
+                old_number_of_cpus = number_of_cpus;
+            }
 
             for (i = 0; i < number_of_cpus; i++) {
                 if (unlikely(!all_cpu_charts[i].st)) {
@@ -1277,7 +1282,7 @@ int do_net_isr(int update_every, usec_t dt) {
             return 1;
         } else {
             netisr_stats = reallocz(netisr_stats, (number_of_cpus + 1) * sizeof(struct netisr_stats));
-            bzero(netisr_stats, (number_of_cpus + 1) * sizeof(struct netisr_stats));
+            memset(netisr_stats, 0, (number_of_cpus + 1) * sizeof(struct netisr_stats));
             for (i = 0; i < num_netisr_workstreams; i++) {
                 for (n = 0; n < num_netisr_works; n++) {
                     if (netisr_workstream[i].snws_wsid == netisr_work[n].snw_wsid) {
@@ -1344,8 +1349,13 @@ int do_net_isr(int update_every, usec_t dt) {
             RRDDIM *rd_qdrops;
             RRDDIM *rd_queued;
         } *all_softnet_charts = NULL;
+        static int old_number_of_cpus = 0;
 
-        all_softnet_charts = reallocz(all_softnet_charts, sizeof(struct softnet_chart) * number_of_cpus);
+        if(unlikely(number_of_cpus > old_number_of_cpus)) {
+            all_softnet_charts = reallocz(all_softnet_charts, sizeof(struct softnet_chart) * number_of_cpus);
+            memset(&all_softnet_charts[old_number_of_cpus], 0, sizeof(struct softnet_chart) * (number_of_cpus - old_number_of_cpus));
+            old_number_of_cpus = number_of_cpus;
+        }
 
         for (i = 0; i < number_of_cpus ;i++) {
             snprintfz(all_softnet_charts[i].netisr_cpuid, MAX_INT_DIGITS + 17, "cpu%d_softnet_stat", i);
