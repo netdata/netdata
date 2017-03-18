@@ -104,6 +104,12 @@ Valid <installer options> are:
         Enable/disable the FreeIPMI plugin.
         Default: enable it when libipmimonitoring is available.
 
+   --enable-plugin-nfacct
+   --disable-plugin-nfacct
+
+        Enable/disable the nfacct plugin.
+        Default: enable it when libmnl and libnetfilter_acct are available.
+
    --enable-lto
    --disable-lto
 
@@ -204,6 +210,14 @@ do
     elif [ "$1" = "--disable-plugin-freeipmi" ]
         then
         NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --disable-plugin-freeipmi"
+        shift 1
+    elif [ "$1" = "--enable-plugin-nfacct" ]
+        then
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --enable-plugin-nfacct"
+        shift 1
+    elif [ "$1" = "--disable-plugin-nfacct" ]
+        then
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --disable-plugin-nfacct"
         shift 1
     elif [ "$1" = "--enable-lto" ]
         then
