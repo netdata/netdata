@@ -97,7 +97,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
 
-    host->rrd_update_every    = update_every;
+    host->rrd_update_every    = (update_every > 0)?update_every:1;
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->rrd_memory_mode     = memory_mode;
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;

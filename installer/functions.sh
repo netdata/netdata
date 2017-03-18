@@ -17,6 +17,32 @@ check_cmd() {
 # -----------------------------------------------------------------------------
 
 setup_terminal() {
+    TPUT_RESET=""
+    TPUT_BLACK=""
+    TPUT_RED=""
+    TPUT_GREEN=""
+    TPUT_YELLOW=""
+    TPUT_BLUE=""
+    TPUT_PURPLE=""
+    TPUT_CYAN=""
+    TPUT_WHITE=""
+    TPUT_BGBLACK=""
+    TPUT_BGRED=""
+    TPUT_BGGREEN=""
+    TPUT_BGYELLOW=""
+    TPUT_BGBLUE=""
+    TPUT_BGPURPLE=""
+    TPUT_BGCYAN=""
+    TPUT_BGWHITE=""
+    TPUT_BOLD=""
+    TPUT_DIM=""
+    TPUT_UNDERLINED=""
+    TPUT_BLINK=""
+    TPUT_INVERTED=""
+    TPUT_STANDOUT=""
+    TPUT_BELL=""
+    TPUT_CLEAR=""
+
     # Is stderr on the terminal? If not, then fail
     test -t 2 || return 1
 
