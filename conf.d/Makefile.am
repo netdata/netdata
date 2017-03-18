@@ -36,6 +36,7 @@ dist_pythonconfig_DATA = \
     python.d/freeradius.conf \
     python.d/haproxy.conf \
     python.d/hddtemp.conf \
+    python.d/intel_gpu.conf \
     python.d/ipfs.conf \
     python.d/isc_dhcpd.conf \
     python.d/mdstat.conf \

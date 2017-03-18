@@ -26,6 +26,7 @@ dist_python_DATA = \
     freeradius.chart.py \
     haproxy.chart.py \
     hddtemp.chart.py \
+    intel_gpu.chart.py \
     ipfs.chart.py \
     isc_dhcpd.chart.py \
     mdstat.chart.py \
