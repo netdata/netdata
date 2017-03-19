@@ -3476,7 +3476,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                     }
 
                     if (unlikely(!enable_pass_devices))
-                        if (dstat[i].device_type & DEVSTAT_TYPE_PASS == DEVSTAT_TYPE_PASS)
+                        if ((dstat[i].device_type & DEVSTAT_TYPE_PASS) == DEVSTAT_TYPE_PASS)
                             continue;
 
                     if (((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_DIRECT) || ((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_STORARRAY)) {
