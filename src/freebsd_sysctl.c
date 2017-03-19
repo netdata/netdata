@@ -380,7 +380,7 @@ int do_kern_cp_times(int update_every, usec_t dt) {
 
 int do_hw_intcnt(int update_every, usec_t dt) {
     static int mib_hw_intrcnt[2] = {0, 0};
-    size_t intrcnt_size;
+    size_t intrcnt_size = sizeof(mib_hw_intrcnt);
     int i;
 
     if (unlikely(GETSYSCTL_SIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt_size))) {
@@ -1241,7 +1241,7 @@ int do_net_isr(int update_every, usec_t dt) {
     static int mib_workstream[3] = {0, 0, 0}, mib_work[3] = {0, 0, 0};
     int common_error = 0;
     int i, n;
-    size_t netisr_workstream_size, netisr_work_size;
+    size_t netisr_workstream_size = sizeof(mib_workstream), netisr_work_size = sizeof(mib_work);
     unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
     static struct sysctl_netisr_workstream *netisr_workstream = NULL;
     static struct sysctl_netisr_work *netisr_work = NULL;
@@ -3476,7 +3476,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                     }
 
                     if (unlikely(!enable_pass_devices))
-                        if (dstat[i].device_type & DEVSTAT_TYPE_PASS == DEVSTAT_TYPE_PASS)
+                        if ((dstat[i].device_type & DEVSTAT_TYPE_PASS) == DEVSTAT_TYPE_PASS)
                             continue;
 
                     if (((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_DIRECT) || ((dstat[i].device_type & DEVSTAT_TYPE_MASK) == DEVSTAT_TYPE_STORARRAY)) {
