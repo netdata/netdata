@@ -233,9 +233,14 @@ int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *val
         if(base->head == base->next_keyword)
             base->head = e;
     }
-    else
+    else {
         e->prev = NULL;
 
+        if(!base->head)
+            base->head = e;
+    }
+
+    // prepare the next iteration
     base->next_keyword = e->next;
     if(unlikely(!base->next_keyword))
         base->next_keyword = base->head;
