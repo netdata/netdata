@@ -380,7 +380,7 @@ int do_kern_cp_times(int update_every, usec_t dt) {
 
 int do_hw_intcnt(int update_every, usec_t dt) {
     static int mib_hw_intrcnt[2] = {0, 0};
-    size_t intrcnt_size;
+    size_t intrcnt_size = sizeof(mib_hw_intrcnt);
     int i;
 
     if (unlikely(GETSYSCTL_SIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt_size))) {
