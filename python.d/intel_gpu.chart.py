@@ -19,20 +19,16 @@ CHARTS = {
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
         LogService.__init__(self, configuration=configuration, name=name)
-        if len(self.log_path) == 0:
-            self.log_path = "/var/log/intel_gpu_top.log"
+
+        self.log_path = self.configuration.get('path', '/var/log/intel_gpu_top.log')
         self.order = ORDER
         self.definitions = CHARTS
 
     def _get_data(self):
         try:
             raw = self._get_raw_data()
-            if raw is None:
+            if raw is None or not raw:
                 return None
-            elif not raw:
-                return {'render': 0,
-                        'bitstream': 0,
-                        'blitter': 0}
 
         except (ValueError, AttributeError):
             return None
