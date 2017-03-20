@@ -33,15 +33,16 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
 <a href="https://octoverse.github.com/" target="_blank"><img src="https://cloud.githubusercontent.com/assets/2662304/21743260/23ebe62c-d507-11e6-80c0-76b95f53e464.png"/></a>
 </p>
 
-`Jan 22nd, 2017` - **[netdata v1.5.0 released!](https://github.com/firehol/netdata/releases)**
+`Mar 20th, 2017` - **[netdata v1.6.0 released!](https://github.com/firehol/netdata/releases)**
 
- - netdata now runs on **FreeBSD** and **MacOS**
- - netdata now supports **Graphite**, **OpenTSDB**, **Prometheus** and compatible backends
- - netdata now monitors **systemd Services**
- - new plugins: fping, postgres, varnish, elasticsearch, haproxy, freeradius, mdstat, ISC dhcpd, fail2ban, openvpn, NUMA memory, CPU Idle States, gunicorn, ECC memory errors, IPC semaphores, uptime
- - improved plugins: netfilter conntrack, mysql/mariadb, ipfs, cpufreq, hddtemp, sensors, nginx, nginx_log, phpfpm, redis, dovecot, containers and cgroups, disk space, apps.plugin, tc (QoS) and almost all internal plugins (memory, IPv4 and IPv6, network interfaces, QoS, etc)
- - dozens of new and improved alarms (including performance monitoring alarms for mysql)
- - new alarm notifications: messagebird.com, pagerduty.com, pushbullet.com, twilio.com, hipchat, kafka
+ - central netdata is here! headless collectors, proxies, streaming of metrics, etc.
+ - [monitoring ephemeral nodes (auto-scaled VMs)](https://github.com/firehol/netdata/wiki/monitoring-ephemeral-nodes)
+ - [monitoring ephemeral containers and VM guests](https://github.com/firehol/netdata/wiki/monitoring-ephemeral-containers)
+ - [monitoring web servers](https://github.com/firehol/netdata/wiki/The-spectacles-of-a-web-server-log-file)
+ - apps.plugin ported for FreeBSD
+ - [monitoring IPMI](https://github.com/firehol/netdata/wiki/monitoring-IPMI)
+ - dozens of new and improved plugins
+ - dozens of new and improved alarms
  - dozens more improvements and performance optimizations
 
 ---

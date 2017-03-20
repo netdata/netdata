@@ -1,3 +1,167 @@
+netdata (1.6.0) - 2017-03-20
+
+ * birthday release: 1 year netdata
+
+   netdata was first published on March 30th, 2016.
+   It has been a crazy year since then:
+
+     225.000 unique netdata users
+             currently, at 1.000 new unique users per day
+
+      80.000 unique netdata installations
+             currently, at 500 new installation per day
+
+     610.000 docker pulls on docker hub
+
+   4.000.000 netdata sessions served
+             currently, at 15.000 sessions served per day
+
+      20.000 github stars
+
+             Thank you!
+          You are awesome!
+
+ * central netdata is here
+
+   This is the first release that supports real-time streaming of
+   metrics between netdata servers.
+
+   netdata can now be:
+
+   - autonomous host monitoring
+     (like it always has been)
+
+   - headless data collector
+     (collect and stream metrics in real-time to another netdata)
+
+   - headless proxy
+     (collect metrics from multiple netdata and stream them to another netdata)
+
+   - store and forward proxy
+     (like headless proxy, but with a local database)
+
+   - central database
+     (metrics from multiple hosts are aggregated)
+
+   metrics databases can be configured on all nodes and each node maintaining
+   a database may have a different retention policy and possibly run
+   (even different) alarms on them.
+
+ * monitoring ephemeral nodes
+
+   netdata now supports monitoring autoscaled ephemeral nodes,
+   that are started and stopped on demand (their IP is not known).
+
+   When the ephemeral nodes start streaming metrics to the central
+   netdata, the central netdata will show register them at "my-netdata"
+   menu on the dashboard.
+
+   For more information check:
+   https://github.com/firehol/netdata/wiki/monitoring-ephemeral-nodes
+
+ * monitoring ephemeral containers and VM guests
+
+   netdata now cleans up container, guest VM, network interfaces and mounted
+   disk metrics, disabling automatically their alarms too.
+
+   For more information check:
+   https://github.com/firehol/netdata/wiki/monitoring-ephemeral-containers
+
+ * apps.plugin ported for FreeBSD
+
+   @vlvkobal has ported "apps.plugin" to FreeBSD. netdata can now provide
+   "Applications", "Users" and "User Groups" on FreeBSD.
+
+ * web_log plugin
+
+   @l2isbad has done a wonderful job creating a unified web log parsing plugin
+   for all kinds of web server logs. With it, netdata provides real-time
+   performance information and health monitoring alarms for web applications
+   and web sites!
+
+   For more information check:
+   https://github.com/firehol/netdata/wiki/The-spectacles-of-a-web-server-log-file
+
+ * backends
+
+   netdata can now archive metrics to `JSON` backends
+   (both push, by @lfdominguez, and pull modes).
+
+ * IPMI monitoring
+
+   netdata now has an IPMI plugin (based on freeipmi)
+   for monitoring server hardware.
+
+   The plugin creates (up to) 8 charts:
+
+    1. number of sensors by state
+    2. number of events in SEL
+    3. Temperatures CELCIUS
+    4. Temperatures FAHRENHEIT
+    5. Voltages
+    6. Currents
+    7. Power
+    8. Fans
+
+   It also supports alarms (including the number of sensors in critical state).
+
+   For more information, check:
+   https://github.com/firehol/netdata/wiki/monitoring-IPMI
+
+ * new plugins
+
+   @l2isbad builds python data collection plugins for netdata at an wonderfull
+   rate! He rocks!
+
+    - **web_log** for monitoring in real-time all kinds of web server log files @l2isbad
+    - **freeipmi** for monitoring IPMI (server hardware)
+    - **nsd** (the [name server daemon](https://www.nlnetlabs.nl/projects/nsd/)) @383c57
+    - **mongodb** @l2isbad
+    - **smartd_log** (monitoring disk S.M.A.R.T. values) @l2isbad
+
+ * improved plugins
+
+    - **nfacct** reworked and now collects connection tracker information using netlink.
+    - **ElasticSearch** re-worked @l2isbad
+    - **mysql** re-worked to allow faster development of custom mysql based plugins (MySQLService) @l2isbad
+    - **SNMP**
+    - **tomcat** @NMcCloud
+    - **ap** (monitoring hostapd access points)
+    - **php_fpm** @l2isbad
+    - **postgres** @l2isbad
+    - **isc_dhcpd** @l2isbad
+    - **bind_rndc** @l2isbad
+    - **numa**
+    - **apps.plugin** improvements and freebsd support @vlvkobal
+    - **fail2ban** @l2isbad
+    - **freeradius** @l2isbad
+    - **nut** (monitoring UPSes)
+    - **tc** (Linux QoS) now works on qdiscs instead of classes for the same result (a lot faster) @t-h-e
+    - **varnish** @l2isbad
+
+ * new and improved alarms
+    - **web_log**, many alarms to detect common web site/API issues
+    - **fping**, alarms to detect packet loss, disconnects and unusually high latency
+    - **cpu**, cpu utilization alarm now ignores `nice`
+
+ * new and improved alarm notification methods
+    - **HipChat** to allow hosted HipChat @frei-style
+    - **discordapp** @lowfive
+
+ * dashboard improvements
+    - dashboard now works on HiDPi screens
+    - dashboard now shows version of netdata
+    - dashboard now resets charts properly
+    - dashboard updated to use latest gauge.js release
+
+ * other improvements
+    - thanks to @rlefevre netdata now uses a lot of different high resolution system clocks.
+
+ netdata has received a lot more improvements from many more  contributors!
+
+ Thank you all!
+
+
 netdata (1.5.0) - 2017-01-22
 
  * yet another release that makes netdata the fastest
