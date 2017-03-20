@@ -914,6 +914,9 @@ char *trim(char *s) {
 }
 
 void *mymmap(const char *filename, size_t size, int flags, int ksm) {
+#ifndef MADV_MERGEABLE
+    (void)ksm;
+#endif
     static int log_madvise_1 = 1;
 #ifdef MADV_MERGEABLE
     static int log_madvise_2 = 1, log_madvise_3 = 1;
