@@ -128,7 +128,7 @@ get_configure_ac_rpmrel() {
 get_spec_version() {
   get_staged_file -o "$1".spec.in
   test -f $MYTMP/files/"$1".spec.in || return 0 # Spec file is optional
-  sed -n -e '1,/^%changelog/d' -e '/^*/{s/.*- \([0-9].*\)/\1/p;q}' "$1".spec.in
+  sed -n -e '1,/^%changelog/d' -e '/^*/{' -e 's/.*- \([0-9].*\)/\1/p' -e q -e '}' "$1".spec.in
 }
 
 splitver() {
