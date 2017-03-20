@@ -205,6 +205,17 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_datadir}/%{name}/web
 
 %changelog
+* Mon Mar 20 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.6.0-1
+- central netdata
+- monitoring ephemeral nodes
+- monitoring ephemeral containers and VM guests
+- apps.plugin ported for FreeBSD
+- web_log plugin
+- JSON backends
+- IPMI monitoring
+- several new and improved plugins
+- several new and improved alarms and notifications
+- dozens more improvements and bug fixes
 * Sun Jan 22 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.5.0-1
 - FreeBSD, MacOS, FreeNAS
 - Backends support
