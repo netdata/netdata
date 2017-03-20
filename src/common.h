@@ -189,6 +189,7 @@
 #include "plugin_nfacct.h"
 
 #if defined(__FreeBSD__)
+#include <pthread_np.h>
 #include "plugin_freebsd.h"
 #define NETDATA_OS_TYPE "freebsd"
 #elif defined(__APPLE__)

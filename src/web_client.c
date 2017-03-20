@@ -25,6 +25,8 @@ static inline int web_client_crock_socket(struct web_client *w) {
             return -1;
         }
     }
+#else
+    (void)w;
 #endif /* TCP_CORK */
 
     return 0;
@@ -40,6 +42,8 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
             return -1;
         }
     }
+#else
+    (void)w;
 #endif /* TCP_CORK */
 
     return 0;
