@@ -1080,6 +1080,7 @@ static inline int read_proc_pid_statm(struct pid_stat *p, void *ptr) {
 
     return 1;
 
+#ifndef __FreeBSD__
 cleanup:
     p->statm_size           = 0;
     p->statm_resident       = 0;
@@ -1089,6 +1090,7 @@ cleanup:
     // p->statm_data           = 0;
     // p->statm_dirty          = 0;
     return 0;
+#endif
 }
 
 static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
@@ -1142,6 +1144,7 @@ static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
 
     return 1;
 
+#ifndef __FreeBSD__
 cleanup:
     p->io_logical_bytes_read        = 0;
     p->io_logical_bytes_written     = 0;
@@ -1151,12 +1154,13 @@ cleanup:
     p->io_storage_bytes_written     = 0;
     // p->io_cancelled_write_bytes  = 0;
     return 0;
+#endif
 }
 
 static inline int read_proc_stat() {
 #ifdef __FreeBSD__
     long cp_time[CPUSTATES];
-    int i;
+    static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
 
     if (unlikely(CPUSTATES != 5)) {
         error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
@@ -1166,8 +1170,8 @@ static inline int read_proc_stat() {
 #else
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
-#endif
     static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
+#endif
     static usec_t collected_usec = 0, last_collected_usec = 0;
 
 #ifndef __FreeBSD__
@@ -2000,6 +2004,7 @@ static inline void link_all_processes_to_their_parents(void) {
 // to avoid filling up all disk space
 // if debug is enabled, all errors are printed
 
+#ifndef __FreeBSD__
 static int compar_pid(const void *pid1, const void *pid2) {
 
     struct pid_stat *p1 = all_pids[*((pid_t *)pid1)];
@@ -2010,6 +2015,7 @@ static int compar_pid(const void *pid1, const void *pid2) {
     else
         return 1;
 }
+#endif
 
 static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     if(unlikely(pid < INIT_PID || pid > pid_max)) {
@@ -2096,7 +2102,9 @@ static int collect_data_for_all_processes(void) {
 #endif
 
     if(all_pids_count) {
+#ifndef __FreeBSD__
         size_t slc = 0;
+#endif
         for(p = root_of_pids; p ; p = p->next) {
             p->read             = 0; // mark it as not read, so that collect_data_for_pid() will read it
             p->updated          = 0;
