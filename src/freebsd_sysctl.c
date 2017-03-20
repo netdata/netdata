@@ -122,6 +122,7 @@ int do_vm_loadavg(int update_every, usec_t dt){
 // vm.vmtotal
 
 int do_vm_vmtotal(int update_every, usec_t dt) {
+    (void)dt;
     static int do_all_processes = -1, do_processes = -1, do_committed = -1;
 
     if (unlikely(do_all_processes == -1)) {
@@ -240,6 +241,8 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
 // kern.cp_time
 
 int do_kern_cp_time(int update_every, usec_t dt) {
+    (void)dt;
+
     if (unlikely(CPUSTATES != 5)) {
         error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
         error("DISABLED: system.cpu chart");
@@ -297,6 +300,8 @@ int do_kern_cp_time(int update_every, usec_t dt) {
 // kern.cp_times
 
 int do_kern_cp_times(int update_every, usec_t dt) {
+    (void)dt;
+
     if (unlikely(CPUSTATES != 5)) {
         error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
         error("DISABLED: cpu.cpuXX charts");
@@ -379,9 +384,10 @@ int do_kern_cp_times(int update_every, usec_t dt) {
 // hw.intrcnt
 
 int do_hw_intcnt(int update_every, usec_t dt) {
+    (void)dt;
     static int mib_hw_intrcnt[2] = {0, 0};
     size_t intrcnt_size = sizeof(mib_hw_intrcnt);
-    int i;
+    unsigned long i;
 
     if (unlikely(GETSYSCTL_SIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt_size))) {
         error("DISABLED: system.intr chart");
@@ -487,6 +493,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
 // vm.stats.sys.v_intr
 
 int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
+    (void)dt;
     static int mib[4] = {0, 0, 0, 0};
     u_int int_number;
 
@@ -529,6 +536,7 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
 // vm.stats.sys.v_soft
 
 int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
+    (void)dt;
     static int mib[4] = {0, 0, 0, 0};
     u_int soft_intr_number;
 
@@ -571,6 +579,7 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
 // vm.stats.sys.v_swtch
 
 int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
+    (void)dt;
     static int mib[4] = {0, 0, 0, 0};
     u_int ctxt_number;
 
@@ -613,6 +622,7 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
 // vm.stats.vm.v_forks
 
 int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
+    (void)dt;
     static int mib[4] = {0, 0, 0, 0};
     u_int forks_number;
 
@@ -657,6 +667,7 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
 // vm.swap_info
 
 int do_vm_swap_info(int update_every, usec_t dt) {
+    (void)dt;
     static int mib[3] = {0, 0, 0};
 
     if (unlikely(getsysctl_mib("vm.swap_info", mib, 2))) {
@@ -732,6 +743,7 @@ int do_vm_swap_info(int update_every, usec_t dt) {
 // system.ram
 
 int do_system_ram(int update_every, usec_t dt) {
+    (void)dt;
     static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
                mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
     struct vmmeter vmmeter_data;
@@ -799,6 +811,7 @@ int do_system_ram(int update_every, usec_t dt) {
 // vm.stats.vm.v_swappgs
 
 int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
+    (void)dt;
     static int mib_swappgsin[4] = {0, 0, 0, 0}, mib_swappgsout[4] = {0, 0, 0, 0};
     struct vmmeter vmmeter_data;
 
@@ -844,6 +857,7 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
 // vm.stats.vm.v_pgfaults
 
 int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
+    (void)dt;
     static int mib_vm_faults[4] = {0, 0, 0, 0}, mib_io_faults[4] = {0, 0, 0, 0}, mib_cow_faults[4] = {0, 0, 0, 0},
                mib_cow_optim[4] = {0, 0, 0, 0}, mib_intrans[4] = {0, 0, 0, 0};
     struct vmmeter vmmeter_data;
@@ -902,6 +916,7 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
 // kern.ipc.sem
 
 int do_kern_ipc_sem(int update_every, usec_t dt) {
+    (void)dt;
     static int mib_semmni[3] = {0, 0, 0}, mib_sema[3] = {0, 0, 0};
     struct ipc_sem {
         int semmni;
@@ -947,7 +962,7 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
                                                         "IPC Semaphores",
                                                         "semaphores",
                                                         1000,
-                                                        localhost->rrd_update_every,
+                                                        update_every,
                                                         RRDSET_TYPE_AREA
                 );
 
@@ -969,7 +984,7 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
                                                               "IPC Semaphore Arrays",
                                                               "arrays",
                                                               1000,
-                                                              localhost->rrd_update_every,
+                                                              update_every,
                                                               RRDSET_TYPE_AREA
                 );
 
@@ -989,6 +1004,7 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
 // kern.ipc.shm
 
 int do_kern_ipc_shm(int update_every, usec_t dt) {
+    (void)dt;
     static int mib_shmmni[3] = {0, 0, 0}, mib_shmsegs[3] = {0, 0, 0};
     struct ipc_shm {
         u_long shmmni;
@@ -1012,7 +1028,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
             error("DISABLED: kern.ipc.shmmodule");
             return 1;
         } else {
-            int i;
+            unsigned long i;
 
             for (i = 0; i < ipc_shm.shmmni; i++) {
                 if (unlikely(ipc_shm_data[i].u.shm_perm.mode & 0x0800)) {
@@ -1035,7 +1051,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
                                              "IPC Shared Memory Segments",
                                              "segments",
                                              1000,
-                                             localhost->rrd_update_every,
+                                             update_every,
                                              RRDSET_TYPE_AREA
                 );
 
@@ -1057,7 +1073,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
                                              "IPC Shared Memory Segments Size",
                                              "kilobytes",
                                              1000,
-                                             localhost->rrd_update_every,
+                                             update_every,
                                              RRDSET_TYPE_AREA
                 );
 
@@ -1077,6 +1093,7 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
 // kern.ipc.msq
 
 int do_kern_ipc_msq(int update_every, usec_t dt) {
+    (void)dt;
     static int mib_msgmni[3] = {0, 0, 0}, mib_msqids[3] = {0, 0, 0};
     struct ipc_msq {
         int msgmni;
@@ -1129,7 +1146,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                                                     "Number of IPC Message Queues",
                                                     "queues",
                                                     990,
-                                                    localhost->rrd_update_every,
+                                                    update_every,
                                                     RRDSET_TYPE_AREA
                 );
 
@@ -1151,7 +1168,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                                                       "Number of Messages in IPC Message Queues",
                                                       "messages",
                                                       1000,
-                                                      localhost->rrd_update_every,
+                                                      update_every,
                                                       RRDSET_TYPE_AREA
                 );
 
@@ -1173,7 +1190,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                                              "Size of IPC Message Queues",
                                              "bytes",
                                              1100,
-                                             localhost->rrd_update_every,
+                                             update_every,
                                              RRDSET_TYPE_LINE
                 );
 
@@ -1195,6 +1212,7 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
 // uptime
 
 int do_uptime(int update_every, usec_t dt) {
+    (void)dt;
     struct timespec up_time;
 
     clock_gettime(CLOCK_UPTIME, &up_time);
@@ -1231,6 +1249,7 @@ int do_uptime(int update_every, usec_t dt) {
 // net.isr
 
 int do_net_isr(int update_every, usec_t dt) {
+    (void)dt;
     static int do_netisr = -1, do_netisr_per_core = -1;
 
     if (unlikely(do_netisr == -1)) {
@@ -1240,7 +1259,6 @@ int do_net_isr(int update_every, usec_t dt) {
 
     static int mib_workstream[3] = {0, 0, 0}, mib_work[3] = {0, 0, 0};
     int common_error = 0;
-    int i, n;
     size_t netisr_workstream_size = sizeof(mib_workstream), netisr_work_size = sizeof(mib_work);
     unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
     static struct sysctl_netisr_workstream *netisr_workstream = NULL;
@@ -1281,6 +1299,9 @@ int do_net_isr(int update_every, usec_t dt) {
             error("DISABLED: net.isr module");
             return 1;
         } else {
+            unsigned long i, n;
+            int j;
+
             netisr_stats = reallocz(netisr_stats, (number_of_cpus + 1) * sizeof(struct netisr_stats));
             memset(netisr_stats, 0, (number_of_cpus + 1) * sizeof(struct netisr_stats));
             for (i = 0; i < num_netisr_workstreams; i++) {
@@ -1293,11 +1314,11 @@ int do_net_isr(int update_every, usec_t dt) {
                     }
                 }
             }
-            for (i = 0; i < number_of_cpus; i++) {
-                netisr_stats[number_of_cpus].dispatched += netisr_stats[i].dispatched;
-                netisr_stats[number_of_cpus].hybrid_dispatched += netisr_stats[i].hybrid_dispatched;
-                netisr_stats[number_of_cpus].qdrops += netisr_stats[i].qdrops;
-                netisr_stats[number_of_cpus].queued += netisr_stats[i].queued;
+            for (j = 0; j < number_of_cpus; j++) {
+                netisr_stats[number_of_cpus].dispatched += netisr_stats[j].dispatched;
+                netisr_stats[number_of_cpus].hybrid_dispatched += netisr_stats[j].hybrid_dispatched;
+                netisr_stats[number_of_cpus].qdrops += netisr_stats[j].qdrops;
+                netisr_stats[number_of_cpus].queued += netisr_stats[j].queued;
             }
         }
     } else {
@@ -1350,6 +1371,7 @@ int do_net_isr(int update_every, usec_t dt) {
             RRDDIM *rd_queued;
         } *all_softnet_charts = NULL;
         static int old_number_of_cpus = 0;
+        int i;
 
         if(unlikely(number_of_cpus > old_number_of_cpus)) {
             all_softnet_charts = reallocz(all_softnet_charts, sizeof(struct softnet_chart) * number_of_cpus);
@@ -1403,6 +1425,7 @@ int do_net_isr(int update_every, usec_t dt) {
 // net.inet.tcp.states
 
 int do_net_inet_tcp_states(int update_every, usec_t dt) {
+    (void)dt;
     static int mib[4] = {0, 0, 0, 0};
     uint64_t tcps_states[TCP_NSTATES];
 
@@ -1446,6 +1469,7 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
 // net.inet.tcp.stats
 
 int do_net_inet_tcp_stats(int update_every, usec_t dt) {
+    (void)dt;
     static int do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_tcpext_connaborts = -1, do_tcpext_ofo = -1, do_tcpext_syncookies = -1, do_ecn = -1;
 
     if (unlikely(do_tcp_packets == -1)) {
@@ -1740,6 +1764,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 // net.inet.udp.stats
 
 int do_net_inet_udp_stats(int update_every, usec_t dt) {
+    (void)dt;
     static int do_udp_packets = -1, do_udp_errors = -1;
 
     if (unlikely(do_udp_packets == -1)) {
@@ -1840,6 +1865,7 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
 // net.inet.icmp.stats
 
 int do_net_inet_icmp_stats(int update_every, usec_t dt) {
+    (void)dt;
     static int do_icmp_packets = -1, do_icmp_errors = -1, do_icmpmsg = -1;
 
     if (unlikely(do_icmp_packets == -1)) {
@@ -1965,6 +1991,7 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
 // net.inet.ip.stats
 
 int do_net_inet_ip_stats(int update_every, usec_t dt) {
+    (void)dt;
     static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1;
 
     if (unlikely(do_ip_packets == -1)) {
@@ -2147,6 +2174,7 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
 // net.inet6.ip6.stats
 
 int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
+    (void)dt;
     static int do_ip6_packets = -1, do_ip6_fragsout = -1, do_ip6_fragsin = -1, do_ip6_errors = -1;
 
     if (unlikely(do_ip6_packets == -1)) {
@@ -2357,6 +2385,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
 // net.inet6.icmp6.stats
 
 int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
+    (void)dt;
     static int do_icmp6 = -1, do_icmp6_redir = -1, do_icmp6_errors = -1, do_icmp6_echos = -1, do_icmp6_router = -1,
             do_icmp6_neighbor = -1, do_icmp6_types = -1;
 
@@ -2725,6 +2754,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
 // getmntinfo
 
 int do_getmntinfo(int update_every, usec_t dt) {
+    (void)dt;
 
 #define DELAULT_EXLUDED_PATHS "/proc/*"
 // taken from gnulib/mountlist.c and shortened to FreeBSD related fstypes
@@ -2930,6 +2960,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
 // getifaddrs
 
 int do_getifaddrs(int update_every, usec_t dt) {
+    (void)dt;
 
 #define DELAULT_EXLUDED_INTERFACES "lo*"
 #define CONFIG_SECTION_GETIFADDRS "plugin:freebsd:getifaddrs"
@@ -3536,19 +3567,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                     .do_avagsz = iter_avagsz,
                                     .do_svctm  = iter_svctm,
 
-                                    // initialise data for differential charts
-
-                                    .prev_dstat.bytes_read        = dstat[i].bytes[DEVSTAT_READ],
-                                    .prev_dstat.bytes_write       = dstat[i].bytes[DEVSTAT_WRITE],
-                                    .prev_dstat.operations_read   = dstat[i].operations[DEVSTAT_READ],
-                                    .prev_dstat.operations_write  = dstat[i].operations[DEVSTAT_WRITE],
-                                    .prev_dstat.duration_read_ms  = dstat[i].duration[DEVSTAT_READ].sec * 1000
-                                                                    + dstat[i].duration[DEVSTAT_READ].frac * BINTIME_SCALE,
-                                    .prev_dstat.duration_write_ms = dstat[i].duration[DEVSTAT_WRITE].sec * 1000
-                                                                    + dstat[i].duration[DEVSTAT_READ].frac * BINTIME_SCALE,
-                                    .prev_dstat.busy_time_ms      = dstat[i].busy_time.sec * 1000
-                                                                    + dstat[i].busy_time.frac * BINTIME_SCALE,
-
                                     .st_io = NULL,
                                     .rd_io_in = NULL,
                                     .rd_io_out = NULL,
@@ -3578,6 +3596,19 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                     .st_svctm = NULL,
                                     .rd_svctm = NULL,
                             };
+
+                            // initialise data for differential charts
+
+                            dmp.prev_dstat.bytes_read        = dstat[i].bytes[DEVSTAT_READ];
+                            dmp.prev_dstat.bytes_write       = dstat[i].bytes[DEVSTAT_WRITE];
+                            dmp.prev_dstat.operations_read   = dstat[i].operations[DEVSTAT_READ];
+                            dmp.prev_dstat.operations_write  = dstat[i].operations[DEVSTAT_WRITE];
+                            dmp.prev_dstat.duration_read_ms  = dstat[i].duration[DEVSTAT_READ].sec * 1000
+                                                               + dstat[i].duration[DEVSTAT_READ].frac * BINTIME_SCALE;
+                            dmp.prev_dstat.duration_write_ms = dstat[i].duration[DEVSTAT_WRITE].sec * 1000
+                                                               + dstat[i].duration[DEVSTAT_READ].frac * BINTIME_SCALE;
+                            dmp.prev_dstat.busy_time_ms      = dstat[i].busy_time.sec * 1000
+                                                               + dstat[i].busy_time.frac * BINTIME_SCALE;
 
                             dm = dictionary_set(disks, disk, &dmp, sizeof(struct disks_metadata));
                         }
