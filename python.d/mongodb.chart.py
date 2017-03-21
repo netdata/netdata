@@ -391,13 +391,18 @@ class Service(SimpleService):
         self.build_metrics_to_collect_(server_status)
 
         try:
-            self._get_data()
+            data = self._get_data()
         except (LookupError, SyntaxError, AttributeError):
             self.error('Type: %s, error: %s' % (str(exc_info()[0]), str(exc_info()[1])))
             return False
         else:
-            self.create_charts_(server_status)
-            return True
+            if isinstance(data, dict) and data:
+                self._data_from_check = data
+                self.create_charts_(server_status)
+                return True
+            else:
+                self.error('_get_data() returned no data or type is not <dict>')
+                return False
 
     def build_metrics_to_collect_(self, server_status):
 
@@ -473,7 +478,7 @@ class Service(SimpleService):
                     lines.append([dim_id, description, 'absolute', 1, 1])
                 return lines
 
-            all_hosts = server_status['repl']['hosts']
+            all_hosts = server_status['repl']['hosts'] + server_status['repl'].get('arbiters', list())
             this_host = server_status['repl']['me']
             other_hosts = [host for host in all_hosts if host != this_host]
 
@@ -620,7 +625,7 @@ class Service(SimpleService):
                 if not member.get('self'):
                     other_hosts.append(member)
                 # Replica set time diff between current time and time when last entry from the oplog was applied
-                if member['optimeDate'] != unix_epoch:
+                if member.get('optimeDate', unix_epoch) != unix_epoch:
                     member_optimedate = member['name'] + '_optimedate'
                     to_netdata.update({member_optimedate: int(delta_calculation(delta=utc_now - member['optimeDate'],
                                                                                 multiplier=1000))})
