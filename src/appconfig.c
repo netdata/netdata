@@ -337,7 +337,7 @@ const char *appconfig_set_default(struct config *root, const char *section, cons
 {
     struct config_option *cv;
 
-    debug(D_CONFIG, "request to set config in section '%s', name '%s', value '%s'", section, name, value);
+    debug(D_CONFIG, "request to set default config in section '%s', name '%s', value '%s'", section, name, value);
 
     struct section *co = appconfig_section_find(root, section);
     if(!co) return appconfig_set(root, section, name, value);
@@ -558,7 +558,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                 if(only_changed && !changed) continue;
 
                 if(!used) {
-                    buffer_sprintf(wb, "\n# node '%s' is not used.", co->name);
+                    buffer_sprintf(wb, "\n# section '%s' is not used.", co->name);
                 }
 
                 buffer_sprintf(wb, "\n[%s]\n", co->name);
