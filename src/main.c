@@ -625,6 +625,7 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+
                         if(strcmp(optarg, "unittest") == 0) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
@@ -691,9 +692,36 @@ int main(int argc, char **argv) {
                             config_set(CONFIG_SECTION_GLOBAL, "debug flags",  optarg);
                             debug_flags = strtoull(optarg, NULL, 0);
                         }
+                        else if(strcmp(optarg, "set") == 0) {
+                            if(optind + 3 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W set 'section' 'key' 'value'\n\n"
+                                        " Overwrites settings of netdata.conf.\n"
+                                        "\n"
+                                );
+                                exit(1);
+                            }
+                            const char *section = argv[optind];
+                            const char *key = argv[optind + 1];
+                            const char *value = argv[optind + 2];
+                            optind += 3;
+
+                            // set this one as the default
+                            // only if it is not already set in the config file
+                            // so the caller can use -c netdata.conf before or
+                            // after this parameter to prevent or allow overwriting
+                            // variables at netdata.conf
+                            config_set_default(section, key,  value);
+
+                            // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
+                        }
+                        else {
+                            fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
+                            help(1);
+                        }
                     }
                     break;
                 default: /* ? */
+                    fprintf(stderr, "Unknown parameter '%c'\n", opt);
                     help(1);
                     break;
             }
