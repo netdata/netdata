@@ -299,6 +299,8 @@ void help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W set section option value\n"
+            "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
     );
@@ -625,6 +627,7 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+
                         if(strcmp(optarg, "unittest") == 0) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
@@ -691,9 +694,44 @@ int main(int argc, char **argv) {
                             config_set(CONFIG_SECTION_GLOBAL, "debug flags",  optarg);
                             debug_flags = strtoull(optarg, NULL, 0);
                         }
+                        else if(strcmp(optarg, "set") == 0) {
+                            if(optind + 3 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W set 'section' 'key' 'value'\n\n"
+                                        " Overwrites settings of netdata.conf.\n"
+                                        "\n"
+                                        " These options interact with: -c netdata.conf\n"
+                                        " If -c netdata.conf is given on the command line,\n"
+                                        " before -W set... the user may overwrite command\n"
+                                        " line parameters at netdata.conf\n"
+                                        " If -c netdata.conf is given after (or missing)\n"
+                                        " -W set... the user cannot overwrite the command line\n"
+                                        " parameters."
+                                        "\n"
+                                );
+                                exit(1);
+                            }
+                            const char *section = argv[optind];
+                            const char *key = argv[optind + 1];
+                            const char *value = argv[optind + 2];
+                            optind += 3;
+
+                            // set this one as the default
+                            // only if it is not already set in the config file
+                            // so the caller can use -c netdata.conf before or
+                            // after this parameter to prevent or allow overwriting
+                            // variables at netdata.conf
+                            config_set_default(section, key,  value);
+
+                            // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
+                        }
+                        else {
+                            fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
+                            help(1);
+                        }
                     }
                     break;
                 default: /* ? */
+                    fprintf(stderr, "Unknown parameter '%c'\n", opt);
                     help(1);
                     break;
             }
