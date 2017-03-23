@@ -311,8 +311,10 @@ int do_kern_cp_times(int update_every, usec_t dt) {
         static int mib[2] = {0, 0};
         long cp_time[CPUSTATES];
         static long *pcpu_cp_time = NULL;
+        static int old_number_of_cpus = 0;
 
-        pcpu_cp_time = reallocz(pcpu_cp_time, sizeof(cp_time) * number_of_cpus);
+        if(unlikely(number_of_cpus != old_number_of_cpus))
+            pcpu_cp_time = reallocz(pcpu_cp_time, sizeof(cp_time) * number_of_cpus);
         if (unlikely(GETSYSCTL_WSIZE("kern.cp_times", mib, pcpu_cp_time, sizeof(cp_time) * number_of_cpus))) {
             error("DISABLED: cpu.cpuXX charts");
             error("DISABLED: kern.cp_times module");
@@ -331,12 +333,10 @@ int do_kern_cp_times(int update_every, usec_t dt) {
                 RRDDIM *rd_interrupt;
                 RRDDIM *rd_idle;
             } *all_cpu_charts = NULL;
-            static int old_number_of_cpus = 0;
 
             if(unlikely(number_of_cpus > old_number_of_cpus)) {
                 all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * number_of_cpus);
                 memset(&all_cpu_charts[old_number_of_cpus], 0, sizeof(struct cpu_chart) * (number_of_cpus - old_number_of_cpus));
-                old_number_of_cpus = number_of_cpus;
             }
 
             for (i = 0; i < number_of_cpus; i++) {
@@ -375,6 +375,8 @@ int do_kern_cp_times(int update_every, usec_t dt) {
                 rrdset_done(all_cpu_charts[i].st);
             }
         }
+
+        old_number_of_cpus = number_of_cpus;
     }
 
     return 0;
@@ -396,11 +398,13 @@ int do_hw_intcnt(int update_every, usec_t dt) {
         return 1;
     } else {
         unsigned long nintr = 0;
+        static unsigned long old_nintr = 0;
         static unsigned long *intrcnt = NULL;
         unsigned long long totalintr = 0;
 
         nintr = intrcnt_size / sizeof(u_long);
-        intrcnt = reallocz(intrcnt, nintr * sizeof(u_long));
+        if (unlikely(nintr != old_nintr))
+            intrcnt = reallocz(intrcnt, nintr * sizeof(u_long));
         if (unlikely(GETSYSCTL_WSIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt, nintr * sizeof(u_long)))) {
             error("DISABLED: system.intr chart");
             error("DISABLED: system.interrupts chart");
@@ -443,7 +447,8 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             static char *intrnames = NULL;
 
             size = nintr * (MAXCOMLEN + 1);
-            intrnames = reallocz(intrnames, size);
+            if (unlikely(nintr != old_nintr))
+                intrnames = reallocz(intrnames, size);
             if (unlikely(GETSYSCTL_WSIZE("hw.intrnames", mib_hw_intrnames, intrnames, size))) {
                 error("DISABLED: system.intr chart");
                 error("DISABLED: system.interrupts chart");
@@ -484,6 +489,8 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                 rrdset_done(st_interrupts);
             }
         }
+
+        old_nintr = nintr;
     }
 
     return 0;
@@ -931,8 +938,12 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
         return 1;
     } else {
         static struct semid_kernel *ipc_sem_data = NULL;
+        static int old_semmni = 0;
 
-        ipc_sem_data = reallocz(ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni);
+        if (unlikely(ipc_sem.semmni != old_semmni)) {
+            ipc_sem_data = reallocz(ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni);
+            old_semmni = ipc_sem.semmni;
+        }
         if (unlikely(GETSYSCTL_WSIZE("kern.ipc.sema", mib_sema, ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni))) {
             error("DISABLED: system.ipc_semaphores chart");
             error("DISABLED: system.ipc_semaphore_arrays chart");
@@ -1019,8 +1030,12 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
         return 1;
     } else {
         static struct shmid_kernel *ipc_shm_data = NULL;
+        static u_long old_shmmni = 0;
 
-        ipc_shm_data = reallocz(ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni);
+        if (unlikely(ipc_shm.shmmni != old_shmmni)) {
+            ipc_shm_data = reallocz(ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni);
+            old_shmmni = ipc_shm.shmmni;
+        }
         if (unlikely(
                 GETSYSCTL_WSIZE("kern.ipc.shmsegs", mib_shmsegs, ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni))) {
             error("DISABLED: system.ipc_shared_mem_segs chart");
@@ -1111,8 +1126,12 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
         return 1;
     } else {
         static struct msqid_kernel *ipc_msq_data = NULL;
+        static int old_msgmni = 0;
 
-        ipc_msq_data = reallocz(ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni);
+        if (unlikely(ipc_msq.msgmni != old_msgmni)) {
+            ipc_msq_data = reallocz(ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni);
+            old_msgmni = ipc_msq.msgmni;
+        }
         if (unlikely(
                 GETSYSCTL_WSIZE("kern.ipc.msqids", mib_msqids, ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni))) {
             error("DISABLED: system.ipc_msq_queues chart");
@@ -1276,14 +1295,25 @@ int do_net_isr(int update_every, usec_t dt) {
         } else if (unlikely(GETSYSCTL_SIZE("net.isr.work", mib_work, netisr_work_size))) {
             common_error = 1;
         } else {
+            static size_t old_netisr_workstream_size = 0;
+
             num_netisr_workstreams = netisr_workstream_size / sizeof(struct sysctl_netisr_workstream);
-            netisr_workstream = reallocz(netisr_workstream, num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream));
+            if (unlikely(netisr_workstream_size != old_netisr_workstream_size)) {
+                netisr_workstream = reallocz(netisr_workstream,
+                                             num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream));
+                old_netisr_workstream_size = netisr_workstream_size;
+            }
             if (unlikely(GETSYSCTL_WSIZE("net.isr.workstream", mib_workstream, netisr_workstream,
                                            num_netisr_workstreams * sizeof(struct sysctl_netisr_workstream)))){
                 common_error = 1;
             } else {
+                static size_t old_netisr_work_size = 0;
+
                 num_netisr_works = netisr_work_size / sizeof(struct sysctl_netisr_work);
-                netisr_work = reallocz(netisr_work, num_netisr_works * sizeof(struct sysctl_netisr_work));
+                if (unlikely(netisr_work_size != old_netisr_work_size)) {
+                    netisr_work = reallocz(netisr_work, num_netisr_works * sizeof(struct sysctl_netisr_work));
+                    old_netisr_work_size = netisr_work_size;
+                }
                 if (unlikely(GETSYSCTL_WSIZE("net.isr.work", mib_work, netisr_work,
                                                num_netisr_works * sizeof(struct sysctl_netisr_work)))){
                     common_error = 1;
@@ -1301,8 +1331,12 @@ int do_net_isr(int update_every, usec_t dt) {
         } else {
             unsigned long i, n;
             int j;
+            static int old_number_of_cpus = 0;
 
-            netisr_stats = reallocz(netisr_stats, (number_of_cpus + 1) * sizeof(struct netisr_stats));
+            if (unlikely(number_of_cpus != old_number_of_cpus)) {
+                netisr_stats = reallocz(netisr_stats, (number_of_cpus + 1) * sizeof(struct netisr_stats));
+                old_number_of_cpus = number_of_cpus;
+            }
             memset(netisr_stats, 0, (number_of_cpus + 1) * sizeof(struct netisr_stats));
             for (i = 0; i < num_netisr_workstreams; i++) {
                 for (n = 0; n < num_netisr_works; n++) {
@@ -3418,8 +3452,13 @@ int do_kern_devstat(int update_every, usec_t dt) {
         } else {
             static int mib_devstat[3] = {0, 0, 0};
             static void *devstat_data = NULL;
+            static int old_numdevs = 0;
 
-            devstat_data = reallocz(devstat_data, sizeof(long) + sizeof(struct devstat) * numdevs); // there is generation number before devstat structures
+            if (unlikely(numdevs != old_numdevs)) {
+                devstat_data = reallocz(devstat_data, sizeof(long) + sizeof(struct devstat) *
+                                        numdevs); // there is generation number before devstat structures
+                old_numdevs = numdevs;
+            }
             if (unlikely(GETSYSCTL_WSIZE("kern.devstat.all", mib_devstat, devstat_data,
                                          sizeof(long) + sizeof(struct devstat) * numdevs))) {
                 common_error = 1;
