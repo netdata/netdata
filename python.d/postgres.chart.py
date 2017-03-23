@@ -242,6 +242,7 @@ class Service(SimpleService):
         self.definitions = deepcopy(CHARTS)
         self.table_stats = configuration.pop('table_stats', False)
         self.index_stats = configuration.pop('index_stats', False)
+        self.database_poll = configuration.pop('database_poll', None)
         self.configuration = configuration
         self.connection = False
         self.is_superuser = False
@@ -280,6 +281,9 @@ class Service(SimpleService):
             self.databases = discover_databases_(cursor, QUERIES['FIND_DATABASES'])
             is_superuser = check_if_superuser_(cursor, QUERIES['IF_SUPERUSER'])
             cursor.close()
+
+            if (self.database_poll and isinstance(self.database_poll, str)):
+                self.databases = [dbase for dbase in self.databases if dbase in self.database_poll.split()] or self.databases
 
             self.locks_zeroed = populate_lock_types(self.databases)
             self.add_additional_queries_(is_superuser)
