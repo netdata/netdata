@@ -3298,7 +3298,11 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------
 
                 if (ifm->do_drops == CONFIG_BOOLEAN_YES || (ifm->do_drops == CONFIG_BOOLEAN_AUTO &&
-                        (IFA_DATA(iqdrops) || IFA_DATA(oqdrops)))) {
+                        (IFA_DATA(iqdrops)
+#if __FreeBSD__ >= 11
+                         || IFA_DATA(oqdrops)
+#endif
+                        ))) {
                     if (unlikely(!ifm->st_drops)) {
                         ifm->st_drops = rrdset_create_localhost("net_drops",
                                                                 ifa->ifa_name,
