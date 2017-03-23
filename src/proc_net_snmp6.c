@@ -311,8 +311,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
         rrddim_set(st, "sent", Ip6OutRequests);
         rrddim_set(st, "received", Ip6InReceives);
-        rrddim_set(st, "forwarded", Ip6InDelivers);
-        rrddim_set(st, "delivers", Ip6OutForwDatagrams);
+        rrddim_set(st, "forwarded", Ip6OutForwDatagrams);
+        rrddim_set(st, "delivers", Ip6InDelivers);
         rrdset_done(st);
     }
 
