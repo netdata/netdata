@@ -3,7 +3,7 @@
 # Author: l2isbad
 
 from base import LogService
-from re import compile
+from re import compile as r_compile
 
 try:
     from itertools import filterfalse
@@ -12,11 +12,13 @@ except ImportError:
 from os import access as is_accessible, R_OK
 from os.path import isdir
 from glob import glob
+import bisect
 
 priority = 60000
 retries = 60
-REGEX = compile(r'\[([A-Za-z-_]+)][^\[\]]*?(?<!# )enabled = true')
-ORDER = ['jails_group']
+REGEX_JAILS = r_compile(r'\[([A-Za-z-_]+)][^\[\]]*?(?<!# )enabled = true')
+REGEX_DATA = r_compile(r'\[(?P<jail>[a-z]+)\] (?P<ban>[A-Z])[a-z]+ (?P<ipaddr>\d{1,3}(?:\.\d{1,3}){3})')
+ORDER = ['jails_bans', 'jails_in_jail']
 
 
 class Service(LogService):
@@ -26,35 +28,39 @@ class Service(LogService):
         self.log_path = self.configuration.get('log_path', '/var/log/fail2ban.log')
         self.conf_path = self.configuration.get('conf_path', '/etc/fail2ban/jail.local')
         self.conf_dir = self.configuration.get('conf_dir', '')
+        self.bans = dict()
         try:
             self.exclude = self.configuration['exclude'].split()
         except (KeyError, AttributeError):
-            self.exclude = []
+            self.exclude = list()
 
     def _get_data(self):
         """
         Parse new log lines
         :return: dict
         """
-        try:
-            raw = self._get_raw_data()
-            if raw is None:
-                return None
-            elif not raw:
-                return self.data
-        except (ValueError, AttributeError):
+        raw = self._get_raw_data()
+        if raw is None:
             return None
+        elif not raw:
+            return self.data
 
         # Fail2ban logs looks like
         # 2016-12-25 12:36:04,711 fail2ban.actions[2455]: WARNING [ssh] Ban 178.156.32.231
-        data = dict(
-            zip(
-                self.jails_list,
-                [len(list(filterfalse(lambda line: (jail + '] Ban') not in line, raw))) for jail in self.jails_list]
-            ))
-
-        for jail in data:
-            self.data[jail] += data[jail]
+        for row in raw:
+            match = REGEX_DATA.search(row)
+            if match:
+                match_dict = match.groupdict()
+                jail, ban, ipaddr = match_dict['jail'], match_dict['ban'], match_dict['ipaddr']
+                if jail in self.jails_list:
+                    if ban == 'B':
+                        self.data[jail] += 1
+                        if address_not_in_jail(self.bans[jail], ipaddr, self.data[jail + '_in_jail']):
+                           self.data[jail + '_in_jail'] += 1
+                    else:
+                        if ipaddr in self.bans[jail]:
+                            self.bans[jail].remove(ipaddr)
+                            self.data[jail + '_in_jail'] -= 1
 
         return self.data
 
@@ -81,17 +87,25 @@ class Service(LogService):
 
         # If for some reason parse failed we still can START with default jails_list.
         self.jails_list = list(set(jails_list) - set(self.exclude)) or ['ssh']
+
         self.data = dict([(jail, 0) for jail in self.jails_list])
+        self.data.update(dict([(jail + '_in_jail', 0) for jail in self.jails_list]))
+        self.bans = dict([(jail, list()) for jail in self.jails_list])
+
         self.create_dimensions()
         self.info('Plugin successfully started. Jails: %s' % self.jails_list)
         return True
 
     def create_dimensions(self):
         self.definitions = {
-            'jails_group': {'options': [None, "Jails ban statistics", "bans/s", 'jails', 'jail.ban', 'line'],
-                            'lines': []}}
+            'jails_bans': {'options': [None, "Jails Ban Statistics", "bans/s", 'bans', 'jail.bans', 'line'],
+                            'lines': []},
+            'jails_in_jail': {'options': [None, "Currently In Jail", "ip addresses", 'in jail', 'jail.in_jail', 'line'],
+                            'lines': []},
+                           }
         for jail in self.jails_list:
-            self.definitions['jails_group']['lines'].append([jail, jail, 'incremental'])
+            self.definitions['jails_bans']['lines'].append([jail, jail, 'incremental'])
+            self.definitions['jails_in_jail']['lines'].append([jail + '_in_jail', jail, 'absolute'])
 
 
 def parse_conf_dir(conf_dir):
@@ -114,7 +128,7 @@ def parse_conf_dir(conf_dir):
             raw_data = f.read()
 
         data = ' '.join(raw_data.split())
-        jails_list.extend(REGEX.findall(data))
+        jails_list.extend(REGEX_JAILS.findall(data))
     jails_list = list(set(jails_list))
 
     return jails_list, 'can\'t locate any jails in %s. Default jail is [\'ssh\']' % conf_dir
@@ -128,5 +142,18 @@ def parse_conf_path(conf_path):
         raw_data = jails_conf.read()
 
     data = raw_data.split()
-    jails_list = REGEX.findall(' '.join(data))
+    jails_list = REGEX_JAILS.findall(' '.join(data))
     return jails_list, 'can\'t locate any jails in %s. Default jail is  [\'ssh\']' % conf_path
+
+
+def address_not_in_jail(pool, address, pool_size):
+    index = bisect.bisect_left(pool, address)
+    if index < pool_size:
+        if pool[index] == address:
+            return False
+        else:
+            bisect.insort_left(pool, address)
+            return True
+    else:
+        bisect.insort_left(pool, address)
+        return True
