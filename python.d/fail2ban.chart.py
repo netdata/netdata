@@ -4,11 +4,6 @@
 
 from base import LogService
 from re import compile as r_compile
-
-try:
-    from itertools import filterfalse
-except ImportError:
-    from itertools import ifilterfalse as filterfalse
 from os import access as is_accessible, R_OK
 from os.path import isdir
 from glob import glob
