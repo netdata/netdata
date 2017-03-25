@@ -570,28 +570,56 @@ void *backends_main(void *ptr) {
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
 
+        size_t count_hosts = 0;
+        size_t count_charts_total = 0;
+        size_t count_dims_total = 0;
+
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
-            if(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)
+            if(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE) {
+                debug(D_BACKEND, "BACKEND: not sending host '%s' because its memory mode is '%s'", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
                 continue;
+            }
 
             rrdhost_rdlock(host);
+
+            count_hosts++;
+            size_t count_charts = 0;
+            size_t count_dims = 0;
+            size_t count_dims_skipped = 0;
+
+            const char *__hostname = (host == localhost)?hostname:host->hostname;
 
             RRDSET *st;
             rrdset_foreach_read(st, host) {
                 rrdset_rdlock(st);
 
+                count_charts++;
+
                 RRDDIM *rd;
                 rrddim_foreach_read(rd, st) {
-                    if(rd->last_collected_time.tv_sec >= after)
-                        chart_buffered_metrics += backend_request_formatter(b, prefix, host, (host == localhost)?hostname:host->hostname, st, rd, after, before, options);
+                    if(likely(rd->last_collected_time.tv_sec >= after)) {
+                        chart_buffered_metrics += backend_request_formatter(b, prefix, host, __hostname, st, rd, after, before, options);
+                        count_dims++;
+                    }
+                    else {
+                        debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection is not within our timeframe", rd->id, st->id, __hostname);
+                        count_dims_skipped++;
+                    }
                 }
                 rrdset_unlock(st);
             }
+
+            debug(D_BACKEND, "BACKEND: sending host '%s', metrics of %zu dimensions, of %zu charts. Skipped %zu dimensions.", __hostname, count_dims, count_charts, count_dims_skipped);
+            count_charts_total += count_charts;
+            count_dims_total += count_dims;
+
             rrdhost_unlock(host);
         }
         rrd_unlock();
+
+        debug(D_BACKEND, "BACKEND: buffer has %zu bytes, added metrics for %zu dimensions, of %zu charts, from %zu hosts", buffer_strlen(b), count_dims_total, count_charts_total, count_hosts);
 
         if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
             error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
