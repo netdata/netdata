@@ -228,6 +228,16 @@ It produces one stacked chart per CPU, showing the percentage of time spent in
 each state.
 
 ---
+# dns_query_time
+
+This module provides dns query time statistics.
+
+**Requirement:**
+* `python-dnspython` package
+
+It produces one aggregate chart or one chart per dns server, showing the query time.
+
+---
 
 # dovecot
 
