@@ -49,6 +49,9 @@ static struct proc_module {
         { .name = "/proc/net/rpc/nfsd", .dim = "nfsd", .func = do_proc_net_rpc_nfsd },
         { .name = "/proc/net/rpc/nfs", .dim = "nfs", .func = do_proc_net_rpc_nfs },
 
+        // ZFS metrics
+        { .name = "/proc/spl/kstat/zfs/arcstats", .dim = "zfs_arcstats", .func = do_proc_spl_kstat_zfs_arcstats },
+
         // IPC metrics
         { .name = "ipc", .dim = "ipc", .func = do_ipc },
 
