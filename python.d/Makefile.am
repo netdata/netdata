@@ -18,6 +18,7 @@ dist_python_DATA = \
     bind_rndc.chart.py \
     cpufreq.chart.py \
     cpuidle.chart.py \
+    dns_query_time.chart.py \
     dovecot.chart.py \
     elasticsearch.chart.py \
     example.chart.py \
