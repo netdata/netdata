@@ -83,6 +83,7 @@ set(NETDATA_SOURCE_FILES
         src/proc_self_mountinfo.c
         src/proc_self_mountinfo.h
         src/proc_softirqs.c
+        src/proc_spl_kstat_zfs.c
         src/proc_stat.c
         src/proc_sys_kernel_random_entropy_avail.c
         src/proc_uptime.c
