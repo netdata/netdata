@@ -178,6 +178,7 @@ netdata_SOURCES += \
 	proc_net_softnet_stat.c \
 	proc_net_stat_conntrack.c \
 	proc_net_stat_synproxy.c \
+	proc_spl_kstat_zfs.c \
 	proc_stat.c \
 	proc_sys_kernel_random_entropy_avail.c \
 	proc_vmstat.c \

@@ -81,6 +81,7 @@ dist_healthconfig_DATA = \
     health.d/squid.conf \
     health.d/varnish.conf \
     health.d/web_log.conf \
+    health.d/zfs.conf \
     $(NULL)
 
 if LINUX

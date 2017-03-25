@@ -103,6 +103,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics of the NFS operations of this system, acting as an NFS client.'
     },
 
+    'zfs': {
+        title: 'ZFS filesystem',
+        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        info: 'Performance metrics of the ZFS filesystem. The following charts visualize all metrics reported by <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arcstat/arcstat.py" target="_blank">arcstat.py</a> and <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arc_summary/arc_summary.py" target="_blank">arc_summary.py</a>.'
+    },
+
     'apps': {
         title: 'Applications',
         icon: '<i class="fa fa-heartbeat" aria-hidden="true"></i>',
