@@ -40,7 +40,7 @@ class Service(SimpleService):
 
         self.timeout = self.timeout if isinstance(self.timeout, int) else 4
         self.update_every = self.timeout + 1 if self.update_every <= self.timeout else self.update_every
- 
+
         if not all([self.domains, self.server_list,
                     isinstance(self.server_list, str), isinstance(self.domains, str)]):
             self.error('server_list and domain_list can\'t be empty')
