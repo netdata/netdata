@@ -22,7 +22,7 @@ class Service(LogService):
         self.order = ORDER
         self.log_path = self.configuration.get('log_path', '/var/log/fail2ban.log')
         self.conf_path = self.configuration.get('conf_path', '/etc/fail2ban/jail.local')
-        self.conf_dir = self.configuration.get('conf_dir', '')
+        self.conf_dir = self.configuration.get('conf_dir', '/etc/fail2ban/jail.d/')
         self.bans = dict()
         try:
             self.exclude = self.configuration['exclude'].split()
@@ -86,6 +86,7 @@ class Service(LogService):
         self.data.update(dict([(jail + '_in_jail', 0) for jail in self.jails_list]))
         self.bans = dict([(jail, list()) for jail in self.jails_list])
 
+        self._data_from_check = self.data
         self.create_dimensions()
         self.info('Plugin successfully started. Jails: %s' % self.jails_list)
         return True
