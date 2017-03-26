@@ -824,67 +824,9 @@ fi
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"
 
-installed_init_d=0
-install_non_systemd_init() {
-    [ "${UID}" != 0 ] && return 1
-
-    local key="unknown"
-    if [ -f /etc/os-release ]
-        then
-        source /etc/os-release || return 1
-        key="${ID}-${VERSION_ID}"
-
-    elif [ -f /etc/centos-release ]
-        then
-        key=$(</etc/centos-release)
-    fi
-
-    if [ -d /etc/init.d -a ! -f /etc/init.d/netdata ]
-        then
-        if [ "${key}" = "gentoo" ]
-            then
-            run cp system/netdata-openrc /etc/init.d/netdata && \
-            run chmod 755 /etc/init.d/netdata && \
-            run rc-update add netdata default && \
-            installed_init_d=1
-        
-        elif [ "${key}" = "ubuntu-12.04" -o "${key}" = "ubuntu-14.04" -o "${key}" = "debian-7" ]
-            then
-            run cp system/netdata-lsb /etc/init.d/netdata && \
-            run chmod 755 /etc/init.d/netdata && \
-            run update-rc.d netdata defaults && \
-            run update-rc.d netdata enable && \
-            installed_init_d=1
-
-        elif [ "${key}" = "CentOS release 6.8 (Final)" -o "${key}" = "amzn-2016.09" ]
-            then
-            run cp system/netdata-init-d /etc/init.d/netdata && \
-            run chmod 755 /etc/init.d/netdata && \
-            run chkconfig netdata on && \
-            installed_init_d=1
-        fi
-    fi
-
-    return 0
-}
-
 if [ "${UID}" -eq 0 ]
     then
-
-    if issystemd
-    then
-        # systemd is running on this system
-
-        if [ ! -f /etc/systemd/system/netdata.service ]
-        then
-            echo >&2 "Installing systemd service..."
-            run cp system/netdata.service /etc/systemd/system/netdata.service && \
-                run systemctl daemon-reload && \
-                run systemctl enable netdata
-        fi
-    else
-        install_non_systemd_init
-    fi
+    install_netdata_service
 fi
 
 
