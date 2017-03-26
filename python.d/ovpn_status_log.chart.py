@@ -11,12 +11,12 @@ update_every = 10
 ORDER = ['users', 'traffic']
 CHARTS = {
     'users': {
-        'options': [None, 'OpenVPN Active Users', 'active users', 'Users', 'openvpn_status.users', 'line'],
+        'options': [None, 'OpenVPN Active Users', 'active users', 'users', 'openvpn_status.users', 'line'],
         'lines': [
             ["users", None, "absolute"],
         ]},
     'traffic': {
-        'options': [None, 'OpenVPN Traffic', 'Kb/s', 'Traffic', 'openvpn_status.traffic', 'area'],
+        'options': [None, 'OpenVPN Traffic', 'Kb/s', 'traffic', 'openvpn_status.traffic', 'area'],
         'lines': [
             ["in", None, "incremental", 8, 1000], ["out", None, "incremental", 8, -1000]
         ]},
