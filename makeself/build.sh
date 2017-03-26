@@ -46,7 +46,10 @@ EOF
 
 read "Press ENTER to continue > "
 
-mkdir tmp || exit 1
+if [ ! -d tmp ]
+    then
+    mkdir tmp || exit 1
+fi
 
 ./run-all-jobs.sh "$@"
 exit $?
