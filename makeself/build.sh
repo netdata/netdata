@@ -3,12 +3,12 @@
 # this script should be running in alpine linux
 # install the required packages
 apk add \
-	bash \
-	wget \
-	curl \
-	ncurses \
-	git \
-	netcat-openbsd \
+    bash \
+    wget \
+    curl \
+    ncurses \
+    git \
+    netcat-openbsd \
     alpine-sdk \
     autoconf \
     automake \
@@ -33,7 +33,7 @@ then
     exit $?
 fi
 
-cat >&2 <EOF
+cat >&2 <<EOF
 
 This program will create a self-extracting shell package containing
 a statically linked netdata, able to run on any 64bit Linux system,
@@ -43,7 +43,6 @@ It can be used to have netdata running in no-time, or in cases the
 target Linux system cannot compile netdata.
 
 EOF
-
 
 read "Press ENTER to continue > "
 
