@@ -15,12 +15,21 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 fetch() {
-	local dir="${1}" url="${2}"
-	local tar="${dir}.tar.gz"
+    local dir="${1}" url="${2}"
+    local tar="${dir}.tar.gz"
 
-	[ ! -f "tmp/${tar}" ] && run wget -O "tmp/${tar}" "${url}"
-	[ ! -d "tmp/${dir}" ] && cd tmp && run tar -zxvpf "${tar}"
-	run cd "tmp/${dir}"
+    if [ ! -f "${NETDATA_MAKESELF_PATH}/tmp/${tar}" ]
+        then
+        run wget -O "${NETDATA_MAKESELF_PATH}/tmp/${tar}" "${url}"
+    fi
+    
+    if [ ! -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]
+        then
+        cd "${NETDATA_MAKESELF_PATH}/tmp"
+        run tar -zxvpf "${tar}"
+    fi
+
+    run cd "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
 }
 
 # -----------------------------------------------------------------------------

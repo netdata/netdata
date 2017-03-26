@@ -44,7 +44,7 @@ target Linux system cannot compile netdata.
 
 EOF
 
-read "Press ENTER to continue > "
+read -p "Press ENTER to continue > "
 
 if [ ! -d tmp ]
     then
