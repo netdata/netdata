@@ -93,10 +93,10 @@ class Service(LogService):
 
     def create_dimensions(self):
         self.definitions = {
-            'jails_bans': {'options': [None, "Jails Ban Statistics", "bans/s", 'bans', 'jail.bans', 'line'],
-                            'lines': []},
-            'jails_in_jail': {'options': [None, "Currently In Jail", "ip addresses", 'in jail', 'jail.in_jail', 'line'],
-                            'lines': []},
+            'jails_bans': {'options': [None, 'Jails Ban Statistics', "bans/s", 'bans', 'jail.bans', 'line'],
+                           'lines': []},
+            'jails_in_jail': {'options': [None, 'Banned IPs (since the last restart of netdata)', 'IPs',
+                                          'in jail', 'jail.in_jail', 'line'], 'lines': []},
                            }
         for jail in self.jails_list:
             self.definitions['jails_bans']['lines'].append([jail, jail, 'incremental'])
