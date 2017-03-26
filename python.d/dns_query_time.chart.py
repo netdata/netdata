@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Description: dns_query_time netdata python.d module
+# Author: l2isbad
+
 try:
     from time import monotonic as time
 except ImportError:
@@ -57,17 +61,18 @@ class Service(SimpleService):
 
         data = self._get_data(timeout=1)
 
-        down_servers = [s[2:] for s in data if data[s] == -100]
-        if down_servers:
-            self.info('Removed due to non response %s' % down_servers)
-            self.server_list = [s for s in self.server_list if s not in down_servers]
-        if self.server_list:
-            self._data_from_check = data
-            self.order, self.definitions = create_charts(aggregate=self.aggregate, server_list=self.server_list)
-            self.info(str({'domains': len(self.domains), 'servers': self.server_list}))
-            return True
-        else:
-            return False
+        down_servers = [s for s in data if data[s] == -100]
+        for down in down_servers:
+            down = down[3:].replace('_', '.')
+            self.info('Removed due to non response %s' % down)
+            self.server_list.remove(down)
+            if not self.server_list:
+                return False
+
+        self._data_from_check = data
+        self.order, self.definitions = create_charts(aggregate=self.aggregate, server_list=self.server_list)
+        self.info(str({'domains': len(self.domains), 'servers': self.server_list}))
+        return True
 
     def _get_data(self, timeout=None):
         return dns_request(self.server_list, timeout or self.timeout, self.domains)
@@ -87,9 +92,9 @@ def dns_request(server_list, timeout, domains):
             dns.query.udp(request, ns, timeout=t)
             dns_end = time()
             query_time = round((dns_end - dns_start) * 1000)
-            q.put({''.join(['ns', ns]): query_time})
+            q.put({'_'.join(['ns', ns.replace('.', '_')]): query_time})
         except dns.exception.Timeout:
-            q.put({''.join(['ns', ns]): -100})
+            q.put({'_'.join(['ns', ns.replace('.', '_')]): -100})
 
     for server in server_list:
         th = Thread(target=dns_req, args=(server, timeout, que))
@@ -113,17 +118,18 @@ def check_ns(ns):
 def create_charts(aggregate, server_list):
     if aggregate:
         order = ['dns_group']
-        definitions = {'dns_group': {'options': [None, "DNS Response Time", "ms", 'name servers',
-                                                 'resp.time', 'line'], 'lines': []}}
+        definitions = {'dns_group': {'options': [None, 'DNS Response Time', 'ms', 'name servers',
+                                                 'dns_query_time.response_time', 'line'], 'lines': []}}
         for ns in server_list:
-            definitions['dns_group']['lines'].append([''.join(['ns', ns]), ns, 'absolute'])
+            definitions['dns_group']['lines'].append(['_'.join(['ns', ns.replace('.', '_')]), ns, 'absolute'])
 
         return order, definitions
     else:
-        order = [''.join(['dns_', ns]) for ns in server_list]
+        order = [''.join(['dns_', ns.replace('.', '_')]) for ns in server_list]
         definitions = dict()
         for ns in server_list:
-            definitions[''.join(['dns_', ns])] = {'options': [None, "DNS Response Time", "ms", ns,
-                                                              'resp.time', 'area'],
-                                                  'lines': [[''.join(['ns', ns]), ns, 'absolute']]}
+            definitions[''.join(['dns_', ns.replace('.', '_')])] = {'options': [None, 'DNS Response Time', 'ms', ns,
+                                                                                'dns_query_time.response_time', 'area'],
+                                                                    'lines': [['_'.join(['ns', ns.replace('.', '_')]),
+                                                                               ns, 'absolute']]}
         return order, definitions
