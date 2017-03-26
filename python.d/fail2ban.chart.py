@@ -11,7 +11,7 @@ import bisect
 
 priority = 60000
 retries = 60
-REGEX_JAILS = r_compile(r'\[([A-Za-z-_]+)][^\[\]]*?(?<!# )enabled = true')
+REGEX_JAILS = r_compile(r'\[([A-Za-z-_]+)][^\[\]]*?(?<!# )enabled = (?:(true|false))')
 REGEX_DATA = r_compile(r'\[(?P<jail>[a-z]+)\] (?P<ban>[A-Z])[a-z]+ (?P<ipaddr>\d{1,3}(?:\.\d{1,3}){3})')
 ORDER = ['jails_bans', 'jails_in_jail']
 
@@ -66,19 +66,18 @@ class Service(LogService):
         if not is_accessible(self.log_path, R_OK):
             self.error('Cannot access file %s' % self.log_path)
             return False
+
+        raw_jails_list = list()
         jails_list = list()
 
-        if self.conf_dir:
-            dir_jails, error = parse_conf_dir(self.conf_dir)
-            jails_list.extend(dir_jails)
-            if not dir_jails:
-                self.error(error)
+        for raw_jail in parse_configuration_files(self.conf_path, self.conf_dir, self.error):
+            raw_jails_list.extend(raw_jail)
 
-        if self.conf_path:
-            path_jails, error = parse_conf_path(self.conf_path)
-            jails_list.extend(path_jails)
-            if not path_jails:
-                self.error(error)
+        for jail, status in raw_jails_list:
+            if status == 'true' and jail not in jails_list:
+                jails_list.append(jail)
+            elif status == 'false' and jail in jails_list:
+                jails_list.remove(jail)
 
         # If for some reason parse failed we still can START with default jails_list.
         self.jails_list = list(set(jails_list) - set(self.exclude)) or ['ssh']
@@ -93,52 +92,50 @@ class Service(LogService):
 
     def create_dimensions(self):
         self.definitions = {
-            'jails_bans': {'options': [None, 'Jails Ban Statistics', "bans/s", 'bans', 'jail.bans', 'line'],
+            'jails_bans': {'options': [None, 'Jails Ban Statistics', 'bans/s', 'bans', 'jail.bans', 'line'],
                            'lines': []},
             'jails_in_jail': {'options': [None, 'Banned IPs (since the last restart of netdata)', 'IPs',
-                                          'in jail', 'jail.in_jail', 'line'], 'lines': []},
+                                          'in jail', 'jail.in_jail', 'line'],
+                              'lines': []},
                            }
         for jail in self.jails_list:
             self.definitions['jails_bans']['lines'].append([jail, jail, 'incremental'])
             self.definitions['jails_in_jail']['lines'].append([jail + '_in_jail', jail, 'absolute'])
 
+def parse_configuration_files(jails_conf_path, jails_conf_dir, print_error):
+    path_conf, path_local, dir_conf, dir_local = list(), list(), list(), list()
 
-def parse_conf_dir(conf_dir):
-    if not isdir(conf_dir):
-        return list(), '%s is not a directory' % conf_dir
+    # Parse files in the directory
+    if not (isinstance(jails_conf_dir, str) and isdir(jails_conf_dir)):
+        print_error('%s is not a directory' % jails_conf_dir)
+    else:
+        dir_conf = list(filter(lambda conf: is_accessible(conf, R_OK), glob(jails_conf_dir + '/*.conf')))
+        dir_local = list(filter(lambda local: is_accessible(local, R_OK), glob(jails_conf_dir + '/*.local')))
+        if not (dir_conf or dir_local):
+            print_error('%s is empty or not readable' % jails_conf_dir)
+        else:
+            dir_conf, dir_local = (find_jails_in_files(dir_conf, print_error),
+                                  find_jails_in_files(dir_local, print_error))
 
-    jail_local = list(filter(lambda local: is_accessible(local, R_OK), glob(conf_dir + '/*.local')))
-    jail_conf = list(filter(lambda conf: is_accessible(conf, R_OK), glob(conf_dir + '/*.conf')))
+    # Parse .conf and .local files
+    if (isinstance(jails_conf_path, str) and jails_conf_path.endswith(('.local', '.conf'))):
+        path_conf, path_local = (find_jails_in_files([jails_conf_path.split('.')[0] + '.conf'], print_error),
+                                find_jails_in_files([jails_conf_path.split('.')[0] + '.local'], print_error))
 
-    if not (jail_local or jail_conf):
-        return list(), '%s is empty or not readable' % conf_dir
+    return path_conf, dir_conf, path_local, dir_local
 
-    # According "man jail.conf" files could be *.local AND *.conf
-    # *.conf files parsed first. Changes in *.local overrides configuration in *.conf
-    if jail_conf:
-        jail_local.extend([conf for conf in jail_conf if conf[:-5] not in [local[:-6] for local in jail_local]])
+
+def find_jails_in_files(list_of_files, print_error):
     jails_list = list()
-    for conf in jail_local:
-        with open(conf, 'rt') as f:
-            raw_data = f.read()
-
-        data = ' '.join(raw_data.split())
-        jails_list.extend(REGEX_JAILS.findall(data))
-    jails_list = list(set(jails_list))
-
-    return jails_list, 'can\'t locate any jails in %s. Default jail is [\'ssh\']' % conf_dir
-
-
-def parse_conf_path(conf_path):
-    if not is_accessible(conf_path, R_OK):
-        return list(), '%s is not readable' % conf_path
-
-    with open(conf_path, 'rt') as jails_conf:
-        raw_data = jails_conf.read()
-
-    data = raw_data.split()
-    jails_list = REGEX_JAILS.findall(' '.join(data))
-    return jails_list, 'can\'t locate any jails in %s. Default jail is  [\'ssh\']' % conf_path
+    for conf in list_of_files:
+        if is_accessible(conf, R_OK):
+            with open(conf, 'rt') as f:
+                raw_data = f.read()
+            data = ' '.join(raw_data.split())
+            jails_list.extend(REGEX_JAILS.findall(data))
+        else:
+            print_error('%s is not readable or not exist' % conf)
+    return jails_list
 
 
 def address_not_in_jail(pool, address, pool_size):
