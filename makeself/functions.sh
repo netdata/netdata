@@ -27,6 +27,7 @@ fetch() {
         then
         cd "${NETDATA_MAKESELF_PATH}/tmp"
         run tar -zxvpf "${tar}"
+        cd -
     fi
 
     run cd "${NETDATA_MAKESELF_PATH}/tmp/${dir}"
