@@ -155,7 +155,7 @@ class Service(SocketService):
         :return: boolean
         """
         length = len(data)
-        supposed = data.split('\n')[0][1:]
+        supposed = data.split('\n')[0][1:-1]
         offset = len(supposed) + 4  # 1 dollar sing, 1 new line character + 1 ending sequence '\r\n'
         if not supposed.isdigit():
             return True
