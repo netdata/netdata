@@ -2,6 +2,8 @@
 
 . $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
+
+
 "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     --gzip \
     --notemp \
@@ -11,8 +13,8 @@
     --help-header "${NETDATA_MAKESELF_PATH}/makeself-help-header.txt" \
     "${NETDATA_INSTALL_PATH}" \
     "${NETDATA_INSTALL_PATH}.gz.run" \
-    "LABEL: netdata, real-time performance monitoring" \
-    ./system/install-or-update.sh \
+    "netdata, the real-time performance and health monitoring system" \
+    ./system/post-installer.sh \
     ${NULL}
 
 
