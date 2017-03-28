@@ -9,7 +9,7 @@
 [ -z "${NETDATA_SOURCE_PATH}" ] && export NETDATA_SOURCE_PATH="${NETDATA_MAKESELF_PATH}/.."
 [ -z "${PROCESSORS}" ] && export PROCESSORS=$(cat /proc/cpuinfo 2>/dev/null | grep ^processor | wc -l)
 [ -z "${PROCESSORS}" -o $((PROCESSORS)) -lt 1 ] && export PROCESSORS=1
-
+export NULL=
 
 # debug
 echo "ME=${0}"
