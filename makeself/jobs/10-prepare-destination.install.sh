@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-. ${NETDATA_MAKESELF_PATH}/functions.sh "${@}" || exit 1
+. $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
 [ -d "${NETDATA_INSTALL_PATH}.old" ] && run rm -rf "${NETDATA_INSTALL_PATH}.old"
 [ -d "${NETDATA_INSTALL_PATH}" ] && run mv -f "${NETDATA_INSTALL_PATH}" "${NETDATA_INSTALL_PATH}.old"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-. ${NETDATA_MAKESELF_PATH}/functions.sh "${@}" || exit 1
+. $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
 fetch "bash-4.4" "http://ftp.gnu.org/gnu/bash/bash-4.4.tar.gz"
 

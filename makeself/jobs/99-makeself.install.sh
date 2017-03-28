@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-. ${NETDATA_MAKESELF_PATH}/functions.sh "${@}" || exit 1
+. $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
 "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     --gzip \
