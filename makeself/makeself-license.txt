@@ -1,0 +1,11 @@
+netdata
+(C) Copyright 2017, Costa Tsaousis
+All rights reserved
+
+Released under GPL v3+
+
+netdata re-distributes a lot of open source software components.
+Check its full license at:
+
+https://github.com/firehol/netdata/blob/master/LICENSE.md
+

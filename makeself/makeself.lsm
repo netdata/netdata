@@ -1,0 +1,16 @@
+Begin3
+Title:          netdata
+Version:        1.6.0
+Description:    netdata is a system for distributed real-time performance and health monitoring.
+                It provides unparalleled insights, in real-time, of everything happening on the
+                system it runs (including applications such as web and database servers), using
+                modern interactive web dashboards. netdata is fast and efficient, designed to
+                permanently run on all systems (physical & virtual servers, containers, IoT
+                devices), without disrupting their core function.
+Keywords:       real-time performance and health monitoring
+Author:         Costa Tsaousis (costa@tsaousis.gr)
+Maintained-by:  Costa Tsaousis (costa@tsaousis.gr)
+Original-site:  https://my-netdata.io/
+Platform:       Unix
+Copying-policy: GPL
+End
