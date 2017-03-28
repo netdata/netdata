@@ -1,3 +1,29 @@
-netdata help header
+
+  ^
+  |.-.   .-.   .-.   .-.   .  netdata                                        
+  |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!  
+  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
+
+  (C) Copyright 2017, Costa Tsaousis
+  All rights reserved
+
+  Released under GPL v3+
+
+  You are about to build and install netdata to your system.
+
+  It will be installed at these locations:
+
+   - the daemon     at /opt/netdata/usr/sbin/netdata
+   - config files   in /opt/netdata/etc/netdata
+   - web files      in /opt/netdata/usr/share/netdata
+   - plugins        in /opt/netdata/usr/libexec/netdata
+   - cache files    in /opt/netdata/var/cache/netdata
+   - db files       in /opt/netdata/var/lib/netdata
+   - log files      in /opt/netdata/var/log/netdata
+   - pid file       at /opt/netdata/var/run/netdata.pid
+
+  netdata re-distributes a lot of open source software components.
+  Check its full license at:
+  https://github.com/firehol/netdata/blob/master/LICENSE.md
 
 
