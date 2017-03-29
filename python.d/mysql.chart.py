@@ -278,10 +278,10 @@ CHARTS = {
     'innodb_rows': {
         'options': [None, 'mysql InnoDB Row Operations', 'operations/s', 'innodb', 'mysql.innodb_rows', 'area'],
         'lines': [
-            ['Innodb_rows_inserted', 'read', 'incremental'],
-            ['Innodb_rows_read', 'deleted', 'incremental', -1, 1],
-            ['Innodb_rows_updated', 'inserted', 'incremental', 1, 1],
-            ['Innodb_rows_deleted', 'updated', 'incremental', -1, 1],
+            ['Innodb_rows_inserted', 'inserted', 'incremental'],
+            ['Innodb_rows_read', 'read', 'incremental', 1, 1],
+            ['Innodb_rows_updated', 'updated', 'incremental', 1, 1],
+            ['Innodb_rows_deleted', 'deleted', 'incremental', -1, 1],
         ]},
     'innodb_buffer_pool_pages': {
         'options': [None, 'mysql InnoDB Buffer Pool Pages', 'pages', 'innodb', 'mysql.innodb_buffer_pool_pages', 'line'],
