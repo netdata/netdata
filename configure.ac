@@ -155,6 +155,7 @@ AC_MSG_CHECKING([operating system])
 case "$host_os" in
 freebsd*)
     build_target=freebsd
+    CFLAGS="${CFLAGS} -I/usr/local/include"
     ;;
 darwin*)
     build_target=macos
