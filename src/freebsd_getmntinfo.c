@@ -291,4 +291,3 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
     return 0;
 }
-
