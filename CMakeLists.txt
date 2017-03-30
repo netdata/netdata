@@ -29,6 +29,8 @@ set(NETDATA_SOURCE_FILES
         src/eval.c
         src/eval.h
         src/freebsd_sysctl.c
+        src/freebsd_getmntinfo.c
+        src/freebsd_getifaddrs.c
         src/global_statistics.c
         src/global_statistics.h
         src/health.c
