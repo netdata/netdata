@@ -109,11 +109,12 @@ static size_t
 // metric.
 
 // the total system time, as reported by /proc/stat
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static kernel_uint_t
         global_utime = 0,
         global_stime = 0,
         global_gtime = 0;
-
+#endif
 
 // the normalization ratios, as calculated by normalize_utilization()
 double  utime_fix_ratio = 1.0,
@@ -126,7 +127,6 @@ double  utime_fix_ratio = 1.0,
         cgtime_fix_ratio = 1.0,
         cminflt_fix_ratio = 1.0,
         cmajflt_fix_ratio = 1.0;
-
 
 // ----------------------------------------------------------------------------
 // target
@@ -1157,24 +1157,13 @@ cleanup:
 #endif
 }
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static inline int read_proc_stat() {
-#ifdef __FreeBSD__
-    long cp_time[CPUSTATES];
-    static kernel_uint_t utime_raw = 0, stime_raw = 0, ntime_raw = 0;
-
-    if (unlikely(CPUSTATES != 5)) {
-        error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
-        goto cleanup;
-    }
-    if (unlikely(GETSYSCTL_BY_NAME("kern.cp_time", cp_time))) goto cleanup;
-#else
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
     static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
-#endif
     static usec_t collected_usec = 0, last_collected_usec = 0;
 
-#ifndef __FreeBSD__
     if(unlikely(!ff)) {
         snprintfz(filename, FILENAME_MAX, "%s/proc/stat", netdata_configured_host_prefix);
         ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
@@ -1183,7 +1172,6 @@ static inline int read_proc_stat() {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
-#endif
 
     last_collected_usec = collected_usec;
     collected_usec = now_monotonic_usec();
@@ -1193,25 +1181,13 @@ static inline int read_proc_stat() {
     // temporary - it is added global_ntime;
     kernel_uint_t global_ntime = 0;
 
-#ifdef __FreeBSD__
-    incremental_rate(global_utime, utime_raw, cp_time[0], collected_usec, last_collected_usec);
-    incremental_rate(global_ntime, ntime_raw, cp_time[1], collected_usec, last_collected_usec);
-    incremental_rate(global_stime, stime_raw, cp_time[2], collected_usec, last_collected_usec);
-#else
     incremental_rate(global_utime, utime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  1)), collected_usec, last_collected_usec);
     incremental_rate(global_ntime, ntime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  2)), collected_usec, last_collected_usec);
     incremental_rate(global_stime, stime_raw, str2kernel_uint_t(procfile_lineword(ff, 0,  3)), collected_usec, last_collected_usec);
     incremental_rate(global_gtime, gtime_raw, str2kernel_uint_t(procfile_lineword(ff, 0, 10)), collected_usec, last_collected_usec);
-#endif
 
     global_utime += global_ntime;
 
-#ifdef __FreeBSD__
-    if(enable_guest_charts) {
-        enable_guest_charts = 0;
-        info("Guest charts aren't supported by FreeBSD");
-    }
-#else
     if(enable_guest_charts) {
         // temporary - it is added global_ntime;
         kernel_uint_t global_gntime = 0;
@@ -1224,7 +1200,6 @@ static inline int read_proc_stat() {
         // remove guest time from user time
         global_utime -= (global_utime > global_gtime) ? global_gtime : global_utime;
     }
-#endif
 
     if(unlikely(global_iterations_counter == 1)) {
         global_utime = 0;
@@ -1240,7 +1215,11 @@ cleanup:
     global_gtime = 0;
     return 0;
 }
-
+#else
+static inline int read_proc_stat() {
+    return 0;
+}
+#endif
 
 // ----------------------------------------------------------------------------
 
@@ -2705,13 +2684,6 @@ static usec_t send_resource_usage_to_netdata() {
         "SET targets = %zu\n"
         "SET new_pids = %zu\n"
         "END\n"
-        "BEGIN netdata.apps_fix %llu\n"
-        "SET utime = %u\n"
-        "SET stime = %u\n"
-        "SET gtime = %u\n"
-        "SET minflt = %u\n"
-        "SET majflt = %u\n"
-        "END\n"
         , usec
         , cpuuser
         , cpusyst
@@ -2722,13 +2694,24 @@ static usec_t send_resource_usage_to_netdata() {
         , all_files_len
         , apps_groups_targets_count
         , targets_assignment_counter
-        , usec
-        , (unsigned int)(utime_fix_ratio   * 100 * RATES_DETAIL)
-        , (unsigned int)(stime_fix_ratio   * 100 * RATES_DETAIL)
-        , (unsigned int)(gtime_fix_ratio   * 100 * RATES_DETAIL)
-        , (unsigned int)(minflt_fix_ratio  * 100 * RATES_DETAIL)
-        , (unsigned int)(majflt_fix_ratio  * 100 * RATES_DETAIL)
         );
+
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+    fprintf(stdout,
+            "BEGIN netdata.apps_fix %llu\n"
+            "SET utime = %u\n"
+            "SET stime = %u\n"
+            "SET gtime = %u\n"
+            "SET minflt = %u\n"
+            "SET majflt = %u\n"
+            "END\n"
+            , usec
+            , (unsigned int)(utime_fix_ratio   * 100 * RATES_DETAIL)
+            , (unsigned int)(stime_fix_ratio   * 100 * RATES_DETAIL)
+            , (unsigned int)(gtime_fix_ratio   * 100 * RATES_DETAIL)
+            , (unsigned int)(minflt_fix_ratio  * 100 * RATES_DETAIL)
+            , (unsigned int)(majflt_fix_ratio  * 100 * RATES_DETAIL)
+    );
 
     if(include_exited_childs)
         fprintf(stdout,
@@ -2746,10 +2729,12 @@ static usec_t send_resource_usage_to_netdata() {
             , (unsigned int)(cminflt_fix_ratio * 100 * RATES_DETAIL)
             , (unsigned int)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
             );
+#endif
 
     return usec;
 }
 
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static void normalize_utilization(struct target *root) {
     struct target *w;
 
@@ -2895,6 +2880,11 @@ static void normalize_utilization(struct target *root) {
             );
     }
 }
+#else // ALL_PIDS_ARE_READ_INSTANTLY == 1
+static void normalize_utilization(struct target *root) {
+    (void)root;
+}
+#endif // ALL_PIDS_ARE_READ_INSTANTLY
 
 static void send_collected_data_to_netdata(struct target *root, const char *type, usec_t usec) {
     struct target *w;
