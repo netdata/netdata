@@ -146,6 +146,7 @@ netdata_SOURCES += \
 	plugin_freebsd.c \
 	plugin_freebsd.h \
 	freebsd_sysctl.c \
+	freebsd_getmntinfo.c \
 	$(NULL)
 else
 if MACOS
