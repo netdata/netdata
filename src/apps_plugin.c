@@ -114,7 +114,7 @@ static kernel_uint_t
         global_utime = 0,
         global_stime = 0,
         global_gtime = 0;
-
+#endif
 
 // the normalization ratios, as calculated by normalize_utilization()
 double  utime_fix_ratio = 1.0,
@@ -127,7 +127,6 @@ double  utime_fix_ratio = 1.0,
         cgtime_fix_ratio = 1.0,
         cminflt_fix_ratio = 1.0,
         cmajflt_fix_ratio = 1.0;
-#endif
 
 // ----------------------------------------------------------------------------
 // target
