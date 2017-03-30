@@ -148,6 +148,7 @@ netdata_SOURCES += \
 	freebsd_sysctl.c \
 	freebsd_getmntinfo.c \
 	freebsd_getifaddrs.c \
+	freebsd_devstat.c \
 	$(NULL)
 else
 if MACOS
