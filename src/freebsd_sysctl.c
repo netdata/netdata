@@ -378,7 +378,7 @@ int do_kern_cp_times(int update_every, usec_t dt) {
 int do_hw_intcnt(int update_every, usec_t dt) {
     (void)dt;
     static int mib_hw_intrcnt[2] = {0, 0};
-    size_t intrcnt_size = sizeof(mib_hw_intrcnt);
+    size_t intrcnt_size = 0;
     unsigned long i;
 
     if (unlikely(GETSYSCTL_SIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt_size))) {
@@ -1268,7 +1268,7 @@ int do_net_isr(int update_every, usec_t dt) {
 
     static int mib_workstream[3] = {0, 0, 0}, mib_work[3] = {0, 0, 0};
     int common_error = 0;
-    size_t netisr_workstream_size = sizeof(mib_workstream), netisr_work_size = sizeof(mib_work);
+    size_t netisr_workstream_size = 0, netisr_work_size = 0;
     unsigned long num_netisr_workstreams = 0, num_netisr_works = 0;
     static struct sysctl_netisr_workstream *netisr_workstream = NULL;
     static struct sysctl_netisr_work *netisr_work = NULL;
