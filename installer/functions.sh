@@ -399,23 +399,180 @@ install_non_systemd_init() {
 }
 
 install_netdata_service() {
-    if issystemd
+    if [ "${UID}" -eq 0 ]
     then
-        # systemd is running on this system
-        if [ ! -f /etc/systemd/system/netdata.service ]
+        if issystemd
         then
-            echo >&2 "Installing systemd service..."
-            run cp system/netdata.service /etc/systemd/system/netdata.service && \
-                run systemctl daemon-reload && \
-                run systemctl enable netdata && \
+            # systemd is running on this system
+            if [ ! -f /etc/systemd/system/netdata.service ]
+            then
+                echo >&2 "Installing systemd service..."
+                run cp system/netdata.service /etc/systemd/system/netdata.service && \
+                    run systemctl daemon-reload && \
+                    run systemctl enable netdata && \
+                    return 0
+            else
+                echo >&2 "file '/etc/systemd/system/netdata.service' already exists."
                 return 0
+            fi
         else
-            echo >&2 "file '/etc/systemd/system/netdata.service' already exists."
+            install_non_systemd_init
+            return $?
+        fi
+    fi
+
+    return 1
+}
+
+
+# -----------------------------------------------------------------------------
+# stop netdata
+
+pidisnetdata() {
+    if [ -d /proc/self ]
+    then
+        [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
+        [ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
+        return 1
+    fi
+    return 0
+}
+
+stop_netdata_on_pid() {
+    local pid="${1}" ret=0 count=0
+
+    pidisnetdata ${pid} || return 0
+
+    printf >&2 "Stopping netdata on pid ${pid} ..."
+    while [ ! -z "$pid" -a ${ret} -eq 0 ]
+    do
+        if [ ${count} -gt 45 ]
+            then
+            echo >&2 "Cannot stop the running netdata on pid ${pid}."
+            return 1
+        fi
+
+        count=$(( count + 1 ))
+
+        run kill ${pid} 2>/dev/null
+        ret=$?
+
+        test ${ret} -eq 0 && printf >&2 "." && sleep 2
+    done
+
+    echo >&2
+    if [ ${ret} -eq 0 ]
+    then
+        echo >&2 "SORRY! CANNOT STOP netdata ON PID ${pid} !"
+        return 1
+    fi
+
+    echo >&2 "netdata on pid ${pid} stopped."
+    return 0
+}
+
+stop_all_netdata() {
+    local p myns ns
+
+    myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
+
+    # echo >&2 "Stopping a (possibly) running netdata (namespace '${myns}')..."
+
+    for p in \
+        $(cat /var/run/netdata.pid 2>/dev/null) \
+        $(cat /var/run/netdata/netdata.pid 2>/dev/null) \
+        $(pidof netdata 2>/dev/null)
+    do
+        ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
+
+        if [ -z "${myns}" -o -z "${ns}" -o "${myns}" = "${ns}" ]
+            then
+            stop_netdata_on_pid ${p}
+        fi
+    done
+}
+
+# -----------------------------------------------------------------------------
+# restart netdata
+
+restart_netdata() {
+    local netdata="${1}"
+    shift
+
+    local started=0
+
+    progress "Start netdata"
+
+    if [ "${UID}" -eq 0 ]
+        then
+        service netdata stop
+        stop_all_netdata
+        service netdata restart && started=1
+
+        if [ ${started} -eq 0 ]
+        then
+            service netdata start && started=1
+        fi
+    fi
+
+    if [ ${started} -eq 0 ]
+    then
+        # still not started...
+
+        stop_all_netdata
+        run "${netdata}" "${@}"
+        return $?
+    fi
+
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# install netdata logrotate
+
+install_netdata_logrotate() {
+    if [ ${UID} -eq 0 ]
+        then
+        if [ -d /etc/logrotate.d ]
+            then
+            if [ ! -f /etc/logrotate.d/netdata ]
+                then
+                run cp system/netdata.logrotate /etc/logrotate.d/netdata
+            fi
+            
+            if [ -f /etc/logrotate.d/netdata ]
+                then
+                run chmod 644 /etc/logrotate.d/netdata
+            fi
+
             return 0
         fi
-    else
-        install_non_systemd_init
-        return $?
+    fi
+    
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# add netdata user and group
+
+NETDATA_ADDED_TO_DOCKER=0
+NETDATA_ADDED_TO_NGINX=0
+NETDATA_ADDED_TO_VARNISH=0
+NETDATA_ADDED_TO_HAPROXY=0
+NETDATA_ADDED_TO_ADM=0
+NETDATA_ADDED_TO_NSD=0
+add_netdata_user_and_group() {
+    if [ ${UID} -eq 0 ]
+        then
+        portable_add_group netdata || return 1
+        portable_add_user netdata || return 1
+        portable_add_user_to_group docker   netdata && NETDATA_ADDED_TO_DOCKER=1
+        portable_add_user_to_group nginx    netdata && NETDATA_ADDED_TO_NGINX=1
+        portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
+        portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
+        portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
+        portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
+        return 0
     fi
 
     return 1
