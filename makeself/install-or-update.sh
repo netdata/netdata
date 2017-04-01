@@ -10,7 +10,7 @@ declare -A configs_signatures=()
 
 if [ ! -d etc/netdata ]
     then
-    mkdir -p etc/netdata
+    run mkdir -p etc/netdata
 fi
 
 for x in $(find etc/netdata.new -name '*.conf' -type f)
@@ -19,6 +19,10 @@ do
     f="${x/*etc\/netdata.new\//}"
     t="${x/*etc\/netdata.new\/etc\/netdata/}"
     d=$(dirname "${d}")
+
+    echo >&2 "x: ${x}"
+    echo >&2 "t: ${t}"
+    echo >&2 "d: ${d}"
 
     if [ ! -d "${d}" ]
         then
@@ -32,8 +36,8 @@ do
     fi
 
     # find the checksum of the existing file
-    md5="$(cat "${t}" | ${md5sum} | cut -d ' ' -f 1)"
-    echo >&2 "debug md5 of '${t}': ${md5}"
+    md5="$(cat "${t}" | md5sum | cut -d ' ' -f 1)"
+    echo >&2 "md5: ${md5}"
 
     # check if it matches
     if [ "${configs_signatures[${md5}]}" = "${f}" ]
