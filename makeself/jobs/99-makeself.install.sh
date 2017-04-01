@@ -68,7 +68,10 @@ fi
 
 "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     --gzip \
+    --complevel 9 \
     --notemp \
+    --needroot \
+    --target "${NETDATA_INSTALL_PATH}" \
     --header "${NETDATA_MAKESELF_PATH}/makeself-header.sh" \
     --lsm "${NETDATA_MAKESELF_PATH}/makeself.lsm" \
     --license "${NETDATA_MAKESELF_PATH}/makeself-license.txt" \
