@@ -72,6 +72,7 @@ fi
     --notemp \
     --needroot \
     --target "${NETDATA_INSTALL_PATH}" \
+    --tar-extra "--overwrite" \
     --header "${NETDATA_MAKESELF_PATH}/makeself-header.sh" \
     --lsm "${NETDATA_MAKESELF_PATH}/makeself.lsm" \
     --license "${NETDATA_MAKESELF_PATH}/makeself-license.txt" \
