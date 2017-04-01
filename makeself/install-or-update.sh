@@ -60,7 +60,16 @@ run rm -rf etc/netdata.new
 # -----------------------------------------------------------------------------
 progress "Add user netdata to required user groups"
 
-add_netdata_user_and_group || run_failed "The installer does not run as root."
+NETDATA_USER="root"
+NETDATA_GROUP="root"
+add_netdata_user_and_group
+if [ $? -eq 0 ]
+    then
+    NETDATA_USER="netdata"
+    NETDATA_GROUP="netdata"
+else
+    run_failed "Failed to add netdata user and group"
+fi
 
 
 # -----------------------------------------------------------------------------
