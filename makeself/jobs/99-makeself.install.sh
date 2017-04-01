@@ -4,18 +4,6 @@
 
 
 # -----------------------------------------------------------------------------
-# create a few quick links
-
-run cd "${NETDATA_INSTALL_PATH}"
-run ln -s etc/netdata netdata-configs
-run ln -s usr/share/netdata/web netdata-web-files
-run ln -s usr/libexec/netdata netdata-plugins
-run ln -s var/lib/netdata netdata-dbs
-run ln -s var/cache/netdata netdata-metrics
-run ln -s var/log/netdata netdata-logs
-
-
-# -----------------------------------------------------------------------------
 # copy the files needed by makeself installation
 
 run mkdir -p "${NETDATA_INSTALL_PATH}/system"
@@ -61,6 +49,15 @@ if [ -d "${NETDATA_INSTALL_PATH}/etc/netdata" ]
     mv "${NETDATA_INSTALL_PATH}/etc/netdata" \
         "${NETDATA_INSTALL_PATH}/etc/netdata.new" || exit 1
 fi
+
+
+# -----------------------------------------------------------------------------
+# remove the links to allow the untaring the archive
+
+rm "${NETDATA_INSTALL_PATH}/sbin" \
+    "${NETDATA_INSTALL_PATH}/usr/bin" \
+    "${NETDATA_INSTALL_PATH}/usr/sbin" \
+    "${NETDATA_INSTALL_PATH}/usr/local"
 
 
 # -----------------------------------------------------------------------------
