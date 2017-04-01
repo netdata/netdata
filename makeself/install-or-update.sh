@@ -39,10 +39,11 @@ do
     if [ "${configs_signatures[${md5}]}" = "${f}" ]
         then
         run cp "${x}" "${t}"
-    else
-        run cp "${x}" "${t}.orig"
     fi
+    run mv "${x}" "${t}.orig"
 done
+
+run rm -rf etc/netdata.new
 
 
 # -----------------------------------------------------------------------------
@@ -165,7 +166,7 @@ do
     if [ -f "${f}" ]
         then
         run chown root:${NETDATA_GROUP} "${f}"
-        run chmod 4750 "${d}"
+        run chmod 4750 "${f}"
     fi
 done
 
