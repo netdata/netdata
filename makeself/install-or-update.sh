@@ -147,13 +147,9 @@ dir_should_be_link . var/log/netdata       netdata-logs
 # -----------------------------------------------------------------------------
 progress "fix permissions"
 
-for x in etc/netdata var/log/netdata var/lib/netdata var/cache/netdata usr/share/netdata
-do
-    if [ -d "${x}" ]
-        then
-        run chown -R ${NETDATA_USER}:${NETDATA_GROUP} ${x}
-    fi
-done
+chmod g+rx,o+rx /opt
+chmod g+rx,o+rx /opt/netdata
+chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 
 # -----------------------------------------------------------------------------

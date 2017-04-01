@@ -70,6 +70,7 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
     --needroot \
     --target "${NETDATA_INSTALL_PATH}" \
     --tar-extra "--overwrite" \
+    --keep-umask \
     --header "${NETDATA_MAKESELF_PATH}/makeself-header.sh" \
     --lsm "${NETDATA_MAKESELF_PATH}/makeself.lsm" \
     --license "${NETDATA_MAKESELF_PATH}/makeself-license.txt" \
