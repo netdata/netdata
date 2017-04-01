@@ -2,6 +2,13 @@
 
 . $(dirname "${0}")/functions.sh
 
+export LC_ALL=C
+umask 002
+
+# Be nice on production environments
+renice 19 $$ >/dev/null 2>/dev/null
+
+
 # -----------------------------------------------------------------------------
 progress "Checking new configuration files"
 
@@ -53,63 +60,19 @@ run rm -rf etc/netdata.new
 # -----------------------------------------------------------------------------
 progress "Add user netdata to required user groups"
 
-NETDATA_USER=root
-NETDATA_GROUP=root
-NETDATA_ADDED_TO_DOCKER=0
-NETDATA_ADDED_TO_NGINX=0
-NETDATA_ADDED_TO_VARNISH=0
-NETDATA_ADDED_TO_HAPROXY=0
-NETDATA_ADDED_TO_ADM=0
-NETDATA_ADDED_TO_NSD=0
-if [ ${UID} -eq 0 ]
-    then
-    portable_add_group netdata && NETDATA_USER=netdata
-    portable_add_user  netdata && NETDATA_GROUP=netdata
-    portable_add_user_to_group docker   netdata && NETDATA_ADDED_TO_DOCKER=1
-    portable_add_user_to_group nginx    netdata && NETDATA_ADDED_TO_NGINX=1
-    portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
-    portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
-    portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
-    portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
-    run_ok
-else
-    run_failed "The installer does not run as root."
-fi
+add_netdata_user_and_group || run_failed "The installer does not run as root."
 
 
 # -----------------------------------------------------------------------------
 progress "Install logrotate configuration for netdata"
 
-if [ ${UID} -eq 0 ]
-    then
-    if [ -d /etc/logrotate.d ]
-        then
-        if [ ! -f /etc/logrotate.d/netdata ]
-            then
-            run cp system/netdata.logrotate /etc/logrotate.d/netdata
-        fi
-
-        if [ -f /etc/logrotate.d/netdata ]
-            then
-            run chmod 644 /etc/logrotate.d/netdata
-        fi
-    else
-       run_failed "logrotate dir /etc/logrotate.d is not available."
-    fi
-else
-    run_failed "The installer does not run as root."
-fi
+install_netdata_logrotate || run_failed "Cannot install logrotate file for netdata."
 
 
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"
 
-if [ "${UID}" -eq 0 ]
-    then
-    install_netdata_service
-else
-    run_failed "The installer does not run as root."
-fi
+install_netdata_service || run_failed "Cannot install netdata init service."
 
 
 # -----------------------------------------------------------------------------
@@ -152,7 +115,6 @@ dir_should_be_link . var/log/netdata       netdata-logs
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
-run chmod g+rx,o+rx /opt/netdata
 run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 
@@ -172,4 +134,12 @@ done
 
 
 # -----------------------------------------------------------------------------
-netdata_banner "is installed now!"
+progress "starting netdata"
+
+restart_netdata
+if [ $? -eq 0 ]
+    then
+    netdata_banner "is installed and running now!"
+else
+    netdata_banner "is installed now!"
+fi

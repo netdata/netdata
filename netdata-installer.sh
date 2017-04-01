@@ -43,7 +43,7 @@ then
         export ACLOCAL_PATH
 fi
 
-LC_ALL=C
+export LC_ALL=C
 umask 002
 
 # Be nice on production environments
@@ -612,42 +612,13 @@ run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name 
 # -----------------------------------------------------------------------------
 progress "Add user netdata to required user groups"
 
-NETDATA_ADDED_TO_DOCKER=0
-NETDATA_ADDED_TO_NGINX=0
-NETDATA_ADDED_TO_VARNISH=0
-NETDATA_ADDED_TO_HAPROXY=0
-NETDATA_ADDED_TO_ADM=0
-NETDATA_ADDED_TO_NSD=0
-if [ ${UID} -eq 0 ]
-    then
-    portable_add_group netdata
-    portable_add_user netdata
-    portable_add_user_to_group docker   netdata && NETDATA_ADDED_TO_DOCKER=1
-    portable_add_user_to_group nginx    netdata && NETDATA_ADDED_TO_NGINX=1
-    portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
-    portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
-    portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
-    portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
-    run_ok
-else
-    run_failed "The installer does not run as root."
-fi
+add_netdata_user_and_group || run_failed "The installer does not run as root."
+
 
 # -----------------------------------------------------------------------------
 progress "Install logrotate configuration for netdata"
 
-if [ ${UID} -eq 0 ]
-    then
-    if [ -d /etc/logrotate.d -a ! -f /etc/logrotate.d/netdata ]
-        then
-        run cp system/netdata.logrotate /etc/logrotate.d/netdata
-    fi
-    
-    if [ -f /etc/logrotate.d/netdata ]
-        then
-        run chmod 644 /etc/logrotate.d/netdata
-    fi
-fi
+install_netdata_logrotate
 
 
 # -----------------------------------------------------------------------------
@@ -824,81 +795,13 @@ fi
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"
 
-if [ "${UID}" -eq 0 ]
-    then
-    install_netdata_service
-fi
+install_netdata_service || run_failed "Cannot install netdata init service."
 
 
 # -----------------------------------------------------------------------------
 # check if we can re-start netdata
 
 started=0
-
-isnetdata() {
-    if [ -d /proc/self ]
-    then
-        [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
-        [ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
-        return 1
-    fi
-    return 0
-}
-
-stop_netdata_on_pid() {
-    local pid="${1}" ret=0 count=0
-
-    isnetdata ${pid} || return 0
-
-    printf >&2 "Stopping netdata on pid ${pid} ..."
-    while [ ! -z "$pid" -a ${ret} -eq 0 ]
-    do
-        if [ ${count} -gt 45 ]
-            then
-            echo >&2 "Cannot stop the running netdata on pid ${pid}."
-            return 1
-        fi
-
-        count=$(( count + 1 ))
-
-        run kill ${pid} 2>/dev/null
-        ret=$?
-
-        test ${ret} -eq 0 && printf >&2 "." && sleep 2
-    done
-
-    echo >&2
-    if [ ${ret} -eq 0 ]
-    then
-        echo >&2 "SORRY! CANNOT STOP netdata ON PID ${pid} !"
-        return 1
-    fi
-
-    echo >&2 "netdata on pid ${pid} stopped."
-    return 0
-}
-
-stop_all_netdata() {
-    local p myns ns
-
-    myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
-
-    # echo >&2 "Stopping a (possibly) running netdata (namespace '${myns}')..."
-
-    for p in $(cat "${NETDATA_RUN_DIR}/netdata.pid" 2>/dev/null) \
-        $(cat /var/run/netdata.pid 2>/dev/null) \
-        $(cat /var/run/netdata/netdata.pid 2>/dev/null) \
-        $(pidof netdata 2>/dev/null)
-    do
-        ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
-
-        if [ -z "${myns}" -o -z "${ns}" -o "${myns}" = "${ns}" ]
-            then
-            stop_netdata_on_pid ${p}
-        fi
-    done
-}
-
 if [ ${DONOTSTART} -eq 1 ]
     then
     if [ ! -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]
@@ -913,39 +816,18 @@ if [ ${DONOTSTART} -eq 1 ]
     fi
 
 else
-
-    progress "Start netdata"
-
-    if [ "${UID}" -eq 0 ]
+    restart_netdata ${NETDATA_PREFIX}/usr/sbin/netdata "${@}"
+    if [ $? -ne 0 ]
         then
-        service netdata stop
-        stop_all_netdata
-        service netdata restart && started=1
-        if [ ${started} -eq 0 ]
-        then
-            service netdata start && started=1
-        fi
-    fi
-
-    if [ ${started} -eq 0 ]
-    then
-        # still not started...
-
-        stop_all_netdata
-
-        echo >&2 "Starting netdata..."
-        run ${NETDATA_PREFIX}/usr/sbin/netdata -P ${NETDATA_RUN_DIR}/netdata.pid "${@}"
-        if [ $? -ne 0 ]
-            then
-            echo >&2
-            echo >&2 "SORRY! FAILED TO START NETDATA!"
-            exit 1
-        else
-            echo >&2 "OK. NetData Started!"
-        fi
-
         echo >&2
+        echo >&2 "SORRY! FAILED TO START NETDATA!"
+        echo >&2
+        exit 1
     fi
+
+    started=1
+    echo >&2 "OK. NetData Started!"
+    echo >&2
 
     # -----------------------------------------------------------------------------
     # save a config file, if it is not already there

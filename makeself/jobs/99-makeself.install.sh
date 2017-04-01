@@ -25,13 +25,15 @@ cp \
 # -----------------------------------------------------------------------------
 # create a wrapper to start our netdata with a modified path
 
+mkdir -p "${NETDATA_INSTALL_PATH}/bin/srv"
+
 mv "${NETDATA_INSTALL_PATH}/bin/netdata" \
-    "${NETDATA_INSTALL_PATH}/bin/netdata.bin" || exit 1
+    "${NETDATA_INSTALL_PATH}/bin/srv/netdata" || exit 1
 
 cat >"${NETDATA_INSTALL_PATH}/bin/netdata" <<EOF
 #!${NETDATA_INSTALL_PATH}/bin/bash
 export PATH="${NETDATA_INSTALL_PATH}/bin:\${PATH}"
-exec "${NETDATA_INSTALL_PATH}/bin/netdata.bin" "\${@}"
+exec "${NETDATA_INSTALL_PATH}/bin/srv/netdata" "\${@}"
 EOF
 chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
 
@@ -69,8 +71,6 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
     --notemp \
     --needroot \
     --target "${NETDATA_INSTALL_PATH}" \
-    --tar-extra "--overwrite" \
-    --keep-umask \
     --header "${NETDATA_MAKESELF_PATH}/makeself-header.sh" \
     --lsm "${NETDATA_MAKESELF_PATH}/makeself.lsm" \
     --license "${NETDATA_MAKESELF_PATH}/makeself-license.txt" \
