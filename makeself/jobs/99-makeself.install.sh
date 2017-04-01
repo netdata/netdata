@@ -42,8 +42,8 @@ mv "${NETDATA_INSTALL_PATH}/bin/netdata" \
 
 cat >"${NETDATA_INSTALL_PATH}/bin/netdata" <<EOF
 #!${NETDATA_INSTALL_PATH}/bin/bash
-export PATH="${NETDATA_INSTALL_PATH}/bin:${PATH}"
-exec "${NETDATA_INSTALL_PATH}/bin/netdata.bin" "${@}"
+export PATH="${NETDATA_INSTALL_PATH}/bin:\${PATH}"
+exec "${NETDATA_INSTALL_PATH}/bin/netdata.bin" "\${@}"
 EOF
 chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
 
