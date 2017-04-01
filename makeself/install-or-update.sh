@@ -20,9 +20,9 @@ do
     t="${x/*etc\/netdata.new\//etc\/netdata\/}"
     d=$(dirname "${t}")
 
-    echo >&2 "x: ${x}"
-    echo >&2 "t: ${t}"
-    echo >&2 "d: ${d}"
+    #echo >&2 "x: ${x}"
+    #echo >&2 "t: ${t}"
+    #echo >&2 "d: ${d}"
 
     if [ ! -d "${d}" ]
         then
@@ -37,7 +37,7 @@ do
 
     # find the checksum of the existing file
     md5="$(cat "${t}" | md5sum | cut -d ' ' -f 1)"
-    echo >&2 "md5: ${md5}"
+    #echo >&2 "md5: ${md5}"
 
     # check if it matches
     if [ "${configs_signatures[${md5}]}" = "${f}" ]
