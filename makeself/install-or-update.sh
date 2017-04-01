@@ -18,7 +18,7 @@ do
     # find it relative filename
     f="${x/*etc\/netdata.new\//}"
     t="${x/*etc\/netdata.new\//etc\/netdata\//}"
-    d=$(dirname "${d}")
+    d=$(dirname "${t}")
 
     echo >&2 "x: ${x}"
     echo >&2 "t: ${t}"
