@@ -118,7 +118,7 @@ progress "creating quick links"
 dir_should_be_link() {
     local p="${1}" t="${2}" d="${3}" old
 
-    old="$(pwd)"
+    old="${PWD}"
     cd "${p}" || return 0
 
     if [ -e "${d}" ]
@@ -151,9 +151,9 @@ dir_should_be_link . var/log/netdata       netdata-logs
 # -----------------------------------------------------------------------------
 progress "fix permissions"
 
-chmod g+rx,o+rx /opt
-chmod g+rx,o+rx /opt/netdata
-chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
+run chmod g+rx,o+rx /opt
+run chmod g+rx,o+rx /opt/netdata
+run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 
 # -----------------------------------------------------------------------------
