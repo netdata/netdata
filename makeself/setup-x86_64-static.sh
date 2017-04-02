@@ -15,8 +15,11 @@ apk add --no-cache \
     automake \
     gcc \
     make \
+    libtool \
     pkgconfig \
     util-linux-dev \
+    openssl-dev \
+    gnutls-dev \
     zlib-dev \
     libmnl-dev \
     libnetfilter_acct-dev \
