@@ -54,7 +54,7 @@ fi
 
 
 # -----------------------------------------------------------------------------
-# remove the links to allow the untaring the archive
+# remove the links to allow untaring the archive
 
 rm "${NETDATA_INSTALL_PATH}/sbin" \
     "${NETDATA_INSTALL_PATH}/usr/bin" \
