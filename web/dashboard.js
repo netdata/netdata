@@ -3710,9 +3710,11 @@ var NETDATA = window.NETDATA || {};
                 if(NETDATA.options.debug.main_loop === true)
                     console.log('fast rendering...');
 
-                state.autoRefresh(function() {
-                    NETDATA.chartRefresherNoParallel(++index);
-                });
+                setTimeout(function() {
+                    state.autoRefresh(function () {
+                        NETDATA.chartRefresherNoParallel(++index);
+                    });
+                }, 0);
             }
             else {
                 if(NETDATA.options.debug.main_loop === true) console.log('waiting for next refresh...');
