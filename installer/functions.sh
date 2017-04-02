@@ -144,7 +144,7 @@ run_failed() {
 
 run_logfile="/dev/null"
 run() {
-    local user="${USER}" dir="$(basename "${PWD}")" info info_console
+    local user="${USER:-}" dir="${PWD}" info info_console
 
     if [ "${UID}" = "0" ]
         then
@@ -178,10 +178,53 @@ run() {
     return ${ret}
 }
 
+getent_cmd="$(which_cmd getent)"
+portable_check_user_exists() {
+    local username="${1}" found=
+
+    if [ ! -z "${getent_cmd}" ]
+        then
+        "${getent_cmd}" passwd "${username}" >/dev/null 2>&1
+        return $?
+    fi
+
+    found="$(cut -d ':' -f 1 </etc/passwd | grep "^${username}$")"
+    [ "${found}" = "${username}" ] && return 0
+    return 1
+}
+
+portable_check_group_exists() {
+    local groupname="${1}" found=
+
+    if [ ! -z "${getent_cmd}" ]
+        then
+        "${getent_cmd}" group "${groupname}" >/dev/null 2>&1
+        return $?
+    fi
+
+    found="$(cut -d ':' -f 1 </etc/group | grep "^${groupname}$")"
+    [ "${found}" = "${groupname}" ] && return 0
+    return 1
+}
+
+portable_check_user_in_group() {
+    local username="${1}" groupname="${2}" users=
+
+    if [ ! -z "${getent_cmd}" ]
+        then
+        users="$(getent group "${groupname}" | cut -d ':' -f 4)"
+    else
+        users="$(grep "^${groupname}:" </etc/group | cut -d ':' -f 4)"
+    fi
+
+    [[ ",${users}," =~ ,${username}, ]] && return 0
+    return 1
+}
+
 portable_add_user() {
     local username="${1}"
 
-    getent passwd "${username}" > /dev/null 2>&1
+    portable_check_user_exists "${username}"
     [ $? -eq 0 ] && echo >&2 "User '${username}' already exists." && return 0
 
     echo >&2 "Adding ${username} user account ..."
@@ -214,7 +257,7 @@ portable_add_user() {
 portable_add_group() {
     local groupname="${1}"
 
-    getent group "${groupname}" > /dev/null 2>&1
+    portable_check_group_exists "${groupname}"
     [ $? -eq 0 ] && echo >&2 "Group '${groupname}' already exists." && return 0
 
     echo >&2 "Adding ${groupname} user group ..."
@@ -244,12 +287,11 @@ portable_add_group() {
 portable_add_user_to_group() {
     local groupname="${1}" username="${2}"
 
-    getent group "${groupname}" > /dev/null 2>&1
+    portable_check_group_exists "${groupname}"
     [ $? -ne 0 ] && echo >&2 "Group '${groupname}' does not exist." && return 1
 
     # find the user is already in the group
-    local users=$(getent group "${groupname}" | cut -d ':' -f 4)
-    if [[ ",${users}," =~ ,${username}, ]]
+    if portable_check_user_in_group "${username}" "${groupname}"
         then
         # username is already there
         echo >&2 "User '${username}' is already in group '${groupname}'."
@@ -340,5 +382,240 @@ issystemd() {
     done
 
     # else, it is not systemd
+    return 1
+}
+
+install_non_systemd_init() {
+    [ "${UID}" != 0 ] && return 1
+
+    local key="unknown"
+    if [ -f /etc/os-release ]
+        then
+        source /etc/os-release || return 1
+        key="${ID}-${VERSION_ID}"
+
+    elif [ -f /etc/centos-release ]
+        then
+        key=$(</etc/centos-release)
+    fi
+
+    if [ -d /etc/init.d -a ! -f /etc/init.d/netdata ]
+        then
+        if [ "${key}" = "gentoo" ]
+            then
+            echo >&2 "Installing OpenRC init file..."
+            run cp system/netdata-openrc /etc/init.d/netdata && \
+            run chmod 755 /etc/init.d/netdata && \
+            run rc-update add netdata default && \
+            return 0
+        
+        elif [ "${key}" = "ubuntu-12.04" -o "${key}" = "ubuntu-14.04" -o "${key}" = "debian-7" ]
+            then
+            echo >&2 "Installing LSB init file..."
+            run cp system/netdata-lsb /etc/init.d/netdata && \
+            run chmod 755 /etc/init.d/netdata && \
+            run update-rc.d netdata defaults && \
+            run update-rc.d netdata enable && \
+            return 0
+
+        elif [ "${key}" = "CentOS release 6.8 (Final)" -o "${key}" = "amzn-2016.09" ]
+            then
+            echo >&2 "Installing init.d file..."
+            run cp system/netdata-init-d /etc/init.d/netdata && \
+            run chmod 755 /etc/init.d/netdata && \
+            run chkconfig netdata on && \
+            return 0
+        else
+            echo >&2 "I don't know what init file to install on system '${key}'. Open a github issue to help us fix it."
+            return 1
+        fi
+    elif [ -f /etc/init.d/netdata ]
+        then
+        echo >&2 "file '/etc/init.d/netdata' already exists."
+        return 0
+    else
+        echo >&2 "I don't know what init file to install on system '${key}'. Open a github issue to help us fix it."
+    fi
+
+    return 1
+}
+
+install_netdata_service() {
+    if [ "${UID}" -eq 0 ]
+    then
+        if issystemd
+        then
+            # systemd is running on this system
+            if [ ! -f /etc/systemd/system/netdata.service ]
+            then
+                echo >&2 "Installing systemd service..."
+                run cp system/netdata.service /etc/systemd/system/netdata.service && \
+                    run systemctl daemon-reload && \
+                    run systemctl enable netdata && \
+                    return 0
+            else
+                echo >&2 "file '/etc/systemd/system/netdata.service' already exists."
+                return 0
+            fi
+        else
+            install_non_systemd_init
+            return $?
+        fi
+    fi
+
+    return 1
+}
+
+
+# -----------------------------------------------------------------------------
+# stop netdata
+
+pidisnetdata() {
+    if [ -d /proc/self ]
+    then
+        [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
+        [ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
+        return 1
+    fi
+    return 0
+}
+
+stop_netdata_on_pid() {
+    local pid="${1}" ret=0 count=0
+
+    pidisnetdata ${pid} || return 0
+
+    printf >&2 "Stopping netdata on pid ${pid} ..."
+    while [ ! -z "$pid" -a ${ret} -eq 0 ]
+    do
+        if [ ${count} -gt 45 ]
+            then
+            echo >&2 "Cannot stop the running netdata on pid ${pid}."
+            return 1
+        fi
+
+        count=$(( count + 1 ))
+
+        run kill ${pid} 2>/dev/null
+        ret=$?
+
+        test ${ret} -eq 0 && printf >&2 "." && sleep 2
+    done
+
+    echo >&2
+    if [ ${ret} -eq 0 ]
+    then
+        echo >&2 "SORRY! CANNOT STOP netdata ON PID ${pid} !"
+        return 1
+    fi
+
+    echo >&2 "netdata on pid ${pid} stopped."
+    return 0
+}
+
+stop_all_netdata() {
+    local p myns ns
+
+    myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
+
+    # echo >&2 "Stopping a (possibly) running netdata (namespace '${myns}')..."
+
+    for p in \
+        $(cat /var/run/netdata.pid 2>/dev/null) \
+        $(cat /var/run/netdata/netdata.pid 2>/dev/null) \
+        $(pidof netdata 2>/dev/null)
+    do
+        ns="$(readlink /proc/${p}/ns/pid 2>/dev/null)"
+
+        if [ -z "${myns}" -o -z "${ns}" -o "${myns}" = "${ns}" ]
+            then
+            stop_netdata_on_pid ${p}
+        fi
+    done
+}
+
+# -----------------------------------------------------------------------------
+# restart netdata
+
+restart_netdata() {
+    local netdata="${1}"
+    shift
+
+    local started=0
+
+    progress "Start netdata"
+
+    if [ "${UID}" -eq 0 ]
+        then
+        service netdata stop
+        stop_all_netdata
+        service netdata restart && started=1
+
+        if [ ${started} -eq 0 ]
+        then
+            service netdata start && started=1
+        fi
+    fi
+
+    if [ ${started} -eq 0 ]
+    then
+        # still not started...
+
+        run stop_all_netdata
+        run "${netdata}" "${@}"
+        return $?
+    fi
+
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# install netdata logrotate
+
+install_netdata_logrotate() {
+    if [ ${UID} -eq 0 ]
+        then
+        if [ -d /etc/logrotate.d ]
+            then
+            if [ ! -f /etc/logrotate.d/netdata ]
+                then
+                run cp system/netdata.logrotate /etc/logrotate.d/netdata
+            fi
+            
+            if [ -f /etc/logrotate.d/netdata ]
+                then
+                run chmod 644 /etc/logrotate.d/netdata
+            fi
+
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# add netdata user and group
+
+NETDATA_ADDED_TO_DOCKER=0
+NETDATA_ADDED_TO_NGINX=0
+NETDATA_ADDED_TO_VARNISH=0
+NETDATA_ADDED_TO_HAPROXY=0
+NETDATA_ADDED_TO_ADM=0
+NETDATA_ADDED_TO_NSD=0
+add_netdata_user_and_group() {
+    if [ ${UID} -eq 0 ]
+        then
+        portable_add_group netdata || return 1
+        portable_add_user netdata || return 1
+        portable_add_user_to_group docker   netdata && NETDATA_ADDED_TO_DOCKER=1
+        portable_add_user_to_group nginx    netdata && NETDATA_ADDED_TO_NGINX=1
+        portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
+        portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
+        portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
+        portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
+        return 0
+    fi
+
     return 1
 }
