@@ -84,4 +84,38 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
 
 # -----------------------------------------------------------------------------
 # copy it to the netdata build dir
-cp "${NETDATA_INSTALL_PATH}.gz.run" .
+
+NOWNER="unknown"
+ORIGIN="$(git config --get remote.origin.url)"
+if [[ "${ORIGIN}" =~ ^git@github.com:.*/netdata.*$ ]]
+    then
+    NOWNER="${ORIGIN/git@github.com:/}"
+    NOWNER="${NOWNER/\/netdata*/}"
+
+elif [[ "${ORIGIN}" =~ ^https://github.com/.*/netdata.*$ ]]
+    then
+    NOWNER="${ORIGIN/https:\/\/github.com\//}"
+    NOWNER="${NOWNER/\/netdata*/}"
+fi
+
+# make sure it does not have any slashes in it
+NOWNER="${NOWNER//\//_}"
+
+if [ "${NOWNER}" = "firehol" ]
+    then
+    NOWNER=
+else
+    NOWNER="-${NOWNER}"
+fi
+
+VERSION="$(git describe)"
+[ -z "${VERSION}" ] && VERSION="undefined"
+
+FILE="netdata-${VERSION}${NOWNER}.gz.run"
+
+cp "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
+echo >&2 "Self-extracting installer copied to '${FILE}'"
+
+[ -f netdata-latest.gz.run ] && rm netdata-latest.gz.run
+ln -s "${FILE}" netdata-latest.gz.run
+echo >&2 "Self-extracting installer linked to 'netdata-latest.gz.run'"
