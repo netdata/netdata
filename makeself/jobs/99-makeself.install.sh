@@ -81,3 +81,6 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
     ./system/post-installer.sh \
     ${NULL}
 
+# -----------------------------------------------------------------------------
+# copy it to the netdata build dir
+cp "${NETDATA_INSTALL_PATH}.gz.run" .

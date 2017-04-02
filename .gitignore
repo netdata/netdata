@@ -93,6 +93,7 @@ profile/benchmark-dictionary
 profile/benchmark-registry
 
 *.pyc
+*.run
 
 diagrams/*.png
 diagrams/*.svg

@@ -144,7 +144,7 @@ run_failed() {
 
 run_logfile="/dev/null"
 run() {
-    local user="${USER}" dir="${PWD}" info info_console
+    local user="${USER:-}" dir="${PWD}" info info_console
 
     if [ "${UID}" = "0" ]
         then

@@ -1,25 +1,8 @@
 #!/usr/bin/env sh
 
-# this script should be running in alpine linux
-# install the required packages
-apk add \
-    bash \
-    wget \
-    curl \
-    ncurses \
-    git \
-    netcat-openbsd \
-    alpine-sdk \
-    autoconf \
-    automake \
-    gcc \
-    make \
-    pkgconfig \
-    util-linux-dev \
-    zlib-dev \
-    libmnl-dev \
-    libnetfilter_acct-dev \
-    || exit 1
+# First run setup-x86_64-static.sh under alpine linux to install
+# the required packages. build-x86_64-static.sh will do this for you
+# using docker.
 
 cd $(dirname "$0") || exit 1
 
