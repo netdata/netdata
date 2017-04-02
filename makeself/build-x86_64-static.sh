@@ -28,7 +28,9 @@ then
 fi
 
 # Run the build script inside the container
-sudo docker run -v $(pwd):/usr/src/netdata.git:rw "${DOCKER_CONTAINER_NAME}" \
+sudo docker run -a stdin -a stdout -a stderr -i -t -v \
+    $(pwd):/usr/src/netdata.git:rw \
+    "${DOCKER_CONTAINER_NAME}" \
     /bin/sh /usr/src/netdata.git/makeself/build.sh
 
 if [ "${USER}" ]

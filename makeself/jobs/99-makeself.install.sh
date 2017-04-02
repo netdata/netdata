@@ -41,15 +41,15 @@ chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
 # -----------------------------------------------------------------------------
 # move etc to protect the destination when unpacked
 
-if [ -d "${NETDATA_INSTALL_PATH}/etc/netdata" ]
+if [ -d "${NETDATA_INSTALL_PATH}/etc" ]
     then
-    if [ -d "${NETDATA_INSTALL_PATH}/etc/netdata.new" ]
+    if [ -d "${NETDATA_INSTALL_PATH}/etc.new" ]
         then
-        rm -rf "${NETDATA_INSTALL_PATH}/etc/netdata.new" || exit 1
+        rm -rf "${NETDATA_INSTALL_PATH}/etc.new" || exit 1
     fi
 
-    mv "${NETDATA_INSTALL_PATH}/etc/netdata" \
-        "${NETDATA_INSTALL_PATH}/etc/netdata.new" || exit 1
+    mv "${NETDATA_INSTALL_PATH}/etc" \
+        "${NETDATA_INSTALL_PATH}/etc.new" || exit 1
 fi
 
 
@@ -80,6 +80,7 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
     "netdata, the real-time performance and health monitoring system" \
     ./system/post-installer.sh \
     ${NULL}
+
 
 # -----------------------------------------------------------------------------
 # copy it to the netdata build dir
