@@ -20,6 +20,7 @@ if [ ! -d etc/netdata ]
     run mkdir -p etc/netdata
 fi
 
+md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
 for x in $(find etc/netdata.new -name '*.conf' -type f)
 do
     # find it relative filename
@@ -42,15 +43,19 @@ do
         continue
     fi
 
-    # find the checksum of the existing file
-    md5="$(cat "${t}" | md5sum | cut -d ' ' -f 1)"
-    #echo >&2 "md5: ${md5}"
-
-    # check if it matches
-    if [ "${configs_signatures[${md5}]}" = "${f}" ]
+    if [ ! -z "${md5sum}" ]
         then
-        run cp "${x}" "${t}"
+        # find the checksum of the existing file
+        md5="$(cat "${t}" | ${md5sum} | cut -d ' ' -f 1)"
+        #echo >&2 "md5: ${md5}"
+
+        # check if it matches
+        if [ "${configs_signatures[${md5}]}" = "${f}" ]
+            then
+            run cp "${x}" "${t}"
+        fi
     fi
+    
     run mv "${x}" "${t}.orig"
 done
 
