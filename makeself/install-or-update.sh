@@ -153,7 +153,7 @@ done
 # -----------------------------------------------------------------------------
 progress "starting netdata"
 
-restart_netdata
+restart_netdata "/opt/netdata/bin/netdata"
 if [ $? -eq 0 ]
     then
     netdata_banner "is installed and running now!"
