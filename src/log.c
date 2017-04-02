@@ -298,6 +298,9 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 
 void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... )
 {
+    // save a copy of errno - just in case this function generates a new error
+    int __errno = errno;
+
     va_list args;
 
     // prevent logging too much
@@ -311,9 +314,9 @@ void error_int( const char *prefix, const char *file, const char *function, cons
     vfprintf( stderr, fmt, args );
     va_end( args );
 
-    if(errno) {
+    if(__errno) {
         char buf[1024];
-        fprintf(stderr, " (errno %d, %s)\n", errno, strerror_result(strerror_r(errno, buf, 1023), buf));
+        fprintf(stderr, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
         errno = 0;
     }
     else
