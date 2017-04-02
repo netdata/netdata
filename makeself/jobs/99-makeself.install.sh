@@ -111,7 +111,7 @@ fi
 VERSION="$(git describe)"
 [ -z "${VERSION}" ] && VERSION="undefined"
 
-FILE="netdata-${VERSION}${NOWNER}.gz.run"
+FILE="netdata-${VERSION}-$(uname -m)-$(date +"%Y%m%d-%H%M%S")${NOWNER}.gz.run"
 
 cp "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
 echo >&2 "Self-extracting installer copied to '${FILE}'"
