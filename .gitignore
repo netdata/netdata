@@ -30,6 +30,8 @@ netdata.spec
 
 *.tar.*
 
+cmake-build-debug/
+makeself/tmp/
 sitespeed-result/
 cov-int/
 netdata-coverity-analysis.tgz
