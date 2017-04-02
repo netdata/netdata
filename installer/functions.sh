@@ -519,7 +519,7 @@ restart_netdata() {
     then
         # still not started...
 
-        stop_all_netdata
+        run stop_all_netdata
         run "${netdata}" "${@}"
         return $?
     fi
