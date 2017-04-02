@@ -21,11 +21,11 @@ if [ ! -d etc/netdata ]
 fi
 
 md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-for x in $(find etc/netdata.new -name '*.conf' -type f)
+for x in $(find etc.new -type f)
 do
     # find it relative filename
-    f="${x/*etc\/netdata.new\//}"
-    t="${x/*etc\/netdata.new\//etc\/netdata\/}"
+    f="${x/etc.new\//}"
+    t="${x/etc.new\//etc\/}"
     d=$(dirname "${t}")
 
     #echo >&2 "x: ${x}"
@@ -56,10 +56,13 @@ do
         fi
     fi
     
-    run mv "${x}" "${t}.orig"
+    if ! [[ "${x}" =~ .*\.orig ]]
+        then
+        run mv "${x}" "${t}.orig"
+    fi
 done
 
-run rm -rf etc/netdata.new
+run rm -rf etc.new
 
 
 # -----------------------------------------------------------------------------
