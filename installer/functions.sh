@@ -178,10 +178,53 @@ run() {
     return ${ret}
 }
 
+getent_cmd="$(which_cmd getent)"
+portable_check_user_exists() {
+    local username="${1}" found=
+
+    if [ ! -z "${getent_cmd}" ]
+        then
+        "${getent_cmd}" passwd "${username}" >/dev/null 2>&1
+        return $?
+    fi
+
+    found="$(cut -d ':' -f 1 </etc/passwd | grep "^${username}$")"
+    [ "${found}" = "${username}" ] && return 0
+    return 1
+}
+
+portable_check_group_exists() {
+    local groupname="${1}" found=
+
+    if [ ! -z "${getent_cmd}" ]
+        then
+        "${getent_cmd}" group "${groupname}" >/dev/null 2>&1
+        return $?
+    fi
+
+    found="$(cut -d ':' -f 1 </etc/group | grep "^${groupname}$")"
+    [ "${found}" = "${groupname}" ] && return 0
+    return 1
+}
+
+portable_check_user_in_group() {
+    local username="${1}" groupname="${2}" users=
+
+    if [ ! -z "${getent_cmd}" ]
+        then
+        users="$(getent group "${groupname}" | cut -d ':' -f 4)"
+    else
+        users="$(grep "^${groupname}:" </etc/group | cut -d ':' -f 4)"
+    fi
+
+    [[ ",${users}," =~ ,${username}, ]] && return 0
+    return 1
+}
+
 portable_add_user() {
     local username="${1}"
 
-    getent passwd "${username}" > /dev/null 2>&1
+    portable_check_user_exists "${username}"
     [ $? -eq 0 ] && echo >&2 "User '${username}' already exists." && return 0
 
     echo >&2 "Adding ${username} user account ..."
@@ -214,7 +257,7 @@ portable_add_user() {
 portable_add_group() {
     local groupname="${1}"
 
-    getent group "${groupname}" > /dev/null 2>&1
+    portable_check_group_exists "${groupname}"
     [ $? -eq 0 ] && echo >&2 "Group '${groupname}' already exists." && return 0
 
     echo >&2 "Adding ${groupname} user group ..."
@@ -244,12 +287,11 @@ portable_add_group() {
 portable_add_user_to_group() {
     local groupname="${1}" username="${2}"
 
-    getent group "${groupname}" > /dev/null 2>&1
+    portable_check_group_exists "${groupname}"
     [ $? -ne 0 ] && echo >&2 "Group '${groupname}' does not exist." && return 1
 
     # find the user is already in the group
-    local users=$(getent group "${groupname}" | cut -d ':' -f 4)
-    if [[ ",${users}," =~ ,${username}, ]]
+    if portable_check_user_in_group "${username}" "${groupname}"
         then
         # username is already there
         echo >&2 "User '${username}' is already in group '${groupname}'."
