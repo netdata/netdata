@@ -6,12 +6,10 @@
 
   (C) Copyright 2017, Costa Tsaousis
   All rights reserved
-
   Released under GPL v3+
 
   You are about to install netdata to this system.
-
-  It will be installed at:
+  netdata will be installed at:
 
                     /opt/netdata
 
@@ -21,12 +19,12 @@
   User 'netdata' and group 'netdata' will be added, if not present.
 
   # LOGROTATE
-  This file will be installed:
+  This file will be installed if logrotate is present.
 
    - /etc/logrotate.d/netdata
 
   # SYSTEM INIT
-  If this system runs with systemd:
+  This file will be installed if this system runs with systemd:
 
    - /etc/systemd/system/netdata.service 
 
