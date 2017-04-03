@@ -11,3 +11,6 @@ run ./netdata-installer.sh --install "${NETDATA_INSTALL_PARENT}" \
     --dont-start-it \
     ${NULL}
 
+run strip ${NETDATA_INSTALL_PATH}/bin/netdata
+run strip ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/plugins.d/apps.plugin
+
