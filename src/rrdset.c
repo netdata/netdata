@@ -288,8 +288,6 @@ void rrdset_free(RRDSET *st) {
 }
 
 void rrdset_save(RRDSET *st) {
-    RRDDIM *rd;
-
     rrdset_check_rdlock(st);
 
     // info("Saving chart '%s' ('%s')", st->id, st->name);
@@ -299,6 +297,7 @@ void rrdset_save(RRDSET *st) {
         savememory(st->cache_filename, st, st->memsize);
     }
 
+    RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
             debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
@@ -312,19 +311,23 @@ void rrdset_delete(RRDSET *st) {
 
     rrdset_check_rdlock(st);
 
-    // info("Deleting chart '%s' ('%s')", st->id, st->name);
+    info("Deleting chart '%s' ('%s') from disk...", st->id, st->name);
 
-    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
-        debug(D_RRD_STATS, "Deleting stats '%s' to '%s'.", st->name, st->cache_filename);
-        unlink(st->cache_filename);
+    if(st->rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
+        info("Deleting chart header file '%s'.", st->cache_filename);
+        if(unlikely(unlink(st->cache_filename) == -1))
+            error("Cannot delete chart header file '%s'", st->cache_filename);
     }
 
     rrddim_foreach_read(rd, st) {
-        if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
-            debug(D_RRD_STATS, "Deleting dimension '%s' to '%s'.", rd->name, rd->cache_filename);
-            unlink(rd->cache_filename);
+        if(likely(rd->rrd_memory_mode != RRD_MEMORY_MODE_RAM)) {
+            info("Deleting dimension file '%s'.", rd->cache_filename);
+            if(unlikely(unlink(rd->cache_filename) == -1))
+                error("Cannot delete dimension file '%s'", rd->cache_filename);
         }
     }
+
+    recursively_delete_dir(st->cache_dir, "left-over chart");
 }
 
 // ----------------------------------------------------------------------------
