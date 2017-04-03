@@ -539,6 +539,8 @@ void rrdhost_delete(RRDHOST *host) {
         rrdset_unlock(st);
     }
 
+    recursively_delete_dir(host->cache_dir, "left over host");
+
     rrdhost_unlock(host);
 }
 

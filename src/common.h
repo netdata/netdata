@@ -289,6 +289,8 @@ extern pid_t get_system_pid_max(void);
 extern unsigned int hz;
 extern void get_system_HZ(void);
 
+extern int recursively_delete_dir(const char *path, const char *reason);
+
 extern volatile sig_atomic_t netdata_exit;
 extern const char *os_type;
 
