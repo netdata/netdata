@@ -32,6 +32,12 @@ then
   exit 0
 fi
 
+if [ "$TRAVIS_OS_NAME" != "linux" ]
+then
+  echo "Building non-linux version - skipping deployment to website"
+  exit 0
+fi
+
 if [ "$CC" != "gcc" ]
 then
   echo "Building non-gcc version - skipping deployment to website"
@@ -41,4 +47,5 @@ fi
 ssh-keyscan -H firehol.org >> ~/.ssh/known_hosts
 ssh travis@firehol.org mkdir -p uploads/netdata/$TRAVIS_BRANCH/
 scp -p *.tar.* travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
+scp -p *.gz.run* travis@firehol.org:uploads/netdata/$TRAVIS_BRANCH/
 ssh travis@firehol.org touch uploads/netdata/$TRAVIS_BRANCH/complete.txt
