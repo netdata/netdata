@@ -44,3 +44,4 @@ EOF
 
 run make install
 
+run strip ${NETDATA_INSTALL_PATH}/bin/bash

@@ -233,10 +233,6 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 
     switch(rd->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
-            debug(D_RRD_CALLS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
-            savememory(rd->cache_filename, rd, rd->memsize);
-            // continue to map mode - no break;
-
         case RRD_MEMORY_MODE_MAP:
             debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
             freez((void *)rd->id);
