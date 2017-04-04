@@ -42,3 +42,4 @@ do
 	"${x}" "${NETDATA_INSTALL_PATH}"
 done
 
+exit 0
