@@ -26,7 +26,10 @@ before_install:
  - eval "$(ssh-agent -s)"
  - ./.travis/decrypt-if-have-key decb6f6387c4
  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update ; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gpg fakeroot ossp-uuid xz; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew uninstall gnupg || echo; brew install gpg; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install fakeroot; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install ossp-uuid; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install xz; fi
 #
 # Run
 before_script:
