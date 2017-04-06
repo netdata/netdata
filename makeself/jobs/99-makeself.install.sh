@@ -86,7 +86,7 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
 # copy it to the netdata build dir
 
 NOWNER="unknown"
-ORIGIN="$(git config --get remote.origin.url)"
+ORIGIN="$(git config --get remote.origin.url || echo "unknown")"
 if [[ "${ORIGIN}" =~ ^git@github.com:.*/netdata.*$ ]]
     then
     NOWNER="${ORIGIN/git@github.com:/}"
@@ -108,7 +108,7 @@ else
     NOWNER="-${NOWNER}"
 fi
 
-VERSION="$(git describe)"
+VERSION="$(git describe || echo "undefined")"
 [ -z "${VERSION}" ] && VERSION="undefined"
 
 FILE="netdata-${VERSION}-$(uname -m)-$(date +"%Y%m%d-%H%M%S")${NOWNER}.gz.run"
