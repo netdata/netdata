@@ -7,7 +7,7 @@ installer_dir="$(dirname "${0}")"
 
 if [ "${netdata_source_dir}" != "${installer_dir}" -a "${installer_dir}" != "." ]
     then
-    echo >&2 "Warninng: you are currently in '${netdata_source_dir}' but the installer is in '${installer_dir}'."
+    echo >&2 "Warning: you are currently in '${netdata_source_dir}' but the installer is in '${installer_dir}'."
 fi
 
 
