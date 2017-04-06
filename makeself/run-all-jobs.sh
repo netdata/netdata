@@ -42,4 +42,5 @@ do
 	"${x}" "${NETDATA_INSTALL_PATH}"
 done
 
+echo >&2 "All jobs for static packaging done successfully."
 exit 0
