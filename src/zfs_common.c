@@ -1,6 +1,8 @@
 #include "common.h"
 #include "zfs_common.h"
 
+extern struct arcstats arcstats;
+
 void generate_charts_arcstats(int update_every) {
 
     // ARC reads

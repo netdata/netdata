@@ -7,7 +7,7 @@
 #define ZFS_FAMILY_OPERATIONS "operations"
 #define ZFS_FAMILY_HASH "hashes"
 
-static struct arcstats {
+struct arcstats {
     unsigned long long hits;
     unsigned long long misses;
     unsigned long long demand_data_hits;
@@ -99,7 +99,7 @@ static struct arcstats {
     unsigned long long arc_meta_min;
     unsigned long long arc_need_free;
     unsigned long long arc_sys_free;
-} arcstats = { 0 };
+};
 
 int l2exist;
 
