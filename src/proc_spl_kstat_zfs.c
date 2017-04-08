@@ -3,6 +3,8 @@
 
 #define ZFS_PROC_ARCSTATS "/proc/spl/kstat/zfs/arcstats"
 
+struct arcstats arcstats = { 0 };
+
 int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     (void)dt;
 

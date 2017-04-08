@@ -1,6 +1,8 @@
 #include "common.h"
 #include "zfs_common.h"
 
+struct arcstats arcstats = { 0 };
+
 // kstat.zfs.misc.arcstats
 int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     (void)dt;
