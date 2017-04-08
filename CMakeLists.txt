@@ -32,6 +32,9 @@ set(NETDATA_SOURCE_FILES
         src/freebsd_getmntinfo.c
         src/freebsd_getifaddrs.c
         src/freebsd_devstat.c
+        src/zfs_common.c
+        src/zfs_common.h
+        src/freebsd_kstat_zfs.c
         src/global_statistics.c
         src/global_statistics.h
         src/health.c

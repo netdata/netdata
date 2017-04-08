@@ -149,7 +149,9 @@ netdata_SOURCES += \
 	freebsd_getmntinfo.c \
 	freebsd_getifaddrs.c \
 	freebsd_devstat.c \
-	proc_spl_kstat_zfs.c \
+	zfs_common.c \
+	zfs_common.h \
+	freebsd_kstat_zfs.c \
 	$(NULL)
 else
 if MACOS
@@ -182,6 +184,8 @@ netdata_SOURCES += \
 	proc_net_softnet_stat.c \
 	proc_net_stat_conntrack.c \
 	proc_net_stat_synproxy.c \
+	zfs_common.c \
+    zfs_common.h \
 	proc_spl_kstat_zfs.c \
 	proc_stat.c \
 	proc_sys_kernel_random_entropy_avail.c \
