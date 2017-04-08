@@ -53,6 +53,9 @@ static struct freebsd_module {
         // network interfaces metrics
         { .name = "getifaddrs",            .dim = "getifaddrs",   .enabled = 1, .func = do_getifaddrs },
 
+        // ZFS metrics
+        { .name = "kstat.zfs.misc.arcstats", .dim = "arcstats",   .enabled = 1, .func = do_kstat_zfs_misc_arcstats },
+
         // the terminator of this array
         { .name = NULL, .dim = NULL, .enabled = 0, .func = NULL }
 };
