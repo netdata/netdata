@@ -939,9 +939,16 @@ send_messagebird() {
 # telegram sender
 
 send_telegram() {
-    local bottoken="${1}" chatids="${2}" message="${3}" httpcode sent=0 chatid disableNotification=""
+    local bottoken="${1}" chatids="${2}" message="${3}" httpcode sent=0 chatid emoji disableNotification=""
 
     if [ "${status}" = "CLEAR" ]; then disableNotification="--data-urlencode disable_notification=true"; fi
+    
+    case "${status}" in
+        WARNING)  emoji="⚠️" ;;
+        CRITICAL) emoji="🔴" ;;
+        CLEAR)    emoji="✅" ;;
+        *)        emoji="⚪️" ;;
+    esac
 
     if [ "${SEND_TELEGRAM}" = "YES" -a ! -z "${bottoken}" -a ! -z "${chatids}" -a ! -z "${message}" ];
     then
@@ -951,7 +958,7 @@ send_telegram() {
             httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null ${disableNotification} \
                 --data-urlencode "parse_mode=HTML" \
                 --data-urlencode "disable_web_page_preview=true" \
-                --data-urlencode "text=${message}" \
+                --data-urlencode "text=${emoji} ${message}" \
                 "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
 
             if [ "${httpcode}" == "200" ]
