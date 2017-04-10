@@ -219,7 +219,7 @@ inline int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, ui
     for(rc = host->alarms; rc ; rc = rc->next) {
         if (unlikely(rc->chart && rc->hash == hash_name && rc->hash_chart == hash_chart && !strcmp(name, rc->name) && !strcmp(chart, rc->chart))) {
             debug(D_HEALTH, "Health alarm '%s.%s' already exists in host '%s'.", chart, name, host->hostname);
-            error("Health alarm '%s.%s' already exists in host '%s'.", chart, name, host->hostname);
+            info("Health alarm '%s.%s' already exists in host '%s'.", chart, name, host->hostname);
             return 1;
         }
     }
