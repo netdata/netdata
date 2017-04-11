@@ -222,6 +222,8 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
                 format = ALLMETRICS_SHELL;
             else if(!strcmp(value, ALLMETRICS_FORMAT_PROMETHEUS))
                 format = ALLMETRICS_PROMETHEUS;
+            else if(!strcmp(value, ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS))
+                format = ALLMETRICS_PROMETHEUS_ALL_HOSTS;
             else if(!strcmp(value, ALLMETRICS_FORMAT_JSON))
                 format = ALLMETRICS_JSON;
             else
@@ -248,9 +250,14 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             rrd_stats_api_v1_charts_allmetrics_prometheus(host, w->response.data);
             return 200;
 
+        case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
+            w->response.data->contenttype = CT_PROMETHEUS;
+            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(w->response.data);
+            return 200;
+
         default:
             w->response.data->contenttype = CT_TEXT_PLAIN;
-            buffer_strcat(w->response.data, "Which format? '" ALLMETRICS_FORMAT_SHELL "', '" ALLMETRICS_FORMAT_PROMETHEUS "' and '" ALLMETRICS_FORMAT_JSON "' are currently supported.");
+            buffer_strcat(w->response.data, "Which format? '" ALLMETRICS_FORMAT_SHELL "', '" ALLMETRICS_FORMAT_PROMETHEUS "', '" ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS "' and '" ALLMETRICS_FORMAT_JSON "' are currently supported.");
             return 400;
     }
 }
