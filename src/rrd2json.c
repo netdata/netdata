@@ -239,6 +239,15 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
     rrdhost_unlock(host);
 }
 
+void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(BUFFER *wb) {
+    RRDHOST *host;
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb);
+    }
+    rrd_unlock();
+}
+
 // ----------------------------------------------------------------------------
 // BASH
 // /api/v1/allmetrics?format=bash
