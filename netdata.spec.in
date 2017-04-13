@@ -80,7 +80,7 @@ Version:	@PACKAGE_RPM_VERSION@
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
-Source0:	https://firehol.org/download/netdata/releases/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
+Source0:	https://github.com/firehol/%{name}/releases/download/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.xz
 URL:		http://my-netdata.io
 BuildRequires:	pkgconfig
 BuildRequires:	xz
