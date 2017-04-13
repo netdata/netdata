@@ -395,6 +395,7 @@ declare -A configs_signatures=(
   ['eaa7beb935cae9c48a40fb934eb105a7']='health.d/web_log.conf'
   ['eb5168f0b516bc982aac45e59da6e52e']='health.d/nginx.conf'
   ['eb748d6fb69d11b0d29c5794657e206c']='health.d/qos.conf'
+  ['eb9fedc3c1dface77312d9bf48f673a8']='stream.conf'
   ['ebd0612ccc5807524ebb2b647e3e56c9']='apps_groups.conf'
   ['ecd3aa97e2581f88eb466d6612690ef2']='charts.d/nginx.conf'
   ['ee5343881744e6a97e6ee5cdd329cfb8']='health.d/retroshare.conf'

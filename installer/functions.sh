@@ -409,7 +409,10 @@ install_non_systemd_init() {
             run rc-update add netdata default && \
             return 0
         
-        elif [ "${key}" = "ubuntu-12.04" -o "${key}" = "ubuntu-14.04" -o "${key}" = "debian-7" ]
+        elif [ "${key}" = "debian-7" \
+            -o "${key}" = "ubuntu-12.04" \
+            -o "${key}" = "ubuntu-14.04" \
+            ]
             then
             echo >&2 "Installing LSB init file..."
             run cp system/netdata-lsb /etc/init.d/netdata && \
@@ -418,7 +421,10 @@ install_non_systemd_init() {
             run update-rc.d netdata enable && \
             return 0
 
-        elif [ "${key}" = "CentOS release 6.8 (Final)" -o "${key}" = "amzn-2016.09" ]
+        elif [ "${key}" = "amzn-2016.09" \
+            -o "${key}" = "CentOS release 6.6 (Final)" \
+            -o "${key}" = "CentOS release 6.8 (Final)" \
+            ]
             then
             echo >&2 "Installing init.d file..."
             run cp system/netdata-init-d /etc/init.d/netdata && \
