@@ -186,7 +186,7 @@ static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
 
 #define PROMETHEUS_ELEMENT_MAX 256
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, int help, int types) {
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
@@ -209,18 +209,17 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     prometheus_name_copy(dimension, rd->id, PROMETHEUS_ELEMENT_MAX);
 
-                    // buffer_sprintf(wb, "# HELP %s.%s %s\n", st->id, rd->id, st->units);
-
-                    switch(rd->algorithm) {
-                        case RRD_ALGORITHM_INCREMENTAL:
-                        case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
-                            buffer_sprintf(wb, "# TYPE %s_%s counter\n", chart, dimension);
-                            break;
-
-                        default:
-                            buffer_sprintf(wb, "# TYPE %s_%s gauge\n", chart, dimension);
-                            break;
+                    const char *t = "gauge", *h = "gives";
+                    if(rd->algorithm == RRD_ALGORITHM_INCREMENTAL || rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
+                        t = "counter";
+                        h = "delta gives";
                     }
+
+                    if(unlikely(help))
+                        buffer_sprintf(wb, "# HELP netdata chart %s, dimension %s, value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n", st->id, rd->id, rd->multiplier, rd->divisor, h, st->units, t);
+
+                    if(unlikely(types))
+                        buffer_sprintf(wb, "# TYPE %s_%s %s\n", chart, dimension, t);
 
                     // calculated_number n = (calculated_number)rd->last_collected_value * (calculated_number)(abs(rd->multiplier)) / (calculated_number)(abs(rd->divisor));
                     // buffer_sprintf(wb, "%s.%s " CALCULATED_NUMBER_FORMAT " %llu\n", st->id, rd->id, n, timeval_msec(&rd->last_collected_time));
@@ -237,6 +236,15 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb) {
     }
 
     rrdhost_unlock(host);
+}
+
+void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(BUFFER *wb, int help, int types) {
+    RRDHOST *host;
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, help, types);
+    }
+    rrd_unlock();
 }
 
 // ----------------------------------------------------------------------------

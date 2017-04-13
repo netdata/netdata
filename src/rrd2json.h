@@ -31,13 +31,15 @@
 #define DATASOURCE_FORMAT_SSV_COMMA "ssvcomma"
 #define DATASOURCE_FORMAT_CSV_JSON_ARRAY "csvjsonarray"
 
-#define ALLMETRICS_FORMAT_SHELL "shell"
-#define ALLMETRICS_FORMAT_PROMETHEUS "prometheus"
-#define ALLMETRICS_FORMAT_JSON "json"
+#define ALLMETRICS_FORMAT_SHELL                 "shell"
+#define ALLMETRICS_FORMAT_PROMETHEUS            "prometheus"
+#define ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS  "prometheus_all_hosts"
+#define ALLMETRICS_FORMAT_JSON                  "json"
 
-#define ALLMETRICS_SHELL 1
-#define ALLMETRICS_PROMETHEUS 2
-#define ALLMETRICS_JSON 3
+#define ALLMETRICS_SHELL                        1
+#define ALLMETRICS_PROMETHEUS                   2
+#define ALLMETRICS_JSON                         3
+#define ALLMETRICS_PROMETHEUS_ALL_HOSTS         4
 
 #define GROUP_UNDEFINED         0
 #define GROUP_AVERAGE           1
@@ -65,13 +67,15 @@ extern void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb);
 
 extern void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb);
 extern void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb);
-extern void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb);
+extern void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, int help, int types);
+extern void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(BUFFER *wb, int help, int types);
 
 extern int rrdset2anything_api_v1(RRDSET *st, BUFFER *out, BUFFER *dimensions, uint32_t format, long points
-                                  , long long after, long long before, int group_method, uint32_t options
-                                  , time_t *latest_timestamp);
+                            , long long after, long long before, int group_method, uint32_t options
+                            , time_t *latest_timestamp);
+
 extern int rrdset2value_api_v1(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensions, long points
-                               , long long after, long long before, int group_method, uint32_t options
-                               , time_t *db_before, time_t *db_after, int *value_is_null);
+                            , long long after, long long before, int group_method, uint32_t options
+                            , time_t *db_before, time_t *db_after, int *value_is_null);
 
 #endif /* NETDATA_RRD2JSON_H */
