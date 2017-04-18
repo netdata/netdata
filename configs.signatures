@@ -383,6 +383,7 @@ declare -A configs_signatures=(
   ['e0e96cc47ed61d6492416be5236cd4d3']='python.d/apache_cache.conf'
   ['e2f3388c06726154c10ec22bad5bc7ec']='fping.conf'
   ['e3023092e3b2bbb5351e0fe6682f4fe9']='health_alarm_notify.conf'
+  ['e3112d8e06fa77888aab02e8fcd22e25']='apps_groups.conf'
   ['e3d100c2d0347c08efbf6245e05620c6']='python.d/fail2ban.conf'
   ['e3e5bc57335c489f01b8559f5c70e112']='python.d/squid.conf'
   ['e40947d22f7ed5359f12fc89e3512963']='python.d/dovecot.conf'
