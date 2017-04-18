@@ -66,14 +66,16 @@ void web_server_threading_selection(void) {
     int single_threaded = (web_server_mode == WEB_SERVER_MODE_SINGLE_THREADED);
 
     int i;
-    for(i = 0; static_threads[i].name ; i++) {
-        if(static_threads[i].start_routine == socket_listen_main_multi_threaded)
+    for (i = 0; static_threads[i].name; i++) {
+        if (static_threads[i].start_routine == socket_listen_main_multi_threaded)
             static_threads[i].enabled = multi_threaded;
 
-        if(static_threads[i].start_routine == socket_listen_main_single_threaded)
+        if (static_threads[i].start_routine == socket_listen_main_single_threaded)
             static_threads[i].enabled = single_threaded;
     }
+}
 
+void web_server_config_options(void) {
     web_client_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
 
     respect_web_browser_do_not_track_policy = config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
@@ -915,6 +917,8 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // create the listening sockets
 
+        web_server_threading_selection();
+
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             create_listen_sockets();
     }
@@ -968,7 +972,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // spawn the threads
 
-    web_server_threading_selection();
+    web_server_config_options();
 
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
