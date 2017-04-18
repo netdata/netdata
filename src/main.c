@@ -504,7 +504,7 @@ void set_global_environment() {
 
     // avoid flood calls to stat(/etc/localtime)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-    setenv("TZ", ":/etc/localtime", 0);
+    setenv("TZ", config_get(CONFIG_SECTION_GLOBAL, "TZ environment variable", ":/etc/localtime"), 0);
 
     // set the path we need
     char path[1024 + 1], *p = getenv("PATH");
