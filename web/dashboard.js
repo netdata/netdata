@@ -743,8 +743,8 @@ var NETDATA = window.NETDATA || {};
         // this is the fastest and the preferred
         getIntlNumberFormat: function(min, max) {
             var key = max;
-            if(min == max) {
-                if(typeof this.formatters_fixed[key] == 'undefined')
+            if(min === max) {
+                if(typeof this.formatters_fixed[key] === 'undefined')
                     this.formatters_fixed[key] = new Intl.NumberFormat(undefined, {
                         // style: 'decimal',
                         // minimumIntegerDigits: 1,
@@ -757,8 +757,8 @@ var NETDATA = window.NETDATA || {};
 
                 return this.formatters_fixed[key];
             }
-            else if(min == 0) {
-                if(typeof this.formatters_zero_based[key] == 'undefined')
+            else if(min === 0) {
+                if(typeof this.formatters_zero_based[key] === 'undefined')
                     this.formatters_zero_based[key] = new Intl.NumberFormat(undefined, {
                         // style: 'decimal',
                         // minimumIntegerDigits: 1,
@@ -789,8 +789,8 @@ var NETDATA = window.NETDATA || {};
         // this respects locale
         getLocaleString: function(min, max) {
             var key = max;
-            if(min == max) {
-                if(typeof this.formatters_fixed[key] == 'undefined')
+            if(min === max) {
+                if(typeof this.formatters_fixed[key] === 'undefined')
                     this.formatters_fixed[key] = {
                         format: function (value) {
                             return value.toLocaleString(undefined, {
@@ -807,8 +807,8 @@ var NETDATA = window.NETDATA || {};
 
                 return this.formatters_fixed[key];
             }
-            else if(min == 0) {
-                if(typeof this.formatters_zero_based[key] == 'undefined')
+            else if(min === 0) {
+                if(typeof this.formatters_zero_based[key] === 'undefined')
                     this.formatters_zero_based[key] = {
                         format: function (value) {
                             return value.toLocaleString(undefined, {
@@ -844,8 +844,8 @@ var NETDATA = window.NETDATA || {};
 
         getFixed: function(min, max) {
             var key = max;
-            if(min == max) {
-                if(typeof this.formatters_fixed[key] == 'undefined')
+            if(min === max) {
+                if(typeof this.formatters_fixed[key] === 'undefined')
                     this.formatters_fixed[key] = {
                         format: function (value) {
                             if(value === 0) return "0";
@@ -855,8 +855,8 @@ var NETDATA = window.NETDATA || {};
 
                 return this.formatters_fixed[key];
             }
-            else if(min == 0) {
-                if(typeof this.formatters_zero_based[key] == 'undefined')
+            else if(min === 0) {
+                if(typeof this.formatters_zero_based[key] === 'undefined')
                     this.formatters_zero_based[key] = {
                         format: function (value) {
                             if(value === 0) return "0";
@@ -895,7 +895,7 @@ var NETDATA = window.NETDATA || {};
             }
 
             // console.log('NumberFormat: ', s);
-            return (s == e1 || s == e2);
+            return (s === e1 || s === e2);
         },
 
         testLocaleString: function() {
@@ -915,7 +915,7 @@ var NETDATA = window.NETDATA || {};
             }
 
             // console.log('localeString: ', s);
-            return (s == e1 || s == e2);
+            return (s === e1 || s === e2);
         },
 
         // on first run we decide which formatter to use
@@ -2485,7 +2485,7 @@ var NETDATA = window.NETDATA || {};
                 else                  __legendFormatValueChartDecimals = 4;
             }
 
-            if(__legendFormatValueChartDecimals != old) {
+            if(__legendFormatValueChartDecimals !== old) {
                 if(__legendFormatValueChartDecimals < 0)
                     __intlNumberFormat = null;
                 else
