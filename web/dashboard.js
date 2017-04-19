@@ -737,10 +737,11 @@ var NETDATA = window.NETDATA || {};
     // fast numbers formating
 
     NETDATA.fastNumberFormat = {
+        numberFormatWorks: undefined,
         formatters_fixed: [],
         formatters_zero_based: [],
 
-        get: function(min, max) {
+        getIntlNumberFormat: function(min, max) {
             var key = max;
             if(min == max) {
                 if(typeof this.formatters_fixed[key] == 'undefined')
@@ -783,6 +784,69 @@ var NETDATA = window.NETDATA || {};
                     maximumFractionDigits: max
                 });
             }
+        },
+
+        getLocaleString: function(min, max) {
+            var key = max;
+            if(min == max) {
+                if(typeof this.formatters_fixed[key] == 'undefined')
+                    this.formatters_fixed[key] = {
+                        format: function (value) {
+                            return value.toLocaleString(undefined, {
+                                // style: 'decimal',
+                                // minimumIntegerDigits: 1,
+                                // minimumSignificantDigits: 1,
+                                // maximumSignificantDigits: 1,
+                                useGrouping: true,
+                                minimumFractionDigits: min,
+                                maximumFractionDigits: max
+                            });
+                        }
+                    };
+
+                return this.formatters_fixed[key];
+            }
+            else if(min == 0) {
+                if(typeof this.formatters_zero_based[key] == 'undefined')
+                    this.formatters_zero_based[key] = {
+                        format: function (value) {
+                            return value.toLocaleString(undefined, {
+                                // style: 'decimal',
+                                // minimumIntegerDigits: 1,
+                                // minimumSignificantDigits: 1,
+                                // maximumSignificantDigits: 1,
+                                useGrouping: true,
+                                minimumFractionDigits: min,
+                                maximumFractionDigits: max
+                            });
+                        }
+                    };
+
+                return this.formatters_zero_based[key];
+            }
+            else {
+                return {
+                    format: function (value) {
+                        return value.toLocaleString(undefined, {
+                            // style: 'decimal',
+                            // minimumIntegerDigits: 1,
+                            // minimumSignificantDigits: 1,
+                            // maximumSignificantDigits: 1,
+                            useGrouping: true,
+                            minimumFractionDigits: min,
+                            maximumFractionDigits: max
+                        });
+                    }
+                };
+            }
+        },
+
+        get: function(min, max) {
+            //console.log('numberformat');
+            //this.get = this.getIntlNumberFormat;
+            console.log('localestring');
+            this.get = this.getLocaleString;
+            return this.get(min, max);
         }
     };
 
