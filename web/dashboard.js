@@ -734,13 +734,13 @@ var NETDATA = window.NETDATA || {};
     };
 
     // ----------------------------------------------------------------------------------------------------------------
-    // fast numbers formating
+    // fast numbers formatting
 
     NETDATA.fastNumberFormat = {
-        numberFormatWorks: undefined,
         formatters_fixed: [],
         formatters_zero_based: [],
 
+        // this is the fastest and the preferred
         getIntlNumberFormat: function(min, max) {
             var key = max;
             if(min == max) {
@@ -786,6 +786,7 @@ var NETDATA = window.NETDATA || {};
             }
         },
 
+        // this respects locale
         getLocaleString: function(min, max) {
             var key = max;
             if(min == max) {
@@ -841,6 +842,40 @@ var NETDATA = window.NETDATA || {};
             }
         },
 
+        getFixed: function(min, max) {
+            var key = max;
+            if(min == max) {
+                if(typeof this.formatters_fixed[key] == 'undefined')
+                    this.formatters_fixed[key] = {
+                        format: function (value) {
+                            if(value === 0) return "0";
+                            return value.toFixed(max);
+                        }
+                    };
+
+                return this.formatters_fixed[key];
+            }
+            else if(min == 0) {
+                if(typeof this.formatters_zero_based[key] == 'undefined')
+                    this.formatters_zero_based[key] = {
+                        format: function (value) {
+                            if(value === 0) return "0";
+                            return value.toFixed(max);
+                        }
+                    };
+
+                return this.formatters_zero_based[key];
+            }
+            else {
+                return {
+                    format: function (value) {
+                        if(value === 0) return "0";
+                        return value.toFixed(max);
+                    }
+                };
+            }
+        },
+
         testIntlNumberFormat: function() {
             var n = 1.12345;
             var e1 = "1.12", e2 = "1,12";
@@ -859,18 +894,43 @@ var NETDATA = window.NETDATA || {};
                 s = "";
             }
 
-            console.log(s);
+            console.log('NumberFormat: ', s);
             return (s == e1 || s == e2);
         },
 
+        testLocaleString: function() {
+            var n = 1.12345;
+            var e1 = "1.12", e2 = "1,12";
+            var s = "";
+
+            try {
+                s = value.toLocaleString(undefined, {
+                    useGrouping: true,
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+            catch(e) {
+                s = "";
+            }
+
+            console.log('localeString: ', s);
+            return (s == e1 || s == e2);
+        },
+
+        // on first run we decide which formatter to use
         get: function(min, max) {
             if(this.testIntlNumberFormat()) {
                 console.log('numberformat');
                 this.get = this.getIntlNumberFormat;
             }
-            else {
+            else if(this.testLocaleString()) {
                 console.log('localestring');
                 this.get = this.getLocaleString;
+            }
+            else {
+                console.log('fixed');
+                this.get = this.getFixed;
             }
             return this.get(min, max);
         }
