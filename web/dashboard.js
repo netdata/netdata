@@ -734,6 +734,59 @@ var NETDATA = window.NETDATA || {};
     };
 
     // ----------------------------------------------------------------------------------------------------------------
+    // fast numbers formating
+
+    NETDATA.fastNumberFormat = {
+        formatters_fixed: [],
+        formatters_zero_based: [],
+
+        get: function(min, max) {
+            var key = max;
+            if(min == max) {
+                if(typeof this.formatters_fixed[key] == 'undefined')
+                    this.formatters_fixed[key] = new Intl.NumberFormat(undefined, {
+                        // style: 'decimal',
+                        // minimumIntegerDigits: 1,
+                        // minimumSignificantDigits: 1,
+                        // maximumSignificantDigits: 1,
+                        useGrouping: true,
+                        minimumFractionDigits: min,
+                        maximumFractionDigits: max
+                    });
+
+                return this.formatters_fixed[key];
+            }
+            else if(min == 0) {
+                if(typeof this.formatters_zero_based[key] == 'undefined')
+                    this.formatters_zero_based[key] = new Intl.NumberFormat(undefined, {
+                        // style: 'decimal',
+                        // minimumIntegerDigits: 1,
+                        // minimumSignificantDigits: 1,
+                        // maximumSignificantDigits: 1,
+                        useGrouping: true,
+                        minimumFractionDigits: min,
+                        maximumFractionDigits: max
+                    });
+
+                return this.formatters_zero_based[key];
+            }
+            else {
+                // this is never used
+                // it is added just for completeness
+                return new Intl.NumberFormat(undefined, {
+                    // style: 'decimal',
+                    // minimumIntegerDigits: 1,
+                    // minimumSignificantDigits: 1,
+                    // maximumSignificantDigits: 1,
+                    useGrouping: true,
+                    minimumFractionDigits: min,
+                    maximumFractionDigits: max
+                });
+            }
+        }
+    };
+
+    // ----------------------------------------------------------------------------------------------------------------
     // commonMin & commonMax
 
     NETDATA.commonMin = {
@@ -2248,6 +2301,7 @@ var NETDATA = window.NETDATA || {};
         var __legendFormatValueChartDecimalsLastMin = undefined;
         var __legendFormatValueChartDecimalsLastMax = undefined;
         var __legendFormatValueChartDecimals = -1;
+        var __intlNumberFormat = null;
         this.legendFormatValueDecimalsFromMinMax = function(min, max) {
             if(min === __legendFormatValueChartDecimalsLastMin && max === __legendFormatValueChartDecimalsLastMax)
                 return;
@@ -2255,13 +2309,18 @@ var NETDATA = window.NETDATA || {};
             __legendFormatValueChartDecimalsLastMin = min;
             __legendFormatValueChartDecimalsLastMax = max;
 
+            var old = __legendFormatValueChartDecimals;
+
             if(this.data !== null && this.data.min === this.data.max)
+                // it is a fixed number, let the visualizer decide based on the value
                 __legendFormatValueChartDecimals = -1;
 
             else if(this.value_decimal_detail !== -1)
+                // there is an override
                 __legendFormatValueChartDecimals = this.value_decimal_detail;
 
             else {
+                // ok, let's calculate the proper number of decimal points
                 var delta;
 
                 if (min === max)
@@ -2275,39 +2334,39 @@ var NETDATA = window.NETDATA || {};
                 else if (delta > 0.1) __legendFormatValueChartDecimals = 2;
                 else                  __legendFormatValueChartDecimals = 4;
             }
+
+            if(__legendFormatValueChartDecimals != old) {
+                if(__legendFormatValueChartDecimals < 0)
+                    __intlNumberFormat = null;
+                else
+                    __intlNumberFormat = NETDATA.fastNumberFormat.get(
+                        __legendFormatValueChartDecimals,
+                        __legendFormatValueChartDecimals
+                    );
+            }
         };
 
         this.legendFormatValue = function(value) {
             if(typeof value !== 'number') return '-';
 
+            if(__intlNumberFormat !== null)
+                return __intlNumberFormat.format(value);
+
             var dmin, dmax;
-
-            if(__legendFormatValueChartDecimals < 0) {
-                dmin = 0;
-                var abs = value;
-                if(abs > 1000)      dmax = 0;
-                else if(abs > 10 )  dmax = 1;
-                else if(abs > 1)    dmax = 2;
-                else if(abs > 0.1)  dmax = 2;
-                else                dmax = 4;
-            }
-            else {
-                dmin = dmax = __legendFormatValueChartDecimals;
-            }
-
             if(this.value_decimal_detail !== -1) {
                 dmin = dmax = this.value_decimal_detail;
             }
+            else {
+                dmin = 0;
+                var abs = (value < 0) ? -value : value;
+                if (abs > 1000)     dmax = 0;
+                else if (abs > 10)  dmax = 1;
+                else if (abs > 1)   dmax = 2;
+                else if (abs > 0.1) dmax = 2;
+                else                dmax = 4;
+            }
 
-            return value.toLocaleString(undefined, {
-                // style: 'decimal',
-                // minimumIntegerDigits: 1,
-                // minimumSignificantDigits: 1,
-                // maximumSignificantDigits: 1,
-                useGrouping: true,
-                minimumFractionDigits: dmin,
-                maximumFractionDigits: dmax
-            });
+            return NETDATA.fastNumberFormat.get(dmin, dmax).format(value);
         };
 
         this.legendSetLabelValue = function(label, value) {
