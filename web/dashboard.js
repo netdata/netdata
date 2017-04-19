@@ -894,7 +894,7 @@ var NETDATA = window.NETDATA || {};
                 s = "";
             }
 
-            console.log('NumberFormat: ', s);
+            // console.log('NumberFormat: ', s);
             return (s == e1 || s == e2);
         },
 
@@ -914,22 +914,22 @@ var NETDATA = window.NETDATA || {};
                 s = "";
             }
 
-            console.log('localeString: ', s);
+            // console.log('localeString: ', s);
             return (s == e1 || s == e2);
         },
 
         // on first run we decide which formatter to use
         get: function(min, max) {
             if(this.testIntlNumberFormat()) {
-                console.log('numberformat');
+                // console.log('numberformat');
                 this.get = this.getIntlNumberFormat;
             }
             else if(this.testLocaleString()) {
-                console.log('localestring');
+                // console.log('localestring');
                 this.get = this.getLocaleString;
             }
             else {
-                console.log('fixed');
+                // console.log('fixed');
                 this.get = this.getFixed;
             }
             return this.get(min, max);
