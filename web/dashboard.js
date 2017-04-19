@@ -841,11 +841,37 @@ var NETDATA = window.NETDATA || {};
             }
         },
 
+        testIntlNumberFormat: function() {
+            var n = 1.12345;
+            var e1 = "1.12", e2 = "1,12";
+            var s = "";
+
+            try {
+                var x = new Intl.NumberFormat(undefined, {
+                    useGrouping: true,
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+
+                s = x.format(n);
+            }
+            catch(e) {
+                s = "";
+            }
+
+            console.log(s);
+            return (s == e1 || s == e2);
+        },
+
         get: function(min, max) {
-            //console.log('numberformat');
-            //this.get = this.getIntlNumberFormat;
-            console.log('localestring');
-            this.get = this.getLocaleString;
+            if(this.testIntlNumberFormat()) {
+                console.log('numberformat');
+                this.get = this.getIntlNumberFormat;
+            }
+            else {
+                console.log('localestring');
+                this.get = this.getLocaleString;
+            }
             return this.get(min, max);
         }
     };
