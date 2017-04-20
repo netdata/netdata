@@ -135,6 +135,7 @@ static inline struct section *appconfig_section_create(struct config *root, cons
     struct section *co = callocz(1, sizeof(struct section));
     co->name = strdupz(section);
     co->hash = simple_hash(co->name);
+    netdata_mutex_init(&co->mutex);
 
     avl_init_lock(&co->values_index, appconfig_option_compare);
 
