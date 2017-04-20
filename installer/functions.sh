@@ -422,6 +422,7 @@ install_non_systemd_init() {
             return 0
 
         elif [ "${key}" = "amzn-2016.09" \
+            -o "${key}" = "amzn-2017.03" \
             -o "${key}" = "CentOS release 6.6 (Final)" \
             -o "${key}" = "CentOS release 6.8 (Final)" \
             ]
