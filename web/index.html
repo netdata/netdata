@@ -1308,44 +1308,21 @@
                 + ' data-colors="' + NETDATA.colors[12] + '"'
                 + ' role="application"></div>';
 
-            if(typeof charts['system.ipv4'] !== 'undefined') {
-                head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
+            if(typeof charts['net.eth0'] !== 'undefined') {
+                head += '<div style="margin-right: 10px;" data-netdata="net.eth0"'
                 + ' data-dimensions="received"'
                 + ' data-chart-library="easypiechart"'
-                + ' data-title="IPv4 Inbound"'
+                + ' data-title="Inbound Traffic"'
                 + ' data-width="10%"'
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
                 + ' role="application"></div>';
 
-                head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
+                head += '<div style="margin-right: 10px;" data-netdata="net.eth0"'
                 + ' data-dimensions="sent"'
                 + ' data-chart-library="easypiechart"'
-                + ' data-title="IPv4 Outbound"'
-                + ' data-width="10%"'
-                + ' data-before="0"'
-                + ' data-after="-' + duration.toString() + '"'
-                + ' data-points="' + duration.toString() + '"'
-                + ' role="application"></div>';
-            }
-            else if(typeof charts['system.ipv6'] !== 'undefined') {
-                head += '<div style="margin-right: 10px;" data-netdata="system.ipv6"'
-                + ' data-dimensions="received"'
-                + ' data-chart-library="easypiechart"'
-                + ' data-title="IPv6 Inbound"'
-                + ' data-units="kbps"'
-                + ' data-width="10%"'
-                + ' data-before="0"'
-                + ' data-after="-' + duration.toString() + '"'
-                + ' data-points="' + duration.toString() + '"'
-                + ' role="application"></div>';
-
-                head += '<div style="margin-right: 10px;" data-netdata="system.ipv6"'
-                + ' data-dimensions="sent"'
-                + ' data-chart-library="easypiechart"'
-                + ' data-title="IPv6 Outbound"'
-                + ' data-units="kbps"'
+                + ' data-title="Outbound Traffic"'
                 + ' data-width="10%"'
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
