@@ -309,7 +309,7 @@ RRDHOST *rrdhost_find_or_create(
         if(host->rrd_update_every != update_every)
             error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds.", host->hostname, host->rrd_update_every, update_every);
 
-        if(host->rrd_history_entries != history)
+        if(host->rrd_history_entries < history)
             error("Host '%s' has history of %ld entries, but the wanted one is %ld entries.", host->hostname, host->rrd_history_entries, history);
 
         if(host->rrd_memory_mode != mode)
@@ -502,7 +502,7 @@ void rrdhost_free_all(void) {
 void rrdhost_save(RRDHOST *host) {
     if(!host) return;
 
-    info("Saving database of host '%s'...", host->hostname);
+    info("Saving/Closing database of host '%s'...", host->hostname);
 
     RRDSET *st;
 
