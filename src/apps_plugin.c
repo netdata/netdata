@@ -2599,14 +2599,13 @@ static inline void send_END(void) {
     fprintf(stdout, "END\n");
 }
 
-static usec_t send_resource_usage_to_netdata() {
+void send_resource_usage_to_netdata(usec_t dt) {
     static struct timeval last = { 0, 0 };
     static struct rusage me_last;
 
     struct timeval now;
     struct rusage me;
 
-    usec_t usec;
     usec_t cpuuser;
     usec_t cpusyst;
 
@@ -2614,10 +2613,6 @@ static usec_t send_resource_usage_to_netdata() {
         now_monotonic_timeval(&last);
         getrusage(RUSAGE_SELF, &me_last);
 
-        // the first time, give a zero to allow
-        // netdata calibrate to the current time
-        // usec = update_every * USEC_PER_SEC;
-        usec = 0ULL;
         cpuuser = 0;
         cpusyst = 0;
     }
@@ -2625,7 +2620,6 @@ static usec_t send_resource_usage_to_netdata() {
         now_monotonic_timeval(&now);
         getrusage(RUSAGE_SELF, &me);
 
-        usec = dt_usec(&now, &last);
         cpuuser = me.ru_utime.tv_sec * USEC_PER_SEC + me.ru_utime.tv_usec;
         cpusyst = me.ru_stime.tv_sec * USEC_PER_SEC + me.ru_stime.tv_usec;
 
@@ -2684,10 +2678,10 @@ static usec_t send_resource_usage_to_netdata() {
         "SET targets = %zu\n"
         "SET new_pids = %zu\n"
         "END\n"
-        , usec
+        , dt
         , cpuuser
         , cpusyst
-        , usec
+        , dt
         , calls_counter
         , file_counter
         , all_pids_count
@@ -2705,7 +2699,7 @@ static usec_t send_resource_usage_to_netdata() {
             "SET minflt = %u\n"
             "SET majflt = %u\n"
             "END\n"
-            , usec
+            , dt
             , (unsigned int)(utime_fix_ratio   * 100 * RATES_DETAIL)
             , (unsigned int)(stime_fix_ratio   * 100 * RATES_DETAIL)
             , (unsigned int)(gtime_fix_ratio   * 100 * RATES_DETAIL)
@@ -2722,7 +2716,7 @@ static usec_t send_resource_usage_to_netdata() {
             "SET cminflt = %u\n"
             "SET cmajflt = %u\n"
             "END\n"
-            , usec
+            , dt
             , (unsigned int)(cutime_fix_ratio  * 100 * RATES_DETAIL)
             , (unsigned int)(cstime_fix_ratio  * 100 * RATES_DETAIL)
             , (unsigned int)(cgtime_fix_ratio  * 100 * RATES_DETAIL)
@@ -2730,8 +2724,6 @@ static usec_t send_resource_usage_to_netdata() {
             , (unsigned int)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
             );
 #endif
-
-    return usec;
 }
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
@@ -3462,8 +3454,9 @@ int main(int argc, char **argv) {
         static int profiling_count=0;
         profiling_count++;
         if(unlikely(profiling_count > 1000)) exit(0);
+        usec_t dt = update_every * USEC_PER_SEC;
 #else
-        heartbeat_next(&hb, step);
+        usec_t dt = heartbeat_next(&hb, step);
 #endif
 
         if(!collect_data_for_all_processes()) {
@@ -3475,7 +3468,8 @@ int main(int argc, char **argv) {
         calculate_netdata_statistics();
         normalize_utilization(apps_groups_root_target);
 
-        usec_t dt = send_resource_usage_to_netdata();
+        send_resource_usage_to_netdata(dt);
+        if(global_iterations_counter == 1) dt = 0;
 
         // this is smart enough to show only newly added apps, when needed
         send_charts_updates_to_netdata(apps_groups_root_target, "apps", "Apps");
