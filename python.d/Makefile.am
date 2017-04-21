@@ -41,7 +41,7 @@ dist_python_DATA = \
     postgres.chart.py \
     redis.chart.py \
     retroshare.chart.py \
-    Samba.chart.py \
+    samba.chart.py \
     sensors.chart.py \
     squid.chart.py \
     smartd_log.chart.py \
