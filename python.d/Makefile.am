@@ -60,7 +60,7 @@ dist_pythonmodules_DATA = \
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2
 dist_pythonyaml2_DATA = \
-
+    python_modules/pyyaml2/__init__.py \
     python_modules/pyyaml2/composer.py \
     python_modules/pyyaml2/constructor.py \
     python_modules/pyyaml2/cyaml.py \
