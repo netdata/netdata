@@ -856,48 +856,48 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // SAMBA
 
-    'smb2_read_outbytes': {
+    'samba.smb2_read_outbytes': {
         colors: NETDATA.colors[0],
     },
 
-    'smb2_write_inbytes': {
+    'samba.smb2_write_inbytes': {
         colors: NETDATA.colors[1],
     },
 
-    'smb2_read_inbytes': {
+    'samba.smb2_read_inbytes': {
         colors: NETDATA.colors[2],
     },
 
-    'smb2_write_outbytes': {
+    'samba.smb2_write_outbytes': {
         colors: NETDATA.colors[3],
     },
 
-    'smb2_create_count': {
+    'samba.smb2_create_count': {
         colors: NETDATA.colors[2],
         height: 0.5
     },
 
-    'smb2_close_count': {
+    'samba.smb2_close_count': {
         colors: NETDATA.colors[3],
         height: 0.5
     },
 
-    'smb2_getinfo_count': {
+    'samba.smb2_getinfo_count': {
         colors: NETDATA.colors[4],
         height: 0.5
     },
 
-    'smb2_setinfo_count': {
+    'samba.smb2_setinfo_count': {
         colors: NETDATA.colors[5],
         height: 0.5
     },
 
-    'smb2_find_count': {
+    'samba.smb2_find_count': {
         colors: NETDATA.colors[6],
         height: 0.5
     },
 
-    'smb2_notify_count': {
+    'samba.smb2_notify_count': {
         colors: NETDATA.colors[7],
         height: 0.5
     },
