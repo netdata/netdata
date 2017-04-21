@@ -2878,24 +2878,24 @@ static void normalize_utilization(struct target *root) {
 }
 #endif // ALL_PIDS_ARE_READ_INSTANTLY
 
-static void send_collected_data_to_netdata(struct target *root, const char *type, usec_t usec) {
+static void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt) {
     struct target *w;
 
-    send_BEGIN(type, "cpu", usec);
+    send_BEGIN(type, "cpu", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (kernel_uint_t)(w->stime * stime_fix_ratio) + (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio) + (kernel_uint_t)(w->cstime * cstime_fix_ratio) + (kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
     }
     send_END();
 
-    send_BEGIN(type, "cpu_user", usec);
+    send_BEGIN(type, "cpu_user", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio)):0ULL));
     }
     send_END();
 
-    send_BEGIN(type, "cpu_system", usec);
+    send_BEGIN(type, "cpu_system", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cstime * cstime_fix_ratio)):0ULL));
@@ -2903,7 +2903,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_END();
 
     if(show_guest_time) {
-        send_BEGIN(type, "cpu_guest", usec);
+        send_BEGIN(type, "cpu_guest", dt);
         for (w = root; w ; w = w->next) {
             if(unlikely(w->exposed))
                 send_SET(w->name, (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
@@ -2911,42 +2911,42 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
         send_END();
     }
 
-    send_BEGIN(type, "threads", usec);
+    send_BEGIN(type, "threads", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, w->num_threads);
     }
     send_END();
 
-    send_BEGIN(type, "processes", usec);
+    send_BEGIN(type, "processes", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, w->processes);
     }
     send_END();
 
-    send_BEGIN(type, "mem", usec);
+    send_BEGIN(type, "mem", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, (w->statm_resident > w->statm_share)?(w->statm_resident - w->statm_share):0ULL);
     }
     send_END();
 
-    send_BEGIN(type, "vmem", usec);
+    send_BEGIN(type, "vmem", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, w->statm_size);
     }
     send_END();
 
-    send_BEGIN(type, "minor_faults", usec);
+    send_BEGIN(type, "minor_faults", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)):0ULL));
     }
     send_END();
 
-    send_BEGIN(type, "major_faults", usec);
+    send_BEGIN(type, "major_faults", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
@@ -2954,14 +2954,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_END();
 
 #ifndef __FreeBSD__
-    send_BEGIN(type, "lreads", usec);
+    send_BEGIN(type, "lreads", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, w->io_logical_bytes_read);
     }
     send_END();
 
-    send_BEGIN(type, "lwrites", usec);
+    send_BEGIN(type, "lwrites", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, w->io_logical_bytes_written);
@@ -2969,14 +2969,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_END();
 #endif
 
-    send_BEGIN(type, "preads", usec);
+    send_BEGIN(type, "preads", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, w->io_storage_bytes_read);
     }
     send_END();
 
-    send_BEGIN(type, "pwrites", usec);
+    send_BEGIN(type, "pwrites", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, w->io_storage_bytes_written);
@@ -2984,21 +2984,21 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_END();
 
     if(enable_file_charts) {
-        send_BEGIN(type, "files", usec);
+        send_BEGIN(type, "files", dt);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
                 send_SET(w->name, w->openfiles);
         }
         send_END();
 
-        send_BEGIN(type, "sockets", usec);
+        send_BEGIN(type, "sockets", dt);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
                 send_SET(w->name, w->opensockets);
         }
         send_END();
 
-        send_BEGIN(type, "pipes", usec);
+        send_BEGIN(type, "pipes", dt);
         for (w = root; w; w = w->next) {
             if (unlikely(w->exposed))
                 send_SET(w->name, w->openpipes);
@@ -3469,7 +3469,6 @@ int main(int argc, char **argv) {
         normalize_utilization(apps_groups_root_target);
 
         send_resource_usage_to_netdata(dt);
-        if(global_iterations_counter == 1) dt = 0;
 
         // this is smart enough to show only newly added apps, when needed
         send_charts_updates_to_netdata(apps_groups_root_target, "apps", "Apps");
