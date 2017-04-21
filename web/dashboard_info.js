@@ -426,7 +426,6 @@ netdataDashboard.context = {
     },
 
     'system.idlejitter': {
-        colors: '#5555AA',
         info: 'Idle jitter is calculated by netdata. A thread is spawned that requests to sleep for a few microseconds. When the system wakes it up, it measures how many microseconds have passed. The difference between the requested and the actual duration of the sleep, is the <b>idle jitter</b>. This number is useful in real-time environments, where CPU jitter can affect the quality of the service (like VoIP media gateways).'
     },
 

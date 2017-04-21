@@ -2721,16 +2721,9 @@ var NETDATA = window.NETDATA || {};
                 }
                 else {
                     c = c.split(' ');
-                    var added = 0;
-
-                    while(added < 20) {
-                        len = c.length;
-                        while(len--) {
-                            added++;
-                            this.colors_available.unshift(c[len]);
-                            // this.log('adding color: ' + c[len]);
-                        }
-                    }
+                    len = c.length;
+                    while(len--)
+                        this.colors_available.unshift(c[len]);
                 }
             }
 
