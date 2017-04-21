@@ -33,8 +33,6 @@ retries = 60
 
 ORDER = ['smb2_rw','smb2_create_close','smb2_info','smb2_find','smb2_notify','smb2_sm_count']
 
-# The weird dummy1, etc.  is for color selection.
-
 CHARTS = {
            'smb2_rw': {
              'lines': [
@@ -47,8 +45,6 @@ CHARTS = {
            },
            'smb2_create_close': {
              'lines': [
-               ['dummy1', ' ', 'incremental', 1, 1],
-               ['dummy2', '  ', 'incremental', 1, 1],
                ['smb2_create_count', 'create', 'incremental', 1, 1],
                ['smb2_close_count', 'close', 'incremental', -1, 1]
              ],
@@ -56,10 +52,6 @@ CHARTS = {
            },
            'smb2_info': {
              'lines': [
-               ['dummy1', ' ', 'incremental', 1, 1],
-               ['dummy2', '  ', 'incremental', 1, 1],
-               ['dummy3', '   ', 'incremental', 1, 1],
-               ['dummy4', '    ', 'incremental', 1, 1],
                ['smb2_getinfo_count', 'getinfo', 'incremental', 1, 1],
                ['smb2_setinfo_count', 'setinfo', 'incremental', -1, 1]
              ],
@@ -67,25 +59,12 @@ CHARTS = {
            },
            'smb2_find': {
              'lines': [
-               ['dummy1', ' ', 'incremental', 1, 1],
-               ['dummy2', '  ', 'incremental', 1, 1],
-               ['dummy3', '   ', 'incremental', 1, 1],
-               ['dummy4', '    ', 'incremental', 1, 1],
-               ['dummy5', '     ', 'incremental', 1, 1],
-               ['dummy6', '      ', 'incremental', 1, 1],
                ['smb2_find_count', 'find', 'incremental', 1, 1]
              ],
              'options': [None, 'Find', 'operations/s', 'Smb2', 'smb2.find', 'area']
            },
            'smb2_notify': {
              'lines': [
-               ['dummy1', ' ', 'incremental', 1, 1],
-               ['dummy2', '  ', 'incremental', 1, 1],
-               ['dummy3', '   ', 'incremental', 1, 1],
-               ['dummy4', '    ', 'incremental', 1, 1],
-               ['dummy5', '     ', 'incremental', 1, 1],
-               ['dummy6', '      ', 'incremental', 1, 1],
-               ['dummy7', '       ', 'incremental', 1, 1],
                ['smb2_notify_count', 'notify', 'incremental', 1, 1]
              ],
              'options': [None, 'Notify', 'operations/s', 'Smb2', 'smb2.notify', 'area']
@@ -143,7 +122,7 @@ class Service(SimpleService):
      
     def _get_raw_data(self):
         try:
-            reply = Popen(['/usr/bin/sudo', self.smbstatus, '-P'], stdout=PIPE, stderr=PIPE, shell=False)
+            reply = Popen(['/usr/bin/sudo', '-n', self.smbstatus, '-P'], stdout=PIPE, stderr=PIPE, shell=False)
         except OSError:
             return None
 
@@ -167,15 +146,6 @@ class Service(SimpleService):
 
         # 1. ALL data from 'smbstatus -P'.
         to_netdata = dict([(k, int(v)) for k, v in data_all])
-        # Add dummy values that are always zero (forcing color selection in charts)
-	to_netdata['dummy1'] = 0
-	to_netdata['dummy2'] = 0
-	to_netdata['dummy3'] = 0
-	to_netdata['dummy4'] = 0
-	to_netdata['dummy5'] = 0
-	to_netdata['dummy6'] = 0
-	to_netdata['dummy7'] = 0
-	to_netdata['dummy8'] = 0
         
         # Ready steady go!
         return to_netdata

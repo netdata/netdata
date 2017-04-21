@@ -91,6 +91,12 @@ netdataDashboard.menu = {
         info: 'The Intelligent Platform Management Interface (IPMI) is a set of computer interface specifications for an autonomous computer subsystem that provides management and monitoring capabilities independently of the host system\'s CPU, firmware (BIOS or UEFI) and operating system.'
     },
 
+    'samba': {
+        title: 'Samba',
+        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        info: 'Performance metrics of the Samba file share operations of this system. Samba is a implementation of Windows services, including Windows SMB protocol file shares.'
+    },
+
     'nfsd': {
         title: 'NFS Server',
         icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
@@ -845,6 +851,55 @@ netdataDashboard.context = {
 
     'retroshare.dht': {
         info: 'Statistics about RetroShare\'s DHT. These values are estimated!'
+    },
+
+    // ------------------------------------------------------------------------
+    // SAMBA
+
+    'smb2_read_outbytes': {
+        colors: NETDATA.colors[0],
+    },
+
+    'smb2_write_inbytes': {
+        colors: NETDATA.colors[1],
+    },
+
+    'smb2_read_inbytes': {
+        colors: NETDATA.colors[2],
+    },
+
+    'smb2_write_outbytes': {
+        colors: NETDATA.colors[3],
+    },
+
+    'smb2_create_count': {
+        colors: NETDATA.colors[2],
+        height: 0.5
+    },
+
+    'smb2_close_count': {
+        colors: NETDATA.colors[3],
+        height: 0.5
+    },
+
+    'smb2_getinfo_count': {
+        colors: NETDATA.colors[4],
+        height: 0.5
+    },
+
+    'smb2_setinfo_count': {
+        colors: NETDATA.colors[5],
+        height: 0.5
+    },
+
+    'smb2_find_count': {
+        colors: NETDATA.colors[6],
+        height: 0.5
+    },
+
+    'smb2_notify_count': {
+        colors: NETDATA.colors[7],
+        height: 0.5
     },
 
     // ------------------------------------------------------------------------

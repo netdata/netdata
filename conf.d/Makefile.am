@@ -51,6 +51,7 @@ dist_pythonconfig_DATA = \
     python.d/postgres.conf \
     python.d/redis.conf \
     python.d/retroshare.conf \
+    python.d/Samba.conf \
     python.d/sensors.conf \
     python.d/squid.conf \
     python.d/smartd_log.conf \

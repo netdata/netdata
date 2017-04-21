@@ -41,6 +41,7 @@ dist_python_DATA = \
     postgres.chart.py \
     redis.chart.py \
     retroshare.chart.py \
+    Samba.chart.py \
     sensors.chart.py \
     squid.chart.py \
     smartd_log.chart.py \
@@ -59,7 +60,7 @@ dist_pythonmodules_DATA = \
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2
 dist_pythonyaml2_DATA = \
-    python_modules/pyyaml2/__init__.py \
+
     python_modules/pyyaml2/composer.py \
     python_modules/pyyaml2/constructor.py \
     python_modules/pyyaml2/cyaml.py \
