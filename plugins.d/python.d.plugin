@@ -460,11 +460,11 @@ def read_config(path):
                 config = ordered_load(stream, yaml.SafeLoader)
             else:
                 config = yaml.load(stream)
-    except (OSError, IOError):
-        msg.error(str(path), "is not a valid configuration file")
+    except (OSError, IOError) as error:
+        msg.error(str(path), 'reading error:', str(error))
         return None
-    except yaml.YAMLError as e:
-        msg.error(str(path), "is malformed:", e)
+    except yaml.YAMLError as error:
+        msg.error(str(path), "is malformed:", str(error))
         return None
     return config
 
