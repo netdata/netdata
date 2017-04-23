@@ -1,9 +1,10 @@
 #include "common.h"
 
 static LISTEN_SOCKETS api_sockets = {
-        .config_section = CONFIG_SECTION_WEB,
-        .default_port   = API_LISTEN_PORT,
-        .backlog        = API_LISTEN_BACKLOG
+        .config_section  = CONFIG_SECTION_WEB,
+        .default_bind_to = "*",
+        .default_port    = API_LISTEN_PORT,
+        .backlog         = API_LISTEN_BACKLOG
 };
 
 WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;

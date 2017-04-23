@@ -119,6 +119,8 @@ netdata_SOURCES = \
 	simple_pattern.h \
 	socket.c \
 	socket.h \
+	statsd.c \
+	statsd.h \
 	storage_number.c \
 	storage_number.h \
 	sys_devices_system_edac_mc.c \

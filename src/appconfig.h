@@ -5,6 +5,7 @@
 
 #define CONFIG_SECTION_GLOBAL   "global"
 #define CONFIG_SECTION_WEB      "web"
+#define CONFIG_SECTION_STATSD   "statsd"
 #define CONFIG_SECTION_PLUGINS  "plugins"
 #define CONFIG_SECTION_REGISTRY "registry"
 #define CONFIG_SECTION_HEALTH   "health"

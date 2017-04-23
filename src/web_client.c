@@ -57,46 +57,13 @@ struct web_client *web_client_create(int listener) {
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
     {
-        struct sockaddr *sadr;
-        socklen_t addrlen;
-
-        sadr = (struct sockaddr*) &w->clientaddr;
-        addrlen = sizeof(w->clientaddr);
-
-        w->ifd = accept4(listener, sadr, &addrlen, SOCK_NONBLOCK);
+        w->ifd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port));
         if (w->ifd == -1) {
             error("%llu: Cannot accept new incoming connection.", w->id);
             freez(w);
             return NULL;
         }
         w->ofd = w->ifd;
-
-        if(getnameinfo(sadr, addrlen, w->client_ip, NI_MAXHOST, w->client_port, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
-            error("Cannot getnameinfo() on received client connection.");
-            strncpyz(w->client_ip,   "UNKNOWN", NI_MAXHOST);
-            strncpyz(w->client_port, "UNKNOWN", NI_MAXSERV);
-        }
-        w->client_ip[NI_MAXHOST]   = '\0';
-        w->client_port[NI_MAXSERV] = '\0';
-
-        switch(sadr->sa_family) {
-        case AF_INET:
-            debug(D_WEB_CLIENT_ACCESS, "%llu: New IPv4 web client from %s port %s on socket %d.", w->id, w->client_ip, w->client_port, w->ifd);
-            break;
-
-        case AF_INET6:
-            if(strncmp(w->client_ip, "::ffff:", 7) == 0) {
-                memmove(w->client_ip, &w->client_ip[7], strlen(&w->client_ip[7]) + 1);
-                debug(D_WEB_CLIENT_ACCESS, "%llu: New IPv4 web client from %s port %s on socket %d.", w->id, w->client_ip, w->client_port, w->ifd);
-            }
-            else
-                debug(D_WEB_CLIENT_ACCESS, "%llu: New IPv6 web client from %s port %s on socket %d.", w->id, w->client_ip, w->client_port, w->ifd);
-            break;
-
-        default:
-            debug(D_WEB_CLIENT_ACCESS, "%llu: New UNKNOWN web client from %s port %s on socket %d.", w->id, w->client_ip, w->client_port, w->ifd);
-            break;
-        }
 
         int flag = 1;
         if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
