@@ -56,6 +56,7 @@ struct netdata_static_thread static_threads[] = {
     {"web",                 NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
     {"web-single-threaded", NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
     {"push-metrics",        NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
+    {"statsd",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
     {NULL,                  NULL,                    NULL,         0, NULL, NULL, NULL}
 };
 

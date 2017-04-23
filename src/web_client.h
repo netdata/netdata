@@ -83,7 +83,6 @@ struct web_client {
     char cookie2[COOKIE_MAX+1];
     char origin[ORIGIN_MAX+1];
 
-    struct sockaddr_storage clientaddr;
     struct response response;
 
     size_t stats_received_bytes;

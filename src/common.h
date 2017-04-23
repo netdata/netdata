@@ -40,6 +40,7 @@
 #include <strings.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
+#include <sys/ioctl.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
@@ -207,6 +208,7 @@
 #include "rrd.h"
 #include "plugin_tc.h"
 #include "plugins_d.h"
+#include "statsd.h"
 #include "rrd2json.h"
 #include "rrd2json_api_old.h"
 #include "web_client.h"
