@@ -146,7 +146,6 @@ SELECT current_setting('is_superuser') = 'on' AS is_superuser;
 QUERY_STATS = {
     QUERIES['DATABASE']: METRICS['DATABASE'],
     QUERIES['BACKENDS']: METRICS['BACKENDS'],
-    QUERIES['ARCHIVE']: METRICS['ARCHIVE'],
     QUERIES['LOCKS']: METRICS['LOCKS']
 }
 
@@ -300,6 +299,7 @@ class Service(SimpleService):
             QUERY_STATS[QUERIES['TABLE_STATS']] = METRICS['TABLE_STATS']
         if is_superuser:
             QUERY_STATS[QUERIES['BGWRITER']] = METRICS['BGWRITER']
+            QUERY_STATS[QUERIES['ARCHIVE']] = METRICS['ARCHIVE']
 
     def create_dynamic_charts_(self):
 
