@@ -27,8 +27,7 @@ extern const char *web_server_mode_name(WEB_SERVER_MODE id);
 
 extern void *socket_listen_main_multi_threaded(void *ptr);
 extern void *socket_listen_main_single_threaded(void *ptr);
-extern int create_listen_sockets(void);
-extern int is_listen_socket(int fd);
+extern int create_api_listen_sockets(void);
 
 #ifndef HAVE_ACCEPT4
 extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
