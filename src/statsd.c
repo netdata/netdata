@@ -196,6 +196,7 @@ static inline void statsd_process_metric(const char *metric, STATSD_METRIC_TYPE 
 
             case STATSD_METRIC_TYPE_TIMER:
                 statsd.metrics_timer++;
+                break;
         }
     }
 
