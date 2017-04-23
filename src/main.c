@@ -920,7 +920,7 @@ int main(int argc, char **argv) {
         web_server_threading_selection();
 
         if(web_server_mode != WEB_SERVER_MODE_NONE)
-            create_listen_sockets();
+            api_listen_sockets_setup();
     }
 
     // initialize the log files

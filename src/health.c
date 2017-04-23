@@ -356,8 +356,15 @@ void *health_main(void *ptr) {
 
         // detect if boottime and realtime have twice the difference
         // in which case we assume the system was just waken from hibernation
-        if(unlikely(now - last_now > 2 * (now_boottime - last_now_boottime)))
+        if(unlikely(now - last_now > 2 * (now_boottime - last_now_boottime))) {
             apply_hibernation_delay = 1;
+
+            info("Postponing alarm checks for %ld seconds, due to boottime discrepancy (realtime dt: %ld, boottime dt: %ld)."
+            , hibernation_delay
+            , (long)(now - last_now)
+            , (long)(now_boottime - last_now_boottime)
+            );
+        }
 
         last_now = now;
         last_now_boottime = now_boottime;
@@ -374,11 +381,9 @@ void *health_main(void *ptr) {
 
             if(unlikely(apply_hibernation_delay)) {
 
-                info("Postponing alarm checks for %ld seconds, on host '%s', due to boottime discrepancy (realtime dt: %ld, boottime dt: %ld)."
+                info("Postponing alarm checks for %ld seconds, on host '%s'."
                      , hibernation_delay
                      , host->hostname
-                     , (long)(now - last_now)
-                     , (long)(now_boottime - last_now_boottime)
                 );
 
                 host->health_delay_up_to = now + hibernation_delay;

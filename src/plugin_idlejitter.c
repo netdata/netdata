@@ -13,40 +13,68 @@ void *cpuidlejitter_main(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    int sleep_ms = (int) config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
-    if(sleep_ms <= 0) {
+    usec_t sleep_ut = config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS) * USEC_PER_MS;
+    if(sleep_ut <= 0) {
         config_set_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS);
-        sleep_ms = CPU_IDLEJITTER_SLEEP_TIME_MS;
+        sleep_ut = CPU_IDLEJITTER_SLEEP_TIME_MS * USEC_PER_MS;
     }
 
-    RRDSET *st = rrdset_find_localhost("system.idlejitter");
-    if(!st) {
-        st = rrdset_create_localhost("system", "idlejitter", NULL, "processes", NULL, "CPU Idle Jitter"
-                                     , "microseconds lost/s", 9999, localhost->rrd_update_every, RRDSET_TYPE_LINE);
-        rrddim_add(st, "jitter", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    }
+    RRDSET *st = rrdset_create_localhost(
+            "system"
+            , "idlejitter"
+            , NULL
+            , "processes"
+            , NULL
+            , "CPU Idle Jitter"
+            , "microseconds lost/s"
+            , 9999
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_AREA
+    );
+    RRDDIM *rd_min = rrddim_add(st, "min", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_max = rrddim_add(st, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_avg = rrddim_add(st, "average", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
+    usec_t update_every_ut = localhost->rrd_update_every * USEC_PER_SEC;
     struct timeval before, after;
     unsigned long long counter;
     for(counter = 0; 1 ;counter++) {
-        usec_t usec = 0, susec = 0;
+        int iterations = 0;
+        usec_t error_total = 0,
+                error_min = 0,
+                error_max = 0,
+                elapsed = 0;
 
         if(netdata_exit) break;
 
-        while(susec < (localhost->rrd_update_every * USEC_PER_SEC)) {
-
+        while(elapsed < update_every_ut) {
             now_monotonic_timeval(&before);
-            sleep_usec(sleep_ms * 1000);
+            sleep_usec(sleep_ut);
             now_monotonic_timeval(&after);
 
-            // calculate the time it took for a full loop
-            usec = dt_usec(&after, &before);
-            susec += usec;
-        }
-        usec -= (sleep_ms * 1000);
+            usec_t dt = dt_usec(&after, &before);
+            elapsed += dt;
 
-        if(counter) rrdset_next(st);
-        rrddim_set(st, "jitter", usec);
+            usec_t error = dt - sleep_ut;
+            error_total += error;
+
+            if(unlikely(!iterations))
+                error_min = error;
+            else if(error < error_min)
+                error_min = error;
+
+            if(error > error_max)
+                error_max = error;
+
+            iterations++;
+        }
+
+        if(netdata_exit) break;
+
+        if(likely(counter)) rrdset_next(st);
+        rrddim_set_by_pointer(st, rd_min, error_min);
+        rrddim_set_by_pointer(st, rd_max, error_max);
+        rrddim_set_by_pointer(st, rd_avg, error_total / iterations);
         rrdset_done(st);
     }
 

@@ -57,7 +57,7 @@ int rrdpush_init() {
 // to its current clock, we send for this many
 // iterations a BEGIN line without microseconds
 // this is for the first iterations of each chart
-static unsigned int remote_clock_resync_iterations = 60;
+unsigned int remote_clock_resync_iterations = 60;
 
 #define rrdpush_lock(host) netdata_mutex_lock(&((host)->rrdpush_mutex))
 #define rrdpush_unlock(host) netdata_mutex_unlock(&((host)->rrdpush_mutex))

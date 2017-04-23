@@ -188,7 +188,7 @@ void rrdset_reset(RRDSET *st) {
         rd->last_collected_time.tv_sec = 0;
         rd->last_collected_time.tv_usec = 0;
         rd->collections_counter = 0;
-        memset(rd->values, 0, rd->entries * sizeof(storage_number));
+        // memset(rd->values, 0, rd->entries * sizeof(storage_number));
     }
 }
 
@@ -586,16 +586,10 @@ RRDSET *rrdset_create(
 // RRDSET - data collection iteration control
 
 inline void rrdset_next_usec_unfiltered(RRDSET *st, usec_t microseconds) {
-
-    if(unlikely(!st->last_collected_time.tv_sec)) {
-        // the first entry
-        microseconds = st->update_every * USEC_PER_SEC;
-    }
-    else if(unlikely(!microseconds)) {
-        // no dt given by the plugin
-        struct timeval now;
-        now_realtime_timeval(&now);
-        microseconds = dt_usec(&now, &st->last_collected_time);
+    if(unlikely(!st->last_collected_time.tv_sec || !microseconds || (st->counter % remote_clock_resync_iterations) == 0)) {
+        // call the full next_usec() function
+        rrdset_next_usec(st, microseconds);
+        return;
     }
 
     st->usec_since_last_update = microseconds;
@@ -615,15 +609,11 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
     }
     else {
         // microseconds has the time since the last collection
-//#ifdef NETDATA_INTERNAL_CHECKS
-//        usec_t now_usec = timeval_usec(&now);
-//        usec_t last_usec = timeval_usec(&st->last_collected_time);
-//#endif
         susec_t since_last_usec = dt_usec_signed(&now, &st->last_collected_time);
 
         if(unlikely(since_last_usec < 0)) {
             // oops! the database is in the future
-            error("Database for chart '%s' on host '%s' is %lld microseconds in the future. Adjusting it to current time.", st->id, st->rrdhost->hostname, -since_last_usec);
+            info("RRD database for chart '%s' on host '%s' is %0.5Lf secs in the future. Adjusting it to current time.", st->id, st->rrdhost->hostname, (long double)-since_last_usec / USEC_PER_SEC);
 
             st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
             st->last_collected_time.tv_usec = now.tv_usec;
@@ -634,26 +624,11 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
             last_updated_time_align(&st->last_updated, st->update_every);
 
             microseconds    = st->update_every * USEC_PER_SEC;
-            since_last_usec = st->update_every * USEC_PER_SEC;
         }
+        else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 10 * USEC_PER_SEC))) {
+            // oops! the database is too far behind
+            info("RRD database for chart '%s' on host '%s' is %0.5Lf secs in the past. Adjusting it to current time.", st->id, st->rrdhost->hostname, (long double)since_last_usec / USEC_PER_SEC);
 
-        // verify the microseconds given is good
-        if(unlikely(microseconds > (usec_t)since_last_usec)) {
-            debug(D_RRD_CALLS, "dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - (usec_t)since_last_usec, st->name, st->id);
-
-//#ifdef NETDATA_INTERNAL_CHECKS
-//            if(unlikely(last_usec + microseconds > now_usec + 1000))
-//                error("dt %llu usec given is too big - it leads %llu usec to the future, for chart '%s' (%s).", microseconds, microseconds - (usec_t)since_last_usec, st->name, st->id);
-//#endif
-
-            microseconds = (usec_t)since_last_usec;
-        }
-        else if(unlikely(microseconds < (usec_t)since_last_usec * 0.8)) {
-            debug(D_RRD_CALLS, "dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, (usec_t)since_last_usec, st->name, st->id);
-
-//#ifdef NETDATA_INTERNAL_CHECKS
-//            error("dt %llu usec given is too small - expected %llu usec up to -20%%, for chart '%s' (%s).", microseconds, (usec_t)since_last_usec, st->name, st->id);
-//#endif
             microseconds = (usec_t)since_last_usec;
         }
     }
@@ -690,6 +665,14 @@ static inline void rrdset_init_last_updated_time(RRDSET *st) {
 }
 
 static inline void rrdset_done_push_exclusive(RRDSET *st) {
+//    usec_t update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
+//
+//    if(unlikely(st->usec_since_last_update > update_every_ut * remote_clock_resync_iterations)) {
+//        error("Chart '%s' was last collected %llu usec before. Resetting it.", st->id, st->usec_since_last_update);
+//        rrdset_reset(st);
+//        st->usec_since_last_update = update_every_ut;
+//    }
+
     if(unlikely(!st->last_collected_time.tv_sec)) {
         // it is the first entry
         // set the last_collected_time to now
@@ -758,9 +741,10 @@ void rrdset_done(RRDSET *st) {
 
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut)) {
-        info("%s: took too long to be updated (%0.3Lf secs). Resetting it.", st->name, (long double)(st->usec_since_last_update / 1000000.0));
+        info("host '%s', chart %s: took too long to be updated (%0.3Lf secs). Resetting it.", st->rrdhost->hostname, st->name, (long double)(st->usec_since_last_update / 1000000.0));
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
+        store_this_entry = 0;
         first_entry = 1;
     }
 
@@ -1036,11 +1020,11 @@ void rrdset_done(RRDSET *st) {
         // this is collected in the same interpolation point
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-            debug(D_RRD_STATS, "%s: THIS IS IN THE SAME INTERPOLATION POINT", st->name);
+            debug(D_RRD_STATS, "host '%s', chart '%s': THIS IS IN THE SAME INTERPOLATION POINT", st->rrdhost->hostname, st->name);
 
-//#ifdef NETDATA_INTERNAL_CHECKS
-//        info("%s is collected in the same interpolation point: short by %llu microseconds", st->name, next_store_ut - now_collect_ut);
-//#endif
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("INTERNAL CHECK: host '%s', chart '%s' is collected in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, next_store_ut - now_collect_ut);
+#endif
     }
 
     usec_t first_ut = last_stored_ut;
@@ -1048,9 +1032,9 @@ void rrdset_done(RRDSET *st) {
     if((now_collect_ut % (update_every_ut)) == 0) iterations++;
 
     for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
-//#ifdef NETDATA_INTERNAL_CHECKS
-//        if(iterations < 0) { error("%s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
-//#endif
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
+#endif
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
             debug(D_RRD_STATS, "%s: last_stored_ut = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/1000000.0);
