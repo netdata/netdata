@@ -259,7 +259,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, st->rrdhost->hostname);
         return 1;
     }
 
@@ -272,7 +272,7 @@ int rrddim_unhide(RRDSET *st, const char *id) {
 
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, st->rrdhost->hostname);
         return 1;
     }
 
@@ -301,7 +301,7 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) {
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s).", id, st->name, st->id);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, st->rrdhost->hostname);
         return 0;
     }
 

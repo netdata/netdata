@@ -55,6 +55,8 @@ typedef usec_t heartbeat_t;
 #define USEC_PER_SEC    1000000ULL
 #define MSEC_PER_SEC    1000ULL
 
+#define USEC_PER_MS     1000ULL
+
 #ifndef HAVE_CLOCK_GETTIME
 /* Fallback function for POSIX.1-2001 clock_gettime() function.
  *

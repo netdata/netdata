@@ -1,14 +1,12 @@
 #include "common.h"
 
-int listen_backlog = LISTEN_BACKLOG;
-size_t listen_fds_count = 0;
-int listen_fds[MAX_LISTEN_FDS] = { [0 ... 99] = -1 };
-char *listen_fds_names[MAX_LISTEN_FDS] = { [0 ... 99] = NULL };
-int listen_port = LISTEN_PORT;
+static LISTEN_SOCKETS api_sockets = {
+        .config_section = CONFIG_SECTION_WEB,
+        .default_port   = API_LISTEN_PORT,
+        .backlog        = API_LISTEN_BACKLOG
+};
 
 WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
-
-static int shown_server_socket_error = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
 static void log_allocations(void)
@@ -47,42 +45,7 @@ static void log_allocations(void)
 }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-#ifndef HAVE_ACCEPT4
-int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
-    int fd = accept(sock, addr, addrlen);
-    int newflags = 0;
-
-    if (fd < 0) return fd;
-
-    if (flags & SOCK_NONBLOCK) {
-        newflags |= O_NONBLOCK;
-        flags &= ~SOCK_NONBLOCK;
-    }
-
-#ifdef SOCK_CLOEXEC
-#ifdef O_CLOEXEC
-    if (flags & SOCK_CLOEXEC) {
-        newflags |= O_CLOEXEC;
-        flags &= ~SOCK_CLOEXEC;
-    }
-#endif
-#endif
-
-    if (flags) {
-        errno = -EINVAL;
-        return -1;
-    }
-
-    if (fcntl(fd, F_SETFL, newflags) < 0) {
-        int saved_errno = errno;
-        close(fd);
-        errno = saved_errno;
-        return -1;
-    }
-
-    return fd;
-}
-#endif
+// --------------------------------------------------------------------------------------
 
 WEB_SERVER_MODE web_server_mode_id(const char *mode) {
     if(!strcmp(mode, "none"))
@@ -107,277 +70,10 @@ const char *web_server_mode_name(WEB_SERVER_MODE id) {
     }
 }
 
-int create_listen_socket4(const char *ip, int port, int listen_backlog) {
-    int sock;
-    int sockopt = 1;
+// --------------------------------------------------------------------------------------
 
-    debug(D_LISTENER, "IPv4 creating new listening socket on ip '%s' port %d", ip, port);
-
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if(sock < 0) {
-        error("IPv4 socket() on ip '%s' port %d failed.", ip, port);
-        shown_server_socket_error = 1;
-        return -1;
-    }
-
-    /* avoid "address already in use" */
-    if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt)) != 0)
-        error("Cannot set SO_REUSEADDR on ip '%s' port's %d.", ip, port);
-
-    struct sockaddr_in name;
-    memset(&name, 0, sizeof(struct sockaddr_in));
-    name.sin_family = AF_INET;
-    name.sin_port = htons (port);
-
-    int ret = inet_pton(AF_INET, ip, (void *)&name.sin_addr.s_addr);
-    if(ret != 1) {
-        error("Failed to convert IP '%s' to a valid IPv4 address.", ip);
-        shown_server_socket_error = 1;
-        close(sock);
-        return -1;
-    }
-
-    if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
-        close(sock);
-        error("IPv4 bind() on ip '%s' port %d failed.", ip, port);
-        shown_server_socket_error = 1;
-        return -1;
-    }
-
-    if(listen(sock, listen_backlog) < 0) {
-        close(sock);
-        error("IPv4 listen() on ip '%s' port %d failed.", ip, port);
-        shown_server_socket_error = 1;
-        return -1;
-    }
-
-    debug(D_LISTENER, "Listening on IPv4 ip '%s' port %d", ip, port);
-    return sock;
-}
-
-int create_listen_socket6(const char *ip, int port, int listen_backlog) {
-    int sock = -1;
-    int sockopt = 1;
-    int ipv6only = 1;
-
-    debug(D_LISTENER, "IPv6 creating new listening socket on ip '%s' port %d", ip, port);
-
-    sock = socket(AF_INET6, SOCK_STREAM, 0);
-    if (sock < 0) {
-        error("IPv6 socket() on ip '%s' port %d failed.", ip, port);
-        shown_server_socket_error = 1;
-        return -1;
-    }
-
-    /* avoid "address already in use" */
-    if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt)) != 0)
-        error("Cannot set SO_REUSEADDR on ip '%s' port's %d.", ip, port);
-
-    /* IPv6 only */
-    if(setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void*)&ipv6only, sizeof(ipv6only)) != 0)
-        error("Cannot set IPV6_V6ONLY on ip '%s' port's %d.", ip, port);
-
-    struct sockaddr_in6 name;
-    memset(&name, 0, sizeof(struct sockaddr_in6));
-    name.sin6_family = AF_INET6;
-    name.sin6_port = htons ((uint16_t) port);
-
-    int ret = inet_pton(AF_INET6, ip, (void *)&name.sin6_addr.s6_addr);
-    if(ret != 1) {
-        error("Failed to convert IP '%s' to a valid IPv6 address.", ip);
-        shown_server_socket_error = 1;
-        close(sock);
-        return -1;
-    }
-
-    name.sin6_scope_id = 0;
-
-    if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
-        close(sock);
-        error("IPv6 bind() on ip '%s' port %d failed.", ip, port);
-        shown_server_socket_error = 1;
-        return -1;
-    }
-
-    if (listen(sock, listen_backlog) < 0) {
-        close(sock);
-        error("IPv6 listen() on ip '%s' port %d failed.", ip, port);
-        shown_server_socket_error = 1;
-        return -1;
-    }
-
-    debug(D_LISTENER, "Listening on IPv6 ip '%s' port %d", ip, port);
-    return sock;
-}
-
-static inline int add_listen_socket(int fd, const char *ip, int port) {
-    if(listen_fds_count >= MAX_LISTEN_FDS) {
-        error("Too many listening sockets. Failed to add listening socket at ip '%s' port %d", ip, port);
-        shown_server_socket_error = 1;
-        close(fd);
-        return -1;
-    }
-
-    listen_fds[listen_fds_count] = fd;
-
-    char buffer[100 + 1];
-    snprintfz(buffer, 100, "[%s]:%d", ip, port);
-    listen_fds_names[listen_fds_count] = strdupz(buffer);
-
-    listen_fds_count++;
-    return 0;
-}
-
-int is_listen_socket(int fd) {
-    size_t i;
-    for(i = 0; i < listen_fds_count ;i++)
-        if(listen_fds[i] == fd) return 1;
-
-    return 0;
-}
-
-static inline void close_listen_sockets(void) {
-    size_t i;
-    for(i = 0; i < listen_fds_count ;i++) {
-        close(listen_fds[i]);
-        listen_fds[i] = -1;
-
-        freez(listen_fds_names[i]);
-        listen_fds_names[i] = NULL;
-    }
-
-    listen_fds_count = 0;
-}
-
-static inline int bind_to_one(const char *definition, int default_port, int listen_backlog) {
-    int added = 0;
-    struct addrinfo hints;
-    struct addrinfo *result = NULL, *rp = NULL;
-
-    char buffer[strlen(definition) + 1];
-    strcpy(buffer, definition);
-
-    char buffer2[10 + 1];
-    snprintfz(buffer2, 10, "%d", default_port);
-
-    char *ip = buffer, *port = buffer2;
-
-    char *e = ip;
-    if(*e == '[') {
-        e = ++ip;
-        while(*e && *e != ']') e++;
-        if(*e == ']') {
-            *e = '\0';
-            e++;
-        }
-    }
-    else {
-        while(*e && *e != ':') e++;
-    }
-
-    if(*e == ':') {
-        port = e + 1;
-        *e = '\0';
-    }
-
-    if(!*ip || *ip == '*' || !strcmp(ip, "any") || !strcmp(ip, "all"))
-        ip = NULL;
-    if(!*port)
-        port = buffer2;
-
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-    hints.ai_protocol = 0;          /* Any protocol */
-    hints.ai_canonname = NULL;
-    hints.ai_addr = NULL;
-    hints.ai_next = NULL;
-
-    int r = getaddrinfo(ip, port, &hints, &result);
-    if (r != 0) {
-        error("getaddrinfo('%s', '%s'): %s\n", ip, port, gai_strerror(r));
-        return -1;
-    }
-
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-        int fd = -1;
-
-        char rip[INET_ADDRSTRLEN + INET6_ADDRSTRLEN] = "INVALID";
-        int rport = default_port;
-
-        switch (rp->ai_addr->sa_family) {
-            case AF_INET: {
-                struct sockaddr_in *sin = (struct sockaddr_in *) rp->ai_addr;
-                inet_ntop(AF_INET, &sin->sin_addr, rip, INET_ADDRSTRLEN);
-                rport = ntohs(sin->sin_port);
-                fd = create_listen_socket4(rip, rport, listen_backlog);
-                break;
-            }
-
-            case AF_INET6: {
-                struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) rp->ai_addr;
-                inet_ntop(AF_INET6, &sin6->sin6_addr, rip, INET6_ADDRSTRLEN);
-                rport = ntohs(sin6->sin6_port);
-                fd = create_listen_socket6(rip, rport, listen_backlog);
-                break;
-            }
-        }
-
-        if (fd == -1)
-            error("Cannot bind to ip '%s', port %d", rip, rport);
-        else {
-            add_listen_socket(fd, rip, rport);
-            added++;
-        }
-    }
-
-    freeaddrinfo(result);
-
-    return added;
-}
-
-int create_listen_sockets(void) {
-    shown_server_socket_error = 0;
-
-    listen_backlog = (int) config_get_number(CONFIG_SECTION_WEB, "listen backlog", LISTEN_BACKLOG);
-
-    listen_port = (int) config_get_number(CONFIG_SECTION_WEB, "default port", LISTEN_PORT);
-    if(listen_port < 1 || listen_port > 65535) {
-        error("Invalid listen port %d given. Defaulting to %d.", listen_port, LISTEN_PORT);
-        listen_port = (int) config_set_number(CONFIG_SECTION_WEB, "default port", LISTEN_PORT);
-    }
-    debug(D_OPTIONS, "Default listen port set to %d.", listen_port);
-
-    char *s = config_get(CONFIG_SECTION_WEB, "bind to", "*");
-    while(*s) {
-        char *e = s;
-
-        // skip separators, moving both s(tart) and e(nd)
-        while(isspace(*e) || *e == ',') s = ++e;
-
-        // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',') e++;
-
-        // is there anything?
-        if(!*s || s == e) break;
-
-        char buf[e - s + 1];
-        strncpyz(buf, s, e - s);
-        bind_to_one(buf, listen_port, listen_backlog);
-
-        s = e;
-    }
-
-    if(!listen_fds_count)
-        fatal("Cannot listen on any socket. Exiting...");
-    else if(shown_server_socket_error) {
-        size_t i;
-        for(i = 0; i < listen_fds_count ;i++)
-            info("Listen socket %s opened.", listen_fds_names[i]);
-    }
-
-    return (int)listen_fds_count;
+int api_listen_sockets_setup(void) {
+    return listen_sockets_setup(&api_sockets);
 }
 
 // --------------------------------------------------------------------------------------
@@ -422,25 +118,25 @@ void *socket_listen_main_multi_threaded(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    if(!listen_fds_count)
+    if(!api_sockets.opened)
         fatal("LISTENER: No sockets to listen to.");
 
-    struct pollfd *fds = callocz(sizeof(struct pollfd), listen_fds_count);
+    struct pollfd *fds = callocz(sizeof(struct pollfd), api_sockets.opened);
 
     size_t i;
-    for(i = 0; i < listen_fds_count ;i++) {
-        fds[i].fd = listen_fds[i];
+    for(i = 0; i < api_sockets.opened ;i++) {
+        fds[i].fd = api_sockets.fds[i];
         fds[i].events = POLLIN;
         fds[i].revents = 0;
 
-        info("Listening on '%s'", (listen_fds_names[i])?listen_fds_names[i]:"UNKNOWN");
+        info("Listening on '%s'", (api_sockets.fds_names[i])?api_sockets.fds_names[i]:"UNKNOWN");
     }
 
     int timeout = 10 * 1000;
 
     for(;;) {
         // debug(D_WEB_CLIENT, "LISTENER: Waiting...");
-        retval = poll(fds, listen_fds_count, timeout);
+        retval = poll(fds, api_sockets.opened, timeout);
 
         if(unlikely(retval == -1)) {
             error("LISTENER: poll() failed.");
@@ -453,7 +149,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
             continue;
         }
 
-        for(i = 0 ; i < listen_fds_count ; i++) {
+        for(i = 0 ; i < api_sockets.opened ; i++) {
             short int revents = fds[i].revents;
 
             // check for new incoming connections
@@ -486,7 +182,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
     }
 
     debug(D_WEB_CLIENT, "LISTENER: exit!");
-    close_listen_sockets();
+    listen_sockets_close(&api_sockets);
 
     freez(fds);
 
@@ -555,7 +251,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
-    if(!listen_fds_count)
+    if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
 
     size_t i;
@@ -568,16 +264,16 @@ void *socket_listen_main_single_threaded(void *ptr) {
     FD_ZERO (&efds);
     int fdmax = 0;
 
-    for(i = 0; i < listen_fds_count ; i++) {
-        if (listen_fds[i] < 0 || listen_fds[i] >= FD_SETSIZE)
-            fatal("LISTENER: Listen socket %d is not ready, or invalid.", listen_fds[i]);
+    for(i = 0; i < api_sockets.opened ; i++) {
+        if (api_sockets.fds[i] < 0 || api_sockets.fds[i] >= FD_SETSIZE)
+            fatal("LISTENER: Listen socket %d is not ready, or invalid.", api_sockets.fds[i]);
 
-        info("Listening on '%s'", (listen_fds_names[i])?listen_fds_names[i]:"UNKNOWN");
+        info("Listening on '%s'", (api_sockets.fds_names[i])?api_sockets.fds_names[i]:"UNKNOWN");
 
-        FD_SET(listen_fds[i], &ifds);
-        FD_SET(listen_fds[i], &efds);
-        if(fdmax < listen_fds[i])
-            fdmax = listen_fds[i];
+        FD_SET(api_sockets.fds[i], &ifds);
+        FD_SET(api_sockets.fds[i], &efds);
+        if(fdmax < api_sockets.fds[i])
+            fdmax = api_sockets.fds[i];
     }
 
     for(;;) {
@@ -596,10 +292,10 @@ void *socket_listen_main_single_threaded(void *ptr) {
         else if(likely(retval)) {
             debug(D_WEB_CLIENT_ACCESS, "LISTENER: got something.");
 
-            for(i = 0; i < listen_fds_count ; i++) {
-                if (FD_ISSET(listen_fds[i], &rifds)) {
+            for(i = 0; i < api_sockets.opened ; i++) {
+                if (FD_ISSET(api_sockets.fds[i], &rifds)) {
                     debug(D_WEB_CLIENT_ACCESS, "LISTENER: new connection.");
-                    w = web_client_create(listen_fds[i]);
+                    w = web_client_create(api_sockets.fds[i]);
                     if (single_threaded_link_client(w, &ifds, &ofds, &ifds, &fdmax) != 0) {
                         web_client_free(w);
                     }
@@ -658,7 +354,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
     }
 
     debug(D_WEB_CLIENT, "LISTENER: exit!");
-    close_listen_sockets();
+    listen_sockets_close(&api_sockets);
 
     static_thread->enabled = 0;
     pthread_exit(NULL);
