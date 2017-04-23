@@ -1,6 +1,23 @@
 #include "common.h"
 
-#define STATSD_MAX_METRIC_LENGTH 200
+static struct statsd {
+    size_t events;
+    size_t events_gauge;
+    size_t events_counter;
+    size_t events_timer;
+    size_t events_meter;
+    size_t events_histogram;
+
+    size_t metrics;
+    size_t metrics_gauge;
+    size_t metrics_counter;
+    size_t metrics_timer;
+    size_t metrics_meter;
+    size_t metrics_histogram;
+} statsd = {
+        .events = 0,
+        .metrics = 0
+};
 
 // --------------------------------------------------------------------------------------
 
@@ -83,6 +100,8 @@ static inline STATSD_METRIC *stasd_metric_index_find(const char *name, uint32_t 
 static inline void statsd_collected_value(STATSD_METRIC *m, calculated_number value, calculated_number sample_rate, uint32_t options) {
     debug(D_STATSD, "Updating metric '%s'", m->name);
 
+    statsd.events++;
+
     m->last_collected_ut = now_realtime_usec();
     m->events++;
     m->count += sample_rate;
@@ -95,21 +114,25 @@ static inline void statsd_collected_value(STATSD_METRIC *m, calculated_number va
 
     switch(m->type) {
         case STATSD_METRIC_TYPE_HISTOGRAM:
+            statsd.events_histogram++;
             // FIXME: not implemented yet
             m->value += value;
             break;
 
         case STATSD_METRIC_TYPE_METER:
+            statsd.events_meter++;
             // we add to this metric
             m->value += value;
             break;
 
         case STATSD_METRIC_TYPE_TIMER:
+            statsd.events_timer++;
             // we add time to this metric
             m->value += value;
             break;
 
         case STATSD_METRIC_TYPE_GAUGE:
+            statsd.events_gauge++;
             if(unlikely(options & STATSD_GAUGE_COLLECTION_RELATIVE))
                 // we add the collected value
                 m->value += value;
@@ -119,6 +142,7 @@ static inline void statsd_collected_value(STATSD_METRIC *m, calculated_number va
             break;
 
         case STATSD_METRIC_TYPE_COUNTER:
+            statsd.events_counter++;
             // we add the collected value
             m->value += value;
             break;
@@ -151,6 +175,28 @@ static inline void statsd_process_metric(const char *metric, STATSD_METRIC_TYPE 
         m->hash = hash;
         m->type = type;
         m = (STATSD_METRIC *)avl_insert(&statsd_index, (avl *)m);
+
+        statsd.metrics++;
+        switch(type) {
+            case STATSD_METRIC_TYPE_COUNTER:
+                statsd.metrics_counter++;
+                break;
+
+            case STATSD_METRIC_TYPE_GAUGE:
+                statsd.metrics_gauge++;
+                break;
+
+            case STATSD_METRIC_TYPE_METER:
+                statsd.metrics_meter++;
+                break;
+
+            case STATSD_METRIC_TYPE_HISTOGRAM:
+                statsd.metrics_histogram++;
+                break;
+
+            case STATSD_METRIC_TYPE_TIMER:
+                statsd.metrics_timer++;
+        }
     }
 
     statsd_collected_value(m, value, sample_rate, options);
@@ -399,11 +445,93 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
 
 
 // --------------------------------------------------------------------------------------------------------------------
+// statsd child thread to update netdata
+
+void *statsd_child_thread(void *ptr) {
+    info("STATSD thread created with task id %d", gettid());
+
+    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+        error("Cannot set pthread cancel type to DEFERRED.");
+
+    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+        error("Cannot set pthread cancel state to ENABLE.");
+
+
+    RRDSET *st_metrics = rrdset_create_localhost(
+            "netdata"
+            , "statsd_metrics"
+            , NULL
+            , "statsd"
+            , NULL
+            , "Metrics in the netdata statsd database"
+            , "metrics"
+            , 132000
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_STACKED
+    );
+    RRDDIM *rd_metrics_gauge     = rrddim_add(st_metrics, "gauge", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_metrics_counter   = rrddim_add(st_metrics, "counter", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_metrics_timer     = rrddim_add(st_metrics, "timer", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_metrics_meter     = rrddim_add(st_metrics, "meter", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_metrics_histogram = rrddim_add(st_metrics, "histogram", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDSET *st_events = rrdset_create_localhost(
+            "netdata"
+            , "statsd_events"
+            , NULL
+            , "statsd"
+            , NULL
+            , "Events processed by the netdata statsd server"
+            , "events/s"
+            , 132001
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_STACKED
+    );
+    RRDDIM *rd_events_gauge     = rrddim_add(st_events, "gauge", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_events_counter   = rrddim_add(st_events, "counter", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_events_timer     = rrddim_add(st_events, "timer", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_events_meter     = rrddim_add(st_events, "meter", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_events_histogram = rrddim_add(st_events, "histogram", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    for(;;) {
+        usec_t hb_dt = heartbeat_next(&hb, step);
+
+        if(unlikely(netdata_exit))
+            break;
+
+        if(hb_dt) {
+            rrdset_next(st_metrics);
+            rrdset_next(st_events);
+        }
+
+        rrddim_set_by_pointer(st_metrics, rd_metrics_gauge, (collected_number)statsd.metrics_gauge);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_counter, (collected_number)statsd.metrics_counter);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_timer, (collected_number)statsd.metrics_timer);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_meter, (collected_number)statsd.metrics_meter);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_histogram, (collected_number)statsd.metrics_histogram);
+
+        rrddim_set_by_pointer(st_events, rd_events_gauge, (collected_number)statsd.events_gauge);
+        rrddim_set_by_pointer(st_events, rd_events_counter, (collected_number)statsd.events_counter);
+        rrddim_set_by_pointer(st_events, rd_events_timer, (collected_number)statsd.events_timer);
+        rrddim_set_by_pointer(st_events, rd_events_meter, (collected_number)statsd.events_meter);
+        rrddim_set_by_pointer(st_events, rd_events_histogram, (collected_number)statsd.events_histogram);
+
+        rrdset_done(st_metrics);
+        rrdset_done(st_events);
+    }
+
+    pthread_exit(NULL);
+    return NULL;
+}
+
+
+// --------------------------------------------------------------------------------------------------------------------
 // statsd main thread
 
 void *statsd_main(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-
     info("STATSD thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
@@ -418,6 +546,14 @@ void *statsd_main(void *ptr) {
         goto cleanup;
     }
 
+    pthread_t thread;
+
+    if(pthread_create(&thread, NULL, statsd_child_thread, (void *)NULL))
+        error("STATSD: failed to create child thread.");
+
+    else if(pthread_detach(thread))
+        error("STATSD: cannot request detach of child thread.");
+
     poll_events(&statsd_sockets
             , statsd_add_callback
             , statsd_del_callback
@@ -425,6 +561,8 @@ void *statsd_main(void *ptr) {
     );
 
 cleanup:
+    pthread_cancel(thread);
+
     debug(D_WEB_CLIENT, "STATSD: exit!");
     listen_sockets_close(&statsd_sockets);
 
