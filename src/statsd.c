@@ -28,19 +28,18 @@ typedef enum statsd_metric_type {
 typedef struct statsd_metric {
     avl avl;                        // indexing
 
-    const char *key;                // "type|name" for indexing
-    uint32_t hash;                  // hash of the key
-
     const char *name;
+    uint32_t hash;                  // hash of the name
+
     STATSD_METRIC_TYPE type;
 
     usec_t last_collected_ut;       // the last time this metric was updated
     usec_t last_exposed_ut;         // the last time this metric was sent to netdata
     size_t events;                  // the number of times this metrics has been collected
 
-    size_t count;                   // number of events since the last exposure to netdata
+    calculated_number count;        // number of events since the last exposure to netdata
     calculated_number last;         // the last value collected
-    calculated_number total;        // the sum of all values collected since the last exposure to netdata
+    calculated_number value;        // the value of the metric
     calculated_number min;          // the min value collected since the last exposure to netdata
     calculated_number max;          // the max value collected since the last exposure to netdata
 
@@ -59,7 +58,7 @@ typedef struct statsd_metric {
 int statsd_compare(void* a, void* b) {
     if(((STATSD_METRIC *)a)->hash < ((STATSD_METRIC *)b)->hash) return -1;
     else if(((STATSD_METRIC *)a)->hash > ((STATSD_METRIC *)b)->hash) return 1;
-    else return strcmp(((STATSD_METRIC *)a)->key, ((STATSD_METRIC *)b)->key);
+    else return strcmp(((STATSD_METRIC *)a)->name, ((STATSD_METRIC *)b)->name);
 }
 
 static avl_tree statsd_index = {
@@ -67,10 +66,10 @@ static avl_tree statsd_index = {
         .root = NULL
 };
 
-static inline STATSD_METRIC *stasd_metric_index_find(const char *key, uint32_t hash) {
+static inline STATSD_METRIC *stasd_metric_index_find(const char *name, uint32_t hash) {
     STATSD_METRIC tmp;
-    tmp.key = key;
-    tmp.hash = (hash)?hash:simple_hash(tmp.key);
+    tmp.name = name;
+    tmp.hash = (hash)?hash:simple_hash(tmp.name);
 
     return (STATSD_METRIC *)avl_search(&statsd_index, (avl *)&tmp);
 }
@@ -79,179 +78,130 @@ static inline STATSD_METRIC *stasd_metric_index_find(const char *key, uint32_t h
 // --------------------------------------------------------------------------------------------------------------------
 // statsd data collection
 
-static inline void statsd_collected_value(STATSD_METRIC *m, calculated_number value, const char *options) {
-    debug(D_STATSD, "Updating metric '%s'", m->key);
+#define STATSD_GAUGE_COLLECTION_RELATIVE 0x00000001
 
-    (void)options;
+static inline void statsd_collected_value(STATSD_METRIC *m, calculated_number value, calculated_number sample_rate, uint32_t options) {
+    debug(D_STATSD, "Updating metric '%s'", m->name);
 
     m->last_collected_ut = now_realtime_usec();
     m->events++;
-    m->count++;
+    m->count += sample_rate;
+
+    m->last = value;
+    if(value < m->min)
+        m->min = value;
+    if(value > m->max)
+        m->max = value;
 
     switch(m->type) {
         case STATSD_METRIC_TYPE_HISTOGRAM:
             // FIXME: not implemented yet
+            m->value += value;
+            break;
+
+        case STATSD_METRIC_TYPE_METER:
+            // we add to this metric
+            m->value += value;
+            break;
+
+        case STATSD_METRIC_TYPE_TIMER:
+            // we add time to this metric
+            m->value += value;
+            break;
 
         case STATSD_METRIC_TYPE_GAUGE:
-        case STATSD_METRIC_TYPE_TIMER:
-        case STATSD_METRIC_TYPE_METER:
-            m->last = value;
-            m->total += value;
-            if(value < m->min)
-                m->min = value;
-            if(value > m->max)
-                m->max = value;
+            if(unlikely(options & STATSD_GAUGE_COLLECTION_RELATIVE))
+                // we add the collected value
+                m->value += value;
+            else
+                // we replace the value of the metric
+                m->value = value;
             break;
 
         case STATSD_METRIC_TYPE_COUNTER:
-            m->total = m->last = value;
+            // we add the collected value
+            m->value += value;
             break;
     }
 
-    debug(D_STATSD, "Updated metric '%s', name '%s', type '%c', events %zu, count %zu, last_collected %llu, last value %0.5Lf, total %0.5Lf, min %0.5Lf, max %0.5Lf"
-          , m->key
+    debug(D_STATSD, "Updated metric '%s', type '%c', events %zu, count %0.5Lf, last_collected %llu, last value %0.5Lf, value %0.5Lf, min %0.5Lf, max %0.5Lf"
           , m->name
           , (char)m->type
           , m->events
           , m->count
           , m->last_collected_ut
           , m->last
-          , m->total
+          , m->value
           , m->min
           , m->max
     );
 }
 
-static inline void statsd_process_metric(const char *metric, STATSD_METRIC_TYPE type, calculated_number value, const char *options) {
-    debug(D_STATSD, "processing metric '%s', type '%c', value %0.5Lf, options '%s'", metric, (char)type, value, options?options:"");
+static inline void statsd_process_metric(const char *metric, STATSD_METRIC_TYPE type, calculated_number value, calculated_number sample_rate, uint32_t options) {
+    debug(D_STATSD, "processing metric '%s', type '%c', value %0.5Lf, sample_rate %0.5Lf, options '0x%08x'", metric, (char)type, value, sample_rate, options);
 
-    char key[STATSD_MAX_METRIC_LENGTH + 1];
-    key[0] = (char)type;
-    key[1] = '|';
-    strncpyz(&key[2], metric, sizeof(key) - 3);
+    uint32_t hash = simple_hash(metric);
 
-    uint32_t hash = simple_hash(key);
-
-    STATSD_METRIC *m = stasd_metric_index_find(key, hash);
+    STATSD_METRIC *m = stasd_metric_index_find(metric, hash);
     if(unlikely(!m)) {
-        debug(D_STATSD, "Creating new metric '%s'", key);
+        debug(D_STATSD, "Creating new metric '%s'", metric);
 
         m = (STATSD_METRIC *)callocz(sizeof(STATSD_METRIC), 1);
-        m->key = strdupz(key);
-        m->hash = hash;
         m->name = strdupz(metric);
+        m->hash = hash;
         m->type = type;
         m = (STATSD_METRIC *)avl_insert(&statsd_index, (avl *)m);
     }
 
-    statsd_collected_value(m, value, options);
+    statsd_collected_value(m, value, sample_rate, options);
 }
 
 
 // --------------------------------------------------------------------------------------------------------------------
 // statsd parsing
 
-static inline char *skip_to_next_separator(char *s) {
-    while(*s && *s != ':' && *s != '|' && *s != ' ' && *s != '\t' && *s != '\r' && *s != '\n')
-        s++;
+static void statsd_process_metric_raw(char *m, char *v, char *t, char *r) {
+    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', rate '%s'", m, v, t, r);
 
-    return s;
-}
+    if(unlikely(!m || !*m)) return;
 
-static inline char *skip_all_spaces(char *s) {
-    while(*s == ' ' || *s == '\t')
-        s++;
+    STATSD_METRIC_TYPE type = STATSD_METRIC_TYPE_METER;
+    calculated_number value = 1.0;
+    calculated_number sample_rate = 1.0;
+    uint32_t options = 0;
+    char *e;
 
-    return s;
-}
+    // collect the value
+    if(likely(v && *v)) {
+        e = NULL;
+        value = strtold(v, &e);
+        if(e && *e)
+            error("STATSD: excess data '%s' after value, metric '%s', value '%s'", e, m, v);
+    }
 
-static inline char *skip_all_spaces_and_newlines(char *s) {
-    while(*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n')
-        s++;
+    if(likely(r && *r)) {
+        e = NULL;
+        sample_rate = strtold(r, &e);
+        if(e && *e)
+            error("STATSD: excess data '%s' after sampling rate, metric '%s', value '%s', sampling rate '%s'", e, m, v, r);
+    }
 
-    return s;
-}
-
-static void statsd_process(char *buffer, size_t size) {
-    STATSD_METRIC_TYPE type;
-
-    buffer[size] = '\0';
-    debug(D_STATSD, "RECEIVED: '%s'", buffer);
-
-    char *s = buffer, *m, *v, *t;
-    while(*s) {
-        // skip all spaces and newlines
-        s = skip_all_spaces_and_newlines(s);
-
-        if(unlikely(!*s)) {
-            // we have nothing
-            continue;
-        }
-
-        // the beginning of the metric name
-        m = s;
-
-        // find the next separator
-        s = skip_to_next_separator(s);
-
-        // terminate the metric name
-        if(*s != '\0')
-            *s++ = '\0';
-
-        // skip all spaces
-        s = skip_all_spaces(s);
-
-        if(unlikely(!*s || *s == '\r' || *s == '\n')) {
-            // we have only the metric name
-            statsd_process_metric(m, STATSD_METRIC_TYPE_METER, 1.0, 0);
-            continue;
-        }
-
-        // the beginning of the metric value
-        v = s;
-
-        // find the next separator
-        s = skip_to_next_separator(s);
-
-        // terminate the value
-        if(*s != '\0')
-            *s++ = '\0';
-
-        // skip all spaces
-        s = skip_all_spaces(s);
-
-        if(unlikely(!*s || *s == '\r' || *s == '\n')) {
-            // we have only the metric name and value
-            statsd_process_metric(m, STATSD_METRIC_TYPE_GAUGE, strtold(v, NULL), 0);
-            continue;
-        }
-
-        // the beginning of type
-        t = s;
-
-        // find the next separator
-        s = skip_to_next_separator(s);
-
-        // terminate the type
-        if(*s != '\0')
-            *s++ = '\0';
-
-        // skip all spaces
-        s = skip_all_spaces(s);
-
-        // we have the metric name, value and type
-        switch(*t) {
-            default:
+    // we have the metric name, value and type
+    if(likely(t && *t)) {
+        switch (*t) {
             case 'g':
                 type = STATSD_METRIC_TYPE_GAUGE;
+                if (unlikely(*v == '-' || *v == '+'))
+                    options |= STATSD_GAUGE_COLLECTION_RELATIVE;
                 break;
 
+            default:
             case 'c':
                 type = STATSD_METRIC_TYPE_COUNTER;
                 break;
 
             case 'm':
-                if(t[1] == 's') type = STATSD_METRIC_TYPE_TIMER;
+                if (t[1] == 's') type = STATSD_METRIC_TYPE_TIMER;
                 else type = STATSD_METRIC_TYPE_METER;
                 break;
 
@@ -259,8 +209,112 @@ static void statsd_process(char *buffer, size_t size) {
                 type = STATSD_METRIC_TYPE_HISTOGRAM;
                 break;
         }
+    }
 
-        statsd_process_metric(m, type, strtold(v, NULL), 0);
+    statsd_process_metric(m, type, value, sample_rate, options);
+}
+
+static inline int is_statsd_space(char c) {
+    if(c == ' ' || c == '\t')
+        return 1;
+
+    return 0;
+}
+
+static inline int is_statsd_newline(char c) {
+    if(c == '\r' || c == '\n')
+        return 1;
+
+    return 0;
+}
+
+static inline int is_statsd_separator(char c) {
+    if(c == ':' || c == '|' || c == '@')
+        return 1;
+
+    return 0;
+}
+
+static inline char *skip_to_next_separator(char *s) {
+    while(*s && !is_statsd_separator(*s) && !is_statsd_newline(*s))
+        s++;
+
+    return s;
+}
+
+static char *statsd_get_field(char *s, char **field, int *line_break) {
+    *line_break = 0;
+
+    while(is_statsd_separator(*s) || is_statsd_space(*s))
+        s++;
+
+    if(unlikely(is_statsd_newline(*s))) {
+        *field = NULL;
+        *line_break = 1;
+
+        while(is_statsd_newline(*s))
+            *s++ = '\0';
+
+        return s;
+    }
+
+    *field = s;
+    s = skip_to_next_separator(s);
+
+    if(unlikely(is_statsd_newline(*s))) {
+        *line_break = 1;
+
+        while(is_statsd_newline(*s))
+            *s++ = '\0';
+    }
+    else if(likely(*s))
+        *s++ = '\0';
+
+    return s;
+}
+
+static void statsd_process(char *buffer, size_t size) {
+    buffer[size] = '\0';
+    debug(D_STATSD, "RECEIVED: '%s'", buffer);
+
+    char *s = buffer, *m, *v, *t, *r;
+    while(*s) {
+        m = v = t = r = NULL;
+        int line_break = 0;
+
+        s = statsd_get_field(s, &m, &line_break);
+        if(unlikely(line_break)) {
+            statsd_process_metric_raw(m, v, t, r);
+            continue;
+        }
+
+        s = statsd_get_field(s, &v, &line_break);
+        if(unlikely(line_break)) {
+            statsd_process_metric_raw(m, v, t, r);
+            continue;
+        }
+
+        s = statsd_get_field(s, &t, &line_break);
+        if(likely(line_break)) {
+            statsd_process_metric_raw(m, v, t, r);
+            continue;
+        }
+
+        s = statsd_get_field(s, &r, &line_break);
+        if(likely(line_break)) {
+            statsd_process_metric_raw(m, v, t, r);
+            continue;
+        }
+
+        if(*s && *s != '\r' && *s != '\n') {
+            error("STATSD: excess data '%s' at end of line, metric '%s', value '%s', sampling rate '%s'", s, m, v, r);
+
+            // delete the excess data at the end if line
+            while(*s && *s != '\r' && *s != '\n')
+                s++;
+        }
+
+        statsd_process_metric_raw(m, v, t, r);
     }
 }
 
