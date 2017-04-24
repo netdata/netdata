@@ -2,31 +2,24 @@
 # Description:  samba netdata python.d module
 # Author: Christopher Cox <chris_cox@endlessnow.com>
 #
-# The netdata user needs to be able to be able to sudo the smbstatus program without password
+# The netdata user needs to be able to be able to sudo the smbstatus program
+# without password:
 # netdata ALL=(ALL)       NOPASSWD: /usr/bin/smbstatus -P
 #
-# This makes calls to smbstatus -P (note smbd needs to be run with the -P 1 option) a lot.
+# This makes calls to smbstatus -P
 # 
-# Right now this just looks for the smb2_ counters, but adjust the regex to get what you need.
+# This just looks at a couple of values out of syscall, and some from smb2.
 #
-# The first chart makes a bad assumption that somehow readout/readin and writeout/writein 
-# have something to do with actual reads and writes.  While it seems to be mostly true for reads,
-# I am not sure what the write values are.  Perhaps they shouldn't be paired?
-#
-# create and close are paired, maybe they shouldn't be?
-#
-# getinfo and setinfo are paired, maybe they shouldn't be?
-#
-# The Other Smb2 chart is merely a display of current counter values.  They didn't seem to change
-# much to me.  However, if you notice something changing a lot there, bring one or more out into its own
-# chart and make it incremental (like find and notify... good examples).
-
+# The Lesser Ops chart is merely a display of current counter values.  They
+# didn't seem to change much to me.  However, if you notice something changing
+# a lot there, bring one or more out into its own chart and make it incremental
+# (like find and notify... good examples).
 
 from base import ExecutableService
 from re import compile
 
 # default module values (can be overridden per job in `config`)
-# update_every = 2
+update_every = 5
 priority = 60000
 retries = 60
 
@@ -38,7 +31,7 @@ CHARTS = {
                ['syscall_sendfile_bytes', 'sendfile', 'incremental', 1, 1024],
                ['syscall_recvfile_bytes', 'recvfile', 'incremental', -1, 1024]
              ],
-             'options': [None, 'R/Ws', 'kilobytes/s', 'Smb2', 'smb2.readwrite', 'area']
+             'options': [None, 'R/Ws', 'kilobytes/s', 'syscall', 'syscall.rw', 'area']
            },
            'smb2_rw': {
              'lines': [
@@ -47,33 +40,33 @@ CHARTS = {
                ['smb2_read_inbytes', 'readin', 'incremental', 1, 1024],
                ['smb2_write_outbytes', 'writeout', 'incremental', -1, 1024]
              ],
-             'options': [None, 'R/Ws', 'kilobytes/s', 'Smb2', 'smb2.readwrite', 'area']
+             'options': [None, 'R/Ws', 'kilobytes/s', 'smb2', 'smb2.rw', 'area']
            },
            'smb2_create_close': {
              'lines': [
                ['smb2_create_count', 'create', 'incremental', 1, 1],
                ['smb2_close_count', 'close', 'incremental', -1, 1]
              ],
-             'options': [None, 'Create/Close', 'operations/s', 'Smb2', 'smb2.create_close', 'line']
+             'options': [None, 'Create/Close', 'operations/s', 'smb2', 'smb2.create_close', 'line']
            },
            'smb2_info': {
              'lines': [
                ['smb2_getinfo_count', 'getinfo', 'incremental', 1, 1],
                ['smb2_setinfo_count', 'setinfo', 'incremental', -1, 1]
              ],
-             'options': [None, 'Info', 'operations/s', 'Smb2', 'smb2.get_set_info', 'line']
+             'options': [None, 'Info', 'operations/s', 'smb2', 'smb2.get_set_info', 'line']
            },
            'smb2_find': {
              'lines': [
                ['smb2_find_count', 'find', 'incremental', 1, 1]
              ],
-             'options': [None, 'Find', 'operations/s', 'Smb2', 'smb2.find', 'line']
+             'options': [None, 'Find', 'operations/s', 'smb2', 'smb2.find', 'line']
            },
            'smb2_notify': {
              'lines': [
                ['smb2_notify_count', 'notify', 'incremental', 1, 1]
              ],
-             'options': [None, 'Notify', 'operations/s', 'Smb2', 'smb2.notify', 'line']
+             'options': [None, 'Notify', 'operations/s', 'smb2', 'smb2.notify', 'line']
            },
            'smb2_sm_count': {
              'lines': [
@@ -88,7 +81,7 @@ CHARTS = {
                ['smb2_break_count', 'break', 'absolute', 1, 1],
                ['smb2_sessetup_count', 'sessetup', 'absolute', 1, 1]
              ],
-             'options': [None, 'Lesser Ops', 'count', 'Other Smb2', 'smb2.sm_counters', 'stacked']
+             'options': [None, 'Lesser Ops', 'count', 'smb2', 'smb2.sm_counters', 'stacked']
            }
          }
 
@@ -123,5 +116,3 @@ class Service(ExecutableService):
         parsed = self.rgx_smb2.findall(' '.join(raw_data))
 
         return dict(parsed) or None
-
-
