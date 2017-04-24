@@ -202,6 +202,7 @@
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
 
+#include "statistical.h"
 #include "socket.h"
 #include "eval.h"
 #include "health.h"

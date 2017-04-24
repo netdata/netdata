@@ -167,12 +167,6 @@ static int statsd_metric_compare(void* a, void* b) {
     else return strcmp(((STATSD_METRIC *)a)->name, ((STATSD_METRIC *)b)->name);
 }
 
-static int statsd_metric_set_compare(void* a, void* b) {
-    if(((STATSD_METRIC_SET_VALUE *)a)->hash < ((STATSD_METRIC_SET_VALUE *)b)->hash) return -1;
-    else if(((STATSD_METRIC_SET_VALUE *)a)->hash > ((STATSD_METRIC_SET_VALUE *)b)->hash) return 1;
-    else return strcmp(((STATSD_METRIC_SET_VALUE *)a)->value, ((STATSD_METRIC_SET_VALUE *)b)->value);
-}
-
 static inline STATSD_METRIC *stasd_metric_index_find(STATSD_INDEX *index, const char *name, uint32_t hash) {
     STATSD_METRIC tmp;
     tmp.name = name;
@@ -316,6 +310,8 @@ static inline void statsd_process_timer(STATSD_METRIC *m, char *v, char *r) {
 }
 
 static inline void statsd_process_set(STATSD_METRIC *m, char *v, char *r) {
+    (void)r;
+
     if(unlikely(!v || !*v)) {
         error("STATSD: metric of type set, with empty value is ignored.");
         return;
@@ -649,6 +645,9 @@ void *statsd_main(void *ptr) {
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
+
+    int enabled = config_get_boolean(CONFIG_SECTION_STATSD, "enabled", 1);
+    if(!enabled) return NULL;
 
     statsd_listen_sockets_setup();
     if(!statsd.sockets.opened) {
