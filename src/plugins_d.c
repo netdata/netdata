@@ -159,7 +159,16 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
             if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value?value:"<nothing>");
 
-            if(value) rrddim_set(st, dimension, strtoll(value, NULL, 0));
+            if(value) {
+                RRDDIM *rd = rrddim_find(st, dimension);
+                if(unlikely(!rd)) {
+                    error("PLUGINSD: '%s' is requesting a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.", cd->fullfilename, dimension, st->name, st->id, st->rrdhost->hostname);
+                    enabled = 0;
+                    break;
+                }
+                else
+                    rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));
+            }
         }
         else if(likely(hash == BEGIN_HASH && !strcmp(s, "BEGIN"))) {
             char *id = words[1];
