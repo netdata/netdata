@@ -83,6 +83,7 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
             rd->variables = NULL;
             rd->next = NULL;
             rd->rrdset = NULL;
+            rd->exposed = 0;
 
             struct timeval now;
             now_realtime_timeval(&now);
