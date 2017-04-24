@@ -7,7 +7,7 @@
 # netdata ALL=(ALL)       NOPASSWD: /usr/bin/smbstatus -P
 #
 # This makes calls to smbstatus -P
-# 
+#
 # This just looks at a couple of values out of syscall, and some from smb2.
 #
 # The Lesser Ops chart is merely a display of current counter values.  They
@@ -99,7 +99,7 @@ class Service(ExecutableService):
         if not (sudo_binary and smbstatus_binary):
             self.error('Can\'t locate \'sudo\' or \'smbstatus\' binary')
             return False
-        
+
         self.command = ' '.join([sudo_binary, '-n', smbstatus_binary, '-P'])
 
         return ExecutableService.check(self)
