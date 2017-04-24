@@ -103,7 +103,7 @@ class Service(ExecutableService):
         self.command = ' '.join([sudo_binary, '-n', smbstatus_binary, '-P'])
 
         return ExecutableService.check(self)
-    
+
     def _get_data(self):
         """
         Format data received from shell command
