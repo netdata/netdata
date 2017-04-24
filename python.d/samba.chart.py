@@ -24,7 +24,6 @@
 
 from base import ExecutableService
 from re import compile
-from subprocess import Popen, PIPE
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
