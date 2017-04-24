@@ -22,7 +22,7 @@
 # chart and make it incremental (like find and notify... good examples).
 
 
-from base import SimpleService
+from base import ExecutableService
 from re import compile
 from subprocess import Popen, PIPE
 
@@ -31,9 +31,16 @@ from subprocess import Popen, PIPE
 priority = 60000
 retries = 60
 
-ORDER = ['smb2_rw','smb2_create_close','smb2_info','smb2_find','smb2_notify','smb2_sm_count']
+ORDER = ['syscall_rw','smb2_rw','smb2_create_close','smb2_info','smb2_find','smb2_notify','smb2_sm_count']
 
 CHARTS = {
+           'syscall_rw': {
+             'lines': [
+               ['syscall_sendfile_bytes', 'sendfile', 'incremental', 1, 1024],
+               ['syscall_recvfile_bytes', 'recvfile', 'incremental', -1, 1024]
+             ],
+             'options': [None, 'R/Ws', 'kilobytes/s', 'Smb2', 'smb2.readwrite', 'area']
+           },
            'smb2_rw': {
              'lines': [
                ['smb2_read_outbytes', 'readout', 'incremental', 1, 1024],
@@ -48,26 +55,26 @@ CHARTS = {
                ['smb2_create_count', 'create', 'incremental', 1, 1],
                ['smb2_close_count', 'close', 'incremental', -1, 1]
              ],
-             'options': [None, 'Create/Close', 'operations/s', 'Smb2', 'smb2.create_close', 'area']
+             'options': [None, 'Create/Close', 'operations/s', 'Smb2', 'smb2.create_close', 'line']
            },
            'smb2_info': {
              'lines': [
                ['smb2_getinfo_count', 'getinfo', 'incremental', 1, 1],
                ['smb2_setinfo_count', 'setinfo', 'incremental', -1, 1]
              ],
-             'options': [None, 'Info', 'operations/s', 'Smb2', 'smb2.get_set_info', 'area']
+             'options': [None, 'Info', 'operations/s', 'Smb2', 'smb2.get_set_info', 'line']
            },
            'smb2_find': {
              'lines': [
                ['smb2_find_count', 'find', 'incremental', 1, 1]
              ],
-             'options': [None, 'Find', 'operations/s', 'Smb2', 'smb2.find', 'area']
+             'options': [None, 'Find', 'operations/s', 'Smb2', 'smb2.find', 'line']
            },
            'smb2_notify': {
              'lines': [
                ['smb2_notify_count', 'notify', 'incremental', 1, 1]
              ],
-             'options': [None, 'Notify', 'operations/s', 'Smb2', 'smb2.notify', 'area']
+             'options': [None, 'Notify', 'operations/s', 'Smb2', 'smb2.notify', 'line']
            },
            'smb2_sm_count': {
              'lines': [
@@ -87,84 +94,35 @@ CHARTS = {
          }
 
 
-class Service(SimpleService):
+class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
-        SimpleService.__init__(self, configuration=configuration, name=name)
-        self.smbstatus = self.find_binary('smbstatus')
-        self.rgx_smb2 = compile(r'(smb2_[^:]+):\s+(\d+)')
-        self.cache_prev = list()
+        ExecutableService.__init__(self, configuration=configuration, name=name)
+        self.order = ORDER
+        self.definitions = CHARTS
+        self.rgx_smb2 = compile(r'(smb2_[^:]+|syscall_.*file_bytes):\s+(\d+)')
 
     def check(self):
-        # Cant start without 'smbstatus' command
-        if not self.smbstatus:
-            self.error('Can\'t locate \'smbstatus\' binary or binary is not executable by netdata')
+        sudo_binary, smbstatus_binary = self.find_binary('sudo'), self.find_binary('smbstatus')
+
+        if not (sudo_binary and smbstatus_binary):
+            self.error('Can\'t locate \'sudo\' or \'smbstatus\' binary')
             return False
+        
+        self.command = ' '.join([sudo_binary, '-n', smbstatus_binary, '-P'])
 
-        # If command is present and we can execute it we need to make sure..
-        # 1. STDOUT is not empty
-        reply = self._get_raw_data()
-        if not reply:
-            self.error('No output from \'smbstatus\' (not enough privileges?)')
-            return False
-        self.error(reply)
-
-        # 2. Output is parsable (list is not empty after regex findall)
-        is_parsable = self.rgx_smb2.findall(reply)
-        if not is_parsable:
-            self.error('Cant parse output...')
-            return False
-
-        # We are about to start!
-        self.create_charts()
-
-        self.info('Plugin was started successfully')
-        return True
-     
-    def _get_raw_data(self):
-        try:
-            reply = Popen(['/usr/bin/sudo', '-n', self.smbstatus, '-P'], stdout=PIPE, stderr=PIPE, shell=False)
-        except OSError:
-            return None
-
-        raw_data = reply.communicate()[0]
-
-        if not raw_data:
-            return None
-
-        return raw_data.decode()
-
+        return ExecutableService.check(self)
+    
     def _get_data(self):
         """
         Format data received from shell command
         :return: dict
         """
         raw_data = self._get_raw_data()
-        data_all = self.rgx_smb2.findall(raw_data)
-
-        if not data_all:
+        if not raw_data:
             return None
 
-        # 1. ALL data from 'smbstatus -P'.
-        to_netdata = dict([(k, int(v)) for k, v in data_all])
-        
-        # Ready steady go!
-        return to_netdata
+        parsed = self.rgx_smb2.findall(' '.join(raw_data))
 
-    def create_charts(self):
-        # If 'all_charts' is true...ALL charts are displayed. If no only default + 'extra_charts'
-        #if self.configuration.get('all_charts'):
-        #    self.order = EXTRA_ORDER
-        #else:
-        #    try:
-        #        extra_charts = list(filter(lambda chart: chart in EXTRA_ORDER, self.extra_charts.split()))
-        #    except (AttributeError, NameError, ValueError):
-        #        self.error('Extra charts disabled.')
-        #        extra_charts = []
-    
-        self.order = ORDER[:]
-        #self.order.extend(extra_charts)
+        return dict(parsed) or None
 
-        # Create static charts
-        #self.definitions = {chart: values for chart, values in CHARTS.items() if chart in self.order}
-        self.definitions = CHARTS
 
