@@ -93,7 +93,7 @@ netdataDashboard.menu = {
 
     'samba': {
         title: 'Samba',
-        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        icon: "<i class=\"fa fa-folder-open\" aria-hidden=\"true\"></i>",
         info: 'Performance metrics of the Samba file share operations of this system. Samba is a implementation of Windows services, including Windows SMB protocol file shares.'
     },
 
