@@ -169,11 +169,11 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
             // The following stats depend on CONFIG_NUMA_BALANCING in the
             // kernel.
-            rrddim_add(st_numa, "pte updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "huge pte updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "hint faults", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "hint faults local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "pages migrated", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "pte_updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "huge_pte_updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "hint_faults", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "hint_faults_local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_numa, "pages_migrated", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_numa);
 
@@ -182,11 +182,11 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         rrddim_set(st_numa, "interleave", numa_interleave);
         rrddim_set(st_numa, "other", numa_other);
 
-        rrddim_set(st_numa, "pte updates", numa_pte_updates);
-        rrddim_set(st_numa, "huge pte updates", numa_huge_pte_updates);
-        rrddim_set(st_numa, "hint faults", numa_hint_faults);
-        rrddim_set(st_numa, "hint faults local", numa_hint_faults_local);
-        rrddim_set(st_numa, "pages migrated", numa_pages_migrated);
+        rrddim_set(st_numa, "pte_updates", numa_pte_updates);
+        rrddim_set(st_numa, "huge_pte_updates", numa_huge_pte_updates);
+        rrddim_set(st_numa, "hint_faults", numa_hint_faults);
+        rrddim_set(st_numa, "hint_faults_local", numa_hint_faults_local);
+        rrddim_set(st_numa, "pages_migrated", numa_pages_migrated);
 
         rrdset_done(st_numa);
     }
