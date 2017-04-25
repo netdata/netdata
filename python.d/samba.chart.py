@@ -16,7 +16,7 @@
 # (like find and notify... good examples).
 
 from base import ExecutableService
-from re import compile
+import re
 
 # default module values (can be overridden per job in `config`)
 update_every = 5
@@ -91,7 +91,7 @@ class Service(ExecutableService):
         ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.rgx_smb2 = compile(r'(smb2_[^:]+|syscall_.*file_bytes):\s+(\d+)')
+        self.rgx_smb2 = re.compile(r'(smb2_[^:]+|syscall_.*file_bytes):\s+(\d+)')
 
     def check(self):
         sudo_binary, smbstatus_binary = self.find_binary('sudo'), self.find_binary('smbstatus')
