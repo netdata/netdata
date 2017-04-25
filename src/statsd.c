@@ -720,7 +720,7 @@ static inline void statsd_chart_from_gauge(STATSD_METRIC *m) {
             , "value"       // units
             , STATSD_CHART_PRIORITY
             , statsd.update_every
-            , RRDSET_TYPE_AREA
+            , RRDSET_TYPE_LINE
         );
 
         m->rd_value = rrddim_add(m->st, "gauge",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
@@ -752,7 +752,7 @@ static inline void statsd_chart_from_counter(STATSD_METRIC *m) {
                 , "events/s"    // units
                 , STATSD_CHART_PRIORITY
                 , statsd.update_every
-                , RRDSET_TYPE_LINE
+                , RRDSET_TYPE_AREA
         );
 
         m->rd_value = rrddim_add(m->st, "counter", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -887,30 +887,30 @@ void *statsd_main(void *ptr) {
     if(!statsd.enabled) return NULL;
 
     statsd.update_every = default_rrd_update_every;
-    statsd.update_every = config_get_boolean(CONFIG_SECTION_STATSD, "update every (statsd flushInterval)", statsd.update_every);
+    statsd.update_every = (int)config_get_number(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
     if(statsd.update_every < default_rrd_update_every) {
         error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d", statsd.update_every, default_rrd_update_every);
         statsd.update_every = default_rrd_update_every;
     }
 
-    statsd.charts_for = simple_pattern_create(config_get(CONFIG_SECTION_STATSD, "create charts for metrics", "*"), SIMPLE_PATTERN_EXACT);
+    statsd.charts_for = simple_pattern_create(config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), SIMPLE_PATTERN_EXACT);
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on gauges (statsd deleteGauges)", 0))
+    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on gauges (deleteGauges)", 0))
         statsd.gauges.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on counters (statsd deleteCounters)", 0))
+    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on counters (deleteCounters)", 0))
         statsd.counters.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on meters (statsd deleteMeters)", 0))
+    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on meters (deleteMeters)", 0))
         statsd.meters.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on sets (statsd deleteSets)", 0))
+    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on sets (deleteSets)", 0))
         statsd.sets.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on histograms (statsd deleteHistograms)", 0))
+    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on histograms (deleteHistograms)", 0))
         statsd.histograms.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on timers (statsd deleteTimers)", 0))
+    if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on timers (deleteTimers)", 0))
         statsd.timers.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
     statsd_listen_sockets_setup();
