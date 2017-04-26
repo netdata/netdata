@@ -58,6 +58,7 @@ typedef enum statsd_metric_options {
     STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED = 0x00000001,
     STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED        = 0x00000002,
     STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED       = 0x00000004,
+    STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT        = 0x00000008,
 } STATS_METRIC_OPTIONS;
 
 typedef struct statsd_metric {
@@ -724,7 +725,8 @@ static inline void statsd_chart_from_gauge(STATSD_METRIC *m) {
         );
 
         m->rd_value = rrddim_add(m->st, "gauge",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1,    RRD_ALGORITHM_INCREMENTAL);
+        if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
+            m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1,    RRD_ALGORITHM_INCREMENTAL);
     }
     else rrdset_next(m->st);
 
@@ -733,20 +735,23 @@ static inline void statsd_chart_from_gauge(STATSD_METRIC *m) {
 
     m->reset = 1;
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
-    rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+
+    if(m->rd_count)
+        rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+
     rrdset_done(m->st);
 }
 
-static inline void statsd_chart_from_counter(STATSD_METRIC *m) {
+static inline void statsd_chart_from_counter_or_meter(STATSD_METRIC *m, char *dim, char *family) {
     if(unlikely(!m->st)) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
-        statsd_get_metric_type_and_id(m, type, id, "counter", RRD_ID_LENGTH_MAX);
+        statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
 
         m->st = rrdset_create_localhost(
                 type
                 , id
                 , NULL          // name
-                , "counters"    // family (submenu)
+                , family        // family (submenu)
                 , m->name       // context
                 , m->name       // title
                 , "events/s"    // units
@@ -755,8 +760,9 @@ static inline void statsd_chart_from_counter(STATSD_METRIC *m) {
                 , RRDSET_TYPE_AREA
         );
 
-        m->rd_value = rrddim_add(m->st, "counter", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        m->rd_count = rrddim_add(m->st, "events",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        m->rd_value = rrddim_add(m->st, dim,      NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
+            m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
     else rrdset_next(m->st);
 
@@ -765,40 +771,19 @@ static inline void statsd_chart_from_counter(STATSD_METRIC *m) {
 
     m->reset = 1;
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
-    rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+
+    if(m->rd_count)
+        rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+
     rrdset_done(m->st);
 }
 
+static inline void statsd_chart_from_counter(STATSD_METRIC *m) {
+    statsd_chart_from_counter_or_meter(m, "counter", "counters");
+}
+
 static inline void statsd_chart_from_meter(STATSD_METRIC *m) {
-    if(unlikely(!m->st)) {
-        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
-        statsd_get_metric_type_and_id(m, type, id, "meter", RRD_ID_LENGTH_MAX);
-
-        m->st = rrdset_create_localhost(
-                type
-                , id
-                , NULL          // name
-                , "meters"      // family (submenu)
-                , m->name       // context
-                , m->name       // title
-                , "events/s"    // units
-                , STATSD_CHART_PRIORITY
-                , statsd.update_every
-                , RRDSET_TYPE_LINE
-        );
-
-        m->rd_value = rrddim_add(m->st, "meter",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        m->rd_count = rrddim_add(m->st, "events",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    }
-    else rrdset_next(m->st);
-
-    if(m->count && !m->reset)
-        m->last = m->counter.value;
-
-    m->reset = 1;
-    rrddim_set_by_pointer(m->st, m->rd_value, m->last);
-    rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
-    rrdset_done(m->st);
+    statsd_chart_from_counter_or_meter(m, "meter", "meters");
 }
 
 static inline void statsd_chart_from_set(STATSD_METRIC *m) {
@@ -820,7 +805,9 @@ static inline void statsd_chart_from_set(STATSD_METRIC *m) {
         );
 
         m->rd_value = rrddim_add(m->st, "set",    "set size", 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        m->rd_count = rrddim_add(m->st, "events", NULL,       1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
+            m->rd_count = rrddim_add(m->st, "events", NULL,       1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
     else rrdset_next(m->st);
 
@@ -829,7 +816,10 @@ static inline void statsd_chart_from_set(STATSD_METRIC *m) {
 
     m->reset = 1;
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
-    rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+
+    if(m->rd_count)
+        rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+
     rrdset_done(m->st);
 }
 
@@ -894,6 +884,15 @@ void *statsd_main(void *ptr) {
     }
 
     statsd.charts_for = simple_pattern_create(config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), SIMPLE_PATTERN_EXACT);
+
+    if(config_get_boolean(CONFIG_SECTION_STATSD, "add dimension for number of events received", 1)) {
+        statsd.gauges.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
+        statsd.counters.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
+        statsd.meters.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
+        statsd.sets.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
+        statsd.histograms.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
+        statsd.timers.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
+    }
 
     if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on gauges (deleteGauges)", 0))
         statsd.gauges.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
