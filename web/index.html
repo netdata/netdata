@@ -1447,6 +1447,22 @@
                         mhead += generateHeadCharts('mainheads', chart, duration);
                         head += generateHeadCharts('heads', chart, duration);
 
+                        function chartCommonMin(family, context, units) {
+                            var x = netdataDashboard.anyAttribute(netdataDashboard.context, 'commonMin', context, undefined);
+                            if(typeof x !== 'undefined')
+                                return ' data-common-min="' + family + '/' + context + '/' + units + '"';
+                            else
+                                return '';
+                        }
+
+                        function chartCommonMax(family, context, units) {
+                            var x = netdataDashboard.anyAttribute(netdataDashboard.context, 'commonMax', context, undefined);
+                            if(typeof x !== 'undefined')
+                                return ' data-common-max="' + family + '/' + context + '/' + units + '"';
+                            else
+                                return '';
+                        }
+
                         // generate the chart
                         chtml += netdataDashboard.contextInfo(chart.context) + '<div id="chart_' + NETDATA.name2id(chart.id) + '" data-netdata="' + chart.id + '"'
                             + ' data-width="' + pcent_width.toString() + '%"'
@@ -1456,8 +1472,8 @@
                             + ' data-after="-' + duration.toString() + '"'
                             + ' data-id="' + NETDATA.name2id(options.hostname + '/' + chart.id) + '"'
                             + ' data-colors="' + netdataDashboard.anyAttribute(netdataDashboard.context, 'colors', chart.context, '') + '"'
-                            + ' data-common-min="' + chart.family + '/' + chart.context + '/' + chart.units + '"'
-                            + ' data-common-max="' + chart.family + '/' + chart.context + '/' + chart.units + '"'
+                            + chartCommonMin(chart.family, chart.context, chart.units)
+                            + chartCommonMax(chart.family, chart.context, chart.units)
                             + ' role="application"></div>';
 
                         // console.log('         \------- ' + chart.id + ' (' + chart.priority + '): ' + chart.context  + ' height: ' + menus[menu].submenus[submenu].height);
@@ -2899,7 +2915,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'dashboard_info.js?v20170426-1',
+                url: NETDATA.serverDefault + 'dashboard_info.js?v20170427-1',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
