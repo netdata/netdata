@@ -295,6 +295,17 @@ long long appconfig_get_number(struct config *root, const char *section, const c
     return strtoll(s, NULL, 0);
 }
 
+long double appconfig_get_float(struct config *root, const char *section, const char *name, long double value)
+{
+    char buffer[100], *s;
+    sprintf(buffer, "%0.5Lf", value);
+
+    s = appconfig_get(root, section, name, buffer);
+    if(!s) return value;
+
+    return strtold(s, NULL);
+}
+
 int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value)
 {
     char *s;
@@ -388,6 +399,16 @@ long long appconfig_set_number(struct config *root, const char *section, const c
 {
     char buffer[100];
     sprintf(buffer, "%lld", value);
+
+    appconfig_set(root, section, name, buffer);
+
+    return value;
+}
+
+long double appconfig_set_float(struct config *root, const char *section, const char *name, long double value)
+{
+    char buffer[100];
+    sprintf(buffer, "%0.5Lf", value);
 
     appconfig_set(root, section, name, buffer);
 
