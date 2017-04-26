@@ -344,7 +344,7 @@ static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
     return NULL;
 }
 
-RRDSET *rrdset_create(
+RRDSET *rrdset_create_custom(
           RRDHOST *host
         , const char *type
         , const char *id
@@ -356,6 +356,8 @@ RRDSET *rrdset_create(
         , long priority
         , int update_every
         , RRDSET_TYPE chart_type
+        , RRD_MEMORY_MODE memory_mode
+        , long history_entries
 ) {
     if(!type || !type[0]) {
         fatal("Cannot create rrd stats without a type.");
@@ -398,11 +400,11 @@ RRDSET *rrdset_create(
     // ------------------------------------------------------------------------
     // get the options from the config, we need to create it
 
-    long rentries = config_get_number(config_section, "history", host->rrd_history_entries);
-    long entries = align_entries_to_pagesize(host->rrd_memory_mode, rentries);
+    long rentries = config_get_number(config_section, "history", history_entries);
+    long entries = align_entries_to_pagesize(memory_mode, rentries);
     if(entries != rentries) entries = config_set_number(config_section, "history", entries);
 
-    if(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
+    if(memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
         entries = config_set_number(config_section, "history", 10);
 
     int enabled = config_get_boolean(config_section, "enabled", 1);
@@ -419,8 +421,8 @@ RRDSET *rrdset_create(
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || host->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
-        st = (RRDSET *) mymmap(fullfilename, size, ((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 0);
+    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP) {
+        st = (RRDSET *) mymmap(fullfilename, size, ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 0);
         if(st) {
             memset(&st->avl, 0, sizeof(avl));
             memset(&st->avlname, 0, sizeof(avl));
@@ -480,13 +482,13 @@ RRDSET *rrdset_create(
 
             // make sure we have the right memory mode
             // even if we cleared the memory
-            st->rrd_memory_mode = host->rrd_memory_mode;
+            st->rrd_memory_mode = memory_mode;
         }
     }
 
     if(unlikely(!st)) {
         st = callocz(1, size);
-        st->rrd_memory_mode = (host->rrd_memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_RAM;
+        st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_RAM;
     }
 
     st->config_section = strdup(config_section);

@@ -126,11 +126,20 @@ static struct statsd {
     int update_every;
     SIMPLE_PATTERN *charts_for;
 
+    size_t private_charts;
+    size_t max_private_charts;
+    size_t max_private_charts_hard;
+    RRD_MEMORY_MODE private_charts_memory_mode;
+    int private_charts_history;
+
     size_t histogram_increase_step;
     int threads;
     LISTEN_SOCKETS sockets;
 } statsd = {
         .enabled = 1,
+        .private_charts = 0,
+        .max_private_charts = 200,
+        .max_private_charts_hard = 1000,
 
         .gauges     = {
                 .name = "gauge",
@@ -706,22 +715,65 @@ static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, c
     netdata_fix_chart_id(id);
 }
 
+static inline RRDSET *statsd_private_rrdset_create(
+        STATSD_METRIC *m
+        , const char *type
+        , const char *id
+        , const char *name
+        , const char *family
+        , const char *context
+        , const char *title
+        , const char *units
+        , long priority
+        , int update_every
+        , RRDSET_TYPE chart_type
+) {
+    RRD_MEMORY_MODE memory_mode = statsd.private_charts_memory_mode;
+    long history = statsd.private_charts_history;
+
+    if(unlikely(statsd.private_charts >= statsd.max_private_charts)) {
+        debug(D_STATSD, "STATSD: metric '%s' will be charted with memory mode = none, because the maximum number of charts has been reached.", m->name);
+        info("STATSD: metric '%s' will be charted with memory mode = none, because the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts);
+        memory_mode = RRD_MEMORY_MODE_NONE;
+        history = 5;
+    }
+
+    statsd.private_charts++;
+    return rrdset_create_custom(
+            localhost
+            , type
+            , id
+            , name
+            , family
+            , context
+            , title
+            , units
+            , priority
+            , update_every
+            , chart_type
+            , memory_mode
+            , history
+    );
+}
+
+
 static inline void statsd_chart_from_gauge(STATSD_METRIC *m) {
     if(unlikely(!m->st)) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, "gauge", RRD_ID_LENGTH_MAX);
 
-        m->st = rrdset_create_localhost(
-            type
-            , id
-            , NULL          // name
-            , "gauges"      // family (submenu)
-            , m->name       // context
-            , m->name       // title
-            , "value"       // units
-            , STATSD_CHART_PRIORITY
-            , statsd.update_every
-            , RRDSET_TYPE_LINE
+        m->st = statsd_private_rrdset_create(
+                m
+                , type
+                , id
+                , NULL          // name
+                , "gauges"      // family (submenu)
+                , m->name       // context
+                , m->name       // title
+                , "value"       // units
+                , STATSD_CHART_PRIORITY
+                , statsd.update_every
+                , RRDSET_TYPE_LINE
         );
 
         m->rd_value = rrddim_add(m->st, "gauge",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
@@ -747,8 +799,9 @@ static inline void statsd_chart_from_counter_or_meter(STATSD_METRIC *m, char *di
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
 
-        m->st = rrdset_create_localhost(
-                type
+        m->st = statsd_private_rrdset_create(
+                m
+                , type
                 , id
                 , NULL          // name
                 , family        // family (submenu)
@@ -791,8 +844,9 @@ static inline void statsd_chart_from_set(STATSD_METRIC *m) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, "set", RRD_ID_LENGTH_MAX);
 
-        m->st = rrdset_create_localhost(
-                type
+        m->st = statsd_private_rrdset_create(
+                m
+                , type
                 , id
                 , NULL          // name
                 , "sets"        // family (submenu)
@@ -804,7 +858,7 @@ static inline void statsd_chart_from_set(STATSD_METRIC *m) {
                 , RRDSET_TYPE_LINE
         );
 
-        m->rd_value = rrddim_add(m->st, "set",    "set size", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value = rrddim_add(m->st, "set", "set size", 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL,       1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -823,23 +877,27 @@ static inline void statsd_chart_from_set(STATSD_METRIC *m) {
     rrdset_done(m->st);
 }
 
-static inline void statsd_charts_from_index(STATSD_INDEX *index, void (*chart_from_metric)(STATSD_METRIC *m)) {
+static inline void statsd_private_charts_from_index(STATSD_INDEX *index, void (*chart_from_metric)(STATSD_METRIC *m)) {
     STATSD_METRIC *m;
     for(m = index->first; m ; m = m->next) {
-
-        // if this is the first time we see this metric
-        // check it against our list
-        if(unlikely(!(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED|STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED))) {
-            if(simple_pattern_matches(statsd.charts_for, m->name))
-                m->options |= STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
-            else
+        if(unlikely(!(m->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED|STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED)))) {
+            if(statsd.private_charts >= statsd.max_private_charts_hard) {
+                debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts has been reached.", m->name);
+                info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts);
                 m->options |= STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED;
-        }
-
-        // if it is not enabled, don't do anything
-        if(unlikely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED)) {
-            m->reset = 1; // reset it to allow housekeeping
-            continue;
+                m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
+            }
+            else {
+                if (simple_pattern_matches(statsd.charts_for, m->name)) {
+                    debug(D_STATSD, "STATSD: metric '%s' will be charted.", m->name);
+                    m->options |= STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
+                    m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED;
+                } else {
+                    debug(D_STATSD, "STATSD: metric '%s' will not be charted.", m->name);
+                    m->options |= STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED;
+                    m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
+                }
+            }
         }
 
         // if no values are collected, and we need to show gaps
@@ -848,9 +906,12 @@ static inline void statsd_charts_from_index(STATSD_INDEX *index, void (*chart_fr
             continue;
         }
 
-        // send it to netdata
-        if(likely(chart_from_metric))
+        if(likely(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && chart_from_metric))
+            // send it to netdata
             chart_from_metric(m);
+        else
+            // since we not going to send it, reset it to allow housekeeping
+            m->reset = 1;
     }
 }
 
@@ -884,6 +945,10 @@ void *statsd_main(void *ptr) {
     }
 
     statsd.charts_for = simple_pattern_create(config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), SIMPLE_PATTERN_EXACT);
+    statsd.max_private_charts = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts allowed", (long long)statsd.max_private_charts);
+    statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts * 5);
+    statsd.private_charts_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_STATSD, "private charts memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
+    statsd.private_charts_history = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
 
     if(config_get_boolean(CONFIG_SECTION_STATSD, "add dimension for number of events received", 1)) {
         statsd.gauges.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
@@ -978,6 +1043,20 @@ void *statsd_main(void *ptr) {
     RRDDIM *rd_events_histogram = rrddim_add(st_events, "histograms", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_events_set       = rrddim_add(st_events, "sets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
+    RRDSET *st_pcharts = rrdset_create_localhost(
+            "netdata"
+            , "private_charts"
+            , NULL
+            , "statsd"
+            , NULL
+            , "Private metric charts created by the netdata statsd server"
+            , "charts"
+            , 132002
+            , statsd.update_every
+            , RRDSET_TYPE_AREA
+    );
+    RRDDIM *rd_pcharts = rrddim_add(st_pcharts, "charts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
     usec_t step = statsd.update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -987,9 +1066,20 @@ void *statsd_main(void *ptr) {
         if(unlikely(netdata_exit))
             break;
 
+        statsd_private_charts_from_index(&statsd.gauges, statsd_chart_from_gauge);
+        statsd_private_charts_from_index(&statsd.counters, statsd_chart_from_counter);
+        statsd_private_charts_from_index(&statsd.meters, statsd_chart_from_meter);
+        statsd_private_charts_from_index(&statsd.timers, NULL);
+        statsd_private_charts_from_index(&statsd.histograms, NULL);
+        statsd_private_charts_from_index(&statsd.sets, statsd_chart_from_set);
+
+        if(unlikely(netdata_exit))
+            break;
+
         if(hb_dt) {
             rrdset_next(st_metrics);
             rrdset_next(st_events);
+            rrdset_next(st_pcharts);
         }
 
         rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,     (collected_number)statsd.gauges.metrics);
@@ -1006,22 +1096,17 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_events, rd_events_histogram,   (collected_number)statsd.histograms.events);
         rrddim_set_by_pointer(st_events, rd_events_set,         (collected_number)statsd.sets.events);
 
+        rrddim_set_by_pointer(st_pcharts, rd_pcharts,           (collected_number)statsd.private_charts);
+
         if(unlikely(netdata_exit))
             break;
 
         rrdset_done(st_metrics);
         rrdset_done(st_events);
+        rrdset_done(st_pcharts);
 
         if(unlikely(netdata_exit))
             break;
-
-        statsd_charts_from_index(&statsd.gauges,     statsd_chart_from_gauge);
-        statsd_charts_from_index(&statsd.counters,   statsd_chart_from_counter);
-        statsd_charts_from_index(&statsd.meters,     statsd_chart_from_meter);
-        statsd_charts_from_index(&statsd.timers,     NULL);
-        statsd_charts_from_index(&statsd.histograms, NULL);
-        statsd_charts_from_index(&statsd.sets,       statsd_chart_from_set);
-
     }
 
     for(i = 0; i < statsd.threads ;i++)

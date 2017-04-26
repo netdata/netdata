@@ -53,7 +53,7 @@ inline void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
 // ----------------------------------------------------------------------------
 // RRDDIM create a dimension
 
-RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm) {
+RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode) {
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(rd)) {
         debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
@@ -71,8 +71,8 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
     rrdset_strncpyz_name(filename, id, FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
-        rd = (RRDDIM *)mymmap(fullfilename, size, ((st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
+    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP) {
+        rd = (RRDDIM *)mymmap(fullfilename, size, ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
         if(likely(rd)) {
             // we have a file mapped for rd
 
@@ -126,14 +126,14 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
 
             // make sure we have the right memory mode
             // even if we cleared the memory
-            rd->rrd_memory_mode = st->rrd_memory_mode;
+            rd->rrd_memory_mode = memory_mode;
         }
     }
 
     if(unlikely(!rd)) {
         // if we didn't manage to get a mmap'd dimension, just create one
         rd = callocz(1, size);
-        rd->rrd_memory_mode = (st->rrd_memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_RAM;
+        rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_RAM;
     }
 
     rd->memsize = size;
@@ -202,7 +202,6 @@ RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_numbe
 
     return(rd);
 }
-
 
 // ----------------------------------------------------------------------------
 // RRDDIM remove / free a dimension
