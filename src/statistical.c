@@ -121,7 +121,6 @@ long double moving_median(long double *series, size_t entries, size_t period) {
     if(entries <= period)
         return median(series, entries);
 
-    size_t len = entries - period;
     long double *data = copy_series(series, entries);
 
     size_t i;
