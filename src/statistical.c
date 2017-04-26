@@ -64,6 +64,38 @@ static int qsort_compare(const void *a, const void *b) {
     return 0;
 }
 
+inline void sort_series(long double *series, size_t entries) {
+    qsort(series, entries, sizeof(long double), qsort_compare);
+}
+
+inline long double *copy_series(long double *series, size_t entries) {
+    long double *copy = mallocz(sizeof(long double) * entries);
+    memcpy(copy, series, sizeof(long double) * entries);
+    return copy;
+}
+
+long double median_on_sorted_series(long double *series, size_t entries) {
+    if(unlikely(entries == 0))
+        return NAN;
+
+    if(unlikely(entries == 1))
+        return series[0];
+
+    if(unlikely(entries == 2))
+        return (series[0] + series[1]) / 2;
+
+    long double avg;
+    if(entries % 2 == 0) {
+        size_t m = entries / 2;
+        avg = (series[m] + series[m + 1]) / 2;
+    }
+    else {
+        avg = series[entries / 2];
+    }
+
+    return avg;
+}
+
 long double median(long double *series, size_t entries) {
     if(unlikely(entries == 0))
         return NAN;
@@ -74,18 +106,10 @@ long double median(long double *series, size_t entries) {
     if(unlikely(entries == 2))
         return (series[0] + series[1]) / 2;
 
-    long double *copy = mallocz(sizeof(long double) * entries);
-    memcpy(copy, series, sizeof(long double) * entries);
-    qsort(copy, entries, sizeof(long double), qsort_compare);
+    long double *copy = copy_series(series, entries);
+    sort_series(copy, entries);
 
-    long double avg;
-    if(entries % 2 == 0) {
-        size_t m = entries / 2;
-        avg = (copy[m] + copy[m + 1]) / 2;
-    }
-    else {
-        avg = copy[entries / 2];
-    }
+    long double avg = median_on_sorted_series(copy, entries);
 
     freez(copy);
     return avg;
@@ -98,7 +122,7 @@ long double moving_median(long double *series, size_t entries, size_t period) {
         return median(series, entries);
 
     size_t len = entries - period;
-    long double *data = mallocz(sizeof(long double) * len);
+    long double *data = copy_series(series, entries);
 
     size_t i;
     for(i = period; i < entries; i++) {
