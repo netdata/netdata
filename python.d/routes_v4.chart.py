@@ -3,10 +3,12 @@
 # Author: Tristan Keen
 
 from copy import deepcopy
-import os.path
+from os import access, R_OK
 import re
 
+# Internals
 from base import ExecutableService
+from msg import DEBUG_FLAG
 
 # default module values (can be overridden per job in `config`)
 update_every = 5
@@ -18,115 +20,129 @@ ORDER = ['ipv4']
 CHARTS = {
     'ipv4': {
         'options': [None, 'IPv4 Routes', 'routes found', 'ipv4', 'ipv4.routes', 'line'],
-        'lines': []
+        'lines': [['num_routes', None, 'absolute']]
     }}
 CIDR_MATCHER = re.compile(
-    '^(default|([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})(?:\/([0-9]|[1-2][0-9]|3[0-2]))?)(?:(?:\s.*)?)$')
+    '^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?)$')
 
 # TODO: Host path to proc file under docker?
 LINUX_IPV4_ROUTES_PROCFILE = '/proc/net/route'
+IP_COMMAND = 'ip -4 route list'
+IP_BINARY = 'ip'
+NETSTAT_COMMAND = 'netstat -rn4'
 
 
 class Service(ExecutableService):
+
+    @staticmethod
+    def normalise_cidr_list(value):
+        """
+        Allows cidrs to be provided in a list, or space/comma seperated
+        :return: list
+        """
+        cidrs = value
+        if isinstance(value, basestring):
+            cidrs = value.replace(',', ' ').split()
+        for i, cidr in enumerate(cidrs):
+            if '/' not in cidr:
+                cidrs[i] = cidr + '/32'
+        return cidrs
 
     def __init__(self, configuration=None, name=None):
         ExecutableService.__init__(
             self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
-        self.tested_cidrs = self.configuration.get('tested_cidrs')
+        self.tests = {}
+        for test_name, value in self.configuration.get('tests', {}).items():
+            self.tests[test_name] = self.normalise_cidr_list(value)
 
     def check(self):
-        if not (self.tested_cidrs and hasattr(self.tested_cidrs, 'keys')):
-            self.error('tested_cidrs not defined')
-            return False
-
-        if os.path.isfile(LINUX_IPV4_ROUTES_PROCFILE):
-            self.command = 'false'
-            self.get_routes_as_numeric_cidrs = self._read_proc_file
-        elif self.find_binary('ip'):
-            self.command = 'ip -4 route list'
-            self.get_routes_as_numeric_cidrs = self._parse_cidr_output
-        else:
-            self.command = 'netstat -rn4'
-            # TODO check which sort of netstat output
-            self.get_routes_as_numeric_cidrs = self._parse_netstat_netmask_output
-
-        self.numeric_cidrs_to_test = []
-        for cidr_name, cidr in self.tested_cidrs.items():
+        """
+        Check for validity of test CIDRs, and method to read routes
+        :return: Boolean
+        """
+        cidrs_ok = True
+        self.info('tests: ' + str(self.tests))
+        for test_name, test_cidrs in self.tests.items():
+            for test_cidr in test_cidrs:
+                if not CIDR_MATCHER.match(test_cidr):
+                    self.error('Syntax error with CIDR: ' + test_cidr)
+                    cidrs_ok = False
             self.definitions['ipv4']['lines'].append(
-                [cidr_name, None, 'absolute'])
-            numeric_cidr = self._cidr_to_number(cidr)
-            if numeric_cidr < 0:
-                self.error('Unparsable CIDR: ' + cidr)
-                return False
-            self.numeric_cidrs_to_test.append((cidr_name, numeric_cidr))
-        return True
+                [test_name, None, 'absolute'])
+        if access(LINUX_IPV4_ROUTES_PROCFILE, R_OK):
+            self.info('Reading routes via: ' + LINUX_IPV4_ROUTES_PROCFILE)
+            self.proc_file_dest_index = -1
+            self.get_route_cidrs = self._route_cidrs_from_proc_file
+            return cidrs_ok
+        self.command = IP_COMMAND if self.find_binary(IP_BINARY) else NETSTAT_COMMAND
+        self.info('Reading routes via command: ' + self.command)
+        self.get_route_cidrs = self._route_cidrs_from_command
+        return cidrs_ok and ExecutableService.check(self)
 
-    def _read_proc_file(self):
+    def _route_cidrs_from_proc_file(self):
         """
         Extract route table cidrs from /proc/net/route
         :return: set
         """
-        routes_as_numeric_cidrs = set()
-        with open(LINUX_IPV4_ROUTES_PROCFILE) as file:
-            parsed_header = False
-            for line in file:
-                elems = line.split('\t')
-                if not parsed_header:
-                    dest_index = elems.index('Destination')
-                    mask_index = elems.index('Mask')
-                    if dest_index == -1 or mask_index == -1:
-                        self.error('Unable to parse {} header:{}'.format(
-                            LINUX_IPV4_ROUTES_PROCFILE, line))
-                        break
-                    parsed_header = True
-                else:
-                    reversed_dest = int(elems[dest_index], 16)
-                    prefix_len = bin(int(elems[mask_index], 16)).count('1')
-                    routes_as_numeric_cidrs.add((reversed_dest << 8) + prefix_len)
-        return routes_as_numeric_cidrs
+        route_cidrs = set()
+        with open(LINUX_IPV4_ROUTES_PROCFILE) as route_procfile:
+            rows = route_procfile.readlines()
+            try:
+                if self.proc_file_dest_index < 0:
+                    title = rows[0].split('\t')
+                    self.proc_file_dest_index = title.index('Destination')
+                    self.proc_file_mask_index = title.index('Mask')
+                for data_row in rows[1:]:
+                    elems = data_row.split('\t')
+                    reversed_dest = int(elems[self.proc_file_dest_index], 16)
+                    prefix_len = bin(int(elems[self.proc_file_mask_index], 16)).count('1')
+                    route_cidrs.add('{}.{}.{}.{}/{}'.format(reversed_dest & 0xff, (reversed_dest >> 8) &
+                                                            0xff, (reversed_dest >> 16) & 0xff, reversed_dest >> 24, prefix_len))
+            except ValueError:
+                self.error('Failed to parse ' + LINUX_IPV4_ROUTES_PROCFILE)
+        return route_cidrs
 
-    def _parse_cidr_output(self):
+    def _route_cidrs_from_command(self):
         """
-        Run ip or other command that returns cidrs and parse to numeric_cidrs
+        Extract route table cidrs from ip or netstat command
         :return: set
         """
-        raw_output = self._get_raw_data()
-        if not raw_output:
-            return None
-        routes_as_numeric_cidrs = set()
-        for line in raw_output:
-            numeric_cidr = self._cidr_to_number(line)
-            if numeric_cidr >= 0:
-                routes_as_numeric_cidrs.add(numeric_cidr)
-        return routes_as_numeric_cidrs
-
-    @staticmethod
-    def _cidr_to_number(text):
-        """
-        Convert the CIDR of form A.B.C.D/E to a number formed as DCBAE in base 256,
-        i.e. the 32-bit reversed hex Destination from /proc/net/route
-        bumped up by 8 bits with the prefix length added.
-        """
-        m = CIDR_MATCHER.match(text)
-        if not m:
-            return -1
-        if m.group(0) == 'default':
-            return 0
-        prefix_length = 32 if m.group(6) == None else int(m.group(6))
-        return ((((int(m.group(5)) << 8) + int(m.group(4)) << 8) + int(m.group(3)) << 8) + int(m.group(2)) << 8) + prefix_length
+        route_cidrs = set()
+        raw = self._get_raw_data()
+        genmask_found = False
+        for line in raw:
+            fields = line.split()
+            if len(fields) < 3:
+                continue
+            first_field = fields[0]
+            if genmask_found:
+                prefix_length = str(''.join(bin(int(i)) for i in fields[2].split('.')).count('1'))
+                route_cidrs.add(first_field + '/' + prefix_length)
+            else:
+                if first_field == 'Destination' and fields[2] == 'Genmask':
+                    genmask_found = True
+                elif first_field == 'default':
+                    route_cidrs.add('0.0.0.0/0')
+                elif CIDR_MATCHER.match(first_field):
+                    if '/' not in first_field:
+                        first_field += '/32'
+                    route_cidrs.add(first_field)
+        return route_cidrs
 
     def _get_data(self):
         """
-        Read routing table via selected strategy and extract metrics
+        Parse routing table to extract metrics
         :return: dict
         """
-        routes = self.get_routes_as_numeric_cidrs()
-        if len(routes) == 0:
+        route_cidrs = self.get_route_cidrs()
+        if DEBUG_FLAG:
+            self.debug('Found routes: ' + str(route_cidrs))
+        if len(route_cidrs) == 0:
             self.error('No routes detected - likely bug in routes_v4.chart.py')
             return None
-        data = {'num_routes': len(routes)}
-        for cidr_name, numeric_cidr in self.numeric_cidrs_to_test:
-            data[cidr_name] = 1 if numeric_cidr in routes else 0
+        data = {'num_routes': len(route_cidrs)}
+        for test_name, test_cidrs in self.tests.items():
+            data[test_name] = 1 if any(c in route_cidrs for c in test_cidrs) else 0
         return data
