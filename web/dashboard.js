@@ -4472,11 +4472,11 @@ var NETDATA = window.NETDATA || {};
         options.valueRange = state.dygraph_options.valueRange;
 
         var oldMax = null, oldMin = null;
-        if(state.__commonMin !== null) {
+        if (state.__commonMin !== null) {
             state.data.min = state.dygraph_instance.axes_[0].extremeRange[0];
             oldMin = options.valueRange[0] = NETDATA.commonMin.get(state);
         }
-        if(state.__commonMax !== null) {
+        if (state.__commonMax !== null) {
             state.data.max = state.dygraph_instance.axes_[0].extremeRange[1];
             oldMax = options.valueRange[1] = NETDATA.commonMax.get(state);
         }
@@ -5100,12 +5100,19 @@ var NETDATA = window.NETDATA || {};
         state.dygraph_user_action = false;
         state.dygraph_last_rendered = Date.now();
 
-        if(typeof state.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
-            state.__commonMin = self.data('common-min') || null;
-            state.__commonMax = self.data('common-max') || null;
+        if(state.dygraph_options.valueRange[0] === null && state.dygraph_options.valueRange[1] === null) {
+            if (typeof state.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
+                state.__commonMin = self.data('common-min') || null;
+                state.__commonMax = self.data('common-max') || null;
+            }
+            else {
+                state.log('incompatible version of Dygraph detected');
+                state.__commonMin = null;
+                state.__commonMax = null;
+            }
         }
         else {
-            state.log('incompatible version of Dygraph detected');
+            // if the user gave a valueRange, respect it
             state.__commonMin = null;
             state.__commonMax = null;
         }
@@ -6596,7 +6603,7 @@ var NETDATA = window.NETDATA || {};
             if(typeof chart_id === 'string') {
                 var offset = $('#' + NETDATA.alarms.chart_div_id_prefix + NETDATA.name2id(chart_id)).offset();
                 if(typeof offset !== 'undefined') {
-                    $('html, body').animate({ scrollTop: offset.top - NETDATA.alarms.chart_div_offset }, NETDATA.alarms.chart_div_animation_duration);
+                    $('html, body').animate({ scrollTop: offset.top + NETDATA.alarms.chart_div_offset }, NETDATA.alarms.chart_div_animation_duration);
                     return true;
                 }
             }

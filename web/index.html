@@ -983,7 +983,7 @@
             if(hash && hash != '' && document.getElementById(hash) !== null) {
                 var offset = $('#' + hash).offset();
                 if(typeof offset !== 'undefined')
-                    $('html, body').animate({ scrollTop: offset.top }, 0);
+                    $('html, body').animate({ scrollTop: offset.top - 50 }, 0);
             }
 
             // we must return false to prevent the default action
@@ -1456,6 +1456,8 @@
                             + ' data-after="-' + duration.toString() + '"'
                             + ' data-id="' + NETDATA.name2id(options.hostname + '/' + chart.id) + '"'
                             + ' data-colors="' + netdataDashboard.anyAttribute(netdataDashboard.context, 'colors', chart.context, '') + '"'
+                            + ' data-common-min="' + chart.family + '/' + chart.context + '/' + chart.units + '"'
+                            + ' data-common-max="' + chart.family + '/' + chart.context + '/' + chart.units + '"'
                             + ' role="application"></div>';
 
                         // console.log('         \------- ' + chart.id + ' (' + chart.priority + '): ' + chart.context  + ' height: ' + menus[menu].submenus[submenu].height);
@@ -2676,10 +2678,11 @@
 
             // change the URL based on the current position of the screen
             $sidebar.on('activate.bs.scrollspy', function (e) {
-                // console.log(e);
+                //console.log(e);
                 var el = $(e.target);
                 //if(el.find('ul').size() == 0) {
                 var hash = el.find('a').attr('href');
+                // console.log(hash);
                 if(typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
                     urlOptions.hash = hash;
                     //console.log(urlOptions.hash);
@@ -3524,4 +3527,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170421-2"></script>
+<script type="text/javascript" src="dashboard.js?v20170426-6"></script>
