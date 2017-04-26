@@ -251,8 +251,14 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, char
         m->name = strdupz(metric);
         m->hash = hash;
         m->options = index->default_options;
+
+        if(index == &statsd.histograms || index == &statsd.timers) {
+            m->histogram.ext = callocz(sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS), 1);
+            netdata_mutex_init(&m->histogram.mutex);
+        }
         STATSD_METRIC *n = (STATSD_METRIC *)STATSD_AVL_INSERT(&index->index, (avl *)m);
         if(unlikely(n != m)) {
+            freez((void *)m->histogram.ext);
             freez((void *)m->name);
             freez((void *)m);
             m = n;
@@ -262,12 +268,6 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, char
             index->metrics++;
             m->next = index->first;
             index->first = m;
-
-            if(index == &statsd.histograms || index == &statsd.timers) {
-                m->histogram.ext = callocz(sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS), 1);
-                netdata_mutex_init(&m->histogram.mutex);
-            }
-
             STATSD_FIRST_PTR_MUTEX_UNLOCK(index);
         }
     }
