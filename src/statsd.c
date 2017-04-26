@@ -38,10 +38,21 @@ typedef struct statsd_metric_counter { // counter and meter
     long long value;
 } STATSD_METRIC_COUNTER;
 
-typedef struct statsd_metric_histogram { // histogram and timer
+typedef struct statsd_histogram_extensions {
     size_t size;
     size_t used;
-    long double *values;   // dynamic array of values collected
+    collected_number last_min;
+    collected_number last_max;
+    collected_number last_pct;
+    RRDDIM *rd_min;
+    RRDDIM *rd_max;
+    RRDDIM *rd_pct;
+    long double values[];   // dynamic array of values collected
+} STATSD_METRIC_HISTOGRAM_EXTENSIONS;
+
+typedef struct statsd_metric_histogram { // histogram and timer
+    netdata_mutex_t mutex;
+    STATSD_METRIC_HISTOGRAM_EXTENSIONS *ext;
 } STATSD_METRIC_HISTOGRAM;
 
 typedef struct statsd_metric_set {
@@ -133,6 +144,8 @@ static struct statsd {
     int private_charts_history;
 
     size_t histogram_increase_step;
+    double histogram_percentile;
+    char *histogram_percentile_str;
     int threads;
     LISTEN_SOCKETS sockets;
 } statsd = {
@@ -196,6 +209,7 @@ static struct statsd {
                 STATSD_FIRST_PTR_MUTEX_INIT
         },
 
+        .histogram_percentile = 95.0,
         .histogram_increase_step = 10,
         .threads = 0,
         .sockets = {
@@ -248,6 +262,12 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, char
             index->metrics++;
             m->next = index->first;
             index->first = m;
+
+            if(index == &statsd.histograms || index == &statsd.timers) {
+                m->histogram.ext = callocz(sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS), 1);
+                netdata_mutex_init(&m->histogram.mutex);
+            }
+
             STATSD_FIRST_PTR_MUTEX_UNLOCK(index);
         }
     }
@@ -338,16 +358,18 @@ static inline void statsd_process_histogram(STATSD_METRIC *m, char *v, char *r) 
     }
 
     if(unlikely(m->reset)) {
-        m->histogram.used = 0;
+        m->histogram.ext->used = 0;
         statsd_reset_metric(m);
     }
 
-    if(m->histogram.used == m->histogram.size) {
-        m->histogram.size += statsd.histogram_increase_step;
-        m->histogram.values = reallocz(m->histogram.values, sizeof(long double) * m->histogram.size);
+    if(m->histogram.ext->used == m->histogram.ext->size) {
+        netdata_mutex_lock(&m->histogram.mutex);
+        m->histogram.ext->size += statsd.histogram_increase_step;
+        m->histogram.ext = reallocz(m->histogram.ext, sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS) + (sizeof(long double) * m->histogram.ext->size));
+        netdata_mutex_unlock(&m->histogram.mutex);
     }
 
-    m->histogram.values[m->histogram.used++] = statsd_parse_float(v, 1.0) / statsd_parse_float(r, 1.0);
+    m->histogram.ext->values[m->histogram.ext->used++] = statsd_parse_float(v, 1.0) / statsd_parse_float(r, 1.0);
 
     m->events++;
     m->count++;
@@ -690,7 +712,7 @@ void *statsd_collector_thread(void *ptr) {
 
 
 // --------------------------------------------------------------------------------------------------------------------
-// send metrics to netdata - called from the main thread
+// send metrics to netdata - in private charts - called from the main thread
 
 #define STATSD_CHART_PREFIX "statsd"
 #define STATSD_CHART_PRIORITY 90000
@@ -877,7 +899,72 @@ static inline void statsd_chart_from_set(STATSD_METRIC *m) {
     rrdset_done(m->st);
 }
 
-static inline void statsd_private_charts_from_index(STATSD_INDEX *index, void (*chart_from_metric)(STATSD_METRIC *m)) {
+static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *dim, char *family) {
+    if(unlikely(!m->st)) {
+        char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
+        statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
+
+        m->st = statsd_private_rrdset_create(
+                m
+                , type
+                , id
+                , NULL          // name
+                , family        // family (submenu)
+                , m->name       // context
+                , m->name       // title
+                , "events/s"    // units
+                , STATSD_CHART_PRIORITY
+                , statsd.update_every
+                , RRDSET_TYPE_AREA
+        );
+
+        m->histogram.ext->rd_min = rrddim_add(m->st, "min", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_max = rrddim_add(m->st, "max", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value              = rrddim_add(m->st, "avg", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_pct = rrddim_add(m->st, statsd.histogram_percentile_str, NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+
+        if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
+            m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+    else rrdset_next(m->st);
+
+    if(m->count && !m->reset) {
+        netdata_mutex_lock(&m->histogram.mutex);
+
+        size_t len = m->histogram.ext->used;
+        long double *series = m->histogram.ext->values;
+        sort_series(series, len);
+
+        m->histogram.ext->last_min = (collected_number)roundl(series[0] * 1000.0);
+        m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * 1000.0);
+        m->last = (collected_number)roundl(average(series, len) * 1000);
+        m->histogram.ext->last_pct = (collected_number)roundl(average(series, (size_t)floor((double)len * statsd.histogram_percentile / 100.0)) * 1000);
+
+        netdata_mutex_unlock(&m->histogram.mutex);
+    }
+
+    m->reset = 1;
+    rrddim_set_by_pointer(m->st, m->histogram.ext->rd_min, m->histogram.ext->last_min);
+    rrddim_set_by_pointer(m->st, m->histogram.ext->rd_max, m->histogram.ext->last_max);
+    rrddim_set_by_pointer(m->st, m->histogram.ext->rd_pct, m->histogram.ext->last_pct);
+    rrddim_set_by_pointer(m->st, m->rd_value, m->last);
+
+    if(m->rd_count)
+        rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+
+    rrdset_done(m->st);
+}
+
+
+static inline void statsd_chart_from_timer(STATSD_METRIC *m) {
+    statsd_chart_from_timer_or_histogram(m, "timer", "timers");
+}
+
+static inline void statsd_chart_from_histogram(STATSD_METRIC *m) {
+    statsd_chart_from_timer_or_histogram(m, "histogram", "histograms");
+}
+
+static inline void statsd_private_charts_from_index(STATSD_INDEX *index, void (*chart_from_metric)(STATSD_METRIC *)) {
     STATSD_METRIC *m;
     for(m = index->first; m ; m = m->next) {
         if(unlikely(!(m->options & (STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED|STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED)))) {
@@ -949,6 +1036,17 @@ void *statsd_main(void *ptr) {
     statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts * 5);
     statsd.private_charts_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_STATSD, "private charts memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
     statsd.private_charts_history = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
+
+    statsd.histogram_percentile = (double)config_get_float(CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
+    if(isless(statsd.histogram_percentile, 0) || isgreater(statsd.histogram_percentile, 100)) {
+        error("STATSD: invalid histograms and timers percentile %0.5f given", statsd.histogram_percentile);
+        statsd.histogram_percentile = 95.0;
+    }
+    {
+        char buffer[100 + 1];
+        snprintf(buffer, 100, "%0.1f%%", statsd.histogram_percentile);
+        statsd.histogram_percentile_str = strdupz(buffer);
+    }
 
     if(config_get_boolean(CONFIG_SECTION_STATSD, "add dimension for number of events received", 1)) {
         statsd.gauges.default_options |= STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT;
@@ -1069,8 +1167,8 @@ void *statsd_main(void *ptr) {
         statsd_private_charts_from_index(&statsd.gauges, statsd_chart_from_gauge);
         statsd_private_charts_from_index(&statsd.counters, statsd_chart_from_counter);
         statsd_private_charts_from_index(&statsd.meters, statsd_chart_from_meter);
-        statsd_private_charts_from_index(&statsd.timers, NULL);
-        statsd_private_charts_from_index(&statsd.histograms, NULL);
+        statsd_private_charts_from_index(&statsd.timers, statsd_chart_from_timer);
+        statsd_private_charts_from_index(&statsd.histograms, statsd_chart_from_histogram);
         statsd_private_charts_from_index(&statsd.sets, statsd_chart_from_set);
 
         if(unlikely(netdata_exit))

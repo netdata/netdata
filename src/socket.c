@@ -978,5 +978,8 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
         }
     }
+
+    freez(p.fds);
+    freez(p.inf);
 }
 

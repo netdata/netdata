@@ -35,12 +35,14 @@ extern int appconfig_load(struct config *root, char *filename, int overwrite_use
 
 extern char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 extern long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
+extern long double appconfig_get_float(struct config *root, const char *section, const char *name, long double value);
 extern int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 extern int appconfig_get_boolean_ondemand(struct config *root, const char *section, const char *name, int value);
 
 extern const char *appconfig_set(struct config *root, const char *section, const char *name, const char *value);
 extern const char *appconfig_set_default(struct config *root, const char *section, const char *name, const char *value);
 extern long long appconfig_set_number(struct config *root, const char *section, const char *name, long long value);
+extern long double appconfig_set_float(struct config *root, const char *section, const char *name, long double value);
 extern int appconfig_set_boolean(struct config *root, const char *section, const char *name, int value);
 
 extern int appconfig_exists(struct config *root, const char *section, const char *name);
@@ -54,12 +56,14 @@ extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed
 #define config_load(filename, overwrite_used) appconfig_load(&netdata_config, filename, overwrite_used)
 #define config_get(section, name, default_value) appconfig_get(&netdata_config, section, name, default_value)
 #define config_get_number(section, name, value) appconfig_get_number(&netdata_config, section, name, value)
+#define config_get_float(section, name, value) appconfig_get_float(&netdata_config, section, name, value)
 #define config_get_boolean(section, name, value) appconfig_get_boolean(&netdata_config, section, name, value)
 #define config_get_boolean_ondemand(section, name, value) appconfig_get_boolean_ondemand(&netdata_config, section, name, value)
 
 #define config_set(section, name, default_value) appconfig_set(&netdata_config, section, name, default_value)
 #define config_set_default(section, name, value) appconfig_set_default(&netdata_config, section, name, value)
 #define config_set_number(section, name, value) appconfig_set_number(&netdata_config, section, name, value)
+#define config_set_float(section, name, value) appconfig_set_float(&netdata_config, section, name, value)
 #define config_set_boolean(section, name, value) appconfig_set_boolean(&netdata_config, section, name, value)
 
 #define config_exists(section, name) appconfig_exists(&netdata_config, section, name)
