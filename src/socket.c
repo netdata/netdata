@@ -746,6 +746,7 @@ struct poll {
     void *(*add_callback)(int fd, short int *events);
     void  (*del_callback)(int fd, void *data);
     int   (*rcv_callback)(int fd, int socktype, void *data, short int *events);
+    int   (*snd_callback)(int fd, int socktype, void *data, short int *events);
 };
 
 static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype, short int events, uint32_t flags) {
@@ -762,7 +763,7 @@ static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype,
 
         ssize_t i;
         for(i = new_slots - 1; i >= (ssize_t)p->slots ; i--) {
-            debug(D_POLLFD, "POLLFD: ADD: reseting new slot %zd", i);
+            debug(D_POLLFD, "POLLFD: ADD: resetting new slot %zd", i);
             p->fds[i].fd = -1;
             p->fds[i].events = 0;
             p->fds[i].revents = 0;
@@ -854,6 +855,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         , void *(*add_callback)(int fd, short int *events)
         , void  (*del_callback)(int fd, void *data)
         , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
+        , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
 ) {
     int retval;
 
@@ -867,7 +869,8 @@ void poll_events(LISTEN_SOCKETS *sockets
 
             .add_callback = add_callback,
             .del_callback = del_callback,
-            .rcv_callback = rcv_callback
+            .rcv_callback = rcv_callback,
+            .snd_callback = snd_callback
     };
 
     size_t i;
@@ -905,9 +908,10 @@ void poll_events(LISTEN_SOCKETS *sockets
                 continue;
             }
 
-            // check for new incoming connections
             if(pf->revents & POLLIN || pf->revents & POLLPRI) {
-                debug(D_POLLFD, "POLLFD: LISTENER: processing events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+                // receiving data
+
+                debug(D_POLLFD, "POLLFD: LISTENER: processing POLLIN events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
 
                 pf->revents = 0;
 
@@ -916,8 +920,10 @@ void poll_events(LISTEN_SOCKETS *sockets
 
                     debug(D_POLLFD, "POLLFD: LISTENER: reading data from TCP client slot %zu (fd %d)", i, fd);
 
-                    if (p.rcv_callback(fd, pi->socktype, pi->data, &pf->events) == -1)
+                    if (p.rcv_callback(fd, pi->socktype, pi->data, &pf->events) == -1) {
                         poll_close_fd(&p, pi);
+                        continue;
+                    }
                 }
 
                 if(likely(pi->flags & POLLINFO_FLAG_SERVER_SOCKET)) {
@@ -973,8 +979,41 @@ void poll_events(LISTEN_SOCKETS *sockets
                     }
                 }
             }
-            else {
-                debug(D_POLLFD, "POLLFD: LISTENER: no events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+
+            if(unlikely(pf->revents & POLLOUT)) {
+                // sending data
+
+                debug(D_POLLFD, "POLLFD: LISTENER: processing POLLOUT events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+
+                pf->revents = 0;
+
+                debug(D_POLLFD, "POLLFD: LISTENER: sending data to socket on slot %zu (fd %d)", i, fd);
+
+                if (p.snd_callback(fd, pi->socktype, pi->data, &pf->events) == -1) {
+                    poll_close_fd(&p, pi);
+                    continue;
+                }
+            }
+
+            if(unlikely(pf->revents & POLLERR)) {
+                debug(D_POLLFD, "POLLFD: LISTENER: processing POLLERR events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+                error("POLLFD: LISTENER: processing POLLERR events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+                poll_close_fd(&p, pi);
+                continue;
+            }
+
+            if(unlikely(pf->revents & POLLHUP)) {
+                debug(D_POLLFD, "POLLFD: LISTENER: processing POLLHUP events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+                error("POLLFD: LISTENER: processing POLLHUP events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+                poll_close_fd(&p, pi);
+                continue;
+            }
+
+            if(unlikely(pf->revents & POLLNVAL)) {
+                debug(D_POLLFD, "POLLFD: LISTENER: processing POLLNVAP events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+                error("POLLFD: LISTENER: processing POLLNVAP events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+                poll_close_fd(&p, pi);
+                continue;
             }
         }
     }

@@ -682,6 +682,15 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
     return 0;
 }
 
+static int statsd_snd_callback(int fd, int socktype, void *data, short int *events) {
+    (void)fd;
+    (void)socktype;
+    (void)data;
+    (void)events;
+    
+    error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
+    return -1;
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // statsd child thread to collect metrics from network
@@ -701,6 +710,7 @@ void *statsd_collector_thread(void *ptr) {
             , statsd_add_callback
             , statsd_del_callback
             , statsd_rcv_callback
+            , statsd_snd_callback
     );
 
     debug(D_WEB_CLIENT, "STATSD: exit!");
