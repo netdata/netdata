@@ -238,17 +238,17 @@ static inline STATSD_METRIC *stasd_metric_index_find(STATSD_INDEX *index, const 
     return (STATSD_METRIC *)STATSD_AVL_SEARCH(&index->index, (avl *)&tmp);
 }
 
-static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, char *metric) {
-    debug(D_STATSD, "finding or adding metric '%s' under '%s'", metric, index->name);
+static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name) {
+    debug(D_STATSD, "finding or adding metric '%s' under '%s'", name, index->name);
 
-    uint32_t hash = simple_hash(metric);
+    uint32_t hash = simple_hash(name);
 
-    STATSD_METRIC *m = stasd_metric_index_find(index, metric, hash);
+    STATSD_METRIC *m = stasd_metric_index_find(index, name, hash);
     if(unlikely(!m)) {
-        debug(D_STATSD, "Creating new %s metric '%s'", index->name, metric);
+        debug(D_STATSD, "Creating new %s metric '%s'", index->name, name);
 
         m = (STATSD_METRIC *)callocz(sizeof(STATSD_METRIC), 1);
-        m->name = strdupz(metric);
+        m->name = strdupz(name);
         m->hash = hash;
         m->options = index->default_options;
 
@@ -315,8 +315,8 @@ static inline void statsd_reset_metric(STATSD_METRIC *m) {
     m->count = 0;
 }
 
-static inline void statsd_process_gauge(STATSD_METRIC *m, char *v, char *r) {
-    if(unlikely(!v || !*v)) {
+static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
+    if(unlikely(!value || !*value)) {
         error("STATSD: metric '%s' of type gauge, with empty value is ignored.", m->name);
         return;
     }
@@ -326,33 +326,33 @@ static inline void statsd_process_gauge(STATSD_METRIC *m, char *v, char *r) {
         statsd_reset_metric(m);
     }
 
-    if(*v == '+' || *v == '-')
-        m->gauge.value += statsd_parse_float(v, 1.0) / statsd_parse_float(r, 1.0);
+    if(*value == '+' || *value == '-')
+        m->gauge.value += statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
     else
-        m->gauge.value = statsd_parse_float(v, 1.0) / statsd_parse_float(r, 1.0);
+        m->gauge.value = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
 
     m->events++;
     m->count++;
 }
 
-static inline void statsd_process_counter(STATSD_METRIC *m, char *v, char *r) {
+static inline void statsd_process_counter(STATSD_METRIC *m, const char *value, const char *sampling) {
     // we accept empty values for counters
 
     if(unlikely(m->reset)) statsd_reset_metric(m);
 
-    m->counter.value += roundl((long double)statsd_parse_int(v, 1) / statsd_parse_float(r, 1.0));
+    m->counter.value += roundl((long double)statsd_parse_int(value, 1) / statsd_parse_float(sampling, 1.0));
 
     m->events++;
     m->count++;
 }
 
-static inline void statsd_process_meter(STATSD_METRIC *m, char *v, char *r) {
+static inline void statsd_process_meter(STATSD_METRIC *m, const char *value, const char *sampling) {
     // this is the same with the counter
-    statsd_process_counter(m, v, r);
+    statsd_process_counter(m, value, sampling);
 }
 
-static inline void statsd_process_histogram(STATSD_METRIC *m, char *v, char *r) {
-    if(unlikely(!v || !*v)) {
+static inline void statsd_process_histogram(STATSD_METRIC *m, const char *value, const char *sampling) {
+    if(unlikely(!value || !*value)) {
         error("STATSD: metric '%s' of type histogram, with empty value is ignored.", m->name);
         return;
     }
@@ -369,26 +369,24 @@ static inline void statsd_process_histogram(STATSD_METRIC *m, char *v, char *r) 
         netdata_mutex_unlock(&m->histogram.mutex);
     }
 
-    m->histogram.ext->values[m->histogram.ext->used++] = statsd_parse_float(v, 1.0) / statsd_parse_float(r, 1.0);
+    m->histogram.ext->values[m->histogram.ext->used++] = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
 
     m->events++;
     m->count++;
 }
 
-static inline void statsd_process_timer(STATSD_METRIC *m, char *v, char *r) {
-    if(unlikely(!v || !*v)) {
+static inline void statsd_process_timer(STATSD_METRIC *m, const char *value, const char *sampling) {
+    if(unlikely(!value || !*value)) {
         error("STATSD: metric of type set, with empty value is ignored.");
         return;
     }
 
     // timers are a use case of histogram
-    statsd_process_histogram(m, v, r);
+    statsd_process_histogram(m, value, sampling);
 }
 
-static inline void statsd_process_set(STATSD_METRIC *m, char *v, char *r) {
-    (void)r;
-
-    if(unlikely(!v || !*v)) {
+static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
+    if(unlikely(!value || !*value)) {
         error("STATSD: metric of type set, with empty value is ignored.");
         return;
     }
@@ -406,9 +404,9 @@ static inline void statsd_process_set(STATSD_METRIC *m, char *v, char *r) {
         m->set.unique = 0;
     }
 
-    void *t = dictionary_get(m->set.dict, v);
+    void *t = dictionary_get(m->set.dict, value);
     if(unlikely(!t)) {
-        dictionary_set(m->set.dict, v, v, 1);
+        dictionary_set(m->set.dict, value, NULL, 1);
         m->set.unique++;
     }
 
@@ -420,158 +418,160 @@ static inline void statsd_process_set(STATSD_METRIC *m, char *v, char *r) {
 // --------------------------------------------------------------------------------------------------------------------
 // statsd parsing
 
-static void statsd_process_metric(char *m, char *v, char *t, char *r) {
-    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', rate '%s'", m, v, t, r);
+static void statsd_process_metric(const char *name, const char *value, const char *type, const char *sampling) {
+    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', rate '%s'", name, value, type, sampling);
 
-    if(unlikely(!m || !*m)) return;
-    if(unlikely(!t || !*t)) t = "m";
+    if(unlikely(!name || !*name)) return;
+    if(unlikely(!type || !*type)) type = "m";
 
-    switch (*t) {
+    switch (*type) {
         case 'g':
             statsd_process_gauge(
-                    statsd_find_or_add_metric(&statsd.gauges, m),
-                    v, r);
+                    statsd_find_or_add_metric(&statsd.gauges, name),
+                    value, sampling);
             break;
 
         case 'c':
             statsd_process_counter(
-                    statsd_find_or_add_metric(&statsd.counters, m),
-                    v, r);
+                    statsd_find_or_add_metric(&statsd.counters, name),
+                    value, sampling);
             break;
 
         case 'm':
-            if (t[1] == 's')
+            if (type[1] == 's')
                 statsd_process_timer(
-                        statsd_find_or_add_metric(&statsd.timers, m),
-                        v, r);
+                        statsd_find_or_add_metric(&statsd.timers, name),
+                        value, sampling);
             else
                 statsd_process_meter(
-                        statsd_find_or_add_metric(&statsd.meters, m),
-                        v, r);
+                        statsd_find_or_add_metric(&statsd.meters, name),
+                        value, sampling);
             break;
 
         case 'h':
             statsd_process_histogram(
-                    statsd_find_or_add_metric(&statsd.histograms, m),
-                    v, r);
+                    statsd_find_or_add_metric(&statsd.histograms, name),
+                    value, sampling);
             break;
 
         case 's':
             statsd_process_set(
-                    statsd_find_or_add_metric(&statsd.sets, m),
-                    v, r);
+                    statsd_find_or_add_metric(&statsd.sets, name),
+                    value);
             break;
 
         default:
-            error("STATSD: metric '%s' with value '%s' specifies an unknown type '%s'.", m, v?v:"<unset>", t);
+            error("STATSD: metric '%s' with value '%s' specifies an unknown type '%s'.", name, value?value:"<unset>", type);
             break;
     }
 }
 
-static inline int is_statsd_space(char c) {
-    if(c == ' ' || c == '\t')
-        return 1;
+static inline const char *statsd_parse_name(const char *s, const char **name) {
+    char c;
 
-    return 0;
-}
-
-static inline int is_statsd_newline(char c) {
-    if(c == '\r' || c == '\n')
-        return 1;
-
-    return 0;
-}
-
-static inline int is_statsd_separator(char c) {
-    if(c == ':' || c == '|' || c == '@')
-        return 1;
-
-    return 0;
-}
-
-static inline char *skip_to_next_separator(char *s) {
-    while(*s && !is_statsd_separator(*s) && !is_statsd_newline(*s))
-        s++;
+    *name = s;
+    for(c = *s; c && c != ':' && c != '|' && c != '\n'; c = *++s) ;
 
     return s;
 }
 
-static inline char *statsd_get_field(char *s, char **field, int *line_break) {
-    *line_break = 0;
+static inline const char *statsd_parse_value(const char *s, const char **value) {
+    char c;
 
-    while(is_statsd_separator(*s) || is_statsd_space(*s))
-        s++;
-
-    if(unlikely(is_statsd_newline(*s))) {
-        *field = NULL;
-        *line_break = 1;
-
-        while(is_statsd_newline(*s))
-            *s++ = '\0';
-
-        return s;
-    }
-
-    *field = s;
-    s = skip_to_next_separator(s);
-
-    if(unlikely(is_statsd_newline(*s))) {
-        *line_break = 1;
-
-        while(is_statsd_newline(*s))
-            *s++ = '\0';
-    }
-    else if(likely(*s))
-        *s++ = '\0';
+    *value = s;
+    for(c = *s; c && c != '|' && c != '\n'; c = *++s) ;
 
     return s;
+}
+
+static inline const char *statsd_parse_type(const char *s, const char **type) {
+    char c;
+
+    *type = s;
+    for(c = *s; c && c != '|' && c != '@' && c != '\n'; c = *++s) ;
+
+    return s;
+}
+
+static inline const char *statsd_parse_sampling(const char *s, const char **sampling) {
+    char c;
+
+    *sampling = s;
+    for(c = *s; c && c != '\n'; c = *++s) ;
+
+    return s;
+}
+
+const char *statsd_parse_skip_spaces(const char *s) {
+    char c;
+
+    for(c = *s; c && ( c == ' ' || c == '\t' || c == '\r' || c == '\n' ); c = *++s) ;
+
+    return s;
+}
+
+static inline const char *statsd_parse_field_trim(const char *start, char *end) {
+    *end = '\0';
+
+    if(unlikely(!start)) {
+        start = end;
+        return start;
+    }
+
+    while(start <= end && (*start == ' ' || *start == '\t'))
+        start++;
+
+    end--;
+    while(end >= start && (*end == ' ' || *end == '\t'))
+        *end-- = '\0';
+
+    return start;
 }
 
 static inline size_t statsd_process(char *buffer, size_t size, int require_newlines) {
-    (void)require_newlines;
-    // FIXME: respect require_newlines to support metrics split in multiple TCP packets
-
     buffer[size] = '\0';
-    debug(D_STATSD, "RECEIVED: '%s'", buffer);
+    debug(D_STATSD, "RECEIVED: %zu bytes: '%s'", size, buffer);
 
-    char *s = buffer, *m, *v, *t, *r;
+    const char *s = buffer;
     while(*s) {
-        m = v = t = r = NULL;
-        int line_break = 0;
+        const char *name = NULL, *value = NULL, *type = NULL, *sampling = NULL;
+        char *name_end, *value_end, *type_end, *sampling_end;
 
-        s = statsd_get_field(s, &m, &line_break);
-        if(unlikely(line_break)) {
-            statsd_process_metric(m, v, t, r);
+        s = statsd_parse_name(s, &name);
+        if(name == s || !*name) {
+            s = statsd_parse_skip_spaces(s);
             continue;
         }
+        name_end = (char *)s;
 
-        s = statsd_get_field(s, &v, &line_break);
-        if(unlikely(line_break)) {
-            statsd_process_metric(m, v, t, r);
-            continue;
+        if(likely(*s == ':')) s = statsd_parse_value(++s, &value);
+        value_end = (char *)s;
+
+        if(likely(*s == '|')) s = statsd_parse_type(++s, &type);
+        type_end = (char *)s;
+
+        if(unlikely(*s == '|' || *s == '@')) {
+            s = statsd_parse_sampling(++s, &sampling);
+            if(*sampling == '@') sampling++;
+        }
+        sampling_end = (char *)s;
+
+        // skip everything until the end of the line
+        while(*s && *s != '\n') s++;
+
+        if(unlikely(require_newlines && *s != '\n' && s > buffer)) {
+            // move the remaining data to the beginning
+            size -= (name - buffer);
+            memmove(buffer, name, size);
+            return size;
         }
 
-        s = statsd_get_field(s, &t, &line_break);
-        if(likely(line_break)) {
-            statsd_process_metric(m, v, t, r);
-            continue;
-        }
-
-        s = statsd_get_field(s, &r, &line_break);
-        if(likely(line_break)) {
-            statsd_process_metric(m, v, t, r);
-            continue;
-        }
-
-        if(*s && *s != '\r' && *s != '\n') {
-            error("STATSD: excess data '%s' at end of line, metric '%s', value '%s', sampling rate '%s'", s, m, v, r);
-
-            // delete the excess data at the end if line
-            while(*s && *s != '\r' && *s != '\n')
-                s++;
-        }
-
-        statsd_process_metric(m, v, t, r);
+        statsd_process_metric(
+                  statsd_parse_field_trim(name, name_end)
+                , statsd_parse_field_trim(value, value_end)
+                , statsd_parse_field_trim(type, type_end)
+                , statsd_parse_field_trim(sampling, sampling_end)
+        );
     }
 
     return 0;
