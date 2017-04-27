@@ -687,7 +687,7 @@ static int statsd_snd_callback(int fd, int socktype, void *data, short int *even
     (void)socktype;
     (void)data;
     (void)events;
-    
+
     error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
     return -1;
 }
@@ -910,6 +910,8 @@ static inline void statsd_chart_from_set(STATSD_METRIC *m) {
 }
 
 static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *dim, char *family, char *units) {
+    netdata_mutex_lock(&m->histogram.mutex);
+
     if(unlikely(!m->st)) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
@@ -939,8 +941,6 @@ static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *
     else rrdset_next(m->st);
 
     if(m->count && !m->reset) {
-        netdata_mutex_lock(&m->histogram.mutex);
-
         size_t len = m->histogram.ext->used;
         long double *series = m->histogram.ext->values;
         sort_series(series, len);
@@ -949,8 +949,6 @@ static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *
         m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * 1000.0);
         m->last = (collected_number)roundl(average(series, len) * 1000);
         m->histogram.ext->last_pct = (collected_number)roundl(average(series, (size_t)floor((double)len * statsd.histogram_percentile / 100.0)) * 1000);
-
-        netdata_mutex_unlock(&m->histogram.mutex);
     }
 
     m->reset = 1;
@@ -963,6 +961,8 @@ static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *
         rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
 
     rrdset_done(m->st);
+
+    netdata_mutex_unlock(&m->histogram.mutex);
 }
 
 
