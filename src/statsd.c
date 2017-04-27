@@ -899,7 +899,7 @@ static inline void statsd_chart_from_set(STATSD_METRIC *m) {
     rrdset_done(m->st);
 }
 
-static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *dim, char *family) {
+static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *dim, char *family, char *units) {
     if(unlikely(!m->st)) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
@@ -912,7 +912,7 @@ static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *
                 , family        // family (submenu)
                 , m->name       // context
                 , m->name       // title
-                , "events/s"    // units
+                , units         // units
                 , STATSD_CHART_PRIORITY
                 , statsd.update_every
                 , RRDSET_TYPE_AREA
@@ -957,11 +957,11 @@ static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *
 
 
 static inline void statsd_chart_from_timer(STATSD_METRIC *m) {
-    statsd_chart_from_timer_or_histogram(m, "timer", "timers");
+    statsd_chart_from_timer_or_histogram(m, "timer", "timers", "milliseconds");
 }
 
 static inline void statsd_chart_from_histogram(STATSD_METRIC *m) {
-    statsd_chart_from_timer_or_histogram(m, "histogram", "histograms");
+    statsd_chart_from_timer_or_histogram(m, "histogram", "histograms", "value");
 }
 
 static inline void statsd_private_charts_from_index(STATSD_INDEX *index, void (*chart_from_metric)(STATSD_METRIC *)) {
