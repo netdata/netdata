@@ -756,7 +756,7 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
                         error("STATSD: recv() on UDP socket %d failed.", fd);
-                        statsd.errors++;
+                        statsd.socket_errors++;
                         return -1;
                     }
                 } else if (rc) {
