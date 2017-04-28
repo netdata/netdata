@@ -126,6 +126,7 @@ AC_CHECK_TYPES([struct timespec, clockid_t], [], [], [[#include <time.h>]])
 AC_SEARCH_LIBS([clock_gettime], [rt posix4])
 AC_CHECK_FUNCS([clock_gettime])
 AC_CHECK_FUNCS([sched_setscheduler sched_get_priority_min sched_get_priority_max nice])
+AC_CHECK_FUNCS([recvmmsg])
 
 AC_TYPE_INT8_T
 AC_TYPE_INT16_T

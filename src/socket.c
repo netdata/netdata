@@ -851,11 +851,62 @@ static inline void poll_close_fd(struct poll *p, struct pollinfo *pi) {
     debug(D_POLLFD, "POLLFD: DEL: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 }
 
+static void *add_callback_default(int fd, short int *events) {
+    (void)fd;
+    (void)events;
+
+    return NULL;
+}
+static void del_callback_default(int fd, void *data) {
+    (void)fd;
+    (void)data;
+
+    if(data)
+        error("POLLFD: internal error: del_callback_default() called with data pointer - possible memory leak");
+}
+
+static int rcv_callback_default(int fd, int socktype, void *data, short int *events) {
+    (void)socktype;
+    (void)data;
+    (void)events;
+
+    char buffer[1024 + 1];
+
+    ssize_t rc;
+    do {
+        rc = recv(fd, buffer, 1024, MSG_DONTWAIT);
+        if (rc < 0) {
+            // read failed
+            if (errno != EWOULDBLOCK && errno != EAGAIN) {
+                error("POLLFD: recv() failed.");
+                return -1;
+            }
+        } else if (rc) {
+            // data received
+            info("POLLFD: internal error: discarding %zd bytes received on socket %d", rc, fd);
+        }
+    } while (rc != -1);
+
+    return 0;
+}
+
+static int snd_callback_default(int fd, int socktype, void *data, short int *events) {
+    (void)socktype;
+    (void)data;
+    (void)events;
+
+    *events &= ~POLLOUT;
+
+    info("POLLFD: internal error: nothing to send on socket %d", fd);
+    return 0;
+}
+
 void poll_events(LISTEN_SOCKETS *sockets
         , void *(*add_callback)(int fd, short int *events)
         , void  (*del_callback)(int fd, void *data)
         , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
         , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
+        , void *data
 ) {
     int retval;
 
@@ -867,15 +918,16 @@ void poll_events(LISTEN_SOCKETS *sockets
             .inf = NULL,
             .first_free = NULL,
 
-            .add_callback = add_callback,
-            .del_callback = del_callback,
-            .rcv_callback = rcv_callback,
-            .snd_callback = snd_callback
+            .add_callback = add_callback?add_callback:add_callback_default,
+            .del_callback = del_callback?del_callback:del_callback_default,
+            .rcv_callback = rcv_callback?rcv_callback:rcv_callback_default,
+            .snd_callback = snd_callback?snd_callback:snd_callback_default
     };
 
     size_t i;
     for(i = 0; i < sockets->opened ;i++) {
-        poll_add_fd(&p, sockets->fds[i], sockets->fds_types[i], POLLIN, POLLINFO_FLAG_SERVER_SOCKET);
+        struct pollinfo *pi = poll_add_fd(&p, sockets->fds[i], sockets->fds_types[i], POLLIN, POLLINFO_FLAG_SERVER_SOCKET);
+        pi->data = data;
         info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }
 
@@ -1008,7 +1060,11 @@ void poll_events(LISTEN_SOCKETS *sockets
         }
     }
 
+    for(i = 0 ; i <= p.max ; i++) {
+        struct pollinfo *pi = &p.inf[i];
+        poll_close_fd(&p, pi);
+    }
+
     freez(p.fds);
     freez(p.inf);
 }
-

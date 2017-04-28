@@ -5,6 +5,7 @@
 // #define STATSD_MULTITHREADED 1
 
 #ifdef STATSD_MULTITHREADED
+// DO NOT ENABLE MULTITHREADING - IT IS NOT WELL TESTED
 #define STATSD_AVL_TREE avl_tree_lock
 #define STATSD_AVL_INSERT avl_insert_lock
 #define STATSD_AVL_SEARCH avl_search_lock
@@ -132,7 +133,14 @@ static struct statsd {
     STATSD_INDEX histograms;
     STATSD_INDEX meters;
     STATSD_INDEX sets;
-    size_t unknown;
+    size_t unknown_types;
+    size_t socket_errors;
+    size_t tcp_socket_reads;
+    size_t tcp_packets_received;
+    size_t tcp_bytes_read;
+    size_t udp_socket_reads;
+    size_t udp_packets_received;
+    size_t udp_bytes_read;
 
     int enabled;
     int update_every;
@@ -144,6 +152,7 @@ static struct statsd {
     RRD_MEMORY_MODE private_charts_memory_mode;
     int private_charts_history;
 
+    size_t recvmmsg_size;
     size_t histogram_increase_step;
     double histogram_percentile;
     char *histogram_percentile_str;
@@ -151,10 +160,9 @@ static struct statsd {
     LISTEN_SOCKETS sockets;
 } statsd = {
         .enabled = 1,
-        .private_charts = 0,
         .max_private_charts = 200,
         .max_private_charts_hard = 1000,
-        .unknown = 0,
+        .recvmmsg_size = 10,
 
         .gauges     = {
                 .name = "gauge",
@@ -450,7 +458,7 @@ static void statsd_process_metric(const char *name, const char *value, const cha
                         statsd_find_or_add_metric(&statsd.meters, name),
                         value, sampling);
             else
-                statsd.unknown++;
+                statsd.unknown_types++;
             break;
 
         case 'h':
@@ -466,7 +474,7 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             break;
 
         default:
-            statsd.unknown++;
+            statsd.unknown_types++;
             break;
     }
 }
@@ -586,14 +594,34 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
 // --------------------------------------------------------------------------------------------------------------------
 // statsd pollfd interface
 
-#define STATSD_TCP_BUFFER_SIZE 16384 // minimize reads
-#define STATSD_UDP_BUFFER_SIZE 1500  // this should be up to MTU
+#define STATSD_TCP_BUFFER_SIZE 65536 // minimize tcp reads
+#define STATSD_UDP_BUFFER_SIZE 9000  // this should be up to MTU
+
+typedef enum {
+    STATSD_SOCKET_DATA_TYPE_TCP,
+    STATSD_SOCKET_DATA_TYPE_UDP
+} STATSD_SOCKET_DATA_TYPE;
 
 struct statsd_tcp {
+    STATSD_SOCKET_DATA_TYPE type;
     size_t size;
     size_t len;
     char buffer[];
 };
+
+#ifdef HAVE_RECVMMSG
+struct statsd_udp {
+    STATSD_SOCKET_DATA_TYPE type;
+    size_t size;
+    struct iovec *iovecs;
+    struct mmsghdr *msgs;
+};
+#else
+struct statsd_udp {
+    STATSD_SOCKET_DATA_TYPE type;
+    char buffer[STATSD_UDP_BUFFER_SIZE];
+};
+#endif
 
 // new TCP client connected
 static void *statsd_add_callback(int fd, short int *events) {
@@ -601,6 +629,7 @@ static void *statsd_add_callback(int fd, short int *events) {
     *events = POLLIN;
 
     struct statsd_tcp *data = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
+    data->type = STATSD_SOCKET_DATA_TYPE_TCP;
     data->size = STATSD_TCP_BUFFER_SIZE - 1;
 
     return data;
@@ -610,20 +639,37 @@ static void *statsd_add_callback(int fd, short int *events) {
 static void statsd_del_callback(int fd, void *data) {
     (void)fd;
 
-    freez(data);
+    if(data) {
+        struct statsd_tcp *t = data;
+        if(t->type != STATSD_SOCKET_DATA_TYPE_TCP)
+            error("STATSD: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
+
+        freez(data);
+    }
 
     return;
 }
 
 // Receive data
 static int statsd_rcv_callback(int fd, int socktype, void *data, short int *events) {
+    *events = POLLIN;
+
     switch(socktype) {
         case SOCK_STREAM: {
             struct statsd_tcp *d = (struct statsd_tcp *)data;
             if(unlikely(!d)) {
-                error("STATSD: internal error - tcp receive buffer is null");
+                error("STATSD: internal error: expected TCP data pointer is NULL");
+                statsd.socket_errors++;
                 return -1;
             }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_UDP)) {
+                error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
+                statsd.socket_errors++;
+                return -1;
+            }
+#endif
 
             int ret = 0;
             ssize_t rc;
@@ -631,8 +677,11 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
                 rc = recv(fd, &d->buffer[d->len], d->size - d->len, MSG_DONTWAIT);
                 if (rc < 0) {
                     // read failed
-                    if (errno != EWOULDBLOCK && errno != EAGAIN)
+                    if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
+                        error("STATSD: recv() on TCP socket %d failed.", fd);
+                        statsd.socket_errors++;
                         ret = -1;
+                    }
                 }
                 else if (!rc) {
                     // connection closed
@@ -642,10 +691,14 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
                 else {
                     // data received
                     d->len += rc;
+                    statsd.tcp_socket_reads++;
+                    statsd.tcp_bytes_read += rc;
                 }
 
-                if(likely(d->len > 0))
+                if(likely(d->len > 0)) {
+                    statsd.tcp_packets_received++;
                     d->len = statsd_process(d->buffer, d->len, 1);
+                }
 
                 if(unlikely(ret == -1))
                     return -1;
@@ -655,33 +708,77 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
         }
 
         case SOCK_DGRAM: {
-            char buffer[STATSD_UDP_BUFFER_SIZE + 1];
+            struct statsd_udp *d = (struct statsd_udp *)data;
+            if(unlikely(!d)) {
+                error("STATSD: internal error: expected UDP data pointer is NULL");
+                statsd.socket_errors++;
+                return -1;
+            }
 
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_UDP)) {
+                error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_UDP);
+                statsd.socket_errors++;
+                return -1;
+            }
+#endif
+
+#ifdef HAVE_RECVMMSG
             ssize_t rc;
             do {
-                // FIXME: collect sender information
-                rc = recvfrom(fd, buffer, STATSD_UDP_BUFFER_SIZE, MSG_DONTWAIT, NULL, NULL);
+                rc = recvmmsg(fd, d->msgs, (unsigned int)d->size, MSG_DONTWAIT, NULL);
                 if (rc < 0) {
                     // read failed
-                    if (errno != EWOULDBLOCK && errno != EAGAIN) {
-                        error("STATSD: recvfrom() failed.");
+                    if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
+                        error("STATSD: recvmmsg() on UDP socket %d failed.", fd);
+                        statsd.socket_errors++;
                         return -1;
                     }
                 } else if (rc) {
                     // data received
-                    statsd_process(buffer, (size_t) rc, 0);
+                    statsd.udp_socket_reads++;
+                    statsd.udp_packets_received += rc;
+
+                    size_t i;
+                    for (i = 0; i < (size_t)rc; ++i) {
+                        size_t len = (size_t)d->msgs[i].msg_len;
+                        statsd.udp_bytes_read += len;
+                        statsd_process(d->msgs[i].msg_hdr.msg_iov->iov_base, len, 0);
+                    }
                 }
             } while (rc != -1);
+
+#else // !HAVE_RECVMMSG
+            ssize_t rc;
+            do {
+                rc = recv(fd, d->buffer, STATSD_UDP_BUFFER_SIZE, MSG_DONTWAIT);
+                if (rc < 0) {
+                    // read failed
+                    if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
+                        error("STATSD: recv() on UDP socket %d failed.", fd);
+                        statsd.errors++;
+                        return -1;
+                    }
+                } else if (rc) {
+                    // data received
+                    statsd.udp_socket_reads++;
+                    statsd.udp_packets_received++;
+                    statsd.udp_bytes_read += rc;
+                    statsd_process(d->buffer, (size_t) rc, 0);
+                }
+            } while (rc != -1);
+#endif
+
             break;
         }
 
         default: {
-            error("STATSD: unknown socktype %d on socket %d", socktype, fd);
+            error("STATSD: internal error: unknown socktype %d on socket %d", socktype, fd);
+            statsd.socket_errors++;
             return -1;
         }
     }
 
-    *events = POLLIN;
     return 0;
 }
 
@@ -709,12 +806,40 @@ void *statsd_collector_thread(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
+    struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
+
+#ifdef HAVE_RECVMMSG
+    d->type = STATSD_SOCKET_DATA_TYPE_UDP;
+    d->size = statsd.recvmmsg_size;
+    d->iovecs = callocz(sizeof(struct iovec), d->size);
+    d->msgs = callocz(sizeof(struct mmsghdr), d->size);
+
+    size_t i;
+    for (i = 0; i < d->size; i++) {
+        d->iovecs[i].iov_base = mallocz(STATSD_UDP_BUFFER_SIZE);
+        d->iovecs[i].iov_len = STATSD_UDP_BUFFER_SIZE - 1;
+        d->msgs[i].msg_hdr.msg_iov = &d->iovecs[i];
+        d->msgs[i].msg_hdr.msg_iovlen = 1;
+    }
+#endif
+
     poll_events(&statsd.sockets
             , statsd_add_callback
             , statsd_del_callback
             , statsd_rcv_callback
             , statsd_snd_callback
+            , (void *)d
     );
+
+#ifdef HAVE_RECVMMSG
+    for (i = 0; i < d->size; i++)
+        freez(d->iovecs[i].iov_base);
+
+    freez(d->iovecs);
+    freez(d->msgs);
+#endif
+
+    freez(d);
 
     debug(D_WEB_CLIENT, "STATSD: exit!");
     listen_sockets_close(&statsd.sockets);
@@ -1044,6 +1169,10 @@ void *statsd_main(void *ptr) {
         statsd.update_every = default_rrd_update_every;
     }
 
+#ifdef HAVE_RECVMMSG
+    statsd.recvmmsg_size = (size_t)config_get_number(CONFIG_SECTION_STATSD, "udp messages to process at once", (long long)statsd.recvmmsg_size);
+#endif
+
     statsd.charts_for = simple_pattern_create(config_get(CONFIG_SECTION_STATSD, "create private charts for metrics matching", "*"), SIMPLE_PATTERN_EXACT);
     statsd.max_private_charts = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts allowed", (long long)statsd.max_private_charts);
     statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts * 5);
@@ -1154,6 +1283,52 @@ void *statsd_main(void *ptr) {
     RRDDIM *rd_events_histogram = rrddim_add(st_events, "histograms", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_events_set       = rrddim_add(st_events, "sets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_events_unknown   = rrddim_add(st_events, "unknown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_events_errors    = rrddim_add(st_events, "errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    RRDSET *st_reads = rrdset_create_localhost(
+            "netdata"
+            , "statsd_reads"
+            , NULL
+            , "statsd"
+            , NULL
+            , "Read operations made by the netdata statsd server"
+            , "reads/s"
+            , 132002
+            , statsd.update_every
+            , RRDSET_TYPE_STACKED
+    );
+    RRDDIM *rd_reads_tcp = rrddim_add(st_reads, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_reads_udp = rrddim_add(st_reads, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    RRDSET *st_bytes = rrdset_create_localhost(
+            "netdata"
+            , "statsd_bytes"
+            , NULL
+            , "statsd"
+            , NULL
+            , "Bytes read by the netdata statsd server"
+            , "kbps"
+            , 132003
+            , statsd.update_every
+            , RRDSET_TYPE_STACKED
+    );
+    RRDDIM *rd_bytes_tcp = rrddim_add(st_bytes, "tcp", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_bytes_udp = rrddim_add(st_bytes, "udp", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
+
+    RRDSET *st_packets = rrdset_create_localhost(
+            "netdata"
+            , "statsd_packets"
+            , NULL
+            , "statsd"
+            , NULL
+            , "Network packets processed by the netdata statsd server"
+            , "packets/s"
+            , 132004
+            , statsd.update_every
+            , RRDSET_TYPE_STACKED
+    );
+    RRDDIM *rd_packets_tcp = rrddim_add(st_packets, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_packets_udp = rrddim_add(st_packets, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     RRDSET *st_pcharts = rrdset_create_localhost(
             "netdata"
@@ -1163,7 +1338,7 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Private metric charts created by the netdata statsd server"
             , "charts"
-            , 132002
+            , 132010
             , statsd.update_every
             , RRDSET_TYPE_AREA
     );
@@ -1191,6 +1366,9 @@ void *statsd_main(void *ptr) {
         if(hb_dt) {
             rrdset_next(st_metrics);
             rrdset_next(st_events);
+            rrdset_next(st_reads);
+            rrdset_next(st_bytes);
+            rrdset_next(st_packets);
             rrdset_next(st_pcharts);
         }
 
@@ -1201,13 +1379,23 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_metrics, rd_metrics_histogram, (collected_number)statsd.histograms.metrics);
         rrddim_set_by_pointer(st_metrics, rd_metrics_set,       (collected_number)statsd.sets.metrics);
 
-        rrddim_set_by_pointer(st_events, rd_events_gauge,       (collected_number)statsd.gauges.events);
-        rrddim_set_by_pointer(st_events, rd_events_counter,     (collected_number)statsd.counters.events);
-        rrddim_set_by_pointer(st_events, rd_events_timer,       (collected_number)statsd.timers.events);
-        rrddim_set_by_pointer(st_events, rd_events_meter,       (collected_number)statsd.meters.events);
-        rrddim_set_by_pointer(st_events, rd_events_histogram,   (collected_number)statsd.histograms.events);
-        rrddim_set_by_pointer(st_events, rd_events_set,         (collected_number)statsd.sets.events);
-        rrddim_set_by_pointer(st_events, rd_events_unknown,     (collected_number)statsd.unknown);
+        rrddim_set_by_pointer(st_events,  rd_events_gauge,       (collected_number)statsd.gauges.events);
+        rrddim_set_by_pointer(st_events,  rd_events_counter,     (collected_number)statsd.counters.events);
+        rrddim_set_by_pointer(st_events,  rd_events_timer,       (collected_number)statsd.timers.events);
+        rrddim_set_by_pointer(st_events,  rd_events_meter,       (collected_number)statsd.meters.events);
+        rrddim_set_by_pointer(st_events,  rd_events_histogram,   (collected_number)statsd.histograms.events);
+        rrddim_set_by_pointer(st_events,  rd_events_set,         (collected_number)statsd.sets.events);
+        rrddim_set_by_pointer(st_events,  rd_events_unknown,     (collected_number)statsd.unknown_types);
+        rrddim_set_by_pointer(st_events,  rd_events_errors,      (collected_number)statsd.socket_errors);
+
+        rrddim_set_by_pointer(st_reads,   rd_reads_tcp,          (collected_number)statsd.tcp_socket_reads);
+        rrddim_set_by_pointer(st_reads,   rd_reads_udp,          (collected_number)statsd.udp_socket_reads);
+
+        rrddim_set_by_pointer(st_bytes,   rd_bytes_tcp,          (collected_number)statsd.tcp_bytes_read);
+        rrddim_set_by_pointer(st_bytes,   rd_bytes_udp,          (collected_number)statsd.udp_bytes_read);
+
+        rrddim_set_by_pointer(st_packets, rd_packets_tcp,        (collected_number)statsd.tcp_packets_received);
+        rrddim_set_by_pointer(st_packets, rd_packets_udp,        (collected_number)statsd.udp_packets_received);
 
         rrddim_set_by_pointer(st_pcharts, rd_pcharts,           (collected_number)statsd.private_charts);
 
@@ -1216,6 +1404,9 @@ void *statsd_main(void *ptr) {
 
         rrdset_done(st_metrics);
         rrdset_done(st_events);
+        rrdset_done(st_reads);
+        rrdset_done(st_bytes);
+        rrdset_done(st_packets);
         rrdset_done(st_pcharts);
 
         if(unlikely(netdata_exit))

@@ -48,6 +48,7 @@ extern void poll_events(LISTEN_SOCKETS *sockets
         , void  (*del_callback)(int fd, void *data)
         , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
         , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
+        , void *data
 );
 
 #endif //NETDATA_SOCKET_H
