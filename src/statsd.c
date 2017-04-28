@@ -132,6 +132,7 @@ static struct statsd {
     STATSD_INDEX histograms;
     STATSD_INDEX meters;
     STATSD_INDEX sets;
+    size_t unknown;
 
     int enabled;
     int update_every;
@@ -153,6 +154,7 @@ static struct statsd {
         .private_charts = 0,
         .max_private_charts = 200,
         .max_private_charts_hard = 1000,
+        .unknown = 0,
 
         .gauges     = {
                 .name = "gauge",
@@ -431,7 +433,8 @@ static void statsd_process_metric(const char *name, const char *value, const cha
                     value, sampling);
             break;
 
-        case 'c':
+        case 'c': // etsy/statsd, but brubeck uses it as 'meter' - sorry brubeck, this is stupid
+        case 'C': // brubeck
             statsd_process_counter(
                     statsd_find_or_add_metric(&statsd.counters, name),
                     value, sampling);
@@ -442,10 +445,12 @@ static void statsd_process_metric(const char *name, const char *value, const cha
                 statsd_process_timer(
                         statsd_find_or_add_metric(&statsd.timers, name),
                         value, sampling);
-            else
+            else if (type[1] == '\0')
                 statsd_process_meter(
                         statsd_find_or_add_metric(&statsd.meters, name),
                         value, sampling);
+            else
+                statsd.unknown++;
             break;
 
         case 'h':
@@ -461,7 +466,7 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             break;
 
         default:
-            error("STATSD: metric '%s' with value '%s' specifies an unknown type '%s'.", name, value?value:"<unset>", type);
+            statsd.unknown++;
             break;
     }
 }
@@ -582,7 +587,7 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
 // statsd pollfd interface
 
 #define STATSD_TCP_BUFFER_SIZE 16384 // minimize reads
-#define STATSD_UDP_BUFFER_SIZE 9000  // this should be up to MTU
+#define STATSD_UDP_BUFFER_SIZE 1500  // this should be up to MTU
 
 struct statsd_tcp {
     size_t size;
@@ -612,8 +617,6 @@ static void statsd_del_callback(int fd, void *data) {
 
 // Receive data
 static int statsd_rcv_callback(int fd, int socktype, void *data, short int *events) {
-    (void)data;
-
     switch(socktype) {
         case SOCK_STREAM: {
             struct statsd_tcp *d = (struct statsd_tcp *)data;
@@ -1150,6 +1153,7 @@ void *statsd_main(void *ptr) {
     RRDDIM *rd_events_meter     = rrddim_add(st_events, "meters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_events_histogram = rrddim_add(st_events, "histograms", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_events_set       = rrddim_add(st_events, "sets", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_events_unknown   = rrddim_add(st_events, "unknown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     RRDSET *st_pcharts = rrdset_create_localhost(
             "netdata"
@@ -1203,6 +1207,7 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_events, rd_events_meter,       (collected_number)statsd.meters.events);
         rrddim_set_by_pointer(st_events, rd_events_histogram,   (collected_number)statsd.histograms.events);
         rrddim_set_by_pointer(st_events, rd_events_set,         (collected_number)statsd.sets.events);
+        rrddim_set_by_pointer(st_events, rd_events_unknown,     (collected_number)statsd.unknown);
 
         rrddim_set_by_pointer(st_pcharts, rd_pcharts,           (collected_number)statsd.private_charts);
 
