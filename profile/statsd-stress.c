@@ -90,6 +90,8 @@ static void *spam_thread(void *__data) {
 		}
 	}
 
+	free(packets);
+	free(lengths);
 	close(s);
 	return NULL;
 }
