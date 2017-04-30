@@ -277,6 +277,14 @@ And you can extend it, by writing plugins that collect data from any source, usi
 
 ---
 
+## netdata infographic
+
+This is how netdata works: 
+
+![netdata-overview 4](https://cloud.githubusercontent.com/assets/2662304/25564483/e93126be-2dbc-11e7-97de-975c89a71a51.png)
+
+---
+
 ## Installation
 
 Use our **[automatic installer](https://github.com/firehol/netdata/wiki/Installation)** to build and install it on your system.
