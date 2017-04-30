@@ -3,6 +3,12 @@
 // --------------------------------------------------------------------------------------------------------------------
 
 long double average(long double *series, size_t entries) {
+    if(unlikely(entries == 0))
+        return NAN;
+
+    if(unlikely(entries == 1))
+        return series[0];
+
     size_t i, count = 0;
     long double sum = 0;
 
@@ -13,21 +19,33 @@ long double average(long double *series, size_t entries) {
         sum += value;
     }
 
+    if(unlikely(entries == 0))
+        return NAN;
+
+    if(unlikely(entries == 1))
+        return sum;
+
     return sum / (long double)count;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
 long double moving_average(long double *series, size_t entries, size_t period) {
-    size_t i, count = 0;
+    if(unlikely(period <= 0))
+        return 0.0;
+
+    size_t i, count;
     long double sum = 0, avg = 0;
     long double p[period];
 
-    for(i = 0; i < entries; i++) {
+    for(count = 0; count < period ; count++)
+        p[count] = 0.0;
+
+    for(i = 0, count = 0; i < entries; i++) {
         long double value = series[i];
         if(unlikely(isnan(value) || isinf(value))) continue;
 
-        if(count < period) {
+        if(unlikely(count < period)) {
             sum += value;
             avg = (count == period - 1) ? sum / (long double)period : 0;
         }
@@ -39,6 +57,7 @@ long double moving_average(long double *series, size_t entries, size_t period) {
         p[count % period] = value;
         count++;
     }
+
     return avg;
 }
 
@@ -155,25 +174,45 @@ long double running_median_estimate(long double *series, size_t entries) {
 // --------------------------------------------------------------------------------------------------------------------
 
 long double standard_deviation(long double *series, size_t entries) {
+    if(unlikely(entries < 1))
+        return NAN;
+
+    if(unlikely(entries == 1))
+        return series[0];
+
     size_t i, count = 0;
     long double sum = 0;
 
     for(i = 0; i < entries ; i++) {
         long double value = series[i];
         if(unlikely(isnan(value) || isinf(value))) continue;
-        count++;
 
+        count++;
         sum += value;
     }
+
+    if(unlikely(count == 0))
+        return NAN;
+
+    if(unlikely(count == 1))
+        return sum;
+
     long double average = sum / (long double)count;
 
     for(i = 0, count = 0, sum = 0; i < entries ; i++) {
         long double value = series[i];
         if(unlikely(isnan(value) || isinf(value))) continue;
-        count++;
 
+        count++;
         sum += powl(value - average, 2);
     }
+
+    if(unlikely(count == 0))
+        return NAN;
+
+    if(unlikely(count == 1))
+        return average;
+
     long double variance = sum / (long double)(count - 1); // remove -1 to have a population stddev
 
     long double stddev = sqrtl(variance);
@@ -359,7 +398,7 @@ long double holtwinters(long double *series, size_t entries, long double alpha, 
     long double b0 = 0;
     long double s[] = {};
 
-    long double errors;
+    long double errors = 0.0;
     size_t nb_computations = entries;
     long double *estimated_level  = callocz(nb_computations, sizeof(long double));
     long double *estimated_trend  = callocz(nb_computations, sizeof(long double));

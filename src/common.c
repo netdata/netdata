@@ -1268,5 +1268,7 @@ int recursively_delete_dir(const char *path, const char *reason) {
     else
         ret++;
 
+    closedir(dir);
+
     return ret;
 }

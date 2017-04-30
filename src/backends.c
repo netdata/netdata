@@ -379,9 +379,10 @@ static inline int process_json_response(BUFFER *b) {
 // the backend thread
 
 static inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
-    if(unlikely(!rrdset_is_available_for_backends(st)))
+    if(unlikely(!rrdset_is_available_for_backends(st))) {
         debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, st->rrdhost->hostname);
         return 0;
+    }
 
     if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(options & BACKEND_SOURCE_DATA_AS_COLLECTED))) {
         debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.", st->id, st->rrdhost->hostname, rrd_memory_mode_name(st->rrdhost->rrd_memory_mode));
