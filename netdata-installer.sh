@@ -630,7 +630,7 @@ progress "Read installation options from netdata.conf"
 
 # function to extract values from the config file
 config_option() {
-    local section="${1}" key="${2}" value="${3}" line=
+    local section="${1}" key="${2}" value="${3}"
 
     if [ -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]
         then
@@ -638,8 +638,6 @@ config_option() {
             -c "${NETDATA_PREFIX}/etc/netdata/netdata.conf" \
             -W get "${section}" "${key}" "${value}" || \
             echo "${value}"
-        # line="$( grep "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" | head -n 1 )"
-        # [ ! -z "${line}" ] && value="$( echo "${line}" | cut -d '=' -f 2 | sed -e "s/^[[:space:]]\+//g" -e "s/[[:space:]]\+$//g" )"
     else
         echo "${value}"
     fi
@@ -656,9 +654,6 @@ fi
 # the owners of the web files
 NETDATA_WEB_USER="$(  config_option "web" "web files owner" "${NETDATA_USER}" )"
 NETDATA_WEB_GROUP="$( config_option "web" "web files group" "${NETDATA_WEB_USER}" )"
-
-# debug flags
-NETDATA_DEBUG="$( config_option "global" "debug flags" 0 )"
 
 # port
 defport=19999
