@@ -256,6 +256,7 @@ static inline int bind_to_one(LISTEN_SOCKETS *sockets, const char *definition, i
                 struct sockaddr_in *sin = (struct sockaddr_in *) rp->ai_addr;
                 inet_ntop(AF_INET, &sin->sin_addr, rip, INET_ADDRSTRLEN);
                 rport = ntohs(sin->sin_port);
+                // info("Attempting to listen on IPv4 '%s' ('%s'), port %d ('%s'), socktype %d", rip, ip, rport, port, socktype);
                 fd = create_listen_socket4(socktype, rip, rport, listen_backlog);
                 break;
             }
@@ -264,6 +265,7 @@ static inline int bind_to_one(LISTEN_SOCKETS *sockets, const char *definition, i
                 struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) rp->ai_addr;
                 inet_ntop(AF_INET6, &sin6->sin6_addr, rip, INET6_ADDRSTRLEN);
                 rport = ntohs(sin6->sin6_port);
+                // info("Attempting to listen on IPv6 '%s' ('%s'), port %d ('%s'), socktype %d", rip, ip, rport, port, socktype);
                 fd = create_listen_socket6(socktype, scope_id, rip, rport, listen_backlog);
                 break;
             }
@@ -321,10 +323,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
         s = e;
     }
 
-    if(!sockets->opened)
-        fatal("LISTENER: Cannot listen on any socket. Exiting...");
-
-    else if(sockets->failed) {
+    if(sockets->failed) {
         size_t i;
         for(i = 0; i < sockets->opened ;i++)
             info("LISTENER: Listen socket %s opened successfully.", sockets->fds_names[i]);

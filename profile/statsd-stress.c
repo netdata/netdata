@@ -15,15 +15,15 @@ void diep(char *s)
 	exit(1);
 }
 
-int run_threads = 1;
-int metrics = 1024;
+size_t run_threads = 1;
+size_t metrics = 1024;
 
 #define SERVER_IP "127.0.0.1"
 #define PORT 8125
 
 size_t myrand(size_t max) {
-	int loops = max / RAND_MAX;
-	int i;
+	size_t loops = max / RAND_MAX;
+	size_t i;
 
 	size_t ret = rand();
 	for(i = 0; i < loops ;i++)
@@ -33,7 +33,7 @@ size_t myrand(size_t max) {
 }
 
 struct thread_data {
-	int id;
+	size_t id;
 	struct sockaddr_in *si_other;
 	int slen;
 	size_t counter;
@@ -44,7 +44,7 @@ static void *report_thread(void *__data) {
 
 	size_t last = 0;
 	for (;;) {
-		int i;
+		size_t i;
 		size_t total = 0;
 		for(i = 0; i < run_threads ;i++)
 			total += data[i].counter;
@@ -65,17 +65,17 @@ char *types[STATSD_METRIC_TYPES] = {"g", "c", "m", "ms", "h", "s"};
 static void *spam_thread(void *__data) {
 	struct thread_data *data = (struct thread_data *)__data;
 
-	int s, i;
+	int s;
 	char packet[1024];
 
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0))==-1)
 		diep("socket");
 
 	char **packets = malloc(sizeof(char *) * metrics);
-	size_t *lengths = malloc(sizeof(size_t) * metrics);
+	size_t i, *lengths = malloc(sizeof(size_t) * metrics);
 
 	for(i = 0; i < metrics ;i++) {
-		lengths[i] = sprintf(packet, "github.test.packet.%zu:%zu.%zu|%s", myrand(metrics), myrand(metrics), myrand(metrics), types[myrand(STATSD_METRIC_TYPES)]);
+		lengths[i] = sprintf(packet, "github.test.packet.%zu.%zu:%zu.%zu|%s", data->id, i, myrand(metrics), myrand(metrics), types[myrand(STATSD_METRIC_TYPES)]);
 		packets[i] = strdup(packet);
 		// printf("packet %d, of length %zu: '%s'\n", i, lengths[i], packets[i]);
 	}
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
 	struct thread_data data[run_threads];
 	struct sockaddr_in si_other;
 	pthread_t threads[run_threads], report;
-	int i;
+	size_t i;
 
 	srand(time(NULL));
 
@@ -132,8 +132,8 @@ int main(int argc, char *argv[])
 	}
 
 	printf("\n");
-	printf("THREADS     : %d\n", run_threads);
-	printf("METRICS     : %d\n", metrics);
+	printf("THREADS     : %zu\n", run_threads);
+	printf("METRICS     : %zu\n", metrics);
 	printf("DESTINATION : %s:%d\n", ip, port);
 	printf("\n");
 	pthread_create(&report, NULL, report_thread, &data);

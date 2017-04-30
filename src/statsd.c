@@ -44,10 +44,14 @@ typedef struct statsd_histogram_extensions {
     size_t used;
     collected_number last_min;
     collected_number last_max;
-    collected_number last_pct;
+    collected_number last_percentile;
+    collected_number last_median;
+    collected_number last_stddev;
     RRDDIM *rd_min;
     RRDDIM *rd_max;
-    RRDDIM *rd_pct;
+    RRDDIM *rd_percentile;
+    RRDDIM *rd_median;
+    RRDDIM *rd_stddev;
     long double values[];   // dynamic array of values collected
 } STATSD_METRIC_HISTOGRAM_EXTENSIONS;
 
@@ -224,7 +228,7 @@ static struct statsd {
         .threads = 0,
         .sockets = {
                 .config_section  = CONFIG_SECTION_STATSD,
-                .default_bind_to = "udp:* tcp:*",
+                .default_bind_to = "udp:localhost:8125 tcp:localhost:8125",
                 .default_port    = STATSD_LISTEN_PORT,
                 .backlog         = STATSD_LISTEN_BACKLOG
         },
@@ -641,8 +645,14 @@ static void statsd_del_callback(int fd, void *data) {
 
     if(data) {
         struct statsd_tcp *t = data;
-        if(t->type != STATSD_SOCKET_DATA_TYPE_TCP)
-            error("STATSD: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
+        if(t->type == STATSD_SOCKET_DATA_TYPE_TCP) {
+            if(t->len != 0) {
+                statsd.socket_errors++;
+                error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'", &t->buffer[t->len]);
+            }
+        }
+        else
+            error("STATSD: internal error: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
 
         freez(data);
     }
@@ -1060,8 +1070,10 @@ static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *
 
         m->histogram.ext->rd_min = rrddim_add(m->st, "min", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         m->histogram.ext->rd_max = rrddim_add(m->st, "max", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        m->rd_value              = rrddim_add(m->st, "avg", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_pct = rrddim_add(m->st, statsd.histogram_percentile_str, NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value              = rrddim_add(m->st, "average", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_percentile = rrddim_add(m->st, statsd.histogram_percentile_str, NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_median = rrddim_add(m->st, "median", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_stddev = rrddim_add(m->st, "stddev", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1076,13 +1088,17 @@ static inline void statsd_chart_from_timer_or_histogram(STATSD_METRIC *m, char *
         m->histogram.ext->last_min = (collected_number)roundl(series[0] * 1000.0);
         m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * 1000.0);
         m->last = (collected_number)roundl(average(series, len) * 1000);
-        m->histogram.ext->last_pct = (collected_number)roundl(average(series, (size_t)floor((double)len * statsd.histogram_percentile / 100.0)) * 1000);
+        m->histogram.ext->last_percentile = (collected_number)roundl(average(series, (size_t)floor((double)len * statsd.histogram_percentile / 100.0)) * 1000);
+        m->histogram.ext->last_median = (collected_number)roundl(median_on_sorted_series(series, len) * 1000);
+        m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * 1000);
     }
 
     m->reset = 1;
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_min, m->histogram.ext->last_min);
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_max, m->histogram.ext->last_max);
-    rrddim_set_by_pointer(m->st, m->histogram.ext->rd_pct, m->histogram.ext->last_pct);
+    rrddim_set_by_pointer(m->st, m->histogram.ext->rd_percentile, m->histogram.ext->last_percentile);
+    rrddim_set_by_pointer(m->st, m->histogram.ext->rd_median, m->histogram.ext->last_median);
+    rrddim_set_by_pointer(m->st, m->histogram.ext->rd_stddev, m->histogram.ext->last_stddev);
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
     if(m->rd_count)
@@ -1219,7 +1235,7 @@ void *statsd_main(void *ptr) {
 
     statsd_listen_sockets_setup();
     if(!statsd.sockets.opened) {
-        error("STATSD: No statsd sockets to listen to.");
+        error("STATSD: No statsd sockets to listen to. statsd will be disabled.");
         pthread_exit(NULL);
     }
 
