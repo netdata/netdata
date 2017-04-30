@@ -279,9 +279,9 @@ And you can extend it, by writing plugins that collect data from any source, usi
 
 ## netdata infographic
 
-This is how netdata works: 
+This is a high level overview of netdata feature set and architecture:
 
-![netdata-overview 5](https://cloud.githubusercontent.com/assets/2662304/25564818/db213ac6-2dc3-11e7-9513-cbc7eb64bd65.png)
+![netdata-overview](https://cloud.githubusercontent.com/assets/2662304/25565083/4ecfaf34-2dc9-11e7-9488-975225e6f4c1.png)
 
 ---
 
