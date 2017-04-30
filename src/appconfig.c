@@ -452,7 +452,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
         line++;
 
         s = trim(buffer);
-        if(!s) {
+        if(!s || *s == '#') {
             debug(D_CONFIG, "Ignoring line %d, it is empty.", line);
             continue;
         }
@@ -487,7 +487,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
         name = trim(name);
         value = trim(value);
 
-        if(!name) {
+        if(!name || *name == '#') {
             error("Ignoring line %d, name is empty.", line);
             continue;
         }
