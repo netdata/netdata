@@ -729,6 +729,33 @@ int main(int argc, char **argv) {
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
                         }
+                        else if(strcmp(optarg, "get") == 0) {
+                            if(optind + 3 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W get 'section' 'key' 'value'\n\n"
+                                        " Prints settings of netdata.conf.\n"
+                                        "\n"
+                                        " These options interact with: -c netdata.conf\n"
+                                        " -c netdata.conf has to be given before -W get.\n"
+                                        "\n"
+                                );
+                                exit(1);
+                            }
+
+                            if(!config_loaded) {
+                                fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
+                                config_load(NULL, 0);
+                            }
+
+                            backwards_compatible_config();
+                            get_netdata_configured_variables();
+
+                            const char *section = argv[optind];
+                            const char *key = argv[optind + 1];
+                            const char *def = argv[optind + 2];
+                            const char *value = config_get(section, key, def);
+                            printf("%s\n", value);
+                            exit(0);
+                        }
                         else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
                             help(1);

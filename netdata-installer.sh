@@ -630,51 +630,46 @@ progress "Read installation options from netdata.conf"
 
 # function to extract values from the config file
 config_option() {
-    local key="${1}" value="${2}" line=
+    local section="${1}" key="${2}" value="${3}" line=
 
     if [ -s "${NETDATA_PREFIX}/etc/netdata/netdata.conf" ]
         then
-        line="$( grep "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" | head -n 1 )"
-        [ ! -z "${line}" ] && value="$( echo "${line}" | cut -d '=' -f 2 | sed -e "s/^[[:space:]]\+//g" -e "s/[[:space:]]\+$//g" )"
+        "${NETDATA_PREFIX}/usr/sbin/netdata" \
+            -c "${NETDATA_PREFIX}/etc/netdata/netdata.conf" \
+            -W get "${section}" "${key}" "${value}" || \
+            echo "${value}"
+        # line="$( grep "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" | head -n 1 )"
+        # [ ! -z "${line}" ] && value="$( echo "${line}" | cut -d '=' -f 2 | sed -e "s/^[[:space:]]\+//g" -e "s/[[:space:]]\+$//g" )"
+    else
+        echo "${value}"
     fi
-
-    echo "${value}"
 }
 
 # the user netdata will run as
 if [ "${UID}" = "0" ]
     then
-    NETDATA_USER="$( config_option "run as user" "netdata" )"
+    NETDATA_USER="$( config_option "global" "run as user" "netdata" )"
 else
     NETDATA_USER="${USER}"
 fi
 
 # the owners of the web files
-NETDATA_WEB_USER="$(  config_option "web files owner" "${NETDATA_USER}" )"
-NETDATA_WEB_GROUP="$( config_option "web files group" "${NETDATA_WEB_USER}" )"
+NETDATA_WEB_USER="$(  config_option "web" "web files owner" "${NETDATA_USER}" )"
+NETDATA_WEB_GROUP="$( config_option "web" "web files group" "${NETDATA_WEB_USER}" )"
 
 # debug flags
-NETDATA_DEBUG="$( config_option "debug flags" 0 )"
+NETDATA_DEBUG="$( config_option "global" "debug flags" 0 )"
 
 # port
 defport=19999
-NETDATA_PORT="$( config_option "default port" ${defport} )"
-NETDATA_PORT2="$( config_option "port" ${defport} )"
-
-if [ "${NETDATA_PORT}" != "${NETDATA_PORT2}" ]
-then
-    if [ "${NETDATA_PORT2}" != "${defport}" ]
-    then
-        NETDATA_PORT="${NETDATA_PORT2}"
-    fi
-fi
+NETDATA_PORT="$( config_option "web" "default port" ${defport} )"
 
 # directories
-NETDATA_LIB_DIR="$( config_option "lib directory" "${NETDATA_PREFIX}/var/lib/netdata" )"
-NETDATA_CACHE_DIR="$( config_option "cache directory" "${NETDATA_PREFIX}/var/cache/netdata" )"
-NETDATA_WEB_DIR="$( config_option "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
-NETDATA_LOG_DIR="$( config_option "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
-NETDATA_CONF_DIR="$( config_option "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
+NETDATA_LIB_DIR="$( config_option "global" "lib directory" "${NETDATA_PREFIX}/var/lib/netdata" )"
+NETDATA_CACHE_DIR="$( config_option "global" "cache directory" "${NETDATA_PREFIX}/var/cache/netdata" )"
+NETDATA_WEB_DIR="$( config_option "global" "web files directory" "${NETDATA_PREFIX}/usr/share/netdata/web" )"
+NETDATA_LOG_DIR="$( config_option "global" "log directory" "${NETDATA_PREFIX}/var/log/netdata" )"
+NETDATA_CONF_DIR="$( config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 
 
@@ -1257,7 +1252,7 @@ REINSTALL
     echo >&2 "Update script generated   : ${TPUT_GREEN}${TPUT_BOLD}./netdata-updater.sh${TPUT_RESET}"
     echo >&2
     echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} can work from cron. It will trigger an email from cron"
-    echo >&2 "only if it fails (it does not print anything if it can update netdata).${TPUT_RESET}"
+    echo >&2 "only if it fails (it does not print anything when it can update netdata).${TPUT_RESET}"
     if [ "${UID}" -eq "0" ]
     then
         if [ -d "/etc/cron.daily" -a ! -f "/etc/cron.daily/netdata-updater.sh" ]
