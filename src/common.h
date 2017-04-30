@@ -241,7 +241,8 @@ extern void netdata_fix_chart_name(char *s);
 
 extern void strreverse(char* begin, char* end);
 extern char *mystrsep(char **ptr, char *s);
-extern char *trim(char *s);
+extern char *trim(char *s); // remove leading and trailing spaces; may return NULL
+extern char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces inside the string; may return NULL
 
 extern int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 extern int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);

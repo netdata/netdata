@@ -70,11 +70,11 @@ typedef struct statsd_metric_set {
 // this is a metric - for all types of metrics
 
 typedef enum statsd_metric_options {
-    STATSD_METRIC_OPTION_NONE                         = 0x00000000,
-    STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED = 0x00000001,
-    STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED        = 0x00000002,
-    STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED       = 0x00000004,
-    STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT        = 0x00000008,
+    STATSD_METRIC_OPTION_NONE                         = 0x00000000, // no options set
+    STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED = 0x00000001, // do not update the chart dimension, when this metric is not collected
+    STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED        = 0x00000002, // render a private chart for this metric
+    STATSD_METRIC_OPTION_PRIVATE_CHART_DISABLED       = 0x00000004, // do not render a private chart for this metric
+    STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT        = 0x00000008, // show the count of events for this private chart
 } STATS_METRIC_OPTIONS;
 
 typedef struct statsd_metric {
@@ -126,6 +126,47 @@ typedef struct statsd_index {
 
 static int statsd_metric_compare(void* a, void* b);
 
+// --------------------------------------------------------------------------------------------------------------------
+// synthetic charts
+
+typedef struct statsd_app_chart_dim {
+    const char *name;
+    const char *metric;
+    uint32_t metric_hash;
+    collected_number multiplier;
+    collected_number divider;
+    STATSD_INDEX *index;
+
+    STATSD_METRIC *m;
+    RRDDIM *rd;
+    struct statsd_app_chart_dim *next;
+} STATSD_APP_CHART_DIM;
+
+typedef struct statsd_app_chart {
+    const char *source;
+    const char *id;
+    const char *name;
+    const char *title;
+    const char *family;
+    const char *context;
+    const char *units;
+    long priority;
+    RRDSET_TYPE chart_type;
+    STATSD_APP_CHART_DIM *dimensions;
+
+    RRDSET *st;
+    struct statsd_app_chart *next;
+} STATSD_APP_CHART;
+
+typedef struct statsd_app {
+    const char *name;
+    SIMPLE_PATTERN *metrics;
+    STATS_METRIC_OPTIONS default_options;
+
+    const char *source;
+    STATSD_APP_CHART *charts;
+    struct statsd_app *next;
+} STATSD_APP;
 
 // --------------------------------------------------------------------------------------------------------------------
 // global statsd data
@@ -156,6 +197,7 @@ static struct statsd {
     RRD_MEMORY_MODE private_charts_memory_mode;
     int private_charts_history;
 
+    STATSD_APP *apps;
     size_t recvmmsg_size;
     size_t histogram_increase_step;
     double histogram_percentile;
@@ -223,6 +265,7 @@ static struct statsd {
                 STATSD_FIRST_PTR_MUTEX_INIT
         },
 
+        .apps = NULL,
         .histogram_percentile = 95.0,
         .histogram_increase_step = 10,
         .threads = 0,
@@ -858,6 +901,62 @@ void *statsd_collector_thread(void *ptr) {
     return NULL;
 }
 
+
+// --------------------------------------------------------------------------------------------------------------------
+// statsd applications configuration files parsing
+
+#define STATSD_CONF_MAX_LINE 8192
+
+int statsd_readfile(const char *path, const char *filename) {
+    debug(D_STATSD, "STATSD configuration reading file '%s/%s'", path, filename);
+    // FIXME
+    return 1;
+}
+
+static void statsd_readdir(const char *path) {
+    size_t pathlen = strlen(path);
+
+    debug(D_STATSD, "STATSD configuration reading directory '%s'", path);
+
+    DIR *dir = opendir(path);
+    if (!dir) {
+        error("STATSD configuration cannot open directory '%s'.", path);
+        return;
+    }
+
+    struct dirent *de = NULL;
+    while ((de = readdir(dir))) {
+        size_t len = strlen(de->d_name);
+
+        if(de->d_type == DT_DIR
+           && (
+                   (de->d_name[0] == '.' && de->d_name[1] == '\0')
+                   || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+           )) {
+            debug(D_STATSD, "STATSD: ignoring directory '%s'", de->d_name);
+            continue;
+        }
+
+        else if(de->d_type == DT_DIR) {
+            char *s = mallocz(pathlen + strlen(de->d_name) + 2);
+            strcpy(s, path);
+            strcat(s, "/");
+            strcat(s, de->d_name);
+            statsd_readdir(s);
+            freez(s);
+            continue;
+        }
+
+        else if((de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN) &&
+                len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
+            statsd_readfile(path, de->d_name);
+        }
+
+        else debug(D_STATSD, "STATSD: ignoring file '%s'", de->d_name);
+    }
+
+    closedir(dir);
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // send metrics to netdata - in private charts - called from the main thread
