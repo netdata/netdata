@@ -1175,8 +1175,10 @@ void *statsd_main(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("Cannot set pthread cancel state to ENABLE.");
 
+    // ----------------------------------------------------------------------------------------------------------------
+    // statsd configuration
+
     statsd.enabled = config_get_boolean(CONFIG_SECTION_STATSD, "enabled", statsd.enabled);
-    if(!statsd.enabled) return NULL;
 
     statsd.update_every = default_rrd_update_every;
     statsd.update_every = (int)config_get_number(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
@@ -1233,14 +1235,8 @@ void *statsd_main(void *ptr) {
     if(config_get_boolean(CONFIG_SECTION_STATSD, "gaps on timers (deleteTimers)", 0))
         statsd.timers.default_options |= STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED;
 
-    statsd_listen_sockets_setup();
-    if(!statsd.sockets.opened) {
-        error("STATSD: No statsd sockets to listen to. statsd will be disabled.");
-        pthread_exit(NULL);
-    }
-
 #ifdef STATSD_MULTITHREADED
-    statsd.threads = (int)config_get_number(CONFIG_SECTION_STATSD, "collector threads", processors);
+    statsd.threads = (int)config_get_number(CONFIG_SECTION_STATSD, "threads", processors);
     if(statsd.threads < 1) {
         error("STATSD: Invalid number of threads %d, using %d", statsd.threads, processors);
         statsd.threads = processors;
@@ -1249,6 +1245,17 @@ void *statsd_main(void *ptr) {
 #else
     statsd.threads = 1;
 #endif
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // statsd setup
+
+    if(!statsd.enabled) return NULL;
+
+    statsd_listen_sockets_setup();
+    if(!statsd.sockets.opened) {
+        error("STATSD: No statsd sockets to listen to. statsd will be disabled.");
+        pthread_exit(NULL);
+    }
 
     pthread_t threads[statsd.threads];
     int i;
@@ -1260,6 +1267,9 @@ void *statsd_main(void *ptr) {
         else if(pthread_detach(threads[i]))
             error("STATSD: cannot request detach of child thread.");
     }
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // statsd monitoring charts
 
     RRDSET *st_metrics = rrdset_create_localhost(
             "netdata"
@@ -1359,6 +1369,10 @@ void *statsd_main(void *ptr) {
             , RRDSET_TYPE_AREA
     );
     RRDDIM *rd_pcharts = rrddim_add(st_pcharts, "charts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // statsd thread to turn metrics into charts
 
     usec_t step = statsd.update_every * USEC_PER_SEC;
     heartbeat_t hb;
