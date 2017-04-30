@@ -71,11 +71,13 @@ void *cpuidlejitter_main(void *ptr) {
 
         if(netdata_exit) break;
 
-        if(likely(counter)) rrdset_next(st);
-        rrddim_set_by_pointer(st, rd_min, error_min);
-        rrddim_set_by_pointer(st, rd_max, error_max);
-        rrddim_set_by_pointer(st, rd_avg, error_total / iterations);
-        rrdset_done(st);
+        if(iterations) {
+            if (likely(counter)) rrdset_next(st);
+            rrddim_set_by_pointer(st, rd_min, error_min);
+            rrddim_set_by_pointer(st, rd_max, error_max);
+            rrddim_set_by_pointer(st, rd_avg, error_total / iterations);
+            rrdset_done(st);
+        }
     }
 
     info("IDLEJITTER thread exiting");
