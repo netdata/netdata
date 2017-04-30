@@ -19,10 +19,10 @@ long double average(long double *series, size_t entries) {
         sum += value;
     }
 
-    if(unlikely(entries == 0))
+    if(unlikely(count == 0))
         return NAN;
 
-    if(unlikely(entries == 1))
+    if(unlikely(count == 1))
         return sum;
 
     return sum / (long double)count;
