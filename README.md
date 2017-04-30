@@ -281,7 +281,7 @@ And you can extend it, by writing plugins that collect data from any source, usi
 
 This is how netdata works: 
 
-![netdata-overview 4](https://cloud.githubusercontent.com/assets/2662304/25564483/e93126be-2dbc-11e7-97de-975c89a71a51.png)
+![netdata-overview 5](https://cloud.githubusercontent.com/assets/2662304/25564818/db213ac6-2dc3-11e7-9513-cbc7eb64bd65.png)
 
 ---
 
