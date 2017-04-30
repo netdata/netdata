@@ -74,7 +74,12 @@ const char *web_server_mode_name(WEB_SERVER_MODE id) {
 // --------------------------------------------------------------------------------------
 
 int api_listen_sockets_setup(void) {
-    return listen_sockets_setup(&api_sockets);
+    int socks = listen_sockets_setup(&api_sockets);
+
+    if(!socks)
+        fatal("LISTENER: Cannot listen on any API socket. Exiting...");
+
+    return socks;
 }
 
 // --------------------------------------------------------------------------------------
