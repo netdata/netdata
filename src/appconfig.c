@@ -439,11 +439,11 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
     if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
 
-    debug(D_CONFIG, "Opening config file '%s'", filename);
+    debug(D_CONFIG, "CONFIG: opening config file '%s'", filename);
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
-        error("Cannot open file '%s'", filename);
+        error("CONFIG: cannot open file '%s'", filename);
         return 0;
     }
 
@@ -453,7 +453,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
         s = trim(buffer);
         if(!s || *s == '#') {
-            debug(D_CONFIG, "Ignoring line %d, it is empty.", line);
+            debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
             continue;
         }
 
@@ -471,14 +471,14 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
         if(!co) {
             // line outside a section
-            error("Ignoring line %d ('%s'), it is outside all sections.", line, s);
+            error("CONFIG: ignoring line %d ('%s') of file '%s', it is outside all sections.", line, s, filename);
             continue;
         }
 
         char *name = s;
         char *value = strchr(s, '=');
         if(!value) {
-            error("Ignoring line %d ('%s'), there is no = in it.", line, s);
+            error("CONFIG: ignoring line %d ('%s') of file '%s', there is no = in it.", line, s, filename);
             continue;
         }
         *value = '\0';
@@ -488,11 +488,11 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
         value = trim(value);
 
         if(!name || *name == '#') {
-            error("Ignoring line %d, name is empty.", line);
+            error("CONFIG: ignoring line %d of file '%s', name is empty.", line, filename);
             continue;
         }
         if(!value) {
-            debug(D_CONFIG, "Ignoring line %d, value is empty.", line);
+            debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', value is empty.", line, filename);
             continue;
         }
 
@@ -501,12 +501,12 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
         if(!cv) cv = appconfig_value_create(co, name, value);
         else {
             if(((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
-                debug(D_CONFIG, "Line %d, overwriting '%s/%s'.", line, co->name, cv->name);
+                debug(D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
                 freez(cv->value);
                 cv->value = strdupz(value);
             }
             else
-                debug(D_CONFIG, "Ignoring line %d, '%s/%s' is already present and used.", line, co->name, cv->name);
+                debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', '%s/%s' is already present and used.", line, filename, co->name, cv->name);
         }
         cv->flags |= CONFIG_VALUE_LOADED;
     }

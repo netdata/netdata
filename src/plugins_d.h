@@ -4,7 +4,16 @@
 #define PLUGINSD_FILE_SUFFIX ".plugin"
 #define PLUGINSD_FILE_SUFFIX_LEN strlen(PLUGINSD_FILE_SUFFIX)
 #define PLUGINSD_CMD_MAX (FILENAME_MAX*2)
+
+#define PLUGINSD_KEYWORD_CHART "CHART"
+#define PLUGINSD_KEYWORD_DIMENSION "DIMENSION"
+#define PLUGINSD_KEYWORD_BEGIN "BEGIN"
+#define PLUGINSD_KEYWORD_END "END"
+#define PLUGINSD_KEYWORD_FLUSH "FLUSH"
+#define PLUGINSD_KEYWORD_DISABLE "DISABLE"
+
 #define PLUGINSD_LINE_MAX 1024
+#define PLUGINSD_MAX_WORDS 20
 
 struct plugind {
     char id[CONFIG_MAX_NAME+1];         // config node id
@@ -35,5 +44,6 @@ extern struct plugind *pluginsd_root;
 
 extern void *pluginsd_main(void *ptr);
 extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
+extern int pluginsd_split_words(char *str, char **words, int max_words);
 
 #endif /* NETDATA_PLUGINS_D_H */
