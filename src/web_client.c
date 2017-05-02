@@ -962,13 +962,22 @@ static inline void web_client_send_http_header(struct web_client *w) {
 
     web_client_crock_socket(w);
 
-    ssize_t bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0);
+    size_t count = 0;
+    ssize_t bytes;
+    while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
+        count++;
+
+        if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+            error("Cannot send HTTP headers to web client.");
+            break;
+        }
+    }
+
     if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
         if(bytes > 0)
             w->stats_sent_bytes += bytes;
 
-        debug(D_WEB_CLIENT, "%llu: HTTP Header failed to be sent (I sent %zu bytes but the system sent %zd bytes). Closing web client."
-              , w->id
+        error("HTTP headers failed to be sent (I sent %zu bytes but the system sent %zd bytes). Closing web client."
               , buffer_strlen(w->response.header_output)
               , bytes);
 
