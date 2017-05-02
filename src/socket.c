@@ -900,6 +900,19 @@ static int snd_callback_default(int fd, int socktype, void *data, short int *eve
     return 0;
 }
 
+void poll_events_cleanup(void *data) {
+    struct poll *p = (struct poll *)data;
+
+    size_t i;
+    for(i = 0 ; i <= p->max ; i++) {
+        struct pollinfo *pi = &p->inf[i];
+        poll_close_fd(p, pi);
+    }
+
+    freez(p->fds);
+    freez(p->inf);
+}
+
 void poll_events(LISTEN_SOCKETS *sockets
         , void *(*add_callback)(int fd, short int *events)
         , void  (*del_callback)(int fd, void *data)
@@ -930,7 +943,9 @@ void poll_events(LISTEN_SOCKETS *sockets
         info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }
 
-    int timeout = 10 * 1000;
+    int timeout = -1; // wait forever
+
+    pthread_cleanup_push(poll_events_cleanup, &p);
 
     for(;;) {
         if(unlikely(netdata_exit)) break;
@@ -1059,11 +1074,6 @@ void poll_events(LISTEN_SOCKETS *sockets
         }
     }
 
-    for(i = 0 ; i <= p.max ; i++) {
-        struct pollinfo *pi = &p.inf[i];
-        poll_close_fd(&p, pi);
-    }
-
-    freez(p.fds);
-    freez(p.inf);
+    pthread_cleanup_pop(1);
+    debug(D_POLLFD, "POLLFD: LISTENER: cleanup completed");
 }

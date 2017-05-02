@@ -1556,11 +1556,11 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
 }
 
 static inline void statsd_update_all_app_charts(void) {
-    debug(D_STATSD, "updating app charts");
+    // debug(D_STATSD, "updating app charts");
 
     STATSD_APP *app;
     for(app = statsd.apps; app ;app = app->next) {
-        debug(D_STATSD, "updating charts for app '%s'", app->name);
+        // debug(D_STATSD, "updating charts for app '%s'", app->name);
 
         STATSD_APP_CHART *chart;
         for(chart = app->charts; chart ;chart = chart->next) {
@@ -1570,7 +1570,7 @@ static inline void statsd_update_all_app_charts(void) {
         }
     }
 
-    debug(D_STATSD, "completed update of app charts");
+    // debug(D_STATSD, "completed update of app charts");
 }
 
 static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_metric)(STATSD_METRIC *)) {
