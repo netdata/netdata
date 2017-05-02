@@ -293,7 +293,7 @@ static struct statsd {
         .threads = 0,
         .sockets = {
                 .config_section  = CONFIG_SECTION_STATSD,
-                .default_bind_to = "udp:localhost:8125 tcp:localhost:8125",
+                .default_bind_to = "udp:localhost tcp:localhost",
                 .default_port    = STATSD_LISTEN_PORT,
                 .backlog         = STATSD_LISTEN_BACKLOG
         },
@@ -957,6 +957,7 @@ int statsd_readfile(const char *path, const char *filename) {
             debug(D_STATSD, "STATSD: ignoring line %zu of file '%s/%s', it is empty.", line, path, filename);
             continue;
         }
+        debug(D_STATSD, "STATSD: processing line %zu of file '%s/%s': %s", line, path, filename, buffer);
 
         int len = (int) strlen(s);
         if (*s == '[' && s[len - 1] == ']') {
@@ -986,7 +987,7 @@ int statsd_readfile(const char *path, const char *filename) {
                 chart->priority = STATSD_CHART_PRIORITY;
                 chart->chart_type = RRDSET_TYPE_LINE;
 
-                chart->next = chart;
+                chart->next = app->charts;
                 app->charts = chart;
             }
 
@@ -1519,6 +1520,8 @@ static inline RRD_ALGORITHM statsd_algorithm_for_metric(STATSD_METRIC *m) {
 }
 
 static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *chart) {
+    debug(D_STATSD, "updating chart '%s' for app '%s'", chart->id, app->name);
+
     if(!chart->st) {
         chart->st = rrdset_create_custom(
                 localhost
@@ -1549,11 +1552,16 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
     }
 
     rrdset_done(chart->st);
+    debug(D_STATSD, "completed update of chart '%s' for app '%s'", chart->id, app->name);
 }
 
 static inline void statsd_update_all_app_charts(void) {
+    debug(D_STATSD, "updating app charts");
+
     STATSD_APP *app;
     for(app = statsd.apps; app ;app = app->next) {
+        debug(D_STATSD, "updating charts for app '%s'", app->name);
+
         STATSD_APP_CHART *chart;
         for(chart = app->charts; chart ;chart = chart->next) {
             if(unlikely(chart->dimensions_linked_count)) {
@@ -1561,6 +1569,8 @@ static inline void statsd_update_all_app_charts(void) {
             }
         }
     }
+
+    debug(D_STATSD, "completed update of app charts");
 }
 
 static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_metric)(STATSD_METRIC *)) {

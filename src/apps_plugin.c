@@ -1730,7 +1730,6 @@ static inline int print_process_and_parents(struct pid_stat *p, usec_t time) {
 }
 
 static inline void print_process_tree(struct pid_stat *p, char *msg) {
-    log_date(stderr);
     fprintf(stderr, "%s: process %s (%d, %s) with parents:\n", msg, p->comm, p->pid, p->updated?"running":"exited");
     print_process_and_parents(p, p->stat_collected_usec);
 }
@@ -1839,7 +1838,6 @@ static inline void process_exited_processes() {
             continue;
 
         if(unlikely(debug)) {
-            log_date(stderr);
             fprintf(stderr, "Absorb %s (%d %s total resources: utime=" KERNEL_UINT_FORMAT " stime=" KERNEL_UINT_FORMAT " gtime=" KERNEL_UINT_FORMAT " minflt=" KERNEL_UINT_FORMAT " majflt=" KERNEL_UINT_FORMAT ")\n"
                 , p->comm
                 , p->pid
