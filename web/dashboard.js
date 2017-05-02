@@ -1523,7 +1523,6 @@ var NETDATA = window.NETDATA || {};
         this.colors = null;
         this.colors_assigned = {};
         this.colors_available = null;
-        this.colors_defined = null;
         this.colors_custom = null;
 
         // the element already created by the user
@@ -2683,12 +2682,24 @@ var NETDATA = window.NETDATA || {};
             this.chartPrepareColorPalette();
 
             if(typeof this.colors_assigned[label] === 'undefined') {
+
                 if(this.colors_available.length === 0) {
-                    var len = NETDATA.themes.current.colors.length;
+                    var len;
+
+                    // copy the custom colors
+                    if(this.colors_custom !== null) {
+                        len = this.colors_custom.length;
+                        while (len--)
+                            this.colors_available.unshift(this.colors_custom[len]);
+                    }
+
+                    // copy the standard palette colors
+                    len = NETDATA.themes.current.colors.length;
                     while(len--)
                         this.colors_available.unshift(NETDATA.themes.current.colors[len]);
                 }
 
+                // assign a color to this dimension
                 this.colors_assigned[label] = this.colors_available.shift();
 
                 if(this.debug === true)
@@ -2708,42 +2719,17 @@ var NETDATA = window.NETDATA || {};
 
             if(this.colors !== null) return;
 
-            if(this.colors_defined !== null) {
-                this.colors = [];
-                this.colors_available = [];
-
-                if(this.colors_custom !== null) {
-                    len = this.colors_custom.length;
-                    while(len--)
-                        this.colors.unshift(this.colors_custom[len]);
-                }
-
-                len = this.colors_defined.length;
-                while(len--)
-                    this.colors_available.unshift(this.colors_defined[len]);
-
-                if(this.debug === true) {
-                    this.log("colors_available:");
-                    this.log(this.colors_available);
-                }
-
-                return;
-            }
-
             if(this.debug === true)
                 this.log("Preparing chart color palette");
 
             this.colors = [];
             this.colors_available = [];
-            this.colors_defined = [];
             this.colors_custom = [];
 
             // add the standard colors
             len = NETDATA.themes.current.colors.length;
-            while(len--) {
+            while(len--)
                 this.colors_available.unshift(NETDATA.themes.current.colors[len]);
-                this.colors_defined.unshift(NETDATA.themes.current.colors[len]);
-            }
 
             // add the user supplied colors
             var c = $(this.element).data('colors');
@@ -2757,27 +2743,34 @@ var NETDATA = window.NETDATA || {};
 
                     this.colors_custom.unshift(c[len]);
                     this.colors_available.unshift(c[len]);
-                    this.colors_defined.unshift(c[len]);
                 }
             }
 
             if(this.debug === true) {
-                this.log("colors_defined:");
-                this.log(this.colors_defined);
+                this.log("colors_custom:");
+                this.log(this.colors_custom);
+                this.log("colors_available:");
+                this.log(this.colors_available);
             }
         };
 
         // get the ordered list of chart colors
         // this includes user defined colors
-        this.chartDefinedColors = function() {
+        this.chartCustomColors = function() {
             this.chartPrepareColorPalette();
 
+            var colors;
+            if(this.colors_custom.length)
+                colors = this.colors_custom;
+            else
+                colors = this.colors;
+
             if(this.debug === true) {
-                this.log("chartDefinedColors() returns:");
-                this.log(this.colors);
+                this.log("chartCustomColors() returns:");
+                this.log(colors);
             }
 
-            return this.colors_defined;
+            return colors;
         };
 
         // get the ordered list of chart ASSIGNED colors
@@ -3666,8 +3659,8 @@ var NETDATA = window.NETDATA || {};
             if(this.isAutoRefreshable() === true) {
                 // allow the first update, even if the page is not visible
                 if(this.updates_counter && this.updates_since_last_unhide && NETDATA.options.page_is_visible === false) {
-                    if(NETDATA.options.debug.focus === true || this.debug === true)
-                        this.log('canBeAutoRefreshed(): page does not have focus');
+                    // if(NETDATA.options.debug.focus === true || this.debug === true)
+                    //    this.log('canBeAutoRefreshed(): page does not have focus');
 
                     return false;
                 }
@@ -4180,12 +4173,12 @@ var NETDATA = window.NETDATA || {};
     NETDATA.peityChartUpdate = function(state, data) {
         state.peity_instance.innerHTML = data.result;
 
-        if(state.peity_options.stroke !== state.chartColors()[0]) {
-            state.peity_options.stroke = state.chartColors()[0];
+        if(state.peity_options.stroke !== state.chartCustomColors()[0]) {
+            state.peity_options.stroke = state.chartCustomColors()[0];
             if(state.chart.chart_type === 'line')
                 state.peity_options.fill = NETDATA.themes.current.background;
             else
-                state.peity_options.fill = NETDATA.colorLuminance(state.chartColors()[0], NETDATA.chartDefaults.fill_luminance);
+                state.peity_options.fill = NETDATA.colorLuminance(state.chartCustomColors()[0], NETDATA.chartDefaults.fill_luminance);
         }
 
         $(state.peity_instance).peity('line', state.peity_options);
@@ -4250,7 +4243,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.sparklineChartCreate = function(state, data) {
         var self = $(state.element);
         var type = self.data('sparkline-type') || 'line';
-        var lineColor = self.data('sparkline-linecolor') || state.chartColors()[0];
+        var lineColor = self.data('sparkline-linecolor') || state.chartCustomColors()[0];
         var fillColor = self.data('sparkline-fillcolor') || ((state.chart.chart_type === 'line')?NETDATA.themes.current.background:NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance));
         var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
         var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
@@ -5770,7 +5763,7 @@ var NETDATA = window.NETDATA || {};
 
         var barColor = self.data('easypiechart-barcolor');
         if(typeof barColor === 'undefined' || barColor === null)
-            barColor = state.chartColors()[0];
+            barColor = state.chartCustomColors()[0];
         else {
             // <div ... data-easypiechart-barcolor="(function(percent){return(percent < 50 ? '#5cb85c' : percent < 85 ? '#f0ad4e' : '#cb3935');})" ...></div>
             var tmp = eval(barColor);
@@ -6001,7 +5994,7 @@ var NETDATA = window.NETDATA || {};
         var adjust = self.data('gauge-adjust') || null;
         var pointerColor = self.data('gauge-pointer-color') || NETDATA.themes.current.gauge_pointer;
         var strokeColor = self.data('gauge-stroke-color') || NETDATA.themes.current.gauge_stroke;
-        var startColor = self.data('gauge-start-color') || state.chartColors()[0];
+        var startColor = self.data('gauge-start-color') || state.chartCustomColors()[0];
         var stopColor = self.data('gauge-stop-color') || void 0;
         var generateGradient = self.data('gauge-generate-gradient') || false;
 
