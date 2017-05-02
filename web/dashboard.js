@@ -2717,7 +2717,7 @@ var NETDATA = window.NETDATA || {};
         this.chartPrepareColorPalette = function() {
             var len;
 
-            if(this.colors !== null) return;
+            if(this.colors_custom !== null) return;
 
             if(this.debug === true)
                 this.log("Preparing chart color palette");
@@ -2841,8 +2841,8 @@ var NETDATA = window.NETDATA || {};
                 }
             }
             // we will re-generate the colors for the chart
-            // based on the selected dimensions
-            this.colors = null;
+            // based on the dimensions this result has data for
+            this.colors = [];
 
             if(this.debug === true)
                 this.log('updating Legend DOM');
