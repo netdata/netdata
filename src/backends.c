@@ -401,13 +401,13 @@ void *backends_main(void *ptr) {
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, uint32_t) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
 
-    info("BACKEND thread created with task id %d", gettid());
+    info("BACKEND: thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+        error("BACKEND: cannot set pthread cancel type to DEFERRED.");
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+        error("BACKEND: cannot set pthread cancel state to ENABLE.");
 
     // ------------------------------------------------------------------------
     // collect configuration options
@@ -444,12 +444,12 @@ void *backends_main(void *ptr) {
         options |= BACKEND_SOURCE_DATA_SUM;
     }
     else {
-        error("Invalid data source method '%s' for backend given. Disabling backed.", source);
+        error("BACKEND: invalid data source method '%s' for backend given. Disabling backed.", source);
         goto cleanup;
     }
 
     if(timeoutms < 1) {
-        error("BACKED invalid timeout %ld ms given. Assuming %d ms.", timeoutms, frequency * 2 * 1000);
+        error("BACKEND: invalid timeout %ld ms given. Assuming %d ms.", timeoutms, frequency * 2 * 1000);
         timeoutms = frequency * 2 * 1000;
     }
     timeout.tv_sec  = (timeoutms * 1000) / 1000000;
@@ -493,12 +493,12 @@ void *backends_main(void *ptr) {
 
     }
     else {
-        error("Unknown backend type '%s'", type);
+        error("BACKEND: Unknown backend type '%s'", type);
         goto cleanup;
     }
 
     if(backend_request_formatter == NULL || backend_response_checker == NULL) {
-        error("backend is misconfigured - disabling it.");
+        error("BACKEND: backend is misconfigured - disabling it.");
         goto cleanup;
     }
 
@@ -560,7 +560,7 @@ void *backends_main(void *ptr) {
     // ------------------------------------------------------------------------
     // prepare the backend main loop
 
-    info("BACKEND configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, frequency, hostname, prefix);
+    info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, frequency, hostname, prefix);
 
     usec_t step_ut = frequency * USEC_PER_SEC;
     time_t after = now_realtime_sec();
@@ -582,7 +582,7 @@ void *backends_main(void *ptr) {
         int pthreadoldcancelstate;
 
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
-            error("Cannot set pthread cancel state to DISABLE.");
+            error("BACKEND: cannot set pthread cancel state to DISABLE.");
 
         size_t count_hosts = 0;
         size_t count_charts_total = 0;
@@ -634,7 +634,7 @@ void *backends_main(void *ptr) {
         debug(D_BACKEND, "BACKEND: buffer has %zu bytes, added metrics for %zu dimensions, of %zu charts, from %zu hosts", buffer_strlen(b), count_dims_total, count_charts_total, count_hosts);
 
         if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
-            error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
+            error("BACKEND: cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
 
         // ------------------------------------------------------------------------
 
@@ -679,14 +679,14 @@ void *backends_main(void *ptr) {
                     chart_receptions++;
                 }
                 else if(r == 0) {
-                    error("Backend '%s' closed the socket", destination);
+                    error("BACKEND: '%s' closed the socket", destination);
                     close(sock);
                     sock = -1;
                 }
                 else {
                     // failed to receive data
                     if(errno != EAGAIN && errno != EWOULDBLOCK) {
-                        error("Cannot receive data from backend '%s'.", destination);
+                        error("BACKEND: cannot receive data from backend '%s'.", destination);
                     }
                 }
             }
@@ -738,7 +738,7 @@ void *backends_main(void *ptr) {
             }
             else {
                 // oops! we couldn't send (all or some of the) data
-                error("Failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.", destination, len, written);
+                error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.", destination, len, written);
                 chart_transmission_failures++;
 
                 if(written != -1)
@@ -753,7 +753,7 @@ void *backends_main(void *ptr) {
             }
         }
         else {
-            error("Failed to update database backend '%s'", destination);
+            error("BACKEND: failed to update database backend '%s'", destination);
             chart_transmission_failures++;
 
             // increment the counter we check for data loss
@@ -763,7 +763,7 @@ void *backends_main(void *ptr) {
         if(failures > buffer_on_failures) {
             // too bad! we are going to lose data
             chart_lost_bytes += buffer_strlen(b);
-            error("Reached %d backend failures. Flushing buffers to protect this host - this results in data loss on back-end server '%s'", failures, destination);
+            error("BACKEND: reached %d backend failures. Flushing buffers to protect this host - this results in data loss on back-end server '%s'", failures, destination);
             buffer_flush(b);
             failures = 0;
             chart_data_lost_events++;
@@ -821,7 +821,7 @@ cleanup:
     buffer_free(b);
     buffer_free(response);
 
-    info("BACKEND thread exiting");
+    info("BACKEND: thread exiting");
 
     static_thread->enabled = 0;
     pthread_exit(NULL);

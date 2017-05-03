@@ -355,8 +355,8 @@ int mysendfile(struct web_client *w, char *filename) {
             return 404;
         }
     }
-    if(fcntl(w->ifd, F_SETFL, O_NONBLOCK) < 0)
-        error("%llu: Cannot set O_NONBLOCK on file '%s'.", w->id, webfilename);
+
+    sock_setnonblock(w->ifd);
 
     // pick a Content-Type for the file
          if(strstr(filename, ".html") != NULL)  w->response.data->contenttype = CT_TEXT_HTML;

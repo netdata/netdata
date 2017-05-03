@@ -27,6 +27,13 @@ extern int connect_to_one_of(const char *destination, int default_port, struct t
 extern ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 extern ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 
+extern int sock_setnonblock(int fd);
+extern int sock_delnonblock(int fd);
+extern int sock_setreuse(int fd, int reuse);
+extern int sock_setreuse_port(int fd, int reuse);
+extern int sock_enlarge_in(int fd);
+extern int sock_enlarge_out(int fd);
+
 extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize);
 
 #ifndef HAVE_ACCEPT4

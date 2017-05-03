@@ -1,12 +1,87 @@
 #include "common.h"
 
 // --------------------------------------------------------------------------------------------------------------------
+// various library calls
+
+#ifdef __gnu_linux__
+#define LARGE_SOCK_SIZE 33554431 // don't ask why - I found it at brubeck source - I guess it is just a large number
+#else
+#define LARGE_SOCK_SIZE 4096
+#endif
+
+int sock_setnonblock(int fd) {
+    int flags;
+
+    flags = fcntl(fd, F_GETFL);
+    flags |= O_NONBLOCK;
+
+    int ret = fcntl(fd, F_SETFL, flags);
+    if(ret < 0)
+        error("Failed to set O_NONBLOCK on socket %d", fd);
+
+    return ret;
+}
+
+int sock_delnonblock(int fd) {
+    int flags;
+
+    flags = fcntl(fd, F_GETFL);
+    flags &= ~O_NONBLOCK;
+
+    int ret = fcntl(fd, F_SETFL, flags);
+    if(ret < 0)
+        error("Failed to remove O_NONBLOCK on socket %d", fd);
+
+    return ret;
+}
+
+int sock_setreuse(int fd, int reuse) {
+    int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
+    if(ret == -1)
+        error("Failed to set SO_REUSEADDR on socket %d", fd);
+
+    return ret;
+}
+
+int sock_setreuse_port(int fd, int reuse) {
+    int ret = -1;
+#ifdef SO_REUSEPORT
+    ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
+#endif
+    if(ret == -1)
+        error("failed to set SO_REUSEPORT on socket %d", fd);
+
+    return ret;
+}
+
+int sock_enlarge_in(int fd) {
+    int ret, bs = LARGE_SOCK_SIZE;
+
+    ret = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bs, sizeof(bs));
+
+    if(ret == -1)
+        error("Failed to set SO_RCVBUF on socket %d", fd);
+
+    return ret;
+}
+
+int sock_enlarge_out(int fd) {
+    int ret, bs = LARGE_SOCK_SIZE;
+    ret = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bs, sizeof(bs));
+
+    if(ret == -1)
+        error("Failed to set SO_SNDBUF on socket %d", fd);
+
+    return ret;
+}
+
+
+// --------------------------------------------------------------------------------------------------------------------
 // listening sockets
 
 int create_listen_socket4(int socktype, const char *ip, int port, int listen_backlog) {
     int sock;
-    int sockopt = 1;
-    int nonblock = 1;
 
     debug(D_LISTENER, "LISTENER: IPv4 creating new listening socket on ip '%s' port %d, socktype %d", ip, port, socktype);
 
@@ -16,13 +91,10 @@ int create_listen_socket4(int socktype, const char *ip, int port, int listen_bac
         return -1;
     }
 
-    /* avoid "address already in use" */
-    if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt)) != 0)
-        error("LISTENER: Cannot set SO_REUSEADDR on ip '%s' port %d, socktype %d.", ip, port, socktype);
-
-    /* set non-blocking mode */
-    if(ioctl(sock, FIONBIO, (char *)&nonblock))
-        error("LISTENER: Cannot set FIONBIO on ip '%s' port %d, socktype %d.", ip, port, socktype);
+    sock_setreuse(sock, 1);
+    sock_setreuse_port(sock, 1);
+    sock_setnonblock(sock);
+    sock_enlarge_in(sock);
 
     struct sockaddr_in name;
     memset(&name, 0, sizeof(struct sockaddr_in));
@@ -53,10 +125,8 @@ int create_listen_socket4(int socktype, const char *ip, int port, int listen_bac
 }
 
 int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int port, int listen_backlog) {
-    int sock = -1;
-    int sockopt = 1;
+    int sock;
     int ipv6only = 1;
-    int nonblock = 1;
 
     debug(D_LISTENER, "LISTENER: IPv6 creating new listening socket on ip '%s' port %d, socktype %d", ip, port, socktype);
 
@@ -66,13 +136,10 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
         return -1;
     }
 
-    /* avoid "address already in use" */
-    if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void*)&sockopt, sizeof(sockopt)) != 0)
-        error("LISTENER: Cannot set SO_REUSEADDR on ip '%s' port %d, socktype %d.", ip, port, socktype);
-
-    /* set non-blocking mode */
-    if(ioctl(sock, FIONBIO, (char *)&nonblock))
-        error("LISTENER: Cannot set FIONBIO on ip '%s' port %d, socktype %d.", ip, port, socktype);
+    sock_setreuse(sock, 1);
+    sock_setreuse_port(sock, 1);
+    sock_setnonblock(sock);
+    sock_enlarge_in(sock);
 
     /* IPv6 only */
     if(setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (void*)&ipv6only, sizeof(ipv6only)) != 0)

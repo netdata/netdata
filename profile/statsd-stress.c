@@ -59,8 +59,8 @@ static void *report_thread(void *__data) {
 	return NULL;
 }
 
-#define STATSD_METRIC_TYPES 6
-char *types[STATSD_METRIC_TYPES] = {"g", "c", "m", "ms", "h", "s"};
+char *types[] = {"g", "c", "m", "ms", "h", "s", NULL};
+// char *types[] = {"g", "c", "C", "h", "ms", NULL}; // brubeck compatible
 
 static void *spam_thread(void *__data) {
 	struct thread_data *data = (struct thread_data *)__data;
@@ -73,12 +73,17 @@ static void *spam_thread(void *__data) {
 
 	char **packets = malloc(sizeof(char *) * metrics);
 	size_t i, *lengths = malloc(sizeof(size_t) * metrics);
+	size_t t;
 
-	for(i = 0; i < metrics ;i++) {
-		lengths[i] = sprintf(packet, "github.test.packet.%zu.%zu:%zu.%zu|%s", data->id, i, myrand(metrics), myrand(metrics), types[myrand(STATSD_METRIC_TYPES)]);
+	for(i = 0, t = 0; i < metrics ;i++, t++) {
+		if(!types[t]) t = 0;
+		char *type = types[t];
+
+		lengths[i] = sprintf(packet, "stress.%s.t%zu.m%zu:%zu|%s", type, data->id, i, myrand(metrics), type);
 		packets[i] = strdup(packet);
-		// printf("packet %d, of length %zu: '%s'\n", i, lengths[i], packets[i]);
+		// printf("packet %zu, of length %zu: '%s'\n", i, lengths[i], packets[i]);
 	}
+	//printf("\n");
 
 	for (;;) {
 		for(i = 0; i < metrics ;i++) {
