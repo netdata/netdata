@@ -17,8 +17,8 @@ int check_storage_number(calculated_number n, int debug) {
 
     if(dcdiff < 0) dcdiff = -dcdiff;
 
-    size_t len = print_calculated_number(buffer, d);
-    calculated_number p = str2l(buffer);
+    size_t len = (size_t)print_calculated_number(buffer, d);
+    calculated_number p = str2ld(buffer, NULL);
     calculated_number pdiff = n - p;
     calculated_number pcdiff = pdiff * 100.0 / n;
     if(pcdiff < 0) pcdiff = -pcdiff;
@@ -229,6 +229,45 @@ int unit_test_storage()
     return r;
 }
 
+int unit_test_str2ld() {
+    char *values[] = {
+            "1.234567", "-35.6", "0.00123", "23842384234234.2", ".1", "1.2e-10",
+            "hello", "1wrong", "nan", "inf", NULL
+    };
+
+    int i;
+    for(i = 0; values[i] ; i++) {
+        char *e_mine = "hello", *e_sys = "world";
+        long double mine = str2ld(values[i], &e_mine);
+        long double sys = strtold(values[i], &e_sys);
+
+        if(isnan(mine)) {
+            if(!isnan(sys)) {
+                fprintf(stderr, "Value '%s' is parsed as %Lf, but system believes it is %Lf.\n", values[i], mine, sys);
+                return -1;
+            }
+        }
+        else if(isinf(mine)) {
+            if(!isinf(sys)) {
+                fprintf(stderr, "Value '%s' is parsed as %Lf, but system believes it is %Lf.\n", values[i], mine, sys);
+                return -1;
+            }
+        }
+        else if(mine != sys && abs(mine-sys) > 0.000001) {
+            fprintf(stderr, "Value '%s' is parsed as %Lf, but system believes it is %Lf, delta %Lf.\n", values[i], mine, sys, sys-mine);
+            return -1;
+        }
+
+        if(e_mine != e_sys) {
+            fprintf(stderr, "Value '%s' is parsed correctly, but endptr is not right\n", values[i]);
+            return -1;
+        }
+
+        fprintf(stderr, "str2ld() parsed value '%s' exactly the same way with strtold(), returned %Lf vs %Lf\n", values[i], mine, sys);
+    }
+
+    return 0;
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -244,7 +283,7 @@ struct test {
     int update_every;
     unsigned long long multiplier;
     unsigned long long divisor;
-    int algorithm;
+    RRD_ALGORITHM algorithm;
 
     unsigned long feed_entries;
     unsigned long result_entries;
@@ -916,7 +955,9 @@ int run_test(struct test *test)
                 (float)time_now / 1000000.0,
                 ((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor,
                 (((calculated_number)test->feed[c].value - (calculated_number)last) * (calculated_number)test->multiplier / (calculated_number)test->divisor) / (calculated_number)test->feed[c].microseconds * (calculated_number)1000000);
-            rrdset_next_usec_unfiltered(st, test->feed[c].microseconds);
+
+            // rrdset_next_usec_unfiltered(st, test->feed[c].microseconds);
+            st->usec_since_last_update = test->feed[c].microseconds;
         }
         else {
             fprintf(stderr, "    > %s: feeding position %lu\n", test->name, c+1);
@@ -1125,7 +1166,8 @@ int unit_test(long delay, long shift)
 
         fprintf(stderr, "\n\nLOOP = %lu, DELAY = %ld, VALUE = " COLLECTED_NUMBER_FORMAT "\n", c, delay, i);
         if(c) {
-            rrdset_next_usec_unfiltered(st, delay);
+            // rrdset_next_usec_unfiltered(st, delay);
+            st->usec_since_last_update = delay;
         }
         if(do_abs) rrddim_set(st, "absolute", i);
         if(do_inc) rrddim_set(st, "incremental", i);

@@ -136,7 +136,7 @@ static inline int health_parse_duration(char *string, int *result) {
     }
 
     char *e = NULL;
-    calculated_number n = strtold(string, &e);
+    calculated_number n = str2ld(string, &e);
     if(e && *e) {
         switch (*e) {
             case 'Y':
@@ -562,7 +562,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
-                rc->green = strtold(value, &e);
+                rc->green = str2ld(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, path, filename, rc->name, key, e);
@@ -570,7 +570,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
                 char *e;
-                rc->red = strtold(value, &e);
+                rc->red = str2ld(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, path, filename, rc->name, key, e);
@@ -686,7 +686,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
-                rt->green = strtold(value, &e);
+                rt->green = str2ld(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, path, filename, rt->name, key, e);
@@ -694,7 +694,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
                 char *e;
-                rt->red = strtold(value, &e);
+                rt->red = str2ld(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, path, filename, rt->name, key, e);
