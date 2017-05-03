@@ -303,7 +303,7 @@ long double appconfig_get_float(struct config *root, const char *section, const 
     s = appconfig_get(root, section, name, buffer);
     if(!s) return value;
 
-    return strtold(s, NULL);
+    return str2ld(s, NULL);
 }
 
 int appconfig_get_boolean(struct config *root, const char *section, const char *name, int value)

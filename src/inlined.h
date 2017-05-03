@@ -156,12 +156,33 @@ static inline long double str2ld(const char *s, char **endptr) {
     unsigned long decimal_part = 0;
     size_t decimal_digits = 0;
 
-    if(unlikely(*s == '-')) {
-        s++;
-        negative = 1;
+    switch(*s) {
+        case '-':
+            s++;
+            negative = 1;
+            break;
+
+        case '+':
+            s++;
+            break;
+
+        case 'n':
+            if(s[1] == 'a' && s[2] == 'n') {
+                if(endptr) *endptr = (char *)&s[3];
+                return NAN;
+            }
+            break;
+
+        case 'i':
+            if(s[1] == 'n' && s[2] == 'f') {
+                if(endptr) *endptr = (char *)&s[3];
+                return INFINITY;
+            }
+            break;
+
+        default:
+            break;
     }
-    else if(unlikely(*s == '+'))
-        s++;
 
     while (*s >= '0' && *s <= '9') {
         integer_part = (integer_part * 10) + (*s - '0');
