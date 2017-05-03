@@ -3,7 +3,6 @@
 #define STATSD_CHART_PREFIX "statsd"
 #define STATSD_CHART_PRIORITY 90000
 
-
 // --------------------------------------------------------------------------------------
 
 // #define STATSD_MULTITHREADED 1
@@ -145,18 +144,17 @@ static int statsd_metric_compare(void* a, void* b);
 // --------------------------------------------------------------------------------------------------------------------
 // synthetic charts
 
-typedef struct statsd_app_chart_dim {
+typedef struct statsd_app_chart_dimension {
     const char *name;
     const char *metric;
     uint32_t metric_hash;
-    const char *options;
     collected_number multiplier;
     collected_number divider;
     STATSD_INDEX *index;
 
     STATSD_METRIC *m;
     RRDDIM *rd;
-    struct statsd_app_chart_dim *next;
+    struct statsd_app_chart_dimension *next;
 } STATSD_APP_CHART_DIM;
 
 typedef struct statsd_app_chart {
@@ -318,7 +316,7 @@ static inline STATSD_METRIC *stasd_metric_index_find(STATSD_INDEX *index, const 
 }
 
 static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, const char *name, STATSD_METRIC_TYPE type) {
-    debug(D_STATSD, "finding or adding metric '%s' under '%s'", name, index->name);
+    debug(D_STATSD, "searching for metric '%s' under '%s'", name, index->name);
 
     uint32_t hash = simple_hash(name);
 
@@ -365,8 +363,8 @@ static inline long double statsd_parse_float(const char *v, long double def) {
 
     if(likely(v && *v)) {
         char *e = NULL;
-        value = strtold(v, &e);
-        if(e && *e)
+        value = str2ld(v, &e);
+        if(unlikely(e && *e))
             error("STATSD: excess data '%s' after value '%s'", e, v);
     }
 
@@ -378,8 +376,8 @@ static inline long long statsd_parse_int(const char *v, long long def) {
 
     if(likely(v && *v)) {
         char *e = NULL;
-        value = strtoll(v, &e, 10);
-        if(e && *e)
+        value = str2ll(v, &e);
+        if(unlikely(e && *e))
             error("STATSD: excess data '%s' after value '%s'", e, v);
     }
 
@@ -406,7 +404,7 @@ static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, con
         statsd_reset_metric(m);
     }
 
-    if(*value == '+' || *value == '-')
+    if(unlikely(*value == '+' || *value == '-'))
         m->gauge.value += statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
     else
         m->gauge.value = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
@@ -442,7 +440,7 @@ static inline void statsd_process_histogram(STATSD_METRIC *m, const char *value,
         statsd_reset_metric(m);
     }
 
-    if(m->histogram.ext->used == m->histogram.ext->size) {
+    if(unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
         netdata_mutex_lock(&m->histogram.mutex);
         m->histogram.ext->size += statsd.histogram_increase_step;
         m->histogram.ext = reallocz(m->histogram.ext, sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS) + (sizeof(long double) * m->histogram.ext->size));
@@ -1080,15 +1078,14 @@ int statsd_readfile(const char *path, const char *filename) {
                 chart->chart_type = rrdset_type_id(value);
             }
             else if (!strcmp(name, "dimension")) {
-                // metric [name [multiplier [divider [options]]]
-                char *words[5];
-                pluginsd_split_words(value, words, 5);
+                // metric [name [multiplier [divider]]]
+                char *words[4];
+                pluginsd_split_words(value, words, 4);
 
                 char *metric_name = words[0];
                 char *dim_name = words[1];
                 char *multipler = words[2];
                 char *divider = words[3];
-                char *options = words[4];
 
                 STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
                 dim->next = chart->dimensions;
@@ -1101,7 +1098,6 @@ int statsd_readfile(const char *path, const char *filename) {
                 dim->name = strdupz((dim_name && *dim_name)?dim_name:metric_name);
                 dim->multiplier = (multipler && *multipler)?str2l(multipler):1;
                 dim->divider = (divider && *divider)?str2l(divider):1;
-                dim->options = (options && *options)?strdupz(options):NULL;
 
                 if(!dim->multiplier) {
                     error("STATSD: invalid multiplier value '%s' at line %zu of file '%s/%s'. Using 1.", multipler, line, path, filename);
@@ -1233,6 +1229,8 @@ static inline RRDSET *statsd_private_rrdset_create(
 }
 
 static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
+    debug(D_STATSD, "updating private chart for gauge metric '%s'", m->name);
+
     if(unlikely(!m->st)) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, "gauge", RRD_ID_LENGTH_MAX);
@@ -1267,6 +1265,8 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
 }
 
 static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const char *dim, const char *family) {
+    debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
+
     if(unlikely(!m->st)) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
@@ -1301,6 +1301,8 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
 }
 
 static inline void statsd_private_chart_set(STATSD_METRIC *m) {
+    debug(D_STATSD, "updating private chart for set metric '%s'", m->name);
+
     if(unlikely(!m->st)) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, "set", RRD_ID_LENGTH_MAX);
@@ -1335,6 +1337,8 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
 }
 
 static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
+    debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
+
     if(unlikely(!m->st)) {
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, dim, RRD_ID_LENGTH_MAX);
@@ -1382,6 +1386,8 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
 // statsd flush metrics
 
 static inline void statsd_flush_gauge(STATSD_METRIC *m) {
+    debug(D_STATSD, "flushing gauge metric '%s'", m->name);
+
     int updated = 0;
 
     if(m->count && !m->reset)
@@ -1394,6 +1400,8 @@ static inline void statsd_flush_gauge(STATSD_METRIC *m) {
 }
 
 static inline void statsd_flush_counter_or_meter(STATSD_METRIC *m, const char *dim, const char *family) {
+    debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
+
     int updated = 0;
 
     if(m->count && !m->reset) {
@@ -1417,6 +1425,8 @@ static inline void statsd_flush_meter(STATSD_METRIC *m) {
 }
 
 static inline void statsd_flush_set(STATSD_METRIC *m) {
+    debug(D_STATSD, "flushing set metric '%s'", m->name);
+
     int updated = 0;
 
     if(m->count && !m->reset) {
@@ -1431,6 +1441,8 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
 }
 
 static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
+    debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
+
     int updated = 0;
 
     netdata_mutex_lock(&m->histogram.mutex);
@@ -1472,6 +1484,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
     STATSD_APP *app;
     for(app = statsd.apps; app ;app = app->next) {
         if(unlikely(simple_pattern_matches(app->metrics, m->name))) {
+            debug(D_STATSD, "metric '%s' matches app '%s'", m->name, app->name);
 
             // the metric should get the options from the app
 
@@ -1494,7 +1507,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                 for(dim = chart->dimensions; dim ; dim = dim->next) {
                     if(!dim->m && dim->metric_hash == m->hash && !strcmp(dim->metric, m->name)) {
                         // we have a match - this metric should be linked to this dimension
-                        debug(D_STATSD, "new metric '%s' is now linked with app '%s', chart '%s', dimension '%s'", m->name, app->name, chart->id, dim->name);
+                        debug(D_STATSD, "metric '%s' linked with app '%s', chart '%s', dimension '%s'", m->name, app->name, chart->id, dim->name);
                         dim->m = m;
                         chart->dimensions_linked_count++;
                     }
