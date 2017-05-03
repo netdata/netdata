@@ -1389,11 +1389,12 @@ static inline void statsd_flush_gauge(STATSD_METRIC *m) {
     debug(D_STATSD, "flushing gauge metric '%s'", m->name);
 
     int updated = 0;
+    if(m->count && !m->reset) {
+        m->last = (collected_number) (m->gauge.value * 1000.0);
 
-    if(m->count && !m->reset)
-        m->last = (collected_number )(m->gauge.value * 1000.0);
-
-    m->reset = 1;
+        m->reset = 1;
+        updated = 1;
+    }
 
     if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
         statsd_private_chart_gauge(m);
@@ -1403,7 +1404,6 @@ static inline void statsd_flush_counter_or_meter(STATSD_METRIC *m, const char *d
     debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
     int updated = 0;
-
     if(m->count && !m->reset) {
         m->last = m->counter.value;
 
@@ -1414,7 +1414,6 @@ static inline void statsd_flush_counter_or_meter(STATSD_METRIC *m, const char *d
     if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
         statsd_private_chart_counter_or_meter(m, dim, family);
 }
-
 
 static inline void statsd_flush_counter(STATSD_METRIC *m) {
     statsd_flush_counter_or_meter(m, "counter", "counters");
@@ -1428,7 +1427,6 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
     debug(D_STATSD, "flushing set metric '%s'", m->name);
 
     int updated = 0;
-
     if(m->count && !m->reset) {
         m->last = m->set.unique;
 
@@ -1443,10 +1441,9 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
 static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
-    int updated = 0;
-
     netdata_mutex_lock(&m->histogram.mutex);
 
+    int updated = 0;
     if(m->count && !m->reset) {
         size_t len = m->histogram.ext->used;
         long double *series = m->histogram.ext->values;
