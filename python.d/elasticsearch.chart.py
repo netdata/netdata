@@ -313,10 +313,10 @@ class Service(UrlService):
             self.error(str(error))
             return False
 
-        scheme = 'http' if self.scheme else 'https'
+        scheme = 'http' if self.scheme == 'http' else 'https'
         # Add handlers (auth, self signed cert accept)
         self.url = '%s://%s:%s' % (scheme, self.host, self.port)
-        self._UrlService__add_openers()
+        self.opener = self._build_opener()
         # Create URL for every Elasticsearch API
         url_node_stats = '%s://%s:%s/_nodes/_local/stats' % (scheme, self.host, self.port)
         url_cluster_health = '%s://%s:%s/_cluster/health' % (scheme, self.host, self.port)

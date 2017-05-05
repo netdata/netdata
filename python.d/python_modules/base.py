@@ -473,47 +473,73 @@ class UrlService(SimpleService):
         self.user = self.configuration.get('user')
         self.password = self.configuration.get('pass')
         self.ss_cert = self.configuration.get('ss_cert')
+        self.proxy = self.configuration.get('proxy')
 
-    def __add_openers(self):
-        def self_signed_cert(ss_cert):
-            if ss_cert:
-                try:
-                    ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
-                    return urllib2.build_opener(urllib2.HTTPSHandler(context=ctx))
-                except AttributeError:
-                    return None
-            else:
-                return None
+    def __add_openers(self, user=None, password=None, ss_cert=None, proxy=None, url=None):
+        user = user or self.user
+        password = password or self.password
+        ss_cert = ss_cert or self.ss_cert
+        proxy = proxy or self.proxy
 
-        self.opener = self_signed_cert(self.ss_cert) or urllib2.build_opener()
+        handlers = list()
 
-        # HTTP Basic Auth
-        if self.user and self.password:
-            url_parse = urlparse(self.url)
+        # HTTP Basic Auth handler
+        if all([user, password, isinstance(user, str), isinstance(password, str)]):
+            url = url or self.url
+            url_parse = urlparse(url)
             top_level_url = '://'.join([url_parse.scheme, url_parse.netloc])
             passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
-            passman.add_password(None, top_level_url, self.user, self.password)
-            self.opener.add_handler(urllib2.HTTPBasicAuthHandler(passman))
+            passman.add_password(None, top_level_url, user, password)
+            handlers.append(urllib2.HTTPBasicAuthHandler(passman))
             self.debug("Enabling HTTP basic auth")
 
-    def _get_raw_data(self, custom_url=None):
+        # HTTPS handler
+        # Self-signed certificate ignore
+        if ss_cert:
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+            except AttributeError:
+                self.error('HTTPS self-signed certificate ignore not enabled')
+            else:
+                handlers.append(urllib2.HTTPSHandler(context=ctx))
+                self.debug("Enabling HTTP self-signed certificate ignore")
+
+        # PROXY handler
+        if proxy and isinstance(proxy, str) and not ss_cert:
+            handlers.append(urllib2.ProxyHandler(dict(http=proxy)))
+            self.debug("Enabling HTTP proxy handler (%s)" % proxy)
+
+        opener = urllib2.build_opener(*handlers)
+        return opener
+
+    def _build_opener(self, **kwargs):
+        try:
+            return self.__add_openers(**kwargs)
+        except TypeError as error:
+            self.error('build_opener() error:', str(error))
+            return None
+
+    def _get_raw_data(self, url=None, opener=None):
         """
         Get raw data from http request
         :return: str
         """
-        raw_data = None
-        f = None
+        data = None
         try:
-            f = self.opener.open(custom_url or self.url, timeout=self.update_every * 2)
-            raw_data = f.read().decode('utf-8', 'ignore')
+            opener = opener or self.opener
+            data = opener.open(url or self.url, timeout=self.update_every * 2)
+            raw_data = data.read().decode('utf-8', 'ignore')
+        except urllib2.URLError as error:
+            self.error('Url: %s. Error: %s' % (url or self.url, str(error)))
+            return None
         except Exception as error:
-            self.error('Url: %s. Error: %s' %(custom_url or self.url, str(error)))
+            self.error(str(error))
             return None
         finally:
-            if f is not None: f.close()
-
+            if data is not None:
+                data.close()
         return raw_data or None
 
     def check(self):
@@ -525,7 +551,7 @@ class UrlService(SimpleService):
             self.error('URL is not defined or type is not <str>')
             return False
 
-        self.__add_openers()
+        self.opener = self.__add_openers()
 
         try:
             data = self._get_data()
