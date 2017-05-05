@@ -723,7 +723,7 @@ static inline int parse_variable(const char **string, char *buffer, size_t len) 
 
 static inline int parse_constant(const char **string, calculated_number *number) {
     char *end = NULL;
-    calculated_number n = strtold(*string, &end);
+    calculated_number n = str2ld(*string, &end);
     if(unlikely(!end || *string == end)) {
         *number = 0;
         return 0;

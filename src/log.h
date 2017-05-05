@@ -29,6 +29,8 @@
 #define D_RRDHOST           0x0000000002000000
 #define D_LOCKS             0x0000000004000000
 #define D_BACKEND           0x0000000008000000
+#define D_STATSD            0x0000000010000000
+#define D_POLLFD            0x0000000020000000
 #define D_SYSTEM            0x8000000000000000
 
 //#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
@@ -57,16 +59,22 @@ extern int error_log_limit(int reset);
 extern void open_all_log_files();
 extern void reopen_all_log_files();
 
+static inline void debug_dummy(void) {}
+
 #define error_log_limit_reset() do { error_log_throttle_period = error_log_throttle_period_backup; error_log_limit(1); } while(0)
 #define error_log_limit_unlimited() do { error_log_throttle_period = 0; } while(0)
 
+#ifdef NETDATA_INTERNAL_CHECKS
 #define debug(type, args...) do { if(unlikely(debug_flags & type)) debug_int(__FILE__, __FUNCTION__, __LINE__, ##args); } while(0)
+#else
+#define debug(type, args...) debug_dummy()
+#endif
+
 #define info(args...)    info_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 #define infoerr(args...) error_int("INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define error(args...)   error_int("ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define fatal(args...)   fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 
-extern void log_date(FILE *out);
 extern void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
 extern void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
 extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);

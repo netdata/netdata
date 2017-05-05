@@ -23,6 +23,37 @@ void syslog_init(void) {
     }
 }
 
+#define LOG_DATE_LENGTH 26
+
+static inline void log_date(char *buffer, size_t len) {
+    if(unlikely(!buffer || !len))
+        return;
+
+    time_t t;
+    struct tm *tmp, tmbuf;
+
+    t = now_realtime_sec();
+    tmp = localtime_r(&t, &tmbuf);
+
+    if (tmp == NULL) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    if (unlikely(strftime(buffer, len, "%Y-%m-%d %H:%M:%S", tmp) == 0))
+        buffer[0] = '\0';
+
+    buffer[len - 1] = '\0';
+}
+
+static netdata_mutex_t log_mutex = NETDATA_MUTEX_INITIALIZER;
+static inline void log_lock() {
+    netdata_mutex_lock(&log_mutex);
+}
+static inline void log_unlock() {
+    netdata_mutex_unlock(&log_mutex);
+}
+
 int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) {
     int f;
 
@@ -136,8 +167,10 @@ int error_log_limit(int reset) {
 
     if(reset) {
         if(prevented) {
-            log_date(stderr);
-            fprintf(stderr, "%s: Resetting logging for process '%s' (prevented %lu logs in the last %ld seconds).\n"
+            char date[LOG_DATE_LENGTH];
+            log_date(date, LOG_DATE_LENGTH);
+            fprintf(stderr, "%s: %s Resetting logging for process '%s' (prevented %lu logs in the last %ld seconds).\n"
+                    , date
                     , program_name
                     , program_name
                     , prevented
@@ -155,8 +188,10 @@ int error_log_limit(int reset) {
 
     if(now - start > error_log_throttle_period) {
         if(prevented) {
-            log_date(stderr);
-            fprintf(stderr, "%s: Resuming logging from process '%s' (prevented %lu logs in the last %ld seconds).\n"
+            char date[LOG_DATE_LENGTH];
+            log_date(date, LOG_DATE_LENGTH);
+            fprintf(stderr, "%s: %s Resuming logging from process '%s' (prevented %lu logs in the last %ld seconds).\n"
+                    , date
                     , program_name
                     , program_name
                     , prevented
@@ -175,8 +210,10 @@ int error_log_limit(int reset) {
 
     if(counter > error_log_errors_per_period) {
         if(!prevented) {
-            log_date(stderr);
-            fprintf(stderr, "%s: Too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %ld seconds). Preventing more logs from process '%s' for %ld seconds.\n"
+            char date[LOG_DATE_LENGTH];
+            log_date(date, LOG_DATE_LENGTH);
+            fprintf(stderr, "%s: %s Too many logs (%lu logs in %ld seconds, threshold is set to %lu logs in %ld seconds). Preventing more logs from process '%s' for %ld seconds.\n"
+                    , date
                     , program_name
                     , counter
                     , now - start
@@ -200,37 +237,16 @@ int error_log_limit(int reset) {
 }
 
 // ----------------------------------------------------------------------------
-// print the date
-
-// FIXME
-// this should print the date in a buffer the way it
-// is now, logs from multiple threads may be multiplexed
-
-void log_date(FILE *out)
-{
-        char outstr[26];
-        time_t t;
-        struct tm *tmp, tmbuf;
-
-        t = now_realtime_sec();
-        tmp = localtime_r(&t, &tmbuf);
-
-        if (tmp == NULL) return;
-        if (unlikely(strftime(outstr, sizeof(outstr), "%Y-%m-%d %H:%M:%S", tmp) == 0)) return;
-
-        fprintf(out, "%s: ", outstr);
-}
-
-// ----------------------------------------------------------------------------
 // debug log
 
-void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
-{
+void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     va_list args;
 
-    log_date(stdout);
+    char date[LOG_DATE_LENGTH];
+    log_date(date, LOG_DATE_LENGTH);
+
     va_start( args, fmt );
-    printf("%s: DEBUG (%04lu@%-10.10s:%-15.15s): ", program_name, line, file, function);
+    printf("%s: %s DEBUG (%04lu@%-10.10s:%-15.15s): ", date, program_name, line, file, function);
     vprintf(fmt, args);
     va_end( args );
     putchar('\n');
@@ -254,21 +270,26 @@ void info_int( const char *file, const char *function, const unsigned long line,
     // prevent logging too much
     if(error_log_limit(0)) return;
 
-    log_date(stderr);
-
-    va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: INFO : (%04lu@%-10.10s:%-15.15s): ", program_name, line, file, function);
-    else            fprintf(stderr, "%s: INFO : ", program_name);
-    vfprintf( stderr, fmt, args );
-    va_end( args );
-
-    fputc('\n', stderr);
-
     if(error_log_syslog) {
         va_start( args, fmt );
         vsyslog(LOG_INFO,  fmt, args );
         va_end( args );
     }
+
+    char date[LOG_DATE_LENGTH];
+    log_date(date, LOG_DATE_LENGTH);
+
+    log_lock();
+
+    va_start( args, fmt );
+    if(debug_flags) fprintf(stderr, "%s: %s INFO : (%04lu@%-10.10s:%-15.15s): ", date, program_name, line, file, function);
+    else            fprintf(stderr, "%s: %s INFO : ", date, program_name);
+    vfprintf( stderr, fmt, args );
+    va_end( args );
+
+    fputc('\n', stderr);
+
+    log_unlock();
 }
 
 // ----------------------------------------------------------------------------
@@ -296,8 +317,7 @@ static const char *strerror_result_string(const char *a, const char *b) { (void)
 #error "cannot detect the format of function strerror_r()"
 #endif
 
-void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... )
-{
+void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
 
@@ -306,11 +326,20 @@ void error_int( const char *prefix, const char *file, const char *function, cons
     // prevent logging too much
     if(error_log_limit(0)) return;
 
-    log_date(stderr);
+    if(error_log_syslog) {
+        va_start( args, fmt );
+        vsyslog(LOG_ERR,  fmt, args );
+        va_end( args );
+    }
+
+    char date[LOG_DATE_LENGTH];
+    log_date(date, LOG_DATE_LENGTH);
+
+    log_lock();
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: %s: (%04lu@%-10.10s:%-15.15s): ", program_name, prefix, line, file, function);
-    else            fprintf(stderr, "%s: %s: ", program_name, prefix);
+    if(debug_flags) fprintf(stderr, "%s: %s %s: (%04lu@%-10.10s:%-15.15s): ", date, program_name, prefix, line, file, function);
+    else            fprintf(stderr, "%s: %s %s: ", date, program_name, prefix);
     vfprintf( stderr, fmt, args );
     va_end( args );
 
@@ -322,27 +351,11 @@ void error_int( const char *prefix, const char *file, const char *function, cons
     else
         fputc('\n', stderr);
 
-    if(error_log_syslog) {
-        va_start( args, fmt );
-        vsyslog(LOG_ERR,  fmt, args );
-        va_end( args );
-    }
+    log_unlock();
 }
 
-void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... )
-{
+void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     va_list args;
-
-    log_date(stderr);
-
-    va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: FATAL: (%04lu@%-10.10s:%-15.15s): ", program_name, line, file, function);
-    else            fprintf(stderr, "%s: FATAL: ", program_name);
-    vfprintf( stderr, fmt, args );
-    va_end( args );
-
-    perror(" # ");
-    fputc('\n', stderr);
 
     if(error_log_syslog) {
         va_start( args, fmt );
@@ -350,29 +363,51 @@ void fatal_int( const char *file, const char *function, const unsigned long line
         va_end( args );
     }
 
+    char date[LOG_DATE_LENGTH];
+    log_date(date, LOG_DATE_LENGTH);
+
+    log_lock();
+
+    va_start( args, fmt );
+    if(debug_flags) fprintf(stderr, "%s: %s FATAL: (%04lu@%-10.10s:%-15.15s): ", date, program_name, line, file, function);
+    else            fprintf(stderr, "%s: %s FATAL: ", date, program_name);
+    vfprintf( stderr, fmt, args );
+    va_end( args );
+
+    perror(" # ");
+    fputc('\n', stderr);
+
+    log_unlock();
+
     netdata_cleanup_and_exit(1);
 }
 
 // ----------------------------------------------------------------------------
 // access log
 
-void log_access( const char *fmt, ... )
-{
+void log_access( const char *fmt, ... ) {
     va_list args;
-
-    if(stdaccess) {
-        log_date(stdaccess);
-
-        va_start( args, fmt );
-        vfprintf( stdaccess, fmt, args );
-        va_end( args );
-        fputc('\n', stdaccess);
-    }
 
     if(access_log_syslog) {
         va_start( args, fmt );
         vsyslog(LOG_INFO,  fmt, args );
         va_end( args );
     }
-}
 
+    if(stdaccess) {
+        static netdata_mutex_t access_mutex = NETDATA_MUTEX_INITIALIZER;
+
+        netdata_mutex_lock(&access_mutex);
+
+        char date[LOG_DATE_LENGTH];
+        log_date(date, LOG_DATE_LENGTH);
+        fprintf(stdaccess, "%s: ", date);
+
+        va_start( args, fmt );
+        vfprintf( stdaccess, fmt, args );
+        va_end( args );
+        fputc('\n', stdaccess);
+
+        netdata_mutex_unlock(&access_mutex);
+    }
+}

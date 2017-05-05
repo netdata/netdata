@@ -895,9 +895,8 @@ char *mystrsep(char **ptr, char *s) {
 
 char *trim(char *s) {
     // skip leading spaces
-    // and 'comments' as well!?
     while (*s && isspace(*s)) s++;
-    if (!*s || *s == '#') return NULL;
+    if (!*s) return NULL;
 
     // skip tailing spaces
     // this way is way faster. Writes only one NUL char.
@@ -911,6 +910,37 @@ char *trim(char *s) {
     if (!*s) return NULL;
 
     return s;
+}
+
+inline char *trim_all(char *buffer) {
+    char *d = buffer, *s = buffer;
+
+    // skip spaces
+    while(isspace(*s)) s++;
+
+    while(*s) {
+        // copy the non-space part
+        while(*s && !isspace(*s)) *d++ = *s++;
+
+        // add a space if we have to
+        if(*s && isspace(*s)) {
+            *d++ = ' ';
+            s++;
+        }
+
+        // skip spaces
+        while(isspace(*s)) s++;
+    }
+
+    *d = '\0';
+
+    if(d > buffer) {
+        d--;
+        if(isspace(*d)) *d = '\0';
+    }
+
+    if(!buffer[0]) return NULL;
+    return buffer;
 }
 
 void *mymmap(const char *filename, size_t size, int flags, int ksm) {
@@ -1267,6 +1297,8 @@ int recursively_delete_dir(const char *path, const char *reason) {
         error("Cannot delete empty directory '%s'", path);
     else
         ret++;
+
+    closedir(dir);
 
     return ret;
 }
