@@ -403,6 +403,7 @@ declare -A configs_signatures=(
   ['eb9fedc3c1dface77312d9bf48f673a8']='stream.conf'
   ['ebd0612ccc5807524ebb2b647e3e56c9']='apps_groups.conf'
   ['ecd3aa97e2581f88eb466d6612690ef2']='charts.d/nginx.conf'
+  ['ed43efac299c31f8fd5e2abccff30071']='python.d/samba.conf'
   ['ee5343881744e6a97e6ee5cdd329cfb8']='health.d/retroshare.conf'
   ['ef1861bf5725d91e773cbdba05687597']='python.d.conf'
   ['ef9916ea144878a9f37cbb6b1b29da10']='health.d/squid.conf'
