@@ -974,7 +974,7 @@ int statsd_readfile(const char *path, const char *filename) {
                 statsd.apps = app;
                 chart = NULL;
             }
-            else {
+            else if(app) {
                 // a new chart
                 chart = callocz(sizeof(STATSD_APP_CHART), 1);
                 chart->id = strdupz(s);
@@ -988,6 +988,8 @@ int statsd_readfile(const char *path, const char *filename) {
                 chart->next = app->charts;
                 app->charts = chart;
             }
+            else
+                error("STATSD: ignoring line %zu ('%s') of file '%s/%s', [app] is not defined.", line, s, path, filename);
 
             continue;
         }
