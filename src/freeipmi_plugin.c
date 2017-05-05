@@ -242,7 +242,7 @@ _get_sensor_type_string (int sensor_type)
 
 static int debug = 0;
 
-static int netdata_update_every = 5;
+static int netdata_update_every = 5; // this is the minimum update frequency
 static int netdata_priority = 90000;
 static int netdata_do_sel = 1;
 
@@ -1403,7 +1403,7 @@ int ipmi_detect_speed_secs(struct ipmi_monitoring_ipmi_config *ipmi_config) {
     // we find the average in microseconds
     // and we round-up to the closest second
 
-    return (( total * 2 / checks / 1000000 ) + 1);
+    return (int)(( total * 2 / checks / 1000000 ) + 1);
 }
 
 int main (int argc, char **argv) {
@@ -1426,15 +1426,14 @@ int main (int argc, char **argv) {
 
     int i, freq = 0;
     for(i = 1; i < argc ; i++) {
-        if(!freq) {
+        if(isdigit(*argv[i]) && !freq) {
             int n = atoi(argv[i]);
-            if(n > 0) {
+            if(n > 0 && freq < 86400) {
                 freq = n;
                 continue;
             }
         }
-
-        if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
+        else if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
             printf("freeipmi.plugin %s\n", VERSION);
             exit(0);
         }
@@ -1568,7 +1567,7 @@ int main (int argc, char **argv) {
     freq = ipmi_detect_speed_secs(&ipmi_config);
     if(debug) fprintf(stderr, "freeipmi.plugin: IPMI minimum update frequency was calculated to %d seconds.\n", freq);
 
-    if(netdata_update_every < freq) {
+    if(freq > netdata_update_every) {
         info("enforcing minimum data collection frequency, calculated to %d seconds.", freq);
         netdata_update_every = freq;
     }
