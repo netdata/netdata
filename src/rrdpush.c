@@ -339,7 +339,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
             info("STREAM %s [send to %s]: established communication - sending metrics...", host->hostname, connected_to);
 
-            if(fcntl(host->rrdpush_socket, F_SETFL, O_NONBLOCK) < 0)
+            if(sock_setnonblock(host->rrdpush_socket) < 0)
                 error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, connected_to);
 
             rrdpush_sender_thread_data_flush(host);
@@ -560,7 +560,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     }
 
     // remove the non-blocking flag from the socket
-    if(fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) & ~O_NONBLOCK) == -1)
+    if(sock_delnonblock(fd) < 0)
         error("STREAM %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", host->hostname, client_ip, client_port, fd);
 
     // convert the socket to a FILE *

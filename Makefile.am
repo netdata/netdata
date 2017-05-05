@@ -60,6 +60,7 @@ dist_noinst_DATA= \
 	diagrams/registry.puml \
 	diagrams/netdata-for-ephemeral-nodes.xml \
 	diagrams/netdata-proxies-example.xml \
+	diagrams/netdata-overview.xml \
 	configs.signatures \
 	Dockerfile \
 	netdata.spec \

@@ -713,7 +713,7 @@ static inline void tc_device_free_all()
         tc_device_free(tc_device_root);
 }
 
-#define MAX_WORDS 20
+#define PLUGINSD_MAX_WORDS 20
 
 static inline int tc_space(char c) {
     switch(c) {
@@ -779,7 +779,7 @@ void *tc_main(void *ptr) {
     RRDSET *stcpu = NULL, *sttime = NULL;
 
     char buffer[TC_LINE_MAX+1] = "";
-    char *words[MAX_WORDS] = { NULL };
+    char *words[PLUGINSD_MAX_WORDS] = { NULL };
 
     uint32_t BEGIN_HASH = simple_hash("BEGIN");
     uint32_t END_HASH = simple_hash("END");
@@ -822,7 +822,7 @@ void *tc_main(void *ptr) {
             buffer[TC_LINE_MAX] = '\0';
             // debug(D_TC_LOOP, "TC: read '%s'", buffer);
 
-            tc_split_words(buffer, words, MAX_WORDS);
+            tc_split_words(buffer, words, PLUGINSD_MAX_WORDS);
 
             if(unlikely(!words[0] || !*words[0])) {
                 // debug(D_TC_LOOP, "empty line");

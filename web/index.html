@@ -983,7 +983,7 @@
             if(hash && hash != '' && document.getElementById(hash) !== null) {
                 var offset = $('#' + hash).offset();
                 if(typeof offset !== 'undefined')
-                    $('html, body').animate({ scrollTop: offset.top }, 0);
+                    $('html, body').animate({ scrollTop: offset.top - 50 }, 0);
             }
 
             // we must return false to prevent the default action
@@ -1164,6 +1164,7 @@
                 case 'ap':
                 case 'net':
                 case 'disk':
+                case 'statsd':
                     chart.menu = tmp;
                     break;
 
@@ -1446,6 +1447,22 @@
                         mhead += generateHeadCharts('mainheads', chart, duration);
                         head += generateHeadCharts('heads', chart, duration);
 
+                        function chartCommonMin(family, context, units) {
+                            var x = netdataDashboard.anyAttribute(netdataDashboard.context, 'commonMin', context, undefined);
+                            if(typeof x !== 'undefined')
+                                return ' data-common-min="' + family + '/' + context + '/' + units + '"';
+                            else
+                                return '';
+                        }
+
+                        function chartCommonMax(family, context, units) {
+                            var x = netdataDashboard.anyAttribute(netdataDashboard.context, 'commonMax', context, undefined);
+                            if(typeof x !== 'undefined')
+                                return ' data-common-max="' + family + '/' + context + '/' + units + '"';
+                            else
+                                return '';
+                        }
+
                         // generate the chart
                         chtml += netdataDashboard.contextInfo(chart.context) + '<div id="chart_' + NETDATA.name2id(chart.id) + '" data-netdata="' + chart.id + '"'
                             + ' data-width="' + pcent_width.toString() + '%"'
@@ -1455,6 +1472,8 @@
                             + ' data-after="-' + duration.toString() + '"'
                             + ' data-id="' + NETDATA.name2id(options.hostname + '/' + chart.id) + '"'
                             + ' data-colors="' + netdataDashboard.anyAttribute(netdataDashboard.context, 'colors', chart.context, '') + '"'
+                            + chartCommonMin(chart.family, chart.context, chart.units)
+                            + chartCommonMax(chart.family, chart.context, chart.units)
                             + ' role="application"></div>';
 
                         // console.log('         \------- ' + chart.id + ' (' + chart.priority + '): ' + chart.context  + ' height: ' + menus[menu].submenus[submenu].height);
@@ -2675,10 +2694,11 @@
 
             // change the URL based on the current position of the screen
             $sidebar.on('activate.bs.scrollspy', function (e) {
-                // console.log(e);
+                //console.log(e);
                 var el = $(e.target);
                 //if(el.find('ul').size() == 0) {
                 var hash = el.find('a').attr('href');
+                // console.log(hash);
                 if(typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
                     urlOptions.hash = hash;
                     //console.log(urlOptions.hash);
@@ -2895,7 +2915,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'dashboard_info.js?v20170421-1',
+                url: NETDATA.serverDefault + 'dashboard_info.js?v20170427-1',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
@@ -3523,4 +3543,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170421-2"></script>
+<script type="text/javascript" src="dashboard.js?v20170503-3"></script>

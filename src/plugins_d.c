@@ -2,8 +2,6 @@
 
 struct plugind *pluginsd_root = NULL;
 
-#define MAX_WORDS 20
-
 static inline int pluginsd_space(char c) {
     switch(c) {
     case ' ':
@@ -18,7 +16,8 @@ static inline int pluginsd_space(char c) {
     }
 }
 
-static int pluginsd_split_words(char *str, char **words, int max_words) {
+// split a text into words, respecting quotes
+inline int pluginsd_split_words(char *str, char **words, int max_words) {
     char *s = str, quote = 0;
     int i = 0, j;
 
@@ -95,14 +94,13 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
     char line[PLUGINSD_LINE_MAX + 1];
 
-    char *words[MAX_WORDS] = { NULL };
-    /* uint32_t HOST_HASH = simple_hash("HOST"); */
-    uint32_t BEGIN_HASH = simple_hash("BEGIN");
-    uint32_t END_HASH = simple_hash("END");
-    uint32_t FLUSH_HASH = simple_hash("FLUSH");
-    uint32_t CHART_HASH = simple_hash("CHART");
-    uint32_t DIMENSION_HASH = simple_hash("DIMENSION");
-    uint32_t DISABLE_HASH = simple_hash("DISABLE");
+    char *words[PLUGINSD_MAX_WORDS] = { NULL };
+    uint32_t BEGIN_HASH = simple_hash(PLUGINSD_KEYWORD_BEGIN);
+    uint32_t END_HASH = simple_hash(PLUGINSD_KEYWORD_END);
+    uint32_t FLUSH_HASH = simple_hash(PLUGINSD_KEYWORD_FLUSH);
+    uint32_t CHART_HASH = simple_hash(PLUGINSD_KEYWORD_CHART);
+    uint32_t DIMENSION_HASH = simple_hash(PLUGINSD_KEYWORD_DIMENSION);
+    uint32_t DISABLE_HASH = simple_hash(PLUGINSD_KEYWORD_DISABLE);
 
     RRDSET *st = NULL;
     uint32_t hash;
@@ -130,7 +128,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
         // debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
 
-        int w = pluginsd_split_words(line, words, MAX_WORDS);
+        int w = pluginsd_split_words(line, words, PLUGINSD_MAX_WORDS);
         char *s = words[0];
         if(unlikely(!s || !*s || !w)) {
             // debug(D_PLUGINSD, "PLUGINSD: empty line");
@@ -170,7 +168,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                     rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));
             }
         }
-        else if(likely(hash == BEGIN_HASH && !strcmp(s, "BEGIN"))) {
+        else if(likely(hash == BEGIN_HASH && !strcmp(s, PLUGINSD_KEYWORD_BEGIN))) {
             char *id = words[1];
             char *microseconds_txt = words[2];
 
@@ -200,7 +198,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 else rrdset_next(st);
             }
         }
-        else if(likely(hash == END_HASH && !strcmp(s, "END"))) {
+        else if(likely(hash == END_HASH && !strcmp(s, PLUGINSD_KEYWORD_END))) {
             if(unlikely(!st)) {
                 error("PLUGINSD: '%s' is requesting an END, without a BEGIN on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
                 enabled = 0;
@@ -214,28 +212,11 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
             count++;
         }
-/*        else if(likely(hash == HOST_HASH && !strcmp(s, "HOST"))) {
-            char *guid = words[1];
-            char *hostname = words[2];
-
-            if(unlikely(!guid || !*guid)) {
-                error("PLUGINSD: '%s' is requesting HOST with guid '%s' and hostname '%s', without a guid. Disabling it.", cd->fullfilename, guid?guid:"", hostname?hostname:"");
-                enabled = 0;
-                break;
-            }
-            if(unlikely(!hostname || !*hostname)) {
-                error("PLUGINSD: '%s' is requesting HOST with guid '%s' and hostname '%s', without a hostname. Disabling it.", cd->fullfilename, guid?guid:"", hostname?hostname:"");
-                enabled = 0;
-                break;
-            }
-
-            host = rrdhost_find_or_create(hostname, guid);
-        } */
-        else if(likely(hash == FLUSH_HASH && !strcmp(s, "FLUSH"))) {
+        else if(likely(hash == FLUSH_HASH && !strcmp(s, PLUGINSD_KEYWORD_FLUSH))) {
             debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
             st = NULL;
         }
-        else if(likely(hash == CHART_HASH && !strcmp(s, "CHART"))) {
+        else if(likely(hash == CHART_HASH && !strcmp(s, PLUGINSD_KEYWORD_CHART))) {
             int noname = 0;
             st = NULL;
 
@@ -294,7 +275,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             }
             else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
         }
-        else if(likely(hash == DIMENSION_HASH && !strcmp(s, "DIMENSION"))) {
+        else if(likely(hash == DIMENSION_HASH && !strcmp(s, PLUGINSD_KEYWORD_DIMENSION))) {
             char *id = words[1];
             char *name = words[2];
             char *algorithm = words[3];
@@ -349,7 +330,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             else if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                 debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
         }
-        else if(unlikely(hash == DISABLE_HASH && !strcmp(s, "DISABLE"))) {
+        else if(unlikely(hash == DISABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_DISABLE))) {
             info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
             enabled = 0;
             break;

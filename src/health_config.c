@@ -136,7 +136,7 @@ static inline int health_parse_duration(char *string, int *result) {
     }
 
     char *e = NULL;
-    calculated_number n = strtold(string, &e);
+    calculated_number n = str2ld(string, &e);
     if(e && *e) {
         switch (*e) {
             case 'Y':
@@ -241,10 +241,10 @@ static inline int health_parse_delay(
 
     if(!given_max) {
         if((*delay_max_duration) < (*delay_up_duration) * (*delay_multiplier))
-            *delay_max_duration = (*delay_up_duration) * (*delay_multiplier);
+            *delay_max_duration = (int)((*delay_up_duration) * (*delay_multiplier));
 
         if((*delay_max_duration) < (*delay_down_duration) * (*delay_multiplier))
-            *delay_max_duration = (*delay_down_duration) * (*delay_multiplier);
+            *delay_max_duration = (int)((*delay_down_duration) * (*delay_multiplier));
     }
 
     return 1;
@@ -381,37 +381,6 @@ static inline int health_parse_db_lookup(
     return 1;
 }
 
-static inline char *trim_all_spaces(char *buffer) {
-    char *d = buffer, *s = buffer;
-
-    // skip spaces
-    while(isspace(*s)) s++;
-
-    while(*s) {
-        // copy the non-space part
-        while(*s && !isspace(*s)) *d++ = *s++;
-
-        // add a space if we have to
-        if(*s && isspace(*s)) {
-            *d++ = ' ';
-            s++;
-        }
-
-        // skip spaces
-        while(isspace(*s)) s++;
-    }
-
-    *d = '\0';
-
-    if(d > buffer) {
-        d--;
-        if(isspace(*d)) *d = '\0';
-    }
-
-    if(!buffer[0]) return NULL;
-    return buffer;
-}
-
 static inline char *health_source_file(size_t line, const char *path, const char *filename) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%zu@%s/%s", line, path, filename);
@@ -485,7 +454,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         int stop_appending = !s;
         line++;
         s = trim(buffer);
-        if(!s) continue;
+        if(!s || *s == '#') continue;
 
         append = strlen(s);
         if(!stop_appending && s[append - 1] == '\\') {
@@ -509,8 +478,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         s++;
 
         char *value = s;
-        key = trim_all_spaces(key);
-        value = trim_all_spaces(value);
+        key = trim_all(key);
+        value = trim_all(value);
 
         if(!key) {
             error("Health configuration has invalid line %zu of file '%s/%s'. Keyword is empty. Ignoring it.", line, path, filename);
@@ -593,7 +562,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
-                rc->green = strtold(value, &e);
+                rc->green = str2ld(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, path, filename, rc->name, key, e);
@@ -601,7 +570,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
                 char *e;
-                rc->red = strtold(value, &e);
+                rc->red = str2ld(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s/%s' for alarm '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, path, filename, rc->name, key, e);
@@ -717,7 +686,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
                 char *e;
-                rt->green = strtold(value, &e);
+                rt->green = str2ld(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, path, filename, rt->name, key, e);
@@ -725,7 +694,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
                 char *e;
-                rt->red = strtold(value, &e);
+                rt->red = str2ld(value, &e);
                 if(e && *e) {
                     error("Health configuration at line %zu of file '%s/%s' for template '%s' at key '%s' leaves this string unmatched: '%s'.",
                             line, path, filename, rt->name, key, e);

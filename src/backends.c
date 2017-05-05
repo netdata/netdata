@@ -378,6 +378,20 @@ static inline int process_json_response(BUFFER *b) {
 // ----------------------------------------------------------------------------
 // the backend thread
 
+static inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
+    if(unlikely(!rrdset_is_available_for_backends(st))) {
+        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, st->rrdhost->hostname);
+        return 0;
+    }
+
+    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !(options & BACKEND_SOURCE_DATA_AS_COLLECTED))) {
+        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.", st->id, st->rrdhost->hostname, rrd_memory_mode_name(st->rrdhost->rrd_memory_mode));
+        return 0;
+    }
+
+    return 1;
+}
+
 void *backends_main(void *ptr) {
     int default_port = 0;
     int sock = -1;
@@ -387,13 +401,13 @@ void *backends_main(void *ptr) {
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, uint32_t) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
 
-    info("BACKEND thread created with task id %d", gettid());
+    info("BACKEND: thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+        error("BACKEND: cannot set pthread cancel type to DEFERRED.");
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+        error("BACKEND: cannot set pthread cancel state to ENABLE.");
 
     // ------------------------------------------------------------------------
     // collect configuration options
@@ -402,7 +416,7 @@ void *backends_main(void *ptr) {
             .tv_sec = 0,
             .tv_usec = 0
     };
-    uint32_t options;
+    uint32_t options = 0x00000000;
     int enabled             = config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", 0);
     const char *source      = config_get(CONFIG_SECTION_BACKEND, "data source", "average");
     const char *type        = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
@@ -421,21 +435,21 @@ void *backends_main(void *ptr) {
         goto cleanup;
 
     if(!strcmp(source, "as collected")) {
-        options = BACKEND_SOURCE_DATA_AS_COLLECTED;
+        options |= BACKEND_SOURCE_DATA_AS_COLLECTED;
     }
     else if(!strcmp(source, "average")) {
-        options = BACKEND_SOURCE_DATA_AVERAGE;
+        options |= BACKEND_SOURCE_DATA_AVERAGE;
     }
     else if(!strcmp(source, "sum") || !strcmp(source, "volume")) {
-        options = BACKEND_SOURCE_DATA_SUM;
+        options |= BACKEND_SOURCE_DATA_SUM;
     }
     else {
-        error("Invalid data source method '%s' for backend given. Disabling backed.", source);
+        error("BACKEND: invalid data source method '%s' for backend given. Disabling backed.", source);
         goto cleanup;
     }
 
     if(timeoutms < 1) {
-        error("BACKED invalid timeout %ld ms given. Assuming %d ms.", timeoutms, frequency * 2 * 1000);
+        error("BACKEND: invalid timeout %ld ms given. Assuming %d ms.", timeoutms, frequency * 2 * 1000);
         timeoutms = frequency * 2 * 1000;
     }
     timeout.tv_sec  = (timeoutms * 1000) / 1000000;
@@ -450,7 +464,7 @@ void *backends_main(void *ptr) {
         default_port = 2003;
         backend_response_checker = process_graphite_response;
 
-        if(options == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        if(options & BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_graphite_plaintext;
         else
             backend_request_formatter = format_dimension_stored_graphite_plaintext;
@@ -461,7 +475,7 @@ void *backends_main(void *ptr) {
         default_port = 4242;
         backend_response_checker = process_opentsdb_response;
 
-        if(options == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        if(options & BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_opentsdb_telnet;
         else
             backend_request_formatter = format_dimension_stored_opentsdb_telnet;
@@ -472,19 +486,19 @@ void *backends_main(void *ptr) {
         default_port = 5448;
         backend_response_checker = process_json_response;
 
-        if (options == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        if (options & BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_json_plaintext;
         else
             backend_request_formatter = format_dimension_stored_json_plaintext;
 
     }
     else {
-        error("Unknown backend type '%s'", type);
+        error("BACKEND: Unknown backend type '%s'", type);
         goto cleanup;
     }
 
     if(backend_request_formatter == NULL || backend_response_checker == NULL) {
-        error("backend is misconfigured - disabling it.");
+        error("BACKEND: backend is misconfigured - disabling it.");
         goto cleanup;
     }
 
@@ -546,7 +560,7 @@ void *backends_main(void *ptr) {
     // ------------------------------------------------------------------------
     // prepare the backend main loop
 
-    info("BACKEND configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, frequency, hostname, prefix);
+    info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, frequency, hostname, prefix);
 
     usec_t step_ut = frequency * USEC_PER_SEC;
     time_t after = now_realtime_sec();
@@ -568,7 +582,7 @@ void *backends_main(void *ptr) {
         int pthreadoldcancelstate;
 
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
-            error("Cannot set pthread cancel state to DISABLE.");
+            error("BACKEND: cannot set pthread cancel state to DISABLE.");
 
         size_t count_hosts = 0;
         size_t count_charts_total = 0;
@@ -577,11 +591,6 @@ void *backends_main(void *ptr) {
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
-            if(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE) {
-                debug(D_BACKEND, "BACKEND: not sending host '%s' because its memory mode is '%s'", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
-                continue;
-            }
-
             rrdhost_rdlock(host);
 
             count_hosts++;
@@ -593,22 +602,25 @@ void *backends_main(void *ptr) {
 
             RRDSET *st;
             rrdset_foreach_read(st, host) {
-                rrdset_rdlock(st);
+                if(likely(backends_can_send_rrdset(options, st))) {
+                    rrdset_rdlock(st);
 
-                count_charts++;
+                    count_charts++;
 
-                RRDDIM *rd;
-                rrddim_foreach_read(rd, st) {
-                    if(likely(rd->last_collected_time.tv_sec >= after)) {
-                        chart_buffered_metrics += backend_request_formatter(b, prefix, host, __hostname, st, rd, after, before, options);
-                        count_dims++;
+                    RRDDIM *rd;
+                    rrddim_foreach_read(rd, st) {
+                        if (likely(rd->last_collected_time.tv_sec >= after)) {
+                            chart_buffered_metrics += backend_request_formatter(b, prefix, host, __hostname, st, rd, after, before, options);
+                            count_dims++;
+                        }
+                        else {
+                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection is not within our timeframe", rd->id, st->id, __hostname);
+                            count_dims_skipped++;
+                        }
                     }
-                    else {
-                        debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection is not within our timeframe", rd->id, st->id, __hostname);
-                        count_dims_skipped++;
-                    }
+
+                    rrdset_unlock(st);
                 }
-                rrdset_unlock(st);
             }
 
             debug(D_BACKEND, "BACKEND: sending host '%s', metrics of %zu dimensions, of %zu charts. Skipped %zu dimensions.", __hostname, count_dims, count_charts, count_dims_skipped);
@@ -622,7 +634,7 @@ void *backends_main(void *ptr) {
         debug(D_BACKEND, "BACKEND: buffer has %zu bytes, added metrics for %zu dimensions, of %zu charts, from %zu hosts", buffer_strlen(b), count_dims_total, count_charts_total, count_hosts);
 
         if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
-            error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
+            error("BACKEND: cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
 
         // ------------------------------------------------------------------------
 
@@ -667,14 +679,14 @@ void *backends_main(void *ptr) {
                     chart_receptions++;
                 }
                 else if(r == 0) {
-                    error("Backend '%s' closed the socket", destination);
+                    error("BACKEND: '%s' closed the socket", destination);
                     close(sock);
                     sock = -1;
                 }
                 else {
                     // failed to receive data
                     if(errno != EAGAIN && errno != EWOULDBLOCK) {
-                        error("Cannot receive data from backend '%s'.", destination);
+                        error("BACKEND: cannot receive data from backend '%s'.", destination);
                     }
                 }
             }
@@ -726,7 +738,7 @@ void *backends_main(void *ptr) {
             }
             else {
                 // oops! we couldn't send (all or some of the) data
-                error("Failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.", destination, len, written);
+                error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zd bytes. Will re-connect.", destination, len, written);
                 chart_transmission_failures++;
 
                 if(written != -1)
@@ -741,7 +753,7 @@ void *backends_main(void *ptr) {
             }
         }
         else {
-            error("Failed to update database backend '%s'", destination);
+            error("BACKEND: failed to update database backend '%s'", destination);
             chart_transmission_failures++;
 
             // increment the counter we check for data loss
@@ -751,7 +763,7 @@ void *backends_main(void *ptr) {
         if(failures > buffer_on_failures) {
             // too bad! we are going to lose data
             chart_lost_bytes += buffer_strlen(b);
-            error("Reached %d backend failures. Flushing buffers to protect this host - this results in data loss on back-end server '%s'", failures, destination);
+            error("BACKEND: reached %d backend failures. Flushing buffers to protect this host - this results in data loss on back-end server '%s'", failures, destination);
             buffer_flush(b);
             failures = 0;
             chart_data_lost_events++;
@@ -809,7 +821,7 @@ cleanup:
     buffer_free(b);
     buffer_free(response);
 
-    info("BACKEND thread exiting");
+    info("BACKEND: thread exiting");
 
     static_thread->enabled = 0;
     pthread_exit(NULL);

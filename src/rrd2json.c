@@ -199,7 +199,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, in
         prometheus_name_copy(chart, st->id, PROMETHEUS_ELEMENT_MAX);
 
         buffer_strcat(wb, "\n");
-        if(rrdset_is_available_for_viewers(st)) {
+        if(rrdset_is_available_for_backends(st)) {
             rrdset_rdlock(st);
 
             // for each dimension

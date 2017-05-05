@@ -17,6 +17,7 @@ dist_web_DATA = \
 	favicon.ico \
 	goto-host-from-alarm.html \
 	index.html \
+	infographic.html \
 	netdata-swagger.yaml \
 	netdata-swagger.json \
 	robots.txt \

@@ -446,6 +446,30 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // CPU charts
+
+    'cpu.cpu': {
+        commonMin: true,
+        commonMax: true,
+        valueRange: "[0, 100]"
+    },
+
+    'cpu.interrupts': {
+        commonMin: true,
+        commonMax: true
+    },
+
+    'cpu.softirqs': {
+        commonMin: true,
+        commonMax: true
+    },
+
+    'cpu.softnet_stat': {
+        commonMin: true,
+        commonMax: true
+    },
+
+    // ------------------------------------------------------------------------
     // MEMORY
 
     'mem.ksm_savings': {

@@ -1523,7 +1523,7 @@ var NETDATA = window.NETDATA || {};
         this.colors = null;
         this.colors_assigned = {};
         this.colors_available = null;
-        this.colors_defined = null;
+        this.colors_custom = null;
 
         // the element already created by the user
         this.element_message = null;
@@ -2682,12 +2682,24 @@ var NETDATA = window.NETDATA || {};
             this.chartPrepareColorPalette();
 
             if(typeof this.colors_assigned[label] === 'undefined') {
+
                 if(this.colors_available.length === 0) {
-                    var len = NETDATA.themes.current.colors.length;
+                    var len;
+
+                    // copy the custom colors
+                    if(this.colors_custom !== null) {
+                        len = this.colors_custom.length;
+                        while (len--)
+                            this.colors_available.unshift(this.colors_custom[len]);
+                    }
+
+                    // copy the standard palette colors
+                    len = NETDATA.themes.current.colors.length;
                     while(len--)
                         this.colors_available.unshift(NETDATA.themes.current.colors[len]);
                 }
 
+                // assign a color to this dimension
                 this.colors_assigned[label] = this.colors_available.shift();
 
                 if(this.debug === true)
@@ -2705,39 +2717,21 @@ var NETDATA = window.NETDATA || {};
         this.chartPrepareColorPalette = function() {
             var len;
 
-            if(this.colors !== null) return;
-
-            if(this.colors_defined !== null) {
-                this.colors = [];
-                this.colors_available = [];
-
-                len = this.colors_defined.length;
-                while(len--)
-                    this.colors_available.unshift(this.colors_defined[len]);
-
-                if(this.debug === true) {
-                    this.log("restored available palette:");
-                    this.log(this.colors_defined);
-                }
-
-                return;
-            }
+            if(this.colors_custom !== null) return;
 
             if(this.debug === true)
                 this.log("Preparing chart color palette");
 
             this.colors = [];
             this.colors_available = [];
-            this.colors_defined = [];
+            this.colors_custom = [];
 
             // add the standard colors
             len = NETDATA.themes.current.colors.length;
-            while(len--) {
+            while(len--)
                 this.colors_available.unshift(NETDATA.themes.current.colors[len]);
-                this.colors_defined.unshift(NETDATA.themes.current.colors[len]);
-            }
 
-            // add the user supplied colosrs
+            // add the user supplied colors
             var c = $(this.element).data('colors');
             // this.log('read colors: ' + c);
             if(typeof c === 'string' && c.length > 0) {
@@ -2747,29 +2741,50 @@ var NETDATA = window.NETDATA || {};
                     if(this.debug === true)
                         this.log("Adding custom color " + c[len].toString() + " to palette");
 
+                    this.colors_custom.unshift(c[len]);
                     this.colors_available.unshift(c[len]);
-                    this.colors_defined.unshift(c[len]);
                 }
             }
 
             if(this.debug === true) {
-                this.log("defined palette:");
-                this.log(this.colors_defined);
+                this.log("colors_custom:");
+                this.log(this.colors_custom);
+                this.log("colors_available:");
+                this.log(this.colors_available);
             }
         };
 
         // get the ordered list of chart colors
         // this includes user defined colors
-        this.chartDefinedColors = function() {
+        this.chartCustomColors = function() {
             this.chartPrepareColorPalette();
-            return this.colors_defined;
+
+            var colors;
+            if(this.colors_custom.length)
+                colors = this.colors_custom;
+            else
+                colors = this.colors;
+
+            if(this.debug === true) {
+                this.log("chartCustomColors() returns:");
+                this.log(colors);
+            }
+
+            return colors;
         };
 
-        // get the order list of chart ASSIGNED colors
-        // (this retuns only the colors that have beed
-        //  assigned to dimensions)
-        this.chartDimensionColors = function() {
+        // get the ordered list of chart ASSIGNED colors
+        // (this returns only the colors that have been
+        //  assigned to dimensions, prepended with any
+        // custom colors defined)
+        this.chartColors = function() {
             this.chartPrepareColorPalette();
+
+            if(this.debug === true) {
+                this.log("chartColors() returns:");
+                this.log(this.colors);
+            }
+
             return this.colors;
         };
 
@@ -2826,8 +2841,8 @@ var NETDATA = window.NETDATA || {};
                 }
             }
             // we will re-generate the colors for the chart
-            // based on the selected dimensions
-            this.colors = null;
+            // based on the dimensions this result has data for
+            this.colors = [];
 
             if(this.debug === true)
                 this.log('updating Legend DOM');
@@ -3644,8 +3659,8 @@ var NETDATA = window.NETDATA || {};
             if(this.isAutoRefreshable() === true) {
                 // allow the first update, even if the page is not visible
                 if(this.updates_counter && this.updates_since_last_unhide && NETDATA.options.page_is_visible === false) {
-                    if(NETDATA.options.debug.focus === true || this.debug === true)
-                        this.log('canBeAutoRefreshed(): page does not have focus');
+                    // if(NETDATA.options.debug.focus === true || this.debug === true)
+                    //    this.log('canBeAutoRefreshed(): page does not have focus');
 
                     return false;
                 }
@@ -4158,12 +4173,12 @@ var NETDATA = window.NETDATA || {};
     NETDATA.peityChartUpdate = function(state, data) {
         state.peity_instance.innerHTML = data.result;
 
-        if(state.peity_options.stroke !== state.chartDefinedColors()[0]) {
-            state.peity_options.stroke = state.chartDefinedColors()[0];
+        if(state.peity_options.stroke !== state.chartCustomColors()[0]) {
+            state.peity_options.stroke = state.chartCustomColors()[0];
             if(state.chart.chart_type === 'line')
                 state.peity_options.fill = NETDATA.themes.current.background;
             else
-                state.peity_options.fill = NETDATA.colorLuminance(state.chartDefinedColors()[0], NETDATA.chartDefaults.fill_luminance);
+                state.peity_options.fill = NETDATA.colorLuminance(state.chartCustomColors()[0], NETDATA.chartDefaults.fill_luminance);
         }
 
         $(state.peity_instance).peity('line', state.peity_options);
@@ -4228,7 +4243,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.sparklineChartCreate = function(state, data) {
         var self = $(state.element);
         var type = self.data('sparkline-type') || 'line';
-        var lineColor = self.data('sparkline-linecolor') || state.chartDefinedColors()[0];
+        var lineColor = self.data('sparkline-linecolor') || state.chartCustomColors()[0];
         var fillColor = self.data('sparkline-fillcolor') || ((state.chart.chart_type === 'line')?NETDATA.themes.current.background:NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance));
         var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
         var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
@@ -4443,7 +4458,7 @@ var NETDATA = window.NETDATA || {};
 
         var options = {
                 file: data.result.data,
-                colors: state.chartDimensionColors(),
+                colors: state.chartColors(),
                 labels: data.result.labels,
                 labelsDivWidth: state.chartWidth() - 70,
                 visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
@@ -4472,11 +4487,11 @@ var NETDATA = window.NETDATA || {};
         options.valueRange = state.dygraph_options.valueRange;
 
         var oldMax = null, oldMin = null;
-        if(state.__commonMin !== null) {
+        if (state.__commonMin !== null) {
             state.data.min = state.dygraph_instance.axes_[0].extremeRange[0];
             oldMin = options.valueRange[0] = NETDATA.commonMin.get(state);
         }
-        if(state.__commonMax !== null) {
+        if (state.__commonMax !== null) {
             state.data.max = state.dygraph_instance.axes_[0].extremeRange[1];
             oldMax = options.valueRange[1] = NETDATA.commonMax.get(state);
         }
@@ -4528,7 +4543,7 @@ var NETDATA = window.NETDATA || {};
             :false;
 
         state.dygraph_options = {
-            colors:                 self.data('dygraph-colors') || state.chartDimensionColors(),
+            colors:                 self.data('dygraph-colors') || state.chartColors(),
 
             // leave a few pixels empty on the right of the chart
             rightGap:               self.data('dygraph-rightgap')
@@ -5100,12 +5115,19 @@ var NETDATA = window.NETDATA || {};
         state.dygraph_user_action = false;
         state.dygraph_last_rendered = Date.now();
 
-        if(typeof state.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
-            state.__commonMin = self.data('common-min') || null;
-            state.__commonMax = self.data('common-max') || null;
+        if(state.dygraph_options.valueRange[0] === null && state.dygraph_options.valueRange[1] === null) {
+            if (typeof state.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
+                state.__commonMin = self.data('common-min') || null;
+                state.__commonMax = self.data('common-max') || null;
+            }
+            else {
+                state.log('incompatible version of Dygraph detected');
+                state.__commonMin = null;
+                state.__commonMax = null;
+            }
         }
         else {
-            state.log('incompatible version of Dygraph detected');
+            // if the user gave a valueRange, respect it
             state.__commonMin = null;
             state.__commonMax = null;
         }
@@ -5316,7 +5338,7 @@ var NETDATA = window.NETDATA || {};
                 height: state.chartHeight()
             },
             color: {
-                pattern: state.chartDimensionColors()
+                pattern: state.chartColors()
             },
             data: {
                 x: 'time',
@@ -5446,7 +5468,7 @@ var NETDATA = window.NETDATA || {};
         var datatable = new google.visualization.DataTable(data.result);
 
         state.google_options = {
-            colors: state.chartDimensionColors(),
+            colors: state.chartColors(),
 
             // do not set width, height - the chart resizes itself
             //width: state.chartWidth(),
@@ -5741,7 +5763,7 @@ var NETDATA = window.NETDATA || {};
 
         var barColor = self.data('easypiechart-barcolor');
         if(typeof barColor === 'undefined' || barColor === null)
-            barColor = state.chartDefinedColors()[0];
+            barColor = state.chartCustomColors()[0];
         else {
             // <div ... data-easypiechart-barcolor="(function(percent){return(percent < 50 ? '#5cb85c' : percent < 85 ? '#f0ad4e' : '#cb3935');})" ...></div>
             var tmp = eval(barColor);
@@ -5972,7 +5994,7 @@ var NETDATA = window.NETDATA || {};
         var adjust = self.data('gauge-adjust') || null;
         var pointerColor = self.data('gauge-pointer-color') || NETDATA.themes.current.gauge_pointer;
         var strokeColor = self.data('gauge-stroke-color') || NETDATA.themes.current.gauge_stroke;
-        var startColor = self.data('gauge-start-color') || state.chartDefinedColors()[0];
+        var startColor = self.data('gauge-start-color') || state.chartCustomColors()[0];
         var stopColor = self.data('gauge-stop-color') || void 0;
         var generateGradient = self.data('gauge-generate-gradient') || false;
 
@@ -6596,7 +6618,7 @@ var NETDATA = window.NETDATA || {};
             if(typeof chart_id === 'string') {
                 var offset = $('#' + NETDATA.alarms.chart_div_id_prefix + NETDATA.name2id(chart_id)).offset();
                 if(typeof offset !== 'undefined') {
-                    $('html, body').animate({ scrollTop: offset.top - NETDATA.alarms.chart_div_offset }, NETDATA.alarms.chart_div_animation_duration);
+                    $('html, body').animate({ scrollTop: offset.top + NETDATA.alarms.chart_div_offset }, NETDATA.alarms.chart_div_animation_duration);
                     return true;
                 }
             }

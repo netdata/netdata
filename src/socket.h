@@ -7,6 +7,7 @@
 
 typedef struct listen_sockets {
     const char *config_section;         // the netdata configuration section to read settings from
+    const char *default_bind_to;        // the default bind to configuration string
     int default_port;                   // the default port to use
     int backlog;                        // the default listen backlog to use
 
@@ -14,6 +15,7 @@ typedef struct listen_sockets {
     size_t failed;                      // the number of sockets attempted to open, but failed
     int fds[MAX_LISTEN_FDS];            // the open sockets
     char *fds_names[MAX_LISTEN_FDS];    // descriptions for the open sockets
+    int fds_types[MAX_LISTEN_FDS];      // the socktype for the open sockets
 } LISTEN_SOCKETS;
 
 extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
@@ -24,6 +26,15 @@ extern int connect_to_one_of(const char *destination, int default_port, struct t
 
 extern ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 extern ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
+
+extern int sock_setnonblock(int fd);
+extern int sock_delnonblock(int fd);
+extern int sock_setreuse(int fd, int reuse);
+extern int sock_setreuse_port(int fd, int reuse);
+extern int sock_enlarge_in(int fd);
+extern int sock_enlarge_out(int fd);
+
+extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize);
 
 #ifndef HAVE_ACCEPT4
 extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
@@ -37,5 +48,14 @@ extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flag
 #endif /* #ifndef SOCK_CLOEXEC */
 
 #endif /* #ifndef HAVE_ACCEPT4 */
+
+
+extern void poll_events(LISTEN_SOCKETS *sockets
+        , void *(*add_callback)(int fd, short int *events)
+        , void  (*del_callback)(int fd, void *data)
+        , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
+        , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
+        , void *data
+);
 
 #endif //NETDATA_SOCKET_H

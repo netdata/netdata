@@ -528,7 +528,7 @@ extern void __rrd_check_wrlock(const char *file, const char *function, const uns
 
 extern void rrdset_set_name(RRDSET *st, const char *name);
 
-extern RRDSET *rrdset_create(RRDHOST *host
+extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , const char *type
                              , const char *id
                              , const char *name
@@ -538,9 +538,15 @@ extern RRDSET *rrdset_create(RRDHOST *host
                              , const char *units
                              , long priority
                              , int update_every
-                             , RRDSET_TYPE chart_type);
+                             , RRDSET_TYPE chart_type
+                             , RRD_MEMORY_MODE memory_mode
+                             , long history_entries);
 
-#define rrdset_create_localhost(type, id, name, family, context, title, units, priority, update_every, chart_type) rrdset_create(localhost, type, id, name, family, context, title, units, priority, update_every, chart_type)
+#define rrdset_create(host, type, id, name, family, context, title, units, priority, update_every, chart_type) \
+    rrdset_create_custom(host, type, id, name, family, context, title, units, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries)
+
+#define rrdset_create_localhost(type, id, name, family, context, title, units, priority, update_every, chart_type) \
+    rrdset_create(localhost, type, id, name, family, context, title, units, priority, update_every, chart_type)
 
 extern void rrdhost_free_all(void);
 extern void rrdhost_save_all(void);
@@ -566,7 +572,8 @@ extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
 extern void rrdset_done(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
-#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions)
+#define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
+#define rrdset_is_available_for_backends(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions)
 
 // get the total duration in seconds of the round robin database
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
@@ -604,7 +611,8 @@ extern void rrdset_done(RRDSET *st);
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
 
-extern RRDDIM *rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm);
+extern RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode);
+#define rrddim_add(st, id, name, multiplier, divisor, algorithm) rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->rrd_memory_mode)
 
 extern void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
 extern RRDDIM *rrddim_find(RRDSET *st, const char *id);

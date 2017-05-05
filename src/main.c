@@ -56,6 +56,7 @@ struct netdata_static_thread static_threads[] = {
     {"web",                 NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
     {"web-single-threaded", NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
     {"push-metrics",        NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
+    {"statsd",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
     {NULL,                  NULL,                    NULL,         0, NULL, NULL, NULL}
 };
 
@@ -633,9 +634,10 @@ int main(int argc, char **argv) {
                         char* debug_flags_string = "debug_flags=";
 
                         if(strcmp(optarg, "unittest") == 0) {
-                            default_rrd_update_every = 1;
-                            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
-                            if(!config_loaded) config_load(NULL, 0);
+                            if(unit_test_str2ld()) exit(1);
+                            //default_rrd_update_every = 1;
+                            //default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+                            //if(!config_loaded) config_load(NULL, 0);
                             get_netdata_configured_variables();
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
@@ -727,6 +729,33 @@ int main(int argc, char **argv) {
                             config_set_default(section, key,  value);
 
                             // fprintf(stderr, "SET section '%s', key '%s', value '%s'\n", section, key, value);
+                        }
+                        else if(strcmp(optarg, "get") == 0) {
+                            if(optind + 3 > argc) {
+                                fprintf(stderr, "%s", "\nUSAGE: -W get 'section' 'key' 'value'\n\n"
+                                        " Prints settings of netdata.conf.\n"
+                                        "\n"
+                                        " These options interact with: -c netdata.conf\n"
+                                        " -c netdata.conf has to be given before -W get.\n"
+                                        "\n"
+                                );
+                                exit(1);
+                            }
+
+                            if(!config_loaded) {
+                                fprintf(stderr, "warning: no configuration file has been loaded. Use -c CONFIG_FILE, before -W get. Using default config.\n");
+                                config_load(NULL, 0);
+                            }
+
+                            backwards_compatible_config();
+                            get_netdata_configured_variables();
+
+                            const char *section = argv[optind];
+                            const char *key = argv[optind + 1];
+                            const char *def = argv[optind + 2];
+                            const char *value = config_get(section, key, def);
+                            printf("%s\n", value);
+                            exit(0);
                         }
                         else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
