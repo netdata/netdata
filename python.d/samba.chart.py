@@ -100,6 +100,12 @@ class Service(ExecutableService):
             self.error('Can\'t locate \'sudo\' or \'smbstatus\' binary')
             return False
 
+        self.command = [sudo_binary, '-v']
+        err = self._get_raw_data(stderr=True)
+        if err:
+            self.error(''.join(err))
+            return False
+
         self.command = ' '.join([sudo_binary, '-n', smbstatus_binary, '-P'])
 
         return ExecutableService.check(self)
