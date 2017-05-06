@@ -23,4 +23,3 @@ run make -j${PROCESSORS}
 run make install
 
 run strip ${NETDATA_INSTALL_PATH}/bin/fping
-run strip ${NETDATA_INSTALL_PATH}/bin/fping6
