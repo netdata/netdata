@@ -625,7 +625,7 @@
                 len = sorted.length;
                 while(len--) {
                     hostname = sorted[i].hostname;
-                    if(hostname == master) {
+                    if(hostname === master) {
                         url = base + "/";
                         icon = "home";
                     }
@@ -936,6 +936,8 @@
         };
 
         function chartsPerRow(total) {
+            void(total);
+
             if(options.chartsPerRow === 0) {
                 return 1;
                 //var width = Math.floor(total / options.chartsMinWidth);
@@ -980,10 +982,10 @@
         // scroll to a section, without changing the browser history
 
         function scrollToId(hash) {
-            if(hash && hash != '' && document.getElementById(hash) !== null) {
+            if(hash && hash !== '' && document.getElementById(hash) !== null) {
                 var offset = $('#' + hash).offset();
                 if(typeof offset !== 'undefined')
-                    $('html, body').animate({ scrollTop: offset.top - 50 }, 0);
+                    $('html, body').animate({ scrollTop: offset.top - 30 }, 0);
             }
 
             // we must return false to prevent the default action
@@ -1490,7 +1492,7 @@
 
             sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more charts</a></li>';
             sidebar += '<li class=""><a href="https://github.com/firehol/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more alarms</a></li>';
-            sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every == 1)?'second':data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + seconds4human(data.update_every * data.history) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' +  data.version.toString() +'</small></li>';
+            sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1)?'second':data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + seconds4human(data.update_every * data.history) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' +  data.version.toString() +'</small></li>';
             sidebar += '</ul>';
             div.innerHTML = html;
             document.getElementById('sidebar').innerHTML = sidebar;
@@ -1638,7 +1640,7 @@
                     var t = new Date(timestamp * 1000);
                     var now = new Date();
 
-                    if(t.toDateString() == now.toDateString())
+                    if(t.toDateString() === now.toDateString())
                         return t.toLocaleTimeString();
 
                     return t.toLocaleDateString() + space + t.toLocaleTimeString();
@@ -1695,8 +1697,8 @@
                     }
 
                     var delay = '';
-                    if((alarm.delay_up_duration > 0 || alarm.delay_down_duration > 0) && alarm.delay_multiplier != 0 && alarm.delay_max_duration > 0) {
-                        if(alarm.delay_up_duration == alarm.delay_down_duration) {
+                    if((alarm.delay_up_duration > 0 || alarm.delay_down_duration > 0) && alarm.delay_multiplier !== 0 && alarm.delay_max_duration > 0) {
+                        if(alarm.delay_up_duration === alarm.delay_down_duration) {
                             delay += '<small><br/>hysteresis ' + seconds4human(alarm.delay_up_duration, { negative_suffix: '' });
                         }
                         else {
@@ -1708,7 +1710,7 @@
                                 delay += 'on&nbsp;recovery&nbsp;<code>' + seconds4human(alarm.delay_down_duration, { negative_suffix: '' }) + '</code>, ';
                             }
                         }
-                        if(alarm.delay_multiplier != 1.0) {
+                        if(alarm.delay_multiplier !== 1.0) {
                             delay += 'multiplied&nbsp;by&nbsp;<code>' + alarm.delay_multiplier.toString() + '</code>';
                             delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + seconds4human(alarm.delay_max_duration, { negative_suffix: '' }) + '</code>';
                         }
@@ -2272,7 +2274,7 @@
             if(hours > 1) txt += hours.toString() + options.space + options.hours;
             else if(hours === 1) txt += hours.toString() + options.space + options.hour;
 
-            if(hours > 0 && minutes > 0 && seconds == 0)
+            if(hours > 0 && minutes > 0 && seconds === 0)
                 txt += options.space + options.and + options.space;
             else if(hours > 0 && minutes > 0 && seconds > 0)
                 txt += ',' + options.space;
@@ -2312,7 +2314,7 @@
                 options.version = data.version;
                 netdataDashboard.os = data.os;
 
-                if(typeof data.hosts != 'undefined')
+                if(typeof data.hosts !=='undefined')
                     options.hosts = data.hosts;
 
                 // update the dashboard hostname
@@ -2356,7 +2358,7 @@
 
                 // download all the charts the server knows
                 NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
-                    if(data != null) {
+                    if(data !== null) {
                         if(typeof data.custom_info !== 'undefined' && data.custom_info !== "") {
                             loadJs(data.custom_info, function () {
                                 $.extend(true, netdataDashboard, customDashboard);
@@ -2381,7 +2383,7 @@
             var s = options.version.split('-');
 
             if(s.length !== 3) return null;
-            if(s[2][0] == 'g') {
+            if(s[2][0] === 'g') {
                 var v = s[2].split('_')[0].substring(1, 8);
                 if(v.length === 7) {
                     versionLog('Installed git commit id of netdata is ' + v);
@@ -2585,17 +2587,17 @@
                             var tagName = null;
 
                             for (var i = 0, r = 0; r <= config.showChars; i++) {
-                                if (content[i] == '<' && !inTag) {
+                                if (content[i] === '<' && !inTag) {
                                     inTag = true;
 
                                     // This could be "tag" or "/tag"
                                     tagName = content.substring(i + 1, content.indexOf('>', i));
 
                                     // If its a closing tag
-                                    if (tagName[0] == '/') {
+                                    if (tagName[0] === '/') {
 
 
-                                        if (tagName != '/' + openTags[0]) {
+                                        if (tagName !== ('/' + openTags[0])) {
                                             config.errMsg = 'ERROR en HTML: the top of the stack should be the tag that closes';
                                         } else {
                                             openTags.shift(); // Pops the last tag from the open tag stack (the tag is closed in the retult HTML!)
@@ -2603,12 +2605,12 @@
 
                                     } else {
                                         // There are some nasty tags that don't have a close tag like <br/>
-                                        if (tagName.toLowerCase() != 'br') {
+                                        if (tagName.toLowerCase() !== 'br') {
                                             openTags.unshift(tagName); // Add to start the name of the tag that opens
                                         }
                                     }
                                 }
-                                if (inTag && content[i] == '>') {
+                                if (inTag && content[i] === '>') {
                                     inTag = false;
                                 }
 
@@ -2696,7 +2698,7 @@
             $sidebar.on('activate.bs.scrollspy', function (e) {
                 //console.log(e);
                 var el = $(e.target);
-                //if(el.find('ul').size() == 0) {
+                //if(el.find('ul').size() === 0) {
                 var hash = el.find('a').attr('href');
                 // console.log(hash);
                 if(typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
