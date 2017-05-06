@@ -274,6 +274,7 @@ void *rrdpush_sender_thread(void *ptr) {
             .tv_usec = 0
     };
 
+    time_t last_sent_t = 0;
     struct pollfd fds[2], *ifd, *ofd;
     nfds_t fdmax;
 
@@ -281,6 +282,11 @@ void *rrdpush_sender_thread(void *ptr) {
     ofd = &fds[1];
 
     for(; host->rrdpush_enabled && !netdata_exit ;) {
+        if(host->rrdpush_socket != -1 && now_monotonic_sec() - last_sent_t > timeout) {
+            error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, timeout, sent_connection);
+            close(host->rrdpush_socket);
+            host->rrdpush_socket = -1;
+        }
 
         if(unlikely(host->rrdpush_socket == -1)) {
             // stop appending data into rrdpush_buffer
@@ -338,9 +344,13 @@ void *rrdpush_sender_thread(void *ptr) {
             }
 
             info("STREAM %s [send to %s]: established communication - sending metrics...", host->hostname, connected_to);
+            last_sent_t = now_monotonic_sec();
 
             if(sock_setnonblock(host->rrdpush_socket) < 0)
                 error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, connected_to);
+
+            if(sock_enlarge_out(host->rrdpush_socket) < 0)
+                error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", host->hostname, connected_to);
 
             rrdpush_sender_thread_data_flush(host);
             sent_connection = 0;
@@ -377,58 +387,65 @@ void *rrdpush_sender_thread(void *ptr) {
             host->rrdpush_socket = -1;
             break;
         }
-        else if(unlikely(!retval)) {
-            // timeout
-            continue;
-        }
+        else if(likely(retval)) {
+            if (ifd->revents & POLLIN) {
+                char buffer[1000 + 1];
+                if (read(host->rrdpush_pipe[PIPE_READ], buffer, 1000) == -1)
+                    error("STREAM %s [send to %s]: cannot read from internal pipe.", host->hostname, connected_to);
+            }
 
-        if(ifd->revents & POLLIN) {
-            char buffer[1000 + 1];
-            if(read(host->rrdpush_pipe[PIPE_READ], buffer, 1000) == -1)
-                error("STREAM %s [send to %s]: cannot read from internal pipe.", host->hostname, connected_to);
-        }
+            if (ofd->revents & POLLOUT && begin < buffer_strlen(host->rrdpush_buffer)) {
 
-        if(ofd->revents & POLLOUT && begin < buffer_strlen(host->rrdpush_buffer)) {
+                // BEGIN RRDPUSH LOCKED SESSION
 
-            // BEGIN RRDPUSH LOCKED SESSION
+                // during this session, data collectors
+                // will not be able to append data to our buffer
+                // but the socket is in non-blocking mode
+                // so, we will not block at send()
 
-            // during this session, data collectors
-            // will not be able to append data to our buffer
-            // but the socket is in non-blocking mode
-            // so, we will not block at send()
+                if (pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
+                    error("STREAM %s [send]: cannot set pthread cancel state to DISABLE.", host->hostname);
 
-            if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
-                error("STREAM %s [send]: cannot set pthread cancel state to DISABLE.", host->hostname);
+                rrdpush_lock(host);
 
-            rrdpush_lock(host);
+                ssize_t ret = send(host->rrdpush_socket, &host->rrdpush_buffer->buffer[begin],
+                                   buffer_strlen(host->rrdpush_buffer) - begin, MSG_DONTWAIT);
+                if (unlikely(ret == -1)) {
+                    if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
+                        error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                        close(host->rrdpush_socket);
+                        host->rrdpush_socket = -1;
+                    }
+                }
+                else if(likely(ret > 0)) {
+                    sent_connection += ret;
+                    sent_bytes += ret;
+                    begin += ret;
 
-            ssize_t ret = send(host->rrdpush_socket, &host->rrdpush_buffer->buffer[begin], buffer_strlen(host->rrdpush_buffer) - begin, MSG_DONTWAIT);
-            if(ret == -1) {
-                if(errno != EAGAIN && errno != EINTR) {
-                    error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                    if (begin == buffer_strlen(host->rrdpush_buffer)) {
+                        // we send it all
+
+                        buffer_flush(host->rrdpush_buffer);
+                        begin = 0;
+                    }
+
+                    last_sent_t = now_monotonic_sec();
+                }
+                else {
+                    error("STREAM %s [send to %s]: failed to send metrics (send() returned %zd) - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, ret, sent_connection);
                     close(host->rrdpush_socket);
                     host->rrdpush_socket = -1;
                 }
+
+                rrdpush_unlock(host);
+
+                if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+                    error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
+
+                // END RRDPUSH LOCKED SESSION
             }
-            else {
-                sent_connection += ret;
-                sent_bytes += ret;
-                begin += ret;
-                if(begin == buffer_strlen(host->rrdpush_buffer)) {
-                    // we send it all
-
-                    buffer_flush(host->rrdpush_buffer);
-                    begin = 0;
-                }
-            }
-
-            rrdpush_unlock(host);
-
-            if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-                error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
-
-            // END RRDPUSH LOCKED SESSION
         }
+        // else timeout
 
         // protection from overflow
         if(host->rrdpush_buffer->len > max_size) {
