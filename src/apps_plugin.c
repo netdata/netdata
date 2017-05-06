@@ -2629,38 +2629,45 @@ void send_resource_usage_to_netdata(usec_t dt) {
     if(unlikely(!created_charts)) {
         created_charts = 1;
 
-        fprintf(stdout
-                , "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
-                        "DIMENSION user '' incremental 1 1000\n"
-                        "DIMENSION system '' incremental 1 1000\n"
-                        "CHART netdata.apps_sizes '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_sizes line 140001 %1$d\n"
-                        "DIMENSION calls '' incremental 1 1\n"
-                        "DIMENSION files '' incremental 1 1\n"
-                        "DIMENSION pids '' absolute 1 1\n"
-                        "DIMENSION fds '' absolute 1 1\n"
-                        "DIMENSION targets '' absolute 1 1\n"
-                        "DIMENSION new_pids 'new pids' incremental 1 1\n"
-                        "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
-                        "DIMENSION utime '' absolute 1 %2$llu\n"
-                        "DIMENSION stime '' absolute 1 %2$llu\n"
-                        "DIMENSION gtime '' absolute 1 %2$llu\n"
-                        "DIMENSION minflt '' absolute 1 %2$llu\n"
-                        "DIMENSION majflt '' absolute 1 %2$llu\n"
+        fprintf(stdout,
+                "CHART netdata.apps_cpu '' 'Apps Plugin CPU' 'milliseconds/s' apps.plugin netdata.apps_cpu stacked 140000 %1$d\n"
+                "DIMENSION user '' incremental 1 1000\n"
+                "DIMENSION system '' incremental 1 1000\n"
+                "CHART netdata.apps_sizes '' 'Apps Plugin Files' 'files/s' apps.plugin netdata.apps_sizes line 140001 %1$d\n"
+                "DIMENSION calls '' incremental 1 1\n"
+                "DIMENSION files '' incremental 1 1\n"
+                "DIMENSION pids '' absolute 1 1\n"
+                "DIMENSION fds '' absolute 1 1\n"
+                "DIMENSION targets '' absolute 1 1\n"
+                "DIMENSION new_pids 'new pids' incremental 1 1\n"
+                , update_every
+        );
+
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+        fprintf(stdout,
+                "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
+                "DIMENSION utime '' absolute 1 %2$llu\n"
+                "DIMENSION stime '' absolute 1 %2$llu\n"
+                "DIMENSION gtime '' absolute 1 %2$llu\n"
+                "DIMENSION minflt '' absolute 1 %2$llu\n"
+                "DIMENSION majflt '' absolute 1 %2$llu\n"
                 , update_every
                 , RATES_DETAIL
         );
 
         if(include_exited_childs)
-            fprintf(stdout
-                    , "CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
-                            "DIMENSION cutime '' absolute 1 %2$llu\n"
-                            "DIMENSION cstime '' absolute 1 %2$llu\n"
-                            "DIMENSION cgtime '' absolute 1 %2$llu\n"
-                            "DIMENSION cminflt '' absolute 1 %2$llu\n"
-                            "DIMENSION cmajflt '' absolute 1 %2$llu\n"
+            fprintf(stdout,
+                    "CHART netdata.apps_children_fix '' 'Apps Plugin Exited Children Normalization Ratios' 'percentage' apps.plugin netdata.apps_children_fix line 140003 %1$d\n"
+                    "DIMENSION cutime '' absolute 1 %2$llu\n"
+                    "DIMENSION cstime '' absolute 1 %2$llu\n"
+                    "DIMENSION cgtime '' absolute 1 %2$llu\n"
+                    "DIMENSION cminflt '' absolute 1 %2$llu\n"
+                    "DIMENSION cmajflt '' absolute 1 %2$llu\n"
                     , update_every
                     , RATES_DETAIL
             );
+#endif
+
     }
 
     fprintf(stdout,
