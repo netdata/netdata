@@ -873,7 +873,7 @@ class ExecutableService(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.command = None
 
-    def _get_raw_data(self):
+    def _get_raw_data(self, stderr=False):
         """
         Get raw data from executed command
         :return: <list>
@@ -884,7 +884,8 @@ class ExecutableService(SimpleService):
             self.error("Executing command", self.command, "resulted in error:", str(error))
             return None
         data = list()
-        for line in p.stdout.readlines():
+        std = p.stderr if stderr else p.stdout
+        for line in std.readlines():
             data.append(line.decode())
 
         return data or None
