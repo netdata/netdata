@@ -2,11 +2,9 @@
 
 . $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
-fetch "fping-3.16" "https://github.com/schweikert/fping/archive/3.16.tar.gz"
+fetch "fping-4.0" "https://github.com/schweikert/fping/releases/download/v4.0/fping-4.0.tar.gz"
 
 export CFLAGS="-static"
-
-run ./autogen.sh
 
 run ./configure \
 	--prefix=${NETDATA_INSTALL_PATH} \
@@ -25,4 +23,3 @@ run make -j${PROCESSORS}
 run make install
 
 run strip ${NETDATA_INSTALL_PATH}/bin/fping
-run strip ${NETDATA_INSTALL_PATH}/bin/fping6
