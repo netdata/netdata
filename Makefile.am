@@ -82,7 +82,7 @@ dist_noinst_SCRIPTS= \
 	makeself/jobs/10-prepare-destination.install.sh \
 	makeself/jobs/50-curl-7.53.1.install.sh \
 	makeself/jobs/50-bash-4.4.install.sh \
-	makeself/jobs/50-fping-3.16.install.sh \
+	makeself/jobs/50-fping-4.0.install.sh \
 	makeself/jobs/70-netdata-git.install.sh \
 	makeself/jobs/99-makeself.install.sh \
 	makeself/run-all-jobs.sh \
