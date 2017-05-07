@@ -360,6 +360,8 @@ void *rrdpush_sender_thread(void *ptr) {
 
             // allow appending data into rrdpush_buffer
             host->rrdpush_connected = 1;
+
+            debug(D_STREAM, "Connected...");
         }
 
         ifd->fd = host->rrdpush_pipe[PIPE_READ];
@@ -379,13 +381,13 @@ void *rrdpush_sender_thread(void *ptr) {
             fdmax = 1;
         }
 
-        debug(D_STREAM, "STREAM: Waiting for poll() events...");
+        debug(D_STREAM, "STREAM: Waiting for poll() events (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
         if(netdata_exit) break;
         int retval = poll(fds, fdmax, 1000);
         if(netdata_exit) break;
 
         if(unlikely(retval == -1)) {
-            debug(D_STREAM, "STREAM: poll() failed...");
+            debug(D_STREAM, "STREAM: poll() failed (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
 
             if(errno == EAGAIN || errno == EINTR) {
                 debug(D_STREAM, "STREAM: poll() failed with EAGAIN or EINTR...");
@@ -399,7 +401,7 @@ void *rrdpush_sender_thread(void *ptr) {
         }
         else if(likely(retval)) {
             if (ifd->revents & POLLIN) {
-                debug(D_STREAM, "STREAM: Data added to send buffer...");
+                debug(D_STREAM, "STREAM: Data added to send buffer (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
 
                 char buffer[1000 + 1];
                 if (read(host->rrdpush_pipe[PIPE_READ], buffer, 1000) == -1)
@@ -407,7 +409,7 @@ void *rrdpush_sender_thread(void *ptr) {
             }
 
             if (ofd->revents & POLLOUT && begin < buffer_strlen(host->rrdpush_buffer)) {
-                debug(D_STREAM, "STREAM: Sending socket is ready for output...");
+                debug(D_STREAM, "STREAM: Sending data (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
 
                 // BEGIN RRDPUSH LOCKED SESSION
 
@@ -422,20 +424,20 @@ void *rrdpush_sender_thread(void *ptr) {
                 debug(D_STREAM, "STREAM: Getting exclusive lock on host...");
                 rrdpush_lock(host);
 
-                debug(D_STREAM, "STREAM: Sending data from %zu to %zu...", begin, buffer_strlen(host->rrdpush_buffer));
+                debug(D_STREAM, "STREAM: Sending data, starting from %zu, size %zu...", begin, buffer_strlen(host->rrdpush_buffer));
                 ssize_t ret = send(host->rrdpush_socket, &host->rrdpush_buffer->buffer[begin], buffer_strlen(host->rrdpush_buffer) - begin, MSG_DONTWAIT);
                 if (unlikely(ret == -1)) {
-                    debug(D_STREAM, "STREAM: Send failed...");
-
                     if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
+                        debug(D_STREAM, "STREAM: Send failed - closing socket...");
                         error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
                         close(host->rrdpush_socket);
                         host->rrdpush_socket = -1;
                     }
+                    else {
+                        debug(D_STREAM, "STREAM: Send failed - will retry...");
+                    }
                 }
                 else if(likely(ret > 0)) {
-                    debug(D_STREAM, "STREAM: Sent %zd bytes...", ret);
-
                     sent_connection += ret;
                     sent_bytes += ret;
                     begin += ret;
@@ -443,13 +445,18 @@ void *rrdpush_sender_thread(void *ptr) {
                     if (begin == buffer_strlen(host->rrdpush_buffer)) {
                         // we send it all
 
+                        debug(D_STREAM, "STREAM: Sent %zd bytes (the whole buffer)...", ret);
                         buffer_flush(host->rrdpush_buffer);
                         begin = 0;
+                    }
+                    else {
+                        debug(D_STREAM, "STREAM: Sent %zd bytes (part of the data buffer)...", ret);
                     }
 
                     last_sent_t = now_monotonic_sec();
                 }
                 else {
+                    debug(D_STREAM, "STREAM: send() returned %zd - closing the socket...", ret);
                     error("STREAM %s [send to %s]: failed to send metrics (send() returned %zd) - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, ret, sent_connection);
                     close(host->rrdpush_socket);
                     host->rrdpush_socket = -1;
@@ -469,8 +476,8 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // protection from overflow
-        debug(D_STREAM, "STREAM: Checking for buffer overflow...");
-        if(host->rrdpush_buffer->len > max_size) {
+        if(buffer_strlen(host->rrdpush_buffer) > max_size) {
+            debug(D_STREAM, "STREAM: Buffer is too big (%zu bytes), bigger than the max (%zu) - flushing it...", buffer_strlen(host->rrdpush_buffer), max_size);
             errno = 0;
             error("STREAM %s [send to %s]: too many data pending - buffer is %zu bytes long, %zu unsent - we have sent %zu bytes in total, %zu on this connection. Closing connection to flush the data.", host->hostname, connected_to, host->rrdpush_buffer->len, host->rrdpush_buffer->len - begin, sent_bytes, sent_connection);
             if(host->rrdpush_socket != -1) {
