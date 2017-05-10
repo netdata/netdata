@@ -1323,6 +1323,12 @@ Charts are created dynamically.
 
 For detailed configuration information please read [`sensors.conf`](https://github.com/firehol/netdata/blob/master/conf.d/python.d/sensors.conf) file.
 
+### possible issues
+
+There have been reports from users that on certain servers, ACPI ring buffer errors are printed by the kernel (`dmesg`) when ACPI sensors are being accessed.
+We are tracking such cases in issue [#827](https://github.com/firehol/netdata/issues/827).
+Please join this discussion for help.
+
 ---
 
 # squid
