@@ -2,28 +2,50 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 
-long double average(long double *series, size_t entries) {
-    if(unlikely(entries == 0))
+inline long double sum_and_count(long double *series, size_t entries, size_t *count) {
+    if(unlikely(entries == 0)) {
+        if(likely(count))
+            *count = 0;
+
         return NAN;
+    }
 
-    if(unlikely(entries == 1))
+    if(unlikely(entries == 1)) {
+        if(likely(count))
+            *count = (isnan(series[0])?0:1);
+
         return series[0];
+    }
 
-    size_t i, count = 0;
+    size_t i, c = 0;
     long double sum = 0;
 
     for(i = 0; i < entries ; i++) {
         long double value = series[i];
         if(unlikely(isnan(value) || isinf(value))) continue;
-        count++;
+        c++;
         sum += value;
     }
 
-    if(unlikely(count == 0))
+    if(likely(count))
+        *count = c;
+
+    if(unlikely(c == 0))
         return NAN;
 
-    if(unlikely(count == 1))
-        return sum;
+    return sum;
+}
+
+inline long double sum(long double *series, size_t entries) {
+    return sum_and_count(series, entries, NULL);
+}
+
+inline long double average(long double *series, size_t entries) {
+    size_t count = 0;
+    long double sum = sum_and_count(series, entries, &count);
+
+    if(unlikely(count == 0))
+        return NAN;
 
     return sum / (long double)count;
 }
