@@ -1,5 +1,7 @@
 #include "common.h"
 
+unsigned long long tcpext_TCPSynRetrans;
+
 static void parse_line_pair(procfile *ff, ARL_BASE *base, size_t header_line, size_t values_line) {
     size_t hwords = procfile_linewords(ff, header_line);
     size_t vwords = procfile_linewords(ff, values_line);
@@ -93,6 +95,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
     // IPv4 TCP memory pressures
     static unsigned long long tcpext_TCPMemoryPressures = 0;
+
+    // shared: tcpext_TCPSynRetrans
+
 
     if(unlikely(!arl_ipext)) {
         hash_ipext = simple_hash("IpExt");
@@ -191,6 +196,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         if(do_tcpext_memory != CONFIG_BOOLEAN_NO) {
             arl_expect(arl_tcpext, "TCPMemoryPressures", &tcpext_TCPMemoryPressures);
         }
+
+        // shared metrics
+        arl_expect(arl_tcpext, "TCPSynRetrans", &tcpext_TCPSynRetrans);
     }
 
     if(unlikely(!ff)) {

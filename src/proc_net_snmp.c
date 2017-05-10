@@ -645,24 +645,35 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             if(do_tcp_handshake) {
                 st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".tcphandshake");
                 if(!st) {
-                    st = rrdset_create_localhost(RRD_TYPE_NET_SNMP, "tcphandshake", NULL, "tcp", NULL
-                                                 , "IPv4 TCP Handshake Issues", "events/s", 2900, update_every
-                                                 , RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost(
+                            RRD_TYPE_NET_SNMP
+                            , "tcphandshake"
+                            , NULL
+                            , "tcp"
+                            , NULL
+                            , "IPv4 TCP Handshake Issues"
+                            , "events/s"
+                            , 2900
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(st, "EstabResets",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutRsts",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "ActiveOpens",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "PassiveOpens", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "AttemptFails", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "EstabResets",   NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutRsts",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "ActiveOpens",   NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "PassiveOpens",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "AttemptFails",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "TCPSynRetrans", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
-                rrddim_set(st, "EstabResets",  *tcp_EstabResets);
-                rrddim_set(st, "OutRsts",      *tcp_OutRsts);
-                rrddim_set(st, "ActiveOpens",  *tcp_ActiveOpens);
-                rrddim_set(st, "PassiveOpens", *tcp_PassiveOpens);
-                rrddim_set(st, "AttemptFails", *tcp_AttemptFails);
+                rrddim_set(st, "EstabResets",   *tcp_EstabResets);
+                rrddim_set(st, "OutRsts",       *tcp_OutRsts);
+                rrddim_set(st, "ActiveOpens",   *tcp_ActiveOpens);
+                rrddim_set(st, "PassiveOpens",  *tcp_PassiveOpens);
+                rrddim_set(st, "AttemptFails",  *tcp_AttemptFails);
+                rrddim_set(st, "TCPSynRetrans", tcpext_TCPSynRetrans);
                 rrdset_done(st);
             }
         }

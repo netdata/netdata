@@ -50,11 +50,13 @@ typedef struct statsd_histogram_extensions {
     collected_number last_percentile;
     collected_number last_median;
     collected_number last_stddev;
+    collected_number last_sum;
     RRDDIM *rd_min;
     RRDDIM *rd_max;
     RRDDIM *rd_percentile;
     RRDDIM *rd_median;
     RRDDIM *rd_stddev;
+    RRDDIM *rd_sum;
     long double values[];   // dynamic array of values collected
 } STATSD_METRIC_HISTOGRAM_EXTENSIONS;
 
@@ -1365,6 +1367,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
         m->histogram.ext->rd_percentile = rrddim_add(m->st, statsd.histogram_percentile_str, NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         m->histogram.ext->rd_median = rrddim_add(m->st, "median", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         m->histogram.ext->rd_stddev = rrddim_add(m->st, "stddev", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_sum = rrddim_add(m->st, "sum", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1376,6 +1379,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_percentile, m->histogram.ext->last_percentile);
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_median, m->histogram.ext->last_median);
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_stddev, m->histogram.ext->last_stddev);
+    rrddim_set_by_pointer(m->st, m->histogram.ext->rd_sum, m->histogram.ext->last_sum);
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
     if(m->rd_count)
@@ -1451,12 +1455,13 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         long double *series = m->histogram.ext->values;
         sort_series(series, len);
 
-        m->histogram.ext->last_min = (collected_number)roundl(series[0] * 1000.0);
-        m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * 1000.0);
+        m->histogram.ext->last_min = (collected_number)roundl(series[0] * 1000);
+        m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * 1000);
         m->last = (collected_number)roundl(average(series, len) * 1000);
         m->histogram.ext->last_percentile = (collected_number)roundl(average(series, (size_t)floor((double)len * statsd.histogram_percentile / 100.0)) * 1000);
         m->histogram.ext->last_median = (collected_number)roundl(median_on_sorted_series(series, len) * 1000);
         m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * 1000);
+        m->histogram.ext->last_sum = (collected_number)roundl(sum(series, len) * 1000);
 
         m->reset = 1;
         updated = 1;
