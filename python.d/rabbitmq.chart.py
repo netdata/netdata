@@ -21,12 +21,8 @@ retries = 60
 METHODS = namedtuple('METHODS', ['get_data_function', 'url', 'stats'])
 
 NODE_STATS = [('fd_used', None),
-              ('fd_total', None),
               ('mem_used', None),
-              ('mem_limit', None),
               ('sockets_used', None),
-              ('sockets_total', None),
-              ('proc_total', None),
               ('proc_used', None)
               ]
 OVERVIEW_STATS = [('object_totals.channels', None),
@@ -47,30 +43,26 @@ ORDER = ['queued_messages', 'message_rates', 'global_counts',
 CHARTS = {
     'file_descriptors': {
         'options': [None, 'File Descriptors', 'descriptors', 'overview',
-                    'rabbitmq.file_descriptors', 'stacked'],
+                    'rabbitmq.file_descriptors', 'line'],
         'lines': [
-            ['fd_total', 'total', 'absolute'],
             ['fd_used', 'used', 'absolute']
         ]},
     'memory': {
         'options': [None, 'Memory', 'MB', 'overview',
-                    'rabbitmq.memory', 'stacked'],
+                    'rabbitmq.memory', 'line'],
         'lines': [
-            ['mem_limit', 'limit', 'absolute', 1, 1024 << 10],
             ['mem_used', 'used', 'absolute', 1, 1024 << 10]
         ]},
     'sockets': {
         'options': [None, 'Sockets', 'sockets', 'overview',
-                    'rabbitmq.sockets', 'stacked'],
+                    'rabbitmq.sockets', 'line'],
         'lines': [
-            ['sockets_total', 'total', 'absolute'],
             ['sockets_used', 'used', 'absolute']
         ]},
     'processes': {
         'options': [None, 'Erlang Processes', 'processes', 'overview',
-                    'rabbitmq.processes', 'stacked'],
+                    'rabbitmq.processes', 'line'],
         'lines': [
-            ['proc_total', 'total', 'absolute'],
             ['proc_used', 'used', 'absolute']
         ]},
     'global_counts': {
