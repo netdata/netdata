@@ -380,7 +380,7 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
 // statsd parsing numbers
 
 static inline long double statsd_parse_float(const char *v, long double def) {
-    long double value = def;
+    long double value;
 
     if(likely(v && *v)) {
         char *e = NULL;
@@ -388,12 +388,14 @@ static inline long double statsd_parse_float(const char *v, long double def) {
         if(unlikely(e && *e))
             error("STATSD: excess data '%s' after value '%s'", e, v);
     }
+    else
+        value = def;
 
     return value;
 }
 
 static inline long long statsd_parse_int(const char *v, long long def) {
-    long long value = def;
+    long long value;
 
     if(likely(v && *v)) {
         char *e = NULL;
@@ -401,6 +403,8 @@ static inline long long statsd_parse_int(const char *v, long long def) {
         if(unlikely(e && *e))
             error("STATSD: excess data '%s' after value '%s'", e, v);
     }
+    else
+        value = def;
 
     return value;
 }
@@ -518,88 +522,55 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
 // statsd parsing
 
 static void statsd_process_metric(const char *name, const char *value, const char *type, const char *sampling) {
-    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', rate '%s'", name, value, type, sampling);
+    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', rate '%s'", name?name:"(null)", value?value:"(null)", type?type:"(null)", sampling?sampling:"(null)");
 
     if(unlikely(!name || !*name)) return;
     if(unlikely(!type || !*type)) type = "m";
 
-    switch (*type) {
-        case 'g':
-            statsd_process_gauge(
-                    statsd_find_or_add_metric(&statsd.gauges, name, STATSD_METRIC_TYPE_GAUGE),
-                    value, sampling);
-            break;
+    char t0 = type[0], t1 = type[1];
 
-        case 'c': // etsy/statsd, but brubeck uses it as 'meter' - sorry brubeck, this is stupid
-        case 'C': // brubeck
-            statsd_process_counter(
-                    statsd_find_or_add_metric(&statsd.counters, name, STATSD_METRIC_TYPE_COUNTER),
-                    value, sampling);
-            break;
-
-        case 'm':
-            if (type[1] == 's')
-                statsd_process_timer(
-                        statsd_find_or_add_metric(&statsd.timers, name, STATSD_METRIC_TYPE_TIMER),
-                        value, sampling);
-            else if (type[1] == '\0')
-                statsd_process_meter(
-                        statsd_find_or_add_metric(&statsd.meters, name, STATSD_METRIC_TYPE_METER),
-                        value, sampling);
-            else
-                statsd.unknown_types++;
-            break;
-
-        case 'h':
-            statsd_process_histogram(
-                    statsd_find_or_add_metric(&statsd.histograms, name, STATSD_METRIC_TYPE_HISTOGRAM),
-                    value, sampling);
-            break;
-
-        case 's':
-            statsd_process_set(
-                    statsd_find_or_add_metric(&statsd.sets, name, STATSD_METRIC_TYPE_SET),
-                    value);
-            break;
-
-        default:
-            statsd.unknown_types++;
-            break;
+    if(unlikely(t0 == 'g' && t1 == '\0')) {
+        statsd_process_gauge(
+                statsd_find_or_add_metric(&statsd.gauges, name, STATSD_METRIC_TYPE_GAUGE),
+                value, sampling);
+    }
+    else if(unlikely((t0 == 'c' || t0 == 'C') && t1 == '\0')) {
+        // etsy/statsd uses 'c'
+        // brubeck     uses 'C'
+        statsd_process_counter(
+                statsd_find_or_add_metric(&statsd.counters, name, STATSD_METRIC_TYPE_COUNTER),
+                value, sampling);
+    }
+    else if(unlikely(t0 == 'm' && t1 == '\0')) {
+        statsd_process_meter(
+                statsd_find_or_add_metric(&statsd.meters, name, STATSD_METRIC_TYPE_METER),
+                value, sampling);
+    }
+    else if(unlikely(t0 == 'h' && t1 == '\0')) {
+        statsd_process_histogram(
+                statsd_find_or_add_metric(&statsd.histograms, name, STATSD_METRIC_TYPE_HISTOGRAM),
+                value, sampling);
+    }
+    else if(unlikely(t0 == 's' && t1 == '\0')) {
+        statsd_process_set(
+                statsd_find_or_add_metric(&statsd.sets, name, STATSD_METRIC_TYPE_SET),
+                value);
+    }
+    else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0')) {
+        statsd_process_timer(
+                statsd_find_or_add_metric(&statsd.timers, name, STATSD_METRIC_TYPE_TIMER),
+                value, sampling);
+    }
+    else {
+        statsd.unknown_types++;
+        error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
     }
 }
 
-static inline const char *statsd_parse_name(const char *s, const char **name) {
+static inline const char *statsd_parse_skip_up_to(const char *s, char d1, char d2) {
     char c;
 
-    *name = s;
-    for(c = *s; c && c != ':' && c != '|' && c != '\n'; c = *++s) ;
-
-    return s;
-}
-
-static inline const char *statsd_parse_value(const char *s, const char **value) {
-    char c;
-
-    *value = s;
-    for(c = *s; c && c != '|' && c != '\n'; c = *++s) ;
-
-    return s;
-}
-
-static inline const char *statsd_parse_type(const char *s, const char **type) {
-    char c;
-
-    *type = s;
-    for(c = *s; c && c != '|' && c != '@' && c != '\n'; c = *++s) ;
-
-    return s;
-}
-
-static inline const char *statsd_parse_sampling(const char *s, const char **sampling) {
-    char c;
-
-    *sampling = s;
-    for(c = *s; c && c != '\n'; c = *++s) ;
+    for(c = *s; c && c != d1 && c != d2 && c != '\r' && c != '\n'; c = *++s) ;
 
     return s;
 }
@@ -613,8 +584,6 @@ const char *statsd_parse_skip_spaces(const char *s) {
 }
 
 static inline const char *statsd_parse_field_trim(const char *start, char *end) {
-    *end = '\0';
-
     if(unlikely(!start)) {
         start = end;
         return start;
@@ -623,6 +592,7 @@ static inline const char *statsd_parse_field_trim(const char *start, char *end) 
     while(start <= end && (*start == ' ' || *start == '\t'))
         start++;
 
+    *end = '\0';
     end--;
     while(end >= start && (*end == ' ' || *end == '\t'))
         *end-- = '\0';
@@ -637,26 +607,24 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
     const char *s = buffer;
     while(*s) {
         const char *name = NULL, *value = NULL, *type = NULL, *sampling = NULL;
-        char *name_end, *value_end, *type_end, *sampling_end;
+        char *name_end = NULL, *value_end = NULL, *type_end = NULL, *sampling_end = NULL;
 
-        s = statsd_parse_name(s, &name);
-        if(name == s || !*name) {
+        s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '|');
+        if(name == name_end) {
             s = statsd_parse_skip_spaces(s);
             continue;
         }
-        name_end = (char *)s;
 
-        if(likely(*s == ':')) s = statsd_parse_value(++s, &value);
-        value_end = (char *)s;
+        if(likely(*s == ':'))
+            s = value_end = (char *) statsd_parse_skip_up_to(value = ++s, '|', '|');
 
-        if(likely(*s == '|')) s = statsd_parse_type(++s, &type);
-        type_end = (char *)s;
+        if(likely(*s == '|'))
+            s = type_end = (char *) statsd_parse_skip_up_to(type = ++s, '|', '@');
 
-        if(unlikely(*s == '|' || *s == '@')) {
-            s = statsd_parse_sampling(++s, &sampling);
+        if(likely(*s == '|' || *s == '@')) {
+            s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '\r', '\n');
             if(*sampling == '@') sampling++;
         }
-        sampling_end = (char *)s;
 
         // skip everything until the end of the line
         while(*s && *s != '\n') s++;
@@ -667,6 +635,8 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
             memmove(buffer, name, size);
             return size;
         }
+        else
+            s = statsd_parse_skip_spaces(s);
 
         statsd_process_metric(
                   statsd_parse_field_trim(name, name_end)
@@ -733,7 +703,8 @@ static void statsd_del_callback(int fd, void *data) {
         if(t->type == STATSD_SOCKET_DATA_TYPE_TCP) {
             if(t->len != 0) {
                 statsd.socket_errors++;
-                error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'", &t->buffer[t->len]);
+                error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'. Trying to process it.", t->buffer);
+                statsd_process(t->buffer, t->len, 0);
             }
         }
         else
@@ -759,8 +730,8 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
             }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-            if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_UDP)) {
-                error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
+            if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_TCP)) {
+                error("STATSD: internal error: socket data type should be %d, but it is %d", (int)STATSD_SOCKET_DATA_TYPE_TCP, (int)d->type);
                 statsd.socket_errors++;
                 return -1;
             }
@@ -780,7 +751,7 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
                 }
                 else if (!rc) {
                     // connection closed
-                    error("STATSD: client disconnected.");
+                    debug(D_STATSD, "STATSD: client disconnected.");
                     ret = -1;
                 }
                 else {
@@ -846,7 +817,7 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
 #else // !HAVE_RECVMMSG
             ssize_t rc;
             do {
-                rc = recv(fd, d->buffer, STATSD_UDP_BUFFER_SIZE, MSG_DONTWAIT);
+                rc = recv(fd, d->buffer, STATSD_UDP_BUFFER_SIZE - 1, MSG_DONTWAIT);
                 if (rc < 0) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
@@ -1146,6 +1117,9 @@ int statsd_readfile(const char *path, const char *filename) {
                     error("STATSD: invalid divider value '%s' at line %zu of file '%s/%s'. Using 1.", divider, line, path, filename);
                     dim->divider = 1;
                 }
+
+                debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divider " COLLECTED_NUMBER_FORMAT,
+                    dim->name, chart->name, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divider);
             }
             else {
                 error("STATSD: ignoring line %zu ('%s') of file '%s/%s'. Unknown keyword for the [%s] section.", line, name, path, filename, chart->id);
@@ -1498,6 +1472,9 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * STATSD_DECIMAL_DETAIL);
         m->histogram.ext->last_sum = (collected_number)roundl(sum(series, len) * STATSD_DECIMAL_DETAIL);
 
+        debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
+              dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
+
         m->reset = 1;
         updated = 1;
     }
@@ -1649,10 +1626,11 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
 
     STATSD_APP_CHART_DIM *dim;
     for(dim = chart->dimensions; dim ;dim = dim->next) {
-        if(dim->value_ptr) {
+        if(unlikely(dim->value_ptr)) {
             if(unlikely(!dim->rd))
-                dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divider, dim->algorithm);
+                dim->rd = rrddim_add(chart->st, dim->name, NULL, dim->multiplier, dim->divider, dim->algorithm);
 
+            debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
             rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
         }
     }
