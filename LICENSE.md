@@ -3,6 +3,6 @@ netdata
 
 Please read the following files:
 
-- LICENSE (GPL v3+)
-- LICENSE-REDISTRIBUTED.md for third party packages re-distributed with netdata
+- [LICENSE](LICENSE) (GPL v3+)
+- [LICENSE-REDISTRIBUTED.md](LICENSE-REDISTRIBUTED.md) for third party packages re-distributed with netdata
 
