@@ -126,3 +126,8 @@ dist_chartsconfig_DATA = \
     charts.d/postfix.conf \
     charts.d/squid.conf \
     $(NULL)
+
+statsdconfigdir=$(configdir)/statsd.d
+dist_statsdconfig_DATA = \
+    statsd.d/example.conf \
+    $(NULL)

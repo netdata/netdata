@@ -30,6 +30,7 @@
 #define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_SINGLE_THREADED
 #endif
 
+#define STATSD_DECIMAL_DETAIL 1000 // floating point values get multiplied by this, with the same divider
 
 // --------------------------------------------------------------------------------------------------------------------
 // data specific to each metric type
@@ -43,31 +44,35 @@ typedef struct statsd_metric_counter { // counter and meter
 } STATSD_METRIC_COUNTER;
 
 typedef struct statsd_histogram_extensions {
-    size_t size;
-    size_t used;
+    netdata_mutex_t mutex;
+
+    // average is stored in metric->last
     collected_number last_min;
     collected_number last_max;
     collected_number last_percentile;
     collected_number last_median;
     collected_number last_stddev;
     collected_number last_sum;
+
     RRDDIM *rd_min;
     RRDDIM *rd_max;
     RRDDIM *rd_percentile;
     RRDDIM *rd_median;
     RRDDIM *rd_stddev;
     RRDDIM *rd_sum;
-    long double values[];   // dynamic array of values collected
+
+    size_t size;
+    size_t used;
+    long double *values;   // dynamic array of values collected
 } STATSD_METRIC_HISTOGRAM_EXTENSIONS;
 
 typedef struct statsd_metric_histogram { // histogram and timer
-    netdata_mutex_t mutex;
     STATSD_METRIC_HISTOGRAM_EXTENSIONS *ext;
 } STATSD_METRIC_HISTOGRAM;
 
 typedef struct statsd_metric_set {
     DICTIONARY *dict;
-    unsigned long long unique;
+    size_t unique;
 } STATSD_METRIC_SET;
 
 
@@ -92,6 +97,7 @@ typedef enum statsd_metric_type {
     STATSD_METRIC_TYPE_SET
 } STATSD_METRIC_TYPE;
 
+
 typedef struct statsd_metric {
     avl avl;                        // indexing
 
@@ -101,7 +107,7 @@ typedef struct statsd_metric {
     STATSD_METRIC_TYPE type;
 
     // metadata about data collection
-    size_t events;                  // the number of times this metric has been collected (never resets)
+    collected_number events;        // the number of times this metric has been collected (never resets)
     size_t count;                   // the number of times this metric has been collected since the last flush
 
     // the actual collected data
@@ -146,16 +152,30 @@ static int statsd_metric_compare(void* a, void* b);
 // --------------------------------------------------------------------------------------------------------------------
 // synthetic charts
 
+typedef enum statsd_app_chart_dimension_value_type {
+    STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS,
+    STATSD_APP_CHART_DIM_VALUE_TYPE_LAST,
+    STATSD_APP_CHART_DIM_VALUE_TYPE_AVERAGE,
+    STATSD_APP_CHART_DIM_VALUE_TYPE_SUM,
+    STATSD_APP_CHART_DIM_VALUE_TYPE_MIN,
+    STATSD_APP_CHART_DIM_VALUE_TYPE_MAX,
+    STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE,
+    STATSD_APP_CHART_DIM_VALUE_TYPE_MEDIAN,
+    STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV
+} STATSD_APP_CHART_DIM_VALUE_TYPE;
+
 typedef struct statsd_app_chart_dimension {
     const char *name;
     const char *metric;
     uint32_t metric_hash;
     collected_number multiplier;
     collected_number divider;
-    STATSD_INDEX *index;
+    STATSD_APP_CHART_DIM_VALUE_TYPE value_type;
 
-    STATSD_METRIC *m;
     RRDDIM *rd;
+    collected_number *value_ptr;
+    RRD_ALGORITHM algorithm;
+
     struct statsd_app_chart_dimension *next;
 } STATSD_APP_CHART_DIM;
 
@@ -186,7 +206,6 @@ typedef struct statsd_app {
 
     const char *source;
     STATSD_APP_CHART *charts;
-    size_t charts_count;
     struct statsd_app *next;
 } STATSD_APP;
 
@@ -334,7 +353,7 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
 
         if(type == STATSD_METRIC_TYPE_HISTOGRAM || type == STATSD_METRIC_TYPE_TIMER) {
             m->histogram.ext = callocz(sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS), 1);
-            netdata_mutex_init(&m->histogram.mutex);
+            netdata_mutex_init(&m->histogram.ext->mutex);
         }
         STATSD_METRIC *n = (STATSD_METRIC *)STATSD_AVL_INSERT(&index->index, (avl *)m);
         if(unlikely(n != m)) {
@@ -361,7 +380,7 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
 // statsd parsing numbers
 
 static inline long double statsd_parse_float(const char *v, long double def) {
-    long double value = def;
+    long double value;
 
     if(likely(v && *v)) {
         char *e = NULL;
@@ -369,12 +388,14 @@ static inline long double statsd_parse_float(const char *v, long double def) {
         if(unlikely(e && *e))
             error("STATSD: excess data '%s' after value '%s'", e, v);
     }
+    else
+        value = def;
 
     return value;
 }
 
 static inline long long statsd_parse_int(const char *v, long long def) {
-    long long value = def;
+    long long value;
 
     if(likely(v && *v)) {
         char *e = NULL;
@@ -382,6 +403,8 @@ static inline long long statsd_parse_int(const char *v, long long def) {
         if(unlikely(e && *e))
             error("STATSD: excess data '%s' after value '%s'", e, v);
     }
+    else
+        value = def;
 
     return value;
 }
@@ -443,10 +466,10 @@ static inline void statsd_process_histogram(STATSD_METRIC *m, const char *value,
     }
 
     if(unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
-        netdata_mutex_lock(&m->histogram.mutex);
+        netdata_mutex_lock(&m->histogram.ext->mutex);
         m->histogram.ext->size += statsd.histogram_increase_step;
-        m->histogram.ext = reallocz(m->histogram.ext, sizeof(STATSD_METRIC_HISTOGRAM_EXTENSIONS) + (sizeof(long double) * m->histogram.ext->size));
-        netdata_mutex_unlock(&m->histogram.mutex);
+        m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(long double) * m->histogram.ext->size);
+        netdata_mutex_unlock(&m->histogram.ext->mutex);
     }
 
     m->histogram.ext->values[m->histogram.ext->used++] = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
@@ -499,88 +522,55 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
 // statsd parsing
 
 static void statsd_process_metric(const char *name, const char *value, const char *type, const char *sampling) {
-    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', rate '%s'", name, value, type, sampling);
+    debug(D_STATSD, "STATSD: raw metric '%s', value '%s', type '%s', rate '%s'", name?name:"(null)", value?value:"(null)", type?type:"(null)", sampling?sampling:"(null)");
 
     if(unlikely(!name || !*name)) return;
     if(unlikely(!type || !*type)) type = "m";
 
-    switch (*type) {
-        case 'g':
-            statsd_process_gauge(
-                    statsd_find_or_add_metric(&statsd.gauges, name, STATSD_METRIC_TYPE_GAUGE),
-                    value, sampling);
-            break;
+    char t0 = type[0], t1 = type[1];
 
-        case 'c': // etsy/statsd, but brubeck uses it as 'meter' - sorry brubeck, this is stupid
-        case 'C': // brubeck
-            statsd_process_counter(
-                    statsd_find_or_add_metric(&statsd.counters, name, STATSD_METRIC_TYPE_COUNTER),
-                    value, sampling);
-            break;
-
-        case 'm':
-            if (type[1] == 's')
-                statsd_process_timer(
-                        statsd_find_or_add_metric(&statsd.timers, name, STATSD_METRIC_TYPE_TIMER),
-                        value, sampling);
-            else if (type[1] == '\0')
-                statsd_process_meter(
-                        statsd_find_or_add_metric(&statsd.meters, name, STATSD_METRIC_TYPE_METER),
-                        value, sampling);
-            else
-                statsd.unknown_types++;
-            break;
-
-        case 'h':
-            statsd_process_histogram(
-                    statsd_find_or_add_metric(&statsd.histograms, name, STATSD_METRIC_TYPE_HISTOGRAM),
-                    value, sampling);
-            break;
-
-        case 's':
-            statsd_process_set(
-                    statsd_find_or_add_metric(&statsd.sets, name, STATSD_METRIC_TYPE_SET),
-                    value);
-            break;
-
-        default:
-            statsd.unknown_types++;
-            break;
+    if(unlikely(t0 == 'g' && t1 == '\0')) {
+        statsd_process_gauge(
+                statsd_find_or_add_metric(&statsd.gauges, name, STATSD_METRIC_TYPE_GAUGE),
+                value, sampling);
+    }
+    else if(unlikely((t0 == 'c' || t0 == 'C') && t1 == '\0')) {
+        // etsy/statsd uses 'c'
+        // brubeck     uses 'C'
+        statsd_process_counter(
+                statsd_find_or_add_metric(&statsd.counters, name, STATSD_METRIC_TYPE_COUNTER),
+                value, sampling);
+    }
+    else if(unlikely(t0 == 'm' && t1 == '\0')) {
+        statsd_process_meter(
+                statsd_find_or_add_metric(&statsd.meters, name, STATSD_METRIC_TYPE_METER),
+                value, sampling);
+    }
+    else if(unlikely(t0 == 'h' && t1 == '\0')) {
+        statsd_process_histogram(
+                statsd_find_or_add_metric(&statsd.histograms, name, STATSD_METRIC_TYPE_HISTOGRAM),
+                value, sampling);
+    }
+    else if(unlikely(t0 == 's' && t1 == '\0')) {
+        statsd_process_set(
+                statsd_find_or_add_metric(&statsd.sets, name, STATSD_METRIC_TYPE_SET),
+                value);
+    }
+    else if(unlikely(t0 == 'm' && t1 == 's' && type[2] == '\0')) {
+        statsd_process_timer(
+                statsd_find_or_add_metric(&statsd.timers, name, STATSD_METRIC_TYPE_TIMER),
+                value, sampling);
+    }
+    else {
+        statsd.unknown_types++;
+        error("STATSD: metric '%s' with value '%s' is sent with unknown metric type '%s'", name, value?value:"", type);
     }
 }
 
-static inline const char *statsd_parse_name(const char *s, const char **name) {
+static inline const char *statsd_parse_skip_up_to(const char *s, char d1, char d2) {
     char c;
 
-    *name = s;
-    for(c = *s; c && c != ':' && c != '|' && c != '\n'; c = *++s) ;
-
-    return s;
-}
-
-static inline const char *statsd_parse_value(const char *s, const char **value) {
-    char c;
-
-    *value = s;
-    for(c = *s; c && c != '|' && c != '\n'; c = *++s) ;
-
-    return s;
-}
-
-static inline const char *statsd_parse_type(const char *s, const char **type) {
-    char c;
-
-    *type = s;
-    for(c = *s; c && c != '|' && c != '@' && c != '\n'; c = *++s) ;
-
-    return s;
-}
-
-static inline const char *statsd_parse_sampling(const char *s, const char **sampling) {
-    char c;
-
-    *sampling = s;
-    for(c = *s; c && c != '\n'; c = *++s) ;
+    for(c = *s; c && c != d1 && c != d2 && c != '\r' && c != '\n'; c = *++s) ;
 
     return s;
 }
@@ -594,8 +584,6 @@ const char *statsd_parse_skip_spaces(const char *s) {
 }
 
 static inline const char *statsd_parse_field_trim(const char *start, char *end) {
-    *end = '\0';
-
     if(unlikely(!start)) {
         start = end;
         return start;
@@ -604,6 +592,7 @@ static inline const char *statsd_parse_field_trim(const char *start, char *end) 
     while(start <= end && (*start == ' ' || *start == '\t'))
         start++;
 
+    *end = '\0';
     end--;
     while(end >= start && (*end == ' ' || *end == '\t'))
         *end-- = '\0';
@@ -618,26 +607,24 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
     const char *s = buffer;
     while(*s) {
         const char *name = NULL, *value = NULL, *type = NULL, *sampling = NULL;
-        char *name_end, *value_end, *type_end, *sampling_end;
+        char *name_end = NULL, *value_end = NULL, *type_end = NULL, *sampling_end = NULL;
 
-        s = statsd_parse_name(s, &name);
-        if(name == s || !*name) {
+        s = name_end = (char *)statsd_parse_skip_up_to(name = s, ':', '|');
+        if(name == name_end) {
             s = statsd_parse_skip_spaces(s);
             continue;
         }
-        name_end = (char *)s;
 
-        if(likely(*s == ':')) s = statsd_parse_value(++s, &value);
-        value_end = (char *)s;
+        if(likely(*s == ':'))
+            s = value_end = (char *) statsd_parse_skip_up_to(value = ++s, '|', '|');
 
-        if(likely(*s == '|')) s = statsd_parse_type(++s, &type);
-        type_end = (char *)s;
+        if(likely(*s == '|'))
+            s = type_end = (char *) statsd_parse_skip_up_to(type = ++s, '|', '@');
 
-        if(unlikely(*s == '|' || *s == '@')) {
-            s = statsd_parse_sampling(++s, &sampling);
+        if(likely(*s == '|' || *s == '@')) {
+            s = sampling_end = (char *) statsd_parse_skip_up_to(sampling = ++s, '\r', '\n');
             if(*sampling == '@') sampling++;
         }
-        sampling_end = (char *)s;
 
         // skip everything until the end of the line
         while(*s && *s != '\n') s++;
@@ -648,6 +635,8 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
             memmove(buffer, name, size);
             return size;
         }
+        else
+            s = statsd_parse_skip_spaces(s);
 
         statsd_process_metric(
                   statsd_parse_field_trim(name, name_end)
@@ -714,7 +703,8 @@ static void statsd_del_callback(int fd, void *data) {
         if(t->type == STATSD_SOCKET_DATA_TYPE_TCP) {
             if(t->len != 0) {
                 statsd.socket_errors++;
-                error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'", &t->buffer[t->len]);
+                error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'. Trying to process it.", t->buffer);
+                statsd_process(t->buffer, t->len, 0);
             }
         }
         else
@@ -740,8 +730,8 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
             }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-            if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_UDP)) {
-                error("STATSD: internal error: socket data should be %d, but it is %d", (int)d->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
+            if(unlikely(d->type != STATSD_SOCKET_DATA_TYPE_TCP)) {
+                error("STATSD: internal error: socket data type should be %d, but it is %d", (int)STATSD_SOCKET_DATA_TYPE_TCP, (int)d->type);
                 statsd.socket_errors++;
                 return -1;
             }
@@ -761,7 +751,7 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
                 }
                 else if (!rc) {
                     // connection closed
-                    error("STATSD: client disconnected.");
+                    debug(D_STATSD, "STATSD: client disconnected.");
                     ret = -1;
                 }
                 else {
@@ -827,7 +817,7 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
 #else // !HAVE_RECVMMSG
             ssize_t rc;
             do {
-                rc = recv(fd, d->buffer, STATSD_UDP_BUFFER_SIZE, MSG_DONTWAIT);
+                rc = recv(fd, d->buffer, STATSD_UDP_BUFFER_SIZE - 1, MSG_DONTWAIT);
                 if (rc < 0) {
                     // read failed
                     if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) {
@@ -1082,14 +1072,15 @@ int statsd_readfile(const char *path, const char *filename) {
                 chart->chart_type = rrdset_type_id(value);
             }
             else if (!strcmp(name, "dimension")) {
-                // metric [name [multiplier [divider]]]
-                char *words[4];
-                pluginsd_split_words(value, words, 4);
+                // metric [name [type [multiplier [divider]]]]
+                char *words[5];
+                pluginsd_split_words(value, words, 5);
 
                 char *metric_name = words[0];
                 char *dim_name = words[1];
-                char *multipler = words[2];
-                char *divider = words[3];
+                char *type = words[2];
+                char *multipler = words[3];
+                char *divider = words[4];
 
                 STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
                 dim->next = chart->dimensions;
@@ -1103,6 +1094,21 @@ int statsd_readfile(const char *path, const char *filename) {
                 dim->multiplier = (multipler && *multipler)?str2l(multipler):1;
                 dim->divider = (divider && *divider)?str2l(divider):1;
 
+                if(!type || !*type) type = "last";
+                if(!strcmp(type, "events")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS;
+                else if(!strcmp(type, "last")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
+                else if(!strcmp(type, "min")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_MIN;
+                else if(!strcmp(type, "max")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_MAX;
+                else if(!strcmp(type, "sum")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_SUM;
+                else if(!strcmp(type, "average")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_AVERAGE;
+                else if(!strcmp(type, "median")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_MEDIAN;
+                else if(!strcmp(type, "stddev")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV;
+                else if(!strcmp(type, "percentile")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE;
+                else {
+                    error("STATSD: invalid type '%s' at line %zu of file '%s/%s'. Using 'last'.", type, line, path, filename);
+                    dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
+                }
+
                 if(!dim->multiplier) {
                     error("STATSD: invalid multiplier value '%s' at line %zu of file '%s/%s'. Using 1.", multipler, line, path, filename);
                     dim->multiplier = 1;
@@ -1111,6 +1117,9 @@ int statsd_readfile(const char *path, const char *filename) {
                     error("STATSD: invalid divider value '%s' at line %zu of file '%s/%s'. Using 1.", divider, line, path, filename);
                     dim->divider = 1;
                 }
+
+                debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divider " COLLECTED_NUMBER_FORMAT,
+                    dim->name, chart->name, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divider);
             }
             else {
                 error("STATSD: ignoring line %zu ('%s') of file '%s/%s'. Unknown keyword for the [%s] section.", line, name, path, filename, chart->id);
@@ -1253,7 +1262,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
                 , RRDSET_TYPE_LINE
         );
 
-        m->rd_value = rrddim_add(m->st, "gauge",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value = rrddim_add(m->st, "gauge",  NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1,    RRD_ALGORITHM_INCREMENTAL);
@@ -1263,7 +1272,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
     if(m->rd_count)
-        rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+        rrddim_set_by_pointer(m->st, m->rd_count, m->events);
 
     rrdset_done(m->st);
 }
@@ -1299,7 +1308,7 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
     if(m->rd_count)
-        rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+        rrddim_set_by_pointer(m->st, m->rd_count, m->events);
 
     rrdset_done(m->st);
 }
@@ -1335,7 +1344,7 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
     if(m->rd_count)
-        rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+        rrddim_set_by_pointer(m->st, m->rd_count, m->events);
 
     rrdset_done(m->st);
 }
@@ -1361,13 +1370,13 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
                 , RRDSET_TYPE_AREA
         );
 
-        m->histogram.ext->rd_min = rrddim_add(m->st, "min", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_max = rrddim_add(m->st, "max", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        m->rd_value              = rrddim_add(m->st, "average", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_percentile = rrddim_add(m->st, statsd.histogram_percentile_str, NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_median = rrddim_add(m->st, "median", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_stddev = rrddim_add(m->st, "stddev", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_sum = rrddim_add(m->st, "sum", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_min = rrddim_add(m->st, "min", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_max = rrddim_add(m->st, "max", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value              = rrddim_add(m->st, "average", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_percentile = rrddim_add(m->st, statsd.histogram_percentile_str, NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_median = rrddim_add(m->st, "median", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_stddev = rrddim_add(m->st, "stddev", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_sum = rrddim_add(m->st, "sum", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1383,7 +1392,7 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
     if(m->rd_count)
-        rrddim_set_by_pointer(m->st, m->rd_count, (collected_number)m->events);
+        rrddim_set_by_pointer(m->st, m->rd_count, m->events);
 
     rrdset_done(m->st);
 }
@@ -1396,7 +1405,7 @@ static inline void statsd_flush_gauge(STATSD_METRIC *m) {
 
     int updated = 0;
     if(m->count && !m->reset) {
-        m->last = (collected_number) (m->gauge.value * 1000.0);
+        m->last = (collected_number) (m->gauge.value * STATSD_DECIMAL_DETAIL);
 
         m->reset = 1;
         updated = 1;
@@ -1434,7 +1443,7 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
 
     int updated = 0;
     if(m->count && !m->reset) {
-        m->last = m->set.unique;
+        m->last = (collected_number)m->set.unique;
 
         m->reset = 1;
         updated = 1;
@@ -1447,7 +1456,7 @@ static inline void statsd_flush_set(STATSD_METRIC *m) {
 static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
-    netdata_mutex_lock(&m->histogram.mutex);
+    netdata_mutex_lock(&m->histogram.ext->mutex);
 
     int updated = 0;
     if(m->count && !m->reset) {
@@ -1455,13 +1464,16 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         long double *series = m->histogram.ext->values;
         sort_series(series, len);
 
-        m->histogram.ext->last_min = (collected_number)roundl(series[0] * 1000);
-        m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * 1000);
-        m->last = (collected_number)roundl(average(series, len) * 1000);
-        m->histogram.ext->last_percentile = (collected_number)roundl(average(series, (size_t)floor((double)len * statsd.histogram_percentile / 100.0)) * 1000);
-        m->histogram.ext->last_median = (collected_number)roundl(median_on_sorted_series(series, len) * 1000);
-        m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * 1000);
-        m->histogram.ext->last_sum = (collected_number)roundl(sum(series, len) * 1000);
+        m->histogram.ext->last_min = (collected_number)roundl(series[0] * STATSD_DECIMAL_DETAIL);
+        m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * STATSD_DECIMAL_DETAIL);
+        m->last = (collected_number)roundl(average(series, len) * STATSD_DECIMAL_DETAIL);
+        m->histogram.ext->last_percentile = (collected_number)roundl(average(series, (size_t)floor((double)len * statsd.histogram_percentile / 100.0)) * STATSD_DECIMAL_DETAIL);
+        m->histogram.ext->last_median = (collected_number)roundl(median_on_sorted_series(series, len) * STATSD_DECIMAL_DETAIL);
+        m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * STATSD_DECIMAL_DETAIL);
+        m->histogram.ext->last_sum = (collected_number)roundl(sum(series, len) * STATSD_DECIMAL_DETAIL);
+
+        debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
+              dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
 
         m->reset = 1;
         updated = 1;
@@ -1471,7 +1483,7 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
     if(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED && (updated || !(m->options & STATSD_METRIC_OPTION_SHOW_GAPS_WHEN_NOT_COLLECTED)))
         statsd_private_chart_timer_or_histogram(m, dim, family, units);
 
-    netdata_mutex_unlock(&m->histogram.mutex);
+    netdata_mutex_unlock(&m->histogram.ext->mutex);
 }
 
 static inline void statsd_flush_timer(STATSD_METRIC *m) {
@@ -1480,6 +1492,21 @@ static inline void statsd_flush_timer(STATSD_METRIC *m) {
 
 static inline void statsd_flush_histogram(STATSD_METRIC *m) {
     statsd_flush_timer_or_histogram(m, "histogram", "histograms", "value");
+}
+
+static inline RRD_ALGORITHM statsd_algorithm_for_metric(STATSD_METRIC *m) {
+    switch(m->type) {
+        default:
+        case STATSD_METRIC_TYPE_GAUGE:
+        case STATSD_METRIC_TYPE_SET:
+        case STATSD_METRIC_TYPE_TIMER:
+        case STATSD_METRIC_TYPE_HISTOGRAM:
+            return RRD_ALGORITHM_ABSOLUTE;
+
+        case STATSD_METRIC_TYPE_METER:
+        case STATSD_METRIC_TYPE_COUNTER:
+            return RRD_ALGORITHM_INCREMENTAL;
+    }
 }
 
 static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC *m) {
@@ -1509,30 +1536,69 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
             for(chart = app->charts; chart; chart = chart->next) {
                 STATSD_APP_CHART_DIM *dim;
                 for(dim = chart->dimensions; dim ; dim = dim->next) {
-                    if(!dim->m && dim->metric_hash == m->hash && !strcmp(dim->metric, m->name)) {
+                    if(!dim->value_ptr && dim->metric_hash == m->hash && !strcmp(dim->metric, m->name)) {
                         // we have a match - this metric should be linked to this dimension
                         debug(D_STATSD, "metric '%s' linked with app '%s', chart '%s', dimension '%s'", m->name, app->name, chart->id, dim->name);
-                        dim->m = m;
+
+                        if(dim->value_type == STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS) {
+                            dim->value_ptr = &m->events;
+                            dim->algorithm = RRD_ALGORITHM_INCREMENTAL;
+                        }
+                        else if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
+                            dim->algorithm = RRD_ALGORITHM_ABSOLUTE;
+                            dim->divider *= STATSD_DECIMAL_DETAIL;
+
+                            switch(dim->value_type) {
+                                case STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS:
+                                    // will never match - added to avoid warning
+                                    break;
+
+                                case STATSD_APP_CHART_DIM_VALUE_TYPE_LAST:
+                                case STATSD_APP_CHART_DIM_VALUE_TYPE_AVERAGE:
+                                    dim->value_ptr = &m->last;
+                                    break;
+
+                                case STATSD_APP_CHART_DIM_VALUE_TYPE_SUM:
+                                    dim->value_ptr = &m->histogram.ext->last_sum;
+                                    break;
+
+                                case STATSD_APP_CHART_DIM_VALUE_TYPE_MIN:
+                                    dim->value_ptr = &m->histogram.ext->last_min;
+                                    break;
+
+                                case STATSD_APP_CHART_DIM_VALUE_TYPE_MAX:
+                                    dim->value_ptr = &m->histogram.ext->last_max;
+                                    break;
+
+                                case STATSD_APP_CHART_DIM_VALUE_TYPE_MEDIAN:
+                                    dim->value_ptr = &m->histogram.ext->last_median;
+                                    break;
+
+                                case STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE:
+                                    dim->value_ptr = &m->histogram.ext->last_percentile;
+                                    break;
+
+                                case STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV:
+                                    dim->value_ptr = &m->histogram.ext->last_stddev;
+                                    break;
+                            }
+                        }
+                        else {
+                            if (dim->value_type != STATSD_APP_CHART_DIM_VALUE_TYPE_LAST)
+                                error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->name, app->name, m->name);
+
+                            dim->value_ptr = &m->last;
+                            dim->algorithm = statsd_algorithm_for_metric(m);
+
+                            if(m->type == STATSD_METRIC_TYPE_GAUGE)
+                                dim->divider *= STATSD_DECIMAL_DETAIL;
+                        }
+
                         chart->dimensions_linked_count++;
                     }
                 }
             }
         }
-    }
-}
-
-static inline RRD_ALGORITHM statsd_algorithm_for_metric(STATSD_METRIC *m) {
-    switch(m->type) {
-        default:
-        case STATSD_METRIC_TYPE_GAUGE:
-        case STATSD_METRIC_TYPE_SET:
-        case STATSD_METRIC_TYPE_TIMER:
-        case STATSD_METRIC_TYPE_HISTOGRAM:
-            return RRD_ALGORITHM_ABSOLUTE;
-
-        case STATSD_METRIC_TYPE_METER:
-        case STATSD_METRIC_TYPE_COUNTER:
-            return RRD_ALGORITHM_INCREMENTAL;
     }
 }
 
@@ -1560,11 +1626,12 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
 
     STATSD_APP_CHART_DIM *dim;
     for(dim = chart->dimensions; dim ;dim = dim->next) {
-        if(dim->m) {
+        if(unlikely(dim->value_ptr)) {
             if(unlikely(!dim->rd))
-                dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divider,statsd_algorithm_for_metric(dim->m));
+                dim->rd = rrddim_add(chart->st, dim->name, NULL, dim->multiplier, dim->divider, dim->algorithm);
 
-            rrddim_set_by_pointer(chart->st, dim->rd, dim->m->last);
+            debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
+            rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
         }
     }
 
