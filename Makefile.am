@@ -37,7 +37,9 @@ EXTRA_DIST = \
     m4/ax_c__generic.m4 \
 	autogen.sh \
 	README.md \
+	LICENSE \
 	LICENSE.md \
+	LICENSE-REDISTRIBUTED.md \
 	COPYING \
 	autogen.sh \
 	tests/stress.sh \
