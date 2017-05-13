@@ -80,16 +80,17 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
 // RRDHOST - add a host
 
 RRDHOST *rrdhost_create(const char *hostname,
-        const char *guid,
-        const char *os,
-        int update_every,
-        long entries,
-        RRD_MEMORY_MODE memory_mode,
-        int health_enabled,
-        int rrdpush_enabled,
-        char *rrdpush_destination,
-        char *rrdpush_api_key,
-        int is_localhost
+                        const char *registry_hostname,
+                        const char *guid,
+                        const char *os,
+                        int update_every,
+                        long entries,
+                        RRD_MEMORY_MODE memory_mode,
+                        int health_enabled,
+                        int rrdpush_enabled,
+                        char *rrdpush_destination,
+                        char *rrdpush_api_key,
+                        int is_localhost
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
 
@@ -115,6 +116,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
     rrdhost_init_os(host, os);
+    host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
     avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
     avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
@@ -229,7 +231,7 @@ RRDHOST *rrdhost_create(const char *hostname,
         host = NULL;
     }
     else {
-        info("Host '%s' with guid '%s' initialized"
+        info("Host '%s' (at registry as '%s') with guid '%s' initialized"
                      ", os %s"
                      ", update every %d"
                      ", memory mode %s"
@@ -243,6 +245,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                      ", alarms default handler '%s'"
                      ", alarms default recipient '%s'"
              , host->hostname
+             , host->registry_hostname
              , host->machine_guid
              , host->os
              , host->rrd_update_every
@@ -267,6 +270,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
 RRDHOST *rrdhost_find_or_create(
           const char *hostname
+        , const char *registry_hostname
         , const char *guid
         , const char *os
         , int update_every
@@ -284,6 +288,7 @@ RRDHOST *rrdhost_find_or_create(
     if(!host) {
         host = rrdhost_create(
                 hostname
+                , registry_hostname
                 , guid
                 , os
                 , update_every
@@ -372,6 +377,7 @@ void rrd_init(char *hostname) {
     rrd_wrlock();
     localhost = rrdhost_create(
             hostname
+            , registry_get_this_machine_hostname()
             , registry_get_this_machine_guid()
             , os_type
             , default_rrd_update_every
@@ -482,6 +488,7 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->health_default_recipient);
     freez(host->health_log_filename);
     freez(host->hostname);
+    freez(host->registry_hostname);
     rrdhost_unlock(host);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);

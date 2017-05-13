@@ -148,7 +148,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
-              host->hostname,
+              host->registry_hostname,
               ae->unique_id,
               ae->alarm_id,
               ae->alarm_event_id,

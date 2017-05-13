@@ -115,8 +115,6 @@ debug() {
 NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
 NETDATA_CACHE_DIR="${NETDATA_CACHE_DIR-/var/cache/netdata}"
 [ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
-[ -z "${NETDATA_HOSTNAME}" ] && NETDATA_HOSTNAME="$(hostname)"
-[ -z "${NETDATA_REGISTRY_HOSTNAME}" ] && NETDATA_REGISTRY_HOSTNAME="${NETDATA_HOSTNAME}"
 
 # -----------------------------------------------------------------------------
 # parse command line parameters
@@ -145,8 +143,6 @@ old_value_string="${20}"    # friendly old value (with units)
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
 
-[ -z "${host}" ] && host="${NETDATA_HOSTNAME}"
-[ -z "${host}" ] && host="${NETDATA_REGISTRY_HOSTNAME}"
 [ -z "${host}" ] && host="$(hostname 2>/dev/null)"
 
 # -----------------------------------------------------------------------------
@@ -1108,7 +1104,7 @@ EOF
 # prepare the content of the notification
 
 # the url to send the user on click
-urlencode "${NETDATA_REGISTRY_HOSTNAME}" >/dev/null; url_host="${REPLY}"
+urlencode "${host}" >/dev/null; url_host="${REPLY}"
 urlencode "${chart}" >/dev/null; url_chart="${REPLY}"
 urlencode "${family}" >/dev/null; url_family="${REPLY}"
 urlencode "${name}" >/dev/null; url_name="${REPLY}"
