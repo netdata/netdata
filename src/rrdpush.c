@@ -309,11 +309,12 @@ void *rrdpush_sender_thread(void *ptr) {
 
             char http[1000 + 1];
             snprintfz(http, 1000,
-                    "STREAM key=%s&hostname=%s&machine_guid=%s&os=%s&update_every=%d HTTP/1.1\r\n"
+                    "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&os=%s&update_every=%d HTTP/1.1\r\n"
                     "User-Agent: netdata-push-service/%s\r\n"
                     "Accept: */*\r\n\r\n"
                       , host->rrdpush_api_key
                       , host->hostname
+                      , host->registry_hostname
                       , host->machine_guid
                       , host->os
                       , default_rrd_update_every
@@ -510,7 +511,7 @@ cleanup:
 // ----------------------------------------------------------------------------
 // rrdpush receiver thread
 
-int rrdpush_receive(int fd, const char *key, const char *hostname, const char *machine_guid, const char *os, int update_every, char *client_ip, char *client_port) {
+int rrdpush_receive(int fd, const char *key, const char *hostname, const char *registry_hostname, const char *machine_guid, const char *os, int update_every, char *client_ip, char *client_port) {
     RRDHOST *host;
     int history = default_rrd_history_entries;
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
@@ -550,6 +551,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *m
     else
         host = rrdhost_find_or_create(
                 hostname
+                , registry_hostname
                 , machine_guid
                 , os
                 , update_every
@@ -649,6 +651,7 @@ struct rrdpush_thread {
     int fd;
     char *key;
     char *hostname;
+    char *registry_hostname;
     char *machine_guid;
     char *os;
     char *client_ip;
@@ -667,11 +670,12 @@ void *rrdpush_receiver_thread(void *ptr) {
 
 
     info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
-    rrdpush_receive(rpt->fd, rpt->key, rpt->hostname, rpt->machine_guid, rpt->os, rpt->update_every, rpt->client_ip, rpt->client_port);
+    rrdpush_receive(rpt->fd, rpt->key, rpt->hostname, rpt->registry_hostname, rpt->machine_guid, rpt->os, rpt->update_every, rpt->client_ip, rpt->client_port);
     info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
     freez(rpt->key);
     freez(rpt->hostname);
+    freez(rpt->registry_hostname);
     freez(rpt->machine_guid);
     freez(rpt->os);
     freez(rpt->client_ip);
@@ -704,7 +708,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
     info("STREAM [receive from [%s]:%s]: new client connection.", w->client_ip, w->client_port);
 
-    char *key = NULL, *hostname = NULL, *machine_guid = NULL, *os = "unknown";
+    char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown";
     int update_every = default_rrd_update_every;
     char buf[GUID_LEN + 1];
 
@@ -720,12 +724,16 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
             key = value;
         else if(!strcmp(name, "hostname"))
             hostname = value;
+        else if(!strcmp(name, "registry_hostname"))
+            registry_hostname = value;
         else if(!strcmp(name, "machine_guid"))
             machine_guid = value;
         else if(!strcmp(name, "update_every"))
             update_every = (int)strtoul(value, NULL, 0);
         else if(!strcmp(name, "os"))
             os = value;
+        else
+            info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
     }
 
     if(!key || !*key) {
@@ -750,7 +758,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     if(regenerate_guid(key, buf) == -1) {
-        error("STREAM [receive from [%s]:%s]: API key '%s' is not valid GUID. Forbidding access.", w->client_ip, w->client_port, key);
+        error("STREAM [receive from [%s]:%s]: API key '%s' is not valid GUID (use the command uuidgen to generate one). Forbidding access.", w->client_ip, w->client_port, key);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your API key is invalid.");
         return 401;
@@ -778,14 +786,15 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     struct rrdpush_thread *rpt = mallocz(sizeof(struct rrdpush_thread));
-    rpt->fd           = w->ifd;
-    rpt->key          = strdupz(key);
-    rpt->hostname     = strdupz(hostname);
-    rpt->machine_guid = strdupz(machine_guid);
-    rpt->os           = strdupz(os);
-    rpt->client_ip    = strdupz(w->client_ip);
-    rpt->client_port  = strdupz(w->client_port);
-    rpt->update_every = update_every;
+    rpt->fd                = w->ifd;
+    rpt->key               = strdupz(key);
+    rpt->hostname          = strdupz(hostname);
+    rpt->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
+    rpt->machine_guid      = strdupz(machine_guid);
+    rpt->os                = strdupz(os);
+    rpt->client_ip         = strdupz(w->client_ip);
+    rpt->client_port       = strdupz(w->client_port);
+    rpt->update_every      = update_every;
     pthread_t thread;
 
     debug(D_SYSTEM, "STREAM [receive from [%s]:%s]: starting receiving thread.", w->client_ip, w->client_port);

@@ -425,8 +425,6 @@ static void get_netdata_configured_variables() {
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
     debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
 
-    netdata_configured_hostname    = config_get(CONFIG_SECTION_GLOBAL, "hostname",    CONFIG_DIR);
-
     // ------------------------------------------------------------------------
     // get default database size
 
