@@ -1,8 +1,9 @@
-netdata
-(C) Copyright 2017, Costa Tsaousis
+**netdata**<br/>
+(C) Copyright 2017<br/>
+Costa Tsaousis &lt;costa@tsaousis.gr&gt;
 
-Please read the following files:
+For license details refer to the following files:
 
-- [LICENSE](LICENSE) (GPL v3+)
-- [LICENSE-REDISTRIBUTED.md](LICENSE-REDISTRIBUTED.md) for third party packages re-distributed with netdata
+- [netdata license](LICENSE) (GPL v3+)
+- [third party licenses](LICENSE-REDISTRIBUTED.md), for packages re-distributed with netdata
 
