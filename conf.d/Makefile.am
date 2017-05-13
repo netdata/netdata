@@ -49,6 +49,7 @@ dist_pythonconfig_DATA = \
     python.d/phpfpm.conf \
     python.d/postfix.conf \
     python.d/postgres.conf \
+    python.d/rabbitmq.conf \
     python.d/redis.conf \
     python.d/retroshare.conf \
     python.d/samba.conf \

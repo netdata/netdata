@@ -13,7 +13,6 @@ from collections import namedtuple
 from json import loads
 
 # default module values (can be overridden per job in `config`)
-# update_every = 2
 update_every = 1
 priority = 60000
 retries = 60
@@ -23,7 +22,8 @@ METHODS = namedtuple('METHODS', ['get_data_function', 'url', 'stats'])
 NODE_STATS = [('fd_used', None),
               ('mem_used', None),
               ('sockets_used', None),
-              ('proc_used', None)
+              ('proc_used', None),
+              ('disk_free', None)
               ]
 OVERVIEW_STATS = [('object_totals.channels', None),
                   ('object_totals.consumers', None),
@@ -38,7 +38,7 @@ OVERVIEW_STATS = [('object_totals.channels', None),
                   ('message_stats.publish', None)
                   ]
 ORDER = ['queued_messages', 'message_rates', 'global_counts',
-         'file_descriptors', 'memory', 'sockets', 'processes']
+         'file_descriptors', 'socket_descriptors', 'erlang_processes', 'memory', 'disk_space']
 
 CHARTS = {
     'file_descriptors': {
@@ -53,13 +53,19 @@ CHARTS = {
         'lines': [
             ['mem_used', 'used', 'absolute', 1, 1024 << 10]
         ]},
-    'sockets': {
-        'options': [None, 'Sockets', 'sockets', 'overview',
+    'disk_space': {
+        'options': [None, 'Disk Space', 'GB', 'overview',
+                    'rabbitmq.disk_space', 'line'],
+        'lines': [
+            ['disk_free', 'free', 'absolute', 1, 1024 ** 3]
+        ]},
+    'socket_descriptors': {
+        'options': [None, 'Socket Descriptors', 'descriptors', 'overview',
                     'rabbitmq.sockets', 'line'],
         'lines': [
             ['sockets_used', 'used', 'absolute']
         ]},
-    'processes': {
+    'erlang_processes': {
         'options': [None, 'Erlang Processes', 'processes', 'overview',
                     'rabbitmq.processes', 'line'],
         'lines': [
