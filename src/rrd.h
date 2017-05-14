@@ -368,6 +368,8 @@ struct rrdhost {
     char *hostname;                                 // the hostname of this host
     uint32_t hash_hostname;                         // the hostname hash
 
+    char *registry_hostname;                        // the registry hostname for this host
+
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
     uint32_t hash_machine_guid;                     // the hash of the unique ID
 
@@ -488,6 +490,7 @@ extern RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash);
 
 extern RRDHOST *rrdhost_find_or_create(
         const char *hostname
+        , const char *registry_hostname
         , const char *guid
         , const char *os
         , int update_every
