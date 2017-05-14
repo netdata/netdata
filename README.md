@@ -1,4 +1,4 @@
-# netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Coverity Scan Build Status](https://scan.coverity.com/projects/9140/badge.svg)](https://scan.coverity.com/projects/firehol-netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=firehol/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/firehol/netdata/badges/gpa.svg)](https://codeclimate.com/github/firehol/netdata) [![license](https://img.shields.io/github/license/firehol/netdata.svg)](LICENSE.md)
+# netdata [![Build Status](https://travis-ci.org/firehol/netdata.svg?branch=master)](https://travis-ci.org/firehol/netdata) [![Coverity Scan Build Status](https://scan.coverity.com/projects/9140/badge.svg)](https://scan.coverity.com/projects/firehol-netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=firehol/netdata&amp;utm_campaign=Badge_Grade) [![Code Climate](https://codeclimate.com/github/firehol/netdata/badges/gpa.svg)](https://codeclimate.com/github/firehol/netdata) [![license](https://img.shields.io/github/license/firehol/netdata.svg)](LICENSE)
 > *New to netdata? Here is a live demo: [http://my-netdata.io](http://my-netdata.io)*
 
 **netdata** is a system for **distributed real-time performance and health monitoring**.
@@ -273,13 +273,17 @@ This is a list of what it currently monitors:
 - **SNMP devices**<br/>
   can be monitored too (although you will need to configure these)
 
+- **statsd**<br/>
+  [netdata is a fully featured statsd server](https://github.com/firehol/netdata/wiki/statsd)
+
 And you can extend it, by writing plugins that collect data from any source, using any computer language.
 
 ---
 
 ## netdata infographic
 
-This is a high level overview of netdata feature set and architecture. Click it to to interact with it.
+This is a high level overview of netdata feature set and architecture.
+Click it to to interact with it (it has direct links to documentation).
 
 [![netdata-overview](https://cloud.githubusercontent.com/assets/2662304/25580009/bf7016a4-2e85-11e7-9a7a-b36c57db7b91.png)](https://my-netdata.io/infographic.html)
 
@@ -311,6 +315,6 @@ Check the **[netdata wiki](https://github.com/firehol/netdata/wiki)**.
 
 ## License
 
-netdata is GPLv3+.
+netdata is [GPLv3+](LICENSE).
 
-It re-distributes other open-source tools and libraries. Please check its [License Statement](https://github.com/firehol/netdata/blob/master/LICENSE.md).
+It re-distributes other open-source tools and libraries. Please check the [third party licenses](https://github.com/firehol/netdata/blob/master/LICENSE-REDISTRIBUTED.md).
