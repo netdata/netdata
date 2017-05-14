@@ -6472,7 +6472,7 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.alarms = {
         onclick: null,                  // the callback to handle the click - it will be called with the alarm log entry
-        chart_div_offset: 100,          // give that space above the chart when scrolling to it
+        chart_div_offset: -50,          // give that space above the chart when scrolling to it
         chart_div_id_prefix: 'chart_',  // the chart DIV IDs have this prefix (they should be NETDATA.name2id(chart.id))
         chart_div_animation_duration: 0,// the duration of the animation while scrolling to a chart
 
