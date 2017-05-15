@@ -287,7 +287,7 @@ var NETDATA = window.NETDATA || {};
                                         // rendering the chart that is panned or zoomed).
                                         // Used with .current.global_pan_sync_time
 
-        last_resized: Date.now(),       // the timestamp of the last resize request
+        last_page_resize: Date.now(),       // the timestamp of the last resize request
 
         last_page_scroll: 0,            // the timestamp the last time the page was scrolled
 
@@ -571,7 +571,7 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.onresizeCallback = null;
     NETDATA.onresize = function() {
-        NETDATA.options.last_resized = Date.now();
+        NETDATA.options.last_page_resize = Date.now();
         NETDATA.onscroll();
 
         if(typeof NETDATA.onresizeCallback === 'function')
@@ -1829,6 +1829,9 @@ var NETDATA = window.NETDATA || {};
                     showRendering();
                     that.element_chart.style.display = 'none';
                     if(that.element_legend !== null) that.element_legend.style.display = 'none';
+                    if(that.element_legend_childs.toolbox !== null) that.element_legend_childs.toolbox.style.display = 'none';
+                    if(that.element_legend_childs.resize_handler !== null) that.element_legend_childs.resize_handler.style.display = 'none';
+
                     that.tm.last_hidden = Date.now();
 
                     // de-allocate data
@@ -1858,6 +1861,8 @@ var NETDATA = window.NETDATA || {};
                 that.tm.last_unhidden = Date.now();
                 that.element_chart.style.display = '';
                 if(that.element_legend !== null) that.element_legend.style.display = '';
+                if(that.element_legend_childs.toolbox !== null) that.element_legend_childs.toolbox.style.display = '';
+                if(that.element_legend_childs.resize_handler !== null) that.element_legend_childs.resize_handler.style.display = '';
                 resizeChart();
                 hideMessage();
             }
@@ -1928,7 +1933,7 @@ var NETDATA = window.NETDATA || {};
         // to be called just before the chart library to make sure that
         // a properly sized dom is available
         var resizeChart = function() {
-            if(that.isVisible() === true && that.tm.last_resized < NETDATA.options.last_resized) {
+            if(that.isVisible() === true && that.tm.last_resized < NETDATA.options.last_page_resize) {
                 if(that.chart_created === false) return;
 
                 if(that.needsRecreation()) {
@@ -3247,7 +3252,7 @@ var NETDATA = window.NETDATA || {};
                     this.chart_created === true
                     && this.library
                     && this.library.autoresize() === false
-                    && this.tm.last_resized < NETDATA.options.last_resized
+                    && this.tm.last_resized < NETDATA.options.last_page_resize
                 );
         };
 
@@ -3574,30 +3579,30 @@ var NETDATA = window.NETDATA || {};
             if(nocache === false && this.tm.last_visible_check > NETDATA.options.last_page_scroll)
                 return this.___isVisible___;
 
-            this.tm.last_visible_check = Date.now();
-
-            var wh = window.innerHeight;
-            var x = this.element.getBoundingClientRect();
-            var ret = 0;
+            // tolerance is the number of pixels a chart can be off-screen
+            // to consider it as visible and refresh it as if was visible
             var tolerance = 0;
 
-            if(x.width === 0 || x.height === 0) {
+            this.tm.last_visible_check = Date.now();
+
+            var rect = this.element.getBoundingClientRect();
+
+            var screenTop = window.scrollY;
+            var screenBottom = screenTop + window.innerHeight;
+
+            var chartTop = rect.top + screenTop;
+            var chartBottom = chartTop + rect.height;
+
+            if(rect.width === 0 || rect.height === 0) {
                 hideChart();
                 this.___isVisible___ = false;
                 return this.___isVisible___;
             }
 
-            if(x.top < 0 && -x.top > x.height) {
-                // the chart is entirely above
-                ret = -x.top - x.height;
-            }
-            else if(x.top > wh) {
-                // the chart is entirely below
-                ret = x.top - wh;
-            }
-
-            if(ret > tolerance) {
+            if(chartBottom + tolerance < screenTop || chartTop - tolerance > screenBottom) {
                 // the chart is too far
+
+                // this.log('nocache: ' + nocache.toString() + ', screen top: ' + screenTop.toString() + ', bottom: ' + screenBottom.toString() + ', chart top: ' + chartTop.toString() + ', bottom: ' + chartBottom.toString() + ', OFF SCREEN');
 
                 hideChart();
                 this.___isVisible___ = false;
@@ -3605,6 +3610,8 @@ var NETDATA = window.NETDATA || {};
             }
             else {
                 // the chart is inside or very close
+
+                // this.log('nocache: ' + nocache.toString() + ', screen top: ' + screenTop.toString() + ', bottom: ' + screenBottom.toString() + ', chart top: ' + chartTop.toString() + ', bottom: ' + chartBottom.toString() + ', VISIBLE');
 
                 unhideChart();
                 this.___isVisible___ = true;
