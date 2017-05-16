@@ -1083,9 +1083,6 @@ int statsd_readfile(const char *path, const char *filename) {
                 char *divider = words[4];
 
                 STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
-                dim->next = chart->dimensions;
-                chart->dimensions = dim;
-                chart->dimensions_count++;
 
                 dim->metric = strdupz(metric_name);
                 dim->metric_hash = simple_hash(dim->metric);
@@ -1117,6 +1114,19 @@ int statsd_readfile(const char *path, const char *filename) {
                     error("STATSD: invalid divider value '%s' at line %zu of file '%s/%s'. Using 1.", divider, line, path, filename);
                     dim->divider = 1;
                 }
+
+                // append it to the list of dimension
+                STATSD_APP_CHART_DIM *tdim;
+                for(tdim = chart->dimensions; tdim && tdim->next ; tdim = tdim->next) ;
+                if(!tdim) {
+                    dim->next = chart->dimensions;
+                    chart->dimensions = dim;
+                }
+                else {
+                    dim->next = tdim->next;
+                    tdim->next = dim;
+                }
+                chart->dimensions_count++;
 
                 debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divider " COLLECTED_NUMBER_FORMAT,
                     dim->name, chart->name, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divider);
@@ -1459,7 +1469,7 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
     netdata_mutex_lock(&m->histogram.ext->mutex);
 
     int updated = 0;
-    if(m->count && !m->reset) {
+    if(m->count && !m->reset && m->histogram.ext->used > 0) {
         size_t len = m->histogram.ext->used;
         long double *series = m->histogram.ext->values;
         sort_series(series, len);
@@ -1467,10 +1477,15 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         m->histogram.ext->last_min = (collected_number)roundl(series[0] * STATSD_DECIMAL_DETAIL);
         m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * STATSD_DECIMAL_DETAIL);
         m->last = (collected_number)roundl(average(series, len) * STATSD_DECIMAL_DETAIL);
-        m->histogram.ext->last_percentile = (collected_number)roundl(average(series, (size_t)floor((double)len * statsd.histogram_percentile / 100.0)) * STATSD_DECIMAL_DETAIL);
         m->histogram.ext->last_median = (collected_number)roundl(median_on_sorted_series(series, len) * STATSD_DECIMAL_DETAIL);
         m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * STATSD_DECIMAL_DETAIL);
         m->histogram.ext->last_sum = (collected_number)roundl(sum(series, len) * STATSD_DECIMAL_DETAIL);
+
+        size_t pct_len = (size_t)floor((double)len * statsd.histogram_percentile / 100.0);
+        if(pct_len < 1)
+            m->histogram.ext->last_percentile = (collected_number)(series[0] * STATSD_DECIMAL_DETAIL);
+        else
+            m->histogram.ext->last_percentile = (collected_number)roundl(average(series, pct_len) * STATSD_DECIMAL_DETAIL);
 
         debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
               dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
@@ -1626,10 +1641,10 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
 
     STATSD_APP_CHART_DIM *dim;
     for(dim = chart->dimensions; dim ;dim = dim->next) {
-        if(unlikely(dim->value_ptr)) {
-            if(unlikely(!dim->rd))
-                dim->rd = rrddim_add(chart->st, dim->name, NULL, dim->multiplier, dim->divider, dim->algorithm);
+        if(unlikely(!dim->rd))
+            dim->rd = rrddim_add(chart->st, dim->name, NULL, dim->multiplier, dim->divider, dim->algorithm);
 
+        if(unlikely(dim->value_ptr)) {
             debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
             rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
         }
