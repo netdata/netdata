@@ -343,7 +343,30 @@ AM_CONDITIONAL([ENABLE_PLUGIN_APPS], [test "${enable_plugin_apps}" = "yes"])
 PKG_CHECK_MODULES(
     [IPMIMONITORING],
     [libipmimonitoring],
-    [have_ipmimonitoring=yes],
+    [AC_CHECK_LIB([ipmimonitoring], [
+        ipmi_monitoring_sensor_readings_by_record_id,
+        ipmi_monitoring_sensor_readings_by_sensor_type,
+        ipmi_monitoring_sensor_read_sensor_number,
+        ipmi_monitoring_sensor_read_sensor_name,
+        ipmi_monitoring_sensor_read_sensor_state,
+        ipmi_monitoring_sensor_read_sensor_units,
+        ipmi_monitoring_sensor_iterator_next,
+        ipmi_monitoring_ctx_sensor_config_file,
+        ipmi_monitoring_ctx_sdr_cache_directory,
+        ipmi_monitoring_ctx_errormsg,
+        ipmi_monitoring_ctx_create
+    ],
+        [AC_CHECK_HEADER(
+            [ipmi_monitoring.h],
+            [AC_CHECK_HEADER(
+                [ipmi_monitoring_bitmasks.h],
+                [have_ipmimonitoring=yes],
+                [have_ipmimonitoring=no]
+            )],
+            [have_ipmimonitoring=no]
+        )],
+        [have_ipmimonitoring=no]
+    )],
     [have_ipmimonitoring=no]
 )
 test "${enable_plugin_freeipmi}" = "yes" -a "${have_ipmimonitoring}" != "yes" && \
