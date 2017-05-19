@@ -12,7 +12,7 @@ from base import LogService
 priority = 60000
 retries = 60
 REGEX_JAILS = r_compile(r'\[([A-Za-z-_0-9]+)][^\[\]]*?(?<!# )enabled = (?:(true|false))')
-REGEX_DATA = r_compile(r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>[A-Z])[a-z]+ (?P<ipaddr>\d{1,3}(?:\.\d{1,3}){3})')
+REGEX_DATA = r_compile(r'\[(?P<jail>[A-Za-z-_0-9]+)\] (?P<action>(?:(U|B)))[a-z]+ (?P<ipaddr>\d{1,3}(?:\.\d{1,3}){3})')
 ORDER = ['jails_bans', 'jails_in_jail']
 
 
