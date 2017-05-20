@@ -103,7 +103,7 @@ Valid <installer options> are:
 
         Install netdata-updater to cron,
         to update netdata automatically once per day
-        (can only be done for installation from git)
+        (can only be done for installations from git)
 
    --enable-plugin-freeipmi
    --disable-plugin-freeipmi
@@ -145,7 +145,7 @@ these packages installed:
 
 For the plugins, you will at least need:
 
-   curl nodejs
+   curl, bash v4+, python v2 or v3, node.js
 
 USAGE
 }
