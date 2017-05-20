@@ -222,47 +222,44 @@ class Service(LogService):
             return find_regex_return(msg='Pattern compile error: %s' % str(error))
 
         match = regex.search(last_line)
-        if match:
-            match_dict = match.groupdict() or None
-        else:
+        if not match:
             return find_regex_return(msg='Custom log: pattern search FAILED')
 
+        match_dict = match.groupdict() or None
         if match_dict is None:
-            find_regex_return(msg='Custom log: search OK but contains no named subgroups'
-                                  ' (you need to use ?P<subgroup_name>)')
+            return find_regex_return(msg='Custom log: search OK but contains no named subgroups'
+                                     ' (you need to use ?P<subgroup_name>)')
+        mandatory_dict = {'address': r'[\da-f.:]+',
+                          'code': r'[1-9]\d{2}',
+                          'method': r'[A-Z]+',
+                          'bytes_sent': r'\d+|-'}
+        optional_dict = {'resp_length': r'\d+',
+                         'resp_time': r'[\d.]+',
+                         'http_version': r'\d\.\d'}
+
+        mandatory_values = set(mandatory_dict) - set(match_dict)
+        if mandatory_values:
+            return find_regex_return(msg='Custom log: search OK but some mandatory keys (%s) are missing'
+                                     % list(mandatory_values))
+        for key in mandatory_dict:
+            if not re.search(mandatory_dict[key], match_dict[key]):
+                return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
+                                             % (key, match_dict[key]))
+
+        optional_values = set(optional_dict) & set(match_dict)
+        for key in optional_values:
+            if not re.search(optional_dict[key], match_dict[key]):
+                return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
+                                             % (key, match_dict[key]))
+
+        dot_in_time = '.' in match_dict.get('resp_time', '')
+        if dot_in_time:
+            self.resp_time_func = lambda time: time * (resp_time_func or 1000000)
         else:
-            mandatory_dict = {'address': r'[\da-f.:]+',
-                              'code': r'[1-9]\d{2}',
-                              'method': r'[A-Z]+',
-                              'bytes_sent': r'\d+|-'}
-            optional_dict = {'resp_length': r'\d+',
-                             'resp_time': r'[\d.]+',
-                             'http_version': r'\d\.\d'}
+            self.resp_time_func = lambda time: time * (resp_time_func or 1)
 
-            mandatory_values = set(mandatory_dict) - set(match_dict)
-            if mandatory_values:
-                return find_regex_return(msg='Custom log: search OK but some mandatory keys (%s) are missing'
-                                         % list(mandatory_values))
-            else:
-                for key in mandatory_dict:
-                    if not re.search(mandatory_dict[key], match_dict[key]):
-                        return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
-                                                     % (key, match_dict[key]))
-
-            optional_values = set(optional_dict) & set(match_dict)
-            for key in optional_values:
-                if not re.search(optional_dict[key], match_dict[key]):
-                    return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
-                                                 % (key, match_dict[key]))
-
-            dot_in_time = '.' in match_dict.get('resp_time', '')
-            if dot_in_time:
-                self.resp_time_func = lambda time: time * (resp_time_func or 1000000)
-            else:
-                self.resp_time_func = lambda time: time * (resp_time_func or 1)
-
-            self.regex = regex
-            return find_regex_return(match_dict=match_dict)
+        self.regex = regex
+        return find_regex_return(match_dict=match_dict)
 
     def find_regex(self, last_line):
         """
