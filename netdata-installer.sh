@@ -1250,11 +1250,11 @@ REINSTALL
     echo >&2 "only if it fails (it does not print anything when it can update netdata).${TPUT_RESET}"
     if [ "${UID}" -eq "0" ]
     then
-        if [ -d "/etc/cron.daily" -a ! -f "/etc/cron.daily/netdata-updater.sh" ]
+        if [ -d "/etc/cron.daily" -a ! -f "/etc/cron.daily/netdata-updater" ]
             then
             echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
             echo >&2
-            echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh /etc/cron.daily/netdata-updater.sh${TPUT_RESET}"
+            echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh /etc/cron.daily/netdata-updater${TPUT_RESET}"
         elif [ -d "/etc/periodic/daily" -a ! -f "/etc/periodic/daily/netdata-updater" ]
             then
             echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
