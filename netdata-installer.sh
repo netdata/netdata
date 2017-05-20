@@ -71,6 +71,7 @@ setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
 ME="$0"
 DONOTSTART=0
 DONOTWAIT=0
+AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
@@ -97,6 +98,12 @@ Valid <installer options> are:
 
         Do not wait for the user to press ENTER.
         Start immediately building it.
+
+   --auto-update | -u
+
+        Install netdata-updater to cron,
+        to update netdata automatically once per day
+        (can only be done for installation from git)
 
    --enable-plugin-freeipmi
    --disable-plugin-freeipmi
@@ -202,6 +209,10 @@ do
     elif [ "$1" = "--dont-wait" ]
         then
         DONOTWAIT=1
+        shift 1
+    elif [ "$1" = "--auto-update" -o "$1" = "-u" ]
+        then
+        AUTOUPDATE=1
         shift 1
     elif [ "$1" = "--enable-plugin-freeipmi" ]
         then
@@ -1250,21 +1261,41 @@ REINSTALL
     echo >&2 "only if it fails (it does not print anything when it can update netdata).${TPUT_RESET}"
     if [ "${UID}" -eq "0" ]
     then
-        if [ -d "/etc/cron.daily" -a ! -f "/etc/cron.daily/netdata-updater" ]
+        crondir=
+        [ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
+        [ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
+
+        if [ ! -z "${crondir}" ]
+        then
+            if [ -f "${crondir}/netdata-updater.sh" -a ! -f "${crondir}/netdata-updater" ]
             then
-            echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
-            echo >&2
-            echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh /etc/cron.daily/netdata-updater${TPUT_RESET}"
-        elif [ -d "/etc/periodic/daily" -a ! -f "/etc/periodic/daily/netdata-updater" ]
+                # remove .sh from the filename under cron
+                progress "Fixing netdata-updater filename at cron"
+                mv -f "${crondir}/netdata-updater.sh" "${crondir}/netdata-updater"
+            fi
+
+            if [ ! -f "${crondir}/netdata-updater" ]
             then
-            echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
-            echo >&2
-            echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh /etc/periodic/daily/netdata-updater${TPUT_RESET}"
+                if [ "${AUTOUPDATE}" = "1" ]
+                then
+                    progress "Installing netdata-updater at cron"
+                    run ln -s "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
+                else
+                    echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
+                    echo >&2
+                    echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh ${crondir}/netdata-updater${TPUT_RESET}"
+                fi
+            else if [ "${AUTOUPDATE}" = "1" ]
+            then
+                progress "Refreshing netdata-updater at cron"
+                run rm "${crondir}/netdata-updater"
+                run ln -s "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
+            fi
         fi
     fi
-elif [ -f "netdata-updater.sh" ]
-    then
-    rm "netdata-updater.sh"
+else
+    [ -f "netdata-updater.sh" ] && rm "netdata-updater.sh"
+    [ "${AUTOUPDATE}" = "1" ] && echo >&2 "Your installation method does not support daily auto-updating via cron."
 fi
 
 # -----------------------------------------------------------------------------
