@@ -1285,7 +1285,7 @@ REINSTALL
                     echo >&2
                     echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh ${crondir}/netdata-updater${TPUT_RESET}"
                 fi
-            else if [ "${AUTOUPDATE}" = "1" ]
+            elif [ "${AUTOUPDATE}" = "1" ]
             then
                 progress "Refreshing netdata-updater at cron"
                 run rm "${crondir}/netdata-updater"
