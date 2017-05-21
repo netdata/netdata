@@ -107,6 +107,16 @@ p {
     margin: 0 0 2em
 }
 
+.title {
+    opacity: 0;
+    transition: opacity 500ms;
+}
+
+.titlefadein {
+    opacity: 1;
+    transition: opacity 500ms;
+}
+
 .grid {
     margin: 0 -15px;
     letter-spacing: -.31em;
@@ -634,14 +644,14 @@ p {
             <li><a href=https://github.com/firehol/netdata/wiki data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Docs target="_blank">Docs</a>
         </ul>
     </div>
-    <div class=site-promo><h1>Get control<br/>of your Linux servers</h1>
+    <div class=site-promo><h1><span class="title">Get control<br/>of your Linux servers</span></h1>
         <p class=description>
             Simple.
             Effective.
-            Awesome.
+            Awesome!
             <br/>&nbsp;<br/>
             <strong>Unparalleled</strong> insights, in <strong>real-time</strong>,
-            of <strong>everything</strong> happening on your Linux systems and applications,
+            of <strong>everything</strong> happening on your systems and applications,
             with stunning, <strong>interactive</strong> web dashboards
             and powerful <strong>performance</strong> and <strong>health</strong> alarms.
         <div class=cta-option>
@@ -651,27 +661,30 @@ p {
             <a class="btn btn-alt" href="#demosites" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Demo>netdata live demo</a>
         </div>
     </div>
-
 </div>
 <div class=site-section>
-    <div class=container><h2>Save time. Run Linux with confidence.</h2>
+    <div class=container><h2>Save time. Run your systems with confidence.</h2>
         <div class=grid>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Monitor everything</h3>
-                <p>Analyze thousands of metrics per server.
+                <p>
+                    Analyze thousands of metrics per server.
+                <br/>
                     Everything about <a href="https://github.com/firehol/netdata/wiki/Internal-Plugins" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=InternalPlugins>the system</a> (CPU,
                         RAM, <a href="https://github.com/firehol/netdata/wiki/Monitoring-disks" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=MonitoringDisks>disks</a>,
-                    network, firewall, <a href="https://github.com/firehol/netdata/wiki/Why-netdata%3F#visualizes-qos" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=QoS>QoS</a>, NFS, etc)
-                    and detailed performance metrics for dozens of
-                    <a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=AddMoreCharts>Linux applications</a>
-                    (such as web servers, databases servers, email servers, DNS servers, etc)
-                    and <a href="https://github.com/firehol/netdata/blob/master/conf.d/node.d/snmp.conf.md" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=SNMP>SNMP</a> devices.
+                    network, firewall, <a href="https://github.com/firehol/netdata/wiki/Why-netdata%3F#visualizes-qos" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=QoS>QoS</a>, NFS, ZFS, etc).
+                <br/>
+                    Detailed performance metrics for dozens of
+                    <b><a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=AddMoreCharts>applications</a></b>
+                    (such as web servers, databases servers, email servers, DNS servers, etc).
+                <br/>
+                    Visualize metrics collected from <b><a href="https://github.com/firehol/netdata/blob/master/conf.d/node.d/snmp.conf.md" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=SNMP>SNMP devices</a></b>,
+                    and APM metrics via the embedded <b><a href="https://github.com/firehol/netdata/wiki/statsd" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=statsd>statsd server</a></b>.
             </div>
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> With alarms</h3>
-                <p><a href="https://github.com/firehol/netdata/wiki/health-monitoring" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Alarms>Alarms</a>
-                    can be set on any metric monitored by netdata.
-                    Alarm <a href="https://github.com/firehol/netdata/wiki/health-monitoring#alarm-actions" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=AlarmNotifications>notifications</a>
-                    are role-based and support dynamic thresholds, hysteresis and can be dispatched via multiple methods
-                    (such as email, slack.com, pushover.net, pushbullet.com, telegram.org, twilio.com).
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> Out of the box</h3>
+                <p>netdata supports <a href="https://github.com/firehol/netdata/tree/master/conf.d/python.d" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=AutoDetection>auto-detection</a> for everything. It collects more than 5000 metrics automatically, with
+                    <strong>zero configuration</strong>, it has <strong>zero dependencies</strong>, requires <strong>zero
+                        maintenance</strong> and comes with more than <a href="https://github.com/firehol/netdata/tree/master/conf.d/health.d" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=AlarmConfigs>100 alarms</a> pre-configured to detect common
+                    failures, performance and availability issues.
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> In real-time</h3>
                 <p>netdata collects thousands of metrics per server <strong>per second</strong>,
@@ -681,14 +694,15 @@ p {
                     View everything on <strong>stunning</strong> real-time interactive web dashboards, even when netdata is
                     running on low-end hardware.
             </div>
-            <div class=grid-cell><h3><span class=star>&#x2605;</span> Out of the box</h3>
-                <p>netdata supports <a href="https://github.com/firehol/netdata/tree/master/conf.d/python.d" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=AutoDetection>auto-detection</a> for everything. It collects more than 5000 metrics automatically, with
-                    <strong>zero configuration</strong>, it has <strong>zero dependencies</strong>, requires <strong>zero
-                        maintenance</strong> and comes with more than <a href="https://github.com/firehol/netdata/tree/master/conf.d/health.d" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=AlarmConfigs>100 alarms</a> pre-configured to detect common
-                    failures, performance and availability issues.
+            <div class=grid-cell><h3><span class=star>&#x2605;</span> With alarms</h3>
+                <p><a href="https://github.com/firehol/netdata/wiki/health-monitoring" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Alarms>Alarms</a>
+                    can be set on any metric monitored by netdata.
+                    Alarm <a href="https://github.com/firehol/netdata/wiki/health-monitoring#alarm-actions" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=AlarmNotifications>notifications</a>
+                    are role-based and support dynamic thresholds, hysteresis and can be dispatched via multiple methods
+                    (such as email, slack.com, pushover.net, pushbullet.com, telegram.org, twilio.com).
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Embeddable</h3>
-                <p>netdata can run anywhere a Linux kernel runs (<a href="https://github.com/firehol/netdata/wiki/netdata-for-IoT" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=IoT>even IoT</a>) and its charts can be embedded on any web site too.
+                <p>netdata has minimal dependencies and can run <b><a href="https://github.com/firehol/netdata/wiki/netdata-for-IoT" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=IoT>even weak on IoT devices</a></b>. Also, its charts can be embedded on any web site.
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Customizable</h3>
                 <p><a href="https://github.com/firehol/netdata/wiki/Custom-Dashboards" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=CustomDashboards>Custom dashboards</a> can be built using simple HTML (no javascript necessary).
@@ -697,9 +711,15 @@ p {
                 <p>Anything you can get a number for, can be given to netdata, using its <a href="https://github.com/firehol/netdata/wiki/External-Plugins" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=ExternalPlugins>Plugin API</a> (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
             </div>
             <div class=grid-cell><h3><span class=star>&#x2605;</span> Scalable</h3>
-                <p>netdata scales out, your web browser is the central netdata <a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=MyNetdataMenu>connecting all your servers</a> together.
-                    netdata can <a href="https://github.com/firehol/netdata/wiki/netdata-backends" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Backends>archive its metrics</a> to <strong>graphite</strong> or <strong>opentsdb</strong> at a lower
-                rate, to avoid congesting these servers with the amount of data collected.
+                <p>
+                    netdata scales out, your web browser is the central netdata
+                    <a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=MyNetdataMenu>connecting all your servers</a>
+                    together. But netdata can also
+                    <a href="https://github.com/firehol/netdata/wiki/Replication-Overview" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Streaming>replicate its database</a>
+                    to other netdata, and
+                    <a href="https://github.com/firehol/netdata/wiki/netdata-backends" target="_blank" data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=Backends>archive its metrics</a>
+                    to <strong>graphite</strong>, <strong>opentsdb</strong>, <strong>influxdb</strong> or <strong>prometheus</strong> at a lower
+                    rate, to avoid congesting these servers with the amount of data collected.
             </div>
         </div>
     </div>
@@ -1024,7 +1044,7 @@ p {
         </div>
 
         <div style="padding-top: 40px; color: #999;">
-            <small>I would love to show demos of IoT devices running netdata.<br/>
+            <small>We would love to show demos of IoT devices running netdata.<br/>
                 If you can host at your DC an RPi or a Linux IoT, <a href="mailto:costa@tsaousis.gr?subject=I can host IoT for netdata&body=Hi Costa,%0D%0A%0D%0AI would love to host an IoT device to demo netdata on it.%0D%0A%0D%0A-- please tell me who you are and what infrastructure you have --%0D%0A-- Take into account I would need SSH access to it --%0D%0A-- You have to have a DC - a home is not good enough - sorry. --%0D%0A%0D%0AThanks!">contact me</a>.</small>
         </div>
     </div>
@@ -1137,20 +1157,12 @@ p {
 </div>
 <div class=aside>
     <div class=container>
-        <ul class=inline-block-list>
-            <li>
                 <!-- Place this tag where you want the button to render. -->
-                <a class="github-button" href="https://github.com/firehol/netdata/subscription" data-style="mega" data-show-count="true" aria-label="Watch firehol/netdata on GitHub">Watch</a>
-            </li>
-            <li>
+                <a class="github-button" href="https://github.com/firehol/netdata/subscription" data-style="mega" data-show-count="true" aria-label="Watch firehol/netdata on GitHub"><img src="https://img.shields.io/github/watchers/firehol/netdata.svg?style=flat&label=Github%20Watchers"></a>
                 <!-- Place this tag where you want the button to render. -->
-                <a class="github-button" href="https://github.com/firehol/netdata" data-style="mega" data-show-count="true" aria-label="Star firehol/netdata on GitHub">Star</a>
-            </li>
-            <li>
+                <a class="github-button" href="https://github.com/firehol/netdata" data-style="mega" data-show-count="true" aria-label="Star firehol/netdata on GitHub"><img src="https://img.shields.io/github/stars/firehol/netdata.svg?style=flat&label=Github%20Stars"></a>
                 <!-- Place this tag where you want the button to render. -->
-                <a class="github-button" href="https://github.com/firehol/netdata/fork" data-style="mega" data-show-count="true" aria-label="Fork firehol/netdata on GitHub">Fork</a>
-            </li>
-        </ul>
+                <a class="github-button" href="https://github.com/firehol/netdata/fork" data-style="mega" data-show-count="true" aria-label="Fork firehol/netdata on GitHub"><img src="https://img.shields.io/github/forks/firehol/netdata.svg?style=flat&label=Github%20Repo%20Forks"></a>
     </div>
 </div>
 
@@ -1264,5 +1276,42 @@ p {
     }(document, 'script', 'facebook-jssdk'));
 </script>
 
-<!-- Place this tag in your head or just before your close body tag. -->
-<script async defer src="https://buttons.github.io/buttons.js"></script>
+<script>
+    var allTitles = [
+          'Get control<br/>of your Linux servers'
+        , 'Get control<br/>of your FreeBSD servers'
+        , 'Monitor<br/>your containers'
+        , 'Monitor<br/>your virtual machines'
+        , 'Monitor<br/>your web servers'
+        , 'Monitor<br/>your databases'
+        , 'Monitor<br/>your applications'
+        , 'Monitor<br/>your SNMP devices'
+        , 'Monitor<br/>your IoT devices'
+        , 'Monitor<br/>your MacOS systems'
+    ];
+    var lastTitle = -1;
+
+    function updateTitle(){
+        lastTitle++;
+        if(lastTitle >= allTitles.length)
+            lastTitle = 0;
+
+        var os = document.getElementsByClassName('title');
+        var len = os.length;
+        while (len--) {
+            var el = os[len];
+            el.innerHTML = allTitles[lastTitle];
+            el.classList.add('titlefadein');
+        }
+
+        setTimeout(function() {
+            var os = document.getElementsByClassName('title');
+            var len = os.length;
+            while (len--)
+                os[len].classList.remove('titlefadein');
+
+        }, 5750);
+        setTimeout(updateTitle, 6000);
+    }
+    updateTitle();
+</script>
