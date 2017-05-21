@@ -1,3 +1,4 @@
+#define _IFI_OQDROPS
 #include "common.h"
 
 #include <sys/vmmeter.h>
