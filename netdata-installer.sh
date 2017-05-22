@@ -65,6 +65,9 @@ printf "\n" >>netdata-installer.log
 
 REINSTALL_PWD="${PWD}"
 REINSTALL_COMMAND="$(printf "%q " "$0" "${@}"; printf "\n")"
+# remove options that shown not be inherited by netdata-updater.sh
+REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
+REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
 
 setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
 
@@ -1242,7 +1245,7 @@ update() {
 
     emptyline
     info "Re-installing netdata..."
-    ${REINSTALL_COMMAND// --dont-wait/} --dont-wait >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
+    ${REINSTALL_COMMAND} --dont-wait >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
 
     [ ! -z "\${tmp}" ] && rm "\${tmp}" && tmp=
     return 0
@@ -1283,15 +1286,18 @@ REINSTALL
                 else
                     echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
                     echo >&2
-                    echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh ${crondir}/netdata-updater${TPUT_RESET}"
+                    echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}sudo ln -s ${PWD}/netdata-updater.sh ${crondir}/netdata-updater${TPUT_RESET}"
                 fi
-            elif [ "${AUTOUPDATE}" = "1" ]
-            then
+            else
                 progress "Refreshing netdata-updater at cron"
                 run rm "${crondir}/netdata-updater"
                 run ln -s "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
             fi
+        else
+            [ "${AUTOUPDATE}" = "1" ] && echo >&2 "Cannot figure out the cron directory to install netdata-updater."
         fi
+    else
+        [ "${AUTOUPDATE}" = "1" ] && echo >&2 "You need to run the installer as root for auto-updating via cron."
     fi
 else
     [ -f "netdata-updater.sh" ] && rm "netdata-updater.sh"
