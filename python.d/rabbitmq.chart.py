@@ -85,8 +85,8 @@ CHARTS = {
         'options': [None, 'Queued Messages', 'messages', 'overview',
                     'rabbitmq.queued_messages', 'stacked'],
         'lines': [
-            ['messages_ready', 'ready', 'incremental'],
-            ['messages_unacknowledged', 'unacknowledged', 'incremental']
+            ['messages_ready', 'ready', 'absolute'],
+            ['messages_unacknowledged', 'unacknowledged', 'absolute']
         ]},
     'message_rates': {
         'options': [None, 'Message Rates', 'messages/s', 'overview',
