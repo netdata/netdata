@@ -163,7 +163,7 @@ class Service(UrlService, SocketService):
             name, idx = front['# pxname'], front['# pxname'].replace('.', '_')
             for metric in METRICS:
                 self.definitions['f' + metric]['lines'].append(['_'.join(['frontend', metric, idx]),
-                                                                METRICS[metric]['algorithm'], 1,
+                                                                name, METRICS[metric]['algorithm'], 1,
                                                                 METRICS[metric]['divisor']])
         for back in self.data['backend']:
             name, idx = back['# pxname'], back['# pxname'].replace('.', '_')
