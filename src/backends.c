@@ -193,6 +193,8 @@ static inline int process_graphite_response(BUFFER *b) {
 // ----------------------------------------------------------------------------
 // opentsdb backend
 
+static const char *opentsdb_host_tags = NULL;
+
 static inline int format_dimension_collected_opentsdb_telnet(
           BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
@@ -211,13 +213,15 @@ static inline int format_dimension_collected_opentsdb_telnet(
 
     buffer_sprintf(
             b
-            , "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s\n"
+            , "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s%s%s\n"
             , prefix
             , st->id
             , rd->id
             , (uint32_t)rd->last_collected_time.tv_sec
             , rd->last_collected_value
             , hostname
+            , (opentsdb_host_tags)?" ":""
+            , (opentsdb_host_tags)?opentsdb_host_tags:""
     );
 
     return 1;
@@ -242,13 +246,15 @@ static inline int format_dimension_stored_opentsdb_telnet(
 
         buffer_sprintf(
                 b
-                , "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s\n"
+                , "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s%s%s\n"
                 , prefix
                 , st->id
                 , rd->id
                 , (uint32_t) before
                 , value
                 , hostname
+                , (opentsdb_host_tags)?" ":""
+                , (opentsdb_host_tags)?opentsdb_host_tags:""
         );
 
         return 1;
@@ -474,6 +480,10 @@ void *backends_main(void *ptr) {
 
         default_port = 4242;
         backend_response_checker = process_opentsdb_response;
+
+        const char *tags = config_get(CONFIG_SECTION_BACKEND, "opentsdb host tags", "");
+        if(tags && *tags)
+            opentsdb_host_tags = tags;
 
         if(options & BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_opentsdb_telnet;
