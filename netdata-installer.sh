@@ -65,6 +65,9 @@ printf "\n" >>netdata-installer.log
 
 REINSTALL_PWD="${PWD}"
 REINSTALL_COMMAND="$(printf "%q " "$0" "${@}"; printf "\n")"
+# remove options that shown not be inherited by netdata-updater.sh
+REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
+REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
 
 setcap="$(which setcap 2>/dev/null || command -v setcap 2>/dev/null)"
 
@@ -1242,7 +1245,7 @@ update() {
 
     emptyline
     info "Re-installing netdata..."
-    ${REINSTALL_COMMAND// --dont-wait/} --dont-wait >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
+    ${REINSTALL_COMMAND} --dont-wait >&3 2>&3 || failed "FAILED TO COMPILE/INSTALL NETDATA"
 
     [ ! -z "\${tmp}" ] && rm "\${tmp}" && tmp=
     return 0
