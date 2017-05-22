@@ -1212,10 +1212,7 @@ failed() {
 }
 
 get_latest_commit_id() {
-    git log -1           2>&3 |\\
-        grep ^commit     2>&3 |\\
-        head -n 1        2>&3 |\\
-        cut -d ' ' -f 2  2>&3
+	git rev-parse HEAD 2>&3
 }
 
 update() {
