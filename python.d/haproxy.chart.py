@@ -5,10 +5,11 @@
 from base import UrlService, SocketService
 from collections import defaultdict
 from re import compile as re_compile
+
 try:
-        from urlparse import urlparse
+    from urlparse import urlparse
 except ImportError:
-        from urllib.parse import urlparse
+    from urllib.parse import urlparse
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -67,7 +68,11 @@ CHARTS = {
         ]}
 }
 
-METRICS = ('bin', 'bout', 'scur', 'qcur')
+METRICS = {'bin': {'algorithm': 'incremental', 'divisor': 1024},
+           'bout': {'algorithm': 'incremental', 'divisor': 1024},
+           'scur': {'algorithm': 'absolute', 'divisor': 1},
+           'qcur': {'algorithm': 'absolute', 'divisor': 1}}
+
 REGEX = dict(url=re_compile(r'idle = (?P<idle>[0-9]+)'), socket=re_compile(r'Idle_pct: (?P<idle>[0-9]+)'))
 
 
@@ -113,7 +118,7 @@ class Service(UrlService, SocketService):
 
         raw_data = raw_data.splitlines()
         self.data = parse_data_([dict(zip(raw_data[0].split(','), raw_data[_].split(',')))
-                           for _ in range(1, len(raw_data))])
+                                 for _ in range(1, len(raw_data))])
         if not self.data:
             return dict()
 
@@ -127,7 +132,7 @@ class Service(UrlService, SocketService):
         for backend in self.data['backend']:
             name, idx = backend['# pxname'], backend['# pxname'].replace('.', '_')
             stat_data['hsdown_' + idx] = len([server for server in self.data['servers']
-                                                         if server_down(server, name)])
+                                              if server_down(server, name)])
             stat_data['hbdown_' + idx] = 1 if backend.get('status') == 'DOWN' else 0
             for metric in METRICS:
                 stat_data['_'.join(['backend', metric, idx])] = backend.get(metric) or 0
@@ -158,12 +163,14 @@ class Service(UrlService, SocketService):
             name, idx = front['# pxname'], front['# pxname'].replace('.', '_')
             for metric in METRICS:
                 self.definitions['f' + metric]['lines'].append(['_'.join(['frontend', metric, idx]),
-                                                                name, 'incremental', 1, 1024])
+                                                                name, METRICS[metric]['algorithm'], 1,
+                                                                METRICS[metric]['divisor']])
         for back in self.data['backend']:
             name, idx = back['# pxname'], back['# pxname'].replace('.', '_')
             for metric in METRICS:
                 self.definitions['b' + metric]['lines'].append(['_'.join(['backend', metric, idx]),
-                                                                name, 'incremental', 1, 1024])
+                                                                name, METRICS[metric]['algorithm'], 1,
+                                                                METRICS[metric]['divisor']])
             self.definitions['health_sdown']['lines'].append(['hsdown_' + idx, name, 'absolute'])
             self.definitions['health_bdown']['lines'].append(['hbdown_' + idx, name, 'absolute'])
 
