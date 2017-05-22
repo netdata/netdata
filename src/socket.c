@@ -48,9 +48,9 @@ int sock_setreuse_port(int fd, int reuse) {
     int ret = -1;
 #ifdef SO_REUSEPORT
     ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
-#endif
     if(ret == -1)
         error("failed to set SO_REUSEPORT on socket %d", fd);
+#endif
 
     return ret;
 }
