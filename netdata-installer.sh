@@ -1283,15 +1283,18 @@ REINSTALL
                 else
                     echo >&2 "${TPUT_DIM}Run this to automatically check and install netdata updates once per day:${TPUT_RESET}"
                     echo >&2
-                    echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}ln -s ${PWD}/netdata-updater.sh ${crondir}/netdata-updater${TPUT_RESET}"
+                    echo >&2 "${TPUT_YELLOW}${TPUT_BOLD}sudo ln -s ${PWD}/netdata-updater.sh ${crondir}/netdata-updater${TPUT_RESET}"
                 fi
-            elif [ "${AUTOUPDATE}" = "1" ]
-            then
+            else
                 progress "Refreshing netdata-updater at cron"
                 run rm "${crondir}/netdata-updater"
                 run ln -s "${PWD}/netdata-updater.sh" "${crondir}/netdata-updater"
             fi
+        else
+            [ "${AUTOUPDATE}" = "1" ] && echo >&2 "Cannot figure out the cron directory to install netdata-updater."
         fi
+    else
+        [ "${AUTOUPDATE}" = "1" ] && echo >&2 "You need to run the installer as root for auto-updating via cron."
     fi
 else
     [ -f "netdata-updater.sh" ] && rm "netdata-updater.sh"
