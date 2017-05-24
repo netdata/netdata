@@ -34,8 +34,7 @@
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
-#define MAX_CMDLINE 1024
-
+#define MAX_CMDLINE 16384
 
 // ----------------------------------------------------------------------------
 // the rates we are going to send to netdata will have this detail a value of:
@@ -223,7 +222,7 @@ size_t
 struct pid_stat {
     int32_t pid;
     char comm[MAX_COMPARE_NAME + 1];
-    char cmdline[MAX_CMDLINE + 1];
+    char *cmdline;
 
     uint32_t log_thrown;
 
@@ -698,6 +697,7 @@ static inline void del_pid_entry(pid_t pid) {
     freez(p->statm_filename);
     freez(p->io_filename);
     freez(p->cmdline_filename);
+    freez(p->cmdline);
     freez(p);
 
     all_pids[pid] = NULL;
@@ -768,7 +768,7 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
         if(unlikely(( (!w->starts_with && !w->ends_with && w->comparehash == hash && !strcmp(w->compare, p->comm))
                       || (w->starts_with && !w->ends_with && !strncmp(w->compare, p->comm, w->comparelen))
                       || (!w->starts_with && w->ends_with && pclen >= w->comparelen && !strcmp(w->compare, &p->comm[pclen - w->comparelen]))
-                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && strstr(p->cmdline, w->compare))
+                      || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && p->cmdline && strstr(p->cmdline, w->compare))
                     ))) {
 
             if(w->target) p->target = w->target;
@@ -787,6 +787,7 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
 // update pids from proc
 
 static inline int read_proc_pid_cmdline(struct pid_stat *p) {
+    static char cmdline[MAX_CMDLINE + 1];
 
 #ifdef __FreeBSD__
     size_t i, bytes = MAX_CMDLINE;
@@ -796,7 +797,7 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
     mib[1] = KERN_PROC;
     mib[2] = KERN_PROC_ARGS;
     mib[3] = p->pid;
-    if (unlikely(sysctl(mib, 4, p->cmdline, &bytes, NULL, 0)))
+    if (unlikely(sysctl(mib, 4, cmdline, &bytes, NULL, 0)))
         goto cleanup;
 #else
     if(unlikely(!p->cmdline_filename)) {
@@ -808,15 +809,17 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
     int fd = open(p->cmdline_filename, O_RDONLY, 0666);
     if(unlikely(fd == -1)) goto cleanup;
 
-    ssize_t i, bytes = read(fd, p->cmdline, MAX_CMDLINE);
+    ssize_t i, bytes = read(fd, cmdline, MAX_CMDLINE);
     close(fd);
 
     if(unlikely(bytes < 0)) goto cleanup;
 #endif
 
-    p->cmdline[bytes] = '\0';
+    cmdline[bytes] = '\0';
     for(i = 0; i < bytes ; i++)
-        if(unlikely(!p->cmdline[i])) p->cmdline[i] = ' ';
+        if(unlikely(!cmdline[i])) cmdline[i] = ' ';
+
+    p->cmdline = strdupz(cmdline);
 
     if(unlikely(debug))
         fprintf(stderr, "Read file '%s' contents: %s\n", p->cmdline_filename, p->cmdline);
@@ -825,7 +828,7 @@ static inline int read_proc_pid_cmdline(struct pid_stat *p) {
 
 cleanup:
     // copy the command to the command line
-    strncpyz(p->cmdline, p->comm, MAX_CMDLINE);
+    p->cmdline = strdupz(p->comm);
     return 0;
 }
 
