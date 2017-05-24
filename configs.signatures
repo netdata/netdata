@@ -315,6 +315,7 @@ declare -A configs_signatures=(
   ['b07eebc6f58d19721ac069171b911d2a']='health_alarm_notify.conf'
   ['b0c59b2bd7a10f6a3f2be6b4b27857db']='health.d/haproxy.conf'
   ['b0f0a0ac415e4b1a82187b80d211e83b']='python.d/mysql.conf'
+  ['b181dcca01a258d9792ad703583baed2']='statsd.d/example.conf'
   ['b185914d4f795e1732273dc4c7a35845']='health.d/memory.conf'
   ['b27f10a38a95edbbec20f44a4728b7c4']='python.d.conf'
   ['b32164929eda7449a9677044e11151bf']='python.d.conf'
