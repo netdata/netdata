@@ -799,6 +799,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"
 
+NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
 install_netdata_service || run_failed "Cannot install netdata init service."
 
 
@@ -1131,13 +1132,13 @@ so you can access it with:
 
   ${TPUT_CYAN}${TPUT_BOLD}http://this.machine.ip:${NETDATA_PORT}/${TPUT_RESET}
 
-To stop netdata, just kill it, with:
+To stop netdata run:
 
-  ${TPUT_YELLOW}${TPUT_BOLD}killall netdata${TPUT_RESET}
+  ${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_STOP_CMD}${TPUT_RESET}
 
-To start it, just run it:
+To start netdata run:
 
-  ${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_PREFIX}/usr/sbin/netdata${TPUT_RESET}
+  ${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_START_CMD}${TPUT_RESET}
 
 
 END

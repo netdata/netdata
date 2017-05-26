@@ -120,13 +120,13 @@ systemctl_cmd="$(which_cmd systemctl)"
 service() {
     local cmd="${1}" action="${2}"
 
-    if [ ! -z "${service_cmd}" ]
-    then
-        run "${service_cmd}" "${cmd}" "${action}"
-        return $?
-    elif [ ! -z "${systemctl_cmd}" ]
+    if [ ! -z "${systemctl_cmd}" ]
     then
         run "${systemctl_cmd}" "${action}" "${cmd}"
+        return $?
+    elif [ ! -z "${service_cmd}" ]
+    then
+        run "${service_cmd}" "${cmd}" "${action}"
         return $?
     fi
     return 1
@@ -442,12 +442,18 @@ install_non_systemd_init() {
     return 1
 }
 
+NETDATA_START_CMD="netdata"
+NETDATA_STOP_CMD="killall netdata"
+
 install_netdata_service() {
     if [ "${UID}" -eq 0 ]
     then
         if issystemd
         then
             # systemd is running on this system
+            NETDATA_START_CMD="systemctl start netdata"
+            NETDATA_STOP_CMD="systemctl stop netdata"
+
             if [ ! -f /etc/systemd/system/netdata.service ]
             then
                 echo >&2 "Installing systemd service..."
@@ -461,7 +467,15 @@ install_netdata_service() {
             fi
         else
             install_non_systemd_init
-            return $?
+            local ret=$?
+
+            if [ ${ret} -eq 0 ]
+            then
+                NETDATA_START_CMD="service netdata start"
+                NETDATA_STOP_CMD="service netdata stop"
+            fi
+
+            return ${ret}
         fi
     fi
 
