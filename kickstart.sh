@@ -241,7 +241,7 @@ progress "Running netdata installer..."
 
 if [ -f netdata-updater.sh ]
 then
-	run ${sudo} ./netdata-updater.sh || run ${sudo} ./netdata-installer.sh -u "${@}"
+	run ${sudo} ./netdata-updater.sh -f || run ${sudo} ./netdata-installer.sh -u "${@}"
 else
 	run ${sudo} ./netdata-installer.sh -u "${@}"
 fi
