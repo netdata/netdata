@@ -214,9 +214,7 @@ if [ "${ask}" = "1" ]
 then
     echo >&2 "It failed to install all the required packages, but I can try to install netdata."
 	read -p "Press ENTER to continue to netdata installation > "
-	progress "OK, let me give it a try..."
-else
-    progress "OK, downloading netdata..."
+	progress "OK, let's give it a try..."
 fi
 
 SOURCE_DST="/usr/src"
