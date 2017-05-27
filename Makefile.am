@@ -75,6 +75,7 @@ dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
 	docker-build.sh \
 	kickstart.sh \
+	kickstart-static64.sh \
 	netdata-installer.sh \
 	installer/functions.sh \
 	makeself/build.sh \
