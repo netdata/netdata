@@ -153,7 +153,11 @@ run() {
 # ---------------------------------------------------------------------------------------------------------------------
 # collect system information
 
-set -e
+fatal() {
+    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+    exit 1
+}
+
 export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
 curl="$(which_cmd curl)"
@@ -213,18 +217,18 @@ then
     if [ "${HAS_BASH4}" = "1" ]
     then
         tmp="$(mktemp /tmp/netdata-kickstart-XXXXXX)"
+        url="https://raw.githubusercontent.com/firehol/netdata-demo-site/master/install-required-packages.sh"
 
         progress "Downloading script to detect required packages..."
         if [ ! -z "${curl}" ]
         then
-            run ${curl} 'https://raw.githubusercontent.com/firehol/netdata-demo-site/master/install-required-packages.sh' >"${tmp}"
+            run ${curl} "${url}" >"${tmp}" || fatal "Cannot download ${url}"
         elif [ ! -z "${wget}" ]
         then
-            run "${wget}" -O - 'https://raw.githubusercontent.com/firehol/netdata-demo-site/master/install-required-packages.sh' >"${tmp}"
+            run "${wget}" -O - "${url}" >"${tmp}" || fatal "Cannot download ${url}"
         else
-            run_failed "I need curl or wget to proceed, but neither is available on this system."
             rm "${tmp}"
-            exit 1
+            fatal "I need curl or wget to proceed, but neither is available on this system."
         fi
 
         ask=0
@@ -234,9 +238,8 @@ then
             run ${sudo} "${bash}" "${tmp}" ${KICKSTART_OPTIONS} || ask=1
             rm "${tmp}"
         else
-            run_failed "Downloaded script is empty..."
             rm "${tmp}"
-            exit 1
+            fatal "Downloaded script is empty..."
         fi
 
         if [ "${ask}" = "1" ]
@@ -275,20 +278,17 @@ then
     if [ ! -d "${SOURCE_DST}/netdata.git" ]
     then
         progress "Downloading netdata source code..."
-        run ${sudo} ${git} clone https://github.com/firehol/netdata.git "${SOURCE_DST}/netdata.git"
-        cd "${SOURCE_DST}/netdata.git"
+        run ${sudo} ${git} clone https://github.com/firehol/netdata.git "${SOURCE_DST}/netdata.git" || fatal "Cannot download netdata source"
+        cd "${SOURCE_DST}/netdata.git" || fatal "Cannot cd to netdata source tree"
     else
         progress "Updating netdata source code..."
-        cd "${SOURCE_DST}/netdata.git"
-        run ${sudo} ${git} fetch --all
-        run ${sudo} ${git} reset --hard origin/master
+        cd "${SOURCE_DST}/netdata.git" || fatal "Cannot cd to netdata source tree"
+        run ${sudo} ${git} fetch --all || fatal "Cannot fetch netdata source updates"
+        run ${sudo} ${git} reset --hard origin/master || fatal "Cannot update netdata source tree"
     fi
     NETDATA_SOURCE_DIR="${SOURCE_DST}/netdata.git"
 else
-    echo >&2 "ERROR"
-    echo >&2 "Cannot find the command 'git' to download the netdata source code."
-    echo >&2
-    exit 1
+    fatal "Cannot find the command 'git' to download the netdata source code."
 fi
 
 
@@ -297,7 +297,7 @@ fi
 
 if [ ! -z "${NETDATA_SOURCE_DIR}" -a -d "${NETDATA_SOURCE_DIR}" ]
 then
-    cd "${NETDATA_SOURCE_DIR}"
+    cd "${NETDATA_SOURCE_DIR}" || fatal "Cannot cd to netdata source tree"
 
     install=0
     if [ -x netdata-updater.sh ]
@@ -314,15 +314,11 @@ then
         if [ -x netdata-installer.sh ]
         then
             progress "Installing netdata..."
-            run ${sudo} ./netdata-installer.sh -u "${@}"
+            run ${sudo} ./netdata-installer.sh -u "${@}" || fatal "netdata-installer.sh exited with error"
         else
-            echo >&2 "ERROR"
-            echo >&2 "Cannot install netdata from source (the source directory does not include netdata-installer.sh)."
-            exit 1
+            fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh)."
         fi
     fi
 else
-    echo >&2 "ERROR"
-    echo >&2 "Cannot install netdata from source, on this system (cannot download the source code)."
-    exit 1
+    fatal "Cannot install netdata from source, on this system (cannot download the source code)."
 fi
