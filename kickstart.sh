@@ -99,7 +99,7 @@ setup_terminal() {
 
     return 0
 }
-setup_terminal
+setup_terminal || echo >/dev/null
 
 progress() {
     echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
