@@ -74,6 +74,7 @@ dist_noinst_SCRIPTS= \
 	diagrams/build.sh \
 	coverity-scan.sh \
 	docker-build.sh \
+	kickstart.sh \
 	netdata-installer.sh \
 	installer/functions.sh \
 	makeself/build.sh \
