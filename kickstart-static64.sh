@@ -30,8 +30,16 @@ if [ $? -ne 0 ]
 	echo >&2 "Failed to download the latest static binary version of netdata."
 	exit 1
 fi
-chmod 755 "/tmp/${LATEST}"
 
 echo >&2 "Executing the downloaded self-extracting archive"
-sudo sh "/tmp/${LATEST}"
 
+sudo=
+[ "${UID}" != "0" ] && sudo="sudo"
+${sudo} sh "/tmp/${LATEST}"
+
+if [ $? -eq 0 ]
+	then
+	rm "/tmp/${LATEST}"
+else
+	echo >&2 "Did not remove: /tmp/${LATEST}"
+fi
