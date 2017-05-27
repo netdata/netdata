@@ -266,7 +266,6 @@ fi
 # download netdata source
 
 git="$(which_cmd git)"
-echo >&2 "git: ${git}"
 
 NETDATA_SOURCE_DIR=
 if [ ! -z "${git}" -a -x "${git}" ]
