@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 #
 # Run me with:
 #
@@ -149,47 +149,57 @@ run() {
     return ${ret}
 }
 
+
 # ---------------------------------------------------------------------------------------------------------------------
+# collect system information
+
+set -e
+export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 
 curl="$(which_cmd curl)"
 wget="$(which_cmd wget)"
 bash="$(which_cmd bash)"
 
-if [ -z "${BASH_VERSION}" -o -z "${bash}" ]
+if [ -z "${BASH_VERSION}" ]
 then
-    run_failed "This script needs BASH version 4+."
-    echo >&2 "You can still install netdata on any 64bit machine."
-    echo >&2 "Check this: https://github.com/firehol/binary-packages"
-    exit 1
+    # we don't run under bash
+    if [ ! -z "${bash}" -a -x "${bash}" ]
+    then
+        BASH_MAJOR_VERSION=$(${bash} -c 'echo "${BASH_VERSINFO[0]}"')
+    fi
+else
+    # we run under bash
+    BASH_MAJOR_VERSION="${BASH_VERSINFO[0]}"
 fi
 
-if [ "${BASH_VERSINFO[0]}" -lt "4" ]
+HAS_BASH4=1
+if [ -z "${BASH_MAJOR_VERSION}" ]
 then
-    run_failed "This script needs BASH version 4+, but you have BASH version ${BASH_VERSION}"
-    echo >&2 "You can still install netdata on any 64bit machine."
-    echo >&2 "Check this: https://github.com/firehol/binary-packages"
-    exit 1
+    echo >&2 "No BASH is available on this system"
+    HAS_BASH4=0
+elif [ $((BASH_MAJOR_VERSION)) -lt 4 ]
+then
+    echo >&2 "No BASH v4+ is available on this system (installed bash is v${BASH_MAJOR_VERSION}"
+    HAS_BASH4=0
 fi
+
+SYSTEM="$(uname -s)"
+OS="$(uname -o)"
+MACHINE="$(uname -m)"
+
+cat <<EOF
+System            : ${SYSTEM}
+Operating System  : ${OS}
+Machine           : ${MACHINE}
+BASH major version: ${BASH_MAJOR_VERSION}
+EOF
+
+sudo=""
+[ "${UID}" -ne "0" ] && sudo="sudo"
+
 
 # ---------------------------------------------------------------------------------------------------------------------
-# this is where the action starts
-
-set -e
-
-tmp="$(mktemp /tmp/netdata-kickstart-XXXXXX)"
-
-progress "Downloading script to detect required packages..."
-if [ ! -z "${curl}" ]
-then
-	run ${curl} 'https://raw.githubusercontent.com/firehol/netdata-demo-site/master/install-required-packages.sh' >"${tmp}"
-elif [ ! -z "${wget}" ]
-then
-	run "${wget}" -O - 'https://raw.githubusercontent.com/firehol/netdata-demo-site/master/install-required-packages.sh' >"${tmp}"
-else
-	run_failed "I need curl or wget to proceed, but neither is available on this system."
-	rm "${tmp}"
-	exit 1
-fi
+# install required system packages
 
 KICKSTART_OPTIONS="netdata"
 if [ "${1}" = "all" ]
@@ -198,49 +208,121 @@ then
     shift 1
 fi
 
-ask=0
-if [ -s "${tmp}" ]
+if [ "${OS}" = "GNU/Linux" -o "${SYSTEM}" = "Linux" ]
 then
-	progress "Running downloaded script to detect required packages..."
-	run "${bash}" "${tmp}" ${KICKSTART_OPTIONS} || ask=1
-    rm "${tmp}"
+    if [ "${HAS_BASH4}" = "1" ]
+    then
+        tmp="$(mktemp /tmp/netdata-kickstart-XXXXXX)"
+
+        progress "Downloading script to detect required packages..."
+        if [ ! -z "${curl}" ]
+        then
+            run ${curl} 'https://raw.githubusercontent.com/firehol/netdata-demo-site/master/install-required-packages.sh' >"${tmp}"
+        elif [ ! -z "${wget}" ]
+        then
+            run "${wget}" -O - 'https://raw.githubusercontent.com/firehol/netdata-demo-site/master/install-required-packages.sh' >"${tmp}"
+        else
+            run_failed "I need curl or wget to proceed, but neither is available on this system."
+            rm "${tmp}"
+            exit 1
+        fi
+
+        ask=0
+        if [ -s "${tmp}" ]
+        then
+            progress "Running downloaded script to detect required packages..."
+            run ${sudo} "${bash}" "${tmp}" ${KICKSTART_OPTIONS} || ask=1
+            rm "${tmp}"
+        else
+            run_failed "Downloaded script is empty..."
+            rm "${tmp}"
+            exit 1
+        fi
+
+        if [ "${ask}" = "1" ]
+        then
+            echo >&2 "It failed to install all the required packages, but I can try to install netdata."
+            read -p "Press ENTER to continue to netdata installation > "
+            progress "OK, let's give it a try..."
+        fi
+    else
+        echo >&2 "WARNING"
+        echo >&2 "Cannot detect the packages to be installed in this system, without BASH v4+."
+        echo >&2 "We can only attempt to install netdata..."
+        echo >&2
+    fi
 else
-	run_failed "Downloaded script is empty..."
-	rm "${tmp}"
-	exit 1
+    echo >&2 "WARNING"
+    echo >&2 "Cannot detect the packages to be installed on a ${SYSTEM} - ${OS} system."
+    echo >&2 "We can only attempt to install netdata..."
+    echo >&2
 fi
 
-if [ "${ask}" = "1" ]
+
+# ---------------------------------------------------------------------------------------------------------------------
+# download netdata source
+
+git="$(which_cmd git)"
+echo >&2 "git: ${git}"
+
+NETDATA_SOURCE_DIR=
+if [ ! -z "${git}" -a -x "${git}" ]
 then
-    echo >&2 "It failed to install all the required packages, but I can try to install netdata."
-	read -p "Press ENTER to continue to netdata installation > "
-	progress "OK, let's give it a try..."
-fi
+    SOURCE_DST="/usr/src"
 
-SOURCE_DST="/usr/src"
-sudo=""
-[ "${UID}" -ne "0" ] && sudo="sudo"
+    [ ! -d "${SOURCE_DST}" ] && run ${sudo} mkdir -p "${SOURCE_DST}"
 
-[ ! -d "${SOURCE_DST}" ] && run ${sudo} mkdir -p "${SOURCE_DST}"
-
-if [ ! -d "${SOURCE_DST}/netdata.git" ]
-then
-    progress "Downloading netdata source code..."
-	run ${sudo} git clone https://github.com/firehol/netdata.git "${SOURCE_DST}/netdata.git"
-	cd "${SOURCE_DST}/netdata.git"
+    if [ ! -d "${SOURCE_DST}/netdata.git" ]
+    then
+        progress "Downloading netdata source code..."
+        run ${sudo} ${git} clone https://github.com/firehol/netdata.git "${SOURCE_DST}/netdata.git"
+        cd "${SOURCE_DST}/netdata.git"
+    else
+        progress "Updating netdata source code..."
+        cd "${SOURCE_DST}/netdata.git"
+        run ${sudo} ${git} fetch --all
+        run ${sudo} ${git} reset --hard origin/master
+    fi
+    NETDATA_SOURCE_DIR="${SOURCE_DST}/netdata.git"
 else
-    progress "Updating netdata source code..."
-	cd "${SOURCE_DST}/netdata.git"
-	run ${sudo} git fetch --all
-	run ${sudo} git reset --hard origin/master
+    echo >&2 "ERROR"
+    echo >&2 "Cannot find the command 'git' to download the netdata source code."
+    echo >&2
+    exit 1
 fi
 
-progress "Running netdata installer..."
 
-if [ -x netdata-updater.sh ]
+# ---------------------------------------------------------------------------------------------------------------------
+# install netdata from source
+
+if [ ! -z "${NETDATA_SOURCE_DIR}" -a -d "${NETDATA_SOURCE_DIR}" ]
 then
-	run ${sudo} ./netdata-updater.sh -f || run ${sudo} ./netdata-installer.sh -u "${@}"
-else
-	run ${sudo} ./netdata-installer.sh -u "${@}"
-fi
+    cd "${NETDATA_SOURCE_DIR}"
 
+    install=0
+    if [ -x netdata-updater.sh ]
+    then
+        # attempt to run the updater, to respect any compilation settings already in place
+        progress "Re-installing netdata..."
+        run ${sudo} ./netdata-updater.sh -f || install=1
+    else
+        install=1
+    fi
+
+    if [ "${install}" = "1" ]
+    then
+        if [ -x netdata-installer.sh ]
+        then
+            progress "Installing netdata..."
+            run ${sudo} ./netdata-installer.sh -u "${@}"
+        else
+            echo >&2 "ERROR"
+            echo >&2 "Cannot install netdata from source (the source directory does not include netdata-installer.sh)."
+            exit 1
+        fi
+    fi
+else
+    echo >&2 "ERROR"
+    echo >&2 "Cannot install netdata from source, on this system (cannot download the source code)."
+    exit 1
+fi
