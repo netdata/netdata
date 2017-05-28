@@ -150,26 +150,56 @@ if [ "$(uname -s)" != "Linux" ]
 	fatal "Static binary versions of netdata are available only for Linux, but this system is $(uname -s)"
 fi
 
+curl="$(which_cmd curl)"
+wget="$(which_cmd wget)"
+
 # ---------------------------------------------------------------------------------------------------------------------
+
+progress "Checking the latest version of static build..."
 
 BASE='https://raw.githubusercontent.com/firehol/binary-packages/master'
 
-progress "Checking the latest version of static build..."
-LATEST="$(run curl -Ss "${BASE}/netdata-latest.gz.run")"
+LATEST=
+if [ ! -z "${curl}" -a -x "${curl}" ]
+then
+    LATEST="$(run ${curl} "${BASE}/netdata-latest.gz.run")"
+elif [ ! -z "${wget}" -a -x "${wget}" ]
+then
+    LATEST="$(run ${wget} -O - "${BASE}/netdata-latest.gz.run")"
+else
+    fatal "curl or wget are needed for this script to work."
+fi
 
 if [ -z "${LATEST}" ]
 	then
 	fatal "Cannot find the latest static binary version of netdata."
 fi
 
+# ---------------------------------------------------------------------------------------------------------------------
+
 progress "Downloading static netdata binary: ${LATEST}"
-run curl "${BASE}/${LATEST}" >"/tmp/${LATEST}"
-if [ $? -ne 0 ]
+
+ret=1
+if [ ! -z "${curl}" -a -x "${curl}" ]
+then
+    run ${curl} "${BASE}/${LATEST}" >"/tmp/${LATEST}"
+    ret=$?
+elif [ ! -z "${wget}" -a -x "${wget}" ]
+then
+    run ${wget} -O "/tmp/${LATEST}" "${BASE}/${LATEST}"
+    ret=$?
+else
+    fatal "curl or wget are needed for this script to work."
+fi
+
+if [ ${ret} -ne 0 -o ! -s "/tmp/${LATEST}" ]
 	then
 	fatal "Failed to download the latest static binary version of netdata."
 fi
 
-progress "Executing the downloaded self-extracting archive"
+# ---------------------------------------------------------------------------------------------------------------------
+
+progress "Installing netdata"
 
 sudo=
 [ "${UID}" != "0" ] && sudo="sudo"
