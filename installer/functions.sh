@@ -142,9 +142,22 @@ run_failed() {
     printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
 }
 
+ESCAPED_PRINT_METHOD=
+printf "%q " test >/dev/null 2>&1
+[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
+escaped_print() {
+    if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]
+    then
+        printf "%q " "${@}"
+    else
+        printf "%s" "${*}"
+    fi
+    return 0
+}
+
 run_logfile="/dev/null"
 run() {
-    local user="${USER:-}" dir="${PWD}" info info_console
+    local user="${USER--}" dir="${PWD}" info info_console
 
     if [ "${UID}" = "0" ]
         then
@@ -156,11 +169,11 @@ run() {
     fi
 
     printf >> "${run_logfile}" "${info}"
-    printf >> "${run_logfile}" "%q " "${@}"
+    escaped_print >> "${run_logfile}" "${@}"
     printf >> "${run_logfile}" " ... "
 
     printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
-    printf >&2 "%q " "${@}"
+    escaped_print >&2 "${@}"
     printf >&2 "${TPUT_RESET}\n"
 
     "${@}"
