@@ -8,13 +8,18 @@ from os.path import getsize
 from collections import namedtuple
 from copy import deepcopy
 from base import LogService
+import msg
 
 priority = 60000
 retries = 60
 
-ORDER = ['response_statuses', 'response_codes', 'bandwidth', 'response_time', 'requests_per_url',
-         'requests_per_user_defined', 'http_method', 'http_version', 'requests_per_ipproto', 'clients', 'clients_all']
-CHARTS = {
+ORDER_APACHE_CACHE = ['cache']
+
+ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth', 'response_time', 'requests_per_url',
+             'requests_per_user_defined', 'http_method', 'http_version', 'requests_per_ipproto',
+             'clients', 'clients_all']
+
+CHARTS_WEB = {
     'response_codes': {
         'options': [None, 'Response Codes', 'requests/s', 'responses', 'web_log.response_codes', 'stacked'],
         'lines': [
@@ -76,6 +81,28 @@ CHARTS = {
             ['redirects', 'redirect', 'incremental', 1, 1],
             ['bad_requests', 'bad', 'incremental', 1, 1],
             ['other_requests', 'other', 'incremental', 1, 1]
+        ]},
+    'requests_per_url': {
+        'options': [None, 'Requests Per Url', 'requests/s', 'urls', 'web_log.requests_per_url',
+                    'stacked'],
+        'lines': [
+            ['url_pattern_other', 'other', 'incremental', 1, 1]
+        ]},
+    'requests_per_user_defined': {
+        'options': [None, 'Requests Per User Defined Pattern', 'requests/s', 'user defined',
+                    'web_log.requests_per_user_defined', 'stacked'],
+        'lines': [
+            ['user_pattern_other', 'other', 'incremental', 1, 1]
+        ]}
+}
+
+CHARTS_APACHE_CACHE = {
+    'cache': {
+        'options': [None, 'Apache Cached Responses', 'percent cached', 'cached', 'web_log.apache_cache', 'stacked'],
+        'lines': [
+            ["hit", 'cache', "percentage-of-absolute-row"],
+            ["miss", None, "percentage-of-absolute-row"],
+            ["other", None, "percentage-of-absolute-row"]
         ]}
 }
 
@@ -89,24 +116,10 @@ class Service(LogService):
         """
         :param configuration:
         :param name:
-        # self._get_data = None  # will be assigned in 'check' method.
-        # self.order = None  # will be assigned in 'create_*_method' method.
-        # self.definitions = None  # will be assigned in 'create_*_method' method.
         """
         LogService.__init__(self, configuration=configuration, name=name)
-        # Variables from module configuration file
-        self.log_type = self.configuration.get('type', 'web_access')
+        self.log_type = self.configuration.get('type', 'web')
         self.log_path = self.configuration.get('path')
-        self.url_pattern = self.configuration.get('categories')  # dict
-        self.user_pattern = self.configuration.get('user_defined')  # dict
-        self.custom_log_format = self.configuration.get('custom_log_format')  # dict
-        # Instance variables
-        self.regex = None  # will be assigned in 'find_regex' or 'find_regex_custom' method
-        self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0, 'resp_time_max': 0,
-                     'resp_time_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
-                     '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
-                     'req_ipv6': 0, 'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
-                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0, 'GET': 0}
 
     def check(self):
         """
@@ -117,149 +130,257 @@ class Service(LogService):
         3. "log_path' must not be empty. We need at least 1 line to find appropriate pattern to parse
         4. other checks depends on log "type"
         """
-        if not self.log_path:
+
+        log_types = dict(web=Web, apache_cache=ApacheCache)
+
+        if self.log_type not in log_types:
+            self.error('bad log type (%s). Supported types: %s' % (self.log_type, log_types.keys()))
+            return False
+
+        if not self.configuration.get('path'):
             self.error('log path is not specified')
             return False
 
-        if not access(self.log_path, R_OK):
-            self.error('%s not readable or not exist' % self.log_path)
+        if not access(self.configuration['path'], R_OK):
+            self.error('%s not readable or not exist' % self.configuration['path'])
             return False
 
-        if not getsize(self.log_path):
-            self.error('%s is empty' % self.log_path)
+        if not getsize(self.configuration['path']):
+            self.error('%s is empty' % self.configuration['path'])
             return False
 
+        self.configuration['update_every'] = self.update_every
+        self.configuration['name'] = self.name
+        self.configuration['override_name'] = self.override_name
+        self.configuration['_dimensions'] = self._dimensions
+
+        cls = log_types[self.log_type]
+        self.Job = cls(configuration=self.configuration)
+        if self.Job.check():
+            self.order = self.Job.order
+            self.definitions = self.Job.definitions
+            return True
+        return False
+
+    def _get_data(self):
+        return self.Job.get_data(self._get_raw_data())
+
+
+class Mixin:
+    def add_new_dimension(self, dimension, dimension_list, key, chart):
+        """
+        :param dimension: str: response status code. Ex.: '202', '499'
+        :param dimension_list: list: Ex.: ['202', '202', 'incremental']
+        :param key: str: CHARTS dict key (chart name). Ex.: 'response_time'
+        :param chart: Current string we need to pass to netdata to rebuild the chart
+        """
+        self.data[dimension] = 0
+        # SET method check if dim in _dimensions
+        self.conf['_dimensions'].append(dimension)
+        # UPDATE method do SET only if dim in definitions
+        self.definitions[key]['lines'].append(dimension_list)
+        print(chart + "%s %s\n" % ('DIMENSION', ' '.join(dimension_list)))
+
+    def get_last_line(self):
+        """
+        :return:
+        """
         # Read last line (or first if there is only one line)
-        with open(self.log_path, 'rb') as logs:
+        with open(self.conf['path'], 'rb') as logs:
             logs.seek(-2, 2)
             while logs.read(1) != b'\n':
                 logs.seek(-2, 1)
                 if logs.tell() == 0:
                     break
             last_line = logs.readline()
-
         try:
-            last_line = last_line.decode()
+            return last_line.decode()
         except UnicodeDecodeError:
             try:
-                last_line = last_line.decode(encoding='utf-8')
+                return last_line.decode(encoding='utf-8')
             except (TypeError, UnicodeDecodeError) as error:
-                self.error(str(error))
+                msg.error('web_log', str(error))
                 return False
 
-        if self.log_type == 'web_access':
-            self.unique_all_time = list()  # sorted list of unique IPs
-            self.detailed_response_codes = self.configuration.get('detailed_response_codes', True)
-            self.detailed_response_aggregate = self.configuration.get('detailed_response_aggregate', True)
-            self.all_time = self.configuration.get('all_time', True)
+    @staticmethod
+    def error(*params):
+        params = map(str, params)
+        msg.error('web_log', ' '.join(params))
 
-            # Custom_log_format or predefined log format.
-            if self.custom_log_format:
-                match_dict, error = self.find_regex_custom(last_line)
-            else:
-                match_dict, error = self.find_regex(last_line)
+    @staticmethod
+    def info(*params):
+        params = map(str, params)
+        msg.info('web_log', ' '.join(params))
 
-            # "match_dict" is None if there are any problems
-            if match_dict is None:
-                self.error(str(error))
-                return False
 
-            self.url_pattern = check_patterns('url_pattern', self.url_pattern)
-            self.user_pattern = check_patterns('user_pattern', self.user_pattern)
+class Web(Mixin):
+    def __init__(self, configuration):
+        self.conf = configuration
+        self.storage = dict()
+        self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0, 'resp_time_max': 0,
+                     'resp_time_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
+                     '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
+                     'req_ipv6': 0, 'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
+                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0, 'GET': 0}
 
-            self.create_access_charts(match_dict)  # Create charts
-            self._get_data = self._get_access_data  # _get_data assignment
-        else:
-            self.error('Not implemented')
+    def check(self):
+        last_line = self.get_last_line()
+        if not last_line:
             return False
+        # Custom_log_format or predefined log format.
+        if self.conf.get('custom_log_format'):
+            match_dict, error = self.find_regex_custom(last_line)
+        else:
+            match_dict, error = self.find_regex(last_line)
 
+        # "match_dict" is None if there are any problems
+        if match_dict is None:
+            self.error(str(error))
+            return False
+        self.storage['unique_all_time'] = list()
+        self.storage['url_pattern'] = check_patterns('url_pattern', self.conf.get('categories'))
+        self.storage['user_pattern'] = check_patterns('user_pattern', self.conf.get('user_defined'))
+
+        self.create_web_charts(match_dict)  # Create charts
         self.info('Collected data: %s' % list(match_dict.keys()))
         return True
 
-    def find_regex_custom(self, last_line):
+    def create_web_charts(self, match_dict):
         """
-        :param last_line: str: literally last line from log file
-        :return: tuple where:
-        [0]: dict or None:  match_dict or None
-        [1]: str: error description
-
-        We are here only if "custom_log_format" is in logs. We need to make sure:
-        1. "custom_log_format" is a dict
-        2. "pattern" in "custom_log_format" and pattern is <str> instance
-        3. if "time_multiplier" is in "custom_log_format" it must be <int> instance
-
-        If all parameters is ok we need to make sure:
-        1. Pattern search is success
-        2. Pattern search contains named subgroups (?P<subgroup_name>) (= "match_dict")
-
-        If pattern search is success we need to make sure:
-        1. All mandatory keys ['address', 'code', 'bytes_sent', 'method', 'url'] are in "match_dict"
-
-        If this is True we need to make sure:
-        1. All mandatory key values from "match_dict" have the correct format
-         ("code" is integer, "method" is uppercase word, etc)
-
-        If non mandatory keys in "match_dict" we need to make sure:
-        1. All non mandatory key values from match_dict ['resp_length', 'resp_time'] have the correct format
-         ("resp_length" is integer or "-", "resp_time" is integer or float)
-
+        :param match_dict: dict: regex.search.groupdict(). Ex. {'address': '127.0.0.1', 'code': '200', 'method': 'GET'}
+        :return:
+        Create additional charts depending on the 'match_dict' keys and configuration file options
+        1. 'time_response' chart is removed if there is no 'resp_time' in match_dict.
+        2. Other stuff is just remove/add chart depending on yes/no in conf
         """
-        if not hasattr(self.custom_log_format, 'keys'):
-            return find_regex_return(msg='Custom log: "custom_log_format" is not a <dict>')
+        self.order = ORDER_WEB[:]
+        self.definitions = deepcopy(CHARTS_WEB)
+        job_name = find_job_name(self.conf['override_name'], self.conf['name'])
 
-        pattern = self.custom_log_format.get('pattern')
-        if not (pattern and isinstance(pattern, str)):
-            return find_regex_return(msg='Custom log: "pattern" option is not specified or type is not <str>')
+        self.storage['chart_http_method'] = 'CHART %s.http_method' \
+                                            ' "" "Requests Per HTTP Method" requests/s "http methods"' \
+                                            ' web_log.http_method stacked 60000 %s\n' \
+                                            'DIMENSION GET GET incremental\n' \
+                                            % (job_name, self.conf['update_every'])
+        self.storage['chart_http_version'] = 'CHART %s.http_version' \
+                                             ' "" "Requests Per HTTP Version" requests/s "http versions"' \
+                                             ' web_log.http_version stacked 60000 %s\n' \
+                                             % (job_name, self.conf['update_every'])
 
-        resp_time_func = self.custom_log_format.get('time_multiplier') or 0
+        if 'resp_time' not in match_dict:
+            self.order.remove('response_time')
+        if not self.conf.get('all_time', True):
+            self.order.remove('clients_all')
+        # Add 'detailed_response_codes' chart if specified in the configuration
+        if self.conf.get('detailed_response_codes', True):
+            self.storage['chart_detailed'] = list()
+            for add_to_dim in DET_RESP_AGGR:
+                self.storage['chart_detailed'].append('CHART %s.detailed_response_codes%s ""'
+                                                      ' "Detailed Response Codes %s" requests/s responses'
+                                                      ' web_log.detailed_response_codes%s stacked 60000 %s\n'
+                                                      % (job_name, add_to_dim, add_to_dim[1:],
+                                                         add_to_dim, self.conf['update_every']))
 
-        if not isinstance(resp_time_func, int):
-            return find_regex_return(msg='Custom log: "time_multiplier" is not an integer')
+            codes = DET_RESP_AGGR[:1] if self.conf.get('detailed_response_aggregate', True) else DET_RESP_AGGR[1:]
+            for code in codes:
+                self.order.append('detailed_response_codes%s' % code)
+                self.definitions['detailed_response_codes%s' % code]\
+                    = {'options': [None, 'Detailed Response Codes %s' % code[1:], 'requests/s', 'responses',
+                                   'web_log.detailed_response_codes%s' % code, 'stacked'],
+                       'lines': []}
 
-        try:
-            regex = re.compile(pattern)
-        except re.error as error:
-            return find_regex_return(msg='Pattern compile error: %s' % str(error))
-
-        match = regex.search(last_line)
-        if not match:
-            return find_regex_return(msg='Custom log: pattern search FAILED')
-
-        match_dict = match.groupdict() or None
-        if match_dict is None:
-            return find_regex_return(msg='Custom log: search OK but contains no named subgroups'
-                                     ' (you need to use ?P<subgroup_name>)')
-        mandatory_dict = {'address': r'[\da-f.:]+',
-                          'code': r'[1-9]\d{2}',
-                          'method': r'[A-Z]+',
-                          'bytes_sent': r'\d+|-'}
-        optional_dict = {'resp_length': r'\d+',
-                         'resp_time': r'[\d.]+',
-                         'http_version': r'\d\.\d'}
-
-        mandatory_values = set(mandatory_dict) - set(match_dict)
-        if mandatory_values:
-            return find_regex_return(msg='Custom log: search OK but some mandatory keys (%s) are missing'
-                                     % list(mandatory_values))
-        for key in mandatory_dict:
-            if not re.search(mandatory_dict[key], match_dict[key]):
-                return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
-                                             % (key, match_dict[key]))
-
-        optional_values = set(optional_dict) & set(match_dict)
-        for key in optional_values:
-            if not re.search(optional_dict[key], match_dict[key]):
-                return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
-                                             % (key, match_dict[key]))
-
-        dot_in_time = '.' in match_dict.get('resp_time', '')
-        if dot_in_time:
-            self.resp_time_func = lambda time: time * (resp_time_func or 1000000)
+        # Add 'requests_per_url' chart if specified in the configuration
+        if self.storage['url_pattern']:
+            for elem in self.storage['url_pattern']:
+                self.definitions['requests_per_url']['lines'].append([elem.description,
+                                                                      elem.description[12:],
+                                                                      'incremental'])
+                self.data[elem.description] = 0
+            self.data['url_pattern_other'] = 0
         else:
-            self.resp_time_func = lambda time: time * (resp_time_func or 1)
+            self.order.remove('requests_per_url')
 
-        self.regex = regex
-        return find_regex_return(match_dict=match_dict)
+        if self.storage['user_pattern'] and 'user_defined' in match_dict:
+            for elem in self.storage['user_pattern']:
+                self.definitions['requests_per_user_defined']['lines'].append([elem.description,
+                                                                               elem.description[13:],
+                                                                               'incremental'])
+                self.data[elem.description] = 0
+            self.data['user_pattern_other'] = 0
+        else:
+            self.order.remove('requests_per_user_defined')
+
+    def get_data(self, raw_data=None):
+        """
+        Parse new log lines
+        :return: dict OR None
+        None if _get_raw_data method fails.
+        In all other cases - dict.
+        """
+        if raw_data is None:
+            return None
+
+        request_time, unique_current = list(), list()
+        request_counter = {'count': 0, 'sum': 0}
+        ip_address_counter = {'unique_cur_ip': 0}
+        for line in raw_data:
+            match = self.storage['regex'].search(line)
+            if match:
+                match_dict = match.groupdict()
+                try:
+                    code = match_dict['code'][0] + 'xx'
+                    self.data[code] += 1
+                except KeyError:
+                    self.data['0xx'] += 1
+                # detailed response code
+                if self.conf.get('detailed_response_codes', True):
+                    self.get_data_detailed_response_codes(code=match_dict['code'])
+                # response statuses
+                self.get_data_statuses(code=match_dict['code'])
+                # requests per url
+                if self.storage['url_pattern']:
+                    self.get_data_per_pattern(field=match_dict['url'], other='url_pattern_other',
+                                              pattern=self.storage['url_pattern'])
+                # requests per user defined pattern
+                if self.storage['user_pattern'] and 'user_defined' in match_dict:
+                    self.get_data_per_pattern(field=match_dict['user_defined'], other='user_pattern_other',
+                                              pattern=self.storage['user_pattern'])
+                # requests per http method
+                self.get_data_http_method(method=match_dict['method'])
+                # requests per http version
+                if 'http_version' in match_dict:
+                    self.get_data_http_version(http_version=match_dict['http_version'])
+                # bandwidth sent
+                bytes_sent = match_dict['bytes_sent'] if '-' not in match_dict['bytes_sent'] else 0
+                self.data['bytes_sent'] += int(bytes_sent)
+                # request processing time and bandwidth received
+                if 'resp_length' in match_dict:
+                    self.data['resp_length'] += int(match_dict['resp_length'])
+                if 'resp_time' in match_dict:
+                    resp_time = self.storage['func_resp_time'](float(match_dict['resp_time']))
+                    bisect.insort_left(request_time, resp_time)
+                    request_counter['count'] += 1
+                    request_counter['sum'] += resp_time
+                # requests per ip proto
+                proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
+                self.data['req_' + proto] += 1
+                # unique clients ips
+                if address_not_in_pool(pool=self.storage['unique_all_time'], address=match_dict['address'],
+                                       pool_size=self.data['unique_tot_ipv4'] + self.data['unique_tot_ipv6']):
+                    self.data['unique_tot_' + proto] += 1
+                if address_not_in_pool(pool=unique_current, address=match_dict['address'],
+                                       pool_size=ip_address_counter['unique_cur_ip']):
+                    self.data['unique_cur_' + proto] += 1
+                    ip_address_counter['unique_cur_ip'] += 1
+            else:
+                self.data['unmatched'] += 1
+
+        # timings
+        if request_time:
+            self.data['resp_time_min'] += request_time[0]
+            self.data['resp_time_avg'] += round(float(request_counter['sum']) / request_counter['count'])
+            self.data['resp_time_max'] += request_time[-1]
+        return self.data
 
     def find_regex(self, last_line):
         """
@@ -334,227 +455,127 @@ class Service(LogService):
         for regex, func in regex_function:
             match = regex.search(last_line)
             if match:
-                self.regex = regex
-                self.resp_time_func = func
+                self.storage['regex'] = regex
+                self.storage['func_resp_time'] = func
                 match_dict = match.groupdict()
                 break
 
         return find_regex_return(match_dict=match_dict or None,
                                  msg='Unknown log format. You need to use "custom_log_format" feature.')
 
-    def create_access_charts(self, match_dict):
+    def find_regex_custom(self, last_line):
         """
-        :param match_dict: dict: regex.search.groupdict(). Ex. {'address': '127.0.0.1', 'code': '200', 'method': 'GET'}
-        :return:
-        Create additional charts depending on the 'match_dict' keys and configuration file options
-        1. 'time_response' chart is removed if there is no 'resp_time' in match_dict.
-        2. Other stuff is just remove/add chart depending on yes/no in conf
+        :param last_line: str: literally last line from log file
+        :return: tuple where:
+        [0]: dict or None:  match_dict or None
+        [1]: str: error description
+
+        We are here only if "custom_log_format" is in logs. We need to make sure:
+        1. "custom_log_format" is a dict
+        2. "pattern" in "custom_log_format" and pattern is <str> instance
+        3. if "time_multiplier" is in "custom_log_format" it must be <int> instance
+
+        If all parameters is ok we need to make sure:
+        1. Pattern search is success
+        2. Pattern search contains named subgroups (?P<subgroup_name>) (= "match_dict")
+
+        If pattern search is success we need to make sure:
+        1. All mandatory keys ['address', 'code', 'bytes_sent', 'method', 'url'] are in "match_dict"
+
+        If this is True we need to make sure:
+        1. All mandatory key values from "match_dict" have the correct format
+         ("code" is integer, "method" is uppercase word, etc)
+
+        If non mandatory keys in "match_dict" we need to make sure:
+        1. All non mandatory key values from match_dict ['resp_length', 'resp_time'] have the correct format
+         ("resp_length" is integer or "-", "resp_time" is integer or float)
+
         """
+        if not hasattr(self.conf.get('custom_log_format'), 'keys'):
+            return find_regex_return(msg='Custom log: "custom_log_format" is not a <dict>')
 
-        def find_job_name(override_name, name):
-            """
-            :param override_name: str: 'name' var from configuration file
-            :param name: str: 'job_name' from configuration file
-            :return: str: new job name
-            We need this for dynamic charts. Actually same logic as in python.d.plugin.
-            """
-            add_to_name = override_name or name
-            if add_to_name:
-                return '_'.join(['web_log', re.sub('\s+', '_', add_to_name)])
-            else:
-                return 'web_log'
+        pattern = self.conf.get('custom_log_format', dict()).get('pattern')
+        if not (pattern and isinstance(pattern, str)):
+            return find_regex_return(msg='Custom log: "pattern" option is not specified or type is not <str>')
 
-        self.order = ORDER[:]
-        self.definitions = deepcopy(CHARTS)
+        resp_time_func = self.conf.get('custom_log_format', dict()).get('time_multiplier') or 0
 
-        job_name = find_job_name(self.override_name, self.name)
+        if not isinstance(resp_time_func, int):
+            return find_regex_return(msg='Custom log: "time_multiplier" is not an integer')
 
-        self.http_method_chart = 'CHART %s.http_method' \
-                                 ' "" "Requests Per HTTP Method" requests/s "http methods"' \
-                                 ' web_log.http_method stacked 11 %s\n' \
-                                 'DIMENSION GET GET incremental\n' % (job_name, self.update_every)
-        self.http_version_chart = 'CHART %s.http_version' \
-                                  ' "" "Requests Per HTTP Version" requests/s "http versions"' \
-                                  ' web_log.http_version stacked 12 %s\n' % (job_name, self.update_every)
+        try:
+            regex = re.compile(pattern)
+        except re.error as error:
+            return find_regex_return(msg='Pattern compile error: %s' % str(error))
+        match = regex.search(last_line)
+        if not match:
+            return find_regex_return(msg='Custom log: pattern search FAILED')
 
-        if 'resp_time' not in match_dict:
-            self.order.remove('response_time')
-        if not self.all_time:
-            self.order.remove('clients_all')
-        # Add 'detailed_response_codes' chart if specified in the configuration
-        if self.detailed_response_codes:
-            self.detailed_chart = list()
-            for prio, add_to_dim in enumerate(DET_RESP_AGGR):
-                self.detailed_chart.append('CHART %s.detailed_response_codes%s ""'
-                                           ' "Detailed Response Codes %s" requests/s responses'
-                                           ' web_log.detailed_response_codes%s stacked %s %s\n'
-                                           % (job_name, add_to_dim, add_to_dim[1:], add_to_dim,
-                                              str(prio), self.update_every))
+        match_dict = match.groupdict() or None
+        if match_dict is None:
+            return find_regex_return(msg='Custom log: search OK but contains no named subgroups'
+                                         ' (you need to use ?P<subgroup_name>)')
+        mandatory_dict = {'address': r'[\da-f.:]+',
+                          'code': r'[1-9]\d{2}',
+                          'method': r'[A-Z]+',
+                          'bytes_sent': r'\d+|-'}
+        optional_dict = {'resp_length': r'\d+',
+                         'resp_time': r'[\d.]+',
+                         'http_version': r'\d\.\d'}
 
-            codes = DET_RESP_AGGR[:1] if self.detailed_response_aggregate else DET_RESP_AGGR[1:]
-            for code in codes:
-                self.order.append('detailed_response_codes%s' % code)
-                self.definitions['detailed_response_codes%s' % code] = {'options':
-                                                                        [None,
-                                                                         'Detailed Response Codes %s' % code[1:],
-                                                                         'requests/s',
-                                                                         'responses',
-                                                                         'web_log.detailed_response_codes%s' % code,
-                                                                         'stacked'],
-                                                                        'lines': []}
+        mandatory_values = set(mandatory_dict) - set(match_dict)
+        if mandatory_values:
+            return find_regex_return(msg='Custom log: search OK but some mandatory keys (%s) are missing'
+                                         % list(mandatory_values))
+        for key in mandatory_dict:
+            if not re.search(mandatory_dict[key], match_dict[key]):
+                return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
+                                             % (key, match_dict[key]))
 
-        # Add 'requests_per_url' chart if specified in the configuration
-        if self.url_pattern:
-            self.definitions['requests_per_url'] = {'options': [None, 'Requests Per Url', 'requests/s',
-                                                                'urls', 'web_log.requests_per_url', 'stacked'],
-                                                    'lines': [['url_pattern_other', 'other', 'incremental']]}
-            for elem in self.url_pattern:
-                self.definitions['requests_per_url']['lines'].append([elem.description,
-                                                                      elem.description[12:],
-                                                                      'incremental'])
-                self.data.update({elem.description: 0})
-            self.data.update({'url_pattern_other': 0})
+        optional_values = set(optional_dict) & set(match_dict)
+        for key in optional_values:
+            if not re.search(optional_dict[key], match_dict[key]):
+                return find_regex_return(msg='Custom log: can\'t parse "%s": %s'
+                                             % (key, match_dict[key]))
+
+        dot_in_time = '.' in match_dict.get('resp_time', '')
+        if dot_in_time:
+            self.storage['func_resp_time'] = lambda time: time * (resp_time_func or 1000000)
         else:
-            self.order.remove('requests_per_url')
+            self.storage['func_resp_time'] = lambda time: time * (resp_time_func or 1)
 
-        if self.user_pattern and 'user_defined' in match_dict:
-            self.definitions['requests_per_user_defined'] = {'options': [None, 'Requests Per User Defined Pattern',
-                                                                         'requests/s', 'user defined',
-                                                                         'web_log.requests_per_user_defined',
-                                                                         'stacked'],
-                                                             'lines': [['user_pattern_other', 'other', 'incremental']]}
-            for elem in self.user_pattern:
-                self.definitions['requests_per_user_defined']['lines'].append([elem.description,
-                                                                               elem.description[13:],
-                                                                               'incremental'])
-                self.data.update({elem.description: 0})
-            self.data.update({'user_pattern_other': 0})
-        else:
-            self.order.remove('requests_per_user_defined')
+        self.storage['regex'] = regex
+        return find_regex_return(match_dict=match_dict)
 
-    def add_new_dimension(self, dimension, line_list, chart_string, key):
-        """
-        :param dimension: str: response status code. Ex.: '202', '499'
-        :param line_list: list: Ex.: ['202', '202', 'incremental']
-        :param chart_string: Current string we need to pass to netdata to rebuild the chart
-        :param key: str: CHARTS dict key (chart name). Ex.: 'response_time'
-        :return: str: new chart string = previous + new dimensions
-        """
-        self.data.update({dimension: 0})
-        # SET method check if dim in _dimensions
-        self._dimensions.append(dimension)
-        # UPDATE method do SET only if dim in definitions
-        self.definitions[key]['lines'].append(line_list)
-        chart = chart_string
-        chart += "%s %s\n" % ('DIMENSION', ' '.join(line_list))
-        print(chart)
-        return chart
-
-    def _get_access_data(self):
-        """
-        Parse new log lines
-        :return: dict OR None
-        None if _get_raw_data method fails.
-        In all other cases - dict.
-        """
-        raw = self._get_raw_data()
-        if raw is None:
-            return None
-
-        request_time, unique_current = list(), list()
-        request_counter = {'count': 0, 'sum': 0}
-        ip_address_counter = {'unique_cur_ip': 0}
-        for line in raw:
-            match = self.regex.search(line)
-            if match:
-                match_dict = match.groupdict()
-                try:
-                    code = ''.join([match_dict['code'][0], 'xx'])
-                    self.data[code] += 1
-                except KeyError:
-                    self.data['0xx'] += 1
-                # detailed response code
-                if self.detailed_response_codes:
-                    self._get_data_detailed_response_codes(code=match_dict['code'])
-                # response statuses
-                self._get_data_statuses(code=match_dict['code'])
-                # requests per url
-                if self.url_pattern:
-                    self._get_data_per_pattern(field=match_dict['url'], other='url_pattern_other',
-                                               pattern=self.url_pattern)
-                # requests per user defined pattern
-                if self.user_pattern and 'user_defined' in match_dict:
-                    self._get_data_per_pattern(field=match_dict['user_defined'], other='user_pattern_other',
-                                               pattern=self.user_pattern)
-                # requests per http method
-                self._get_data_http_method(method=match_dict['method'])
-                # requests per http version
-                if 'http_version' in match_dict:
-                    self._get_data_http_version(http_version=match_dict['http_version'])
-                # bandwidth sent
-                bytes_sent = match_dict['bytes_sent'] if '-' not in match_dict['bytes_sent'] else 0
-                self.data['bytes_sent'] += int(bytes_sent)
-                # request processing time and bandwidth received
-                if 'resp_length' in match_dict:
-                    self.data['resp_length'] += int(match_dict['resp_length'])
-                if 'resp_time' in match_dict:
-                    resp_time = self.resp_time_func(float(match_dict['resp_time']))
-                    bisect.insort_left(request_time, resp_time)
-                    request_counter['count'] += 1
-                    request_counter['sum'] += resp_time
-                # requests per ip proto
-                proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
-                self.data['req_' + proto] += 1
-                # unique clients ips
-                if address_not_in_pool(pool=self.unique_all_time, address=match_dict['address'],
-                                       pool_size=self.data['unique_tot_ipv4'] + self.data['unique_tot_ipv6']):
-                    self.data['unique_tot_' + proto] += 1
-                if address_not_in_pool(pool=unique_current, address=match_dict['address'],
-                                       pool_size=ip_address_counter['unique_cur_ip']):
-                    self.data['unique_cur_' + proto] += 1
-                    ip_address_counter['unique_cur_ip'] += 1
-            else:
-                self.data['unmatched'] += 1
-
-        # timings
-        if request_time:
-            self.data['resp_time_min'] += request_time[0]
-            self.data['resp_time_avg'] += round(float(request_counter['sum']) / request_counter['count'])
-            self.data['resp_time_max'] += request_time[-1]
-        return self.data
-
-    def _get_data_detailed_response_codes(self, code):
+    def get_data_detailed_response_codes(self, code):
         """
         :param code: str: CODE from parsed line. Ex.: '202, '499'
         :return:
         Calls add_new_dimension method If the value is found for the first time
         """
         if code not in self.data:
-            if self.detailed_response_aggregate:
-                chart_string_copy = self.detailed_chart[0]
-                self.detailed_chart[0] = self.add_new_dimension(code, [code, code, 'incremental'],
-                                                                chart_string_copy, 'detailed_response_codes')
+            if self.conf.get('detailed_response_aggregate', True):
+                self.add_new_dimension(dimension=code, dimension_list=list((code, code, 'incremental')),
+                                       key='detailed_response_codes', chart=self.storage['chart_detailed'][0])
             else:
                 code_index = int(code[0]) if int(code[0]) < 6 else 6
-                chart_string_copy = self.detailed_chart[code_index]
                 chart_name = 'detailed_response_codes' + DET_RESP_AGGR[code_index]
-                self.detailed_chart[code_index] = self.add_new_dimension(code, [code, code, 'incremental'],
-                                                                         chart_string_copy, chart_name)
+                self.add_new_dimension(dimension=code, dimension_list=list((code, code, 'incremental')),
+                                       key=chart_name, chart=self.storage['chart_detailed'][code_index])
         self.data[code] += 1
 
-    def _get_data_http_method(self, method):
+    def get_data_http_method(self, method):
         """
         :param method: str: METHOD from parsed line. Ex.: 'GET', 'POST'
         :return:
         Calls add_new_dimension method If the value is found for the first time
         """
         if method not in self.data:
-            chart_string_copy = self.http_method_chart
-            self.http_method_chart = self.add_new_dimension(method, [method, method, 'incremental'],
-                                                            chart_string_copy, 'http_method')
+            self.add_new_dimension(dimension=method, dimension_list=list((method, method, 'incremental')),
+                                   key='http_method', chart=self.storage['chart_http_method'])
         self.data[method] += 1
 
-    def _get_data_http_version(self, http_version):
+    def get_data_http_version(self, http_version):
         """
         :param http_version: str: METHOD from parsed line. Ex.: '1.1', '1.0'
         :return:
@@ -562,16 +583,16 @@ class Service(LogService):
         """
         http_version_dim_id = http_version.replace('.', '_')
         if http_version_dim_id not in self.data:
-            chart_string_copy = self.http_version_chart
-            self.http_version_chart = self.add_new_dimension(http_version_dim_id,
-                                                             [http_version_dim_id, http_version, 'incremental'],
-                                                             chart_string_copy, 'http_version')
+            self.add_new_dimension(dimension=http_version_dim_id,
+                                   dimension_list=list((http_version_dim_id, http_version, 'incremental')),
+                                   key='http_version', chart=self.storage['chart_http_version'])
         self.data[http_version_dim_id] += 1
 
-    def _get_data_per_pattern(self, field, other, pattern):
+    def get_data_per_pattern(self, field, other, pattern):
         """
         :param field: str:
         :param other: str:
+        :param pattern: list:
         :return:
         Scan through string looking for the first location where patterns produce a match for all user
         defined patterns
@@ -585,7 +606,7 @@ class Service(LogService):
         if not match:
             self.data[other] += 1
 
-    def _get_data_statuses(self, code):
+    def get_data_statuses(self, code):
         """
         :param code: str: response status code. Ex.: '202', '499'
         :return:
@@ -601,6 +622,32 @@ class Service(LogService):
             self.data['server_errors'] += 1
         else:
             self.data['other_requests'] += 1
+
+
+class ApacheCache:
+    def __init__(self, configuration):
+        self.conf = configuration
+        self.order = ORDER_APACHE_CACHE
+        self.definitions = CHARTS_APACHE_CACHE
+
+    @staticmethod
+    def check():
+        return True
+
+    @staticmethod
+    def get_data(raw_data=None):
+        data = dict(hit=0, miss=0, other=0)
+        if not raw_data:
+            return None if raw_data is None else data
+
+        for line in raw_data:
+            if 'cache hit' in line:
+                data['hit'] += 1
+            elif 'cache miss' in line:
+                data['miss'] += 1
+            else:
+                data['other'] += 1
+        return data
 
 
 def address_not_in_pool(pool, address, pool_size):
@@ -659,3 +706,16 @@ def check_patterns(string, dimension_regex_dict):
             result.append(NAMED_PATTERN(description='_'.join([string, dimension]), pattern=valid))
 
     return result or None
+
+
+def find_job_name(override_name, name):
+    """
+    :param override_name: str: 'name' var from configuration file
+    :param name: str: 'job_name' from configuration file
+    :return: str: new job name
+    We need this for dynamic charts. Actually same logic as in python.d.plugin.
+    """
+    add_to_name = override_name or name
+    if add_to_name:
+        return '_'.join(['web_log', re.sub('\s+', '_', add_to_name)])
+    return 'web_log'
