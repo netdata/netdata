@@ -19,17 +19,20 @@ ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth', 'response_time'
              'requests_per_user_defined', 'http_method', 'http_version', 'requests_per_ipproto',
              'clients', 'clients_all']
 
+ORDER_SQUID = ['squid_response_codes', 'squid_code', 'http_code',
+               'hier_code', 'bytes', 'duration', 'method', 'clients']
+
 CHARTS_WEB = {
     'response_codes': {
         'options': [None, 'Response Codes', 'requests/s', 'responses', 'web_log.response_codes', 'stacked'],
         'lines': [
-            ['2xx', '2xx', 'incremental'],
-            ['5xx', '5xx', 'incremental'],
-            ['3xx', '3xx', 'incremental'],
-            ['4xx', '4xx', 'incremental'],
-            ['1xx', '1xx', 'incremental'],
+            ['2xx', None, 'incremental'],
+            ['5xx', None, 'incremental'],
+            ['3xx', None, 'incremental'],
+            ['4xx', None, 'incremental'],
+            ['1xx', None, 'incremental'],
             ['0xx', 'other', 'incremental'],
-            ['unmatched', 'unmatched', 'incremental']
+            ['unmatched', None, 'incremental']
         ]},
     'bandwidth': {
         'options': [None, 'Bandwidth', 'KB/s', 'bandwidth', 'web_log.bandwidth', 'area'],
@@ -98,7 +101,8 @@ CHARTS_WEB = {
 
 CHARTS_APACHE_CACHE = {
     'cache': {
-        'options': [None, 'Apache Cached Responses', 'percent cached', 'cached', 'web_log.apache_cache', 'stacked'],
+        'options': [None, 'Apache Cached Responses', 'percent cached', 'cached', 'web_log.apache_cache_cache',
+                    'stacked'],
         'lines': [
             ["hit", 'cache', "percentage-of-absolute-row"],
             ["miss", None, "percentage-of-absolute-row"],
@@ -106,9 +110,67 @@ CHARTS_APACHE_CACHE = {
         ]}
 }
 
+CHARTS_SQUID = {
+    'duration': {
+        'options': [None, 'Elapsed Time The Transaction Busied The Cache',
+                    'seconds', 'timings', 'web_log.squid_duration', 'area'],
+        'lines': [
+            ['duration_min', 'min', 'incremental', 1, 1000],
+            ['duration_max', 'max', 'incremental', 1, 1000],
+            ['duration_avg', 'avg', 'incremental', 1, 1000]
+        ]},
+    'bytes': {
+        'options': [None, 'Amount Of Data Delivered To The Clients',
+                    'KB', 'bandwidth', 'web_log.squid_bytes', 'line'],
+        'lines': [
+            ['bytes', 'sent', 'incremental', 1, 1024]
+        ]},
+    'squid_response_codes': {
+        'options': [None, 'Response Codes', 'responses/s', 'responses', 'web_log.squid_response_codes', 'stacked'],
+        'lines': [
+            ['2xx', None, 'incremental'],
+            ['5xx', None, 'incremental'],
+            ['3xx', None, 'incremental'],
+            ['4xx', None, 'incremental'],
+            ['1xx', None, 'incremental'],
+            ['0xx', None, 'incremental'],
+            ['other', None, 'incremental'],
+            ['unmatched', None, 'incremental']
+        ]},
+    'squid_code': {
+        'options': [None, 'Responses Per Cache Result Of The Request',
+                    'responses/s', 'responses', 'web_log.squid_responses_squid_code', 'stacked'],
+        'lines': [
+        ]},
+    'http_code': {
+        'options': [None, 'Responses Per HTTP Code',
+                    'responses/s', 'responses', 'web_log.squid_responses_http_code', 'stacked'],
+        'lines': [
+        ]},
+    'hier_code': {
+        'options': [None, 'Responses Per Hierarchy Code',
+                    'responses/s', 'responses', 'web_log.squid_responses_hier_code', 'stacked'],
+        'lines': [
+        ]},
+    'method': {
+        'options': [None, 'Responses Per Request Method',
+                    'responses/s', 'responses', 'web_log.squid_responses_request_method', 'stacked'],
+        'lines': [
+        ]},
+    'clients': {
+        'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'clients',
+                    'web_log.squid_clients', 'stacked'],
+        'lines': [
+            ['unique_ipv4', 'ipv4', 'incremental', 1, 1],
+            ['unique_ipv6', 'ipv6', 'incremental', 1, 1]
+        ]}
+}
+
 NAMED_PATTERN = namedtuple('PATTERN', ['description', 'pattern'])
 
 DET_RESP_AGGR = ['', '_1xx', '_2xx', '_3xx', '_4xx', '_5xx', '_Other']
+
+SQUID_DYNAMIC = ('squid_code', 'http_code', 'hier_code', 'method')
 
 
 class Service(LogService):
@@ -131,21 +193,21 @@ class Service(LogService):
         4. other checks depends on log "type"
         """
 
-        log_types = dict(web=Web, apache_cache=ApacheCache)
+        log_types = dict(web=Web, apache_cache=ApacheCache, squid=Squid)
 
         if self.log_type not in log_types:
             self.error('bad log type (%s). Supported types: %s' % (self.log_type, log_types.keys()))
             return False
 
-        if not self.configuration.get('path'):
+        if not self.log_path:
             self.error('log path is not specified')
             return False
 
-        if not access(self.configuration['path'], R_OK):
+        if not access(self.log_path, R_OK):
             self.error('%s not readable or not exist' % self.configuration['path'])
             return False
 
-        if not getsize(self.configuration['path']):
+        if not getsize(self.log_path):
             self.error('%s is empty' % self.configuration['path'])
             return False
 
@@ -167,19 +229,34 @@ class Service(LogService):
 
 
 class Mixin:
-    def add_new_dimension(self, dimension, dimension_list, key, chart):
+    def add_new_dimension(self, dimension_id, chart_key, dimension=None,
+                          algorithm='incremental', multiplier=1, divisor=1):
         """
-        :param dimension: str: response status code. Ex.: '202', '499'
-        :param dimension_list: list: Ex.: ['202', '202', 'incremental']
-        :param key: str: CHARTS dict key (chart name). Ex.: 'response_time'
-        :param chart: Current string we need to pass to netdata to rebuild the chart
+        :param dimension:
+        :param chart_key:
+        :param dimension_id:
+        :param algorithm:
+        :param multiplier:
+        :param divisor:
+        :return:
         """
-        self.data[dimension] = 0
+
+        self.data[dimension_id] = 0
         # SET method check if dim in _dimensions
-        self.conf['_dimensions'].append(dimension)
+        self.conf['_dimensions'].append(dimension_id)
         # UPDATE method do SET only if dim in definitions
-        self.definitions[key]['lines'].append(dimension_list)
-        print(chart + "%s %s\n" % ('DIMENSION', ' '.join(dimension_list)))
+        dimension_list = list(map(str, [dimension_id,
+                                        dimension if dimension else dimension_id,
+                                        algorithm,
+                                        multiplier,
+                                        divisor]))
+        self.definitions[chart_key]['lines'].append(dimension_list)
+        job_name = find_job_name(self.conf['override_name'], self.conf['name'])
+        opts = self.definitions[chart_key]['options']
+        chart = 'CHART %s.%s "" "%s" %s "%s" %s %s 60000 %s\n' % (job_name, chart_key,
+                                                                  opts[1], opts[2], opts[3],
+                                                                  opts[4], opts[5], self.conf['update_every'])
+        print(chart + "DIMENSION %s\n" % ' '.join(dimension_list))
 
     def get_last_line(self):
         """
@@ -204,13 +281,11 @@ class Mixin:
 
     @staticmethod
     def error(*params):
-        params = map(str, params)
-        msg.error('web_log', ' '.join(params))
+        msg.error('web_log', ' '.join(map(str, params)))
 
     @staticmethod
     def info(*params):
-        params = map(str, params)
-        msg.info('web_log', ' '.join(params))
+        msg.info('web_log', ' '.join(map(str, params)))
 
 
 class Web(Mixin):
@@ -255,32 +330,14 @@ class Web(Mixin):
         """
         self.order = ORDER_WEB[:]
         self.definitions = deepcopy(CHARTS_WEB)
-        job_name = find_job_name(self.conf['override_name'], self.conf['name'])
-
-        self.storage['chart_http_method'] = 'CHART %s.http_method' \
-                                            ' "" "Requests Per HTTP Method" requests/s "http methods"' \
-                                            ' web_log.http_method stacked 60000 %s\n' \
-                                            'DIMENSION GET GET incremental\n' \
-                                            % (job_name, self.conf['update_every'])
-        self.storage['chart_http_version'] = 'CHART %s.http_version' \
-                                             ' "" "Requests Per HTTP Version" requests/s "http versions"' \
-                                             ' web_log.http_version stacked 60000 %s\n' \
-                                             % (job_name, self.conf['update_every'])
 
         if 'resp_time' not in match_dict:
             self.order.remove('response_time')
         if not self.conf.get('all_time', True):
             self.order.remove('clients_all')
+
         # Add 'detailed_response_codes' chart if specified in the configuration
         if self.conf.get('detailed_response_codes', True):
-            self.storage['chart_detailed'] = list()
-            for add_to_dim in DET_RESP_AGGR:
-                self.storage['chart_detailed'].append('CHART %s.detailed_response_codes%s ""'
-                                                      ' "Detailed Response Codes %s" requests/s responses'
-                                                      ' web_log.detailed_response_codes%s stacked 60000 %s\n'
-                                                      % (job_name, add_to_dim, add_to_dim[1:],
-                                                         add_to_dim, self.conf['update_every']))
-
             codes = DET_RESP_AGGR[:1] if self.conf.get('detailed_response_aggregate', True) else DET_RESP_AGGR[1:]
             for code in codes:
                 self.order.append('detailed_response_codes%s' % code)
@@ -300,6 +357,7 @@ class Web(Mixin):
         else:
             self.order.remove('requests_per_url')
 
+        # Add 'requests_per_user_defined' chart if specified in the configuration
         if self.storage['user_pattern'] and 'user_defined' in match_dict:
             for elem in self.storage['user_pattern']:
                 self.definitions['requests_per_user_defined']['lines'].append([elem.description,
@@ -334,22 +392,32 @@ class Web(Mixin):
                     self.data['0xx'] += 1
                 # detailed response code
                 if self.conf.get('detailed_response_codes', True):
-                    self.get_data_detailed_response_codes(code=match_dict['code'])
+                    self.get_data_per_response_codes_detailed(code=match_dict['code'])
                 # response statuses
-                self.get_data_statuses(code=match_dict['code'])
+                self.get_data_per_statuses(code=match_dict['code'])
                 # requests per url
                 if self.storage['url_pattern']:
-                    self.get_data_per_pattern(field=match_dict['url'], other='url_pattern_other',
+                    self.get_data_per_pattern(field=match_dict['url'],
+                                              other='url_pattern_other',
                                               pattern=self.storage['url_pattern'])
                 # requests per user defined pattern
                 if self.storage['user_pattern'] and 'user_defined' in match_dict:
-                    self.get_data_per_pattern(field=match_dict['user_defined'], other='user_pattern_other',
+                    self.get_data_per_pattern(field=match_dict['user_defined'],
+                                              other='user_pattern_other',
                                               pattern=self.storage['user_pattern'])
                 # requests per http method
-                self.get_data_http_method(method=match_dict['method'])
+                if match_dict['method'] not in self.data:
+                    self.add_new_dimension(dimension_id=match_dict['method'],
+                                           chart_key='http_method')
+                self.data[match_dict['method']] += 1
                 # requests per http version
                 if 'http_version' in match_dict:
-                    self.get_data_http_version(http_version=match_dict['http_version'])
+                    dim_id = match_dict['http_version'].replace('.', '_')
+                    if dim_id not in self.data:
+                        self.add_new_dimension(dimension_id=dim_id,
+                                               chart_key='http_version',
+                                               dimension=match_dict['http_version'])
+                    self.data[dim_id] += 1
                 # bandwidth sent
                 bytes_sent = match_dict['bytes_sent'] if '-' not in match_dict['bytes_sent'] else 0
                 self.data['bytes_sent'] += int(bytes_sent)
@@ -365,10 +433,12 @@ class Web(Mixin):
                 proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
                 self.data['req_' + proto] += 1
                 # unique clients ips
-                if address_not_in_pool(pool=self.storage['unique_all_time'], address=match_dict['address'],
+                if address_not_in_pool(pool=self.storage['unique_all_time'],
+                                       address=match_dict['address'],
                                        pool_size=self.data['unique_tot_ipv4'] + self.data['unique_tot_ipv6']):
                     self.data['unique_tot_' + proto] += 1
-                if address_not_in_pool(pool=unique_current, address=match_dict['address'],
+                if address_not_in_pool(pool=unique_current,
+                                       address=match_dict['address'],
                                        pool_size=ip_address_counter['unique_cur_ip']):
                     self.data['unique_cur_' + proto] += 1
                     ip_address_counter['unique_cur_ip'] += 1
@@ -547,7 +617,7 @@ class Web(Mixin):
         self.storage['regex'] = regex
         return find_regex_return(match_dict=match_dict)
 
-    def get_data_detailed_response_codes(self, code):
+    def get_data_per_response_codes_detailed(self, code):
         """
         :param code: str: CODE from parsed line. Ex.: '202, '499'
         :return:
@@ -555,38 +625,14 @@ class Web(Mixin):
         """
         if code not in self.data:
             if self.conf.get('detailed_response_aggregate', True):
-                self.add_new_dimension(dimension=code, dimension_list=list((code, code, 'incremental')),
-                                       key='detailed_response_codes', chart=self.storage['chart_detailed'][0])
+                self.add_new_dimension(dimension_id=code,
+                                       chart_key='detailed_response_codes')
             else:
                 code_index = int(code[0]) if int(code[0]) < 6 else 6
-                chart_name = 'detailed_response_codes' + DET_RESP_AGGR[code_index]
-                self.add_new_dimension(dimension=code, dimension_list=list((code, code, 'incremental')),
-                                       key=chart_name, chart=self.storage['chart_detailed'][code_index])
+                chart_key = 'detailed_response_codes' + DET_RESP_AGGR[code_index]
+                self.add_new_dimension(dimension_id=code,
+                                       chart_key=chart_key)
         self.data[code] += 1
-
-    def get_data_http_method(self, method):
-        """
-        :param method: str: METHOD from parsed line. Ex.: 'GET', 'POST'
-        :return:
-        Calls add_new_dimension method If the value is found for the first time
-        """
-        if method not in self.data:
-            self.add_new_dimension(dimension=method, dimension_list=list((method, method, 'incremental')),
-                                   key='http_method', chart=self.storage['chart_http_method'])
-        self.data[method] += 1
-
-    def get_data_http_version(self, http_version):
-        """
-        :param http_version: str: METHOD from parsed line. Ex.: '1.1', '1.0'
-        :return:
-        Calls add_new_dimension method If the value is found for the first time
-        """
-        http_version_dim_id = http_version.replace('.', '_')
-        if http_version_dim_id not in self.data:
-            self.add_new_dimension(dimension=http_version_dim_id,
-                                   dimension_list=list((http_version_dim_id, http_version, 'incremental')),
-                                   key='http_version', chart=self.storage['chart_http_version'])
-        self.data[http_version_dim_id] += 1
 
     def get_data_per_pattern(self, field, other, pattern):
         """
@@ -606,7 +652,7 @@ class Web(Mixin):
         if not match:
             self.data[other] += 1
 
-    def get_data_statuses(self, code):
+    def get_data_per_statuses(self, code):
         """
         :param code: str: response status code. Ex.: '202', '499'
         :return:
@@ -648,6 +694,75 @@ class ApacheCache:
             else:
                 data['other'] += 1
         return data
+
+
+class Squid(Mixin):
+    def __init__(self, configuration):
+        self.conf = configuration
+        self.order = ORDER_SQUID
+        self.definitions = CHARTS_SQUID
+        self.regex = re.compile(r'[0-9.]+\s+(?P<duration>[0-9]+)'
+                                r' (?P<client_address>[\da-f.:]+)'
+                                r' (?P<squid_code>[A-Z_]+)/'
+                                r'(?P<http_code>[0-9]+)'
+                                r' (?P<bytes>[0-9]+)'
+                                r' (?P<method>[A-Z]+)'
+                                r' (?P<url>[^ ]+)'
+                                r' (?P<user>[^ ]+)'
+                                r' (?P<hier_code>[A-Z_]+)/[0-9.-]+'
+                                r' (?P<mime_type>[^\n]+)')
+        self.data = {'duration_max': 0, 'duration_avg': 0, 'duration_min': 0,
+                     'bytes': 0, '0xx': 0, '1xx': 0, '2xx': 0, '3xx': 0, '4xx': 0,
+                     '5xx': 0, 'other': 0, 'unmatched': 0, 'unique_ipv4': 0, 'unique_ipv6': 0}
+
+    def check(self):
+        last_line = self.get_last_line()
+        if not last_line:
+            return False
+        match = self.regex.search(last_line)
+        if not match:
+            self.error('Regex not matches (%s)' % self.regex.pattern)
+            return False
+        return True
+
+    def get_data(self, raw_data=None):
+        if raw_data is None:
+            return None
+
+        unique_ip, duration = set(), list()
+
+        for row in raw_data:
+            match = self.regex.search(row)
+            if match:
+                match = match.groupdict()
+                duration.append(match['duration'])
+                try:
+                    self.data[match['http_code'][0] + 'xx'] += 1
+                except KeyError:
+                    self.data['other'] += 1
+
+                self.data['bytes'] += int(match['bytes'])
+
+                proto = 'ipv4' if '.' in match['client_address'] else 'ipv6'
+                if match['client_address'] not in unique_ip:
+                    self.data['unique_' + proto] += 1
+                    unique_ip.add(match['client_address'])
+
+                for elem in SQUID_DYNAMIC:
+                    if match[elem] not in self.data:
+                        self.add_new_dimension(dimension_id=match[elem],
+                                               chart_key=elem)
+                    else:
+                        self.data[match[elem]] += 1
+            else:
+                self.data['unmatched'] += 1
+
+        if duration:
+            length, duration = len(duration), map(float, duration)
+            self.data['duration_min'] += min(duration)
+            self.data['duration_max'] += max(duration)
+            self.data['duration_avg'] += sum(duration) / length
+        return self.data
 
 
 def address_not_in_pool(pool, address, pool_size):
