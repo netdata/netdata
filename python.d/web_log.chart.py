@@ -20,7 +20,8 @@ ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth', 'response_time'
              'clients', 'clients_all']
 
 ORDER_SQUID = ['response_statuses', 'response_codes', 'detailed_response_codes', 'squid_code',
-               'hier_code', 'bytes', 'duration', 'method', 'clients']
+               'hier_code', 'transport_methods', 'transport_errors', 'handling_opts', 'object_types',
+               'cache_events', 'bytes', 'duration', 'method', 'clients']
 
 CHARTS_WEB = {
     'response_codes': {
@@ -172,6 +173,31 @@ CHARTS_SQUID = {
         'lines': [
             ['unique_ipv4', 'ipv4', 'incremental', 1, 1],
             ['unique_ipv6', 'ipv6', 'incremental', 1, 1]
+        ]},
+    'transport_methods': {
+        'options': [None, 'Transport Methods', 'methods', 'squid_transport',
+                    'web_log.squid_ transport_methods', 'stacked'],
+        'lines': [
+        ]},
+    'transport_errors': {
+        'options': [None, 'Transport Errors', 'errors', 'squid_transport',
+                    'web_log.squid_transport_errors', 'stacked'],
+        'lines': [
+        ]},
+    'handling_opts': {
+        'options': [None, 'Handling Opts', 'errors', 'squid_cache',
+                    'web_log.squid_handling_opts', 'stacked'],
+        'lines': [
+        ]},
+    'object_types': {
+        'options': [None, 'Object Types', 'types', 'squid_cache',
+                    'web_log.squid_object_types', 'stacked'],
+        'lines': [
+        ]},
+    'cache_events': {
+        'options': [None, 'Cache Events', 'events', 'squid_cache',
+                    'web_log.squid_cache_events', 'stacked'],
+        'lines': [
         ]}
 }
 
@@ -183,6 +209,16 @@ SQUID_DYNAMIC = dict(squid_code='squid_code',
                      http_code='detailed_response_codes',
                      hier_code='hier_code',
                      method='method')
+
+SQUID_CODES = dict(TCP='transport_methods', UDP='transport_methods', NONE='transport_methods',
+                   CLIENT='handling_opts', IMS='handling_opts', ASYNC='handling_opts',
+                   SWAPFAIL='handling_opts', REFRESH='handling_opts', SHARED='handling_opts',
+                   REPLY='handling_opts', NEGATIVE='object_types', STALE='object_types',
+                   OFFLINE='object_types', INVALID='object_types', FAIL='object_types',
+                   MODIFIED='object_types', UNMODIFIED='object_types', REDIRECT='object_types',
+                   HIT='cache_events', MEM='cache_events', MISS='cache_events',
+                   DENIED='cache_events', NOFETCH='cache_events', TUNNEL='cache_events',
+                   ABORTED='transport_errors', TIMEOUT='transport_errors')
 
 
 class Service(LogService):
@@ -272,7 +308,8 @@ class Mixin:
 
     def get_last_line(self):
         """
-        :return:
+        Reads last line from the log file
+        :return: str:
         """
         # Read last line (or first if there is only one line)
         with open(self.conf['path'], 'rb') as logs:
@@ -336,9 +373,7 @@ class Web(Mixin):
         """
         :param match_dict: dict: regex.search.groupdict(). Ex. {'address': '127.0.0.1', 'code': '200', 'method': 'GET'}
         :return:
-        Create additional charts depending on the 'match_dict' keys and configuration file options
-        1. 'time_response' chart is removed if there is no 'resp_time' in match_dict.
-        2. Other stuff is just remove/add chart depending on yes/no in conf
+        Create/remove additional charts depending on the 'match_dict' keys and configuration file options
         """
         self.order = ORDER_WEB[:]
         self.definitions = deepcopy(CHARTS_WEB)
@@ -382,7 +417,7 @@ class Web(Mixin):
 
     def get_data(self, raw_data=None):
         """
-        Parse new log lines
+        Parses new log lines
         :return: dict OR None
         None if _get_raw_data method fails.
         In all other cases - dict.
@@ -409,12 +444,12 @@ class Web(Mixin):
                 self.get_data_per_statuses(code=match_dict['code'])
                 # requests per url
                 if self.storage['url_pattern']:
-                    self.get_data_per_pattern(field=match_dict['url'],
+                    self.get_data_per_pattern(row=match_dict['url'],
                                               other='url_pattern_other',
                                               pattern=self.storage['url_pattern'])
                 # requests per user defined pattern
                 if self.storage['user_pattern'] and 'user_defined' in match_dict:
-                    self.get_data_per_pattern(field=match_dict['user_defined'],
+                    self.get_data_per_pattern(row=match_dict['user_defined'],
                                               other='user_pattern_other',
                                               pattern=self.storage['user_pattern'])
                 # requests per http method
@@ -646,18 +681,18 @@ class Web(Mixin):
                                        chart_key=chart_key)
         self.data[code] += 1
 
-    def get_data_per_pattern(self, field, other, pattern):
+    def get_data_per_pattern(self, row, other, pattern):
         """
-        :param field: str:
+        :param row: str:
         :param other: str:
-        :param pattern: list:
+        :param pattern: named tuple: (['pattern_description', 'regular expression'])
         :return:
         Scan through string looking for the first location where patterns produce a match for all user
         defined patterns
         """
         match = None
         for elem in pattern:
-            if elem.pattern.search(field):
+            if elem.pattern.search(row):
                 self.data[elem.description] += 1
                 match = True
                 break
@@ -757,6 +792,8 @@ class Squid(Mixin):
 
                 self.get_data_per_statuses(match['http_code'])
 
+                self.get_data_per_squid_code(match['squid_code'])
+
                 self.data['bytes'] += int(match['bytes'])
 
                 proto = 'ipv4' if '.' in match['client_address'] else 'ipv6'
@@ -795,13 +832,27 @@ class Squid(Mixin):
         else:
             self.data['bad_requests'] += 1
 
+    def get_data_per_squid_code(self, code):
+        """
+        :param code: str: squid response code. Ex.: 'TCP_MISS', 'TCP_MISS_ABORTED'
+        :return:
+        """
+        for tag in code.split('_'):
+            try:
+                chart_key = SQUID_CODES[tag]
+            except KeyError:
+                continue
+            if tag not in self.data:
+                self.add_new_dimension(dimension_id=tag, chart_key=chart_key)
+            self.data[tag] += 1
+
 
 def address_not_in_pool(pool, address, pool_size):
     """
     :param pool: list of ip addresses
     :param address: ip address
     :param pool_size: current pool size
-    :return: True if address not in pool. False if address in pool.
+    :return: True if address not in pool. False otherwise.
     """
     index = bisect.bisect_left(pool, address)
     if index < pool_size:
@@ -825,7 +876,7 @@ def find_regex_return(match_dict=None, msg='Generic error message'):
 def check_patterns(string, dimension_regex_dict):
     """
     :param string: str:
-    :param dimension_regex_dict: dict: ex. {'dim1': 'pattern1>', 'dim2': '<pattern2>'}
+    :param dimension_regex_dict: dict: ex. {'dim1': '<pattern1>', 'dim2': '<pattern2>'}
     :return: list of named tuples or None:
      We need to make sure all patterns are valid regular expressions
     """
@@ -859,7 +910,7 @@ def find_job_name(override_name, name):
     :param override_name: str: 'name' var from configuration file
     :param name: str: 'job_name' from configuration file
     :return: str: new job name
-    We need this for dynamic charts. Actually same logic as in python.d.plugin.
+    We need this for dynamic charts. Actually the same logic as in python.d.plugin.
     """
     add_to_name = override_name or name
     if add_to_name:
