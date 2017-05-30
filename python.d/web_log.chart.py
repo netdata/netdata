@@ -134,7 +134,8 @@ CHARTS_SQUID = {
             ['successful_requests', 'success', 'incremental', 1, 1],
             ['server_errors', 'error', 'incremental', 1, 1],
             ['redirects', 'redirect', 'incremental', 1, 1],
-            ['bad_requests', 'bad', 'incremental', 1, 1]
+            ['bad_requests', 'bad', 'incremental', 1, 1],
+            ['other_requests', 'other', 'incremental', 1, 1]
         ]},
     'squid_response_codes': {
         'options': [None, 'Response Codes', 'responses/s', 'squid_responses',
@@ -762,7 +763,7 @@ class Squid(Mixin):
                      '0xx': 0, '1xx': 0, '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0,
                      'other': 0, 'unmatched': 0, 'unique_ipv4': 0, 'unique_ipv6': 0,
                      'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
-                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0
+                     'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0
                      }
 
     def check(self):
@@ -845,14 +846,16 @@ class Squid(Mixin):
         :return:
         """
         code_class = code[0]
-        if code_class == '2' or code == '304' or code_class == '1':
+        if code_class == '2' or code == '304' or code_class == '1' or code == '000':
             self.data['successful_requests'] += 1
         elif code_class == '3':
             self.data['redirects'] += 1
-        elif code_class == '5':
+        elif code_class == '4':
+            self.data['bad_requests'] += 1
+        elif code_class == '5' or code_class == '6':
             self.data['server_errors'] += 1
         else:
-            self.data['bad_requests'] += 1
+            self.data['other_requests'] += 1
 
     def get_data_per_squid_code(self, code):
         """
