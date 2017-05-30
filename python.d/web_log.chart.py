@@ -115,7 +115,7 @@ CHARTS_APACHE_CACHE = {
 CHARTS_SQUID = {
     'squid_duration': {
         'options': [None, 'Elapsed Time The Transaction Busied The Cache',
-                    'ms', 'timings', 'web_log.squid_duration', 'area'],
+                    'ms', 'squid_timings', 'web_log.squid_duration', 'area'],
         'lines': [
             ['duration_min', 'min', 'incremental', 1, 1000],
             ['duration_max', 'max', 'incremental', 1, 1000],
@@ -123,12 +123,12 @@ CHARTS_SQUID = {
         ]},
     'squid_bytes': {
         'options': [None, 'Amount Of Data Delivered To The Clients',
-                    'kilobits/s', 'bandwidth', 'web_log.squid_bytes', 'area'],
+                    'kilobits/s', 'squid_bandwidth', 'web_log.squid_bytes', 'area'],
         'lines': [
             ['bytes', 'sent', 'incremental', 8, 1000]
         ]},
     'squid_response_statuses': {
-        'options': [None, 'Response Statuses', 'responses/s', 'responses', 'web_log.squid_response_statuses',
+        'options': [None, 'Response Statuses', 'responses/s', 'squid_responses', 'web_log.squid_response_statuses',
                     'stacked'],
         'lines': [
             ['successful_requests', 'success', 'incremental', 1, 1],
@@ -137,7 +137,7 @@ CHARTS_SQUID = {
             ['bad_requests', 'bad', 'incremental', 1, 1]
         ]},
     'squid_response_codes': {
-        'options': [None, 'Response Codes', 'responses/s', 'responses', 'web_log.squid_response_codes', 'stacked'],
+        'options': [None, 'Response Codes', 'responses/s', 'squid_responses', 'web_log.squid_response_codes', 'stacked'],
         'lines': [
             ['2xx', None, 'incremental'],
             ['5xx', None, 'incremental'],
@@ -155,55 +155,55 @@ CHARTS_SQUID = {
         ]},
     'squid_detailed_response_codes': {
         'options': [None, 'Detailed Response Codes',
-                    'responses/s', 'responses', 'web_log.squid_detailed_response_codes', 'stacked'],
+                    'responses/s', 'squid_responses', 'web_log.squid_detailed_response_codes', 'stacked'],
         'lines': [
         ]},
     'squid_hier_code': {
         'options': [None, 'Responses Per Hierarchy Code',
-                    'responses/s', 'hierarchy', 'web_log.squid_hier_code', 'stacked'],
+                    'responses/s', 'squid_hierarchy', 'web_log.squid_hier_code', 'stacked'],
         'lines': [
         ]},
     'squid_method': {
         'options': [None, 'Requests Per Method',
-                    'requests/s', 'requests', 'web_log.squid_method', 'stacked'],
+                    'requests/s', 'squid_requests', 'web_log.squid_method', 'stacked'],
         'lines': [
         ]},
     'squid_clients': {
-        'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'clients',
+        'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'squid_clients',
                     'web_log.squid_clients', 'stacked'],
         'lines': [
             ['unique_ipv4', 'ipv4', 'incremental'],
             ['unique_ipv6', 'ipv6', 'incremental']
         ]},
     'squid_clients_all': {
-        'options': [None, 'All Time Unique Client IPs', 'unique ips', 'clients',
+        'options': [None, 'All Time Unique Client IPs', 'unique ips', 'squid_clients',
                     'web_log.squid_clients_all', 'stacked'],
         'lines': [
             ['unique_tot_ipv4', 'ipv4', 'absolute'],
             ['unique_tot_ipv6', 'ipv6', 'absolute']
         ]},
     'squid_transport_methods': {
-        'options': [None, 'Transport Methods', 'methods', 'squid_transport',
+        'options': [None, 'Transport Methods', 'squid_methods', 'squid_transport',
                     'web_log.squid_transport_methods', 'stacked'],
         'lines': [
         ]},
     'squid_transport_errors': {
-        'options': [None, 'Transport Errors', 'errors', 'squid_transport',
+        'options': [None, 'Transport Errors', 'squid_errors', 'squid_transport',
                     'web_log.squid_transport_errors', 'stacked'],
         'lines': [
         ]},
     'squid_handling_opts': {
-        'options': [None, 'Handling Opts', 'errors', 'squid_cache',
+        'options': [None, 'Handling Opts', 'squid_errors', 'squid_cache',
                     'web_log.squid_handling_opts', 'stacked'],
         'lines': [
         ]},
     'squid_object_types': {
-        'options': [None, 'Object Types', 'types', 'squid_cache',
+        'options': [None, 'Object Types', 'squid_types', 'squid_cache',
                     'web_log.squid_object_types', 'stacked'],
         'lines': [
         ]},
     'squid_cache_events': {
-        'options': [None, 'Cache Events', 'events', 'squid_cache',
+        'options': [None, 'Cache Events', 'squid_events', 'squid_cache',
                     'web_log.squid_cache_events', 'stacked'],
         'lines': [
         ]}
