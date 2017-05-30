@@ -117,13 +117,13 @@ CHARTS_SQUID = {
         'options': [None, 'Elapsed Time The Transaction Busied The Cache',
                     'ms', 'timings', 'web_log.squid_duration', 'area'],
         'lines': [
-            ['duration_min', 'min', 'incremental'],
-            ['duration_max', 'max', 'incremental'],
-            ['duration_avg', 'avg', 'incremental']
+            ['duration_min', 'min', 'incremental', 1, 1000],
+            ['duration_max', 'max', 'incremental', 1, 1000],
+            ['duration_avg', 'avg', 'incremental', 1, 1000]
         ]},
     'squid_bytes': {
         'options': [None, 'Amount Of Data Delivered To The Clients',
-                    'Kb/s', 'bandwidth', 'web_log.squid_bytes', 'line'],
+                    'kilobits/s', 'bandwidth', 'web_log.squid_bytes', 'area'],
         'lines': [
             ['bytes', 'sent', 'incremental', 8, 1000]
         ]},
@@ -777,7 +777,7 @@ class Squid(Mixin):
                                            r' (?P<method>[A-Z]+)'
                                            r' (?P<url>[^ ]+)'
                                            r' (?P<user>[^ ]+)'
-                                           r' (?P<hier_code>[A-Z_]+)/[0-9.-]+'
+                                           r' (?P<hier_code>[A-Z_]+)/[\da-f.:-]+'
                                            r' (?P<mime_type>[^\n]+)')
 
         match = self.storage['regex'].search(last_line)
@@ -832,7 +832,7 @@ class Squid(Mixin):
                 self.data['unmatched'] += 1
 
         if duration:
-            length, duration = len(duration), map(float, duration)
+            length, duration = len(duration), map(lambda v: float(v) * 1000, duration)
             self.data['duration_min'] += min(duration)
             self.data['duration_max'] += max(duration)
             self.data['duration_avg'] += sum(duration) / length
