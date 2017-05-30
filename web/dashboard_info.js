@@ -289,6 +289,35 @@ netdataDashboard.menu = {
 
 // information about the submenus
 netdataDashboard.submenu = {
+    'web_log.squid_bandwidth': {
+        title: 'bandwidth',
+        info: 'Bandwidth of responses (<code>sent</code>) by squid. This chart may present unusual spikes, since the bandwidth is accounted at the time the log line is saved by the server, even if the time needed to serve it spans across a longer duration. We suggest to use QoS (e.g. <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a>) for accurate accounting of the server bandwidth.'
+      },
+    'web_log.squid_responses': {
+        title: 'responses'
+      },
+    'web_log.squid_requests': {
+        title: 'requests'
+      },
+    'web_log.squid_hierarchy': {
+        title: 'hierarchy',
+        info: 'Performance metrics for the squid hierarchy used to serve the requests.'
+      },
+    'web_log.squid_squid_transport': {
+        title: 'squid_transport',
+        info: 'Analysis of the protocols used to receive the requests.'
+      },
+    'web_log.squid_squid_cache': {
+        title: 'squid_cache',
+        info: 'Performance metrics for the performance of the squid cache.'
+      },
+    'web_log.squid_timings': {
+        title: 'timings',
+        info: 'Duration of squid requests. Unrealistic spikes may be reported, since squid logs the total time of the requests, when they complete. Especially for HTTPS, the clients get a tunnel from the proxy and exchange requests directly with the upstream servers, so squid cannot evaluate the individual requests and reports the total time the tunnel was open.'
+      },
+    'web_log.squid_clients': {
+        title: 'clients'
+      },
     'web_log.bandwidth': {
         info: 'Bandwidth of requests (<code>received</code>) and responses (<code>sent</code>). <code>received</code> requires an extended log format (without it, the web server log does not have this information). This chart may present unusual spikes, since the bandwidth is accounted at the time the log line is saved by the web server, even if the time needed to serve it spans across a longer duration. We suggest to use QoS (e.g. <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a>) for accurate accounting of the web server bandwidth.'
     },

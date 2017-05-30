@@ -632,6 +632,8 @@ NETDATA_ADDED_TO_VARNISH=0
 NETDATA_ADDED_TO_HAPROXY=0
 NETDATA_ADDED_TO_ADM=0
 NETDATA_ADDED_TO_NSD=0
+NETDATA_ADDED_TO_PROXY=0
+NETDATA_ADDED_TO_SQUID=0
 add_netdata_user_and_group() {
     if [ ${UID} -eq 0 ]
         then
@@ -643,6 +645,8 @@ add_netdata_user_and_group() {
         portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
         portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
         portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
+        portable_add_user_to_group proxy      netdata && NETDATA_ADDED_TO_PROXY=1
+        portable_add_user_to_group squid      netdata && NETDATA_ADDED_TO_SQUID=1
         return 0
     fi
 

@@ -516,7 +516,7 @@ def run():
     global DEBUG_FLAG, TRACE_FLAG, BASE_CONFIG
 
     # read configuration file
-    disabled = ['nginx_log', 'gunicorn_log']
+    disabled = ['nginx_log', 'gunicorn_log', 'apache_cache']
     enabled = list()
     default_run = True
     configfile = CONFIG_DIR + "python.d.conf"
