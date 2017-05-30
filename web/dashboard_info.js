@@ -310,7 +310,7 @@ netdataDashboard.submenu = {
     },
 
     'web_log.squid_squid_transport': {
-        title: 'transport',
+        title: 'transport'
     },
 
     'web_log.squid_squid_cache': {
