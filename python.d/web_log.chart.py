@@ -19,7 +19,7 @@ ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth', 'response_time'
              'requests_per_user_defined', 'http_method', 'http_version', 'requests_per_ipproto',
              'clients', 'clients_all']
 
-ORDER_SQUID = ['response_statuses', 'response_codes', 'squid_code', 'http_code',
+ORDER_SQUID = ['response_statuses', 'response_codes', 'detailed_response_codes', 'squid_code',
                'hier_code', 'bytes', 'duration', 'method', 'clients']
 
 CHARTS_WEB = {
@@ -151,14 +151,14 @@ CHARTS_SQUID = {
                     'responses/s', 'responses', 'web_log.squid_responses_squid_code', 'stacked'],
         'lines': [
         ]},
-    'http_code': {
-        'options': [None, 'Responses Per HTTP Code',
-                    'responses/s', 'responses', 'web_log.squid_responses_http_code', 'stacked'],
+    'detailed_response_codes': {
+        'options': [None, 'Detailed Response Codes',
+                    'responses/s', 'responses', 'web_log.squid_detailed_response_codes', 'stacked'],
         'lines': [
         ]},
     'hier_code': {
         'options': [None, 'Responses Per Hierarchy Code',
-                    'responses/s', 'responses', 'web_log.squid_responses_hier_code', 'stacked'],
+                    'responses/s', 'hierarchy', 'web_log.squid_responses_hier_code', 'stacked'],
         'lines': [
         ]},
     'method': {
@@ -179,7 +179,10 @@ NAMED_PATTERN = namedtuple('PATTERN', ['description', 'pattern'])
 
 DET_RESP_AGGR = ['', '_1xx', '_2xx', '_3xx', '_4xx', '_5xx', '_Other']
 
-SQUID_DYNAMIC = ('squid_code', 'http_code', 'hier_code', 'method')
+SQUID_DYNAMIC = dict(squid_code='squid_code',
+                     http_code='detailed_response_codes',
+                     hier_code='hier_code',
+                     method='method')
 
 
 class Service(LogService):
@@ -761,12 +764,12 @@ class Squid(Mixin):
                     self.data['unique_' + proto] += 1
                     unique_ip.add(match['client_address'])
 
-                for elem in SQUID_DYNAMIC:
-                    if match[elem] not in self.data:
-                        self.add_new_dimension(dimension_id=match[elem],
-                                               chart_key=elem)
+                for key, chart_key in SQUID_DYNAMIC.items():
+                    if match[key] not in self.data:
+                        self.add_new_dimension(dimension_id=match[key],
+                                               chart_key=chart_key)
                     else:
-                        self.data[match[elem]] += 1
+                        self.data[match[key]] += 1
             else:
                 self.data['unmatched'] += 1
 
