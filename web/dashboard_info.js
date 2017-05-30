@@ -1059,7 +1059,7 @@ netdataDashboard.context = {
 
     'web_log.squid_response_statuses': {
         info: 'Squid responses by type. ' +
-        '<code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>000</b> <b>304</b>, ' +
+        '<code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>000</b>, <b>304</b>, ' +
         '<code>error</code> includes <b>5xx</b> and <b>6xx</b>, ' +
         '<code>redirect</code> includes <b>3xx</b> except <b>304</b>, ' +
         '<code>bad</code> includes <b>4xx</b>, ' +
