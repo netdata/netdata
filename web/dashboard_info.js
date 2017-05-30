@@ -311,7 +311,6 @@ netdataDashboard.submenu = {
 
     'web_log.squid_squid_transport': {
         title: 'transport',
-        info: 'Analysis of the protocols used to receive the requests.'
     },
 
     'web_log.squid_squid_cache': {
