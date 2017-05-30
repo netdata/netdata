@@ -240,7 +240,7 @@ netdataDashboard.menu = {
     'web_log': {
         title: undefined,
         icon: '<i class="fa fa-file-text-o" aria-hidden="true"></i>',
-        info: 'Information extracted from a web server log file. <code>web_log</code> plugin incrementally parses the web server log file to provide, in real-time, a break down of key web server performance metrics. An extended log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) offering timing information and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
+        info: 'Information extracted from a server log file. <code>web_log</code> plugin incrementally parses the server log file to provide, in real-time, a break down of key server performance metrics. For web servers, an extended log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) offering timing information and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     },
 
     'named': {
@@ -292,32 +292,41 @@ netdataDashboard.submenu = {
     'web_log.squid_bandwidth': {
         title: 'bandwidth',
         info: 'Bandwidth of responses (<code>sent</code>) by squid. This chart may present unusual spikes, since the bandwidth is accounted at the time the log line is saved by the server, even if the time needed to serve it spans across a longer duration. We suggest to use QoS (e.g. <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a>) for accurate accounting of the server bandwidth.'
-      },
+    },
+
     'web_log.squid_responses': {
-        title: 'responses'
-      },
+        title: 'responses',
+        info: 'Information related to the responses sent by squid.'
+    },
+
     'web_log.squid_requests': {
-        title: 'requests'
-      },
+        title: 'requests',
+        info: 'Information related to the requests squid has received.'
+    },
+
     'web_log.squid_hierarchy': {
         title: 'hierarchy',
         info: 'Performance metrics for the squid hierarchy used to serve the requests.'
-      },
+    },
+
     'web_log.squid_squid_transport': {
-        title: 'squid_transport',
-        info: 'Analysis of the protocols used to receive the requests.'
-      },
+        title: 'transport'
+    },
+
     'web_log.squid_squid_cache': {
-        title: 'squid_cache',
+        title: 'cache',
         info: 'Performance metrics for the performance of the squid cache.'
-      },
+    },
+
     'web_log.squid_timings': {
         title: 'timings',
         info: 'Duration of squid requests. Unrealistic spikes may be reported, since squid logs the total time of the requests, when they complete. Especially for HTTPS, the clients get a tunnel from the proxy and exchange requests directly with the upstream servers, so squid cannot evaluate the individual requests and reports the total time the tunnel was open.'
-      },
+    },
+
     'web_log.squid_clients': {
         title: 'clients'
-      },
+    },
+
     'web_log.bandwidth': {
         info: 'Bandwidth of requests (<code>received</code>) and responses (<code>sent</code>). <code>received</code> requires an extended log format (without it, the web server log does not have this information). This chart may present unusual spikes, since the bandwidth is accounted at the time the log line is saved by the web server, even if the time needed to serve it spans across a longer duration. We suggest to use QoS (e.g. <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a>) for accurate accounting of the web server bandwidth.'
     },
@@ -917,6 +926,9 @@ netdataDashboard.context = {
         height: 0.5
     },
 
+    // ------------------------------------------------------------------------
+    // web_log
+
     'web_log.response_statuses': {
         info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b> and <b>304</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b>, <code>other</code> are all the other responses.',
         mainheads: [
@@ -995,7 +1007,14 @@ netdataDashboard.context = {
     },
 
     'web_log.response_codes': {
-        info: 'Web server responses by code family. According to the standards <code>1xx</code> are informational responses, <code>2xx</code> are successful responses, <code>3xx</code> are redirects (although they include <b>304</b> which is used as "<b>not modified</b>"), <code>4xx</code> are bad requests, <code>5xx</code> are internal server errors, <code>other</code> are non-standard responses, <code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
+        info: 'Web server responses by code family. ' +
+        'According to the standards <code>1xx</code> are informational responses, ' +
+        '<code>2xx</code> are successful responses, ' +
+        '<code>3xx</code> are redirects (although they include <b>304</b> which is used as "<b>not modified</b>"), ' +
+        '<code>4xx</code> are bad requests, ' +
+        '<code>5xx</code> are internal server errors, ' +
+        '<code>other</code> are non-standard responses, ' +
+        '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
     },
 
     'web_log.response_time': {
@@ -1033,6 +1052,189 @@ netdataDashboard.context = {
 
     'web_log.clients_all': {
         info: 'Unique client IPs accessing the web server since the last restart of netdata. This plugin keeps in memory all the unique IPs that have accessed the web server. On very busy web servers (several millions of unique IPs) you may want to disable this chart (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
-    }
+    },
 
+    // ------------------------------------------------------------------------
+    // web_log for squid
+
+    'web_log.squid_response_statuses': {
+        info: 'Squid responses by type. ' +
+        '<code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>000</b>, <b>304</b>, ' +
+        '<code>error</code> includes <b>5xx</b> and <b>6xx</b>, ' +
+        '<code>redirect</code> includes <b>3xx</b> except <b>304</b>, ' +
+        '<code>bad</code> includes <b>4xx</b>, ' +
+        '<code>other</code> are all the other responses.',
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="success"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Successful"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="redirect"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Redirects"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="bad"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Bad Requests"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            },
+
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="error"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Server Errors"'
+                    + ' data-units="requests/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-common-max="' + id + '"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' data-decimal-digits="0"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'web_log.squid_response_codes': {
+        info: 'Web server responses by code family. ' +
+        'According to HTTP standards <code>1xx</code> are informational responses, ' +
+        '<code>2xx</code> are successful responses, ' +
+        '<code>3xx</code> are redirects (although they include <b>304</b> which is used as "<b>not modified</b>"), ' +
+        '<code>4xx</code> are bad requests, ' +
+        '<code>5xx</code> are internal server errors. ' +
+        'Squid also defines <code>000</code> mostly for UDP requests, and ' +
+        '<code>6xx</code> for broken upstream servers sending wrong headers. ' +
+        'Finally, <code>other</code> are non-standard responses, and ' +
+        '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin (<a href="https://github.com/firehol/netdata/issues/new?title=web_log%20reports%20unmatched%20lines&body=web_log%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20web%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
+    },
+
+    'web_log.squid_duration': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="avg"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Average Response Time"'
+                    + ' data-units="milliseconds"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' data-decimal-digits="2"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'web_log.squid_detailed_response_codes': {
+        info: 'Number of responses for each response code individually.'
+    },
+
+    'web_log.squid_clients': {
+        info: 'Unique client IPs accessing squid, within each data collection iteration. If data collection is <b>per second</b>, this chart shows <b>unique client IPs per second</b>.'
+    },
+
+    'web_log.squid_clients_all': {
+        info: 'Unique client IPs accessing squid since the last restart of netdata. This plugin keeps in memory all the unique IPs that have accessed the server. On very busy squid servers (several millions of unique IPs) you may want to disable this chart (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
+    },
+
+    'web_log.squid_transport_methods': {
+        info: 'Break down per delivery method: <code>TCP</code> are requests on the HTTP port (usually 3128), ' +
+        '<code>UDP</code> are requests on the ICP port (usually 3130), or HTCP port (usually 4128). ' +
+        'If ICP logging was disabled using the log_icp_queries option, no ICP replies will be logged. ' +
+        '<code>NONE</code> are used to state that squid delivered an unusual response or no response at all. ' +
+        'Seen with cachemgr requests and errors, usually when the transaction fails before being classified into one of the above outcomes. ' +
+        'Also seen with responses to <code>CONNECT</code> requests.'
+    },
+
+    'web_log.squid_code': {
+        info: 'These are combined squid result status codes. A break down per component is given in the following charts. ' +
+        'Check the <a href="http://wiki.squid-cache.org/SquidFaq/SquidLogs">squid documentation about them</a>.'
+    },
+
+    'web_log.squid_handling_opts': {
+        info: 'These tags are optional and describe why the particular handling was performed or where the request came from. ' +
+        '<code>CLIENT</code> means that the client request placed limits affecting the response. Usually seen with client issued a <b>no-cache</b>, or analogous cache control command along with the request. Thus, the cache has to validate the object.' +
+        '<code>IMS</code> states that the client sent a revalidation (conditional) request. ' +
+        '<code>ASYNC</code>, is used when the request was generated internally by Squid. Usually this is background fetches for cache information exchanges, background revalidation from stale-while-revalidate cache controls, or ESI sub-objects being loaded. ' +
+        '<code>SWAPFAIL</code> is assigned when the object was believed to be in the cache, but could not be accessed. A new copy was requested from the server. ' +
+        '<code>REFRESH</code> when a revalidation (conditional) request was sent to the server. ' +
+        '<code>SHARED</code> when this request was combined with an existing transaction by collapsed forwarding. NOTE: the existing request is not marked as SHARED. ' +
+        '<code>REPLY</code> when particular handling was requested in the HTTP reply from server or peer. Usually seen on DENIED due to http_reply_access ACLs preventing delivery of servers response object to the client.'
+    },
+
+    'web_log.squid_object_types': {
+        info: 'These tags are optional and describe what type of object was produced. ' +
+        '<code>NEGATIVE</code> is only seen on HIT responses, indicating the response was a cached error response. e.g. <b>404 not found</b>. ' +
+        '<code>STALE</code> means the object was cached and served stale. This is usually caused by stale-while-revalidate or stale-if-error cache controls. ' +
+        '<code>OFFLINE</code> when the requested object was retrieved from the cache during offline_mode. The offline mode never validates any object. ' +
+        '<code>INVALID</code> when an invalid request was received. An error response was delivered indicating what the problem was. ' +
+        '<code>FAIL</code> is only seen on <code>REFRESH</code> to indicate the revalidation request failed. The response object may be the server provided network error or the stale object which was being revalidated depending on stale-if-error cache control. ' +
+        '<code>MODIFIED</code> is only seen on <code>REFRESH</code> responses to indicate revalidation produced a new modified object. ' +
+        '<code>UNMODIFIED</code> is only seen on <code>REFRESH</code> responses to indicate revalidation produced a <b>304</b> (Not Modified) status, which was relayed to the client. ' +
+        '<code>REDIRECT</code> when squid generated an HTTP redirect response to this request.'
+    },
+
+    'web_log.squid_cache_events': {
+        info: 'These tags are optional and describe whether the response was loaded from cache, network, or otherwise. ' +
+        '<code>HIT</code> when the response object delivered was the local cache object. ' +
+        '<code>MEM</code> when the response object came from memory cache, avoiding disk accesses. Only seen on HIT responses. ' +
+        '<code>MISS</code> when the response object delivered was the network response object. ' +
+        '<code>DENIED</code> when the request was denied by access controls. ' +
+        '<code>NOFETCH</code> an ICP specific type, indicating service is alive, but not to be used for this request (sent during "-Y" startup, or during frequent failures, a cache in hit only mode will return either UDP_HIT or UDP_MISS_NOFETCH. Neighbours will thus only fetch hits). ' +
+        '<code>TUNNEL</code> when a binary tunnel was established for this transaction.'
+    },
+
+    'web_log.squid_transport_errors': {
+        info: 'These tags are optional and describe some error conditions which occured during response delivery (if any). ' +
+        '<code>ABORTED</code> when the response was not completed due to the connection being aborted (usually by the client). ' +
+        '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
+    }
 };
