@@ -19,7 +19,7 @@ ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth', 'response_time'
              'requests_per_user_defined', 'http_method', 'http_version', 'requests_per_ipproto',
              'clients', 'clients_all']
 
-ORDER_SQUID = ['squid_response_codes', 'squid_code', 'http_code',
+ORDER_SQUID = ['response_statuses', 'response_codes', 'squid_code', 'http_code',
                'hier_code', 'bytes', 'duration', 'method', 'clients']
 
 CHARTS_WEB = {
@@ -125,7 +125,16 @@ CHARTS_SQUID = {
         'lines': [
             ['bytes', 'sent', 'incremental', 1, 1024]
         ]},
-    'squid_response_codes': {
+    'response_statuses': {
+        'options': [None, 'Response Statuses', 'responses/s', 'responses', 'web_log.squid_response_statuses',
+                    'stacked'],
+        'lines': [
+            ['successful_requests', 'success', 'incremental', 1, 1],
+            ['server_errors', 'error', 'incremental', 1, 1],
+            ['redirects', 'redirect', 'incremental', 1, 1],
+            ['bad_requests', 'bad', 'incremental', 1, 1]
+        ]},
+    'response_codes': {
         'options': [None, 'Response Codes', 'responses/s', 'responses', 'web_log.squid_response_codes', 'stacked'],
         'lines': [
             ['2xx', None, 'incremental'],
@@ -711,9 +720,11 @@ class Squid(Mixin):
                                 r' (?P<user>[^ ]+)'
                                 r' (?P<hier_code>[A-Z_]+)/[0-9.-]+'
                                 r' (?P<mime_type>[^\n]+)')
-        self.data = {'duration_max': 0, 'duration_avg': 0, 'duration_min': 0,
-                     'bytes': 0, '0xx': 0, '1xx': 0, '2xx': 0, '3xx': 0, '4xx': 0,
-                     '5xx': 0, 'other': 0, 'unmatched': 0, 'unique_ipv4': 0, 'unique_ipv6': 0}
+        self.data = {'duration_max': 0, 'duration_avg': 0, 'duration_min': 0, 'bytes': 0,
+                     '0xx': 0, '1xx': 0, '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0,
+                     'other': 0, 'unmatched': 0, 'unique_ipv4': 0, 'unique_ipv6': 0,
+                     'successful_requests': 0, 'redirects': 0, 'bad_requests': 0, 'server_errors': 0
+                     }
 
     def check(self):
         last_line = self.get_last_line()
@@ -741,6 +752,8 @@ class Squid(Mixin):
                 except KeyError:
                     self.data['other'] += 1
 
+                self.get_data_per_statuses(match['http_code'])
+
                 self.data['bytes'] += int(match['bytes'])
 
                 proto = 'ipv4' if '.' in match['client_address'] else 'ipv6'
@@ -763,6 +776,21 @@ class Squid(Mixin):
             self.data['duration_max'] += max(duration)
             self.data['duration_avg'] += sum(duration) / length
         return self.data
+
+    def get_data_per_statuses(self, code):
+        """
+        :param code: str: response status code. Ex.: '202', '499'
+        :return:
+        """
+        code_class = code[0]
+        if code_class == '2' or code == '304' or code_class == '1':
+            self.data['successful_requests'] += 1
+        elif code_class == '3':
+            self.data['redirects'] += 1
+        elif code_class == '5':
+            self.data['server_errors'] += 1
+        else:
+            self.data['bad_requests'] += 1
 
 
 def address_not_in_pool(pool, address, pool_size):
