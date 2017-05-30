@@ -30,7 +30,7 @@
 #define STATSD_DICTIONARY_OPTIONS DICTIONARY_FLAG_SINGLE_THREADED
 #endif
 
-#define STATSD_DECIMAL_DETAIL 1000 // floating point values get multiplied by this, with the same divider
+#define STATSD_DECIMAL_DETAIL 1000 // floating point values get multiplied by this, with the same divisor
 
 // --------------------------------------------------------------------------------------------------------------------
 // data specific to each metric type
@@ -169,7 +169,7 @@ typedef struct statsd_app_chart_dimension {
     const char *metric;
     uint32_t metric_hash;
     collected_number multiplier;
-    collected_number divider;
+    collected_number divisor;
     STATSD_APP_CHART_DIM_VALUE_TYPE value_type;
 
     RRDDIM *rd;
@@ -1072,7 +1072,7 @@ int statsd_readfile(const char *path, const char *filename) {
                 chart->chart_type = rrdset_type_id(value);
             }
             else if (!strcmp(name, "dimension")) {
-                // metric [name [type [multiplier [divider]]]]
+                // metric [name [type [multiplier [divisor]]]]
                 char *words[5];
                 pluginsd_split_words(value, words, 5);
 
@@ -1080,7 +1080,7 @@ int statsd_readfile(const char *path, const char *filename) {
                 char *dim_name = words[1];
                 char *type = words[2];
                 char *multipler = words[3];
-                char *divider = words[4];
+                char *divisor = words[4];
 
                 STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
 
@@ -1089,7 +1089,7 @@ int statsd_readfile(const char *path, const char *filename) {
 
                 dim->name = strdupz((dim_name && *dim_name)?dim_name:metric_name);
                 dim->multiplier = (multipler && *multipler)?str2l(multipler):1;
-                dim->divider = (divider && *divider)?str2l(divider):1;
+                dim->divisor = (divisor && *divisor)?str2l(divisor):1;
 
                 if(!type || !*type) type = "last";
                 if(!strcmp(type, "events")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS;
@@ -1110,9 +1110,9 @@ int statsd_readfile(const char *path, const char *filename) {
                     error("STATSD: invalid multiplier value '%s' at line %zu of file '%s/%s'. Using 1.", multipler, line, path, filename);
                     dim->multiplier = 1;
                 }
-                if(!dim->divider) {
-                    error("STATSD: invalid divider value '%s' at line %zu of file '%s/%s'. Using 1.", divider, line, path, filename);
-                    dim->divider = 1;
+                if(!dim->divisor) {
+                    error("STATSD: invalid divisor value '%s' at line %zu of file '%s/%s'. Using 1.", divisor, line, path, filename);
+                    dim->divisor = 1;
                 }
 
                 // append it to the list of dimension
@@ -1128,8 +1128,8 @@ int statsd_readfile(const char *path, const char *filename) {
                 }
                 chart->dimensions_count++;
 
-                debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divider " COLLECTED_NUMBER_FORMAT,
-                    dim->name, chart->name, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divider);
+                debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divisor " COLLECTED_NUMBER_FORMAT,
+                    dim->name, chart->name, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divisor);
             }
             else {
                 error("STATSD: ignoring line %zu ('%s') of file '%s/%s'. Unknown keyword for the [%s] section.", line, name, path, filename, chart->id);
@@ -1553,7 +1553,6 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                 for(dim = chart->dimensions; dim ; dim = dim->next) {
                     if(!dim->value_ptr && dim->metric_hash == m->hash && !strcmp(dim->metric, m->name)) {
                         // we have a match - this metric should be linked to this dimension
-                        debug(D_STATSD, "metric '%s' linked with app '%s', chart '%s', dimension '%s'", m->name, app->name, chart->id, dim->name);
 
                         if(dim->value_type == STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS) {
                             dim->value_ptr = &m->events;
@@ -1561,7 +1560,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                         }
                         else if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
                             dim->algorithm = RRD_ALGORITHM_ABSOLUTE;
-                            dim->divider *= STATSD_DECIMAL_DETAIL;
+                            dim->divisor *= STATSD_DECIMAL_DETAIL;
 
                             switch(dim->value_type) {
                                 case STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS:
@@ -1606,10 +1605,11 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                             dim->algorithm = statsd_algorithm_for_metric(m);
 
                             if(m->type == STATSD_METRIC_TYPE_GAUGE)
-                                dim->divider *= STATSD_DECIMAL_DETAIL;
+                                dim->divisor *= STATSD_DECIMAL_DETAIL;
                         }
 
                         chart->dimensions_linked_count++;
+                        debug(D_STATSD, "metric '%s' of type %u linked with app '%s', chart '%s', dimension '%s', algorithm '%s'", m->name, m->type, app->name, chart->id, dim->name, rrd_algorithm_name(dim->algorithm));
                     }
                 }
             }
@@ -1642,9 +1642,14 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
     STATSD_APP_CHART_DIM *dim;
     for(dim = chart->dimensions; dim ;dim = dim->next) {
         if(unlikely(!dim->rd))
-            dim->rd = rrddim_add(chart->st, dim->name, NULL, dim->multiplier, dim->divider, dim->algorithm);
+            dim->rd = rrddim_add(chart->st, dim->name, NULL, dim->multiplier, dim->divisor, dim->algorithm);
 
         if(unlikely(dim->value_ptr)) {
+            // FIXME: this is anorthodox, we should an API call at RRDDIM to overwrite these settings
+            dim->rd->algorithm = dim->algorithm;
+            dim->rd->multiplier = dim->multiplier;
+            dim->rd->divisor = dim->divisor;
+
             debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
             rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
         }
