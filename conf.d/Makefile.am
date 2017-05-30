@@ -77,6 +77,7 @@ dist_healthconfig_DATA = \
     health.d/memcached.conf \
     health.d/mysql.conf \
     health.d/named.conf \
+    health.d/mongodb.conf \
     health.d/nginx.conf \
     health.d/postgres.conf \
     health.d/redis.conf \
