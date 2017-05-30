@@ -1118,6 +1118,23 @@ if [ $? -eq 0 -a "${NETDATA_ADDED_TO_NSD}" = "1" ]
     echo "   gpasswd -d netdata nsd"
 fi
 
+getent group proxy > /dev/null
+if [ $? -eq 0 -a "${NETDATA_ADDED_TO_PROXY}" = "1" ]
+    then
+    echo
+    echo "You may also want to remove the netdata user from the proxy group"
+    echo "by running:"
+    echo "   gpasswd -d netdata proxy"
+fi
+
+getent group squid > /dev/null
+if [ $? -eq 0 -a "${NETDATA_ADDED_TO_SQUID}" = "1" ]
+    then
+    echo
+    echo "You may also want to remove the netdata user from the squid group"
+    echo "by running:"
+    echo "   gpasswd -d netdata squid"
+fi
 
 UNINSTALL
 chmod 750 netdata-uninstaller.sh
