@@ -235,6 +235,7 @@ declare -A configs_signatures=(
   ['8213d921b6a8382e27052fb42d81db3d']='python.d/freeradius.conf'
   ['8214bb8f4b005aa4691fcd38f7331e8f']='health.d/swap.conf'
   ['837480f77ba1a85677a36747fbc2cd2e']='python.d/sensors.conf'
+  ['8422e71761d22e817e3cfcb1befc6080']='health.d/mongodb.conf'
   ['8425a60ea3d28ed40bb0bac4c3f182e8']='python.d/sensors.conf'
   ['842b1ad5b89bfa5f421d9c5b72e001a4']='health.d/apache.conf'
   ['845023f9b4a526aa0e6493756dbe6034']='health.d/squid.conf'
