@@ -37,7 +37,7 @@ CHARTS_WEB = {
             ['unmatched', None, 'incremental']
         ]},
     'bandwidth': {
-        'options': [None, 'Bandwidth', 'Kb/s', 'bandwidth', 'web_log.bandwidth', 'area'],
+        'options': [None, 'Bandwidth', 'kilobits/s', 'bandwidth', 'web_log.bandwidth', 'area'],
         'lines': [
             ['resp_length', 'received', 'incremental', 8, 1000],
             ['bytes_sent', 'sent', 'incremental', -8, 1000]
@@ -115,7 +115,7 @@ CHARTS_APACHE_CACHE = {
 CHARTS_SQUID = {
     'squid_duration': {
         'options': [None, 'Elapsed Time The Transaction Busied The Cache',
-                    'ms', 'squid_timings', 'web_log.squid_duration', 'area'],
+                    'milliseconds', 'squid_timings', 'web_log.squid_duration', 'area'],
         'lines': [
             ['duration_min', 'min', 'incremental', 1, 1000],
             ['duration_max', 'max', 'incremental', 1, 1000],
@@ -137,7 +137,8 @@ CHARTS_SQUID = {
             ['bad_requests', 'bad', 'incremental', 1, 1]
         ]},
     'squid_response_codes': {
-        'options': [None, 'Response Codes', 'responses/s', 'squid_responses', 'web_log.squid_response_codes', 'stacked'],
+        'options': [None, 'Response Codes', 'responses/s', 'squid_responses',
+                    'web_log.squid_response_codes', 'stacked'],
         'lines': [
             ['2xx', None, 'incremental'],
             ['5xx', None, 'incremental'],
@@ -150,7 +151,7 @@ CHARTS_SQUID = {
         ]},
     'squid_code': {
         'options': [None, 'Responses Per Cache Result Of The Request',
-                    'responses/s', 'squid_cache', 'web_log.squid_code', 'stacked'],
+                    'requests/s', 'squid_squid_cache', 'web_log.squid_code', 'stacked'],
         'lines': [
         ]},
     'squid_detailed_response_codes': {
@@ -160,7 +161,7 @@ CHARTS_SQUID = {
         ]},
     'squid_hier_code': {
         'options': [None, 'Responses Per Hierarchy Code',
-                    'responses/s', 'squid_hierarchy', 'web_log.squid_hier_code', 'stacked'],
+                    'requests/s', 'squid_hierarchy', 'web_log.squid_hier_code', 'stacked'],
         'lines': [
         ]},
     'squid_method': {
@@ -183,27 +184,27 @@ CHARTS_SQUID = {
             ['unique_tot_ipv6', 'ipv6', 'absolute']
         ]},
     'squid_transport_methods': {
-        'options': [None, 'Transport Methods', 'squid_methods', 'squid_transport',
+        'options': [None, 'Transport Methods', 'requests/s', 'squid_squid_transport',
                     'web_log.squid_transport_methods', 'stacked'],
         'lines': [
         ]},
     'squid_transport_errors': {
-        'options': [None, 'Transport Errors', 'squid_errors', 'squid_transport',
+        'options': [None, 'Transport Errors', 'requests/s', 'squid_squid_transport',
                     'web_log.squid_transport_errors', 'stacked'],
         'lines': [
         ]},
     'squid_handling_opts': {
-        'options': [None, 'Handling Opts', 'squid_errors', 'squid_cache',
+        'options': [None, 'Handling Opts', 'requests/s', 'squid_squid_cache',
                     'web_log.squid_handling_opts', 'stacked'],
         'lines': [
         ]},
     'squid_object_types': {
-        'options': [None, 'Object Types', 'squid_types', 'squid_cache',
+        'options': [None, 'Object Types', 'objects/s', 'squid_squid_cache',
                     'web_log.squid_object_types', 'stacked'],
         'lines': [
         ]},
     'squid_cache_events': {
-        'options': [None, 'Cache Events', 'squid_events', 'squid_cache',
+        'options': [None, 'Cache Events', 'events/s', 'squid_squid_cache',
                     'web_log.squid_cache_events', 'stacked'],
         'lines': [
         ]}
@@ -796,7 +797,7 @@ class Squid(Mixin):
             match = self.storage['regex'].search(row)
             if match:
                 match = match.groupdict()
-                if 'DENIED' not in match['squid_code']:
+                if match['duration'] != '0':
                     duration.append(match['duration'])
                 try:
                     self.data[match['http_code'][0] + 'xx'] += 1
