@@ -1647,6 +1647,8 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
         if(unlikely(dim->value_ptr)) {
             // FIXME: this is anorthodox, we should an API call at RRDDIM to overwrite these settings
             dim->rd->algorithm = dim->algorithm;
+            dim->rd->multiplier = dim->multiplier;
+            dim->rd->divisor = dim->divisor;
 
             debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
             rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
