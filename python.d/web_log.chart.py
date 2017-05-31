@@ -20,9 +20,9 @@ ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth', 'response_time'
              'clients', 'clients_all']
 
 ORDER_SQUID = ['squid_response_statuses', 'squid_response_codes', 'squid_detailed_response_codes',
-               'squid_method', 'squid_hier_code', 'squid_transport_methods', 'squid_transport_errors',
-               'squid_code', 'squid_handling_opts', 'squid_object_types', 'squid_cache_events', 'squid_bytes',
-               'squid_duration', 'squid_clients', 'squid_clients_all']
+               'squid_method', 'squid_mime_type', 'squid_hier_code', 'squid_transport_methods',
+               'squid_transport_errors', 'squid_code', 'squid_handling_opts', 'squid_object_types',
+               'squid_cache_events', 'squid_bytes', 'squid_duration', 'squid_clients', 'squid_clients_all']
 
 CHARTS_WEB = {
     'response_codes': {
@@ -170,6 +170,11 @@ CHARTS_SQUID = {
                     'requests/s', 'squid_requests', 'web_log.squid_method', 'stacked'],
         'lines': [
         ]},
+    'squid_mime_type': {
+        'options': [None, 'Requests Per MIME Type',
+                    'requests/s', 'squid_requests', 'web_log.squid_mime_type', 'stacked'],
+        'lines': [
+        ]},
     'squid_clients': {
         'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'squid_clients',
                     'web_log.squid_clients', 'stacked'],
@@ -214,11 +219,6 @@ CHARTS_SQUID = {
 NAMED_PATTERN = namedtuple('PATTERN', ['description', 'pattern'])
 
 DET_RESP_AGGR = ['', '_1xx', '_2xx', '_3xx', '_4xx', '_5xx', '_Other']
-
-SQUID_DYNAMIC = dict(squid_code='squid_code',
-                     http_code='squid_detailed_response_codes',
-                     hier_code='squid_hier_code',
-                     method='squid_method')
 
 SQUID_CODES = dict(TCP='squid_transport_methods', UDP='squid_transport_methods', NONE='squid_transport_methods',
                    CLIENT='squid_handling_opts', IMS='squid_handling_opts', ASYNC='squid_handling_opts',
@@ -398,7 +398,7 @@ class Web(Mixin):
             codes = DET_RESP_AGGR[:1] if self.conf.get('detailed_response_aggregate', True) else DET_RESP_AGGR[1:]
             for code in codes:
                 self.order.append('detailed_response_codes%s' % code)
-                self.definitions['detailed_response_codes%s' % code]\
+                self.definitions['detailed_response_codes%s' % code] \
                     = {'options': [None, 'Detailed Response Codes %s' % code[1:], 'requests/s', 'responses',
                                    'web_log.detailed_response_codes%s' % code, 'stacked'],
                        'lines': []}
@@ -776,7 +776,7 @@ class Squid(Mixin):
                                            r' (?P<squid_code>[A-Z_]+)/'
                                            r'(?P<http_code>[0-9]+)'
                                            r' (?P<bytes>[0-9]+)'
-                                           r' (?P<method>[A-Z]+)'
+                                           r' (?P<method>[A-Z_]+)'
                                            r' (?P<url>[^ ]+)'
                                            r' (?P<user>[^ ]+)'
                                            r' (?P<hier_code>[A-Z_]+)/[\da-f.:-]+'
@@ -786,6 +786,16 @@ class Squid(Mixin):
         if not match:
             self.error('Regex not matches (%s)' % self.storage['regex'].pattern)
             return False
+        self.storage['dynamic'] = {'squid_code': {'chart': 'squid_code',
+                                                  'func': None},
+                                   'http_code': {'chart': 'squid_detailed_response_codes',
+                                                 'func': None},
+                                   'hier_code': {'chart': 'squid_hier_code',
+                                                 'func': lambda v: v.replace('HIER_', '')},
+                                   'method': {'chart': 'squid_method',
+                                              'func': None},
+                                   'mime_type': {'chart': 'squid_mime_type',
+                                                 'func': lambda v: v.split('/')[0]}}
         return True
 
     def get_data(self, raw_data=None):
@@ -822,14 +832,14 @@ class Squid(Mixin):
                     self.data['unique_' + proto] += 1
                     unique_ip.add(match['client_address'])
 
-                for key, chart_key in SQUID_DYNAMIC.items():
-                    if match[key] not in self.data:
-                        dimension = match[key].replace('HIER_', '')
-                        self.add_new_dimension(dimension_id=match[key],
-                                               chart_key=chart_key,
-                                               dimension=dimension)
-                    else:
-                        self.data[match[key]] += 1
+                for key, values in self.storage['dynamic'].items():
+                    if match[key] == '-':
+                        continue
+                    dimension_id = values['func'](match[key]) if values['func'] else match[key]
+                    if dimension_id not in self.data:
+                        self.add_new_dimension(dimension_id=dimension_id,
+                                               chart_key=values['chart'])
+                    self.data[dimension_id] += 1
             else:
                 self.data['unmatched'] += 1
 
