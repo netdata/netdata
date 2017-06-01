@@ -1,5 +1,9 @@
 # no shebang necessary - this is a library to be sourced
 
+# make sure we have a UID
+[ -z "${UID}" ] && UID="$(id -u)"
+
+
 # -----------------------------------------------------------------------------
 # checking the availability of commands
 
