@@ -1173,6 +1173,8 @@ export PATH="\${PATH}:${PATH}"
 export CFLAGS="${CFLAGS}"
 export NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 
+# make sure we have a UID
+[ -z "\${UID}" ] && UID="\$(id -u)"
 INSTALL_UID="${UID}"
 if [ "\${INSTALL_UID}" != "\${UID}" ]
     then
