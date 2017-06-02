@@ -176,6 +176,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %config(noreplace) %{_sysconfdir}/%{name}/health.d/*.conf
 #%%config(noreplace) %{_sysconfdir}/%{name}/node.d/*.conf
 %config(noreplace) %{_sysconfdir}/%{name}/python.d/*.conf
+%config(noreplace) %{_sysconfdir}/%{name}/statsd.d/*.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 
 # To be eventually moved to %%_defaultdocdir
