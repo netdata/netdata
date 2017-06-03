@@ -11,7 +11,6 @@ from base import LogService
 try:
     from itertools import filterfalse
 except ImportError:
-    from itertools import ifilter as filter
     from itertools import ifilterfalse as filterfalse
 import msg
 
@@ -299,13 +298,13 @@ class Mixin:
         """
         if not self.pre_filter:
             return raw_data
-        parsed = raw_data
+        filtered = raw_data
         for elem in self.pre_filter:
             if elem.description == 'filter_include':
-                parsed = filter(elem.func, parsed)
+                filtered = filter(elem.func, filtered)
             elif elem.description == 'filter_exclude':
-                parsed = filterfalse(elem.func, parsed)
-        return parsed
+                filtered = filterfalse(elem.func, filtered)
+        return filtered
 
     def add_new_dimension(self, dimension_id, chart_key, dimension=None,
                           algorithm='incremental', multiplier=1, divisor=1):
@@ -959,12 +958,14 @@ def check_patterns(string, dimension_regex_dict):
             return False
 
     def func_search(pattern):
-        return lambda v: pattern.search(v)
+        def closure(v):
+            return pattern.search(v)
+        return closure
 
     for dimension, regex in dimension_regex_dict.items():
         valid = valid_pattern(regex)
-        func = func_search(valid)
         if isinstance(dimension, str) and valid_pattern:
+            func = func_search(valid)
             result.append(NAMED_PATTERN(description='_'.join([string, dimension]),
                                         func=func))
     return result or None
