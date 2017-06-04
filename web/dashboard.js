@@ -602,11 +602,11 @@ var NETDATA = window.NETDATA || {};
             // we have to cancel pending requests too
 
             while (len--) {
-                if (targets[len]._updating === true) {
+                if (targets[len].fetching_data === true) {
                     if (typeof targets[len].xhr !== 'undefined') {
                         targets[len].xhr.abort();
                         targets[len].running = false;
-                        targets[len]._updating = false;
+                        targets[len].fetching_data = false;
                     }
                     targets[len].isVisible();
                 }
@@ -940,8 +940,9 @@ var NETDATA = window.NETDATA || {};
     // element data attributes
 
     NETDATA.dataAttribute = function(element, attribute, def) {
-        if(element.hasAttribute('data-' + attribute) === true) {
-            var data = element.getAttribute('data-' + attribute);
+        var key = 'data-' + attribute.toString();
+        if(element.hasAttribute(key) === true) {
+            var data = element.getAttribute(key);
 
             if(data === 'true') return true;
             if(data === 'false') return false;
@@ -956,6 +957,28 @@ var NETDATA = window.NETDATA || {};
             return data;
         }
         else return def;
+    };
+
+    NETDATA.dataAttributeBoolean = function(element, attribute, def) {
+        var value = NETDATA.dataAttribute(element, attribute, def);
+
+        if(value === true || value === false)
+            return value;
+
+        if(typeof(value) === 'string') {
+            if(value === 'yes' || value === 'on')
+                return true;
+
+            if(value === '' || value === 'no' || value === 'off' || value === 'null')
+                return false;
+
+            return def;
+        }
+
+        if(typeof(value) === 'number')
+            return value !== 0;
+
+        return def;
     };
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -1466,6 +1489,9 @@ var NETDATA = window.NETDATA || {};
         // all private functions should use 'that', instead of 'this'
         var that = this;
 
+        // ============================================================================================================
+        // ERROR HANDLING
+
         /* error() - private
          * show an error instead of the chart
          */
@@ -1488,12 +1514,19 @@ var NETDATA = window.NETDATA || {};
             console.log(this.id + ' (' + this.library_name + ' ' + this.uuid + '): ' + msg);
         };
 
+
+        // ============================================================================================================
+        // EARLY INITIALIZATION
+
+        // These are variables that should exist even if the chart is never to be rendered.
+        // Be careful what you add here - there may be thousands of charts on the page.
+
         // GUID - a unique identifier for the chart
         this.uuid = NETDATA.guid();
 
         // string - the name of chart
-        this.id = NETDATA.dataAttribute(this.element, 'netdata', null);
-        if(this.id === null) {
+        this.id = NETDATA.dataAttribute(this.element, 'netdata', undefined);
+        if(typeof this.id === 'undefined') {
             error("netdata elements need data-netdata");
             return;
         }
@@ -1516,92 +1549,24 @@ var NETDATA = window.NETDATA || {};
             });
         }
 
-        // string - the netdata server URL, without any path
-        this.host = NETDATA.dataAttribute(this.element, 'host', NETDATA.chartDefaults.host);
-
-        // make sure the host does not end with /
-        // all netdata API requests use absolute paths
-        while(this.host.slice(-1) === '/')
-            this.host = this.host.substring(0, this.host.length - 1);
-
-        // string - the grouping method requested by the user
-        this.method = NETDATA.dataAttribute(this.element, 'method', NETDATA.chartDefaults.method);
-
-        // the time-range requested by the user
-        this.after = NETDATA.dataAttribute(this.element, 'after', NETDATA.chartDefaults.after);
-        this.before = NETDATA.dataAttribute(this.element, 'before', NETDATA.chartDefaults.before);
-
-        // the pixels per point requested by the user
-        this.pixels_per_point = NETDATA.dataAttribute(this.element, 'pixels-per-point', 1);
-        this.points = NETDATA.dataAttribute(this.element, 'points', null);
-
-        // the dimensions requested by the user
-        this.dimensions = NETDATA.dataAttribute(this.element, 'dimensions', null);
-
         // the chart library requested by the user
         this.library_name = NETDATA.dataAttribute(this.element, 'chart-library', NETDATA.chartDefaults.library);
 
-        // how many retries we have made to load chart data from the server
-        this.retries_on_data_failures = 0;
-
-        // object - the chart library used
-        this.library = null;
-
-        // color management
-        this.colors = null;
-        this.colors_assigned = {};
-        this.colors_available = null;
-        this.colors_custom = null;
-
-        // the element already created by the user
-        this.element_message = null;
-
-        // the element with the chart
-        this.element_chart = null;
-
-        // the element with the legend of the chart (if created by us)
-        this.element_legend = null;
-        this.element_legend_childs = {
-            hidden: null,
-            title_date: null,
-            title_time: null,
-            title_units: null,
-            perfect_scroller: null, // the container to apply perfect scroller to
-            series: null
-        };
-
-        this.chart_url = null;                      // string - the url to download chart info
-        this.chart = null;                          // object - the chart as downloaded from the server
-
-        this.title = NETDATA.dataAttribute(this.element, 'title', null);    // the title of the chart
-        this.units = NETDATA.dataAttribute(this.element, 'units', null);    // the units of the chart dimensions
-        this.append_options = NETDATA.dataAttribute(this.element, 'append-options', null); // additional options to pass to netdata
-        this.override_options = NETDATA.dataAttribute(this.element, 'override-options', null);  // override options to pass to netdata
-
-        this.chart_created = false;                 // boolean - true when the chart has been created
-        this.dom_created = false;                   // boolean - true when the DOM has been created
-        this.running = false;                       // boolean - true when the chart is being refreshed now
-        this.enabled = true;                        // boolean - is the chart enabled for refresh?
-        this.paused = false;                        // boolean - is the chart paused for any reason?
-        this.selected = false;                      // boolean - is the chart shown a selection?
-        this.debug = NETDATA.dataAttribute(this.element, 'debug', false) === true; // boolean - console.log() debug info about this chart
-
-        this.netdata_first = 0;                     // milliseconds - the first timestamp in netdata
-        this.netdata_last = 0;                      // milliseconds - the last timestamp in netdata
-        this.requested_after = null;                // milliseconds - the timestamp of the request after param
-        this.requested_before = null;               // milliseconds - the timestamp of the request before param
-        this.requested_padding = null;
-        this.view_after = 0;
-        this.view_before = 0;
-
-        this.tmp = {};                              // members that can be destroyed to save memory
-
-        this.value_decimal_detail = -1;
-        var d = NETDATA.dataAttribute(this.element, 'decimal-digits', -1);
-        if(typeof d === 'number')
-            this.value_decimal_detail = d;
-        else if(typeof d !== 'undefined')
-            this.log('ignoring decimal-digits value: ' + d.toString());
+        // check the requested library is available
+        // we don't initialize it here - it will be initialized when
+        // this chart will be first used
+        if(typeof NETDATA.chartLibraries[this.library_name] === 'undefined') {
+            NETDATA.error(402, this.library_name);
+            error('chart library "' + this.library_name + '" is not found');
+            this.enabled = false;
+        }
+        else if(NETDATA.chartLibraries[this.library_name].enabled === false) {
+            NETDATA.error(403, this.library_name);
+            error('chart library "' + this.library_name + '" is not enabled');
+            this.enabled = false;
+        }
+        else
+            this.library = NETDATA.chartLibraries[this.library_name];
 
         this.auto = {
             name: 'auto',
@@ -1629,41 +1594,140 @@ var NETDATA = window.NETDATA || {};
         // auto, pan, zoom
         this.current = this.auto;
 
-        // check the requested library is available
-        // we don't initialize it here - it will be initialized when
-        // this chart will be first used
-        if(typeof NETDATA.chartLibraries[this.library_name] === 'undefined') {
-            NETDATA.error(402, this.library_name);
-            error('chart library "' + this.library_name + '" is not found');
-            return;
-        }
-        else if(NETDATA.chartLibraries[this.library_name].enabled === false) {
-            NETDATA.error(403, this.library_name);
-            error('chart library "' + this.library_name + '" is not enabled');
-            return;
-        }
-        else
-            this.library = NETDATA.chartLibraries[this.library_name];
+        this.running = false;                       // boolean - true when the chart is being refreshed now
+        this.enabled = true;                        // boolean - is the chart enabled for refresh?
 
-        // milliseconds - the time the last refresh took
-        this.refresh_dt_ms = 0;
-
-        // if we need to report the rendering speed
-        // find the element that needs to be updated
-        var refresh_dt_element_name = NETDATA.dataAttribute(this.element, 'dt-element-name', null); // string - the element to print refresh_dt_ms
-
-        if(refresh_dt_element_name !== null) {
-            this.refresh_dt_element = document.getElementById(refresh_dt_element_name) || null;
-        }
-        else
-            this.refresh_dt_element = null;
-
-        this.dimensions_visibility = new dimensionsVisibility(this);
-
-        this._updating = false;
 
         // ============================================================================================================
         // PRIVATE FUNCTIONS
+
+        // reset the runtime status variables to their defaults
+        var runtimeInit = function() {
+            that.paused = false;                        // boolean - is the chart paused for any reason?
+            that.selected = false;                      // boolean - is the chart shown a selection?
+
+            that.chart_created = false;                 // boolean - is the library.create() been called?
+            that.dom_created = false;                   // boolean - is the chart DOM been created?
+            that.fetching_data = false;                 // boolean - true while we fetch data via ajax
+
+            that.updates_counter = 0;                   // numeric - the number of refreshes made so far
+            that.updates_since_last_unhide = 0;         // numeric - the number of refreshes made since the last time the chart was unhidden
+            that.updates_since_last_creation = 0;       // numeric - the number of refreshes made since the last time the chart was created
+
+            that.tm = {
+                last_initialized: 0,        // milliseconds - the timestamp it was last initialized
+                last_dom_created: 0,        // milliseconds - the timestamp its DOM was last created
+                last_mode_switch: 0,        // milliseconds - the timestamp it switched modes
+
+                last_info_downloaded: 0,    // milliseconds - the timestamp we downloaded the chart
+                last_updated: 0,            // the timestamp the chart last updated with data
+                pan_and_zoom_seq: 0,        // the sequence number of the global synchronization
+                                            // between chart.
+                                            // Used with NETDATA.globalPanAndZoom.seq
+                last_visible_check: 0,      // the time we last checked if it is visible
+                last_resized: 0,            // the time the chart was resized
+                last_hidden: 0,             // the time the chart was hidden
+                last_unhidden: 0,           // the time the chart was unhidden
+                last_autorefreshed: 0       // the time the chart was last refreshed
+            };
+
+            that.data = null;               // the last data as downloaded from the netdata server
+            that.data_url = 'invalid://';   // string - the last url used to update the chart
+            that.data_points = 0;           // number - the number of points returned from netdata
+            that.data_after = 0;            // milliseconds - the first timestamp of the data
+            that.data_before = 0;           // milliseconds - the last timestamp of the data
+            that.data_update_every = 0;     // milliseconds - the frequency to update the data
+
+            that.tmp = {};                              // members that can be destroyed to save memory
+        };
+
+        // initialize all the variables that are required for the chart to be rendered
+        var lateInitialization = function() {
+            if(typeof that.host !== 'undefined')
+                return;
+
+            // string - the netdata server URL, without any path
+            that.host = NETDATA.dataAttribute(that.element, 'host', NETDATA.chartDefaults.host);
+
+            // make sure the host does not end with /
+            // all netdata API requests use absolute paths
+            while(that.host.slice(-1) === '/')
+                that.host = that.host.substring(0, that.host.length - 1);
+
+            // string - the grouping method requested by the user
+            that.method = NETDATA.dataAttribute(that.element, 'method', NETDATA.chartDefaults.method);
+
+            // the time-range requested by the user
+            that.after = NETDATA.dataAttribute(that.element, 'after', NETDATA.chartDefaults.after);
+            that.before = NETDATA.dataAttribute(that.element, 'before', NETDATA.chartDefaults.before);
+
+            // the pixels per point requested by the user
+            that.pixels_per_point = NETDATA.dataAttribute(that.element, 'pixels-per-point', 1);
+            that.points = NETDATA.dataAttribute(that.element, 'points', null);
+
+            // the dimensions requested by the user
+            that.dimensions = NETDATA.dataAttribute(that.element, 'dimensions', null);
+
+            that.title = NETDATA.dataAttribute(that.element, 'title', null);    // the title of the chart
+            that.units = NETDATA.dataAttribute(that.element, 'units', null);    // the units of the chart dimensions
+            that.append_options = NETDATA.dataAttribute(that.element, 'append-options', null); // additional options to pass to netdata
+            that.override_options = NETDATA.dataAttribute(that.element, 'override-options', null);  // override options to pass to netdata
+
+            that.debug = NETDATA.dataAttributeBoolean(that.element, 'debug', false);
+
+            that.value_decimal_detail = -1;
+            var d = NETDATA.dataAttribute(that.element, 'decimal-digits', -1);
+            if(typeof d === 'number')
+                that.value_decimal_detail = d;
+            else if(typeof d !== 'undefined')
+                that.log('ignoring decimal-digits value: ' + d.toString());
+
+            // if we need to report the rendering speed
+            // find the element that needs to be updated
+            var refresh_dt_element_name = NETDATA.dataAttribute(that.element, 'dt-element-name', null); // string - the element to print refresh_dt_ms
+
+            if(refresh_dt_element_name !== null) {
+                that.refresh_dt_element = document.getElementById(refresh_dt_element_name) || null;
+            }
+            else
+                that.refresh_dt_element = null;
+
+            that.dimensions_visibility = new dimensionsVisibility(that);
+
+            that.netdata_first = 0;                     // milliseconds - the first timestamp in netdata
+            that.netdata_last = 0;                      // milliseconds - the last timestamp in netdata
+            that.requested_after = null;                // milliseconds - the timestamp of the request after param
+            that.requested_before = null;               // milliseconds - the timestamp of the request before param
+            that.requested_padding = null;
+            that.view_after = 0;
+            that.view_before = 0;
+
+            that.refresh_dt_ms = 0;                     // milliseconds - the time the last refresh took
+
+            // how many retries we have made to load chart data from the server
+            that.retries_on_data_failures = 0;
+
+            // color management
+            that.colors = null;
+            that.colors_assigned = {};
+            that.colors_available = null;
+            that.colors_custom = null;
+
+            that.element_message = null; // the element already created by the user
+            that.element_chart = null; // the element with the chart
+            that.element_legend = null; // the element with the legend of the chart (if created by us)
+            that.element_legend_childs = {
+                hidden: null,
+                title_date: null,
+                title_time: null,
+                title_units: null,
+                perfect_scroller: null, // the container to apply perfect scroller to
+                series: null
+            };
+
+            that.chart_url = null;                      // string - the url to download chart info
+            that.chart = null;                          // object - the chart as downloaded from the server
+        };
 
         var destroyDOM = function() {
             if(that.enabled === false) return;
@@ -1712,6 +1776,7 @@ var NETDATA = window.NETDATA || {};
 
         var createDOM = function() {
             if(that.enabled === false) return;
+            lateInitialization();
 
             destroyDOM();
 
@@ -1755,40 +1820,7 @@ var NETDATA = window.NETDATA || {};
             if(that.enabled === false) return;
             if(typeof(force) === 'undefined') force = false;
 
-            that.paused = false;
-            that.selected = false;
-
-            that.chart_created = false;         // boolean - is the library.create() been called?
-            that.dom_created = false;           // boolean - is the chart DOM been created?
-            that.updates_counter = 0;           // numeric - the number of refreshes made so far
-            that.updates_since_last_unhide = 0; // numeric - the number of refreshes made since the last time the chart was unhidden
-            that.updates_since_last_creation = 0; // numeric - the number of refreshes made since the last time the chart was created
-
-            that.tm = {
-                last_initialized: 0,        // milliseconds - the timestamp it was last initialized
-                last_dom_created: 0,        // milliseconds - the timestamp its DOM was last created
-                last_mode_switch: 0,        // milliseconds - the timestamp it switched modes
-
-                last_info_downloaded: 0,    // milliseconds - the timestamp we downloaded the chart
-                last_updated: 0,            // the timestamp the chart last updated with data
-                pan_and_zoom_seq: 0,        // the sequence number of the global synchronization
-                                            // between chart.
-                                            // Used with NETDATA.globalPanAndZoom.seq
-                last_visible_check: 0,      // the time we last checked if it is visible
-                last_resized: 0,            // the time the chart was resized
-                last_hidden: 0,             // the time the chart was hidden
-                last_unhidden: 0,           // the time the chart was unhidden
-                last_autorefreshed: 0       // the time the chart was last refreshed
-            };
-
-            that.data = null;               // the last data as downloaded from the netdata server
-            that.data_url = 'invalid://';   // string - the last url used to update the chart
-            that.data_points = 0;           // number - the number of points returned from netdata
-            that.data_after = 0;            // milliseconds - the first timestamp of the data
-            that.data_before = 0;           // milliseconds - the last timestamp of the data
-            that.data_update_every = 0;     // milliseconds - the frequency to update the data
-
-            that.tmp = {};
+            runtimeInit();
 
             that.tm.last_initialized = Date.now();
             that.setMode('auto');
@@ -3276,10 +3308,8 @@ var NETDATA = window.NETDATA || {};
                 return this.tmp.___hasLegendCache___;
 
             var leg = false;
-            if(this.library && this.library.legend(this) === 'right-side') {
-                var legend = NETDATA.dataAttribute(this.element, 'legend', 'yes');
-                if(legend === 'yes') leg = true;
-            }
+            if(this.library && this.library.legend(this) === 'right-side')
+                leg = NETDATA.dataAttributeBoolean(this.element, 'legend', true);
 
             this.tmp.___hasLegendCache___ = leg;
             return leg;
@@ -3530,7 +3560,7 @@ var NETDATA = window.NETDATA || {};
             if(this.debug === true)
                 this.log('updateChart()');
 
-            if(this._updating === true) {
+            if(this.fetching_data === true) {
                 if(this.debug === true)
                     this.log('I am already updating...');
 
@@ -3595,7 +3625,7 @@ var NETDATA = window.NETDATA || {};
             if(NETDATA.statistics.refreshes_active > NETDATA.statistics.refreshes_active_max)
                 NETDATA.statistics.refreshes_active_max = NETDATA.statistics.refreshes_active;
 
-            this._updating = true;
+            this.fetching_data = true;
 
             this.xhr = $.ajax( {
                 url: this.data_url,
@@ -3636,7 +3666,7 @@ var NETDATA = window.NETDATA || {};
                 that.xhr = undefined;
 
                 NETDATA.statistics.refreshes_active--;
-                that._updating = false;
+                that.fetching_data = false;
 
                 if(typeof callback === 'function')
                     return callback();
@@ -4327,9 +4357,9 @@ var NETDATA = window.NETDATA || {};
         var chartRangeClip = NETDATA.dataAttribute(state.element, 'sparkline-chartrangeclip', undefined);
         var chartRangeMinX = NETDATA.dataAttribute(state.element, 'sparkline-chartrangeminx', undefined);
         var chartRangeMaxX = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemaxx', undefined);
-        var disableInteraction = NETDATA.dataAttribute(state.element, 'sparkline-disableinteraction', false);
-        var disableTooltips = NETDATA.dataAttribute(state.element, 'sparkline-disabletooltips', false);
-        var disableHighlight = NETDATA.dataAttribute(state.element, 'sparkline-disablehighlight', false);
+        var disableInteraction = NETDATA.dataAttributeBoolean(state.element, 'sparkline-disableinteraction', false);
+        var disableTooltips = NETDATA.dataAttributeBoolean(state.element, 'sparkline-disabletooltips', false);
+        var disableHighlight = NETDATA.dataAttributeBoolean(state.element, 'sparkline-disablehighlight', false);
         var highlightLighten = NETDATA.dataAttribute(state.element, 'sparkline-highlightlighten', 1.4);
         var highlightColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightcolor', undefined);
         var tooltipContainer = NETDATA.dataAttribute(state.element, 'sparkline-tooltipcontainer', undefined);
@@ -4337,7 +4367,7 @@ var NETDATA = window.NETDATA || {};
         var tooltipFormat = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformat', undefined);
         var tooltipPrefix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipprefix', undefined);
         var tooltipSuffix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipsuffix', ' ' + state.units);
-        var tooltipSkipNull = NETDATA.dataAttribute(state.element, 'sparkline-tooltipskipnull', true);
+        var tooltipSkipNull = NETDATA.dataAttributeBoolean(state.element, 'sparkline-tooltipskipnull', true);
         var tooltipValueLookups = NETDATA.dataAttribute(state.element, 'sparkline-tooltipvaluelookups', undefined);
         var tooltipFormatFieldlist = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlist', undefined);
         var tooltipFormatFieldlistKey = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlistkey', undefined);
@@ -4345,7 +4375,7 @@ var NETDATA = window.NETDATA || {};
         var numberDigitGroupSep = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupsep', undefined);
         var numberDecimalMark = NETDATA.dataAttribute(state.element, 'sparkline-numberdecimalmark', undefined);
         var numberDigitGroupCount = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupcount', undefined);
-        var animatedZooms = NETDATA.dataAttribute(state.element, 'sparkline-animatedzooms', false);
+        var animatedZooms = NETDATA.dataAttributeBoolean(state.element, 'sparkline-animatedzooms', false);
 
         if(spotColor === 'disable') spotColor='';
         if(minSpotColor === 'disable') minSpotColor='';
@@ -4596,7 +4626,7 @@ var NETDATA = window.NETDATA || {};
         var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state) === true)?3:4;
 
         var smooth = (NETDATA.dygraph.smooth === true)
-            ?(NETDATA.dataAttribute(state.element, 'dygraph-smooth', (chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
+            ?(NETDATA.dataAttributeBoolean(state.element, 'dygraph-smooth', (chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
             :false;
 
         state.tmp.dygraph_options = {
@@ -4604,8 +4634,8 @@ var NETDATA = window.NETDATA || {};
 
             // leave a few pixels empty on the right of the chart
             rightGap:               NETDATA.dataAttribute(state.element, 'dygraph-rightgap', 5),
-            showRangeSelector:      NETDATA.dataAttribute(state.element, 'dygraph-showrangeselector', false),
-            showRoller:             NETDATA.dataAttribute(state.element, 'dygraph-showroller', false),
+            showRangeSelector:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-showrangeselector', false),
+            showRoller:             NETDATA.dataAttributeBoolean(state.element, 'dygraph-showroller', false),
             title:                  NETDATA.dataAttribute(state.element, 'dygraph-title', state.title),
             titleHeight:            NETDATA.dataAttribute(state.element, 'dygraph-titleheight', 19),
             legend:                 NETDATA.dataAttribute(state.element, 'dygraph-legend', 'always'), // we need this to get selection events
@@ -4613,12 +4643,12 @@ var NETDATA = window.NETDATA || {};
             labelsDiv:              NETDATA.dataAttribute(state.element, 'dygraph-labelsdiv', state.element_legend_childs.hidden),
             labelsDivStyles:        NETDATA.dataAttribute(state.element, 'dygraph-labelsdivstyles', { 'fontSize':'1px' }),
             labelsDivWidth:         NETDATA.dataAttribute(state.element, 'dygraph-labelsdivwidth', state.chartWidth() - 70),
-            labelsSeparateLines:    NETDATA.dataAttribute(state.element, 'dygraph-labelsseparatelines', true),
-            labelsShowZeroValues:   NETDATA.dataAttribute(state.element, 'dygraph-labelsshowzerovalues', true),
+            labelsSeparateLines:    NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsseparatelines', true),
+            labelsShowZeroValues:   NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
             labelsKMB:              false,
             labelsKMG2:             false,
-            showLabelsOnHighlight:  NETDATA.dataAttribute(state.element, 'dygraph-showlabelsonhighlight', true),
-            hideOverlayOnMouseOut:  NETDATA.dataAttribute(state.element, 'dygraph-hideoverlayonmouseout', true),
+            showLabelsOnHighlight:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-showlabelsonhighlight', true),
+            hideOverlayOnMouseOut:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-hideoverlayonmouseout', true),
             includeZero:            NETDATA.dataAttribute(state.element, 'dygraph-includezero', (chart_type === 'stacked')),
             xRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-xrangepad', 0),
             yRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-yrangepad', 1),
@@ -4638,16 +4668,16 @@ var NETDATA = window.NETDATA || {};
                                     // A dot is always drawn when a point is "isolated",
                                     // i.e. there is a missing point on either side of it.
                                     // This also controls the size of those dots.
-            drawPoints:             NETDATA.dataAttribute(state.element, 'dygraph-drawpoints', false),
+            drawPoints:             NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawpoints', false),
 
                                     // Draw points at the edges of gaps in the data.
                                     // This improves visibility of small data segments or other data irregularities.
-            drawGapEdgePoints:      NETDATA.dataAttribute(state.element, 'dygraph-drawgapedgepoints', true),
-            connectSeparatedPoints: NETDATA.dataAttribute(state.element, 'dygraph-connectseparatedpoints', false),
+            drawGapEdgePoints:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgapedgepoints', true),
+            connectSeparatedPoints: NETDATA.dataAttributeBoolean(state.element, 'dygraph-connectseparatedpoints', false),
             pointSize:              NETDATA.dataAttribute(state.element, 'dygraph-pointsize', 1),
 
                                     // enabling this makes the chart with little square lines
-            stepPlot:               NETDATA.dataAttribute(state.element, 'dygraph-stepplot', false),
+            stepPlot:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-stepplot', false),
 
                                     // Draw a border around graph lines to make crossing lines more easily
                                     // distinguishable. Useful for graphs with many lines.
@@ -4661,11 +4691,11 @@ var NETDATA = window.NETDATA || {};
                                     ),
             stackedGraph:           NETDATA.dataAttribute(state.element, 'dygraph-stackedgraph', (chart_type === 'stacked')),
             stackedGraphNaNFill:    NETDATA.dataAttribute(state.element, 'dygraph-stackedgraphnanfill', 'none'),
-            drawAxis:               NETDATA.dataAttribute(state.element, 'dygraph-drawaxis', true),
+            drawAxis:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true),
             axisLabelFontSize:      NETDATA.dataAttribute(state.element, 'dygraph-axislabelfontsize', 10),
             axisLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-axislinecolor', NETDATA.themes.current.axis),
             axisLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-axislinewidth', 1.0),
-            drawGrid:               NETDATA.dataAttribute(state.element, 'dygraph-drawgrid', true),
+            drawGrid:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgrid', true),
             gridLinePattern:        NETDATA.dataAttribute(state.element, 'dygraph-gridlinepattern', null),
             gridLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinewidth', 1.0),
             gridLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinecolor', NETDATA.themes.current.grid),
@@ -5961,7 +5991,7 @@ var NETDATA = window.NETDATA || {};
         var strokeColor = NETDATA.dataAttribute(state.element, 'gauge-stroke-color', NETDATA.themes.current.gauge_stroke);
         var startColor = NETDATA.dataAttribute(state.element, 'gauge-start-color', state.chartCustomColors()[0]);
         var stopColor = NETDATA.dataAttribute(state.element, 'gauge-stop-color', void 0);
-        var generateGradient = NETDATA.dataAttribute(state.element, 'gauge-generate-gradient', false);
+        var generateGradient = NETDATA.dataAttributeBoolean(state.element, 'gauge-generate-gradient', false);
 
         if(min === null) {
             min = NETDATA.commonMin.get(state);
