@@ -1769,7 +1769,7 @@ var NETDATA = window.NETDATA || {};
             }
             else {
                 var w = that.element.offsetWidth;
-                if(w === null || w === 0) {
+                if (w === null || w === 0) {
                     // the div is hidden
                     // this will resize the chart when next viewed
                     that.tm.last_resized = 0;
@@ -1821,17 +1821,18 @@ var NETDATA = window.NETDATA || {};
          * destroy all (possibly) created state elements
          * create the basic DOM for a chart
          */
-        var init = function(force) {
+        var init = function(opt) {
             if(that.enabled === false) return;
-            if(typeof(force) === 'undefined') force = false;
 
             runtimeInit();
 
             that.tm.last_initialized = Date.now();
             that.setMode('auto');
 
-            if(that.isVisible(true) || force === true)
-                createDOM();
+            if(opt !== 'fast') {
+                if (that.isVisible(true) || opt === 'force')
+                    createDOM();
+            }
         };
 
         var maxMessageFontSize = function() {
@@ -1916,7 +1917,7 @@ var NETDATA = window.NETDATA || {};
             if(that.chart_created === true) {
                 if(NETDATA.options.current.destroy_on_hide === true) {
                     // we should destroy it
-                    init(true);
+                    init('force');
                 }
                 else {
                     showRendering();
@@ -1948,7 +1949,7 @@ var NETDATA = window.NETDATA || {};
             if(that.chart_created === false) {
                 // we need to re-initialize it, to show our background
                 // logo in bootstrap tabs, until the chart loads
-                init(true);
+                init('force');
             }
             else {
                 that.tm.last_unhidden = Date.now();
@@ -2030,7 +2031,7 @@ var NETDATA = window.NETDATA || {};
                 if(that.chart_created === false) return;
 
                 if(that.needsRecreation()) {
-                    init(true);
+                    init('force');
                 }
                 else if(typeof that.library.resize === 'function') {
                     that.library.resize(that);
@@ -3086,7 +3087,7 @@ var NETDATA = window.NETDATA || {};
                         title: 'Chart Reset',
                         content: 'Reset all the charts to their default auto-refreshing state. You can also <b>double click</b> the chart contents with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
                     });
-                    
+
                     this.element_legend_childs.toolbox_right.className += ' netdata-legend-toolbox-button';
                     this.element_legend_childs.toolbox_right.innerHTML = '<i class="fa fa-forward"></i>';
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_right);
@@ -3110,7 +3111,7 @@ var NETDATA = window.NETDATA || {};
                         content: 'Pan the chart to the right. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
                     });
 
-                    
+
                     this.element_legend_childs.toolbox_zoomin.className += ' netdata-legend-toolbox-button';
                     this.element_legend_childs.toolbox_zoomin.innerHTML = '<i class="fa fa-plus"></i>';
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomin);
@@ -3132,7 +3133,7 @@ var NETDATA = window.NETDATA || {};
                         title: 'Chart Zoom In',
                         content: 'Zoom in the chart. You can also press SHIFT and select an area of the chart to zoom in. On Chrome and Opera, you can press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
                     });
-                    
+
                     this.element_legend_childs.toolbox_zoomout.className += ' netdata-legend-toolbox-button';
                     this.element_legend_childs.toolbox_zoomout.innerHTML = '<i class="fa fa-minus"></i>';
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout);
@@ -3155,7 +3156,7 @@ var NETDATA = window.NETDATA || {};
                         title: 'Chart Zoom Out',
                         content: 'Zoom out the chart. On Chrome and Opera, you can also press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
                     });
-                    
+
                     //this.element_legend_childs.toolbox_volume.className += ' netdata-legend-toolbox-button';
                     //this.element_legend_childs.toolbox_volume.innerHTML = '<i class="fa fa-sort-amount-desc"></i>';
                     //this.element_legend_childs.toolbox_volume.title = 'Visible Volume';
@@ -3174,7 +3175,7 @@ var NETDATA = window.NETDATA || {};
                     this.element_legend_childs.toolbox_zoomout = null;
                     this.element_legend_childs.toolbox_volume = null;
                 }
-                
+
                 this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
                 this.element_legend_childs.resize_handler.innerHTML = '<i class="fa fa-chevron-up"></i><i class="fa fa-chevron-down"></i>';
                 this.element.appendChild(this.element_legend_childs.resize_handler);
@@ -3511,7 +3512,7 @@ var NETDATA = window.NETDATA || {};
                 if(this.debug === true)
                     this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
 
-                init(true);
+                init('force');
                 return;
             }
 
@@ -3888,7 +3889,7 @@ var NETDATA = window.NETDATA || {};
         // INITIALIZATION
 
         initDOM();
-        init();
+        init('fast');
     };
 
     NETDATA.resetAllCharts = function(state) {
