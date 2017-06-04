@@ -613,7 +613,7 @@ var NETDATA = window.NETDATA || {};
             }
         }
         else {
-            // just find which chart is visible
+            // just find which charts are visible
 
             while (len--)
                 targets[len].isVisible();
@@ -644,8 +644,13 @@ var NETDATA = window.NETDATA || {};
         NETDATA.onscroll_updater_running = false;
     };
 
+    NETDATA.scrollUp = false;
+    NETDATA.scrollY = window.scrollY;
     NETDATA.onscroll = function() {
         // console.log('onscroll');
+
+        NETDATA.scrollUp = (window.scrollY > NETDATA.scrollY);
+        NETDATA.scrollY = window.scrollY;
 
         NETDATA.options.last_page_scroll = Date.now();
         NETDATA.options.auto_refresher_stop_until = 0;
@@ -4136,7 +4141,10 @@ var NETDATA = window.NETDATA || {};
                 }
             }
 
-            parallel.unshift(state);
+            if(NETDATA.scrollUp === true)
+                parallel.unshift(state);
+            else
+                parallel.push(state);
         }
 
         if(parallel.length > 0) {
