@@ -3918,7 +3918,14 @@ var NETDATA = window.NETDATA || {};
 
     // get or create a chart state, given a DOM element
     NETDATA.chartState = function(element) {
-        return new chartState(element);
+        var self = $(element);
+
+        var state = self.data('netdata-state-object') || null;
+        if(state === null) {
+            state = new chartState(element);
+            self.data('netdata-state-object', state);
+        }
+        return state;
     };
 
     // ----------------------------------------------------------------------------------------------------------------
