@@ -381,7 +381,7 @@ var NETDATA = window.NETDATA || {};
             focus:              false,
             visibility:         false,
             chart_data_url:     false,
-            chart_errors:       false, // FIXME: remember to set it to false before merging
+            chart_errors:       true, // FIXME: remember to set it to false before merging
             chart_timing:       false,
             chart_calls:        false,
             libraries:          false,
@@ -937,6 +937,28 @@ var NETDATA = window.NETDATA || {};
     };
 
     // ----------------------------------------------------------------------------------------------------------------
+    // element data attributes
+
+    NETDATA.dataAttribute = function(element, attribute, def) {
+        if(element.hasAttribute('data-' + attribute) === true) {
+            var data = element.getAttribute('data-' + attribute);
+
+            if(data === 'true') return true;
+            if(data === 'false') return false;
+            if(data === 'null') return null;
+
+            // Only convert to a number if it doesn't change the string
+            if(data === +data + '') return +data;
+
+            if(/^(?:\{[\w\W]*\}|\[[\w\W]*\])$/.test(data))
+                return JSON.parse(data);
+
+            return data;
+        }
+        else return def;
+    };
+
+    // ----------------------------------------------------------------------------------------------------------------
     // commonMin & commonMax
 
     NETDATA.commonMin = {
@@ -944,14 +966,13 @@ var NETDATA = window.NETDATA || {};
         latest: {},
 
         get: function(state) {
-            if(typeof state.__commonMin === 'undefined') {
+            if(typeof state.tmp.__commonMin === 'undefined') {
                 // get the commonMin setting
-                var self = $(state.element);
-                state.__commonMin = self.data('common-min') || null;
+                state.tmp.__commonMin = NETDATA.dataAttribute(state.element, 'common-min', null);
             }
 
             var min = state.data.min;
-            var name = state.__commonMin;
+            var name = state.tmp.__commonMin;
 
             if(name === null) {
                 // we don't need commonMin
@@ -969,11 +990,11 @@ var NETDATA = window.NETDATA || {};
             var uuid = state.uuid;
             if(typeof t[uuid] !== 'undefined') {
                 if(t[uuid] === min) {
-                    //state.log('commonMin ' + state.__commonMin + ' not changed: ' + this.latest[name]);
+                    //state.log('commonMin ' + state.tmp.__commonMin + ' not changed: ' + this.latest[name]);
                     return this.latest[name];
                 }
                 else if(min < this.latest[name]) {
-                    //state.log('commonMin ' + state.__commonMin + ' increased: ' + min);
+                    //state.log('commonMin ' + state.tmp.__commonMin + ' increased: ' + min);
                     t[uuid] = min;
                     this.latest[name] = min;
                     return min;
@@ -988,7 +1009,7 @@ var NETDATA = window.NETDATA || {};
             for(var i in t)
                 if(t.hasOwnProperty(i) && t[i] < m) m = t[i];
 
-            //state.log('commonMin ' + state.__commonMin + ' updated: ' + m);
+            //state.log('commonMin ' + state.tmp.__commonMin + ' updated: ' + m);
             this.latest[name] = m;
             return m;
         }
@@ -999,14 +1020,13 @@ var NETDATA = window.NETDATA || {};
         latest: {},
 
         get: function(state) {
-            if(typeof state.__commonMax === 'undefined') {
+            if(typeof state.tmp.__commonMax === 'undefined') {
                 // get the commonMax setting
-                var self = $(state.element);
-                state.__commonMax = self.data('common-max') || null;
+                state.tmp.__commonMax = NETDATA.dataAttribute(state.element, 'common-max', null);
             }
 
             var max = state.data.max;
-            var name = state.__commonMax;
+            var name = state.tmp.__commonMax;
 
             if(name === null) {
                 // we don't need commonMax
@@ -1024,11 +1044,11 @@ var NETDATA = window.NETDATA || {};
             var uuid = state.uuid;
             if(typeof t[uuid] !== 'undefined') {
                 if(t[uuid] === max) {
-                    //state.log('commonMax ' + state.__commonMax + ' not changed: ' + this.latest[name]);
+                    //state.log('commonMax ' + state.tmp.__commonMax + ' not changed: ' + this.latest[name]);
                     return this.latest[name];
                 }
                 else if(max > this.latest[name]) {
-                    //state.log('commonMax ' + state.__commonMax + ' increased: ' + max);
+                    //state.log('commonMax ' + state.tmp.__commonMax + ' increased: ' + max);
                     t[uuid] = max;
                     this.latest[name] = max;
                     return max;
@@ -1043,7 +1063,7 @@ var NETDATA = window.NETDATA || {};
             for(var i in t)
                 if(t.hasOwnProperty(i) && t[i] > m) m = t[i];
 
-            //state.log('commonMax ' + state.__commonMax + ' updated: ' + m);
+            //state.log('commonMax ' + state.tmp.__commonMax + ' updated: ' + m);
             this.latest[name] = m;
             return m;
         }
@@ -1440,7 +1460,6 @@ var NETDATA = window.NETDATA || {};
     // Our state object, where all per-chart values are stored
 
     var chartState = function(element) {
-        var self = $(element);
         this.element = element;
 
         // IMPORTANT:
@@ -1464,18 +1483,27 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
+        // console logging
+        this.log = function(msg) {
+            console.log(this.id + ' (' + this.library_name + ' ' + this.uuid + '): ' + msg);
+        };
+
         // GUID - a unique identifier for the chart
         this.uuid = NETDATA.guid();
 
         // string - the name of chart
-        this.id = self.data('netdata');
+        this.id = NETDATA.dataAttribute(this.element, 'netdata', null);
+        if(this.id === null) {
+            error("netdata elements need data-netdata");
+            return;
+        }
 
         // string - the key for localStorage settings
-        this.settings_id = self.data('id') || null;
+        this.settings_id = NETDATA.dataAttribute(this.element, 'id', null);
 
         // the user given dimensions of the element
-        this.width = self.data('width') || NETDATA.chartDefaults.width;
-        this.height = self.data('height') || NETDATA.chartDefaults.height;
+        this.width = NETDATA.dataAttribute(this.element, 'width', NETDATA.chartDefaults.width);
+        this.height = NETDATA.dataAttribute(this.element, 'height', NETDATA.chartDefaults.height);
         this.height_original = this.height;
 
         if(this.settings_id !== null) {
@@ -1489,7 +1517,7 @@ var NETDATA = window.NETDATA || {};
         }
 
         // string - the netdata server URL, without any path
-        this.host = self.data('host') || NETDATA.chartDefaults.host;
+        this.host = NETDATA.dataAttribute(this.element, 'host', NETDATA.chartDefaults.host);
 
         // make sure the host does not end with /
         // all netdata API requests use absolute paths
@@ -1497,21 +1525,21 @@ var NETDATA = window.NETDATA || {};
             this.host = this.host.substring(0, this.host.length - 1);
 
         // string - the grouping method requested by the user
-        this.method = self.data('method') || NETDATA.chartDefaults.method;
+        this.method = NETDATA.dataAttribute(this.element, 'method', NETDATA.chartDefaults.method);
 
         // the time-range requested by the user
-        this.after = self.data('after') || NETDATA.chartDefaults.after;
-        this.before = self.data('before') || NETDATA.chartDefaults.before;
+        this.after = NETDATA.dataAttribute(this.element, 'after', NETDATA.chartDefaults.after);
+        this.before = NETDATA.dataAttribute(this.element, 'before', NETDATA.chartDefaults.before);
 
         // the pixels per point requested by the user
-        this.pixels_per_point = self.data('pixels-per-point') || 1;
-        this.points = self.data('points') || null;
+        this.pixels_per_point = NETDATA.dataAttribute(this.element, 'pixels-per-point', 1);
+        this.points = NETDATA.dataAttribute(this.element, 'points', null);
 
         // the dimensions requested by the user
-        this.dimensions = self.data('dimensions') || null;
+        this.dimensions = NETDATA.dataAttribute(this.element, 'dimensions', null);
 
         // the chart library requested by the user
-        this.library_name = self.data('chart-library') || NETDATA.chartDefaults.library;
+        this.library_name = NETDATA.dataAttribute(this.element, 'chart-library', NETDATA.chartDefaults.library);
 
         // how many retries we have made to load chart data from the server
         this.retries_on_data_failures = 0;
@@ -1545,16 +1573,18 @@ var NETDATA = window.NETDATA || {};
         this.chart_url = null;                      // string - the url to download chart info
         this.chart = null;                          // object - the chart as downloaded from the server
 
-        this.title = self.data('title') || null;    // the title of the chart
-        this.units = self.data('units') || null;    // the units of the chart dimensions
-        this.append_options = self.data('append-options') || null;  // additional options to pass to netdata
-        this.override_options = self.data('override-options') || null;  // override options to pass to netdata
+        this.title = NETDATA.dataAttribute(this.element, 'title', null);    // the title of the chart
+        this.units = NETDATA.dataAttribute(this.element, 'units', null);    // the units of the chart dimensions
+        this.append_options = NETDATA.dataAttribute(this.element, 'append-options', null); // additional options to pass to netdata
+        this.override_options = NETDATA.dataAttribute(this.element, 'override-options', null);  // override options to pass to netdata
 
+        this.chart_created = false;                 // boolean - true when the chart has been created
+        this.dom_created = false;                   // boolean - true when the DOM has been created
         this.running = false;                       // boolean - true when the chart is being refreshed now
         this.enabled = true;                        // boolean - is the chart enabled for refresh?
         this.paused = false;                        // boolean - is the chart paused for any reason?
         this.selected = false;                      // boolean - is the chart shown a selection?
-        this.debug = self.data('debug') === true;   // boolean - console.log() debug info about this chart
+        this.debug = NETDATA.dataAttribute(this.element, 'debug', false) === true; // boolean - console.log() debug info about this chart
 
         this.netdata_first = 0;                     // milliseconds - the first timestamp in netdata
         this.netdata_last = 0;                      // milliseconds - the last timestamp in netdata
@@ -1564,11 +1594,14 @@ var NETDATA = window.NETDATA || {};
         this.view_after = 0;
         this.view_before = 0;
 
+        this.tmp = {};                              // members that can be destroyed to save memory
+
         this.value_decimal_detail = -1;
-        var d = self.data('decimal-digits');
-        if(typeof d === 'number') {
+        var d = NETDATA.dataAttribute(this.element, 'decimal-digits', -1);
+        if(typeof d === 'number')
             this.value_decimal_detail = d;
-        }
+        else if(typeof d !== 'undefined')
+            this.log('ignoring decimal-digits value: ' + d.toString());
 
         this.auto = {
             name: 'auto',
@@ -1599,25 +1632,25 @@ var NETDATA = window.NETDATA || {};
         // check the requested library is available
         // we don't initialize it here - it will be initialized when
         // this chart will be first used
-        if(typeof NETDATA.chartLibraries[that.library_name] === 'undefined') {
-            NETDATA.error(402, that.library_name);
-            error('chart library "' + that.library_name + '" is not found');
+        if(typeof NETDATA.chartLibraries[this.library_name] === 'undefined') {
+            NETDATA.error(402, this.library_name);
+            error('chart library "' + this.library_name + '" is not found');
             return;
         }
-        else if(NETDATA.chartLibraries[that.library_name].enabled === false) {
-            NETDATA.error(403, that.library_name);
-            error('chart library "' + that.library_name + '" is not enabled');
+        else if(NETDATA.chartLibraries[this.library_name].enabled === false) {
+            NETDATA.error(403, this.library_name);
+            error('chart library "' + this.library_name + '" is not enabled');
             return;
         }
         else
-            that.library = NETDATA.chartLibraries[that.library_name];
+            this.library = NETDATA.chartLibraries[this.library_name];
 
         // milliseconds - the time the last refresh took
         this.refresh_dt_ms = 0;
 
         // if we need to report the rendering speed
         // find the element that needs to be updated
-        var refresh_dt_element_name = self.data('dt-element-name') || null; // string - the element to print refresh_dt_ms
+        var refresh_dt_element_name = NETDATA.dataAttribute(this.element, 'dt-element-name', null); // string - the element to print refresh_dt_ms
 
         if(refresh_dt_element_name !== null) {
             this.refresh_dt_element = document.getElementById(refresh_dt_element_name) || null;
@@ -1632,43 +1665,32 @@ var NETDATA = window.NETDATA || {};
         // ============================================================================================================
         // PRIVATE FUNCTIONS
 
-        var createDOM = function() {
+        var destroyDOM = function() {
             if(that.enabled === false) return;
 
-            if(that.element_message !== null) that.element_message.innerHTML = '';
-            if(that.element_legend !== null) that.element_legend.innerHTML = '';
-            if(that.element_chart !== null) that.element_chart.innerHTML = '';
+            if(that.debug === true)
+                that.log('destroyDOM()');
 
+            // that.element.className = 'netdata-message icon';
+            // that.element.innerHTML = '<i class="fa fa-refresh"></i> netdata';
             that.element.innerHTML = '';
-
-            that.element_message = document.createElement('div');
-            that.element_message.className = 'netdata-message icon hidden';
-            that.element.appendChild(that.element_message);
-
-            that.element_chart = document.createElement('div');
-            that.element_chart.id = that.library_name + '-' + that.uuid + '-chart';
-            that.element.appendChild(that.element_chart);
-
-            if(that.hasLegend() === true) {
-                that.element.className = "netdata-container-with-legend";
-                that.element_chart.className = 'netdata-chart-with-legend-right netdata-' + that.library_name + '-chart-with-legend-right';
-
-                that.element_legend = document.createElement('div');
-                that.element_legend.className = 'netdata-chart-legend netdata-' + that.library_name + '-legend';
-                that.element.appendChild(that.element_legend);
-            }
-            else {
-                that.element.className = "netdata-container";
-                that.element_chart.className = ' netdata-chart netdata-' + that.library_name + '-chart';
-
-                that.element_legend = null;
-            }
+            that.element_message = null;
+            that.element_legend = null;
+            that.element_chart = null;
             that.element_legend_childs.series = null;
 
+            that.chart_created = false;
+            that.dom_created = false;
+
+            that.tm.last_resized = 0;
+            that.tm.last_dom_created = 0;
+        };
+
+        var resizeDOM = function() {
             if(typeof(that.width) === 'string')
-                $(that.element).css('width', that.width);
+                that.element.style.width = that.width;
             else if(typeof(that.width) === 'number')
-                $(that.element).css('width', that.width + 'px');
+                that.element.style.width = that.width.toString() + 'px';
 
             if(typeof(that.library.aspect_ratio) === 'undefined') {
                 if(typeof(that.height) === 'string')
@@ -1686,13 +1708,42 @@ var NETDATA = window.NETDATA || {};
                 else
                     that.element.style.height = (w * that.library.aspect_ratio / 100).toString() + 'px';
             }
+        };
+
+        var createDOM = function() {
+            if(that.enabled === false) return;
+
+            destroyDOM();
+
+            if(that.debug === true)
+                that.log('createDOM()');
+
+            if(that.hasLegend() === true)
+                that.element.className = "netdata-container-with-legend";
+            else
+                that.element.className = "netdata-container";
+
+            that.element_message = document.createElement('div');
+            that.element_message.className = 'netdata-message icon hidden';
+            that.element.appendChild(that.element_message);
+
+            that.dom_created = true;
+            that.chart_created = false;
+
+            that.tm.last_dom_created =
+                that.tm.last_resized = Date.now();
+
+            resizeDOM();
+            showLoading();
+        };
+
+        var initDOM = function() {
+            that.element.className = "netdata-container";
 
             if(NETDATA.chartDefaults.min_width !== null)
-                $(that.element).css('min-width', NETDATA.chartDefaults.min_width);
+                that.element.style.min_width = NETDATA.chartDefaults.min_width;
 
-            that.tm.last_dom_created = Date.now();
-
-            showLoading();
+            resizeDOM();
         };
 
         /* init() private
@@ -1700,13 +1751,15 @@ var NETDATA = window.NETDATA || {};
          * destroy all (possibly) created state elements
          * create the basic DOM for a chart
          */
-        var init = function() {
+        var init = function(force) {
             if(that.enabled === false) return;
+            if(typeof(force) === 'undefined') force = false;
 
             that.paused = false;
             that.selected = false;
 
             that.chart_created = false;         // boolean - is the library.create() been called?
+            that.dom_created = false;           // boolean - is the chart DOM been created?
             that.updates_counter = 0;           // numeric - the number of refreshes made so far
             that.updates_since_last_unhide = 0; // numeric - the number of refreshes made since the last time the chart was unhidden
             that.updates_since_last_creation = 0; // numeric - the number of refreshes made since the last time the chart was created
@@ -1735,10 +1788,13 @@ var NETDATA = window.NETDATA || {};
             that.data_before = 0;           // milliseconds - the last timestamp of the data
             that.data_update_every = 0;     // milliseconds - the frequency to update the data
 
-            that.tm.last_initialized = Date.now();
-            createDOM();
+            that.tmp = {};
 
+            that.tm.last_initialized = Date.now();
             that.setMode('auto');
+
+            if(that.isVisible(true) || force === true)
+                createDOM();
         };
 
         var maxMessageFontSize = function() {
@@ -1779,12 +1835,12 @@ var NETDATA = window.NETDATA || {};
             that.element_message.innerHTML = icon;
             maxMessageFontSize();
             $(that.element_message).removeClass('hidden');
-            that.___messageHidden___ = undefined;
+            that.tmp.___messageHidden___ = undefined;
         };
 
         var hideMessage = function() {
-            if(typeof that.___messageHidden___ === 'undefined') {
-                that.___messageHidden___ = true;
+            if(typeof that.tmp.___messageHidden___ === 'undefined') {
+                that.tmp.___messageHidden___ = true;
                 $(that.element_message).addClass('hidden');
             }
         };
@@ -1812,7 +1868,7 @@ var NETDATA = window.NETDATA || {};
         };
 
         var isHidden = function() {
-            return (typeof that.___chartIsHidden___ !== 'undefined');
+            return (typeof that.tmp.___chartIsHidden___ !== 'undefined');
         };
 
         // hide the chart, when it is not visible - called from isVisible()
@@ -1823,7 +1879,7 @@ var NETDATA = window.NETDATA || {};
             if(that.chart_created === true) {
                 if(NETDATA.options.current.destroy_on_hide === true) {
                     // we should destroy it
-                    init();
+                    init(true);
                 }
                 else {
                     showRendering();
@@ -1842,20 +1898,20 @@ var NETDATA = window.NETDATA || {};
                 }
             }
 
-            that.___chartIsHidden___ = true;
+            that.tmp.___chartIsHidden___ = true;
         };
 
         // unhide the chart, when it is visible - called from isVisible()
         var unhideChart = function() {
             if(isHidden() === false) return;
 
-            that.___chartIsHidden___ = undefined;
+            that.tmp.___chartIsHidden___ = undefined;
             that.updates_since_last_unhide = 0;
 
             if(that.chart_created === false) {
                 // we need to re-initialize it, to show our background
                 // logo in bootstrap tabs, until the chart loads
-                init();
+                init(true);
             }
             else {
                 that.tm.last_unhidden = Date.now();
@@ -1937,7 +1993,7 @@ var NETDATA = window.NETDATA || {};
                 if(that.chart_created === false) return;
 
                 if(that.needsRecreation()) {
-                    init();
+                    init(true);
                 }
                 else if(typeof that.library.resize === 'function') {
                     that.library.resize(that);
@@ -2109,7 +2165,7 @@ var NETDATA = window.NETDATA || {};
             // that.data_update_every = 30 * 1000;
             //that.element_chart.style.display = 'none';
             //if(that.element_legend !== null) that.element_legend.style.display = 'none';
-            //that.___chartIsHidden___ = true;
+            //that.tmp.___chartIsHidden___ = true;
         };
 
         // ============================================================================================================
@@ -2312,11 +2368,6 @@ var NETDATA = window.NETDATA || {};
         };
 
         // ----------------------------------------------------------------------------------------------------------------
-
-        // console logging
-        this.log = function(msg) {
-            console.log(this.id + ' (' + this.library_name + ' ' + this.uuid + '): ' + msg);
-        };
 
         this.pauseChart = function() {
             if(this.paused === false) {
@@ -2572,23 +2623,23 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.__legendSetDateString = function(date) {
-            if(date !== this.__last_shown_legend_date) {
+            if(date !== this.tmp.__last_shown_legend_date) {
                 this.element_legend_childs.title_date.innerText = date;
-                this.__last_shown_legend_date = date;
+                this.tmp.__last_shown_legend_date = date;
             }
         };
 
         this.__legendSetTimeString = function(time) {
-            if(time !== this.__last_shown_legend_time) {
+            if(time !== this.tmp.__last_shown_legend_time) {
                 this.element_legend_childs.title_time.innerText = time;
-                this.__last_shown_legend_time = time;
+                this.tmp.__last_shown_legend_time = time;
             }
         };
 
         this.__legendSetUnitsString = function(units) {
-            if(units !== this.__last_shown_legend_units) {
+            if(units !== this.tmp.__last_shown_legend_units) {
                 this.element_legend_childs.title_units.innerText = units;
-                this.__last_shown_legend_units = units;
+                this.tmp.__last_shown_legend_units = units;
             }
         };
 
@@ -2683,7 +2734,7 @@ var NETDATA = window.NETDATA || {};
         };
 
         // this should be called just ONCE per dimension per chart
-        this._chartDimensionColor = function(label) {
+        this.__chartDimensionColor = function(label) {
             this.chartPrepareColorPalette();
 
             if(typeof this.colors_assigned[label] === 'undefined') {
@@ -2737,7 +2788,7 @@ var NETDATA = window.NETDATA || {};
                 this.colors_available.unshift(NETDATA.themes.current.colors[len]);
 
             // add the user supplied colors
-            var c = $(this.element).data('colors');
+            var c = NETDATA.dataAttribute(this.element, 'colors', undefined);
             // this.log('read colors: ' + c);
             if(typeof c === 'string' && c.length > 0) {
                 c = c.split(' ');
@@ -2842,7 +2893,7 @@ var NETDATA = window.NETDATA || {};
                     keys = Object.keys(this.chart.dimensions);
                     len = keys.length;
                     for(i = 0; i < len ;i++)
-                        this._chartDimensionColor(this.chart.dimensions[keys[i]].name);
+                        this.__chartDimensionColor(this.chart.dimensions[keys[i]].name);
                 }
             }
             // we will re-generate the colors for the chart
@@ -2856,12 +2907,12 @@ var NETDATA = window.NETDATA || {};
             this.dimensions_visibility.invalidateAll();
 
             var genLabel = function(state, parent, dim, name, count) {
-                var color = state._chartDimensionColor(name);
+                var color = state.__chartDimensionColor(name);
 
                 var user_element = null;
-                var user_id = self.data('show-value-of-' + name.toLowerCase() + '-at') || null;
+                var user_id = NETDATA.dataAttribute(state.element, 'show-value-of-' + name.toLowerCase() + '-at', null);
                 if(user_id === null)
-                    user_id = self.data('show-value-of-' + dim.toLowerCase() + '-at') || null;
+                    user_id = NETDATA.dataAttribute(state.element, 'show-value-of-' + dim.toLowerCase() + '-at', null);
                 if(user_id !== null) {
                     user_element = document.getElementById(user_id) || null;
                     if (user_element === null)
@@ -2900,7 +2951,26 @@ var NETDATA = window.NETDATA || {};
 
             var content = document.createElement('div');
 
-            if(this.hasLegend()) {
+            if(this.element_chart === null) {
+                this.element_chart = document.createElement('div');
+                this.element_chart.id = this.library_name + '-' + this.uuid + '-chart';
+                this.element.appendChild(this.element_chart);
+
+                if(this.hasLegend() === true)
+                    this.element_chart.className = 'netdata-chart-with-legend-right netdata-' + this.library_name + '-chart-with-legend-right';
+                else
+                    this.element_chart.className = ' netdata-chart netdata-' + this.library_name + '-chart';
+            }
+
+            if(this.hasLegend() === true) {
+                if(this.element_legend === null) {
+                    this.element_legend = document.createElement('div');
+                    this.element_legend.className = 'netdata-chart-legend netdata-' + this.library_name + '-legend';
+                    this.element.appendChild(this.element_legend);
+                }
+                else
+                    this.element_legend.innerHTML = '';
+
                 this.element_legend_childs = {
                     content: content,
                     resize_handler: document.createElement('div'),
@@ -2918,10 +2988,7 @@ var NETDATA = window.NETDATA || {};
                     series: {}
                 };
 
-                this.element_legend.innerHTML = '';
-
                 if(this.library.toolboxPanAndZoom !== null) {
-
                     var get_pan_and_zoom_step = function(event) {
                         if (event.ctrlKey)
                             return NETDATA.options.current.pan_and_zoom_factor * NETDATA.options.current.pan_and_zoom_factor_multiplier_control;
@@ -3099,19 +3166,19 @@ var NETDATA = window.NETDATA || {};
 
                 this.element_legend_childs.title_date.className += " netdata-legend-title-date";
                 this.element_legend.appendChild(this.element_legend_childs.title_date);
-                this.__last_shown_legend_date = undefined;
+                this.tmp.__last_shown_legend_date = undefined;
 
                 this.element_legend.appendChild(document.createElement('br'));
 
                 this.element_legend_childs.title_time.className += " netdata-legend-title-time";
                 this.element_legend.appendChild(this.element_legend_childs.title_time);
-                this.__last_shown_legend_time = undefined;
+                this.tmp.__last_shown_legend_time = undefined;
 
                 this.element_legend.appendChild(document.createElement('br'));
 
                 this.element_legend_childs.title_units.className += " netdata-legend-title-units";
                 this.element_legend.appendChild(this.element_legend_childs.title_units);
-                this.__last_shown_legend_units = undefined;
+                this.tmp.__last_shown_legend_units = undefined;
 
                 this.element_legend.appendChild(document.createElement('br'));
 
@@ -3205,16 +3272,16 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.hasLegend = function() {
-            if(typeof this.___hasLegendCache___ !== 'undefined')
-                return this.___hasLegendCache___;
+            if(typeof this.tmp.___hasLegendCache___ !== 'undefined')
+                return this.tmp.___hasLegendCache___;
 
             var leg = false;
             if(this.library && this.library.legend(this) === 'right-side') {
-                var legend = $(this.element).data('legend') || 'yes';
+                var legend = NETDATA.dataAttribute(this.element, 'legend', 'yes');
                 if(legend === 'yes') leg = true;
             }
 
-            this.___hasLegendCache___ = leg;
+            this.tmp.___hasLegendCache___ = leg;
             return leg;
         };
 
@@ -3248,12 +3315,17 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.needsRecreation = function() {
-            return (
+            var ret = (
                     this.chart_created === true
                     && this.library
                     && this.library.autoresize() === false
                     && this.tm.last_resized < NETDATA.options.last_page_resize
                 );
+
+            if(this.debug === true)
+                this.log('needsRecreation(): ' + ret.toString() + ', chart_created = ' + this.chart_created.toString());
+
+            return ret;
         };
 
         this.chartURL = function() {
@@ -3404,7 +3476,7 @@ var NETDATA = window.NETDATA || {};
                 if(this.debug === true)
                     this.log('max updates of ' + this.updates_since_last_creation.toString() + ' reached. Forcing re-generation.');
 
-                init();
+                init(true);
                 return;
             }
 
@@ -3456,7 +3528,7 @@ var NETDATA = window.NETDATA || {};
 
         this.updateChart = function(callback) {
             if(this.debug === true)
-                this.log('updateChart() called.');
+                this.log('updateChart()');
 
             if(this._updating === true) {
                 if(this.debug === true)
@@ -3486,6 +3558,9 @@ var NETDATA = window.NETDATA || {};
 
                 return;
             }
+
+            if(that.dom_created !== true)
+                createDOM();
 
             if(this.chart === null)
                 return this.getChart(function() {
@@ -3568,24 +3643,14 @@ var NETDATA = window.NETDATA || {};
             });
         };
 
-        this.isVisible = function(nocache) {
-            if(typeof nocache === 'undefined')
-                nocache = false;
-
-            // this.log('last_visible_check: ' + this.tm.last_visible_check + ', last_page_scroll: ' + NETDATA.options.last_page_scroll);
-
-            // caching - we do not evaluate the charts visibility
-            // if the page has not been scrolled since the last check
-            if(nocache === false && this.tm.last_visible_check > NETDATA.options.last_page_scroll)
-                return this.___isVisible___;
-
+        var __isVisible = function() {
             // tolerance is the number of pixels a chart can be off-screen
             // to consider it as visible and refresh it as if was visible
             var tolerance = 0;
 
-            this.tm.last_visible_check = Date.now();
+            that.tm.last_visible_check = Date.now();
 
-            var rect = this.element.getBoundingClientRect();
+            var rect = that.element.getBoundingClientRect();
 
             var screenTop = window.scrollY;
             var screenBottom = screenTop + window.innerHeight;
@@ -3593,30 +3658,23 @@ var NETDATA = window.NETDATA || {};
             var chartTop = rect.top + screenTop;
             var chartBottom = chartTop + rect.height;
 
-            if(rect.width === 0 || rect.height === 0) {
-                hideChart();
-                this.___isVisible___ = false;
-                return this.___isVisible___;
-            }
+            return !(rect.width === 0 || rect.height === 0 || chartBottom + tolerance < screenTop || chartTop - tolerance > screenBottom);
+        };
 
-            if(chartBottom + tolerance < screenTop || chartTop - tolerance > screenBottom) {
-                // the chart is too far
+        this.isVisible = function(nocache) {
+            // this.log('last_visible_check: ' + this.tm.last_visible_check + ', last_page_scroll: ' + NETDATA.options.last_page_scroll);
 
-                // this.log('nocache: ' + nocache.toString() + ', screen top: ' + screenTop.toString() + ', bottom: ' + screenBottom.toString() + ', chart top: ' + chartTop.toString() + ', bottom: ' + chartBottom.toString() + ', OFF SCREEN');
+            // caching - we do not evaluate the charts visibility
+            // if the page has not been scrolled since the last check
+            if((typeof nocache === 'undefined' || nocache === false)
+                && typeof this.tmp.___isVisible___ !== 'undefined'
+                && this.tm.last_visible_check > NETDATA.options.last_page_scroll)
+                return this.tmp.___isVisible___;
 
-                hideChart();
-                this.___isVisible___ = false;
-                return this.___isVisible___;
-            }
-            else {
-                // the chart is inside or very close
-
-                // this.log('nocache: ' + nocache.toString() + ', screen top: ' + screenTop.toString() + ', bottom: ' + screenBottom.toString() + ', chart top: ' + chartTop.toString() + ', bottom: ' + chartBottom.toString() + ', VISIBLE');
-
-                unhideChart();
-                this.___isVisible___ = true;
-                return this.___isVisible___;
-            }
+            this.tmp.___isVisible___ = __isVisible();
+            if(this.tmp.___isVisible___ === true) unhideChart();
+            else hideChart();
+            return this.tmp.___isVisible___;
         };
 
         this.isAutoRefreshable = function() {
@@ -3740,7 +3798,7 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
-        this._defaultsFromDownloadedChart = function(chart) {
+        this.__defaultsFromDownloadedChart = function(chart) {
             this.chart = chart;
             this.chart_url = chart.url;
             this.data_update_every = chart.update_every * 1000;
@@ -3758,7 +3816,7 @@ var NETDATA = window.NETDATA || {};
         this.getChart = function(callback) {
             this.chart = NETDATA.chartRegistry.get(this.host, this.id);
             if(this.chart) {
-                this._defaultsFromDownloadedChart(this.chart);
+                this.__defaultsFromDownloadedChart(this.chart);
 
                 if(typeof callback === 'function')
                     return callback();
@@ -3777,7 +3835,7 @@ var NETDATA = window.NETDATA || {};
                 })
                 .done(function(chart) {
                     chart.url = that.chart_url;
-                    that._defaultsFromDownloadedChart(chart);
+                    that.__defaultsFromDownloadedChart(chart);
                     NETDATA.chartRegistry.add(that.host, that.id, chart);
                 })
                 .fail(function() {
@@ -3794,6 +3852,7 @@ var NETDATA = window.NETDATA || {};
         // ============================================================================================================
         // INITIALIZATION
 
+        initDOM();
         init();
     };
 
@@ -3823,12 +3882,7 @@ var NETDATA = window.NETDATA || {};
 
     // get or create a chart state, given a DOM element
     NETDATA.chartState = function(element) {
-        var state = $(element).data('netdata-state-object') || null;
-        if(state === null) {
-            state = new chartState(element);
-            $(element).data('netdata-state-object', state);
-        }
-        return state;
+        return new chartState(element);
     };
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -4196,10 +4250,9 @@ var NETDATA = window.NETDATA || {};
         state.peity_instance = document.createElement('div');
         state.element_chart.appendChild(state.peity_instance);
 
-        var self = $(state.element);
         state.peity_options = {
             stroke: NETDATA.themes.current.foreground,
-            strokeWidth: self.data('peity-strokewidth') || 1,
+            strokeWidth: NETDATA.dataAttribute(state.element, 'peity-strokewidth', 1),
             width: state.chartWidth(),
             height: state.chartHeight(),
             fill: NETDATA.themes.current.foreground
@@ -4248,52 +4301,51 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.sparklineChartCreate = function(state, data) {
-        var self = $(state.element);
-        var type = self.data('sparkline-type') || 'line';
-        var lineColor = self.data('sparkline-linecolor') || state.chartCustomColors()[0];
-        var fillColor = self.data('sparkline-fillcolor') || ((state.chart.chart_type === 'line')?NETDATA.themes.current.background:NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance));
-        var chartRangeMin = self.data('sparkline-chartrangemin') || undefined;
-        var chartRangeMax = self.data('sparkline-chartrangemax') || undefined;
-        var composite = self.data('sparkline-composite') || undefined;
-        var enableTagOptions = self.data('sparkline-enabletagoptions') || undefined;
-        var tagOptionPrefix = self.data('sparkline-tagoptionprefix') || undefined;
-        var tagValuesAttribute = self.data('sparkline-tagvaluesattribute') || undefined;
-        var disableHiddenCheck = self.data('sparkline-disablehiddencheck') || undefined;
-        var defaultPixelsPerValue = self.data('sparkline-defaultpixelspervalue') || undefined;
-        var spotColor = self.data('sparkline-spotcolor') || undefined;
-        var minSpotColor = self.data('sparkline-minspotcolor') || undefined;
-        var maxSpotColor = self.data('sparkline-maxspotcolor') || undefined;
-        var spotRadius = self.data('sparkline-spotradius') || undefined;
-        var valueSpots = self.data('sparkline-valuespots') || undefined;
-        var highlightSpotColor = self.data('sparkline-highlightspotcolor') || undefined;
-        var highlightLineColor = self.data('sparkline-highlightlinecolor') || undefined;
-        var lineWidth = self.data('sparkline-linewidth') || undefined;
-        var normalRangeMin = self.data('sparkline-normalrangemin') || undefined;
-        var normalRangeMax = self.data('sparkline-normalrangemax') || undefined;
-        var drawNormalOnTop = self.data('sparkline-drawnormalontop') || undefined;
-        var xvalues = self.data('sparkline-xvalues') || undefined;
-        var chartRangeClip = self.data('sparkline-chartrangeclip') || undefined;
-        var chartRangeMinX = self.data('sparkline-chartrangeminx') || undefined;
-        var chartRangeMaxX = self.data('sparkline-chartrangemaxx') || undefined;
-        var disableInteraction = self.data('sparkline-disableinteraction') || false;
-        var disableTooltips = self.data('sparkline-disabletooltips') || false;
-        var disableHighlight = self.data('sparkline-disablehighlight') || false;
-        var highlightLighten = self.data('sparkline-highlightlighten') || 1.4;
-        var highlightColor = self.data('sparkline-highlightcolor') || undefined;
-        var tooltipContainer = self.data('sparkline-tooltipcontainer') || undefined;
-        var tooltipClassname = self.data('sparkline-tooltipclassname') || undefined;
-        var tooltipFormat = self.data('sparkline-tooltipformat') || undefined;
-        var tooltipPrefix = self.data('sparkline-tooltipprefix') || undefined;
-        var tooltipSuffix = self.data('sparkline-tooltipsuffix') || ' ' + state.units;
-        var tooltipSkipNull = self.data('sparkline-tooltipskipnull') || true;
-        var tooltipValueLookups = self.data('sparkline-tooltipvaluelookups') || undefined;
-        var tooltipFormatFieldlist = self.data('sparkline-tooltipformatfieldlist') || undefined;
-        var tooltipFormatFieldlistKey = self.data('sparkline-tooltipformatfieldlistkey') || undefined;
-        var numberFormatter = self.data('sparkline-numberformatter') || function(n){ return n.toFixed(2); };
-        var numberDigitGroupSep = self.data('sparkline-numberdigitgroupsep') || undefined;
-        var numberDecimalMark = self.data('sparkline-numberdecimalmark') || undefined;
-        var numberDigitGroupCount = self.data('sparkline-numberdigitgroupcount') || undefined;
-        var animatedZooms = self.data('sparkline-animatedzooms') || false;
+        var type = NETDATA.dataAttribute(state.element, 'sparkline-type', 'line');
+        var lineColor = NETDATA.dataAttribute(state.element, 'sparkline-linecolor', state.chartCustomColors()[0]);
+        var fillColor = NETDATA.dataAttribute(state.element, 'sparkline-fillcolor', ((state.chart.chart_type === 'line')?NETDATA.themes.current.background:NETDATA.colorLuminance(lineColor, NETDATA.chartDefaults.fill_luminance)));
+        var chartRangeMin = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemin', undefined);
+        var chartRangeMax = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemax', undefined);
+        var composite = NETDATA.dataAttribute(state.element, 'sparkline-composite', undefined);
+        var enableTagOptions = NETDATA.dataAttribute(state.element, 'sparkline-enabletagoptions', undefined);
+        var tagOptionPrefix = NETDATA.dataAttribute(state.element, 'sparkline-tagoptionprefix', undefined);
+        var tagValuesAttribute = NETDATA.dataAttribute(state.element, 'sparkline-tagvaluesattribute', undefined);
+        var disableHiddenCheck = NETDATA.dataAttribute(state.element, 'sparkline-disablehiddencheck', undefined);
+        var defaultPixelsPerValue = NETDATA.dataAttribute(state.element, 'sparkline-defaultpixelspervalue', undefined);
+        var spotColor = NETDATA.dataAttribute(state.element, 'sparkline-spotcolor', undefined);
+        var minSpotColor = NETDATA.dataAttribute(state.element, 'sparkline-minspotcolor', undefined);
+        var maxSpotColor = NETDATA.dataAttribute(state.element, 'sparkline-maxspotcolor', undefined);
+        var spotRadius = NETDATA.dataAttribute(state.element, 'sparkline-spotradius', undefined);
+        var valueSpots = NETDATA.dataAttribute(state.element, 'sparkline-valuespots', undefined);
+        var highlightSpotColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightspotcolor', undefined);
+        var highlightLineColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightlinecolor', undefined);
+        var lineWidth = NETDATA.dataAttribute(state.element, 'sparkline-linewidth', undefined);
+        var normalRangeMin = NETDATA.dataAttribute(state.element, 'sparkline-normalrangemin', undefined);
+        var normalRangeMax = NETDATA.dataAttribute(state.element, 'sparkline-normalrangemax', undefined);
+        var drawNormalOnTop = NETDATA.dataAttribute(state.element, 'sparkline-drawnormalontop', undefined);
+        var xvalues = NETDATA.dataAttribute(state.element, 'sparkline-xvalues', undefined);
+        var chartRangeClip = NETDATA.dataAttribute(state.element, 'sparkline-chartrangeclip', undefined);
+        var chartRangeMinX = NETDATA.dataAttribute(state.element, 'sparkline-chartrangeminx', undefined);
+        var chartRangeMaxX = NETDATA.dataAttribute(state.element, 'sparkline-chartrangemaxx', undefined);
+        var disableInteraction = NETDATA.dataAttribute(state.element, 'sparkline-disableinteraction', false);
+        var disableTooltips = NETDATA.dataAttribute(state.element, 'sparkline-disabletooltips', false);
+        var disableHighlight = NETDATA.dataAttribute(state.element, 'sparkline-disablehighlight', false);
+        var highlightLighten = NETDATA.dataAttribute(state.element, 'sparkline-highlightlighten', 1.4);
+        var highlightColor = NETDATA.dataAttribute(state.element, 'sparkline-highlightcolor', undefined);
+        var tooltipContainer = NETDATA.dataAttribute(state.element, 'sparkline-tooltipcontainer', undefined);
+        var tooltipClassname = NETDATA.dataAttribute(state.element, 'sparkline-tooltipclassname', undefined);
+        var tooltipFormat = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformat', undefined);
+        var tooltipPrefix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipprefix', undefined);
+        var tooltipSuffix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipsuffix', ' ' + state.units);
+        var tooltipSkipNull = NETDATA.dataAttribute(state.element, 'sparkline-tooltipskipnull', true);
+        var tooltipValueLookups = NETDATA.dataAttribute(state.element, 'sparkline-tooltipvaluelookups', undefined);
+        var tooltipFormatFieldlist = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlist', undefined);
+        var tooltipFormatFieldlistKey = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlistkey', undefined);
+        var numberFormatter = NETDATA.dataAttribute(state.element, 'sparkline-numberformatter', function(n){ return n.toFixed(2); });
+        var numberDigitGroupSep = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupsep', undefined);
+        var numberDecimalMark = NETDATA.dataAttribute(state.element, 'sparkline-numberdecimalmark', undefined);
+        var numberDigitGroupCount = NETDATA.dataAttribute(state.element, 'sparkline-numberdigitgroupcount', undefined);
+        var animatedZooms = NETDATA.dataAttribute(state.element, 'sparkline-animatedzooms', false);
 
         if(spotColor === 'disable') spotColor='';
         if(minSpotColor === 'disable') minSpotColor='';
@@ -4373,19 +4425,19 @@ var NETDATA = window.NETDATA || {};
         state.setMode('zoom');
         state.globalSelectionSyncStop();
         state.globalSelectionSyncDelay();
-        state.dygraph_user_action = true;
-        state.dygraph_force_zoom = true;
+        state.tmp.dygraph_user_action = true;
+        state.tmp.dygraph_force_zoom = true;
         state.updateChartPanOrZoom(after, before);
         NETDATA.globalPanAndZoom.setMaster(state, after, before);
     };
 
     NETDATA.dygraphSetSelection = function(state, t) {
-        if(typeof state.dygraph_instance !== 'undefined') {
+        if(typeof state.tmp.dygraph_instance !== 'undefined') {
             var r = state.calculateRowForTime(t);
             if(r !== -1)
-                state.dygraph_instance.setSelection(r);
+                state.tmp.dygraph_instance.setSelection(r);
             else {
-                state.dygraph_instance.clearSelection();
+                state.tmp.dygraph_instance.clearSelection();
                 state.legendShowUndefined();
             }
         }
@@ -4394,8 +4446,8 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.dygraphClearSelection = function(state) {
-        if(typeof state.dygraph_instance !== 'undefined') {
-            state.dygraph_instance.clearSelection();
+        if(typeof state.tmp.dygraph_instance !== 'undefined') {
+            state.tmp.dygraph_instance.clearSelection();
         }
         return true;
     };
@@ -4450,7 +4502,7 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.dygraphChartUpdate = function(state, data) {
-        var dygraph = state.dygraph_instance;
+        var dygraph = state.tmp.dygraph_instance;
 
         if(typeof dygraph === 'undefined')
             return NETDATA.dygraphChartCreate(state, data);
@@ -4460,7 +4512,7 @@ var NETDATA = window.NETDATA || {};
         // its element size as 0x0.
         // this will make it re-appear properly
 
-        if(state.tm.last_unhidden > state.dygraph_last_rendered)
+        if(state.tm.last_unhidden > state.tmp.dygraph_last_rendered)
             dygraph.resize();
 
         var options = {
@@ -4471,13 +4523,13 @@ var NETDATA = window.NETDATA || {};
                 visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
         };
 
-        if(state.dygraph_force_zoom === true) {
+        if(state.tmp.dygraph_force_zoom === true) {
             if(NETDATA.options.debug.dygraph === true || state.debug === true)
                 state.log('dygraphChartUpdate() forced zoom update');
 
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
             options.isZoomedIgnoreProgrammaticZoom = true;
-            state.dygraph_force_zoom = false;
+            state.tmp.dygraph_force_zoom = false;
         }
         else if(state.current.name !== 'auto') {
             if(NETDATA.options.debug.dygraph === true || state.debug === true)
@@ -4491,21 +4543,21 @@ var NETDATA = window.NETDATA || {};
             options.isZoomedIgnoreProgrammaticZoom = true;
         }
 
-        options.valueRange = state.dygraph_options.valueRange;
+        options.valueRange = state.tmp.dygraph_options.valueRange;
 
         var oldMax = null, oldMin = null;
-        if (state.__commonMin !== null) {
-            state.data.min = state.dygraph_instance.axes_[0].extremeRange[0];
+        if (state.tmp.__commonMin !== null) {
+            state.data.min = state.tmp.dygraph_instance.axes_[0].extremeRange[0];
             oldMin = options.valueRange[0] = NETDATA.commonMin.get(state);
         }
-        if (state.__commonMax !== null) {
-            state.data.max = state.dygraph_instance.axes_[0].extremeRange[1];
+        if (state.tmp.__commonMax !== null) {
+            state.data.max = state.tmp.dygraph_instance.axes_[0].extremeRange[1];
             oldMax = options.valueRange[1] = NETDATA.commonMax.get(state);
         }
 
-        if(state.dygraph_smooth_eligible === true) {
-            if((NETDATA.options.current.smooth_plot === true && state.dygraph_options.plotter !== smoothPlotter)
-                || (NETDATA.options.current.smooth_plot === false && state.dygraph_options.plotter === smoothPlotter)) {
+        if(state.tmp.dygraph_smooth_eligible === true) {
+            if((NETDATA.options.current.smooth_plot === true && state.tmp.dygraph_options.plotter !== smoothPlotter)
+                || (NETDATA.options.current.smooth_plot === false && state.tmp.dygraph_options.plotter === smoothPlotter)) {
                 NETDATA.dygraphChartCreate(state, data);
                 return;
             }
@@ -4514,13 +4566,13 @@ var NETDATA = window.NETDATA || {};
         dygraph.updateOptions(options);
 
         var redraw = false;
-        if(oldMin !== null && oldMin > state.dygraph_instance.axes_[0].extremeRange[0]) {
-            state.data.min = state.dygraph_instance.axes_[0].extremeRange[0];
+        if(oldMin !== null && oldMin > state.tmp.dygraph_instance.axes_[0].extremeRange[0]) {
+            state.data.min = state.tmp.dygraph_instance.axes_[0].extremeRange[0];
             options.valueRange[0] = NETDATA.commonMin.get(state);
             redraw = true;
         }
-        if(oldMax !== null && oldMax < state.dygraph_instance.axes_[0].extremeRange[1]) {
-            state.data.max = state.dygraph_instance.axes_[0].extremeRange[1];
+        if(oldMax !== null && oldMax < state.tmp.dygraph_instance.axes_[0].extremeRange[1]) {
+            state.data.max = state.tmp.dygraph_instance.axes_[0].extremeRange[1];
             options.valueRange[1] = NETDATA.commonMax.get(state);
             redraw = true;
         }
@@ -4530,7 +4582,7 @@ var NETDATA = window.NETDATA || {};
             dygraph.updateOptions(options);
         }
 
-        state.dygraph_last_rendered = Date.now();
+        state.tmp.dygraph_last_rendered = Date.now();
         return true;
     };
 
@@ -4538,185 +4590,93 @@ var NETDATA = window.NETDATA || {};
         if(NETDATA.options.debug.dygraph === true || state.debug === true)
             state.log('dygraphChartCreate()');
 
-        var self = $(state.element);
-
-        var chart_type = self.data('dygraph-type') || state.chart.chart_type;
+        var chart_type = NETDATA.dataAttribute(state.element, 'dygraph-type', state.chart.chart_type);
         if(chart_type === 'stacked' && data.dimensions === 1) chart_type = 'area';
 
         var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state) === true)?3:4;
 
         var smooth = (NETDATA.dygraph.smooth === true)
-            ?(self.data('dygraph-smooth') || (chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false))
+            ?(NETDATA.dataAttribute(state.element, 'dygraph-smooth', (chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
             :false;
 
-        state.dygraph_options = {
-            colors:                 self.data('dygraph-colors') || state.chartColors(),
+        state.tmp.dygraph_options = {
+            colors:                 NETDATA.dataAttribute(state.element, 'dygraph-colors', state.chartColors()),
 
             // leave a few pixels empty on the right of the chart
-            rightGap:               self.data('dygraph-rightgap')
-                                    || 5,
-
-            showRangeSelector:      self.data('dygraph-showrangeselector')
-                                    || false,
-
-            showRoller:             self.data('dygraph-showroller')
-                                    || false,
-
-            title:                  self.data('dygraph-title')
-                                    || state.title,
-
-            titleHeight:            self.data('dygraph-titleheight')
-                                    || 19,
-
-            legend:                 self.data('dygraph-legend')
-                                    || 'always', // we need this to get selection events
-
+            rightGap:               NETDATA.dataAttribute(state.element, 'dygraph-rightgap', 5),
+            showRangeSelector:      NETDATA.dataAttribute(state.element, 'dygraph-showrangeselector', false),
+            showRoller:             NETDATA.dataAttribute(state.element, 'dygraph-showroller', false),
+            title:                  NETDATA.dataAttribute(state.element, 'dygraph-title', state.title),
+            titleHeight:            NETDATA.dataAttribute(state.element, 'dygraph-titleheight', 19),
+            legend:                 NETDATA.dataAttribute(state.element, 'dygraph-legend', 'always'), // we need this to get selection events
             labels:                 data.result.labels,
-
-            labelsDiv:              self.data('dygraph-labelsdiv')
-                                    || state.element_legend_childs.hidden,
-
-            labelsDivStyles:        self.data('dygraph-labelsdivstyles')
-                                    || { 'fontSize':'1px' },
-
-            labelsDivWidth:         self.data('dygraph-labelsdivwidth')
-                                    || state.chartWidth() - 70,
-
-            labelsSeparateLines:    self.data('dygraph-labelsseparatelines')
-                                    || true,
-
-            labelsShowZeroValues:   self.data('dygraph-labelsshowzerovalues')
-                                    || true,
-
+            labelsDiv:              NETDATA.dataAttribute(state.element, 'dygraph-labelsdiv', state.element_legend_childs.hidden),
+            labelsDivStyles:        NETDATA.dataAttribute(state.element, 'dygraph-labelsdivstyles', { 'fontSize':'1px' }),
+            labelsDivWidth:         NETDATA.dataAttribute(state.element, 'dygraph-labelsdivwidth', state.chartWidth() - 70),
+            labelsSeparateLines:    NETDATA.dataAttribute(state.element, 'dygraph-labelsseparatelines', true),
+            labelsShowZeroValues:   NETDATA.dataAttribute(state.element, 'dygraph-labelsshowzerovalues', true),
             labelsKMB:              false,
             labelsKMG2:             false,
-
-            showLabelsOnHighlight:  self.data('dygraph-showlabelsonhighlight')
-                                    || true,
-
-            hideOverlayOnMouseOut:  self.data('dygraph-hideoverlayonmouseout')
-                                    || true,
-
-            includeZero:            self.data('dygraph-includezero')
-                                    || (chart_type === 'stacked'),
-
-            xRangePad:              self.data('dygraph-xrangepad')
-                                    || 0,
-
-            yRangePad:              self.data('dygraph-yrangepad')
-                                    || 1,
-
-            valueRange:             self.data('dygraph-valuerange')
-                                    || [ null, null ],
-
+            showLabelsOnHighlight:  NETDATA.dataAttribute(state.element, 'dygraph-showlabelsonhighlight', true),
+            hideOverlayOnMouseOut:  NETDATA.dataAttribute(state.element, 'dygraph-hideoverlayonmouseout', true),
+            includeZero:            NETDATA.dataAttribute(state.element, 'dygraph-includezero', (chart_type === 'stacked')),
+            xRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-xrangepad', 0),
+            yRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-yrangepad', 1),
+            valueRange:             NETDATA.dataAttribute(state.element, 'dygraph-valuerange', [ null, null ]),
             ylabel:                 state.units,
-
-            yLabelWidth:            self.data('dygraph-ylabelwidth')
-                                    || 12,
+            yLabelWidth:            NETDATA.dataAttribute(state.element, 'dygraph-ylabelwidth', 12),
 
                                     // the function to plot the chart
             plotter:                null,
 
                                     // The width of the lines connecting data points.
                                     // This can be used to increase the contrast or some graphs.
-            strokeWidth:            self.data('dygraph-strokewidth')
-                                    || ((chart_type === 'stacked')?0.1:((smooth === true)?1.5:0.7)),
-
-            strokePattern:          self.data('dygraph-strokepattern')
-                                    || undefined,
+            strokeWidth:            NETDATA.dataAttribute(state.element, 'dygraph-strokewidth', ((chart_type === 'stacked')?0.1:((smooth === true)?1.5:0.7))),
+            strokePattern:          NETDATA.dataAttribute(state.element, 'dygraph-strokepattern', undefined),
 
                                     // The size of the dot to draw on each point in pixels (see drawPoints).
                                     // A dot is always drawn when a point is "isolated",
                                     // i.e. there is a missing point on either side of it.
                                     // This also controls the size of those dots.
-            drawPoints:             self.data('dygraph-drawpoints')
-                                    || false,
+            drawPoints:             NETDATA.dataAttribute(state.element, 'dygraph-drawpoints', false),
 
                                     // Draw points at the edges of gaps in the data.
                                     // This improves visibility of small data segments or other data irregularities.
-            drawGapEdgePoints:      self.data('dygraph-drawgapedgepoints')
-                                    || true,
-
-            connectSeparatedPoints: self.data('dygraph-connectseparatedpoints')
-                                    || false,
-
-            pointSize:              self.data('dygraph-pointsize')
-                                    || 1,
+            drawGapEdgePoints:      NETDATA.dataAttribute(state.element, 'dygraph-drawgapedgepoints', true),
+            connectSeparatedPoints: NETDATA.dataAttribute(state.element, 'dygraph-connectseparatedpoints', false),
+            pointSize:              NETDATA.dataAttribute(state.element, 'dygraph-pointsize', 1),
 
                                     // enabling this makes the chart with little square lines
-            stepPlot:               self.data('dygraph-stepplot')
-                                    || false,
+            stepPlot:               NETDATA.dataAttribute(state.element, 'dygraph-stepplot', false),
 
                                     // Draw a border around graph lines to make crossing lines more easily
                                     // distinguishable. Useful for graphs with many lines.
-            strokeBorderColor:      self.data('dygraph-strokebordercolor')
-                                    || NETDATA.themes.current.background,
-
-            strokeBorderWidth:      self.data('dygraph-strokeborderwidth')
-                                    || (chart_type === 'stacked')?0.0:0.0,
-
-            fillGraph:              self.data('dygraph-fillgraph')
-                                    || (chart_type === 'area' || chart_type === 'stacked'),
-
-            fillAlpha:              self.data('dygraph-fillalpha')
-                                    || ((chart_type === 'stacked')
+            strokeBorderColor:      NETDATA.dataAttribute(state.element, 'dygraph-strokebordercolor', NETDATA.themes.current.background),
+            strokeBorderWidth:      NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (chart_type === 'stacked')?0.0:0.0),
+            fillGraph:              NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (chart_type === 'area' || chart_type === 'stacked')),
+            fillAlpha:              NETDATA.dataAttribute(state.element, 'dygraph-fillalpha',
+                                    ((chart_type === 'stacked')
                                         ?NETDATA.options.current.color_fill_opacity_stacked
-                                        :NETDATA.options.current.color_fill_opacity_area),
-
-            stackedGraph:           self.data('dygraph-stackedgraph')
-                                    || (chart_type === 'stacked'),
-
-            stackedGraphNaNFill:    self.data('dygraph-stackedgraphnanfill')
-                                    || 'none',
-
-            drawAxis:               self.data('dygraph-drawaxis')
-                                    || true,
-
-            axisLabelFontSize:      self.data('dygraph-axislabelfontsize')
-                                    || 10,
-
-            axisLineColor:          self.data('dygraph-axislinecolor')
-                                    || NETDATA.themes.current.axis,
-
-            axisLineWidth:          self.data('dygraph-axislinewidth')
-                                    || 1.0,
-
-            drawGrid:               self.data('dygraph-drawgrid')
-                                    || true,
-
-            gridLinePattern:        self.data('dygraph-gridlinepattern')
-                                    || null,
-
-            gridLineWidth:          self.data('dygraph-gridlinewidth')
-                                    || 1.0,
-
-            gridLineColor:          self.data('dygraph-gridlinecolor')
-                                    || NETDATA.themes.current.grid,
-
-            maxNumberWidth:         self.data('dygraph-maxnumberwidth')
-                                    || 8,
-
-            sigFigs:                self.data('dygraph-sigfigs')
-                                    || null,
-
-            digitsAfterDecimal:     self.data('dygraph-digitsafterdecimal')
-                                    || 2,
-
-            valueFormatter:         self.data('dygraph-valueformatter')
-                                    || undefined,
-
-            highlightCircleSize:    self.data('dygraph-highlightcirclesize')
-                                    || highlightCircleSize,
-
-            highlightSeriesOpts:    self.data('dygraph-highlightseriesopts')
-                                    || null, // TOO SLOW: { strokeWidth: 1.5 },
-
-            highlightSeriesBackgroundAlpha: self.data('dygraph-highlightseriesbackgroundalpha')
-                                    || null, // TOO SLOW: (chart_type === 'stacked')?0.7:0.5,
-
-            pointClickCallback:     self.data('dygraph-pointclickcallback')
-                                    || undefined,
-
+                                        :NETDATA.options.current.color_fill_opacity_area)
+                                    ),
+            stackedGraph:           NETDATA.dataAttribute(state.element, 'dygraph-stackedgraph', (chart_type === 'stacked')),
+            stackedGraphNaNFill:    NETDATA.dataAttribute(state.element, 'dygraph-stackedgraphnanfill', 'none'),
+            drawAxis:               NETDATA.dataAttribute(state.element, 'dygraph-drawaxis', true),
+            axisLabelFontSize:      NETDATA.dataAttribute(state.element, 'dygraph-axislabelfontsize', 10),
+            axisLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-axislinecolor', NETDATA.themes.current.axis),
+            axisLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-axislinewidth', 1.0),
+            drawGrid:               NETDATA.dataAttribute(state.element, 'dygraph-drawgrid', true),
+            gridLinePattern:        NETDATA.dataAttribute(state.element, 'dygraph-gridlinepattern', null),
+            gridLineWidth:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinewidth', 1.0),
+            gridLineColor:          NETDATA.dataAttribute(state.element, 'dygraph-gridlinecolor', NETDATA.themes.current.grid),
+            maxNumberWidth:         NETDATA.dataAttribute(state.element, 'dygraph-maxnumberwidth', 8),
+            sigFigs:                NETDATA.dataAttribute(state.element, 'dygraph-sigfigs', null),
+            digitsAfterDecimal:     NETDATA.dataAttribute(state.element, 'dygraph-digitsafterdecimal', 2),
+            valueFormatter:         NETDATA.dataAttribute(state.element, 'dygraph-valueformatter', undefined),
+            highlightCircleSize:    NETDATA.dataAttribute(state.element, 'dygraph-highlightcirclesize', highlightCircleSize),
+            highlightSeriesOpts:    NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesopts', null), // TOO SLOW: { strokeWidth: 1.5 },
+            highlightSeriesBackgroundAlpha: NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesbackgroundalpha', null), // TOO SLOW: (chart_type === 'stacked')?0.7:0.5,
+            pointClickCallback:     NETDATA.dataAttribute(state.element, 'dygraph-pointclickcallback', undefined),
             visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
 
             axes: {
@@ -4764,8 +4724,8 @@ var NETDATA = window.NETDATA || {};
                 return '';
             },
             drawCallback: function(dygraph, is_initial) {
-                if(state.current.name !== 'auto' && state.dygraph_user_action === true) {
-                    state.dygraph_user_action = false;
+                if(state.current.name !== 'auto' && state.tmp.dygraph_user_action === true) {
+                    state.tmp.dygraph_user_action = false;
 
                     var x_range = dygraph.xAxisRange();
                     var after = Math.round(x_range[0]);
@@ -4789,8 +4749,8 @@ var NETDATA = window.NETDATA || {};
                 state.setMode('zoom');
 
                 // refresh it to the greatest possible zoom level
-                state.dygraph_user_action = true;
-                state.dygraph_force_zoom = true;
+                state.tmp.dygraph_user_action = true;
+                state.tmp.dygraph_force_zoom = true;
                 state.updateChartPanOrZoom(minDate, maxDate);
             },
             highlightCallback: function(event, x, points, row, seriesName) {
@@ -4812,7 +4772,7 @@ var NETDATA = window.NETDATA || {};
 
                 // fix legend zIndex using the internal structures of dygraph legend module
                 // this works, but it is a hack!
-                // state.dygraph_instance.plugins_[0].plugin.legend_div_.style.zIndex = 10000;
+                // state.tmp.dygraph_instance.plugins_[0].plugin.legend_div_.style.zIndex = 10000;
             },
             unhighlightCallback: function(event) {
                 void(event);
@@ -4828,7 +4788,7 @@ var NETDATA = window.NETDATA || {};
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.mousedown()');
 
-                    state.dygraph_user_action = true;
+                    state.tmp.dygraph_user_action = true;
                     state.globalSelectionSyncStop();
 
                     if(NETDATA.options.debug.dygraph === true)
@@ -4869,7 +4829,7 @@ var NETDATA = window.NETDATA || {};
                         state.log('interactionModel.mousemove()');
 
                     if(context.isPanning) {
-                        state.dygraph_user_action = true;
+                        state.tmp.dygraph_user_action = true;
                         state.globalSelectionSyncStop();
                         state.globalSelectionSyncDelay();
                         state.setMode('pan');
@@ -4877,7 +4837,7 @@ var NETDATA = window.NETDATA || {};
                         Dygraph.movePan(event, dygraph, context);
                     }
                     else if(context.isZooming) {
-                        state.dygraph_user_action = true;
+                        state.tmp.dygraph_user_action = true;
                         state.globalSelectionSyncStop();
                         state.globalSelectionSyncDelay();
                         state.setMode('zoom');
@@ -4889,12 +4849,12 @@ var NETDATA = window.NETDATA || {};
                         state.log('interactionModel.mouseup()');
 
                     if (context.isPanning) {
-                        state.dygraph_user_action = true;
+                        state.tmp.dygraph_user_action = true;
                         state.globalSelectionSyncDelay();
                         Dygraph.endPan(event, dygraph, context);
                     }
                     else if (context.isZooming) {
-                        state.dygraph_user_action = true;
+                        state.tmp.dygraph_user_action = true;
                         state.globalSelectionSyncDelay();
                         Dygraph.endZoom(event, dygraph, context);
                     }
@@ -4983,7 +4943,7 @@ var NETDATA = window.NETDATA || {};
                     }
 
                     if(event.altKey || event.shiftKey) {
-                        state.dygraph_user_action = true;
+                        state.tmp.dygraph_user_action = true;
 
                         state.globalSelectionSyncStop();
                         state.globalSelectionSyncDelay();
@@ -5035,7 +4995,7 @@ var NETDATA = window.NETDATA || {};
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.touchstart()');
 
-                    state.dygraph_user_action = true;
+                    state.tmp.dygraph_user_action = true;
                     state.setMode('zoom');
                     state.pauseChart();
 
@@ -5057,7 +5017,7 @@ var NETDATA = window.NETDATA || {};
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.touchmove()');
 
-                    state.dygraph_user_action = true;
+                    state.tmp.dygraph_user_action = true;
                     Dygraph.defaultInteractionModel.touchmove(event, dygraph, context);
 
                     state.dygraph_last_touch_move = Date.now();
@@ -5066,7 +5026,7 @@ var NETDATA = window.NETDATA || {};
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.touchend()');
 
-                    state.dygraph_user_action = true;
+                    state.tmp.dygraph_user_action = true;
                     Dygraph.defaultInteractionModel.touchend(event, dygraph, context);
 
                     // if it didn't move, it is a selection
@@ -5095,48 +5055,48 @@ var NETDATA = window.NETDATA || {};
         };
 
         if(NETDATA.chartLibraries.dygraph.isSparkline(state)) {
-            state.dygraph_options.drawGrid = false;
-            state.dygraph_options.drawAxis = false;
-            state.dygraph_options.title = undefined;
-            state.dygraph_options.ylabel = undefined;
-            state.dygraph_options.yLabelWidth = 0;
-            state.dygraph_options.labelsDivWidth = 120;
-            state.dygraph_options.labelsDivStyles.width = '120px';
-            state.dygraph_options.labelsSeparateLines = true;
-            state.dygraph_options.rightGap = 0;
-            state.dygraph_options.yRangePad = 1;
+            state.tmp.dygraph_options.drawGrid = false;
+            state.tmp.dygraph_options.drawAxis = false;
+            state.tmp.dygraph_options.title = undefined;
+            state.tmp.dygraph_options.ylabel = undefined;
+            state.tmp.dygraph_options.yLabelWidth = 0;
+            state.tmp.dygraph_options.labelsDivWidth = 120;
+            state.tmp.dygraph_options.labelsDivStyles.width = '120px';
+            state.tmp.dygraph_options.labelsSeparateLines = true;
+            state.tmp.dygraph_options.rightGap = 0;
+            state.tmp.dygraph_options.yRangePad = 1;
         }
 
         if(smooth === true) {
-            state.dygraph_smooth_eligible = true;
+            state.tmp.dygraph_smooth_eligible = true;
 
             if(NETDATA.options.current.smooth_plot === true)
-                state.dygraph_options.plotter = smoothPlotter;
+                state.tmp.dygraph_options.plotter = smoothPlotter;
         }
-        else state.dygraph_smooth_eligible = false;
+        else state.tmp.dygraph_smooth_eligible = false;
 
-        state.dygraph_instance = new Dygraph(state.element_chart,
-            data.result.data, state.dygraph_options);
+        state.tmp.dygraph_instance = new Dygraph(state.element_chart,
+            data.result.data, state.tmp.dygraph_options);
 
-        state.dygraph_force_zoom = false;
-        state.dygraph_user_action = false;
-        state.dygraph_last_rendered = Date.now();
+        state.tmp.dygraph_force_zoom = false;
+        state.tmp.dygraph_user_action = false;
+        state.tmp.dygraph_last_rendered = Date.now();
 
-        if(state.dygraph_options.valueRange[0] === null && state.dygraph_options.valueRange[1] === null) {
-            if (typeof state.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
-                state.__commonMin = self.data('common-min') || null;
-                state.__commonMax = self.data('common-max') || null;
+        if(state.tmp.dygraph_options.valueRange[0] === null && state.tmp.dygraph_options.valueRange[1] === null) {
+            if (typeof state.tmp.dygraph_instance.axes_[0].extremeRange !== 'undefined') {
+                state.tmp.__commonMin = NETDATA.dataAttribute(state.element, 'common-min', null);
+                state.tmp.__commonMax = NETDATA.dataAttribute(state.element, 'common-max', null);
             }
             else {
                 state.log('incompatible version of Dygraph detected');
-                state.__commonMin = null;
-                state.__commonMax = null;
+                state.tmp.__commonMin = null;
+                state.tmp.__commonMax = null;
             }
         }
         else {
             // if the user gave a valueRange, respect it
-            state.__commonMin = null;
-            state.__commonMax = null;
+            state.tmp.__commonMin = null;
+            state.tmp.__commonMax = null;
         }
 
         return true;
@@ -5623,22 +5583,22 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.easypiechartClearSelection = function(state) {
-        if(typeof state.easyPieChartEvent !== 'undefined') {
-            if(state.easyPieChartEvent.timer !== undefined) {
-                clearTimeout(state.easyPieChartEvent.timer);
+        if(typeof state.tmp.easyPieChartEvent !== 'undefined') {
+            if(state.tmp.easyPieChartEvent.timer !== undefined) {
+                clearTimeout(state.tmp.easyPieChartEvent.timer);
             }
 
-            state.easyPieChartEvent.timer = undefined;
+            state.tmp.easyPieChartEvent.timer = undefined;
         }
 
         if(state.isAutoRefreshable() === true && state.data !== null) {
             NETDATA.easypiechartChartUpdate(state, state.data);
         }
         else {
-            state.easyPieChartLabel.innerText = state.legendFormatValue(null);
-            state.easyPieChart_instance.update(0);
+            state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(null);
+            state.tmp.easyPieChart_instance.update(0);
         }
-        state.easyPieChart_instance.enableAnimation();
+        state.tmp.easyPieChart_instance.enableAnimation();
 
         return true;
     };
@@ -5651,8 +5611,8 @@ var NETDATA = window.NETDATA || {};
         if(slot < 0 || slot >= state.data.result.length)
             return NETDATA.easypiechartClearSelection(state);
 
-        if(typeof state.easyPieChartEvent === 'undefined') {
-            state.easyPieChartEvent = {
+        if(typeof state.tmp.easyPieChartEvent === 'undefined') {
+            state.tmp.easyPieChartEvent = {
                 timer: undefined,
                 value: 0,
                 pcent: 0
@@ -5660,20 +5620,20 @@ var NETDATA = window.NETDATA || {};
         }
 
         var value = state.data.result[state.data.result.length - 1 - slot];
-        var min = (state.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.easyPieChartMin;
-        var max = (state.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.easyPieChartMax;
+        var min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
+        var max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
         var pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
 
-        state.easyPieChartEvent.value = value;
-        state.easyPieChartEvent.pcent = pcent;
-        state.easyPieChartLabel.innerText = state.legendFormatValue(value);
+        state.tmp.easyPieChartEvent.value = value;
+        state.tmp.easyPieChartEvent.pcent = pcent;
+        state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
 
-        if(state.easyPieChartEvent.timer === undefined) {
-            state.easyPieChart_instance.disableAnimation();
+        if(state.tmp.easyPieChartEvent.timer === undefined) {
+            state.tmp.easyPieChart_instance.disableAnimation();
 
-            state.easyPieChartEvent.timer = setTimeout(function() {
-                state.easyPieChartEvent.timer = undefined;
-                state.easyPieChart_instance.update(state.easyPieChartEvent.pcent);
+            state.tmp.easyPieChartEvent.timer = setTimeout(function() {
+                state.tmp.easyPieChartEvent.timer = undefined;
+                state.tmp.easyPieChart_instance.update(state.tmp.easyPieChartEvent.pcent);
             }, NETDATA.options.current.charts_selection_animation_delay);
         }
 
@@ -5689,38 +5649,37 @@ var NETDATA = window.NETDATA || {};
         }
         else {
             value = data.result[0];
-            min = (state.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.easyPieChartMin;
-            max = (state.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.easyPieChartMax;
+            min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
+            max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
             pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
         }
 
-        state.easyPieChartLabel.innerText = state.legendFormatValue(value);
-        state.easyPieChart_instance.update(pcent);
+        state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
+        state.tmp.easyPieChart_instance.update(pcent);
         return true;
     };
 
     NETDATA.easypiechartChartCreate = function(state, data) {
-        var self = $(state.element);
         var chart = $(state.element_chart);
 
         var value = data.result[0];
-        var min = self.data('easypiechart-min-value') || null;
-        var max = self.data('easypiechart-max-value') || null;
-        var adjust = self.data('easypiechart-adjust') || null;
+        var min = NETDATA.dataAttribute(state.element, 'easypiechart-min-value', null);
+        var max = NETDATA.dataAttribute(state.element, 'easypiechart-max-value', null);
+        var adjust = NETDATA.dataAttribute(state.element, 'easypiechart-adjust', null);
 
         if(min === null) {
             min = NETDATA.commonMin.get(state);
-            state.easyPieChartMin = null;
+            state.tmp.easyPieChartMin = null;
         }
         else
-            state.easyPieChartMin = min;
+            state.tmp.easyPieChartMin = min;
 
         if(max === null) {
             max = NETDATA.commonMax.get(state);
-            state.easyPieChartMax = null;
+            state.tmp.easyPieChartMax = null;
         }
         else
-            state.easyPieChartMax = max;
+            state.tmp.easyPieChartMax = max;
 
         var pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
 
@@ -5742,33 +5701,33 @@ var NETDATA = window.NETDATA || {};
 
         var valuefontsize = Math.floor((size * 2 / 3) / 5);
         var valuetop = Math.round((size - valuefontsize - (size / 40)) / 2);
-        state.easyPieChartLabel = document.createElement('span');
-        state.easyPieChartLabel.className = 'easyPieChartLabel';
-        state.easyPieChartLabel.innerText = state.legendFormatValue(value);
-        state.easyPieChartLabel.style.fontSize = valuefontsize + 'px';
-        state.easyPieChartLabel.style.top = valuetop.toString() + 'px';
-        state.element_chart.appendChild(state.easyPieChartLabel);
+        state.tmp.easyPieChartLabel = document.createElement('span');
+        state.tmp.easyPieChartLabel.className = 'easyPieChartLabel';
+        state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
+        state.tmp.easyPieChartLabel.style.fontSize = valuefontsize + 'px';
+        state.tmp.easyPieChartLabel.style.top = valuetop.toString() + 'px';
+        state.element_chart.appendChild(state.tmp.easyPieChartLabel);
 
         var titlefontsize = Math.round(valuefontsize * 1.6 / 3);
         var titletop = Math.round(valuetop - (titlefontsize * 2) - (size / 40));
-        state.easyPieChartTitle = document.createElement('span');
-        state.easyPieChartTitle.className = 'easyPieChartTitle';
-        state.easyPieChartTitle.innerText = state.title;
-        state.easyPieChartTitle.style.fontSize = titlefontsize + 'px';
-        state.easyPieChartTitle.style.lineHeight = titlefontsize + 'px';
-        state.easyPieChartTitle.style.top = titletop.toString() + 'px';
-        state.element_chart.appendChild(state.easyPieChartTitle);
+        state.tmp.easyPieChartTitle = document.createElement('span');
+        state.tmp.easyPieChartTitle.className = 'easyPieChartTitle';
+        state.tmp.easyPieChartTitle.innerText = state.title;
+        state.tmp.easyPieChartTitle.style.fontSize = titlefontsize + 'px';
+        state.tmp.easyPieChartTitle.style.lineHeight = titlefontsize + 'px';
+        state.tmp.easyPieChartTitle.style.top = titletop.toString() + 'px';
+        state.element_chart.appendChild(state.tmp.easyPieChartTitle);
 
         var unitfontsize = Math.round(titlefontsize * 0.9);
         var unittop = Math.round(valuetop + (valuefontsize + unitfontsize) + (size / 40));
-        state.easyPieChartUnits = document.createElement('span');
-        state.easyPieChartUnits.className = 'easyPieChartUnits';
-        state.easyPieChartUnits.innerText = state.units;
-        state.easyPieChartUnits.style.fontSize = unitfontsize + 'px';
-        state.easyPieChartUnits.style.top = unittop.toString() + 'px';
-        state.element_chart.appendChild(state.easyPieChartUnits);
+        state.tmp.easyPieChartUnits = document.createElement('span');
+        state.tmp.easyPieChartUnits.className = 'easyPieChartUnits';
+        state.tmp.easyPieChartUnits.innerText = state.units;
+        state.tmp.easyPieChartUnits.style.fontSize = unitfontsize + 'px';
+        state.tmp.easyPieChartUnits.style.top = unittop.toString() + 'px';
+        state.element_chart.appendChild(state.tmp.easyPieChartUnits);
 
-        var barColor = self.data('easypiechart-barcolor');
+        var barColor = NETDATA.dataAttribute(state.element, 'easypiechart-barcolor', undefined);
         if(typeof barColor === 'undefined' || barColor === null)
             barColor = state.chartCustomColors()[0];
         else {
@@ -5780,28 +5739,28 @@ var NETDATA = window.NETDATA || {};
 
         chart.easyPieChart({
             barColor: barColor,
-            trackColor: self.data('easypiechart-trackcolor') || NETDATA.themes.current.easypiechart_track,
-            scaleColor: self.data('easypiechart-scalecolor') || NETDATA.themes.current.easypiechart_scale,
-            scaleLength: self.data('easypiechart-scalelength') || 5,
-            lineCap: self.data('easypiechart-linecap') || 'round',
-            lineWidth: self.data('easypiechart-linewidth') || stroke,
-            trackWidth: self.data('easypiechart-trackwidth') || undefined,
-            size: self.data('easypiechart-size') || size,
-            rotate: self.data('easypiechart-rotate') || 0,
-            animate: self.data('easypiechart-animate') || {duration: 500, enabled: true},
-            easing: self.data('easypiechart-easing') || undefined
+            trackColor: NETDATA.dataAttribute(state.element, 'easypiechart-trackcolor', NETDATA.themes.current.easypiechart_track),
+            scaleColor: NETDATA.dataAttribute(state.element, 'easypiechart-scalecolor', NETDATA.themes.current.easypiechart_scale),
+            scaleLength: NETDATA.dataAttribute(state.element, 'easypiechart-scalelength', 5),
+            lineCap: NETDATA.dataAttribute(state.element, 'easypiechart-linecap', 'round'),
+            lineWidth: NETDATA.dataAttribute(state.element, 'easypiechart-linewidth', stroke),
+            trackWidth: NETDATA.dataAttribute(state.element, 'easypiechart-trackwidth', undefined),
+            size: NETDATA.dataAttribute(state.element, 'easypiechart-size', size),
+            rotate: NETDATA.dataAttribute(state.element, 'easypiechart-rotate', 0),
+            animate: NETDATA.dataAttribute(state.element, 'easypiechart-animate', {duration: 500, enabled: true}),
+            easing: NETDATA.dataAttribute(state.element, 'easypiechart-easing', undefined)
         });
 
         // when we just re-create the chart
         // do not animate the first update
         var animate = true;
-        if(typeof state.easyPieChart_instance !== 'undefined')
+        if(typeof state.tmp.easyPieChart_instance !== 'undefined')
             animate = false;
 
-        state.easyPieChart_instance = chart.data('easyPieChart');
-        if(animate === false) state.easyPieChart_instance.disableAnimation();
-        state.easyPieChart_instance.update(pcent);
-        if(animate === false) state.easyPieChart_instance.enableAnimation();
+        state.tmp.easyPieChart_instance = chart.data('easyPieChart');
+        if(animate === false) state.tmp.easyPieChart_instance.disableAnimation();
+        state.tmp.easyPieChart_instance.update(pcent);
+        if(animate === false) state.tmp.easyPieChart_instance.enableAnimation();
         return true;
     };
 
@@ -5844,8 +5803,8 @@ var NETDATA = window.NETDATA || {};
             speed = status;
 
         // console.log('gauge speed ' + speed);
-        state.gauge_instance.animationSpeed = speed;
-        state.___gaugeOld__.speed = speed;
+        state.tmp.gauge_instance.animationSpeed = speed;
+        state.tmp.___gaugeOld__.speed = speed;
     };
 
     NETDATA.gaugeSet = function(state, value, min, max) {
@@ -5877,36 +5836,36 @@ var NETDATA = window.NETDATA || {};
         if(pcent < 0.001) pcent = 0.001;
         if(pcent > 99.999) pcent = 99.999;
 
-        state.gauge_instance.set(pcent);
+        state.tmp.gauge_instance.set(pcent);
         // console.log('gauge set ' + pcent + ', value ' + value + ', min ' + min + ', max ' + max);
 
-        state.___gaugeOld__.value = value;
-        state.___gaugeOld__.min = min;
-        state.___gaugeOld__.max = max;
+        state.tmp.___gaugeOld__.value = value;
+        state.tmp.___gaugeOld__.min = min;
+        state.tmp.___gaugeOld__.max = max;
     };
 
     NETDATA.gaugeSetLabels = function(state, value, min, max) {
-        if(state.___gaugeOld__.valueLabel !== value) {
-            state.___gaugeOld__.valueLabel = value;
-            state.gaugeChartLabel.innerText = state.legendFormatValue(value);
+        if(state.tmp.___gaugeOld__.valueLabel !== value) {
+            state.tmp.___gaugeOld__.valueLabel = value;
+            state.tmp.gaugeChartLabel.innerText = state.legendFormatValue(value);
         }
-        if(state.___gaugeOld__.minLabel !== min) {
-            state.___gaugeOld__.minLabel = min;
-            state.gaugeChartMin.innerText = state.legendFormatValue(min);
+        if(state.tmp.___gaugeOld__.minLabel !== min) {
+            state.tmp.___gaugeOld__.minLabel = min;
+            state.tmp.gaugeChartMin.innerText = state.legendFormatValue(min);
         }
-        if(state.___gaugeOld__.maxLabel !== max) {
-            state.___gaugeOld__.maxLabel = max;
-            state.gaugeChartMax.innerText = state.legendFormatValue(max);
+        if(state.tmp.___gaugeOld__.maxLabel !== max) {
+            state.tmp.___gaugeOld__.maxLabel = max;
+            state.tmp.gaugeChartMax.innerText = state.legendFormatValue(max);
         }
     };
 
     NETDATA.gaugeClearSelection = function(state) {
-        if(typeof state.gaugeEvent !== 'undefined') {
-            if(state.gaugeEvent.timer !== undefined) {
-                clearTimeout(state.gaugeEvent.timer);
+        if(typeof state.tmp.gaugeEvent !== 'undefined') {
+            if(state.tmp.gaugeEvent.timer !== undefined) {
+                clearTimeout(state.tmp.gaugeEvent.timer);
             }
 
-            state.gaugeEvent.timer = undefined;
+            state.tmp.gaugeEvent.timer = undefined;
         }
 
         if(state.isAutoRefreshable() === true && state.data !== null) {
@@ -5930,8 +5889,8 @@ var NETDATA = window.NETDATA || {};
         if(slot < 0 || slot >= state.data.result.length)
             return NETDATA.gaugeClearSelection(state);
 
-        if(typeof state.gaugeEvent === 'undefined') {
-            state.gaugeEvent = {
+        if(typeof state.tmp.gaugeEvent === 'undefined') {
+            state.tmp.gaugeEvent = {
                 timer: undefined,
                 value: 0,
                 min: 0,
@@ -5940,24 +5899,24 @@ var NETDATA = window.NETDATA || {};
         }
 
         var value = state.data.result[state.data.result.length - 1 - slot];
-        var min = (state.gaugeMin === null)?NETDATA.commonMin.get(state):state.gaugeMin;
-        var max = (state.gaugeMax === null)?NETDATA.commonMax.get(state):state.gaugeMax;
+        var min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
+        var max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
 
         // make sure it is zero based
         if(min > 0) min = 0;
         if(max < 0) max = 0;
 
-        state.gaugeEvent.value = value;
-        state.gaugeEvent.min = min;
-        state.gaugeEvent.max = max;
+        state.tmp.gaugeEvent.value = value;
+        state.tmp.gaugeEvent.min = min;
+        state.tmp.gaugeEvent.max = max;
         NETDATA.gaugeSetLabels(state, value, min, max);
 
-        if(state.gaugeEvent.timer === undefined) {
+        if(state.tmp.gaugeEvent.timer === undefined) {
             NETDATA.gaugeAnimation(state, false);
 
-            state.gaugeEvent.timer = setTimeout(function() {
-                state.gaugeEvent.timer = undefined;
-                NETDATA.gaugeSet(state, state.gaugeEvent.value, state.gaugeEvent.min, state.gaugeEvent.max);
+            state.tmp.gaugeEvent.timer = setTimeout(function() {
+                state.tmp.gaugeEvent.timer = undefined;
+                NETDATA.gaugeSet(state, state.tmp.gaugeEvent.value, state.tmp.gaugeEvent.min, state.tmp.gaugeEvent.max);
             }, NETDATA.options.current.charts_selection_animation_delay);
         }
 
@@ -5975,8 +5934,8 @@ var NETDATA = window.NETDATA || {};
         }
         else {
             value = data.result[0];
-            min = (state.gaugeMin === null)?NETDATA.commonMin.get(state):state.gaugeMin;
-            max = (state.gaugeMax === null)?NETDATA.commonMax.get(state):state.gaugeMax;
+            min = (state.tmp.gaugeMin === null)?NETDATA.commonMin.get(state):state.tmp.gaugeMin;
+            max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
             if(value < min) min = value;
             if(value > max) max = value;
 
@@ -5992,32 +5951,31 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.gaugeChartCreate = function(state, data) {
-        var self = $(state.element);
         // var chart = $(state.element_chart);
 
         var value = data.result[0];
-        var min = self.data('gauge-min-value') || null;
-        var max = self.data('gauge-max-value') || null;
-        var adjust = self.data('gauge-adjust') || null;
-        var pointerColor = self.data('gauge-pointer-color') || NETDATA.themes.current.gauge_pointer;
-        var strokeColor = self.data('gauge-stroke-color') || NETDATA.themes.current.gauge_stroke;
-        var startColor = self.data('gauge-start-color') || state.chartCustomColors()[0];
-        var stopColor = self.data('gauge-stop-color') || void 0;
-        var generateGradient = self.data('gauge-generate-gradient') || false;
+        var min = NETDATA.dataAttribute(state.element, 'gauge-min-value', null);
+        var max = NETDATA.dataAttribute(state.element, 'gauge-max-value', null);
+        var adjust = NETDATA.dataAttribute(state.element, 'gauge-adjust', null);
+        var pointerColor = NETDATA.dataAttribute(state.element, 'gauge-pointer-color', NETDATA.themes.current.gauge_pointer);
+        var strokeColor = NETDATA.dataAttribute(state.element, 'gauge-stroke-color', NETDATA.themes.current.gauge_stroke);
+        var startColor = NETDATA.dataAttribute(state.element, 'gauge-start-color', state.chartCustomColors()[0]);
+        var stopColor = NETDATA.dataAttribute(state.element, 'gauge-stop-color', void 0);
+        var generateGradient = NETDATA.dataAttribute(state.element, 'gauge-generate-gradient', false);
 
         if(min === null) {
             min = NETDATA.commonMin.get(state);
-            state.gaugeMin = null;
+            state.tmp.gaugeMin = null;
         }
         else
-            state.gaugeMin = min;
+            state.tmp.gaugeMin = min;
 
         if(max === null) {
             max = NETDATA.commonMax.get(state);
-            state.gaugeMax = null;
+            state.tmp.gaugeMax = null;
         }
         else
-            state.gaugeMax = max;
+            state.tmp.gaugeMax = max;
 
         // make sure it is zero based
         if(min > 0) min = 0;
@@ -6065,7 +6023,7 @@ var NETDATA = window.NETDATA || {};
             var len = generateGradient.length;
             while(len--) {
                 var pcent = generateGradient[len];
-                var color = self.attr('data-gauge-gradient-percent-color-' + pcent.toString()) || false;
+                var color = NETDATA.dataAttribute(state.element, 'gauge-gradient-percent-color-' + pcent.toString(), false);
                 if(color !== false) {
                     var a = [];
                     a[0] = pcent / 100;
@@ -6092,57 +6050,57 @@ var NETDATA = window.NETDATA || {};
                 [1.0, NETDATA.colorLuminance(startColor, 0.0)]];
         }
 
-        state.gauge_canvas = document.createElement('canvas');
-        state.gauge_canvas.id = 'gauge-' + state.uuid + '-canvas';
-        state.gauge_canvas.className = 'gaugeChart';
-        state.gauge_canvas.width  = width;
-        state.gauge_canvas.height = height;
-        state.element_chart.appendChild(state.gauge_canvas);
+        state.tmp.gauge_canvas = document.createElement('canvas');
+        state.tmp.gauge_canvas.id = 'gauge-' + state.uuid + '-canvas';
+        state.tmp.gauge_canvas.className = 'gaugeChart';
+        state.tmp.gauge_canvas.width  = width;
+        state.tmp.gauge_canvas.height = height;
+        state.element_chart.appendChild(state.tmp.gauge_canvas);
 
         var valuefontsize = Math.floor(height / 6);
         var valuetop = Math.round((height - valuefontsize - (height / 6)) / 2);
-        state.gaugeChartLabel = document.createElement('span');
-        state.gaugeChartLabel.className = 'gaugeChartLabel';
-        state.gaugeChartLabel.style.fontSize = valuefontsize + 'px';
-        state.gaugeChartLabel.style.top = valuetop.toString() + 'px';
-        state.element_chart.appendChild(state.gaugeChartLabel);
+        state.tmp.gaugeChartLabel = document.createElement('span');
+        state.tmp.gaugeChartLabel.className = 'gaugeChartLabel';
+        state.tmp.gaugeChartLabel.style.fontSize = valuefontsize + 'px';
+        state.tmp.gaugeChartLabel.style.top = valuetop.toString() + 'px';
+        state.element_chart.appendChild(state.tmp.gaugeChartLabel);
 
         var titlefontsize = Math.round(valuefontsize / 2);
         var titletop = 0;
-        state.gaugeChartTitle = document.createElement('span');
-        state.gaugeChartTitle.className = 'gaugeChartTitle';
-        state.gaugeChartTitle.innerText = state.title;
-        state.gaugeChartTitle.style.fontSize = titlefontsize + 'px';
-        state.gaugeChartTitle.style.lineHeight = titlefontsize + 'px';
-        state.gaugeChartTitle.style.top = titletop.toString() + 'px';
-        state.element_chart.appendChild(state.gaugeChartTitle);
+        state.tmp.gaugeChartTitle = document.createElement('span');
+        state.tmp.gaugeChartTitle.className = 'gaugeChartTitle';
+        state.tmp.gaugeChartTitle.innerText = state.title;
+        state.tmp.gaugeChartTitle.style.fontSize = titlefontsize + 'px';
+        state.tmp.gaugeChartTitle.style.lineHeight = titlefontsize + 'px';
+        state.tmp.gaugeChartTitle.style.top = titletop.toString() + 'px';
+        state.element_chart.appendChild(state.tmp.gaugeChartTitle);
 
         var unitfontsize = Math.round(titlefontsize * 0.9);
-        state.gaugeChartUnits = document.createElement('span');
-        state.gaugeChartUnits.className = 'gaugeChartUnits';
-        state.gaugeChartUnits.innerText = state.units;
-        state.gaugeChartUnits.style.fontSize = unitfontsize + 'px';
-        state.element_chart.appendChild(state.gaugeChartUnits);
+        state.tmp.gaugeChartUnits = document.createElement('span');
+        state.tmp.gaugeChartUnits.className = 'gaugeChartUnits';
+        state.tmp.gaugeChartUnits.innerText = state.units;
+        state.tmp.gaugeChartUnits.style.fontSize = unitfontsize + 'px';
+        state.element_chart.appendChild(state.tmp.gaugeChartUnits);
 
-        state.gaugeChartMin = document.createElement('span');
-        state.gaugeChartMin.className = 'gaugeChartMin';
-        state.gaugeChartMin.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
-        state.element_chart.appendChild(state.gaugeChartMin);
+        state.tmp.gaugeChartMin = document.createElement('span');
+        state.tmp.gaugeChartMin.className = 'gaugeChartMin';
+        state.tmp.gaugeChartMin.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
+        state.element_chart.appendChild(state.tmp.gaugeChartMin);
 
-        state.gaugeChartMax = document.createElement('span');
-        state.gaugeChartMax.className = 'gaugeChartMax';
-        state.gaugeChartMax.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
-        state.element_chart.appendChild(state.gaugeChartMax);
+        state.tmp.gaugeChartMax = document.createElement('span');
+        state.tmp.gaugeChartMax.className = 'gaugeChartMax';
+        state.tmp.gaugeChartMax.style.fontSize = Math.round(valuefontsize * 0.75).toString() + 'px';
+        state.element_chart.appendChild(state.tmp.gaugeChartMax);
 
         // when we just re-create the chart
         // do not animate the first update
         var animate = true;
-        if(typeof state.gauge_instance !== 'undefined')
+        if(typeof state.tmp.gauge_instance !== 'undefined')
             animate = false;
 
-        state.gauge_instance = new Gauge(state.gauge_canvas).setOptions(options); // create sexy gauge!
+        state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
 
-        state.___gaugeOld__ = {
+        state.tmp.___gaugeOld__ = {
             value: value,
             min: min,
             max: max,
@@ -6152,8 +6110,8 @@ var NETDATA = window.NETDATA || {};
         };
 
         // we will always feed a percentage
-        state.gauge_instance.minValue = 0;
-        state.gauge_instance.maxValue = 100;
+        state.tmp.gauge_instance.minValue = 0;
+        state.tmp.gauge_instance.maxValue = 100;
 
         NETDATA.gaugeAnimation(state, animate);
         NETDATA.gaugeSet(state, value, min, max);
@@ -6171,8 +6129,8 @@ var NETDATA = window.NETDATA || {};
             create: NETDATA.dygraphChartCreate,
             update: NETDATA.dygraphChartUpdate,
             resize: function(state) {
-                if(typeof state.dygraph_instance.resize === 'function')
-                    state.dygraph_instance.resize();
+                if(typeof state.tmp.dygraph_instance.resize === 'function')
+                    state.tmp.dygraph_instance.resize();
             },
             setSelection: NETDATA.dygraphSetSelection,
             clearSelection:  NETDATA.dygraphClearSelection,
@@ -6191,11 +6149,11 @@ var NETDATA = window.NETDATA || {};
                 return (this.isSparkline(state) === false)?3:2;
             },
             isSparkline: function(state) {
-                if(typeof state.dygraph_sparkline === 'undefined') {
-                    var t = $(state.element).data('dygraph-theme');
-                    state.dygraph_sparkline = (t === 'sparkline');
+                if(typeof state.tmp.dygraph_sparkline === 'undefined') {
+                    var t = NETDATA.dataAttribute(state.element, 'dygraph-theme', undefined);
+                    state.tmp.dygraph_sparkline = (t === 'sparkline');
                 }
-                return state.dygraph_sparkline;
+                return state.tmp.dygraph_sparkline;
             }
         },
         "sparkline": {

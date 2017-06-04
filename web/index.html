@@ -1037,7 +1037,7 @@
 
                 key = key + '.' + this.sparklines_registry[key].count;
 
-                return prefix + '<div data-netdata="' + chart + '" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dimensions="' + dimension + '" data-show-value-of-' + dimension + '-at="' + key + '"></div> (<span id="' + key + '" style="display: inline-block; min-width: 50px; text-align: right;">X</span>' + units + ')' + suffix;
+                return prefix + '<div class="netdata-container" data-netdata="' + chart + '" data-after="-120" data-width="25%" data-height="15px" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dimensions="' + dimension + '" data-show-value-of-' + dimension + '-at="' + key + '"></div> (<span id="' + key + '" style="display: inline-block; min-width: 50px; text-align: right;">X</span>' + units + ')' + suffix;
             },
 
             gaugeChart: function(title, width, dimensions, colors) {
@@ -1047,7 +1047,7 @@
                 if(typeof dimensions === 'undefined')
                     dimensions = '';
 
-                return '<div data-netdata="CHART_UNIQUE_ID"'
+                return '<div class="netdata-container" data-netdata="CHART_UNIQUE_ID"'
                             + ' data-dimensions="' + dimensions + '"'
                             + ' data-chart-library="gauge"'
                             + ' data-gauge-adjust="width"'
@@ -1263,7 +1263,7 @@
             var head = '';
 
             if(typeof charts['system.swap'] !== 'undefined')
-                head += '<div style="margin-right: 10px;" data-netdata="system.swap"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.swap"'
                 + ' data-dimensions="used"'
                 + ' data-append-options="percentage"'
                 + ' data-chart-library="easypiechart"'
@@ -1278,7 +1278,7 @@
                 + ' role="application"></div>';
 
             if(typeof charts['system.io'] !== 'undefined') {
-                head += '<div style="margin-right: 10px;" data-netdata="system.io"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.io"'
                 + ' data-dimensions="in"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="Disk Read"'
@@ -1288,7 +1288,7 @@
                 + ' data-points="' + duration.toString() + '"'
                 + ' role="application"></div>';
 
-                head += '<div style="margin-right: 10px;" data-netdata="system.io"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.io"'
                 + ' data-dimensions="out"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="Disk Write"'
@@ -1300,7 +1300,7 @@
             }
 
             if(typeof charts['system.cpu'] !== 'undefined')
-                head += '<div data-netdata="system.cpu"'
+                head += '<div class="netdata-container" data-netdata="system.cpu"'
                 + ' data-chart-library="gauge"'
                 + ' data-title="CPU"'
                 + ' data-units="%"'
@@ -1312,7 +1312,7 @@
                 + ' role="application"></div>';
 
             if(typeof charts['system.ipv4'] !== 'undefined') {
-                head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ipv4"'
                 + ' data-dimensions="received"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="IPv4 Inbound"'
@@ -1322,7 +1322,7 @@
                 + ' data-points="' + duration.toString() + '"'
                 + ' role="application"></div>';
 
-                head += '<div style="margin-right: 10px;" data-netdata="system.ipv4"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ipv4"'
                 + ' data-dimensions="sent"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="IPv4 Outbound"'
@@ -1333,7 +1333,7 @@
                 + ' role="application"></div>';
             }
             else if(typeof charts['system.ipv6'] !== 'undefined') {
-                head += '<div style="margin-right: 10px;" data-netdata="system.ipv6"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ipv6"'
                 + ' data-dimensions="received"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="IPv6 Inbound"'
@@ -1344,7 +1344,7 @@
                 + ' data-points="' + duration.toString() + '"'
                 + ' role="application"></div>';
 
-                head += '<div style="margin-right: 10px;" data-netdata="system.ipv6"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ipv6"'
                 + ' data-dimensions="sent"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="IPv6 Outbound"'
@@ -1357,7 +1357,7 @@
             }
 
             if(typeof charts['system.ram'] !== 'undefined')
-                head += '<div style="margin-right: 10px;" data-netdata="system.ram"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ram"'
                 + ' data-dimensions="used|buffers|active|wired"' // active and wired are FreeBSD stats
                 + ' data-append-options="percentage"'
                 + ' data-chart-library="easypiechart"'
@@ -1466,7 +1466,7 @@
                         }
 
                         // generate the chart
-                        chtml += netdataDashboard.contextInfo(chart.context) + '<div id="chart_' + NETDATA.name2id(chart.id) + '" data-netdata="' + chart.id + '"'
+                        chtml += netdataDashboard.contextInfo(chart.context) + '<div class="netdata-container" id="chart_' + NETDATA.name2id(chart.id) + '" data-netdata="' + chart.id + '"'
                             + ' data-width="' + pcent_width.toString() + '%"'
                             + ' data-height="' + netdataDashboard.contextHeight(chart.context, options.chartsHeight).toString() + 'px"'
                             + ' data-dygraph-valuerange="' + netdataDashboard.contextValueRange(chart.context) + '"'
@@ -3015,7 +3015,7 @@
                             <b>Hover</b> on them too!
                             </div>
                         <div class="col-md-6">
-                            <div data-netdata="system.intr" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dygraph-type="line" data-dygraph-strokewidth="3" data-dygraph-smooth="true" data-dygraph-highlightcirclesize="6" data-after="-90" data-height="60px" data-colors="#C66"></div>
+                            <div class="netdata-container" data-netdata="system.intr" data-chart-library="dygraph" data-dygraph-theme="sparkline" data-dygraph-type="line" data-dygraph-strokewidth="3" data-dygraph-smooth="true" data-dygraph-highlightcirclesize="6" data-after="-90" data-height="60px" data-colors="#C66"></div>
                             </div>
                         </div>
                     </div>
@@ -3545,4 +3545,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170514-1"></script>
+<script type="text/javascript" src="dashboard.js?v20170604-1"></script>
