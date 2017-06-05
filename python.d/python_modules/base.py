@@ -881,7 +881,7 @@ class ExecutableService(SimpleService):
         try:
             p = Popen(self.command, stdout=PIPE, stderr=PIPE)
         except Exception as error:
-            self.error("Executing command", self.command, "resulted in error:", str(error))
+            self.error("Executing command", " ".join(self.command), "resulted in error:", str(error))
             return None
         data = list()
         std = p.stderr if stderr else p.stdout

@@ -8,6 +8,10 @@ from os.path import getsize
 from collections import namedtuple
 from copy import deepcopy
 from base import LogService
+try:
+    from itertools import filterfalse
+except ImportError:
+    from itertools import ifilterfalse as filterfalse
 import msg
 
 priority = 60000
@@ -216,7 +220,7 @@ CHARTS_SQUID = {
         ]}
 }
 
-NAMED_PATTERN = namedtuple('PATTERN', ['description', 'pattern'])
+NAMED_PATTERN = namedtuple('PATTERN', ['description', 'func'])
 
 DET_RESP_AGGR = ['', '_1xx', '_2xx', '_3xx', '_4xx', '_5xx', '_Other']
 
@@ -287,6 +291,21 @@ class Service(LogService):
 
 
 class Mixin:
+    def filter_data(self, raw_data):
+        """
+        :param raw_data: list
+        :return:
+        """
+        if not self.pre_filter:
+            return raw_data
+        filtered = raw_data
+        for elem in self.pre_filter:
+            if elem.description == 'filter_include':
+                filtered = filter(elem.func, filtered)
+            elif elem.description == 'filter_exclude':
+                filtered = filterfalse(elem.func, filtered)
+        return filtered
+
     def add_new_dimension(self, dimension_id, chart_key, dimension=None,
                           algorithm='incremental', multiplier=1, divisor=1):
         """
@@ -350,6 +369,7 @@ class Mixin:
 class Web(Mixin):
     def __init__(self, configuration):
         self.conf = configuration
+        self.pre_filter = check_patterns('filter', self.conf.get('filter'))
         self.storage = dict()
         self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0, 'resp_time_max': 0,
                      'resp_time_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
@@ -432,13 +452,15 @@ class Web(Mixin):
         None if _get_raw_data method fails.
         In all other cases - dict.
         """
-        if raw_data is None:
-            return None
+        if not raw_data:
+            return None if raw_data is None else self.data
+
+        filtered_data = self.filter_data(raw_data=raw_data)
 
         request_time, unique_current = list(), list()
         request_counter = {'count': 0, 'sum': 0}
         ip_address_counter = {'unique_cur_ip': 0}
-        for line in raw_data:
+        for line in filtered_data:
             match = self.storage['regex'].search(line)
             if match:
                 match_dict = match.groupdict()
@@ -702,7 +724,7 @@ class Web(Mixin):
         """
         match = None
         for elem in pattern:
-            if elem.pattern.search(row):
+            if elem.func(row):
                 self.data[elem.description] += 1
                 match = True
                 break
@@ -758,6 +780,7 @@ class Squid(Mixin):
         self.conf = configuration
         self.order = ORDER_SQUID
         self.definitions = CHARTS_SQUID
+        self.pre_filter = check_patterns('filter', self.conf.get('filter'))
         self.storage = dict()
         self.data = {'duration_max': 0, 'duration_avg': 0, 'duration_min': 0, 'bytes': 0,
                      '0xx': 0, '1xx': 0, '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0,
@@ -799,12 +822,14 @@ class Squid(Mixin):
         return True
 
     def get_data(self, raw_data=None):
-        if raw_data is None:
-            return None
+        if not raw_data:
+            return None if raw_data is None else self.data
+
+        filtered_data = self.filter_data(raw_data=raw_data)
 
         unique_ip, duration = set(), list()
 
-        for row in raw_data:
+        for row in filtered_data:
             match = self.storage['regex'].search(row)
             if match:
                 match = match.groupdict()
@@ -932,11 +957,17 @@ def check_patterns(string, dimension_regex_dict):
         except re.error:
             return False
 
+    def func_search(pattern):
+        def closure(v):
+            return pattern.search(v)
+        return closure
+
     for dimension, regex in dimension_regex_dict.items():
         valid = valid_pattern(regex)
         if isinstance(dimension, str) and valid_pattern:
-            result.append(NAMED_PATTERN(description='_'.join([string, dimension]), pattern=valid))
-
+            func = func_search(valid)
+            result.append(NAMED_PATTERN(description='_'.join([string, dimension]),
+                                        func=func))
     return result or None
 
 
