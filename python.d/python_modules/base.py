@@ -810,6 +810,7 @@ class LogService(SimpleService):
     def __init__(self, configuration=None, name=None):
         self.log_path = ""
         self._last_position = 0
+        self._reload_file = 0
         self._real_log_path = None
         # self._log_reader = None
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -871,9 +872,11 @@ class LogService(SimpleService):
         return status
 
     def _glob_path(self):
-	if not self._real_log_path or not isfile(self._real_log_path):
+	if not self._real_log_path or not isfile(self._real_log_path) or self._reload_file > 120:
+            self._reload_file = 0
             extract_paths = glob(self.log_path)
-            self._real_log_path = extract_paths[0] if extract_paths else None
+            self._real_log_path = max(extract_paths) if extract_paths else None
+        self._reload_file += 1
         return self._real_log_path
 
 
