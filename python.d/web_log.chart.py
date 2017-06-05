@@ -264,19 +264,21 @@ class Service(LogService):
         if not self.log_path:
             self.error('log path is not specified')
             return False
+        self._find_recent_log_file()
 
         if not access(self.log_path, R_OK):
-            self.error('%s not readable or not exist' % self.configuration['path'])
+            self.error('%s not readable or not exist' % self.log_path)
             return False
 
         if not getsize(self.log_path):
-            self.error('%s is empty' % self.configuration['path'])
+            self.error('%s is empty' % self.log_path)
             return False
 
         self.configuration['update_every'] = self.update_every
         self.configuration['name'] = self.name
         self.configuration['override_name'] = self.override_name
         self.configuration['_dimensions'] = self._dimensions
+        self.configuration['path'] = self.log_path
 
         cls = log_types[self.log_type]
         self.Job = cls(configuration=self.configuration)
