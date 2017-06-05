@@ -73,8 +73,9 @@ void create_needed_dir(const char *dir, uid_t uid, gid_t gid)
         error("Cannot create directory '%s'", dir);
 }
 
-int become_user(const char *username, int pid_fd)
-{
+int become_user(const char *username, int pid_fd) {
+    int am_i_root = (getuid() == 0)?1:0;
+
     struct passwd *pw = getpwnam(username);
     if(!pw) {
         error("User %s is not present.", username);
@@ -94,12 +95,12 @@ int become_user(const char *username, int pid_fd)
 
     int ngroups = (int)sysconf(_SC_NGROUPS_MAX);
     gid_t *supplementary_groups = NULL;
-    if(ngroups) {
+    if(ngroups > 0) {
         supplementary_groups = mallocz(sizeof(gid_t) * ngroups);
         if(getgrouplist(username, gid, supplementary_groups, &ngroups) == -1) {
-            error("Cannot get supplementary groups of user '%s'.", username);
-            freez(supplementary_groups);
-            supplementary_groups = NULL;
+            if(am_i_root)
+                error("Cannot get supplementary groups of user '%s'.", username);
+
             ngroups = 0;
         }
     }
@@ -109,13 +110,16 @@ int become_user(const char *username, int pid_fd)
     chown_open_file(stdaccess_fd, uid, gid);
     chown_open_file(pid_fd, uid, gid);
 
-    if(supplementary_groups && ngroups) {
-        if(setgroups(ngroups, supplementary_groups) == -1)
-            error("Cannot set supplementary groups for user '%s'", username);
-
-        freez(supplementary_groups);
+    if(supplementary_groups && ngroups > 0) {
+        if(setgroups((size_t)ngroups, supplementary_groups) == -1) {
+            if(am_i_root)
+                error("Cannot set supplementary groups for user '%s'", username);
+        }
         ngroups = 0;
     }
+
+    if(supplementary_groups)
+        freez(supplementary_groups);
 
 #ifdef __APPLE__
     if(setregid(gid, gid) != 0) {
