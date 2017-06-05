@@ -592,6 +592,43 @@
         }
 
         // --------------------------------------------------------------------
+        // natural sorting
+        // http://www.davekoelle.com/files/alphanum.js - LGPL
+
+        function naturalSortChunkify(t) {
+            var tz = [];
+            var x = 0, y = -1, n = 0, i, j;
+
+            while (i = (j = t.charAt(x++)).charCodeAt(0)) {
+                var m = (i === 46 || (i >= 48 && i <= 57));
+                if (m !== n) {
+                    tz[++y] = "";
+                    n = m;
+                }
+                tz[y] += j;
+            }
+
+            return tz;
+        }
+
+        function naturalSortCompare(a, b) {
+            var aa = naturalSortChunkify(a.toLowerCase());
+            var bb = naturalSortChunkify(b.toLowerCase());
+
+            for (var x = 0; aa[x] && bb[x]; x++) {
+                if (aa[x] !== bb[x]) {
+                    var c = Number(aa[x]), d = Number(bb[x]);
+                    if (c.toString() === aa[x] && d.toString() === bb[x])
+                        return c - d;
+                    else
+                        return (aa[x] > bb[x]) ? 1 : -1;
+                }
+            }
+
+            return aa.length - bb.length;
+        }
+
+        // --------------------------------------------------------------------
         // registry call back to render my-netdata menu
 
         var netdataRegistryCallback = function(machines_array) {
@@ -616,9 +653,7 @@
                 var master = options.hosts[0].hostname;
                 var sorted = options.hosts.sort(function(a, b) {
                     if(a.hostname === master) return -1;
-                    if(a.hostname === b.hostname) return 0;
-                    else if(a.hostname > b.hostname) return 1;
-                    return -1;
+                    return naturalSortCompare(a.hostname, b.hostname);
                 });
 
                 i = 0;
@@ -656,14 +691,13 @@
                 saveLocalStorage("registryCallback", JSON.stringify(machines_array));
 
                 var machines = machines_array.sort(function (a, b) {
-                    if (a.name > b.name) return -1;
-                    if (a.name < b.name) return 1;
-                    return 0;
+                    return naturalSortCompare(a.name, b.name);
                 });
 
+                i = 0;
                 len = machines.length;
                 while(len--) {
-                    var u = machines[len];
+                    var u = machines[i++];
                     found++;
                     el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="' + u.url + '" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
                     a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
@@ -950,8 +984,7 @@
         function prioritySort(a, b) {
             if(a.priority < b.priority) return -1;
             if(a.priority > b.priority) return 1;
-            if(a.name < b.name) return -1;
-            return 1;
+            return naturalSortCompare(a.name, b.name);
         }
 
         function sortObjectByPriority(object) {
@@ -970,8 +1003,7 @@
             sorted.sort(function(a, b) {
                 if(idx[a].priority < idx[b].priority) return -1;
                 if(idx[a].priority > idx[b].priority) return 1;
-                if(a < b) return -1;
-                return 1;
+                return naturalSortCompare(a, b);
             });
 
             return sorted;
@@ -1783,15 +1815,16 @@
 
                 // sort the families, like the dashboard menu does
                 var families_sorted = families_sort.sort(function (a, b) {
-                    if (a.priority > b.priority) return -1;
-                    if (a.priority < b.priority) return 1;
-                    return 0;
+                    if (a.priority < b.priority) return -1;
+                    if (a.priority > b.priority) return 1;
+                    return naturalSortCompare(a.name, b.name);
                 });
 
+                var i = 0;
                 var fc = 0;
                 var len = families_sorted.length;
                 while(len--) {
-                    family = families_sorted[len].name;
+                    family = families_sorted[i++].name;
                     var active_family_added = false;
                     var expanded = 'true';
                     var collapsed = '';
