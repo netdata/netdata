@@ -1302,7 +1302,7 @@
                 + ' data-title="Used Swap"'
                 + ' data-units="%"'
                 + ' data-easypiechart-max-value="100"'
-                + ' data-width="8%"'
+                + ' data-width="9%"'
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
@@ -1314,7 +1314,7 @@
                 + ' data-dimensions="in"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="Disk Read"'
-                + ' data-width="10%"'
+                + ' data-width="11%"'
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
@@ -1324,7 +1324,7 @@
                 + ' data-dimensions="out"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="Disk Write"'
-                + ' data-width="10%"'
+                + ' data-width="11%"'
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
@@ -1332,12 +1332,12 @@
             }
 
             if(typeof charts['system.cpu'] !== 'undefined')
-                head += '<div class="netdata-container" data-netdata="system.cpu"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.cpu"'
                 + ' data-chart-library="gauge"'
                 + ' data-title="CPU"'
                 + ' data-units="%"'
                 + ' data-gauge-max-value="100"'
-                + ' data-width="18%"'
+                + ' data-width="20%"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
                 + ' data-colors="' + NETDATA.colors[12] + '"'
@@ -1348,7 +1348,7 @@
                 + ' data-dimensions="received"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="IPv4 Inbound"'
-                + ' data-width="10%"'
+                + ' data-width="11%"'
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
@@ -1358,7 +1358,7 @@
                 + ' data-dimensions="sent"'
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="IPv4 Outbound"'
-                + ' data-width="10%"'
+                + ' data-width="11%"'
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
@@ -1370,7 +1370,7 @@
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="IPv6 Inbound"'
                 + ' data-units="kbps"'
-                + ' data-width="10%"'
+                + ' data-width="11%"'
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
@@ -1381,7 +1381,7 @@
                 + ' data-chart-library="easypiechart"'
                 + ' data-title="IPv6 Outbound"'
                 + ' data-units="kbps"'
-                + ' data-width="10%"'
+                + ' data-width="11%"'
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
@@ -1396,7 +1396,7 @@
                 + ' data-title="Used RAM"'
                 + ' data-units="%"'
                 + ' data-easypiechart-max-value="100"'
-                + ' data-width="8%"'
+                + ' data-width="9%"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
                 + ' data-colors="' + NETDATA.colors[7] + '"'
@@ -3578,4 +3578,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170604-1"></script>
+<script type="text/javascript" src="dashboard.js?v20170605-2"></script>

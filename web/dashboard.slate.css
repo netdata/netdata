@@ -63,6 +63,38 @@ code {
     /* width and height is given per chart with data-width and data-height */
 }
 
+.netdata-container-gauge {
+    display: inline-block;
+    overflow: hidden;
+
+    /* required for child elements to have absolute position */
+    position: relative;
+
+    /* width and height is given per chart with data-width and data-height */
+}
+
+.netdata-container-gauge:after {
+    padding-top: 60%;
+    display: block;
+    content: '';
+}
+
+.netdata-container-easypiechart {
+    display: inline-block;
+    overflow: hidden;
+
+    /* required for child elements to have absolute position */
+    position: relative;
+
+    /* width and height is given per chart with data-width and data-height */
+}
+
+.netdata-container-easypiechart:after {
+    padding-top: 100%;
+    display: block;
+    content: '';
+}
+
 .netdata-aspect {
     position: relative;
     width: 100%;
@@ -142,12 +174,15 @@ code {
 
 .netdata-message {
     display: inline-block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     text-align: left;
     vertical-align: top;
     font-weight: bold;
     font-size: x-small;
-    width: 100%;
-    height: 100%;
     overflow: hidden;
     background: inherit;
     z-index: 0;
@@ -417,7 +452,7 @@ code {
     margin-left: 18%;
     text-align: center;
     color: #676b70;
-    font-weight: normal;
+    font-weight: bold;
 }
 
 .easyPieChartUnits {
@@ -441,6 +476,8 @@ code {
     position: absolute;
     top: 0;
     left: 0;
+    bottom: 0;
+    right: 0;
     z-index: 0;
 }
 
@@ -489,7 +526,7 @@ code {
     position: absolute;
     float: left;
     left: 0;
-    bottom: 10%;
+    bottom: 8%;
     width: 92%;
     margin-left: 8%;
     text-align: left;
@@ -502,7 +539,7 @@ code {
     position: absolute;
     float: left;
     left: 0;
-    bottom: 10%;
+    bottom: 8%;
     width: 95%;
     margin-right: 5%;
     text-align: right;

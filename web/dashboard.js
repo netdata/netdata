@@ -144,7 +144,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.themes = {
         white: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20161229-2',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20170605-2',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#F0F0F0',
@@ -161,7 +161,7 @@ var NETDATA = window.NETDATA || {};
         },
         slate: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20161229-2',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20170605-2',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
@@ -1602,6 +1602,7 @@ var NETDATA = window.NETDATA || {};
         this.running = false;                       // boolean - true when the chart is being refreshed now
         this.enabled = true;                        // boolean - is the chart enabled for refresh?
 
+        that.tmp = {};
 
         // ============================================================================================================
         // PRIVATE FUNCTIONS
@@ -1620,28 +1621,28 @@ var NETDATA = window.NETDATA || {};
             that.updates_since_last_creation = 0;       // numeric - the number of refreshes made since the last time the chart was created
 
             that.tm = {
-                last_initialized: 0,        // milliseconds - the timestamp it was last initialized
-                last_dom_created: 0,        // milliseconds - the timestamp its DOM was last created
-                last_mode_switch: 0,        // milliseconds - the timestamp it switched modes
+                last_initialized: 0,                    // milliseconds - the timestamp it was last initialized
+                last_dom_created: 0,                    // milliseconds - the timestamp its DOM was last created
+                last_mode_switch: 0,                    // milliseconds - the timestamp it switched modes
 
-                last_info_downloaded: 0,    // milliseconds - the timestamp we downloaded the chart
-                last_updated: 0,            // the timestamp the chart last updated with data
-                pan_and_zoom_seq: 0,        // the sequence number of the global synchronization
-                                            // between chart.
-                                            // Used with NETDATA.globalPanAndZoom.seq
-                last_visible_check: 0,      // the time we last checked if it is visible
-                last_resized: 0,            // the time the chart was resized
-                last_hidden: 0,             // the time the chart was hidden
-                last_unhidden: 0,           // the time the chart was unhidden
-                last_autorefreshed: 0       // the time the chart was last refreshed
+                last_info_downloaded: 0,                // milliseconds - the timestamp we downloaded the chart
+                last_updated: 0,                        // the timestamp the chart last updated with data
+                pan_and_zoom_seq: 0,                    // the sequence number of the global synchronization
+                                                        // between chart.
+                                                        // Used with NETDATA.globalPanAndZoom.seq
+                last_visible_check: 0,                  // the time we last checked if it is visible
+                last_resized: 0,                        // the time the chart was resized
+                last_hidden: 0,                         // the time the chart was hidden
+                last_unhidden: 0,                       // the time the chart was unhidden
+                last_autorefreshed: 0                   // the time the chart was last refreshed
             };
 
-            that.data = null;               // the last data as downloaded from the netdata server
-            that.data_url = 'invalid://';   // string - the last url used to update the chart
-            that.data_points = 0;           // number - the number of points returned from netdata
-            that.data_after = 0;            // milliseconds - the first timestamp of the data
-            that.data_before = 0;           // milliseconds - the last timestamp of the data
-            that.data_update_every = 0;     // milliseconds - the frequency to update the data
+            that.data = null;                           // the last data as downloaded from the netdata server
+            that.data_url = 'invalid://';               // string - the last url used to update the chart
+            that.data_points = 0;                       // number - the number of points returned from netdata
+            that.data_after = 0;                        // milliseconds - the first timestamp of the data
+            that.data_before = 0;                       // milliseconds - the last timestamp of the data
+            that.data_update_every = 0;                 // milliseconds - the frequency to update the data
 
             that.tmp = {};                              // members that can be destroyed to save memory
         };
@@ -1755,30 +1756,6 @@ var NETDATA = window.NETDATA || {};
             that.tm.last_dom_created = 0;
         };
 
-        var resizeDOM = function() {
-            if(typeof(that.width) === 'string')
-                that.element.style.width = that.width;
-            else if(typeof(that.width) === 'number')
-                that.element.style.width = that.width.toString() + 'px';
-
-            if(typeof(that.library.aspect_ratio) === 'undefined') {
-                if(typeof(that.height) === 'string')
-                    that.element.style.height = that.height;
-                else if(typeof(that.height) === 'number')
-                    that.element.style.height = that.height.toString() + 'px';
-            }
-            else {
-                var w = that.element.offsetWidth;
-                if (w === null || w === 0) {
-                    // the div is hidden
-                    // this will resize the chart when next viewed
-                    that.tm.last_resized = 0;
-                }
-                else
-                    that.element.style.height = (w * that.library.aspect_ratio / 100).toString() + 'px';
-            }
-        };
-
         var createDOM = function() {
             if(that.enabled === false) return;
             lateInitialization();
@@ -1787,11 +1764,6 @@ var NETDATA = window.NETDATA || {};
 
             if(that.debug === true)
                 that.log('createDOM()');
-
-            if(that.hasLegend() === true)
-                that.element.className = "netdata-container-with-legend";
-            else
-                that.element.className = "netdata-container";
 
             that.element_message = document.createElement('div');
             that.element_message.className = 'netdata-message icon hidden';
@@ -1803,17 +1775,26 @@ var NETDATA = window.NETDATA || {};
             that.tm.last_dom_created =
                 that.tm.last_resized = Date.now();
 
-            resizeDOM();
             showLoading();
         };
 
         var initDOM = function() {
-            that.element.className = "netdata-container";
+            that.element.className = that.library.container_class(that);
+
+            if(typeof(that.width) === 'string')
+                that.element.style.width = that.width;
+            else if(typeof(that.width) === 'number')
+                that.element.style.width = that.width.toString() + 'px';
+
+            if(typeof(that.library.aspect_ratio) === 'undefined') {
+                if(typeof(that.height) === 'string')
+                    that.element.style.height = that.height;
+                else if(typeof(that.height) === 'number')
+                    that.element.style.height = that.height.toString() + 'px';
+            }
 
             if(NETDATA.chartDefaults.min_width !== null)
                 that.element.style.min_width = NETDATA.chartDefaults.min_width;
-
-            resizeDOM();
         };
 
         /* init() private
@@ -5711,7 +5692,6 @@ var NETDATA = window.NETDATA || {};
         var value = data.result[0];
         var min = NETDATA.dataAttribute(state.element, 'easypiechart-min-value', null);
         var max = NETDATA.dataAttribute(state.element, 'easypiechart-max-value', null);
-        var adjust = NETDATA.dataAttribute(state.element, 'easypiechart-adjust', null);
 
         if(min === null) {
             min = NETDATA.commonMin.get(state);
@@ -5731,17 +5711,7 @@ var NETDATA = window.NETDATA || {};
 
         chart.data('data-percent', pcent);
 
-        var size;
-        switch(adjust) {
-            case 'width': size = state.chartHeight(); break;
-            case 'min': size = Math.min(state.chartWidth(), state.chartHeight()); break;
-            case 'max': size = Math.max(state.chartWidth(), state.chartHeight()); break;
-            case 'height':
-            default: size = state.chartWidth(); break;
-        }
-        state.element.style.width = size + 'px';
-        state.element.style.height = size + 'px';
-
+        var size = state.chartWidth();
         var stroke = Math.floor(size / 22);
         if(stroke < 3) stroke = 2;
 
@@ -6002,7 +5972,7 @@ var NETDATA = window.NETDATA || {};
         var value = data.result[0];
         var min = NETDATA.dataAttribute(state.element, 'gauge-min-value', null);
         var max = NETDATA.dataAttribute(state.element, 'gauge-max-value', null);
-        var adjust = NETDATA.dataAttribute(state.element, 'gauge-adjust', null);
+        // var adjust = NETDATA.dataAttribute(state.element, 'gauge-adjust', null);
         var pointerColor = NETDATA.dataAttribute(state.element, 'gauge-pointer-color', NETDATA.themes.current.gauge_pointer);
         var strokeColor = NETDATA.dataAttribute(state.element, 'gauge-stroke-color', NETDATA.themes.current.gauge_stroke);
         var startColor = NETDATA.dataAttribute(state.element, 'gauge-start-color', state.chartCustomColors()[0]);
@@ -6028,6 +5998,7 @@ var NETDATA = window.NETDATA || {};
         if(max < 0) max = 0;
 
         var width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
+        // console.log('gauge width: ' + width.toString() + ', height: ' + height.toString());
         //switch(adjust) {
         //  case 'width': width = height * ratio; break;
         //  case 'height':
@@ -6040,12 +6011,12 @@ var NETDATA = window.NETDATA || {};
 
         var options = {
             lines: 12,                  // The number of lines to draw
-            angle: 0.15,                // The span of the gauge arc
-            lineWidth: 0.50,            // The line thickness
-            radiusScale: 0.85,          // Relative radius
+            angle: 0.14,                // The span of the gauge arc
+            lineWidth: 0.57,            // The line thickness
+            radiusScale: 1.0,           // Relative radius
             pointer: {
-                length: 0.8,            // 0.9 The radius of the inner circle
-                strokeWidth: 0.035,     // The rotation offset
+                length: 0.85,           // 0.9 The radius of the inner circle
+                strokeWidth: 0.045,     // The rotation offset
                 color: pointerColor     // Fill color
             },
             limitMax: true,             // If false, the max value of the gauge will be updated if value surpass max
@@ -6103,15 +6074,15 @@ var NETDATA = window.NETDATA || {};
         state.tmp.gauge_canvas.height = height;
         state.element_chart.appendChild(state.tmp.gauge_canvas);
 
-        var valuefontsize = Math.floor(height / 6);
-        var valuetop = Math.round((height - valuefontsize - (height / 6)) / 2);
+        var valuefontsize = Math.floor(height / 5);
+        var valuetop = Math.round((height - valuefontsize) / 3.2);
         state.tmp.gaugeChartLabel = document.createElement('span');
         state.tmp.gaugeChartLabel.className = 'gaugeChartLabel';
         state.tmp.gaugeChartLabel.style.fontSize = valuefontsize + 'px';
         state.tmp.gaugeChartLabel.style.top = valuetop.toString() + 'px';
         state.element_chart.appendChild(state.tmp.gaugeChartLabel);
 
-        var titlefontsize = Math.round(valuefontsize / 2);
+        var titlefontsize = Math.round(valuefontsize / 2.1);
         var titletop = 0;
         state.tmp.gaugeChartTitle = document.createElement('span');
         state.tmp.gaugeChartTitle.className = 'gaugeChartTitle';
@@ -6200,6 +6171,11 @@ var NETDATA = window.NETDATA || {};
                     state.tmp.dygraph_sparkline = (t === 'sparkline');
                 }
                 return state.tmp.dygraph_sparkline;
+            },
+            container_class: function(state) {
+                if(this.legend(state) !== null)
+                    return 'netdata-container-with-legend';
+                return 'netdata-container';
             }
         },
         "sparkline": {
@@ -6218,7 +6194,8 @@ var NETDATA = window.NETDATA || {};
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
             track_colors: function(state) { void(state); return false; },
-            pixels_per_point: function(state) { void(state); return 3; }
+            pixels_per_point: function(state) { void(state); return 3; },
+            container_class: function(state) { void(state); return 'netdata-container'; }
         },
         "peity": {
             initialize: NETDATA.peityInitialize,
@@ -6236,7 +6213,8 @@ var NETDATA = window.NETDATA || {};
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
             track_colors: function(state) { void(state); return false; },
-            pixels_per_point: function(state) { void(state); return 3; }
+            pixels_per_point: function(state) { void(state); return 3; },
+            container_class: function(state) { void(state); return 'netdata-container'; }
         },
         "morris": {
             initialize: NETDATA.morrisInitialize,
@@ -6254,7 +6232,8 @@ var NETDATA = window.NETDATA || {};
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 50; },
             track_colors: function(state) { void(state); return false; },
-            pixels_per_point: function(state) { void(state); return 15; }
+            pixels_per_point: function(state) { void(state); return 15; },
+            container_class: function(state) { void(state); return 'netdata-container'; }
         },
         "google": {
             initialize: NETDATA.googleInitialize,
@@ -6272,7 +6251,8 @@ var NETDATA = window.NETDATA || {};
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 300; },
             track_colors: function(state) { void(state); return false; },
-            pixels_per_point: function(state) { void(state); return 4; }
+            pixels_per_point: function(state) { void(state); return 4; },
+            container_class: function(state) { void(state); return 'netdata-container'; }
         },
         "raphael": {
             initialize: NETDATA.raphaelInitialize,
@@ -6290,7 +6270,8 @@ var NETDATA = window.NETDATA || {};
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
             track_colors: function(state) { void(state); return false; },
-            pixels_per_point: function(state) { void(state); return 3; }
+            pixels_per_point: function(state) { void(state); return 3; },
+            container_class: function(state) { void(state); return 'netdata-container'; }
         },
         "c3": {
             initialize: NETDATA.c3Initialize,
@@ -6308,7 +6289,8 @@ var NETDATA = window.NETDATA || {};
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
             track_colors: function(state) { void(state); return false; },
-            pixels_per_point: function(state) { void(state); return 15; }
+            pixels_per_point: function(state) { void(state); return 15; },
+            container_class: function(state) { void(state); return 'netdata-container'; }
         },
         "d3": {
             initialize: NETDATA.d3Initialize,
@@ -6326,7 +6308,8 @@ var NETDATA = window.NETDATA || {};
             autoresize: function(state) { void(state); return false; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
             track_colors: function(state) { void(state); return false; },
-            pixels_per_point: function(state) { void(state); return 3; }
+            pixels_per_point: function(state) { void(state); return 3; },
+            container_class: function(state) { void(state); return 'netdata-container'; }
         },
         "easypiechart": {
             initialize: NETDATA.easypiechartInitialize,
@@ -6345,7 +6328,8 @@ var NETDATA = window.NETDATA || {};
             max_updates_to_recreate: function(state) { void(state); return 5000; },
             track_colors: function(state) { void(state); return true; },
             pixels_per_point: function(state) { void(state); return 3; },
-            aspect_ratio: 100
+            aspect_ratio: 100,
+            container_class: function(state) { void(state); return 'netdata-container-easypiechart'; }
         },
         "gauge": {
             initialize: NETDATA.gaugeInitialize,
@@ -6364,7 +6348,8 @@ var NETDATA = window.NETDATA || {};
             max_updates_to_recreate: function(state) { void(state); return 5000; },
             track_colors: function(state) { void(state); return true; },
             pixels_per_point: function(state) { void(state); return 3; },
-            aspect_ratio: 70
+            aspect_ratio: 60,
+            container_class: function(state) { void(state); return 'netdata-container-gauge'; }
         }
     };
 
