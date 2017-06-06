@@ -264,9 +264,8 @@ class Service(LogService):
         if not self.log_path:
             self.error('log path is not specified')
             return False
-        self._find_recent_log_file()
 
-        if not access(self.log_path, R_OK):
+        if not (self._find_recent_log_file() and access(self.log_path, R_OK)):
             self.error('%s not readable or not exist' % self.log_path)
             return False
 
@@ -285,6 +284,7 @@ class Service(LogService):
         if self.Job.check():
             self.order = self.Job.order
             self.definitions = self.Job.definitions
+            self.info('Current log file: %s' % self.log_path)
             return True
         return False
 
