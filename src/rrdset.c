@@ -294,14 +294,14 @@ void rrdset_save(RRDSET *st) {
 
     if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
         debug(D_RRD_STATS, "Saving stats '%s' to '%s'.", st->name, st->cache_filename);
-        savememory(st->cache_filename, st, st->memsize);
+        memory_file_save(st->cache_filename, st, st->memsize);
     }
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE)) {
             debug(D_RRD_STATS, "Saving dimension '%s' to '%s'.", rd->name, rd->cache_filename);
-            savememory(rd->cache_filename, rd, rd->memsize);
+            memory_file_save(rd->cache_filename, rd, rd->memsize);
         }
     }
 }
@@ -421,8 +421,14 @@ RRDSET *rrdset_create_custom(
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP) {
-        st = (RRDSET *) mymmap(fullfilename, size, ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 0);
+    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP || memory_mode == RRD_MEMORY_MODE_RAM) {
+        st = (RRDSET *) mymmap(
+                  (memory_mode == RRD_MEMORY_MODE_RAM)?NULL:fullfilename
+                , size
+                , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
+                , 0
+        );
+
         if(st) {
             memset(&st->avl, 0, sizeof(avl));
             memset(&st->avlname, 0, sizeof(avl));
