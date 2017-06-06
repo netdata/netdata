@@ -848,6 +848,7 @@ class LogService(SimpleService):
         """
         self.__re_find['run'] = self.__re_find['maximum']
         self.__re_find['current'] = 0
+        self.__glob_path = self.__glob_path or self.log_path  # workaround for modules w/o config files
         path_list = glob(self.__glob_path)
         if path_list:
             self.log_path = max(path_list)
