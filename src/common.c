@@ -944,6 +944,8 @@ inline char *trim_all(char *buffer) {
 }
 
 static int memory_file_open(const char *filename, size_t size) {
+    // info("memory_file_open('%s', %zu", filename, size);
+
     int fd = open(filename, O_RDWR | O_CREAT | O_NOATIME, 0664);
     if (fd != -1) {
         if (lseek(fd, size, SEEK_SET) == (off_t) size) {
@@ -962,6 +964,7 @@ static int memory_file_open(const char *filename, size_t size) {
 
 // mmap_shared is used for memory mode = map
 static void *memory_file_mmap(const char *filename, size_t size, int flags) {
+    // info("memory_file_mmap('%s', %zu", filename, size);
     static int log_madvise = 1;
 
     int fd = -1;
@@ -992,6 +995,7 @@ static void *memory_file_mmap(const char *filename, size_t size, int flags) {
 
 #ifdef MADV_MERGEABLE
 static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) {
+    // info("memory_file_mmap_ksm('%s', %zu", filename, size);
     static int log_madvise_2 = 1, log_madvise_3 = 1;
 
     int fd = -1;
@@ -1011,17 +1015,17 @@ static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) 
                     error("Cannot read from file '%s'", filename);
             }
             else error("Cannot seek to beginning of file '%s'.", filename);
+        }
 
-            // don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
-            if (madvise(mem, size, MADV_SEQUENTIAL | MADV_DONTFORK) != 0 && log_madvise_2) {
-                error("Cannot advise the kernel about the memory usage (MADV_SEQUENTIAL|MADV_DONTFORK) of file '%s'.", filename);
-                log_madvise_2--;
-            }
+        // don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
+        if (madvise(mem, size, MADV_SEQUENTIAL | MADV_DONTFORK) != 0 && log_madvise_2) {
+            error("Cannot advise the kernel about the memory usage (MADV_SEQUENTIAL|MADV_DONTFORK) of file '%s'.", filename);
+            log_madvise_2--;
+        }
 
-            if (madvise(mem, size, MADV_MERGEABLE) != 0 && log_madvise_3) {
-                error("Cannot advise the kernel about the memory usage (MADV_MERGEABLE) of file '%s'.", filename);
-                log_madvise_3--;
-            }
+        if (madvise(mem, size, MADV_MERGEABLE) != 0 && log_madvise_3) {
+            error("Cannot advise the kernel about the memory usage (MADV_MERGEABLE) of file '%s'.", filename);
+            log_madvise_3--;
         }
     }
 
@@ -1032,6 +1036,7 @@ static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) 
 }
 #else
 static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) {
+    // info("memory_file_mmap_ksm FALLBACK ('%s', %zu", filename, size);
 
     if(filename)
         return memory_file_mmap(filename, size, flags);
