@@ -861,6 +861,22 @@ static int statsd_snd_callback(int fd, int socktype, void *data, short int *even
 // --------------------------------------------------------------------------------------------------------------------
 // statsd child thread to collect metrics from network
 
+void statsd_collector_thread_cleanup(void *data) {
+    struct statsd_udp *d = data;
+
+#ifdef HAVE_RECVMMSG
+    size_t i;
+    for (i = 0; i < d->size; i++)
+        freez(d->iovecs[i].iov_base);
+
+    freez(d->iovecs);
+    freez(d->msgs);
+#endif
+
+    freez(d);
+    listen_sockets_close(&statsd.sockets);
+}
+
 void *statsd_collector_thread(void *ptr) {
     int id = *((int *)ptr);
 
@@ -873,6 +889,7 @@ void *statsd_collector_thread(void *ptr) {
         error("Cannot set pthread cancel state to ENABLE.");
 
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
+    pthread_cleanup_push(statsd_collector_thread_cleanup, d);
 
 #ifdef HAVE_RECVMMSG
     d->type = STATSD_SOCKET_DATA_TYPE_UDP;
@@ -897,19 +914,9 @@ void *statsd_collector_thread(void *ptr) {
             , (void *)d
     );
 
-#ifdef HAVE_RECVMMSG
-    for (i = 0; i < d->size; i++)
-        freez(d->iovecs[i].iov_base);
-
-    freez(d->iovecs);
-    freez(d->msgs);
-#endif
-
-    freez(d);
+    pthread_cleanup_pop(1);
 
     debug(D_WEB_CLIENT, "STATSD: exit!");
-    listen_sockets_close(&statsd.sockets);
-
     pthread_exit(NULL);
     return NULL;
 }
