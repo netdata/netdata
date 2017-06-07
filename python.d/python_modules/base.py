@@ -26,6 +26,7 @@ import msg
 import ssl
 from subprocess import Popen, PIPE
 from sys import exc_info
+from glob import glob
 
 try:
     from urlparse import urlparse
@@ -809,6 +810,8 @@ class LogService(SimpleService):
     def __init__(self, configuration=None, name=None):
         self.log_path = ""
         self._last_position = 0
+        self._reload_file = 0
+        self._real_log_path = None
         # self._log_reader = None
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.retries = 100000  # basically always retry
@@ -820,12 +823,13 @@ class LogService(SimpleService):
         """
         lines = []
         try:
-            if os.path.getsize(self.log_path) < self._last_position:
+            log_path = self._glob_path()
+            if os.path.getsize(log_path) < self._last_position:
                 self._last_position = 0  # read from beginning if file has shrunk
-            elif os.path.getsize(self.log_path) == self._last_position:
+            elif os.path.getsize(log_path) == self._last_position:
                 self.debug("Log file hasn't changed. No new data.")
                 return []  # return empty list if nothing has changed
-            with open(self.log_path, "r") as fp:
+            with open(log_path, "r") as fp:
                 fp.seek(self._last_position)
                 for i, line in enumerate(fp):
                     lines.append(line)
@@ -853,7 +857,8 @@ class LogService(SimpleService):
         except (KeyError, TypeError):
             self.info("No path to log specified. Using: '" + self.log_path + "'")
 
-        if os.access(self.log_path, os.R_OK):
+        log_path = self._glob_path()
+        if os.access(log_path, os.R_OK):
             return True
         else:
             self.error("Cannot access file: '" + self.log_path + "'")
@@ -865,6 +870,14 @@ class LogService(SimpleService):
         status = SimpleService.create(self)
         # self._last_position = 0
         return status
+
+    def _glob_path(self):
+	if not self._real_log_path or not isfile(self._real_log_path) or self._reload_file > 120:
+            self._reload_file = 0
+            extract_paths = glob(self.log_path)
+            self._real_log_path = max(extract_paths) if extract_paths else None
+        self._reload_file += 1
+        return self._real_log_path
 
 
 class ExecutableService(SimpleService):
