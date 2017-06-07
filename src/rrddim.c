@@ -276,6 +276,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     switch(rd->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
+        case RRD_MEMORY_MODE_RAM:
             debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);
@@ -283,7 +284,6 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
             break;
 
         case RRD_MEMORY_MODE_NONE:
-        case RRD_MEMORY_MODE_RAM:
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);

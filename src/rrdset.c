@@ -279,12 +279,18 @@ void rrdset_free(RRDSET *st) {
     // free directly allocated members
     freez(st->config_section);
 
-    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
-        debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
-        munmap(st, st->memsize);
+    switch(st->rrd_memory_mode) {
+        case RRD_MEMORY_MODE_SAVE:
+        case RRD_MEMORY_MODE_MAP:
+        case RRD_MEMORY_MODE_RAM:
+            debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
+            munmap(st, st->memsize);
+            break;
+
+        case RRD_MEMORY_MODE_NONE:
+            freez(st);
+            break;
     }
-    else
-        freez(st);
 }
 
 void rrdset_save(RRDSET *st) {
