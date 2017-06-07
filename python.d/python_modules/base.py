@@ -20,12 +20,12 @@
 import time
 import os
 import socket
-import select
 import threading
 import msg
 import ssl
 from subprocess import Popen, PIPE
 from sys import exc_info
+from glob import glob
 
 try:
     from urlparse import urlparse
@@ -807,57 +807,69 @@ class SocketService(SimpleService):
 
 class LogService(SimpleService):
     def __init__(self, configuration=None, name=None):
-        self.log_path = ""
-        self._last_position = 0
-        # self._log_reader = None
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.log_path = self.configuration.get('path')
+        self.__glob_path = self.log_path
+        self._last_position = 0
         self.retries = 100000  # basically always retry
+        self.__re_find = dict(current=0, run=0, maximum=60)
 
     def _get_raw_data(self):
         """
         Get log lines since last poll
         :return: list
         """
-        lines = []
+        lines = list()
         try:
-            if os.path.getsize(self.log_path) < self._last_position:
+            if self.__re_find['current'] == self.__re_find['run']:
+                self._find_recent_log_file()
+            size = os.path.getsize(self.log_path)
+            if size == self._last_position:
+                self.__re_find['current'] += 1
+                return list()  # return empty list if nothing has changed
+            elif size < self._last_position:
                 self._last_position = 0  # read from beginning if file has shrunk
-            elif os.path.getsize(self.log_path) == self._last_position:
-                self.debug("Log file hasn't changed. No new data.")
-                return []  # return empty list if nothing has changed
-            with open(self.log_path, "r") as fp:
+
+            with open(self.log_path) as fp:
                 fp.seek(self._last_position)
-                for i, line in enumerate(fp):
+                for line in fp:
                     lines.append(line)
                 self._last_position = fp.tell()
-        except Exception as e:
-            self.error(str(e))
+                self.__re_find['current'] = 0
+        except (OSError, IOError) as error:
+            self.__re_find['current'] += 1
+            self.error(str(error))
 
-        if len(lines) != 0:
-            return lines
-        else:
-            self.error("No data collected.")
-            return None
+        return lines or None
+
+    def _find_recent_log_file(self):
+        """
+        :return:
+        """
+        self.__re_find['run'] = self.__re_find['maximum']
+        self.__re_find['current'] = 0
+        self.__glob_path = self.__glob_path or self.log_path  # workaround for modules w/o config files
+        path_list = glob(self.__glob_path)
+        if path_list:
+            self.log_path = max(path_list)
+            return True
+        return False
 
     def check(self):
         """
         Parse basic configuration and check if log file exists
         :return: boolean
         """
-        if self.name is not None or self.name != str(None):
-            self.name = ""
-        else:
-            self.name = str(self.name)
-        try:
-            self.log_path = str(self.configuration['path'])
-        except (KeyError, TypeError):
-            self.info("No path to log specified. Using: '" + self.log_path + "'")
+        if not self.log_path:
+            self.error("No path to log specified")
+            return None
 
-        if os.access(self.log_path, os.R_OK):
+        if all([self._find_recent_log_file(),
+                os.access(self.log_path, os.R_OK),
+                os.path.isfile(self.log_path)]):
             return True
-        else:
-            self.error("Cannot access file: '" + self.log_path + "'")
-            return False
+        self.error("Cannot access %s" % self.log_path)
+        return False
 
     def create(self):
         # set cursor at last byte of log file
