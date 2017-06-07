@@ -35,9 +35,9 @@ inline RRDDIM *rrddim_find(RRDSET *st, const char *id) {
 // ----------------------------------------------------------------------------
 // RRDDIM rename a dimension
 
-inline void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
+inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
     if(unlikely(!strcmp(rd->name, name)))
-        return;
+        return 0;
 
     debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);
 
@@ -45,10 +45,40 @@ inline void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
     rd->name = config_set_default(st->config_section, varname, name);
     rd->hash_name = simple_hash(rd->name);
-
     rrddimvar_rename_all(rd);
+    rd->exposed = 0;
+    return 1;
 }
 
+inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm) {
+    if(unlikely(rd->algorithm != algorithm))
+        return 0;
+
+    debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", st->id, rd->name, rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
+    rd->algorithm = algorithm;
+    rd->exposed = 0;
+    return 1;
+}
+
+inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier) {
+    if(unlikely(rd->multiplier != multiplier))
+        return 0;
+
+    debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->multiplier, multiplier);
+    rd->multiplier = multiplier;
+    rd->exposed = 0;
+    return 1;
+}
+
+inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) {
+    if(unlikely(rd->divisor != divisor))
+        return 0;
+
+    debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->divisor, divisor);
+    rd->multiplier = divisor;
+    rd->exposed = 0;
+    return 1;
+}
 
 // ----------------------------------------------------------------------------
 // RRDDIM create a dimension
@@ -57,6 +87,12 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(rd)) {
         debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
+
+        rrddim_set_name(st, rd, name);
+        rrddim_set_algorithm(st, rd, algorithm);
+        rrddim_set_multiplier(st, rd, multiplier);
+        rrddim_set_divisor(st, rd, divisor);
+
         return rd;
     }
 

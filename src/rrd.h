@@ -617,7 +617,11 @@ extern void rrdset_done(RRDSET *st);
 extern RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode);
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->rrd_memory_mode)
 
-extern void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
+extern int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
+extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
+extern int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
+extern int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
+
 extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
 
 extern int rrddim_hide(RRDSET *st, const char *id);

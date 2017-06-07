@@ -1608,6 +1608,12 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                                 dim->divisor *= STATSD_DECIMAL_DETAIL;
                         }
 
+                        if(unlikely(chart->st && dim->rd)) {
+                            rrddim_set_algorithm(chart->st, dim->rd, dim->algorithm);
+                            rrddim_set_multiplier(chart->st, dim->rd, dim->multiplier);
+                            rrddim_set_divisor(chart->st, dim->rd, dim->divisor);
+                        }
+
                         chart->dimensions_linked_count++;
                         debug(D_STATSD, "metric '%s' of type %u linked with app '%s', chart '%s', dimension '%s', algorithm '%s'", m->name, m->type, app->name, chart->id, dim->name, rrd_algorithm_name(dim->algorithm));
                     }
@@ -1645,11 +1651,6 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
             dim->rd = rrddim_add(chart->st, dim->name, NULL, dim->multiplier, dim->divisor, dim->algorithm);
 
         if(unlikely(dim->value_ptr)) {
-            // FIXME: this is anorthodox, we should an API call at RRDDIM to overwrite these settings
-            dim->rd->algorithm = dim->algorithm;
-            dim->rd->multiplier = dim->multiplier;
-            dim->rd->divisor = dim->divisor;
-
             debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
             rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
         }
