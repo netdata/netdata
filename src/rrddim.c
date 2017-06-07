@@ -130,41 +130,46 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             struct timeval now;
             now_realtime_timeval(&now);
 
-            if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
-                errno = 0;
-                info("Initializing file %s.", fullfilename);
+            if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(rd, 0, size);
             }
-            else if(rd->memsize != size) {
-                errno = 0;
-                error("File %s does not have the desired size. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
-            else if(rd->multiplier != multiplier) {
-                errno = 0;
-                error("File %s does not have the same multiplier. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
-            else if(rd->divisor != divisor) {
-                errno = 0;
-                error("File %s does not have the same divisor. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
-            else if(rd->update_every != st->update_every) {
-                errno = 0;
-                error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
-            else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
-                errno = 0;
-                error("File %s is too old. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
+            else {
+                if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
+                    errno = 0;
+                    info("Initializing file %s.", fullfilename);
+                    memset(rd, 0, size);
+                }
+                else if(rd->memsize != size) {
+                    errno = 0;
+                    error("File %s does not have the desired size. Clearing it.", fullfilename);
+                    memset(rd, 0, size);
+                }
+                else if(rd->multiplier != multiplier) {
+                    errno = 0;
+                    error("File %s does not have the same multiplier. Clearing it.", fullfilename);
+                    memset(rd, 0, size);
+                }
+                else if(rd->divisor != divisor) {
+                    errno = 0;
+                    error("File %s does not have the same divisor. Clearing it.", fullfilename);
+                    memset(rd, 0, size);
+                }
+                else if(rd->update_every != st->update_every) {
+                    errno = 0;
+                    error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
+                    memset(rd, 0, size);
+                }
+                else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
+                    errno = 0;
+                    error("File %s is too old. Clearing it.", fullfilename);
+                    memset(rd, 0, size);
+                }
 
-            if(rd->algorithm && rd->algorithm != algorithm)
-                error("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong."
-                      , fullfilename, algorithm, rrd_algorithm_name(algorithm), rd->algorithm,
-                        rrd_algorithm_name(rd->algorithm));
+                if(rd->algorithm && rd->algorithm != algorithm)
+                    error("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong."
+                          , fullfilename, algorithm, rrd_algorithm_name(algorithm), rd->algorithm, rrd_algorithm_name(
+                            rd->algorithm));
+            }
 
             // make sure we have the right memory mode
             // even if we cleared the memory
@@ -175,7 +180,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(!rd)) {
         // if we didn't manage to get a mmap'd dimension, just create one
         rd = callocz(1, size);
-        rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_RAM;
+        rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
 
     rd->memsize = size;
@@ -283,6 +288,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
             munmap(rd, rd->memsize);
             break;
 
+        case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
             freez((void *)rd->id);

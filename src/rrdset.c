@@ -199,7 +199,7 @@ inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
     if(unlikely(entries < 5)) entries = 5;
     if(unlikely(entries > RRD_HISTORY_ENTRIES_MAX)) entries = RRD_HISTORY_ENTRIES_MAX;
 
-    if(unlikely(mode == RRD_MEMORY_MODE_NONE || mode == RRD_MEMORY_MODE_RAM))
+    if(unlikely(mode == RRD_MEMORY_MODE_NONE || mode == RRD_MEMORY_MODE_ALLOC))
         return entries;
 
     long page = (size_t)sysconf(_SC_PAGESIZE);
@@ -287,6 +287,7 @@ void rrdset_free(RRDSET *st) {
             munmap(st, st->memsize);
             break;
 
+        case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
             freez(st);
             break;
@@ -319,14 +320,14 @@ void rrdset_delete(RRDSET *st) {
 
     info("Deleting chart '%s' ('%s') from disk...", st->id, st->name);
 
-    if(st->rrd_memory_mode != RRD_MEMORY_MODE_RAM) {
+    if(st->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || st->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
         info("Deleting chart header file '%s'.", st->cache_filename);
         if(unlikely(unlink(st->cache_filename) == -1))
             error("Cannot delete chart header file '%s'", st->cache_filename);
     }
 
     rrddim_foreach_read(rd, st) {
-        if(likely(rd->rrd_memory_mode != RRD_MEMORY_MODE_RAM)) {
+        if(likely(rd->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || rd->rrd_memory_mode == RRD_MEMORY_MODE_MAP)) {
             info("Deleting dimension file '%s'.", rd->cache_filename);
             if(unlikely(unlink(rd->cache_filename) == -1))
                 error("Cannot delete dimension file '%s'", rd->cache_filename);
@@ -454,43 +455,47 @@ RRDSET *rrdset_create_custom(
             st->alarms = NULL;
             st->flags = 0x00000000;
 
-            if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
-                errno = 0;
-                info("Initializing file %s.", fullfilename);
+            if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(st, 0, size);
             }
-            else if(strcmp(st->id, fullid) != 0) {
-                errno = 0;
-                error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
-                // munmap(st, size);
-                // st = NULL;
-                memset(st, 0, size);
-            }
-            else if(st->memsize != size || st->entries != entries) {
-                errno = 0;
-                error("File %s does not have the desired size. Clearing it.", fullfilename);
-                memset(st, 0, size);
-            }
-            else if(st->update_every != update_every) {
-                errno = 0;
-                error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
-                memset(st, 0, size);
-            }
-            else if((now - st->last_updated.tv_sec) > update_every * entries) {
-                errno = 0;
-                error("File %s is too old. Clearing it.", fullfilename);
-                memset(st, 0, size);
-            }
-            else if(st->last_updated.tv_sec > now + update_every) {
-                errno = 0;
-                error("File %s refers to the future. Clearing it.", fullfilename);
-                memset(st, 0, size);
-            }
+            else {
+                if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
+                    errno = 0;
+                    info("Initializing file %s.", fullfilename);
+                    memset(st, 0, size);
+                }
+                else if(strcmp(st->id, fullid) != 0) {
+                    errno = 0;
+                    error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
+                    // munmap(st, size);
+                    // st = NULL;
+                    memset(st, 0, size);
+                }
+                else if(st->memsize != size || st->entries != entries) {
+                    errno = 0;
+                    error("File %s does not have the desired size. Clearing it.", fullfilename);
+                    memset(st, 0, size);
+                }
+                else if(st->update_every != update_every) {
+                    errno = 0;
+                    error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
+                    memset(st, 0, size);
+                }
+                else if((now - st->last_updated.tv_sec) > update_every * entries) {
+                    errno = 0;
+                    error("File %s is too old. Clearing it.", fullfilename);
+                    memset(st, 0, size);
+                }
+                else if(st->last_updated.tv_sec > now + update_every) {
+                    errno = 0;
+                    error("File %s refers to the future. Clearing it.", fullfilename);
+                    memset(st, 0, size);
+                }
 
-            // make sure the database is aligned
-            if(st->last_updated.tv_sec)
-                last_updated_time_align(&st->last_updated, update_every);
-
+                // make sure the database is aligned
+                if(st->last_updated.tv_sec)
+                    last_updated_time_align(&st->last_updated, update_every);
+            }
 
             // make sure we have the right memory mode
             // even if we cleared the memory
@@ -500,7 +505,7 @@ RRDSET *rrdset_create_custom(
 
     if(unlikely(!st)) {
         st = callocz(1, size);
-        st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_RAM;
+        st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
 
     st->config_section = strdup(config_section);
