@@ -49,9 +49,9 @@ CHARTS_WEB = {
     'response_time': {
         'options': [None, 'Processing Time', 'milliseconds', 'timings', 'web_log.response_time', 'area'],
         'lines': [
-            ['resp_time_min', 'min', 'incremental', 1, 1000],
-            ['resp_time_max', 'max', 'incremental', 1, 1000],
-            ['resp_time_avg', 'avg', 'incremental', 1, 1000]
+            ['resp_time_min', 'min', 'absolute', 1, 1000],
+            ['resp_time_max', 'max', 'absolute', 1, 1000],
+            ['resp_time_avg', 'avg', 'absolute', 1, 1000]
         ]},
     'clients': {
         'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'clients', 'web_log.clients', 'stacked'],
@@ -459,8 +459,11 @@ class Web(Mixin):
 
         filtered_data = self.filter_data(raw_data=raw_data)
 
-        request_time, unique_current = list(), list()
-        request_counter = {'count': 0, 'sum': 0}
+        unique_current = list(), list()
+        request_time_min = 999999999
+        request_time_max = 0
+        request_time_count = 0
+        request_time_sum = 0
         ip_address_counter = {'unique_cur_ip': 0}
         for line in filtered_data:
             match = self.storage['regex'].search(line)
@@ -507,9 +510,12 @@ class Web(Mixin):
                     self.data['resp_length'] += int(match_dict['resp_length'])
                 if 'resp_time' in match_dict:
                     resp_time = self.storage['func_resp_time'](float(match_dict['resp_time']))
-                    bisect.insort_left(request_time, resp_time)
-                    request_counter['count'] += 1
-                    request_counter['sum'] += resp_time
+                    if request_time_min > resp_time:
+                        request_time_min = resp_time
+                    if request_time_max < resp_time:
+                        request_time_max = resp_time
+                    request_time_sum += resp_time
+                    request_time_count += 1
                 # requests per ip proto
                 proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
                 self.data['req_' + proto] += 1
@@ -527,10 +533,14 @@ class Web(Mixin):
                 self.data['unmatched'] += 1
 
         # timings
-        if request_time:
-            self.data['resp_time_min'] += request_time[0]
-            self.data['resp_time_avg'] += round(float(request_counter['sum']) / request_counter['count'])
-            self.data['resp_time_max'] += request_time[-1]
+        if request_time_count > 0:
+            self.data['resp_time_min'] = request_time_min
+            self.data['resp_time_avg'] = request_time_sum / request_time_count
+            self.data['resp_time_max'] = request_time_max
+        else:
+            self.data['resp_time_min'] = 0
+            self.data['resp_time_avg'] = 0
+            self.data['resp_time_max'] = 0
         return self.data
 
     def find_regex(self, last_line):
