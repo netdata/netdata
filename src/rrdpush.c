@@ -74,7 +74,7 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
 
 // sends the current chart definition
 static inline void send_chart_definition(RRDSET *st) {
-    buffer_sprintf(st->rrdhost->rrdpush_buffer, "CHART '%s' '%s' '%s' '%s' '%s' '%s' '%s' %ld %d\n"
+    buffer_sprintf(st->rrdhost->rrdpush_buffer, "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d\n"
                 , st->id
                 , st->name
                 , st->title
@@ -88,7 +88,7 @@ static inline void send_chart_definition(RRDSET *st) {
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        buffer_sprintf(st->rrdhost->rrdpush_buffer, "DIMENSION '%s' '%s' '%s' " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " '%s %s'\n"
+        buffer_sprintf(st->rrdhost->rrdpush_buffer, "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s\"\n"
                        , rd->id
                        , rd->name
                        , rrd_algorithm_name(rd->algorithm)

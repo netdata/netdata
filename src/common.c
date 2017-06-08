@@ -226,6 +226,13 @@ void json_escape_string(char *dst, const char *src, size_t size) {
     *d = '\0';
 }
 
+void json_fix_string(char *s) {
+    for( ; *s ;s++) {
+        if(unlikely(*s == '\\')) *s = '/';
+        else if(unlikely(*s == '"')) *s = '\'';
+    }
+}
+
 int sleep_usec(usec_t usec) {
 
 #ifndef NETDATA_WITH_USLEEP

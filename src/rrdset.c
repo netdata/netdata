@@ -569,13 +569,8 @@ RRDSET *rrdset_create_custom(
     if(name && *name) rrdset_set_name(st, name);
     else rrdset_set_name(st, id);
 
-    {
-        char varvalue[CONFIG_MAX_VALUE + 1];
-        char varvalue2[CONFIG_MAX_VALUE + 1];
-        snprintfz(varvalue, CONFIG_MAX_VALUE, "%s", title?title:"");
-        json_escape_string(varvalue2, varvalue, sizeof(varvalue2));
-        st->title = config_get(st->config_section, "title", varvalue2);
-    }
+    st->title = config_get(st->config_section, "title", title);
+    json_fix_string(st->title);
 
     st->rrdfamily = rrdfamily_create(host, st->family);
 
