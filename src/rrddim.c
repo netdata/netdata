@@ -51,7 +51,7 @@ inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
 }
 
 inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm) {
-    if(unlikely(rd->algorithm != algorithm))
+    if(unlikely(rd->algorithm == algorithm))
         return 0;
 
     debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", st->id, rd->name, rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
@@ -61,7 +61,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
 }
 
 inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier) {
-    if(unlikely(rd->multiplier != multiplier))
+    if(unlikely(rd->multiplier == multiplier))
         return 0;
 
     debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->multiplier, multiplier);
@@ -71,7 +71,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
 }
 
 inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) {
-    if(unlikely(rd->divisor != divisor))
+    if(unlikely(rd->divisor == divisor))
         return 0;
 
     debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->divisor, divisor);
