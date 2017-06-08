@@ -99,11 +99,13 @@ static inline void send_chart_definition(RRDSET *st) {
         );
         rd->exposed = 1;
     }
+
+    st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
 }
 
 // sends the current chart dimensions
 static inline void send_chart_metrics(RRDSET *st) {
-    buffer_sprintf(st->rrdhost->rrdpush_buffer, "BEGIN %s %llu\n", st->id, (st->counter_done > remote_clock_resync_iterations)?st->usec_since_last_update:0);
+    buffer_sprintf(st->rrdhost->rrdpush_buffer, "BEGIN %s %llu\n", st->id, (st->upstream_resync_time > st->last_collected_time.tv_sec)?st->usec_since_last_update:0);
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
@@ -167,9 +169,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     RRDSET *st;
     rrdset_foreach_read(st, host) {
 
-        // make it re-align the current time
-        // on the remote host
-        st->counter_done = 0;
+        st->upstream_resync_time = 0;
 
         rrdset_rdlock(st);
 
