@@ -277,6 +277,12 @@ netdataDashboard.menu = {
         title: 'SNMP',
         icon: '<i class="fa fa-random" aria-hidden="true"></i>',
         info: undefined
+    },
+
+    'go_expvar': {
+        title: 'Go - expvars',
+        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        info: 'Statistics about running Go applications exposed by the <a href="https://golang.org/pkg/expvar/" target="_blank">expvar package</a>.'
     }
 };
 
@@ -389,6 +395,11 @@ netdataDashboard.submenu = {
             else
                 return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
         }
+    },
+
+    'go_expvar.memstats': {
+        title: 'Memory statistics',
+        info: 'Go runtime memory statistics. See <a href="https://golang.org/pkg/runtime/#MemStats" target="_blank">runtime.MemStats</a> documentation for more info about each chart and the values.'
     }
 };
 

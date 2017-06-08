@@ -25,6 +25,7 @@ dist_python_DATA = \
     exim.chart.py \
     fail2ban.chart.py \
     freeradius.chart.py \
+    go_expvar.chart.py \
     haproxy.chart.py \
     hddtemp.chart.py \
     ipfs.chart.py \
