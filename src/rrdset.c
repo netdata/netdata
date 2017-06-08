@@ -572,7 +572,7 @@ RRDSET *rrdset_create_custom(
     {
         char varvalue[CONFIG_MAX_VALUE + 1];
         char varvalue2[CONFIG_MAX_VALUE + 1];
-        snprintfz(varvalue, CONFIG_MAX_VALUE, "%s (%s)", title?title:"", st->name);
+        snprintfz(varvalue, CONFIG_MAX_VALUE, "%s", title?title:"");
         json_escape_string(varvalue2, varvalue, sizeof(varvalue2));
         st->title = config_get(st->config_section, "title", varvalue2);
     }
