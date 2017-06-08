@@ -1226,6 +1226,14 @@
                         chart.menu_pattern = 'cgroup';
                     break;
 
+                case 'go':
+                    chart.menu = chart.type;
+                    if(parts.length > 2 && parts[1] === 'expvar')
+                        chart.menu_pattern = tmp + '_' + parts[1];
+                    else if(parts.length > 1)
+                        chart.menu_pattern = tmp;
+                    break;
+
                 case 'isc':
                     chart.menu = chart.type;
                     if(parts.length > 2 && parts[1] === 'dhcpd')
