@@ -5,13 +5,13 @@ import re
 import bisect
 from os import access, R_OK
 from os.path import getsize
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from copy import deepcopy
-from base import LogService
 try:
     from itertools import filterfalse
 except ImportError:
     from itertools import ifilterfalse as filterfalse
+from base import LogService
 import msg
 
 priority = 60000
@@ -19,9 +19,9 @@ retries = 60
 
 ORDER_APACHE_CACHE = ['apache_cache']
 
-ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth', 'response_time', 'requests_per_url',
-             'requests_per_user_defined', 'http_method', 'http_version', 'requests_per_ipproto',
-             'clients', 'clients_all']
+ORDER_WEB = ['response_statuses', 'response_codes', 'bandwidth', 'response_time', 'response_time_upstream',
+             'requests_per_url', 'requests_per_user_defined', 'http_method', 'http_version',
+             'requests_per_ipproto', 'clients', 'clients_all']
 
 ORDER_SQUID = ['squid_response_statuses', 'squid_response_codes', 'squid_detailed_response_codes',
                'squid_method', 'squid_mime_type', 'squid_hier_code', 'squid_transport_methods',
@@ -52,6 +52,14 @@ CHARTS_WEB = {
             ['resp_time_min', 'min', 'incremental', 1, 1000],
             ['resp_time_max', 'max', 'incremental', 1, 1000],
             ['resp_time_avg', 'avg', 'incremental', 1, 1000]
+        ]},
+    'response_time_upstream': {
+        'options': [None, 'Processing Time Upstream', 'milliseconds', 'timings',
+                    'web_log.response_time_upstream', 'area'],
+        'lines': [
+            ['resp_time_upstream_min', 'min', 'incremental', 1, 1000],
+            ['resp_time_upstream_max', 'max', 'incremental', 1, 1000],
+            ['resp_time_upstream_avg', 'avg', 'incremental', 1, 1000]
         ]},
     'clients': {
         'options': [None, 'Current Poll Unique Client IPs', 'unique ips', 'clients', 'web_log.clients', 'stacked'],
@@ -374,7 +382,8 @@ class Web(Mixin):
         self.pre_filter = check_patterns('filter', self.conf.get('filter'))
         self.storage = dict()
         self.data = {'bytes_sent': 0, 'resp_length': 0, 'resp_time_min': 0, 'resp_time_max': 0,
-                     'resp_time_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
+                     'resp_time_avg': 0, 'resp_time_upstream_min': 0, 'resp_time_upstream_max': 0,
+                     'resp_time_upstream_avg': 0, 'unique_cur_ipv4': 0, 'unique_cur_ipv6': 0, '2xx': 0,
                      '5xx': 0, '3xx': 0, '4xx': 0, '1xx': 0, '0xx': 0, 'unmatched': 0, 'req_ipv4': 0,
                      'req_ipv6': 0, 'unique_tot_ipv4': 0, 'unique_tot_ipv6': 0, 'successful_requests': 0,
                      'redirects': 0, 'bad_requests': 0, 'server_errors': 0, 'other_requests': 0, 'GET': 0}
@@ -412,6 +421,9 @@ class Web(Mixin):
 
         if 'resp_time' not in match_dict:
             self.order.remove('response_time')
+        if 'resp_time_upstream' not in match_dict:
+            self.order.remove('response_time_upstream')
+
         if not self.conf.get('all_time', True):
             self.order.remove('clients_all')
 
@@ -459,8 +471,9 @@ class Web(Mixin):
 
         filtered_data = self.filter_data(raw_data=raw_data)
 
-        request_time, unique_current = list(), list()
-        request_counter = {'count': 0, 'sum': 0}
+        unique_current = set()
+        timings = defaultdict(lambda: dict(minimum=None, maximum=0, summary=0, count=0))
+
         ip_address_counter = {'unique_cur_ip': 0}
         for line in filtered_data:
             match = self.storage['regex'].search(line)
@@ -506,10 +519,11 @@ class Web(Mixin):
                 if 'resp_length' in match_dict:
                     self.data['resp_length'] += int(match_dict['resp_length'])
                 if 'resp_time' in match_dict:
-                    resp_time = self.storage['func_resp_time'](float(match_dict['resp_time']))
-                    bisect.insort_left(request_time, resp_time)
-                    request_counter['count'] += 1
-                    request_counter['sum'] += resp_time
+                    get_timings(timings=timings['resp_time'],
+                                time=self.storage['func_resp_time'](float(match_dict['resp_time'])))
+                if 'resp_time_upstream' in match_dict and match_dict['resp_time_upstream'] != '-':
+                    get_timings(timings=timings['resp_time_upstream'],
+                                time=self.storage['func_resp_time'](float(match_dict['resp_time_upstream'])))
                 # requests per ip proto
                 proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
                 self.data['req_' + proto] += 1
@@ -518,19 +532,17 @@ class Web(Mixin):
                                        address=match_dict['address'],
                                        pool_size=self.data['unique_tot_ipv4'] + self.data['unique_tot_ipv6']):
                     self.data['unique_tot_' + proto] += 1
-                if address_not_in_pool(pool=unique_current,
-                                       address=match_dict['address'],
-                                       pool_size=ip_address_counter['unique_cur_ip']):
+                if match_dict['address'] not in unique_current:
                     self.data['unique_cur_' + proto] += 1
-                    ip_address_counter['unique_cur_ip'] += 1
+                    unique_current.add(match_dict['address'])
             else:
                 self.data['unmatched'] += 1
 
         # timings
-        if request_time:
-            self.data['resp_time_min'] += request_time[0]
-            self.data['resp_time_avg'] += round(float(request_counter['sum']) / request_counter['count'])
-            self.data['resp_time_max'] += request_time[-1]
+        for elem in timings:
+            self.data[elem + '_min'] += timings[elem]['minimum']
+            self.data[elem + '_avg'] += timings[elem]['summary'] / timings[elem]['count']
+            self.data[elem + '_max'] += timings[elem]['maximum']
         return self.data
 
     def find_regex(self, last_line):
@@ -545,51 +557,61 @@ class Web(Mixin):
         """
         # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
         # 5. Bytes sent 6. Response length 7. Response process time
-        acs_default = re.compile(r'(?P<address>[\da-f.:]+)'
-                                 r' -.*?"(?P<method>[A-Z]+)'
-                                 r' (?P<url>[^ ]+)'
-                                 r' [A-Z]+/(?P<http_version>\d\.\d)"'
-                                 r' (?P<code>[1-9]\d{2})'
-                                 r' (?P<bytes_sent>\d+|-)')
+        default = re.compile(r'(?P<address>[\da-f.:]+)'
+                             r' -.*?"(?P<method>[A-Z]+)'
+                             r' (?P<url>[^ ]+)'
+                             r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                             r' (?P<code>[1-9]\d{2})'
+                             r' (?P<bytes_sent>\d+|-)')
 
-        acs_apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
-                                           r' -.*?"(?P<method>[A-Z]+)'
-                                           r' (?P<url>[^ ]+)'
-                                           r' [A-Z]+/(?P<http_version>\d\.\d)"'
-                                           r' (?P<code>[1-9]\d{2})'
-                                           r' (?P<bytes_sent>\d+|-)'
-                                           r' (?P<resp_length>\d+)'
-                                           r' (?P<resp_time>\d+) ')
+        apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
+                                       r' -.*?"(?P<method>[A-Z]+)'
+                                       r' (?P<url>[^ ]+)'
+                                       r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                       r' (?P<code>[1-9]\d{2})'
+                                       r' (?P<bytes_sent>\d+|-)'
+                                       r' (?P<resp_length>\d+)'
+                                       r' (?P<resp_time>\d+) ')
 
-        acs_apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
-                                           r' -.*?"(?P<method>[A-Z]+)'
-                                           r' (?P<url>[^ ]+)'
-                                           r' [A-Z]+/(?P<http_version>\d\.\d)"'
-                                           r' (?P<code>[1-9]\d{2})'
-                                           r' (?P<bytes_sent>\d+|-)'
-                                           r' .*?'
-                                           r' (?P<resp_length>\d+)'
-                                           r' (?P<resp_time>\d+)'
-                                           r'(?: |$)')
+        apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
+                                       r' -.*?"(?P<method>[A-Z]+)'
+                                       r' (?P<url>[^ ]+)'
+                                       r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                       r' (?P<code>[1-9]\d{2})'
+                                       r' (?P<bytes_sent>\d+|-)'
+                                       r' .*?'
+                                       r' (?P<resp_length>\d+)'
+                                       r' (?P<resp_time>\d+)'
+                                       r'(?: |$)')
 
-        acs_nginx_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
-                                          r' -.*?"(?P<method>[A-Z]+)'
-                                          r' (?P<url>[^ ]+)'
-                                          r' [A-Z]+/(?P<http_version>\d\.\d)"'
-                                          r' (?P<code>[1-9]\d{2})'
-                                          r' (?P<bytes_sent>\d+)'
-                                          r' (?P<resp_length>\d+)'
-                                          r' (?P<resp_time>\d+\.\d+) ')
+        nginx_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
+                                      r' -.*?"(?P<method>[A-Z]+)'
+                                      r' (?P<url>[^ ]+)'
+                                      r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                      r' (?P<code>[1-9]\d{2})'
+                                      r' (?P<bytes_sent>\d+)'
+                                      r' (?P<resp_length>\d+)'
+                                      r' (?P<resp_time>\d+\.\d+) ')
 
-        acs_nginx_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
-                                          r' -.*?"(?P<method>[A-Z]+)'
-                                          r' (?P<url>[^ ]+)'
-                                          r' [A-Z]+/(?P<http_version>\d\.\d)"'
-                                          r' (?P<code>[1-9]\d{2})'
-                                          r' (?P<bytes_sent>\d+)'
-                                          r' .*?'
-                                          r' (?P<resp_length>\d+)'
-                                          r' (?P<resp_time>\d+\.\d+)')
+        nginx_ext2_insert = re.compile(r'(?P<address>[\da-f.:]+)'
+                                       r' -.*?"(?P<method>[A-Z]+)'
+                                       r' (?P<url>[^ ]+)'
+                                       r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                       r' (?P<code>[1-9]\d{2})'
+                                       r' (?P<bytes_sent>\d+)'
+                                       r' (?P<resp_length>\d+)'
+                                       r' (?P<resp_time>\d+\.\d+)'
+                                       r' (?P<resp_time_upstream>[\d.-]+) ')
+
+        nginx_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
+                                      r' -.*?"(?P<method>[A-Z]+)'
+                                      r' (?P<url>[^ ]+)'
+                                      r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                      r' (?P<code>[1-9]\d{2})'
+                                      r' (?P<bytes_sent>\d+)'
+                                      r' .*?'
+                                      r' (?P<resp_length>\d+)'
+                                      r' (?P<resp_time>\d+\.\d+)')
 
         def func_usec(time):
             return time
@@ -597,9 +619,10 @@ class Web(Mixin):
         def func_sec(time):
             return time * 1000000
 
-        r_regex = [acs_apache_ext_insert, acs_apache_ext_append, acs_nginx_ext_insert,
-                   acs_nginx_ext_append, acs_default]
-        r_function = [func_usec, func_usec, func_sec, func_sec, func_usec]
+        r_regex = [apache_ext_insert, apache_ext_append,
+                   nginx_ext2_insert, nginx_ext_insert,  nginx_ext_append,
+                   default]
+        r_function = [func_usec, func_usec, func_sec, func_sec, func_sec, func_usec]
         regex_function = zip(r_regex, r_function)
 
         match_dict = dict()
@@ -672,6 +695,7 @@ class Web(Mixin):
                           'bytes_sent': r'\d+|-'}
         optional_dict = {'resp_length': r'\d+',
                          'resp_time': r'[\d.]+',
+                         'resp_time_upstream': r'[\d.-]+',
                          'http_version': r'\d\.\d'}
 
         mandatory_values = set(mandatory_dict) - set(match_dict)
@@ -829,14 +853,15 @@ class Squid(Mixin):
 
         filtered_data = self.filter_data(raw_data=raw_data)
 
-        unique_ip, duration = set(), list()
+        unique_ip = set()
+        timings = defaultdict(lambda: dict(minimum=None, maximum=0, summary=0, count=0))
 
         for row in filtered_data:
             match = self.storage['regex'].search(row)
             if match:
                 match = match.groupdict()
                 if match['duration'] != '0':
-                    duration.append(match['duration'])
+                    get_timings(timings=timings['duration'], time=float(match['duration']) * 1000)
                 try:
                     self.data[match['http_code'][0] + 'xx'] += 1
                 except KeyError:
@@ -870,11 +895,10 @@ class Squid(Mixin):
             else:
                 self.data['unmatched'] += 1
 
-        if duration:
-            length, duration = len(duration), map(lambda v: float(v) * 1000, duration)
-            self.data['duration_min'] += min(duration)
-            self.data['duration_max'] += max(duration)
-            self.data['duration_avg'] += sum(duration) / length
+        for elem in timings:
+            self.data[elem + '_min'] += timings[elem]['minimum']
+            self.data[elem + '_avg'] += timings[elem]['summary'] / timings[elem]['count']
+            self.data[elem + '_max'] += timings[elem]['maximum']
         return self.data
 
     def get_data_per_statuses(self, code):
@@ -907,6 +931,22 @@ class Squid(Mixin):
             if tag not in self.data:
                 self.add_new_dimension(dimension_id=tag, chart_key=chart_key)
             self.data[tag] += 1
+
+
+def get_timings(timings, time):
+    """
+    :param timings:
+    :param time:
+    :return:
+    """
+    if timings['minimum'] is None:
+        timings['minimum'] = time
+    if time > timings['maximum']:
+        timings['maximum'] = time
+    elif time < timings['minimum']:
+        timings['minimum'] = time
+    timings['summary'] += time
+    timings['count'] += 1
 
 
 def address_not_in_pool(pool, address, pool_size):
