@@ -11,7 +11,7 @@ void rrd_stats_api_v1_chart_with_data(RRDSET *st, BUFFER *wb, size_t *dimensions
         "\t\t\t\"type\": \"%s\",\n"
         "\t\t\t\"family\": \"%s\",\n"
         "\t\t\t\"context\": \"%s\",\n"
-        "\t\t\t\"title\": \"%s\",\n"
+        "\t\t\t\"title\": \"%s (%s)\",\n"
         "\t\t\t\"priority\": %ld,\n"
         "\t\t\t\"enabled\": %s,\n"
         "\t\t\t\"units\": \"%s\",\n"
@@ -27,7 +27,7 @@ void rrd_stats_api_v1_chart_with_data(RRDSET *st, BUFFER *wb, size_t *dimensions
         , st->type
         , st->family
         , st->context
-        , st->title
+        , st->title, st->name
         , st->priority
         , rrdset_flag_check(st, RRDSET_FLAG_ENABLED)?"true":"false"
         , st->units

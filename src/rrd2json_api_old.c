@@ -14,7 +14,7 @@ unsigned long rrdset_info2json_api_old(RRDSET *st, char *options, BUFFER *wb) {
             "\t\t\t\"type\": \"%s\",\n"
             "\t\t\t\"family\": \"%s\",\n"
             "\t\t\t\"context\": \"%s\",\n"
-            "\t\t\t\"title\": \"%s\",\n"
+            "\t\t\t\"title\": \"%s (%s)\",\n"
             "\t\t\t\"priority\": %ld,\n"
             "\t\t\t\"enabled\": %d,\n"
             "\t\t\t\"units\": \"%s\",\n"
@@ -37,7 +37,7 @@ unsigned long rrdset_info2json_api_old(RRDSET *st, char *options, BUFFER *wb) {
             , st->type
             , st->family
             , st->context
-            , st->title
+            , st->title, st->name
             , st->priority
             , rrdset_flag_check(st, RRDSET_FLAG_ENABLED)?1:0
             , st->units
