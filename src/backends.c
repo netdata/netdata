@@ -384,7 +384,23 @@ static inline int process_json_response(BUFFER *b) {
 // ----------------------------------------------------------------------------
 // the backend thread
 
+static SIMPLE_PATTERN *charts_pattern = NULL;
+
 static inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
+        return 0;
+
+    if(unlikely(!rrdset_flag_check(st, RRDSET_FLAG_BACKEND_SEND))) {
+        // we have not checked this chart
+        if(simple_pattern_matches(charts_pattern, st->id) || simple_pattern_matches(charts_pattern, st->name))
+            rrdset_flag_set(st, RRDSET_FLAG_BACKEND_SEND);
+        else {
+            rrdset_flag_set(st, RRDSET_FLAG_BACKEND_IGNORE);
+            debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is disabled for backends.", st->id, st->rrdhost->hostname);
+            return 0;
+        }
+    }
+
     if(unlikely(!rrdset_is_available_for_backends(st))) {
         debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, st->rrdhost->hostname);
         return 0;
@@ -432,6 +448,9 @@ void *backends_main(void *ptr) {
     int frequency           = (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", 10);
     int buffer_on_failures  = (int)config_get_number(CONFIG_SECTION_BACKEND, "buffer on failures", 10);
     long timeoutms          = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", frequency * 2 * 1000);
+
+    charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), SIMPLE_PATTERN_EXACT);
+
 
     // ------------------------------------------------------------------------
     // validate configuration options

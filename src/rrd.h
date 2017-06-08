@@ -212,11 +212,13 @@ typedef struct rrddim RRDDIM;
 // and may lead to missing information.
 
 typedef enum rrdset_flags {
-    RRDSET_FLAG_ENABLED  = 1 << 0, // enables or disables a chart
-    RRDSET_FLAG_DETAIL   = 1 << 1, // if set, the data set should be considered as a detail of another
-                                   // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG    = 1 << 2, // enables or disables debugging for a chart
-    RRDSET_FLAG_OBSOLETE = 1 << 3  // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_ENABLED        = 1 << 0, // enables or disables a chart
+    RRDSET_FLAG_DETAIL         = 1 << 1, // if set, the data set should be considered as a detail of another
+                                         // (the master data set should be the one that has the same family and is not detail)
+    RRDSET_FLAG_DEBUG          = 1 << 2, // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE       = 1 << 3, // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_BACKEND_SEND   = 1 << 4,
+    RRDSET_FLAG_BACKEND_IGNORE = 1 << 5
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) ((st)->flags & flag)
