@@ -281,7 +281,8 @@ struct rrdset {
     size_t counter_done;                            // the number of times rrdset_done() has been called
 
     time_t last_accessed_time;                      // the last time this RRDSET has been accessed
-    size_t unused[9];
+    time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
+    size_t unused[8];
 
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons

@@ -558,6 +558,9 @@ RRDSET *rrdset_create_custom(
     st->gap_when_lost_iterations_above = (int) (
             config_get_number(st->config_section, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2);
 
+    st->last_accessed_time = 0;
+    st->upstream_resync_time = 0;
+
     avl_init_lock(&st->dimensions_index, rrddim_compare);
     avl_init_lock(&st->variables_root_index, rrdvar_compare);
 
