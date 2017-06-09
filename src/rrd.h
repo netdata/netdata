@@ -5,7 +5,7 @@
 #define UPDATE_EVERY_MAX 3600
 
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
-#define RRD_HISTORY_ENTRIES_MAX (86400*10)
+#define RRD_HISTORY_ENTRIES_MAX (86400*365)
 
 extern int default_rrd_update_every;
 extern int default_rrd_history_entries;
@@ -42,13 +42,15 @@ typedef enum rrd_memory_mode {
     RRD_MEMORY_MODE_NONE = 0,
     RRD_MEMORY_MODE_RAM  = 1,
     RRD_MEMORY_MODE_MAP  = 2,
-    RRD_MEMORY_MODE_SAVE = 3
+    RRD_MEMORY_MODE_SAVE = 3,
+    RRD_MEMORY_MODE_ALLOC = 4
 } RRD_MEMORY_MODE;
 
 #define RRD_MEMORY_MODE_NONE_NAME "none"
 #define RRD_MEMORY_MODE_RAM_NAME "ram"
 #define RRD_MEMORY_MODE_MAP_NAME "map"
 #define RRD_MEMORY_MODE_SAVE_NAME "save"
+#define RRD_MEMORY_MODE_ALLOC_NAME "alloc"
 
 extern RRD_MEMORY_MODE default_rrd_memory_mode;
 
@@ -210,11 +212,13 @@ typedef struct rrddim RRDDIM;
 // and may lead to missing information.
 
 typedef enum rrdset_flags {
-    RRDSET_FLAG_ENABLED  = 1 << 0, // enables or disables a chart
-    RRDSET_FLAG_DETAIL   = 1 << 1, // if set, the data set should be considered as a detail of another
-                                   // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG    = 1 << 2, // enables or disables debugging for a chart
-    RRDSET_FLAG_OBSOLETE = 1 << 3  // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_ENABLED        = 1 << 0, // enables or disables a chart
+    RRDSET_FLAG_DETAIL         = 1 << 1, // if set, the data set should be considered as a detail of another
+                                         // (the master data set should be the one that has the same family and is not detail)
+    RRDSET_FLAG_DEBUG          = 1 << 2, // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE       = 1 << 3, // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_BACKEND_SEND   = 1 << 4,
+    RRDSET_FLAG_BACKEND_IGNORE = 1 << 5
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) ((st)->flags & flag)
@@ -279,7 +283,8 @@ struct rrdset {
     size_t counter_done;                            // the number of times rrdset_done() has been called
 
     time_t last_accessed_time;                      // the last time this RRDSET has been accessed
-    size_t unused[9];
+    time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
+    size_t unused[8];
 
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons
@@ -617,7 +622,11 @@ extern void rrdset_done(RRDSET *st);
 extern RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode);
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->rrd_memory_mode)
 
-extern void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
+extern int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name);
+extern int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm);
+extern int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier);
+extern int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor);
+
 extern RRDDIM *rrddim_find(RRDSET *st, const char *id);
 
 extern int rrddim_hide(RRDSET *st, const char *id);
