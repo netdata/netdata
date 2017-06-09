@@ -5,7 +5,7 @@
 #define UPDATE_EVERY_MAX 3600
 
 #define RRD_DEFAULT_HISTORY_ENTRIES 3600
-#define RRD_HISTORY_ENTRIES_MAX (86400*10)
+#define RRD_HISTORY_ENTRIES_MAX (86400*365)
 
 extern int default_rrd_update_every;
 extern int default_rrd_history_entries;
