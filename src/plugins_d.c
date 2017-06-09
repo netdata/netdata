@@ -316,19 +316,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                       , options?options:""
                 );
 
-            RRDDIM *rd = rrddim_find(st, id);
-            if(unlikely(!rd)) {
-                rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
-                rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
-                rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-                if(options && *options) {
-                    if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
-                    if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-                    if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-                }
+            RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
+            rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+            rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+            if(options && *options) {
+                if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+                if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+                if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
             }
-            else if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
         }
         else if(unlikely(hash == DISABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_DISABLE))) {
             info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
