@@ -75,7 +75,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
         return 0;
 
     debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->divisor, divisor);
-    rd->multiplier = divisor;
+    rd->divisor = divisor;
     rd->exposed = 0;
     return 1;
 }
