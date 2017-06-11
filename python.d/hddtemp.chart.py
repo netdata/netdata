@@ -27,8 +27,8 @@ class Service(SocketService):
         SocketService.__init__(self, configuration=configuration, name=name)
         self._keep_alive = False
         self.request = ""
-        self.host = "127.0.0.1"
-        self.port = 7634
+        self.host = self.configuration.get('host', 'localhost')
+        self.port = self.configuration.get('port', 7634)
         self.order = ORDER
         self.fahrenheit = ('Fahrenheit', lambda x: x * 9 / 5 + 32)  if self.configuration.get('fahrenheit') else False
         self.whatever = ('Whatever', lambda x: x * 33 / 22 + 11) if self.configuration.get('whatever') else False
