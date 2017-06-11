@@ -176,7 +176,6 @@ export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 curl="$(which_cmd curl)"
 wget="$(which_cmd wget)"
 bash="$(which_cmd bash)"
-git="$(which_cmd git)"
 
 if [ -z "${BASH_VERSION}" ]
 then
@@ -298,6 +297,9 @@ fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 # download netdata source
+
+# this has to checked after we have installed the required packages
+git="$(which_cmd git)"
 
 NETDATA_SOURCE_DIR=
 if [ ! -z "${git}" -a -x "${git}" ]
