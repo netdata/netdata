@@ -21,22 +21,19 @@ import time
 import os
 import socket
 import threading
-import msg
 import ssl
 from subprocess import Popen, PIPE
 from sys import exc_info
 from glob import glob
-
+import re
 try:
     from urlparse import urlparse
 except ImportError:
     from urllib.parse import urlparse
-
 try:
     import urllib.request as urllib2
 except ImportError:
     import urllib2
-
 try:
     import MySQLdb
     PYMYSQL = True
@@ -46,6 +43,7 @@ except ImportError:
         PYMYSQL = True
     except ImportError:
         PYMYSQL = False
+import msg
 
 try:
     PATH = os.getenv('PATH').split(':')
@@ -175,14 +173,15 @@ class SimpleService(threading.Thread):
             # it is important to do this in a loop
             # sleep() is interruptable
             while now < next:
-                self.debug("sleeping for", str(next - now), "secs to reach frequency of", str(step), "secs, now:", str(now), " next:", str(next), " penalty:", str(penalty))
+                self.debug("sleeping for", str(next - now), "secs to reach frequency of",
+                           str(step), "secs, now:", str(now), " next:", str(next), " penalty:", str(penalty))
                 time.sleep(next - now)
                 now = float(time.time())
 
             # do the job
             try:
                 status = self._run_once()
-            except Exception as e:
+            except Exception:
                 status = False
 
             if status:
@@ -202,10 +201,12 @@ class SimpleService(threading.Thread):
                         penalty = 600
 
                     self.retries_left = self.retries
-                    self.alert("failed to collect data for " + str(self.retries) + " times - increasing penalty to " + str(penalty) + " sec and trying again")
+                    self.alert("failed to collect data for " + str(self.retries) +
+                               " times - increasing penalty to " + str(penalty) + " sec and trying again")
 
                 else:
-                    self.error("failed to collect data - " + str(self.retries_left) + " retries left - penalty: " + str(penalty) + " sec")
+                    self.error("failed to collect data - " + str(self.retries_left)
+                               + " retries left - penalty: " + str(penalty) + " sec")
 
     # --- CHART ---
 
@@ -460,10 +461,41 @@ class SimpleService(threading.Thread):
                 return next(('/'.join([p, binary]) for p in PATH
                             if os.path.isfile('/'.join([p, binary]))
                             and os.access('/'.join([p, binary]), os.X_OK)))
-            else:
-                return None
+            return None
         except StopIteration:
             return None
+
+    def _add_new_dimension(self, dimension_id, chart_name, dimension=None, algorithm='incremental',
+                           multiplier=1, divisor=1, priority=65000):
+        """
+        :param dimension_id:
+        :param chart_name:
+        :param dimension:
+        :param algorithm:
+        :param multiplier:
+        :param divisor:
+        :param priority:
+        :return:
+        """
+        if not all([dimension_id not in self._dimensions,
+                    chart_name in self.order,
+                    chart_name in self.definitions]):
+            return
+        self._dimensions.append(dimension_id)
+        dimension_list = list(map(str, [dimension_id,
+                                        dimension if dimension else dimension_id,
+                                        algorithm,
+                                        multiplier,
+                                        divisor]))
+        self.definitions[chart_name]['lines'].append(dimension_list)
+        add_to_name = self.override_name or self.name
+        job_name = ('_'.join([self.__module__, re.sub('\s+', '_', add_to_name)])
+                    if add_to_name != 'None' else self.__module__)
+        chart = 'CHART {0}.{1} '.format(job_name, chart_name)
+        options = '"" "{0}" {1} "{2}" {3} {4} '.format(*self.definitions[chart_name]['options'][1:6])
+        other = '{0} {1}\n'.format(priority, self.update_every)
+        new_dimension = "DIMENSION {0}\n".format(' '.join(dimension_list))
+        print(chart + options + other + new_dimension)
 
 
 class UrlService(SimpleService):
