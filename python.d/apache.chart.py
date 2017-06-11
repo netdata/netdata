@@ -76,7 +76,9 @@ class Service(UrlService):
         self.definitions = CHARTS
         self.assignment = {"BytesPerReq": 'size_req',
                            "IdleWorkers": 'idle',
+                           "IdleServers": 'idle',
                            "BusyWorkers": 'busy',
+                           "BusyServers": 'busy',
                            "ReqPerSec": 'requests_sec',
                            "BytesPerSec": 'size_sec',
                            "Total Accesses": 'requests',
