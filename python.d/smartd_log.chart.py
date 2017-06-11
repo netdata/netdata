@@ -198,11 +198,10 @@ class Service(SimpleService):
             return result
 
         # Use configured attributes, if present. If something goes wrong we don't care.
-        if self.attr:
-            try:
-                ORDER = [attr for attr in self.attr.split() if attr in SMART_ATTR.keys()]
-            except Exception:
-                pass
+        try:
+            ORDER = [attr for attr in self.attr.split() if attr in SMART_ATTR.keys()] or ORDER
+        except Exception:
+            pass
         self.order = [''.join(['attrid', i]) for i in ORDER]
         self.definitions = dict()
         units = 'raw' if self.raw_values else 'normalized'
