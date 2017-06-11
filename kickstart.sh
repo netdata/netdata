@@ -176,6 +176,7 @@ export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 curl="$(which_cmd curl)"
 wget="$(which_cmd wget)"
 bash="$(which_cmd bash)"
+git="$(which_cmd git)"
 
 if [ -z "${BASH_VERSION}" ]
 then
@@ -218,12 +219,32 @@ sudo=""
 # ---------------------------------------------------------------------------------------------------------------------
 # install required system packages
 
-KICKSTART_OPTIONS="netdata"
-if [ "${1}" = "all" ]
+INTERACTIVE=1
+PACKAGES_INSTALLER_OPTIONS="netdata"
+NETDATA_INSTALLER_OPTIONS=""
+while [ ! -z "${1}" ]
+do
+    if [ "${1}" = "all" ]
+    then
+        PACKAGES_INSTALLER_OPTIONS="netdata-all"
+        shift 1
+    elif [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" ]
+    then
+        INTERACTIVE=0
+        shift 1
+    else
+        break
+    fi
+done
+
+if [ "${INTERACTIVE}" = "0" ]
 then
-    KICKSTART_OPTIONS="netdata-all"
-    shift 1
+    PACKAGES_INSTALLER_OPTIONS="--dont-wait --non-interactive ${PACKAGES_INSTALLER_OPTIONS}"
+    NETDATA_INSTALLER_OPTIONS="--dont-wait"
 fi
+
+# echo "PACKAGES_INSTALLER_OPTIONS=${PACKAGES_INSTALLER_OPTIONS}"
+# echo "NETDATA_INSTALLER_OPTIONS=${NETDATA_INSTALLER_OPTIONS} ${*}"
 
 if [ "${OS}" = "GNU/Linux" -o "${SYSTEM}" = "Linux" ]
 then
@@ -248,7 +269,7 @@ then
         if [ -s "${tmp}" ]
         then
             progress "Running downloaded script to detect required packages..."
-            run ${sudo} "${bash}" "${tmp}" ${KICKSTART_OPTIONS} || ask=1
+            run ${sudo} "${bash}" "${tmp}" ${PACKAGES_INSTALLER_OPTIONS} || ask=1
             rm "${tmp}"
         else
             rm "${tmp}"
@@ -277,8 +298,6 @@ fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 # download netdata source
-
-git="$(which_cmd git)"
 
 NETDATA_SOURCE_DIR=
 if [ ! -z "${git}" -a -x "${git}" ]
@@ -326,7 +345,8 @@ then
         if [ -x netdata-installer.sh ]
         then
             progress "Installing netdata..."
-            run ${sudo} ./netdata-installer.sh -u "${@}" || fatal "netdata-installer.sh exited with error"
+            run ${sudo} ./netdata-installer.sh -u ${NETDATA_INSTALLER_OPTIONS} "${@}" || \
+                fatal "netdata-installer.sh exited with error"
         else
             fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh)."
         fi
