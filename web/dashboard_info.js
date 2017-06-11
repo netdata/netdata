@@ -61,6 +61,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics of the netfilter components.'
     },
 
+    'ipfw': {
+        title: 'Firewall (ipfw)',
+        icon: '<i class="fa fa-shield" aria-hidden="true"></i>',
+        info: 'Counters and memory usage for the ipfw rules.'
+    },
+
     'cpu': {
         title: 'CPUs',
         icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
@@ -375,6 +381,11 @@ netdataDashboard.submenu = {
     'netfilter.synproxy': {
         title: 'DDoS Protection',
         info: 'DDoS protection performance metrics. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> is a TCP SYN packets proxy. It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. It is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections. It can be used for any kind of TCP traffic (even encrypted), since it does not interfere with the content itself.'
+    },
+
+    'ipfw.dynamic_rules': {
+        title: 'dynamic rules',
+        info: 'Number of dynamic rules, created by correspondent stateful firewall rules.'
     },
 
     'system.softnet_stat': {
