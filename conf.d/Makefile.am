@@ -74,6 +74,7 @@ dist_healthconfig_DATA = \
     health.d/ipfs.conf \
     health.d/ipmi.conf \
     health.d/isc_dhcpd.conf \
+    health.d/lighttpd.conf \
     health.d/mdstat.conf \
     health.d/memcached.conf \
     health.d/mysql.conf \
