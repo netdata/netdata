@@ -22,7 +22,8 @@ ORDER = ['requests', 'connections', 'conns_async', 'net', 'workers', 'reqpersec'
 
 CHARTS = {
     'bytesperreq': {
-        'options': [None, 'apache Lifetime Avg. Response Size', 'bytes/request', 'statistics', 'apache.bytesperreq', 'area'],
+        'options': [None, 'apache Lifetime Avg. Response Size', 'bytes/request',
+                    'statistics', 'apache.bytesperreq', 'area'],
         'lines': [
             ["size_req"]
         ]},
@@ -30,15 +31,19 @@ CHARTS = {
         'options': [None, 'apache Workers', 'workers', 'workers', 'apache.workers', 'stacked'],
         'lines': [
             ["idle"],
-            ["busy"]
+            ["idle_servers", 'idle'],
+            ["busy"],
+            ["busy_servers", 'busy']
         ]},
     'reqpersec': {
-        'options': [None, 'apache Lifetime Avg. Requests/s', 'requests/s', 'statistics', 'apache.reqpersec', 'area'],
+        'options': [None, 'apache Lifetime Avg. Requests/s', 'requests/s', 'statistics',
+                    'apache.reqpersec', 'area'],
         'lines': [
             ["requests_sec"]
         ]},
     'bytespersec': {
-        'options': [None, 'apache Lifetime Avg. Bandwidth/s', 'kilobytes/s', 'statistics', 'apache.bytesperreq', 'area'],
+        'options': [None, 'apache Lifetime Avg. Bandwidth/s', 'kilobytes/s', 'statistics',
+                    'apache.bytesperreq', 'area'],
         'lines': [
             ["size_sec", None, 'absolute', 1, 1000]
         ]},
@@ -66,43 +71,54 @@ CHARTS = {
         ]}
 }
 
+ASSIGNMENT = {"BytesPerReq": 'size_req',
+              "IdleWorkers": 'idle',
+              "IdleServers": 'idle_servers',
+              "BusyWorkers": 'busy',
+              "BusyServers": 'busy_servers',
+              "ReqPerSec": 'requests_sec',
+              "BytesPerSec": 'size_sec',
+              "Total Accesses": 'requests',
+              "Total kBytes": 'sent',
+              "ConnsTotal": 'connections',
+              "ConnsAsyncKeepAlive": 'keepalive',
+              "ConnsAsyncClosing": 'closing',
+              "ConnsAsyncWriting": 'writing'}
+
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        if len(self.url) == 0:
-            self.url = "http://localhost/server-status?auto"
         self.order = ORDER
         self.definitions = CHARTS
-        self.assignment = {"BytesPerReq": 'size_req',
-                           "IdleWorkers": 'idle',
-                           "BusyWorkers": 'busy',
-                           "ReqPerSec": 'requests_sec',
-                           "BytesPerSec": 'size_sec',
-                           "Total Accesses": 'requests',
-                           "Total kBytes": 'sent',
-                           "ConnsTotal": 'connections',
-                           "ConnsAsyncKeepAlive": 'keepalive',
-                           "ConnsAsyncClosing": 'closing',
-                           "ConnsAsyncWriting": 'writing'}
+        self.url = self.configuration.get('url', 'http://localhost/server-status?auto')
+
+    def check(self):
+        if UrlService.check(self):
+            if 'idle_servers' in self._data_from_check:
+                self.__module__ = 'lighttpd'
+                for chart in self.definitions:
+                    opts = self.definitions[chart]['options']
+                    opts[1] = opts[1].replace('apache', 'lighttpd')
+                    opts[4] = opts[4].replace('apache', 'lighttpd')
+            return True
+        return False
 
     def _get_data(self):
         """
         Format data received from http request
         :return: dict
         """
-        try:
-            raw = self._get_raw_data().split("\n")
-        except AttributeError:
+        raw_data = self._get_raw_data()
+        if not raw_data:
             return None
-        data = {}
-        for row in raw:
+        data = dict()
+
+        for row in raw_data.split('\n'):
             tmp = row.split(":")
-            if str(tmp[0]) in self.assignment:
+            if tmp[0] in ASSIGNMENT:
                 try:
-                    data[self.assignment[tmp[0]]] = int(float(tmp[1]))
+                    data[ASSIGNMENT[tmp[0]]] = int(float(tmp[1]))
                 except (IndexError, ValueError):
-                    pass
-        if len(data) == 0:
-            return None
-        return data
+                    continue
+        return data or None
