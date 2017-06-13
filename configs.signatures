@@ -311,6 +311,7 @@ declare -A configs_signatures=(
   ['a9ab68845db2fb695b7060273a6ac68e']='health_alarm_notify.conf'
   ['a9cd91675467c5426f5b51c47602c889']='apps_groups.conf'
   ['aa4bee249bfc0c4a88ac8c2ffb97aa0d']='health.d/squid.conf'
+  ['aa620b7017c8b864d80aa6c8acab01cf']='python.d/smartd_log.conf'
   ['aa6c4a270e6276f2deddf127ee1a24f6']='statsd.d/example.conf'
   ['aa8b57a733c2035917acf81a8ebdfbe7']='health.d/haproxy.conf'
   ['aac44691a1cf95fa8f8990a79bab4ce1']='python.d/web_log.conf'
