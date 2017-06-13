@@ -237,6 +237,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'lighttpd': {
+        title: 'Lighttpd',
+        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        info: undefined
+    },
+
     'web_log': {
         title: undefined,
         icon: '<i class="fa fa-file-text-o" aria-hidden="true"></i>',
@@ -865,6 +871,66 @@ netdataDashboard.context = {
         height: 0.5
     },
 
+
+    // ------------------------------------------------------------------------
+    // LIGHTTPD
+
+    'lighttpd.connections': {
+        colors: NETDATA.colors[4],
+        mainheads: [
+            netdataDashboard.gaugeChart('Connections', '12%', '', NETDATA.colors[4])
+        ]
+    },
+
+    'lighttpd.requests': {
+        colors: NETDATA.colors[0],
+        mainheads: [
+            netdataDashboard.gaugeChart('Requests', '12%', '', NETDATA.colors[0])
+        ]
+    },
+
+    'lighttpd.net': {
+        colors: NETDATA.colors[3],
+        mainheads: [
+            netdataDashboard.gaugeChart('Bandwidth', '12%', '', NETDATA.colors[3])
+        ]
+    },
+
+    'lighttpd.workers': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="busy"'
+                    + ' data-append-options="percentage"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Servers Utilization"'
+                    + ' data-units="percentage %"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'lighttpd.bytesperreq': {
+        colors: NETDATA.colors[3],
+        height: 0.5
+    },
+
+    'lighttpd.reqpersec': {
+        colors: NETDATA.colors[4],
+        height: 0.5
+    },
+
+    'lighttpd.bytespersec': {
+        colors: NETDATA.colors[6],
+        height: 0.5
+    },
 
     // ------------------------------------------------------------------------
     // NGINX
