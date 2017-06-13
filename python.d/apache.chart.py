@@ -98,10 +98,9 @@ class Service(UrlService):
             if 'idle_servers' in self._data_from_check:
                 self.__module__ = 'lighttpd'
                 for chart in self.definitions:
-                    self.definitions[chart]['options'][1] = self.definitions[chart]['options'][1].replace('apache',
-                                                                                                          'lighttpd')
-                    self.definitions[chart]['options'][4] = self.definitions[chart]['options'][4].replace('apache',
-                                                                                                          'lighttpd')
+                    opts = self.definitions[chart]['options']
+                    opts[1] = opts[1].replace('apache', 'lighttpd')
+                    opts[4] = opts[4].replace('apache', 'lighttpd')
             return True
         return False
 
