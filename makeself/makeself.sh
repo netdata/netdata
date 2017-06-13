@@ -100,7 +100,7 @@ MS_Usage()
     echo "    --tar-quietly      : Suppress verbose output from the tar command"
     echo "    --quiet | -q       : Do not print any messages other than errors."
     echo "    --gzip             : Compress using gzip (default if detected)"
-    echo "    --pigz		 : Compress with pigz"
+    echo "    --pigz             : Compress with pigz"
     echo "    --bzip2            : Compress using bzip2 instead of gzip"
     echo "    --pbzip2           : Compress using pbzip2 instead of gzip"
     echo "    --xz               : Compress using xz instead of gzip"
@@ -110,6 +110,9 @@ MS_Usage()
     echo "    --complevel lvl    : Compression level for gzip pigz xz lzo lz4 bzip2 and pbzip2 (default 9)"
     echo "    --base64           : Instead of compressing, encode the data using base64"
     echo "    --gpg-encrypt      : Instead of compressing, encrypt the data using GPG"
+    echo "    --gpg-asymmetric-encrypt-sign"
+    echo "                       : Instead of compressing, asymmetrically encrypt and sign the data using GPG"
+    echo "    --gpg-extra opt    : Append more options to the gpg command line"
     echo "    --ssl-encrypt      : Instead of compressing, encrypt the data using OpenSSL"
     echo "    --nocomp           : Do not compress the data"
     echo "    --notemp           : The archive will create archive_dir in the"
@@ -125,6 +128,7 @@ MS_Usage()
     echo "    --current          : Files will be extracted to the current directory"
     echo "                         Both --current and --target imply --notemp"
     echo "    --tar-extra opt    : Append more options to the tar command line"
+    echo "    --untar-extra opt  : Append more options to the during the extraction of the tar archive"
     echo "    --nomd5            : Don't calculate an MD5 for archive"
     echo "    --nocrc            : Don't calculate a CRC for archive"
     echo "    --header file      : Specify location of the header script"
@@ -141,6 +145,7 @@ MS_Usage()
     echo "                         instead of the current date."
     echo
     echo "    --keep-umask       : Keep the umask set to shell default, rather than overriding when executing self-extracting archive."
+    echo "    --export-conf      : Export configuration variables to startup_script"
     echo
     echo "Do not forget to give a fully qualified startup script name"
     echo "(i.e. with a ./ prefix if inside the archive)."
@@ -167,11 +172,13 @@ COPY=none
 NEED_ROOT=n
 TAR_ARGS=cvf
 TAR_EXTRA=""
+GPG_EXTRA=""
 DU_ARGS=-ks
 HEADER=`dirname "$0"`/makeself-header.sh
 TARGETDIR=""
 NOOVERWRITE=n
 DATE=`LC_ALL=C date`
+EXPORT_CONF=n
 
 # LSM file stuff
 LSM_CMD="echo No LSM. >> \"\$archname\""
@@ -223,10 +230,18 @@ do
 	COMPRESS=gpg
 	shift
 	;;
+    --gpg-asymmetric-encrypt-sign)
+  COMPRESS=gpg-asymmetric
+  shift
+  ;;
+    --gpg-extra)
+  GPG_EXTRA="$2"
+  if ! shift 2; then MS_Help; exit 1; fi
+  ;;
     --ssl-encrypt)
-        COMPRESS=openssl
-        shift
-        ;;
+  COMPRESS=openssl
+  shift
+  ;;
     --nocomp)
 	COMPRESS=none
 	shift
@@ -250,6 +265,10 @@ do
 	;;
     --tar-extra)
 	TAR_EXTRA="$2"
+        if ! shift 2; then MS_Help; exit 1; fi
+        ;;
+    --untar-extra)
+        UNTAR_EXTRA="$2"
         if ! shift 2; then MS_Help; exit 1; fi
         ;;
     --target)
@@ -324,6 +343,10 @@ do
 	KEEP_UMASK=y
 	shift
 	;;
+    --export-conf)
+    EXPORT_CONF=y
+    shift
+    ;;
     -q | --quiet)
 	QUIET=y
 	shift
@@ -439,8 +462,12 @@ base64)
     GUNZIP_CMD="base64 -d -i"
     ;;
 gpg)
-    GZIP_CMD="gpg -ac -z$COMPRESS_LEVEL"
+    GZIP_CMD="gpg $GPG_EXTRA -ac -z$COMPRESS_LEVEL"
     GUNZIP_CMD="gpg -d"
+    ;;
+gpg-asymmetric)
+    GZIP_CMD="gpg $GPG_EXTRA -z$COMPRESS_LEVEL -es"
+    GUNZIP_CMD="gpg --yes -d"
     ;;
 openssl)
     GZIP_CMD="openssl aes-256-cbc -a -salt"
@@ -502,7 +529,7 @@ if test "$QUIET" = "n";then
    echo Adding files to archive named \"$archname\"...
 fi
 exec 3<> "$tmpfile"
-(cd "$archdir" && ( tar $TAR_EXTRA -$TAR_ARGS - . | eval "$GZIP_CMD" >&3 ) ) || { echo Aborting: Archive directory not found or temporary file: "$tmpfile" could not be created.; exec 3>&-; rm -f "$tmpfile"; exit 1; }
+(cd "$archdir" && ( tar "$TAR_EXTRA" -$TAR_ARGS - . | eval "$GZIP_CMD" >&3 ) ) || { echo Aborting: Archive directory not found or temporary file: "$tmpfile" could not be created.; exec 3>&-; rm -f "$tmpfile"; exit 1; }
 exec 3>&- # try to close the archive
 
 fsize=`cat "$tmpfile" | wc -c | tr -d " "`
@@ -590,3 +617,4 @@ else
     fi
 fi
 rm -f "$tmpfile"
+
