@@ -2,100 +2,141 @@
 # Description: bind rndc netdata python.d module
 # Author: l2isbad
 
-from base import SimpleService
-from re import compile, findall
-from os.path import getsize, split
-from os import access as is_accessible, R_OK
+from os.path import getsize
+from os import access, R_OK
 from subprocess import Popen
+from collections import defaultdict
+from base import SimpleService
 
 priority = 60000
 retries = 60
 update_every = 30
 
-NMS = ['requests', 'responses', 'success', 'auth_answer', 'nonauth_answer', 'nxrrset', 'failure',
-       'nxdomain', 'recursion', 'duplicate', 'rejections']
-QUERIES = ['RESERVED0', 'A', 'NS', 'CNAME', 'SOA', 'PTR', 'MX', 'TXT', 'X25', 'AAAA', 'SRV', 'NAPTR',
-           'A6', 'DS', 'RRSIG', 'DNSKEY', 'SPF', 'ANY', 'DLV']
+ORDER = ['name_server_statistics', 'incoming_queries', 'outgoing_queries', 'named_stats_size']
+
+CHARTS = {
+    'name_server_statistics': {
+        'options': [None, 'Name Server Statistics', 'stats', 'name server statistics',
+                    'bind_rndc.name_server_statistics', 'line'],
+        'lines': [
+            ['nms_requests', 'requests', 'incremental'],
+            ['nms_rejected_queries', 'rejected_queries', 'incremental'],
+            ['nms_success', 'success', 'incremental'],
+            ['nms_failure', 'failure', 'incremental'],
+            ['nms_responses', 'responses', 'incremental'],
+            ['nms_duplicate', 'duplicate', 'incremental'],
+            ['nms_recursion', 'recursion', 'incremental'],
+            ['nms_nxrrset', 'nxrrset', 'incremental'],
+            ['nms_nxdomain', 'nxdomain', 'incremental'],
+            ['nms_non_auth_answer', 'non_auth_answer', 'incremental'],
+            ['nms_auth_answer', 'auth_answer', 'incremental'],
+            ['nms_dropped_queries', 'dropped_queries', 'incremental'],
+        ]},
+    'incoming_queries': {
+        'options': [None, 'Incoming Queries', 'queries', 'incoming queries',
+                    'bind_rndc.incoming_queries', 'line'],
+        'lines': [
+        ]},
+    'outgoing_queries': {
+        'options': [None, 'Outgoing Queries', 'queries', 'outgoing queries',
+                    'bind_rndc.outgoing_queries', 'line'],
+        'lines': [
+        ]},
+    'named_stats_size': {
+        'options': [None, 'Named Stats File Size', 'MB', 'file size',
+                    'bind_rndc.stats_size', 'line'],
+        'lines': [
+            ['stats_size', None, 'absolute', 1, 1 << 20]
+        ]}
+}
+
+NMS = {
+    'nms_requests':
+        ['IPv4 requests received',
+         'IPv6 requests received',
+         'TCP requests received',
+         'requests with EDNS(0) receive'],
+    'nms_responses':
+        ['responses sent',
+         'truncated responses sent',
+         'responses with EDNS(0) sent',
+         'requests with unsupported EDNS version received'],
+    'nms_failure':
+        ['other query failures',
+         'queries resulted in SERVFAIL'],
+    'nms_auth_answer':
+        ['queries resulted in authoritative answer'],
+    'nms_non_auth_answer':
+        ['queries resulted in non authoritative answer'],
+    'nms_nxrrset':
+        ['queries resulted in nxrrset'],
+    'nms_success':
+        ['queries resulted in successful answer'],
+    'nms_nxdomain':
+        ['queries resulted in NXDOMAIN'],
+    'nms_recursion':
+        ['queries caused recursion'],
+    'nms_duplicate':
+        ['duplicate queries received'],
+    'nms_rejected_queries':
+        ['auth queries rejected',
+         'recursive queries rejected'],
+    'nms_dropped_queries':
+        ['queries dropped']
+}
+
+STATS = ['Name Server Statistics', 'Incoming Queries', 'Outgoing Queries']
 
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.order = ORDER
+        self.definitions = CHARTS
         self.named_stats_path = self.configuration.get('named_stats_path', '/var/log/bind/named.stats')
-        self.regex_values = compile(r'([0-9]+) ([^\n]+)')
-        # self.options = ['Incoming Requests', 'Incoming Queries', 'Outgoing Queries',
-        # 'Name Server Statistics', 'Zone Maintenance Statistics', 'Resolver Statistics',
-        # 'Cache DB RRsets', 'Socket I/O Statistics']
-        self.options = ['Name Server Statistics', 'Incoming Queries', 'Outgoing Queries']
-        self.regex_options = [r'(%s(?= \+\+)) \+\+([^\+]+)' % option for option in self.options]
         self.rndc = self.find_binary('rndc')
+        self.data = dict(nms_requests=0, nms_responses=0, nms_failure=0, nms_auth=0,
+                         nms_non_auth=0, nms_nxrrset=0, nms_success=0, nms_nxdomain=0,
+                         nms_recursion=0, nms_duplicate=0, nms_rejected_queries=0,
+                         nms_dropped_queries=0)
 
     def check(self):
-        # We cant start without 'rndc' command
         if not self.rndc:
             self.error('Can\'t locate \'rndc\' binary or binary is not executable by netdata')
             return False
 
-        # We cant start if stats file is not exist or not readable by netdata user
-        if not is_accessible(self.named_stats_path, R_OK):
+        if not access(self.named_stats_path, R_OK):
             self.error('Cannot access file %s' % self.named_stats_path)
             return False
 
-        size_before = getsize(self.named_stats_path)
         run_rndc = Popen([self.rndc, 'stats'], shell=False)
         run_rndc.wait()
-        size_after = getsize(self.named_stats_path)
 
-        # We cant start if netdata user has no permissions to run 'rndc stats'
         if not run_rndc.returncode:
-            # 'rndc' was found, stats file is exist and readable and we can run 'rndc stats'. Lets go!
-            self.create_charts()
-
-            # BIND APPEND dump on every run 'rndc stats'
-            # that is why stats file size can be VERY large if update_interval too small
-            dump_size_24hr = round(86400 / self.update_every * (int(size_after) - int(size_before)) / 1048576, 3)
-
-            # If update_every too small we should WARN user
-            if self.update_every < 30:
-                self.info('Update_every %s is NOT recommended for use. Increase the value to > 30' % self.update_every)
-
-            self.info('With current update_interval it will be + %s MB every 24hr. '
-                      'Don\'t forget to create logrotate conf file for %s' % (dump_size_24hr, self.named_stats_path))
-
-            self.info('Plugin was started successfully.')
-
             return True
-        else:
-            self.error('Not enough permissions to run "%s stats"' % self.rndc)
-            return False
+        self.error('Not enough permissions to run "%s stats"' % self.rndc)
+        return False
 
     def _get_raw_data(self):
         """
         Run 'rndc stats' and read last dump from named.stats
-        :return: tuple(
-                       file.read() obj,
-                       named.stats file size
-                      )
+        :return: dict
         """
+        result = dict()
         try:
             current_size = getsize(self.named_stats_path)
-        except OSError:
-            return None, None
+            run_rndc = Popen([self.rndc, 'stats'], shell=False)
+            run_rndc.wait()
 
-        run_rndc = Popen([self.rndc, 'stats'], shell=False)
-        run_rndc.wait()
-
-        if run_rndc.returncode:     
-            return None, None
-
-        try:
-            with open(self.named_stats_path) as bind_rndc:
-                bind_rndc.seek(current_size)
-                result = bind_rndc.read()
-        except OSError:
-            return None, None
-        else:
-            return result, current_size
+            if run_rndc.returncode:
+                return None
+            with open(self.named_stats_path) as named_stats:
+                named_stats.seek(current_size)
+                result['stats'] = named_stats.readlines()
+                result['size'] = current_size
+                return result
+        except (OSError, IOError):
+            return None
 
     def _get_data(self):
         """
@@ -103,72 +144,98 @@ class Service(SimpleService):
         :return: dict
         """
 
-        raw_data, size = self._get_raw_data()
+        raw_data = self._get_raw_data()
 
         if raw_data is None:
             return None
+        parsed = dict()
+        for stat in STATS:
+            parsed[stat] = parse_stats(field=stat,
+                                       named_stats=raw_data['stats'])
 
-        rndc_stats = dict()
+        self.data.update(nms_mapper(data=parsed['Name Server Statistics']))
 
-        # Result: dict.
-        # topic = Cache DB RRsets; body = A 178303 NS 86790 ... ; desc = A; value = 178303
-        # {'Cache DB RRsets': [('A', 178303), ('NS', 286790), ...],
-        # {Incoming Queries': [('RESERVED0', 8), ('A', 4557317680), ...],
-        # ......
-        for regex in self.regex_options:
-            rndc_stats.update(dict([(topic, [(desc, int(value)) for value, desc in self.regex_values.findall(body)])
-                               for topic, body in findall(regex, raw_data)]))
+        for elem in zip(['Incoming Queries', 'Outgoing Queries'], ['incoming_queries', 'outgoing_queries']):
+            parsed_key, chart_name = elem[0], elem[1]
+            for dimension_id, value in queries_mapper(data=parsed[parsed_key],
+                                                      add=chart_name[:9]).items():
+                if dimension_id not in self.data:
+                    dimension = dimension_id.replace(chart_name[:9], '')
+                    self._add_new_dimension(dimension_id=dimension_id,
+                                            dimension=dimension,
+                                            chart_name=chart_name,
+                                            priority=self.priority + self.order.index(chart_name))
+                self.data[dimension_id] = value
 
-        nms = dict(rndc_stats.get('Name Server Statistics', []))
+        self.data['stats_size'] = raw_data['size']
+        return self.data
 
-        inc_queries = dict([('i' + k, 0) for k in QUERIES])
-        inc_queries.update(dict([('i' + k, v) for k, v in rndc_stats.get('Incoming Queries', [])]))
-        out_queries = dict([('o' + k, 0) for k in QUERIES])
-        out_queries.update(dict([('o' + k, v) for k, v in rndc_stats.get('Outgoing Queries', [])]))
 
-        to_netdata = dict()
-        to_netdata['requests'] = sum([v for k, v in nms.items() if 'request' in k and 'received' in k])
-        to_netdata['responses'] = sum([v for k, v in nms.items() if 'responses' in k and 'sent' in k])
-        to_netdata['success'] = nms.get('queries resulted in successful answer', 0)
-        to_netdata['auth_answer'] = nms.get('queries resulted in authoritative answer', 0)
-        to_netdata['nonauth_answer'] = nms.get('queries resulted in non authoritative answer', 0)
-        to_netdata['nxrrset'] = nms.get('queries resulted in nxrrset', 0)
-        to_netdata['failure'] = sum([nms.get('queries resulted in SERVFAIL', 0), nms.get('other query failures', 0)])
-        to_netdata['nxdomain'] = nms.get('queries resulted in NXDOMAIN', 0)
-        to_netdata['recursion'] = nms.get('queries caused recursion', 0)
-        to_netdata['duplicate'] = nms.get('duplicate queries received', 0)
-        to_netdata['rejections'] = nms.get('recursive queries rejected', 0)
-        to_netdata['stats_size'] = size
+def parse_stats(field, named_stats):
+    """
+    :param field: str:
+    :param named_stats: list:
+    :return: dict
 
-        to_netdata.update(inc_queries)
-        to_netdata.update(out_queries)
-        return to_netdata
+    Example:
+    filed: 'Incoming Queries'
+    names_stats (list of lines):
+    ++ Incoming Requests ++
+             1405660 QUERY
+                   3 NOTIFY
+    ++ Incoming Queries ++
+             1214961 A
+                  75 NS
+                   2 CNAME
+                2897 SOA
+               35544 PTR
+                  14 MX
+                5822 TXT
+              145974 AAAA
+                 371 SRV
+    ++ Outgoing Queries ++
+    ...
 
-    def create_charts(self):
-        self.order = ['stats_size', 'bind_stats', 'incoming_q', 'outgoing_q']
-        self.definitions = {
-            'bind_stats': {
-                'options': [None, 'Name Server Statistics', 'stats', 'name server statistics', 'bind_rndc.stats', 'line'],
-                'lines': [
-                         ]},
-            'incoming_q': {
-                'options': [None, 'Incoming queries', 'queries','incoming queries', 'bind_rndc.incq', 'line'],
-                'lines': [
-                        ]},
-            'outgoing_q': {
-                'options': [None, 'Outgoing queries', 'queries','outgoing queries', 'bind_rndc.outq', 'line'],
-                'lines': [
-                        ]},
-            'stats_size': {
-                'options': [None, '%s file size' % split(self.named_stats_path)[1].capitalize(), 'megabytes',
-                            '%s size' % split(self.named_stats_path)[1], 'bind_rndc.size', 'line'],
-                'lines': [
-                         ["stats_size", None, "absolute", 1, 1048576]
-                        ]}
-                     }
-        for elem in QUERIES:
-            self.definitions['incoming_q']['lines'].append(['i' + elem, elem, 'incremental'])
-            self.definitions['outgoing_q']['lines'].append(['o' + elem, elem, 'incremental'])
+    result:
+    {'A', 1214961, 'NS': 75, 'CNAME': 2, 'SOA': 2897, ...}
+    """
+    data = dict()
+    ns = iter(named_stats)
+    for line in ns:
+        if field not in line:
+            continue
+        while True:
+            try:
+                line = next(ns)
+            except StopIteration:
+                break
+            if '++' not in line:
+                if '[' in line:
+                    continue
+                v, k = line.strip().split(' ', 1)
+                data[k] = int(v)
+                continue
+            break
+        break
+    return data
 
-        for elem in NMS:
-            self.definitions['bind_stats']['lines'].append([elem, None, 'incremental'])
+
+def nms_mapper(data):
+    """
+    :param data: dict
+    :return: dict(defaultdict)
+    """
+    result = defaultdict(int)
+    for k, v in NMS.items():
+        for elem in v:
+            result[k] += data.get(elem, 0)
+    return result
+
+
+def queries_mapper(data, add):
+    """
+    :param data: dict
+    :param add: str
+    :return: dict
+    """
+    return dict([(add + k, v) for k, v in data.items()])
