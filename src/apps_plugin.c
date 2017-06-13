@@ -437,7 +437,7 @@ static struct target *get_users_target(uid_t uid) {
     w->idhash = simple_hash(w->id);
 
     struct passwd *pw = getpwuid(uid);
-    if(!pw)
+    if(!pw || !pw->pw_name || !*pw->pw_name)
         snprintfz(w->name, MAX_NAME, "%u", uid);
     else
         snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
@@ -470,7 +470,7 @@ struct target *get_groups_target(gid_t gid)
     w->idhash = simple_hash(w->id);
 
     struct group *gr = getgrgid(gid);
-    if(!gr)
+    if(!gr || !gr->gr_name || !*gr->gr_name)
         snprintfz(w->name, MAX_NAME, "%u", gid);
     else
         snprintfz(w->name, MAX_NAME, "%s", gr->gr_name);
