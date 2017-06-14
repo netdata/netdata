@@ -566,7 +566,7 @@ do
             then
             # we don't have md5sum - keep it
             echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
-            run cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+            run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
         else
             # find it relative filename
             f="${x/*\/etc\/netdata\//}"
@@ -587,7 +587,7 @@ do
             else
                 # edited by user - keep it
                 echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} has been edited by user${TPUT_RESET}. Keeping it."
-                run cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+                run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
             fi
         fi
 
@@ -611,7 +611,7 @@ for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
     if [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
         then
-        run cp -p "${x}.installer_backup.${installer_backup_suffix}" "${x}" && \
+        run cp -a "${x}.installer_backup.${installer_backup_suffix}" "${x}" && \
             run rm -f "${x}.installer_backup.${installer_backup_suffix}"
     fi
 done
