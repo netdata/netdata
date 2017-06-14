@@ -7,6 +7,7 @@ from os import access, R_OK
 from os.path import getsize
 from collections import namedtuple, defaultdict
 from copy import deepcopy
+
 try:
     from itertools import filterfalse
 except ImportError:
@@ -620,7 +621,7 @@ class Web(Mixin):
             return time * 1000000
 
         r_regex = [apache_ext_insert, apache_ext_append,
-                   nginx_ext2_insert, nginx_ext_insert,  nginx_ext_append,
+                   nginx_ext2_insert, nginx_ext_insert, nginx_ext_append,
                    default]
         r_function = [func_usec, func_usec, func_sec, func_sec, func_sec, func_usec]
         regex_function = zip(r_regex, r_function)
@@ -835,16 +836,23 @@ class Squid(Mixin):
         if not match:
             self.error('Regex not matches (%s)' % self.storage['regex'].pattern)
             return False
-        self.storage['dynamic'] = {'squid_code': {'chart': 'squid_code',
-                                                  'func': None},
-                                   'http_code': {'chart': 'squid_detailed_response_codes',
-                                                 'func': None},
-                                   'hier_code': {'chart': 'squid_hier_code',
-                                                 'func': lambda v: v.replace('HIER_', '')},
-                                   'method': {'chart': 'squid_method',
-                                              'func': None},
-                                   'mime_type': {'chart': 'squid_mime_type',
-                                                 'func': lambda v: v.split('/')[0]}}
+        self.storage['dynamic'] = {
+            'http_code':
+                {'chart': 'squid_detailed_response_codes',
+                 'func_dim_id': None,
+                 'func_dim': None},
+            'hier_code': {
+                'chart': 'squid_hier_code',
+                'func_dim_id': None,
+                'func_dim': lambda v: v.replace('HIER_', '')},
+            'method': {
+                'chart': 'squid_method',
+                'func_dim_id': None,
+                'func_dim': None},
+            'mime_type': {
+                'chart': 'squid_mime_type',
+                'func_dim_id': lambda v: v.split('/')[0],
+                'func_dim': None}}
         return True
 
     def get_data(self, raw_data=None):
@@ -887,10 +895,12 @@ class Squid(Mixin):
                 for key, values in self.storage['dynamic'].items():
                     if match[key] == '-':
                         continue
-                    dimension_id = values['func'](match[key]) if values['func'] else match[key]
+                    dimension_id = values['func_dim_id'](match[key]) if values['func_dim_id'] else match[key]
                     if dimension_id not in self.data:
+                        dimension = values['func_dim'](match[key]) if values['func_dim'] else dimension_id
                         self.add_new_dimension(dimension_id=dimension_id,
-                                               chart_key=values['chart'])
+                                               chart_key=values['chart'],
+                                               dimension=dimension)
                     self.data[dimension_id] += 1
             else:
                 self.data['unmatched'] += 1
@@ -923,6 +933,11 @@ class Squid(Mixin):
         :param code: str: squid response code. Ex.: 'TCP_MISS', 'TCP_MISS_ABORTED'
         :return:
         """
+        if code not in self.data:
+            self.add_new_dimension(dimension_id=code, chart_key='squid_code')
+        self.data[code] += 1
+        if '_' not in code:
+            return
         for tag in code.split('_'):
             try:
                 chart_key = SQUID_CODES[tag]
@@ -1002,6 +1017,7 @@ def check_patterns(string, dimension_regex_dict):
     def func_search(pattern):
         def closure(v):
             return pattern.search(v)
+
         return closure
 
     for dimension, regex in dimension_regex_dict.items():
