@@ -352,7 +352,7 @@ typedef struct rrdset RRDSET;
 // and may lead to missing information.
 
 typedef enum rrdhost_flags {
-    RRDHOST_ORPHAN                 = 1 << 0, // this host is orphan
+    RRDHOST_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
     RRDHOST_DELETE_OBSOLETE_FILES  = 1 << 1, // delete files of obsolete charts
     RRDHOST_DELETE_ORPHAN_FILES    = 1 << 2  // delete the entire host when orphan
 } RRDHOST_FLAGS;
