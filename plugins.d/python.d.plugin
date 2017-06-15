@@ -310,7 +310,7 @@ class PythonCharts(object):
                               ("/" + str(name) if name is not None else "") +
                               ": cannot start job: '" +
                               str(e))
-                    return None
+                    continue
                 else:
                     # set chart_name (needed to plot run time graphs)
                     job.chart_name = module.__name__
