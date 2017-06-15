@@ -2,7 +2,7 @@
 
 # netdata
 # real-time performance and health monitoring, done right!
-# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
 # GPL v3+
 #
 # Script to send alarm notifications for netdata
@@ -18,13 +18,14 @@
 #  - slack.com notifications by @ktsaou
 #  - discordapp.com notifications by @lowfive
 #  - pushover.net notifications by @ktsaou
-#  - pushbullet.com push notifications by Tiago Peralta @tperalta82 PR #1070
-#  - telegram.org notifications by @hashworks PR #1002
-#  - twilio.com notifications by Levi Blaney @shadycuz PR #1211
+#  - pushbullet.com push notifications by Tiago Peralta @tperalta82 #1070
+#  - telegram.org notifications by @hashworks #1002
+#  - twilio.com notifications by Levi Blaney @shadycuz #1211
 #  - kafka notifications by @ktsaou #1342
-#  - pagerduty.com notifications by Jim Cooley @jimcooley PR #1373
+#  - pagerduty.com notifications by Jim Cooley @jimcooley #1373
 #  - messagebird.com notifications by @tech_no_logical #1453
 #  - hipchat notifications by @ktsaou #1561
+#  - custom notifications by @ktsaou
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -103,6 +104,15 @@ debug() {
     [ ${debug} -eq 1 ] && log DEBUG "${@}"
 }
 
+
+# -----------------------------------------------------------------------------
+# this is to be overwritten by the config file
+
+custom_sender() {
+    info "not sending custom notification for ${status} of '${host}.${chart}.${name}'"
+}
+
+
 # -----------------------------------------------------------------------------
 
 # check for BASH v4+ (required for associative arrays)
@@ -112,8 +122,8 @@ debug() {
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
 
-NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
-NETDATA_CACHE_DIR="${NETDATA_CACHE_DIR-/var/cache/netdata}"
+[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+[ -z "${NETDATA_CACHE_DIR}" ] && NETDATA_CACHE_DIR="$(dirname "${0}")/../../../../var/cache/netdata"
 [ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
 
 # -----------------------------------------------------------------------------
@@ -128,8 +138,8 @@ when="${6}"        # the timestamp this event occurred
 name="${7}"        # the name of the alarm, as given in netdata health.d entries
 chart="${8}"       # the name of the chart (type.id)
 family="${9}"      # the family of the chart
-status="${10}"     # the current status : REMOVED, UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-old_status="${11}" # the previous status: REMOVED, UNITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+status="${10}"     # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+old_status="${11}" # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 value="${12}"      # the current value of the alarm
 old_value="${13}"  # the previous value of the alarm
 src="${14}"        # the line number and file the alarm has been configured
@@ -189,6 +199,7 @@ SEND_EMAIL="YES"
 SEND_PUSHBULLET="YES"
 SEND_KAFKA="YES"
 SEND_PD="YES"
+SEND_CUSTOM="YES"
 
 # slack configs
 SLACK_WEBHOOK_URL=
@@ -241,6 +252,10 @@ KAFKA_SENDER_IP=
 # pagerduty.com configs
 PD_SERVICE_KEY=
 declare -A role_recipients_pd=()
+
+# custom configs
+DEFAULT_RECIPIENT_CUSTOM=
+declare -A role_recipients_custom=()
 
 # email configs
 DEFAULT_RECIPIENT_EMAIL="root"
@@ -305,6 +320,7 @@ declare -A arr_hipchat=()
 declare -A arr_telegram=()
 declare -A arr_pd=()
 declare -A arr_email=()
+declare -A arr_custom=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
@@ -393,6 +409,15 @@ do
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality pd "${r}" && arr_pd[${r/|*/}]="1"
     done
+
+    # custom
+    a="${role_recipients_custom[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_CUSTOM}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality custom "${r}" && arr_custom[${r/|*/}]="1"
+    done
+
 done
 
 # build the list of slack recipients (channels)
@@ -430,6 +455,10 @@ to_telegram="${!arr_telegram[*]}"
 # build the list of pagerduty recipients (service keys)
 to_pd="${!arr_pd[*]}"
 [ -z "${to_pd}" ] && SEND_PD="NO"
+
+# build the list of custom recipients
+to_custom="${!arr_custom[*]}"
+[ -z "${to_custom}" ] && SEND_CUSTOM="NO"
 
 # build the list of email recipients (email addresses)
 to_email=
@@ -489,7 +518,7 @@ fi
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
-        -o "${SEND_DISCORD}"       = "YES" \
+        -o "${SEND_DISCORD}"     = "YES" \
         -o "${SEND_HIPCHAT}"     = "YES" \
         -o "${SEND_TWILIO}"      = "YES" \
         -o "${SEND_MESSAGEBIRD}" = "YES" \
@@ -527,13 +556,14 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
     -a "${SEND_TELEGRAM}"       != "YES" \
     -a "${SEND_SLACK}"          != "YES" \
-    -a "${SEND_DISCORD}"          != "YES" \
+    -a "${SEND_DISCORD}"        != "YES" \
     -a "${SEND_TWILIO}"         != "YES" \
     -a "${SEND_HIPCHAT}"        != "YES" \
     -a "${SEND_MESSAGEBIRD}"    != "YES" \
     -a "${SEND_PUSHBULLET}"     != "YES" \
     -a "${SEND_KAFKA}"          != "YES" \
     -a "${SEND_PD}"             != "YES" \
+    -a "${SEND_CUSTOM}"         != "YES" \
     ]
     then
     fatal "All notification methods are disabled. Not sending notification for host '${host}', chart '${chart}' to '${roles}' for '${name}' = '${value}' for status '${status}'."
@@ -1286,6 +1316,24 @@ SENT_PD=$?
 
 
 # -----------------------------------------------------------------------------
+# send the custom message
+
+send_custom() {
+    # is it enabled?
+    [ "${SEND_CUSTOM}" != "YES" ] && return 1
+
+    # do we have any sender?
+    [ -z "${1}" ] && return 1
+
+    # call the custom_sender function
+    custom_sender "${@}"
+}
+
+send_custom "${to_custom}"
+SENT_CUSTOM=$?
+
+
+# -----------------------------------------------------------------------------
 # send hipchat message
 
 send_hipchat "${HIPCHAT_AUTH_TOKEN}" "${to_hipchat}" " \
@@ -1298,6 +1346,7 @@ ${host} ${status_message}<br/> \
 "
 
 SENT_HIPCHAT=$?
+
 
 # -----------------------------------------------------------------------------
 # send the email
@@ -1430,6 +1479,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHBULLET}   -eq 0 \
     -o ${SENT_KAFKA}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \
+    -o ${SENT_CUSTOM}       -eq 0 \
     ]
     then
     # we did send something
