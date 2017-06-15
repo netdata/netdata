@@ -2,7 +2,7 @@
 
 # netdata
 # real-time performance and health monitoring, done right!
-# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
 # GPL v3+
 #
 # This script is a helper to allow netdata collect tc data.
@@ -101,10 +101,11 @@ debug() {
 
 # -----------------------------------------------------------------------------
 
-plugins_dir="${NETDATA_PLUGINS_DIR}"
-[ -z "$plugins_dir" ] && plugins_dir="$( dirname $PROGRAM_FILE )"
+[ -z "${NETDATA_PLUGINS_DIR}" ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
+[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
 
-config_dir=${NETDATA_CONFIG_DIR-/etc/netdata}
+plugins_dir="${NETDATA_PLUGINS_DIR}"
+config_dir="${NETDATA_CONFIG_DIR}"
 tc="$(which tc 2>/dev/null || command -v tc 2>/dev/null)"
 
 

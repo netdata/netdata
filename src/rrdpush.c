@@ -219,8 +219,6 @@ static void rrdpush_sender_thread_cleanup_locked_all(RRDHOST *host) {
     host->rrdpush_buffer = NULL;
 
     host->rrdpush_spawn = 0;
-
-    rrdhost_flag_set(host, RRDHOST_ORPHAN);
 }
 
 void rrdpush_sender_thread_stop(RRDHOST *host) {
@@ -621,6 +619,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *r
 
     rrdhost_wrlock(host);
     host->connected_senders++;
+    rrdhost_flag_clear(host, RRDHOST_ORPHAN);
     if(health_enabled != CONFIG_BOOLEAN_NO)
         host->health_delay_up_to = now_realtime_sec() + alarms_delay;
     rrdhost_unlock(host);
@@ -634,6 +633,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *r
     host->senders_disconnected_time = now_realtime_sec();
     host->connected_senders--;
     if(!host->connected_senders) {
+        rrdhost_flag_set(host, RRDHOST_ORPHAN);
         if(health_enabled == CONFIG_BOOLEAN_AUTO)
             host->health_enabled = 0;
     }
@@ -696,7 +696,6 @@ void rrdpush_sender_thread_spawn(RRDHOST *host) {
         else if(pthread_detach(host->rrdpush_thread))
             error("STREAM %s [send]: cannot request detach newly created thread.", host->hostname);
 
-        rrdhost_flag_clear(host, RRDHOST_ORPHAN);
         host->rrdpush_spawn = 1;
     }
 

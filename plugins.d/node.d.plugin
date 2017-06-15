@@ -4,13 +4,13 @@
 // shebang hack from:
 // http://unix.stackexchange.com/questions/65235/universal-node-js-shebang
 
-// Initially this is run as a shell script (#!/bin/sh).
+// Initially this is run as a shell script.
 // Then, the second line, finds nodejs or node or js in the system path
 // and executes it with the shell parameters.
 
 // netdata
 // real-time performance and health monitoring, done right!
-// (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+// (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
 // GPL v3+
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -21,7 +21,7 @@
 // get NETDATA environment variables
 
 var NETDATA_PLUGINS_DIR = process.env.NETDATA_PLUGINS_DIR || __dirname;
-var NETDATA_CONFIG_DIR = process.env.NETDATA_CONFIG_DIR || '/etc/netdata';
+var NETDATA_CONFIG_DIR = process.env.NETDATA_CONFIG_DIR || __dirname + '/../../../../etc/netdata';
 var NETDATA_UPDATE_EVERY = process.env.NETDATA_UPDATE_EVERY || 1;
 var NODE_D_DIR = NETDATA_PLUGINS_DIR + '/../node.d';
 
