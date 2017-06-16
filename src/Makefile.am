@@ -156,6 +156,7 @@ netdata_SOURCES += \
 	zfs_common.c \
 	zfs_common.h \
 	freebsd_kstat_zfs.c \
+	freebsd_ipfw.c \
 	$(NULL)
 else
 if MACOS
