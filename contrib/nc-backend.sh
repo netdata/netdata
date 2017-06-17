@@ -10,6 +10,18 @@ log() {
 	logger --stderr --id=$$ --tag "netdata-nc-backend" "${*}"
 }
 
+mync() {
+	local ret
+
+	log "Running: nc ${*}"
+	nc "${@}"
+	ret=$?
+
+	log "nc stopped with return code ${ret}."
+
+	return ${ret}
+}
+
 listen_save_replay_forever() {
 	local file="${1}" port="${2}" real_backend_host="${3}" real_backend_port="${4}" ret delay=1 started ended
 
@@ -18,19 +30,16 @@ listen_save_replay_forever() {
 		log "Starting nc to listen on port ${port} and save metrics to ${file}"
 		
 		started=$(date +%s)
-		nc -l "${port}" >>"${file}"
-		ret=$?
+		mync -l "${port}" | tee -a -p --output-error=exit "${file}"
 		ended=$(date +%s)
 		
-		log "nc stopped with return code ${ret}."
-
 		if [ -s "${file}" ]
 			then
 			if [ ! -z "${real_backend_host}" -a ! -z "${real_backend_port}" ]
 				then
 				log "Attempting to send the metrics to the real backend at ${real_backend_host}:${real_backend_port}"
 				
-				nc "${real_backend_host}" "${real_backend_port}" <"${file}"
+				mync "${real_backend_host}" "${real_backend_port}" <"${file}"
 				ret=$?
 
 				if [ ${ret} -eq 0 ]
@@ -50,12 +59,13 @@ listen_save_replay_forever() {
 		# if nc cannot listen to port
 		if [ $((ended - started)) -lt 5 ]
 			then
-			log "nc has been stopped too fast. Waiting 30 secs."
+			log "nc has been stopped too fast."
 			delay=30
 		else
 			delay=1
 		fi
 
+		log "Waiting ${delay} seconds before listening again for data."
 		sleep ${delay}
 	done
 }
