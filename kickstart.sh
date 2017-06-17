@@ -9,7 +9,7 @@
 # bash <(curl -Ss https://my-netdata.io/kickstart.sh) all
 #
 # Other options:
-#  --src-dst PATH    keep netdata.git at PATH/netdata.git
+#  --src-dir PATH    keep netdata.git at PATH/netdata.git
 #  --dont-wait       do not prompt for user input
 #  --non-interactive do not prompt for user input
 #  --no-updates      do not install script for daily updates
@@ -238,14 +238,14 @@ do
     then
         INTERACTIVE=0
         shift 1
-    elif [ "${1}" = "--src-dst" -o "${1}" = "--src-dir" ]
+    elif [ "${1}" = "--src-dir" ]
     then
         SOURCE_DST="${2}"
-        echo >&2 "netdata source will be installed at ${SOURCE_DST}/netdata.git"
+        # echo >&2 "netdata source will be installed at ${SOURCE_DST}/netdata.git"
         shift 2
     elif [ "${1}" = "--no-updates" ]
     then
-        echo >&2 "netdata will not auto-update"
+        # echo >&2 "netdata will not auto-update"
         NETDATA_UPDATES=
         shift 1
     else
