@@ -30,7 +30,7 @@ listen_save_replay_forever() {
 		log "Starting nc to listen on port ${port} and save metrics to ${file}"
 		
 		started=$(date +%s)
-		mync -l "${port}" | tee -a -p --output-error=exit "${file}"
+		mync -l -p "${port}" | tee -a -p --output-error=exit "${file}"
 		ended=$(date +%s)
 		
 		if [ -s "${file}" ]
