@@ -391,7 +391,7 @@ void rrd_init(char *hostname) {
             , registry_get_this_machine_hostname()
             , registry_get_this_machine_guid()
             , os_type
-            , config_get(CONFIG_SECTION_BACKEND, "opentsdb host tags", "")
+            , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
             , default_rrd_update_every
             , default_rrd_history_entries
             , default_rrd_memory_mode
