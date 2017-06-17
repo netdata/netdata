@@ -1,5 +1,8 @@
 #/bin/bash
 
+cpus=$(grep ^processor </proc/cpuinfo| wc -l)
+[ -z "${cpus}" ] && cpus=1
+
 token=
 [ -f .coverity-token ] && token="$(<.coverity-token)"
 [ -z "${token}" ] && \
@@ -30,7 +33,7 @@ make clean || exit 1
 [ -f netdata-coverity-analysis.tgz ] && \
 	rm netdata-coverity-analysis.tgz
 
-"${covbuild}" --dir cov-int make -j4 || exit 1
+"${covbuild}" --dir cov-int make -j${cpus} || exit 1
 
 tar czvf netdata-coverity-analysis.tgz cov-int || exit 1
 
