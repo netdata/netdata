@@ -59,12 +59,18 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
 // RRDHOST - internal helpers
 
 static inline void rrdhost_init_tags(RRDHOST *host, const char *tags) {
+    if(host->tags && tags && !strcmp(host->tags, tags))
+        return;
+
     void *old = (void *)host->tags;
     host->tags = (tags && *tags)?strdupz(tags):NULL;
     freez(old);
 }
 
 static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
+    if(host->hostname && hostname && !strcmp(host->hostname, hostname))
+        return;
+
     void *old = host->hostname;
     host->hostname = strdupz(hostname);
     host->hash_hostname = simple_hash(host->hostname);
@@ -72,6 +78,9 @@ static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
 }
 
 static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
+    if(host->os && os && !strcmp(host->os, os))
+        return;
+
     void *old = (void *)host->os;
     host->os = strdupz(os?os:"unknown");
     freez(old);
@@ -326,13 +335,16 @@ RRDHOST *rrdhost_find_or_create(
         }
 
         if(host->rrd_update_every != update_every)
-            error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds.", host->hostname, host->rrd_update_every, update_every);
+            error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", host->hostname, host->rrd_update_every, update_every);
 
         if(host->rrd_history_entries < history)
-            error("Host '%s' has history of %ld entries, but the wanted one is %ld entries.", host->hostname, host->rrd_history_entries, history);
+            error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", host->hostname, host->rrd_history_entries, history);
 
         if(host->rrd_memory_mode != mode)
-            error("Host '%s' has memory mode '%s', but the wanted one is '%s'.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+            error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+
+        // update host tags
+        rrdhost_init_tags(host, tags);
     }
     rrd_unlock();
 
