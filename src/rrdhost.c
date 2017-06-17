@@ -60,7 +60,7 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
 
 static inline void rrdhost_init_tags(RRDHOST *host, const char *tags) {
     freez((void *)host->tags);
-    host->tags = strdupz(tags);
+    host->tags = (tags && *tags)?strdupz(tags):NULL;
 }
 
 static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
