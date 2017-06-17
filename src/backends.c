@@ -601,9 +601,10 @@ void *backends_main(void *ptr) {
 
         // ------------------------------------------------------------------------
         // Wait for the next iteration point.
+
         heartbeat_next(&hb, step_ut);
         time_t before = now_realtime_sec();
-
+        debug(D_BACKEND, "BACKEND: preparing buffer for timeframe %lu to %lu", (unsigned long)after, (unsigned long)before);
 
         // ------------------------------------------------------------------------
         // add to the buffer the data we need to send to the backend
@@ -643,7 +644,7 @@ void *backends_main(void *ptr) {
                             count_dims++;
                         }
                         else {
-                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection is not within our timeframe", rd->id, st->id, __hostname);
+                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
                             count_dims_skipped++;
                         }
                     }
