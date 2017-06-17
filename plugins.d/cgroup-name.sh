@@ -124,6 +124,18 @@ if [ -z "${NAME}" ]
         # libvirtd / qemu virtual machines
 
         NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
+    elif [[ "${CGROUP}" =~ qemu.slice_[0-9]+.scope && -d /etc/pve ]]
+        then
+        # Proxmox VMs
+
+        PVEID="$( echo "${CGROUP}" | sed "s|qemu.slice_\([0-9]\+\).scope|\1|" )"
+        NAME="$(qm config ${PVEID} |  grep -oP 'name: (.*)' | sed 's/name: //' )"
+    elif [[ "${CGROUP}" =~ lxc_[0-9]+ && -d /etc/pve ]]
+        then
+
+        # Proxmox Container (LXC)
+        PVEID="$( echo "${CGROUP}" | sed "s|lxc_\([0-9]\+\)|\1|" )"
+        NAME="$(pct config ${PVEID} |  grep -oP 'hostname: (.*)' | sed 's/hostname: //' )"
     fi
 
     [ -z "${NAME}" ] && NAME="${CGROUP}"
