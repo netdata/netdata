@@ -59,19 +59,22 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
 // RRDHOST - internal helpers
 
 static inline void rrdhost_init_tags(RRDHOST *host, const char *tags) {
-    freez((void *)host->tags);
+    void *old = (void *)host->tags;
     host->tags = (tags && *tags)?strdupz(tags):NULL;
+    freez(old);
 }
 
 static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
-    freez(host->hostname);
+    void *old = host->hostname;
     host->hostname = strdupz(hostname);
     host->hash_hostname = simple_hash(host->hostname);
+    freez(old);
 }
 
 static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
-    freez((void *)host->os);
+    void *old = (void *)host->os;
     host->os = strdupz(os?os:"unknown");
+    freez(old);
 }
 
 static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_guid) {
