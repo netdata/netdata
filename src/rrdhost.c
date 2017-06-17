@@ -72,7 +72,7 @@ static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
         return;
 
     void *old = host->hostname;
-    host->hostname = strdupz(hostname);
+    host->hostname = strdupz(hostname?hostname:"localhost");
     host->hash_hostname = simple_hash(host->hostname);
     freez(old);
 }
