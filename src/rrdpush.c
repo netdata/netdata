@@ -546,7 +546,8 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
     rrdpush_api_key = appconfig_get(&stream_config, key, "default proxy api key", rrdpush_api_key);
     rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
 
-    tags = appconfig_get(&stream_config, machine_guid, "host tags", tags);
+    tags = appconfig_get(&stream_config, machine_guid, "host tags", (tags)?tags:"");
+    if(tags && !*tags) tags = NULL;
 
     if(!strcmp(machine_guid, "localhost"))
         host = localhost;
