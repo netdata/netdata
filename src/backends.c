@@ -44,9 +44,15 @@ static inline calculated_number backend_calculate_value_from_stored_data(
     time_t first_t = rrdset_first_entry_t(st);
     time_t last_t  = rrdset_last_entry_t(st);
 
-    if(unlikely(before < first_t || after > last_t))
+    if(unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
+        debug(D_BACKEND, "BACKEND: %s.%s.%s: requested timeframe %lu to %lu is outside the chart's database range %lu to %lu",
+              st->rrdhost->hostname, st->id, rd->id,
+              (unsigned long)after, (unsigned long)before,
+              (unsigned long)first_t, (unsigned long)last_t
+        );
         return NAN;
+    }
 
     // align the time-frame
     // for 'after' also skip the first value by adding st->update_every
@@ -88,8 +94,13 @@ static inline calculated_number backend_calculate_value_from_stored_data(
         counter++;
     }
 
-    if(unlikely(!counter))
+    if(unlikely(!counter)) {
+        debug(D_BACKEND, "BACKEND: %s.%s.%s: no values stored in database for range %lu to %lu",
+              st->rrdhost->hostname, st->id, rd->id,
+              (unsigned long)after, (unsigned long)before
+        );
         return NAN;
+    }
 
     if(unlikely(options & BACKEND_SOURCE_DATA_SUM))
         return sum;
@@ -113,7 +124,7 @@ static inline int discard_response(BUFFER *b, const char *backend) {
     }
     *d = '\0';
 
-    info("Received %zu bytes from %s backend. Ignoring them. Sample: '%s'", buffer_strlen(b), backend, sample);
+    info("BACKEND: received %zu bytes from %s backend. Ignoring them. Sample: '%s'", buffer_strlen(b), backend, sample);
     buffer_flush(b);
     return 0;
 }
