@@ -119,7 +119,7 @@ static inline void send_chart_metrics(RRDSET *st) {
     buffer_strcat(st->rrdhost->rrdpush_buffer, "END\n");
 }
 
-void rrdpush_sender_thread_spawn(RRDHOST *host);
+static void rrdpush_sender_thread_spawn(RRDHOST *host);
 
 void rrdset_done_push(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
@@ -305,17 +305,19 @@ void *rrdpush_sender_thread(void *ptr) {
 
             info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
 
-            char http[1000 + 1];
-            snprintfz(http, 1000,
-                    "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&os=%s&update_every=%d HTTP/1.1\r\n"
+            #define HTTP_HEADER_SIZE 8192
+            char http[HTTP_HEADER_SIZE + 1];
+            snprintfz(http, HTTP_HEADER_SIZE,
+                    "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&tags=%s HTTP/1.1\r\n"
                     "User-Agent: netdata-push-service/%s\r\n"
                     "Accept: */*\r\n\r\n"
                       , host->rrdpush_api_key
                       , host->hostname
                       , host->registry_hostname
                       , host->machine_guid
-                      , host->os
                       , default_rrd_update_every
+                      , host->os
+                      , (host->tags)?host->tags:""
                       , program_version
             );
 
@@ -329,7 +331,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
             info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
 
-            if(recv_timeout(host->rrdpush_socket, http, 1000, 0, timeout) == -1) {
+            if(recv_timeout(host->rrdpush_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
                 close(host->rrdpush_socket);
                 host->rrdpush_socket = -1;
                 error("STREAM %s [send to %s]: failed to initialize communication", host->hostname, connected_to);
@@ -509,7 +511,7 @@ cleanup:
 // ----------------------------------------------------------------------------
 // rrdpush receiver thread
 
-int rrdpush_receive(int fd, const char *key, const char *hostname, const char *registry_hostname, const char *machine_guid, const char *os, int update_every, char *client_ip, char *client_port) {
+static int rrdpush_receive(int fd, const char *key, const char *hostname, const char *registry_hostname, const char *machine_guid, const char *os, const char *tags, int update_every, char *client_ip, char *client_port) {
     RRDHOST *host;
     int history = default_rrd_history_entries;
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
@@ -544,6 +546,8 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *r
     rrdpush_api_key = appconfig_get(&stream_config, key, "default proxy api key", rrdpush_api_key);
     rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
 
+    tags = appconfig_get(&stream_config, machine_guid, "host tags", tags);
+
     if(!strcmp(machine_guid, "localhost"))
         host = localhost;
     else
@@ -552,6 +556,7 @@ int rrdpush_receive(int fd, const char *key, const char *hostname, const char *r
                 , registry_hostname
                 , machine_guid
                 , os
+                , tags
                 , update_every
                 , history
                 , mode
@@ -654,12 +659,13 @@ struct rrdpush_thread {
     char *registry_hostname;
     char *machine_guid;
     char *os;
+    char *tags;
     char *client_ip;
     char *client_port;
     int update_every;
 };
 
-void *rrdpush_receiver_thread(void *ptr) {
+static void *rrdpush_receiver_thread(void *ptr) {
     struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
 
     if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
@@ -670,7 +676,7 @@ void *rrdpush_receiver_thread(void *ptr) {
 
 
     info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
-    rrdpush_receive(rpt->fd, rpt->key, rpt->hostname, rpt->registry_hostname, rpt->machine_guid, rpt->os, rpt->update_every, rpt->client_ip, rpt->client_port);
+    rrdpush_receive(rpt->fd, rpt->key, rpt->hostname, rpt->registry_hostname, rpt->machine_guid, rpt->os, rpt->tags, rpt->update_every, rpt->client_ip, rpt->client_port);
     info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
     freez(rpt->key);
@@ -678,6 +684,7 @@ void *rrdpush_receiver_thread(void *ptr) {
     freez(rpt->registry_hostname);
     freez(rpt->machine_guid);
     freez(rpt->os);
+    freez(rpt->tags);
     freez(rpt->client_ip);
     freez(rpt->client_port);
     freez(rpt);
@@ -686,7 +693,7 @@ void *rrdpush_receiver_thread(void *ptr) {
     return NULL;
 }
 
-void rrdpush_sender_thread_spawn(RRDHOST *host) {
+static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     rrdhost_wrlock(host);
 
     if(!host->rrdpush_spawn) {
@@ -707,7 +714,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
     info("STREAM [receive from [%s]:%s]: new client connection.", w->client_ip, w->client_port);
 
-    char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown";
+    char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *tags = NULL;
     int update_every = default_rrd_update_every;
     char buf[GUID_LEN + 1];
 
@@ -731,6 +738,8 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
             update_every = (int)strtoul(value, NULL, 0);
         else if(!strcmp(name, "os"))
             os = value;
+        else if(!strcmp(name, "tags"))
+            tags = value;
         else
             info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
     }
@@ -791,6 +800,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
     rpt->machine_guid      = strdupz(machine_guid);
     rpt->os                = strdupz(os);
+    rpt->tags              = (tags)?strdupz(tags):NULL;
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
