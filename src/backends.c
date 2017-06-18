@@ -44,9 +44,15 @@ static inline calculated_number backend_calculate_value_from_stored_data(
     time_t first_t = rrdset_first_entry_t(st);
     time_t last_t  = rrdset_last_entry_t(st);
 
-    if(unlikely(before < first_t || after > last_t))
+    if(unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
+        debug(D_BACKEND, "BACKEND: %s.%s.%s: requested timeframe %lu to %lu is outside the chart's database range %lu to %lu",
+              st->rrdhost->hostname, st->id, rd->id,
+              (unsigned long)after, (unsigned long)before,
+              (unsigned long)first_t, (unsigned long)last_t
+        );
         return NAN;
+    }
 
     // align the time-frame
     // for 'after' also skip the first value by adding st->update_every
@@ -88,8 +94,13 @@ static inline calculated_number backend_calculate_value_from_stored_data(
         counter++;
     }
 
-    if(unlikely(!counter))
+    if(unlikely(!counter)) {
+        debug(D_BACKEND, "BACKEND: %s.%s.%s: no values stored in database for range %lu to %lu",
+              st->rrdhost->hostname, st->id, rd->id,
+              (unsigned long)after, (unsigned long)before
+        );
         return NAN;
+    }
 
     if(unlikely(options & BACKEND_SOURCE_DATA_SUM))
         return sum;
@@ -113,7 +124,7 @@ static inline int discard_response(BUFFER *b, const char *backend) {
     }
     *d = '\0';
 
-    info("Received %zu bytes from %s backend. Ignoring them. Sample: '%s'", buffer_strlen(b), backend, sample);
+    info("BACKEND: received %zu bytes from %s backend. Ignoring them. Sample: '%s'", buffer_strlen(b), backend, sample);
     buffer_flush(b);
     return 0;
 }
@@ -193,8 +204,6 @@ static inline int process_graphite_response(BUFFER *b) {
 // ----------------------------------------------------------------------------
 // opentsdb backend
 
-static const char *opentsdb_host_tags = NULL;
-
 static inline int format_dimension_collected_opentsdb_telnet(
           BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
@@ -220,8 +229,8 @@ static inline int format_dimension_collected_opentsdb_telnet(
             , (uint32_t)rd->last_collected_time.tv_sec
             , rd->last_collected_value
             , hostname
-            , (opentsdb_host_tags)?" ":""
-            , (opentsdb_host_tags)?opentsdb_host_tags:""
+            , (host->tags)?" ":""
+            , (host->tags)?host->tags:""
     );
 
     return 1;
@@ -253,8 +262,8 @@ static inline int format_dimension_stored_opentsdb_telnet(
                 , (uint32_t) before
                 , value
                 , hostname
-                , (opentsdb_host_tags)?" ":""
-                , (opentsdb_host_tags)?opentsdb_host_tags:""
+                , (host->tags)?" ":""
+                , (host->tags)?host->tags:""
         );
 
         return 1;
@@ -500,10 +509,6 @@ void *backends_main(void *ptr) {
         default_port = 4242;
         backend_response_checker = process_opentsdb_response;
 
-        const char *tags = config_get(CONFIG_SECTION_BACKEND, "opentsdb host tags", "");
-        if(tags && *tags)
-            opentsdb_host_tags = tags;
-
         if(options & BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_opentsdb_telnet;
         else
@@ -601,9 +606,10 @@ void *backends_main(void *ptr) {
 
         // ------------------------------------------------------------------------
         // Wait for the next iteration point.
+
         heartbeat_next(&hb, step_ut);
         time_t before = now_realtime_sec();
-
+        debug(D_BACKEND, "BACKEND: preparing buffer for timeframe %lu to %lu", (unsigned long)after, (unsigned long)before);
 
         // ------------------------------------------------------------------------
         // add to the buffer the data we need to send to the backend
@@ -643,7 +649,7 @@ void *backends_main(void *ptr) {
                             count_dims++;
                         }
                         else {
-                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection is not within our timeframe", rd->id, st->id, __hostname);
+                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
                             count_dims_skipped++;
                         }
                     }

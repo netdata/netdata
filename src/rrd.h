@@ -378,7 +378,8 @@ struct rrdhost {
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host
     uint32_t hash_machine_guid;                     // the hash of the unique ID
 
-    char *os;                                       // the O/S type of the host
+    const char *os;                                 // the O/S type of the host
+    const char *tags;                               // tags for this host
 
     uint32_t flags;                                 // flags about this RRDHOST
 
@@ -498,6 +499,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , const char *registry_hostname
         , const char *guid
         , const char *os
+        , const char *tags
         , int update_every
         , long history
         , RRD_MEMORY_MODE mode

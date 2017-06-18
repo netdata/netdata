@@ -58,15 +58,32 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash) {
 // ----------------------------------------------------------------------------
 // RRDHOST - internal helpers
 
+static inline void rrdhost_init_tags(RRDHOST *host, const char *tags) {
+    if(host->tags && tags && !strcmp(host->tags, tags))
+        return;
+
+    void *old = (void *)host->tags;
+    host->tags = (tags && *tags)?strdupz(tags):NULL;
+    freez(old);
+}
+
 static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname) {
-    freez(host->hostname);
-    host->hostname = strdupz(hostname);
+    if(host->hostname && hostname && !strcmp(host->hostname, hostname))
+        return;
+
+    void *old = host->hostname;
+    host->hostname = strdupz(hostname?hostname:"localhost");
     host->hash_hostname = simple_hash(host->hostname);
+    freez(old);
 }
 
 static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
-    freez(host->os);
+    if(host->os && os && !strcmp(host->os, os))
+        return;
+
+    void *old = (void *)host->os;
     host->os = strdupz(os?os:"unknown");
+    freez(old);
 }
 
 static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_guid) {
@@ -83,6 +100,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                         const char *registry_hostname,
                         const char *guid,
                         const char *os,
+                        const char *tags,
                         int update_every,
                         long entries,
                         RRD_MEMORY_MODE memory_mode,
@@ -116,6 +134,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
     rrdhost_init_os(host, os);
+    rrdhost_init_tags(host, tags);
     host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
     avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
@@ -233,6 +252,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     else {
         info("Host '%s' (at registry as '%s') with guid '%s' initialized"
                      ", os %s"
+                     ", tags '%s'"
                      ", update every %d"
                      ", memory mode %s"
                      ", history entries %ld"
@@ -248,6 +268,7 @@ RRDHOST *rrdhost_create(const char *hostname,
              , host->registry_hostname
              , host->machine_guid
              , host->os
+             , (host->tags)?host->tags:""
              , host->rrd_update_every
              , rrd_memory_mode_name(host->rrd_memory_mode)
              , host->rrd_history_entries
@@ -273,6 +294,7 @@ RRDHOST *rrdhost_find_or_create(
         , const char *registry_hostname
         , const char *guid
         , const char *os
+        , const char *tags
         , int update_every
         , long history
         , RRD_MEMORY_MODE mode
@@ -291,6 +313,7 @@ RRDHOST *rrdhost_find_or_create(
                 , registry_hostname
                 , guid
                 , os
+                , tags
                 , update_every
                 , history
                 , mode
@@ -312,13 +335,16 @@ RRDHOST *rrdhost_find_or_create(
         }
 
         if(host->rrd_update_every != update_every)
-            error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds.", host->hostname, host->rrd_update_every, update_every);
+            error("Host '%s' has an update frequency of %d seconds, but the wanted one is %d seconds. Restart netdata here to apply the new settings.", host->hostname, host->rrd_update_every, update_every);
 
         if(host->rrd_history_entries < history)
-            error("Host '%s' has history of %ld entries, but the wanted one is %ld entries.", host->hostname, host->rrd_history_entries, history);
+            error("Host '%s' has history of %ld entries, but the wanted one is %ld entries. Restart netdata here to apply the new settings.", host->hostname, host->rrd_history_entries, history);
 
         if(host->rrd_memory_mode != mode)
-            error("Host '%s' has memory mode '%s', but the wanted one is '%s'.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+            error("Host '%s' has memory mode '%s', but the wanted one is '%s'. Restart netdata here to apply the new settings.", host->hostname, rrd_memory_mode_name(host->rrd_memory_mode), rrd_memory_mode_name(mode));
+
+        // update host tags
+        rrdhost_init_tags(host, tags);
     }
     rrd_unlock();
 
@@ -380,6 +406,7 @@ void rrd_init(char *hostname) {
             , registry_get_this_machine_hostname()
             , registry_get_this_machine_guid()
             , os_type
+            , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
             , default_rrd_update_every
             , default_rrd_history_entries
             , default_rrd_memory_mode
@@ -479,7 +506,8 @@ void rrdhost_free(RRDHOST *host) {
     // ------------------------------------------------------------------------
     // free it
 
-    freez(host->os);
+    freez((void *)host->tags);
+    freez((void *)host->os);
     freez(host->cache_dir);
     freez(host->varlib_dir);
     freez(host->rrdpush_api_key);
