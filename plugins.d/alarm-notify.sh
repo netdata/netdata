@@ -1074,7 +1074,7 @@ EOF
 # discord sender
 
 send_discord() {
-    local webhook="${1}/slack" channels="${2}" httpcode sent=0 channel color payload
+    local webhook="${1}/slack" channels="${2}" httpcode sent=0 channel color payload username
 
     [ "${SEND_DISCORD}" != "YES" ] && return 1
 
@@ -1087,10 +1087,13 @@ send_discord() {
 
     for channel in ${channels}
     do
+        username="netdata on ${host}"
+        [ ${#username} -gt 32 ] && username="${username:0:29}..."
+
         payload="$(cat <<EOF
         {
             "channel": "#${channel}",
-            "username": "netdata on ${host}",
+            "username": "${username}",
             "text": "${host} ${status_message}, \`${chart}\` (_${family}_), *${alarm}*",
             "icon_url": "${images_base_url}/images/seo-performance-128.png",
             "attachments": [
