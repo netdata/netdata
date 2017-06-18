@@ -2730,9 +2730,12 @@
             });
 
             /* activate bootstrap scrollspy (needed for sidebar) */
+            var scrollspyOffset = $(window).height() / 5;
+            if(scrollspyOffset > 200) scrollspyOffset = 200;
+            if(scrollspyOffset < 50) scrollspyOffset = 50;
             $(document.body).scrollspy({
                 target: '#sidebar',
-                offset: $(window).height() / 5 // controls the diff of the <hX> element to the top, to select it
+                offset: scrollspyOffset // controls the diff of the <hX> element to the top, to select it
             });
 
             // change the URL based on the current position of the screen
