@@ -140,7 +140,7 @@ if [ -z "${NAME}" ]
 
         # Proxmox Container (LXC)
 	FILENAME="/etc/pve/lxc/${BASH_REMATCH[1]}.conf"
-	if [ -f $FILENAME && -r $FILENAME ]]
+	if [[ -f $FILENAME && -r $FILENAME ]]
             then
 	    NAME=$(grep -e '^hostname: ' /etc/pve/lxc/${BASH_REMATCH[1]}.conf | head -1 | sed -rn 's|\s*hostname\s*:\s*(.*)?$|\1|p')
 	else
