@@ -124,6 +124,28 @@ if [ -z "${NAME}" ]
         # libvirtd / qemu virtual machines
 
         NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
+    elif [[ "${CGROUP}" =~ qemu.slice_([0-9]+).scope && -d /etc/pve ]]
+        then
+        
+	# Proxmox VMs
+	FILENAME="/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf"
+	if [[ -f $FILENAME && -r $FILENAME ]]
+	    then
+            NAME=$(grep -e '^name: ' /etc/pve/qemu-server/${BASH_REMATCH[1]}.conf | head -1 | sed -rn 's|\s*name\s*:\s*(.*)?$|\1|p')
+	else	
+            error "proxmox config file missing $FILENAME or netdata does not have read access.  Please ensure netdata is a member of www-data group."
+	fi
+    elif [[ "${CGROUP}" =~ lxc_([0-9]+) && -d /etc/pve ]]
+        then
+
+        # Proxmox Container (LXC)
+	FILENAME="/etc/pve/lxc/${BASH_REMATCH[1]}.conf"
+	if [ -f $FILENAME && -r $FILENAME ]]
+            then
+	    NAME=$(grep -e '^hostname: ' /etc/pve/lxc/${BASH_REMATCH[1]}.conf | head -1 | sed -rn 's|\s*hostname\s*:\s*(.*)?$|\1|p')
+	else
+            error "proxmox config file missing $FILENAME or netdata does not have read access.  Please ensure netdata is a member of www-data group."
+        fi
     fi
 
     [ -z "${NAME}" ] && NAME="${CGROUP}"
