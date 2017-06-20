@@ -774,7 +774,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     if(regenerate_guid(machine_guid, buf) == -1) {
-        error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not GUID. Forbidding access.", w->client_ip, w->client_port, key);
+        error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not GUID. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your machine GUID is invalid.");
         return 404;
