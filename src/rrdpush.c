@@ -774,14 +774,14 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     if(regenerate_guid(machine_guid, buf) == -1) {
-        error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not GUID. Forbidding access.", w->client_ip, w->client_port, key);
+        error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not GUID. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your machine GUID is invalid.");
         return 404;
     }
 
     if(!appconfig_get_boolean(&stream_config, key, "enabled", 0)) {
-        error("STREAM [receive from [%s]:%s]: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, machine_guid);
+        error("STREAM [receive from [%s]:%s]: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your API key is not permitted access.");
         return 401;
