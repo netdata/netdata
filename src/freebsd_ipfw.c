@@ -15,6 +15,8 @@
 
 int do_ipfw(int update_every, usec_t dt) {
     (void)dt;
+#if __FreeBSD__ >= 11
+
     static int do_static = -1, do_dynamic = -1, do_mem = -1;
 
     if (unlikely(do_static == -1)) {
@@ -350,4 +352,9 @@ int do_ipfw(int update_every, usec_t dt) {
     }
 
     return 0;
+#else
+    error("FREEBSD: ipfw charts supported for FreeBSD 11.0 and newer releases only");
+    COMMON_IPFW_ERROR();
+    return 1;
+#endif
 }
