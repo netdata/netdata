@@ -731,6 +731,9 @@ static inline size_t rrdset_done_interpolate(
     ssize_t iterations = (ssize_t)((now_collect_ut - last_stored_ut) / (update_every_ut));
     if((now_collect_ut % (update_every_ut)) == 0) iterations++;
 
+    size_t counter = st->counter;
+    long current_entry = st->current_entry;
+
     for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
         #ifdef NETDATA_INTERNAL_CHECKS
         if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
@@ -830,12 +833,12 @@ static inline size_t rrdset_done_interpolate(
             }
 
             if(unlikely(!store_this_entry)) {
-                rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
+                rd->values[current_entry] = SN_EMPTY_SLOT; //pack_storage_number(0, SN_NOT_EXISTS);
                 continue;
             }
 
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
-                rd->values[st->current_entry] = pack_storage_number(new_value, storage_flags );
+                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
                 rd->last_stored_value = new_value;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
@@ -843,8 +846,8 @@ static inline size_t rrdset_done_interpolate(
                     debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
                             CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
                           , st->id, rd->name
-                          , st->current_entry
-                          , unpack_storage_number(rd->values[st->current_entry]), new_value
+                          , current_entry
+                          , unpack_storage_number(rd->values[current_entry]), new_value
                     );
                 #endif
 
@@ -855,57 +858,57 @@ static inline size_t rrdset_done_interpolate(
                 if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                     debug(D_RRD_STATS, "%s/%s: STORE[%ld] = NON EXISTING "
                           , st->id, rd->name
-                          , st->current_entry
+                          , current_entry
                     );
                 #endif
 
-                rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
+                rd->values[current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
                 rd->last_stored_value = NAN;
             }
 
             stored_entries++;
 
+            #ifdef NETDATA_INTERNAL_CHECKS
             if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
                 calculated_number t1 = new_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor;
-                calculated_number t2 = unpack_storage_number(rd->values[st->current_entry]);
+                calculated_number t2 = unpack_storage_number(rd->values[current_entry]);
 
-                #ifdef NETDATA_INTERNAL_CHECKS
                 calculated_number accuracy = accuracy_loss(t1, t2);
                 debug(D_RRD_STATS, "%s/%s: UNPACK[%ld] = " CALCULATED_NUMBER_FORMAT " FLAGS=0x%08x (original = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s)"
                       , st->id, rd->name
-                      , st->current_entry
+                      , current_entry
                       , t2
-                      , get_storage_number_flags(rd->values[st->current_entry])
+                      , get_storage_number_flags(rd->values[current_entry])
                       , t1
                       , accuracy
                       , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
                 );
-                #endif
 
                 rd->collected_volume += t1;
                 rd->stored_volume += t2;
 
-                #ifdef NETDATA_INTERNAL_CHECKS
                 accuracy = accuracy_loss(rd->collected_volume, rd->stored_volume);
                 debug(D_RRD_STATS, "%s/%s: VOLUME[%ld] = " CALCULATED_NUMBER_FORMAT ", calculated  = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s"
                       , st->id, rd->name
-                      , st->current_entry
+                      , current_entry
                       , rd->stored_volume
                       , rd->collected_volume
                       , accuracy
                       , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
                 );
-                #endif
-
             }
+            #endif
         }
         // reset the storage flags for the next point, if any;
         storage_flags = SN_EXISTS;
 
-        st->counter++;
-        st->current_entry = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
+        counter++;
+        current_entry = ((current_entry + 1) >= st->entries) ? 0 : current_entry + 1;
         last_stored_ut = next_store_ut;
     }
+
+    st->counter = counter;
+    st->current_entry = current_entry;
 
     if(likely(last_ut)) {
         st->last_updated.tv_sec = (time_t) (last_ut / USEC_PER_SEC);
