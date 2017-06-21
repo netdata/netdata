@@ -444,12 +444,16 @@ RRDSET *rrdset_create_custom(
             memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
 
             st->name = NULL;
+            st->config_section = NULL;
             st->type = NULL;
             st->family = NULL;
-            st->context = NULL;
             st->title = NULL;
             st->units = NULL;
+            st->context = NULL;
+            st->cache_dir = NULL;
             st->dimensions = NULL;
+            st->rrdfamily = NULL;
+            st->rrdhost = NULL;
             st->next = NULL;
             st->variables = NULL;
             st->alarms = NULL;
@@ -708,6 +712,212 @@ static inline void rrdset_done_push_exclusive(RRDSET *st) {
     rrdset_unlock(st);
 }
 
+
+static inline size_t rrdset_done_interpolate(
+        RRDSET *st
+        , usec_t update_every_ut
+        , usec_t last_stored_ut
+        , usec_t next_store_ut
+        , usec_t last_collect_ut
+        , usec_t now_collect_ut
+        , char store_this_entry
+        , uint32_t storage_flags
+) {
+    RRDDIM *rd;
+
+    size_t stored_entries = 0;     // the number of entries we have stored in the db, during this call to rrdset_done()
+
+    usec_t first_ut = last_stored_ut, last_ut = 0;
+    ssize_t iterations = (ssize_t)((now_collect_ut - last_stored_ut) / (update_every_ut));
+    if((now_collect_ut % (update_every_ut)) == 0) iterations++;
+
+    size_t counter = st->counter;
+    long current_entry = st->current_entry;
+
+    for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
+        #ifdef NETDATA_INTERNAL_CHECKS
+        if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
+
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
+            debug(D_RRD_STATS, "%s: last_stored_ut = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/1000000.0);
+            debug(D_RRD_STATS, "%s: next_store_ut  = %0.3Lf (next interpolation point)", st->name, (long double)next_store_ut/1000000.0);
+        }
+        #endif
+
+        last_ut = next_store_ut;
+
+        rrddim_foreach_read(rd, st) {
+            calculated_number new_value;
+
+            switch(rd->algorithm) {
+                case RRD_ALGORITHM_INCREMENTAL:
+                    new_value = (calculated_number)
+                            (      rd->calculated_value
+                                   * (calculated_number)(next_store_ut - last_collect_ut)
+                                   / (calculated_number)(now_collect_ut - last_collect_ut)
+                            );
+
+                    #ifdef NETDATA_INTERNAL_CHECKS
+                    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                        debug(D_RRD_STATS, "%s/%s: CALC2 INC "
+                                CALCULATED_NUMBER_FORMAT " = "
+                                CALCULATED_NUMBER_FORMAT
+                                " * %llu"
+                                " / %llu"
+                              , st->id, rd->name
+                              , new_value
+                              , rd->calculated_value
+                              , (next_store_ut - last_stored_ut)
+                              , (now_collect_ut - last_stored_ut)
+                        );
+                    #endif
+
+                    rd->calculated_value -= new_value;
+                    new_value += rd->last_calculated_value;
+                    rd->last_calculated_value = 0;
+                    new_value /= (calculated_number)st->update_every;
+
+                    if(unlikely(next_store_ut - last_stored_ut < update_every_ut)) {
+
+                        #ifdef NETDATA_INTERNAL_CHECKS
+                        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                            debug(D_RRD_STATS, "%s/%s: COLLECTION POINT IS SHORT " CALCULATED_NUMBER_FORMAT " - EXTRAPOLATING",
+                                    st->id, rd->name
+                                  , (calculated_number)(next_store_ut - last_stored_ut)
+                            );
+                        #endif
+
+                        new_value = new_value * (calculated_number)(st->update_every * 1000000) / (calculated_number)(next_store_ut - last_stored_ut);
+                    }
+                    break;
+
+                case RRD_ALGORITHM_ABSOLUTE:
+                case RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL:
+                case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
+                default:
+                    if(iterations == 1) {
+                        // this is the last iteration
+                        // do not interpolate
+                        // just show the calculated value
+
+                        new_value = rd->calculated_value;
+                    }
+                    else {
+                        // we have missed an update
+                        // interpolate in the middle values
+
+                        new_value = (calculated_number)
+                                (   (     (rd->calculated_value - rd->last_calculated_value)
+                                          * (calculated_number)(next_store_ut - last_collect_ut)
+                                          / (calculated_number)(now_collect_ut - last_collect_ut)
+                                    )
+                                    +  rd->last_calculated_value
+                                );
+
+                        #ifdef NETDATA_INTERNAL_CHECKS
+                        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                            debug(D_RRD_STATS, "%s/%s: CALC2 DEF "
+                                    CALCULATED_NUMBER_FORMAT " = ((("
+                                            "(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
+                                            " * %llu"
+                                            " / %llu) + " CALCULATED_NUMBER_FORMAT
+                                  , st->id, rd->name
+                                  , new_value
+                                  , rd->calculated_value, rd->last_calculated_value
+                                  , (next_store_ut - first_ut)
+                                  , (now_collect_ut - first_ut), rd->last_calculated_value
+                            );
+                        #endif
+                    }
+                    break;
+            }
+
+            if(unlikely(!store_this_entry)) {
+                rd->values[current_entry] = SN_EMPTY_SLOT; //pack_storage_number(0, SN_NOT_EXISTS);
+                continue;
+            }
+
+            if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
+                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
+                rd->last_stored_value = new_value;
+
+                #ifdef NETDATA_INTERNAL_CHECKS
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                    debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
+                            CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
+                          , st->id, rd->name
+                          , current_entry
+                          , unpack_storage_number(rd->values[current_entry]), new_value
+                    );
+                #endif
+
+            }
+            else {
+
+                #ifdef NETDATA_INTERNAL_CHECKS
+                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                    debug(D_RRD_STATS, "%s/%s: STORE[%ld] = NON EXISTING "
+                          , st->id, rd->name
+                          , current_entry
+                    );
+                #endif
+
+                rd->values[current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
+                rd->last_stored_value = NAN;
+            }
+
+            stored_entries++;
+
+            #ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
+                calculated_number t1 = new_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor;
+                calculated_number t2 = unpack_storage_number(rd->values[current_entry]);
+
+                calculated_number accuracy = accuracy_loss(t1, t2);
+                debug(D_RRD_STATS, "%s/%s: UNPACK[%ld] = " CALCULATED_NUMBER_FORMAT " FLAGS=0x%08x (original = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s)"
+                      , st->id, rd->name
+                      , current_entry
+                      , t2
+                      , get_storage_number_flags(rd->values[current_entry])
+                      , t1
+                      , accuracy
+                      , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
+                );
+
+                rd->collected_volume += t1;
+                rd->stored_volume += t2;
+
+                accuracy = accuracy_loss(rd->collected_volume, rd->stored_volume);
+                debug(D_RRD_STATS, "%s/%s: VOLUME[%ld] = " CALCULATED_NUMBER_FORMAT ", calculated  = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s"
+                      , st->id, rd->name
+                      , current_entry
+                      , rd->stored_volume
+                      , rd->collected_volume
+                      , accuracy
+                      , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
+                );
+            }
+            #endif
+        }
+        // reset the storage flags for the next point, if any;
+        storage_flags = SN_EXISTS;
+
+        counter++;
+        current_entry = ((current_entry + 1) >= st->entries) ? 0 : current_entry + 1;
+        last_stored_ut = next_store_ut;
+    }
+
+    st->counter = counter;
+    st->current_entry = current_entry;
+
+    if(likely(last_ut)) {
+        st->last_updated.tv_sec = (time_t) (last_ut / USEC_PER_SEC);
+        st->last_updated.tv_usec = 0;
+    }
+
+    return stored_entries;
+}
+
 void rrdset_done(RRDSET *st) {
     if(unlikely(netdata_exit)) return;
 
@@ -728,9 +938,6 @@ void rrdset_done(RRDSET *st) {
     char
             store_this_entry = 1,   // boolean: 1 = store this entry, 0 = don't store this entry
             first_entry = 0;        // boolean: 1 = this is the first entry seen for this chart, 0 = all other entries
-
-    unsigned int
-            stored_entries = 0;     // the number of entries we have stored in the db, during this call to rrdset_done()
 
     usec_t
             last_collect_ut,        // the timestamp in microseconds, of the last collected value
@@ -1044,165 +1251,15 @@ void rrdset_done(RRDSET *st) {
 #endif
     }
 
-    usec_t first_ut = last_stored_ut;
-    long long iterations = (now_collect_ut - last_stored_ut) / (update_every_ut);
-    if((now_collect_ut % (update_every_ut)) == 0) iterations++;
-
-    for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
-#endif
-
-        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
-            debug(D_RRD_STATS, "%s: last_stored_ut = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/1000000.0);
-            debug(D_RRD_STATS, "%s: next_store_ut  = %0.3Lf (next interpolation point)", st->name, (long double)next_store_ut/1000000.0);
-        }
-
-        st->last_updated.tv_sec = (time_t) (next_store_ut / USEC_PER_SEC);
-        st->last_updated.tv_usec = 0;
-
-        rrddim_foreach_read(rd, st) {
-            calculated_number new_value;
-
-            switch(rd->algorithm) {
-                case RRD_ALGORITHM_INCREMENTAL:
-                    new_value = (calculated_number)
-                            (      rd->calculated_value
-                                   * (calculated_number)(next_store_ut - last_collect_ut)
-                                   / (calculated_number)(now_collect_ut - last_collect_ut)
-                            );
-
-                    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                        debug(D_RRD_STATS, "%s/%s: CALC2 INC "
-                                CALCULATED_NUMBER_FORMAT " = "
-                                CALCULATED_NUMBER_FORMAT
-                                " * %llu"
-                                        " / %llu"
-                              , st->id, rd->name
-                              , new_value
-                              , rd->calculated_value
-                              , (next_store_ut - last_stored_ut)
-                              , (now_collect_ut - last_stored_ut)
-                        );
-
-                    rd->calculated_value -= new_value;
-                    new_value += rd->last_calculated_value;
-                    rd->last_calculated_value = 0;
-                    new_value /= (calculated_number)st->update_every;
-
-                    if(unlikely(next_store_ut - last_stored_ut < update_every_ut)) {
-                        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                            debug(D_RRD_STATS, "%s/%s: COLLECTION POINT IS SHORT " CALCULATED_NUMBER_FORMAT " - EXTRAPOLATING",
-                                    st->id, rd->name
-                                  , (calculated_number)(next_store_ut - last_stored_ut)
-                            );
-                        new_value = new_value * (calculated_number)(st->update_every * 1000000) / (calculated_number)(next_store_ut - last_stored_ut);
-                    }
-                    break;
-
-                case RRD_ALGORITHM_ABSOLUTE:
-                case RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL:
-                case RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL:
-                default:
-                    if(iterations == 1) {
-                        // this is the last iteration
-                        // do not interpolate
-                        // just show the calculated value
-
-                        new_value = rd->calculated_value;
-                    }
-                    else {
-                        // we have missed an update
-                        // interpolate in the middle values
-
-                        new_value = (calculated_number)
-                                (   (     (rd->calculated_value - rd->last_calculated_value)
-                                          * (calculated_number)(next_store_ut - last_collect_ut)
-                                          / (calculated_number)(now_collect_ut - last_collect_ut)
-                                    )
-                                    +  rd->last_calculated_value
-                                );
-
-                        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                            debug(D_RRD_STATS, "%s/%s: CALC2 DEF "
-                                    CALCULATED_NUMBER_FORMAT " = ((("
-                                            "(" CALCULATED_NUMBER_FORMAT " - " CALCULATED_NUMBER_FORMAT ")"
-                                            " * %llu"
-                                            " / %llu) + " CALCULATED_NUMBER_FORMAT
-                                  , st->id, rd->name
-                                  , new_value
-                                  , rd->calculated_value, rd->last_calculated_value
-                                  , (next_store_ut - first_ut)
-                                  , (now_collect_ut - first_ut), rd->last_calculated_value
-                            );
-                    }
-                    break;
-            }
-
-            if(unlikely(!store_this_entry)) {
-                rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
-                continue;
-            }
-
-            if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
-                rd->values[st->current_entry] = pack_storage_number(new_value, storage_flags );
-                rd->last_stored_value = new_value;
-
-                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                    debug(D_RRD_STATS, "%s/%s: STORE[%ld] "
-                            CALCULATED_NUMBER_FORMAT " = " CALCULATED_NUMBER_FORMAT
-                          , st->id, rd->name
-                          , st->current_entry
-                          , unpack_storage_number(rd->values[st->current_entry]), new_value
-                    );
-            }
-            else {
-                if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                    debug(D_RRD_STATS, "%s/%s: STORE[%ld] = NON EXISTING "
-                          , st->id, rd->name
-                          , st->current_entry
-                    );
-                rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
-                rd->last_stored_value = NAN;
-            }
-
-            stored_entries++;
-
-            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
-                calculated_number t1 = new_value * (calculated_number)rd->multiplier / (calculated_number)rd->divisor;
-                calculated_number t2 = unpack_storage_number(rd->values[st->current_entry]);
-                calculated_number accuracy = accuracy_loss(t1, t2);
-                debug(D_RRD_STATS, "%s/%s: UNPACK[%ld] = " CALCULATED_NUMBER_FORMAT " FLAGS=0x%08x (original = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s)"
-                      , st->id, rd->name
-                      , st->current_entry
-                      , t2
-                      , get_storage_number_flags(rd->values[st->current_entry])
-                      , t1
-                      , accuracy
-                      , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
-                );
-
-                rd->collected_volume += t1;
-                rd->stored_volume += t2;
-                accuracy = accuracy_loss(rd->collected_volume, rd->stored_volume);
-                debug(D_RRD_STATS, "%s/%s: VOLUME[%ld] = " CALCULATED_NUMBER_FORMAT ", calculated  = " CALCULATED_NUMBER_FORMAT ", accuracy loss = " CALCULATED_NUMBER_FORMAT "%%%s"
-                      , st->id, rd->name
-                      , st->current_entry
-                      , rd->stored_volume
-                      , rd->collected_volume
-                      , accuracy
-                      , (accuracy > ACCURACY_LOSS) ? " **TOO BIG** " : ""
-                );
-
-            }
-        }
-        // reset the storage flags for the next point, if any;
-        storage_flags = SN_EXISTS;
-
-        st->counter++;
-        st->current_entry = ((st->current_entry + 1) >= st->entries) ? 0 : st->current_entry + 1;
-        last_stored_ut = next_store_ut;
-    }
+    rrdset_done_interpolate(st
+            , update_every_ut
+            , last_stored_ut
+            , next_store_ut
+            , last_collect_ut
+            , now_collect_ut
+            , store_this_entry
+            , storage_flags
+    );
 
     st->last_collected_total  = st->collected_total;
 
