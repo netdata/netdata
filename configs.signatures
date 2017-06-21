@@ -276,6 +276,7 @@ declare -A configs_signatures=(
   ['97eee7a30e6419df4537242e9d4a719d']='health.d/mysql.conf'
   ['97f337eb96213f3ede05e522e3743a6c']='python.d/memcached.conf'
   ['99a3de85d1e7826ed64a5f8576712e5d']='python.d.conf'
+  ['99b06e68f1da5917ae4cf60e901439f6']='health.d/ram.conf'
   ['99b6030ce25c8fee4598179c0f95fb0b']='health.d/redis.conf'
   ['99c1617448abbdc493976ab9bda5ce02']='apps_groups.conf'
   ['9a8a459a3841b78d4c6ef07428ad2fe1']='health.d/entropy.conf'
