@@ -976,6 +976,7 @@ int statsd_readfile(const char *path, const char *filename) {
             else if(app) {
                 // a new chart
                 chart = callocz(sizeof(STATSD_APP_CHART), 1);
+                netdata_fix_chart_id(s);
                 chart->id = strdupz(s);
                 chart->title = strdupz("Statsd chart");
                 chart->context = strdupz(s);
@@ -1022,6 +1023,7 @@ int statsd_readfile(const char *path, const char *filename) {
         if(!chart) {
             if(!strcmp(name, "name")) {
                 freez((void *)app->name);
+                netdata_fix_chart_name(value);
                 app->name = strdupz(value);
             }
             else if (!strcmp(name, "metrics")) {
@@ -1054,6 +1056,7 @@ int statsd_readfile(const char *path, const char *filename) {
         else {
             if(!strcmp(name, "name")) {
                 freez((void *)chart->name);
+                netdata_fix_chart_id(value);
                 chart->name = strdupz(value);
             }
             else if(!strcmp(name, "title")) {
@@ -1066,6 +1069,7 @@ int statsd_readfile(const char *path, const char *filename) {
             }
             else if (!strcmp(name, "context")) {
                 freez((void *)chart->context);
+                netdata_fix_chart_id(value);
                 chart->context = strdupz(value);
             }
             else if (!strcmp(name, "units")) {
