@@ -555,7 +555,7 @@ config_signature_matches() {
 
 # backup user configurations
 installer_backup_suffix="${PID}.${RANDOM}"
-for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
+for x in $(find -L "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
     if [ -f "${x}" ]
         then
@@ -607,7 +607,7 @@ run make install || exit 1
 # -----------------------------------------------------------------------------
 progress "Restore user edited netdata configuration files"
 
-for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
+for x in $(find -L "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
     if [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
         then
