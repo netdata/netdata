@@ -976,7 +976,9 @@ int statsd_readfile(const char *path, const char *filename) {
             else if(app) {
                 // a new chart
                 chart = callocz(sizeof(STATSD_APP_CHART), 1);
+                netdata_fix_chart_id(s);
                 chart->id = strdupz(s);
+                chart->name = strdupz(s);
                 chart->title = strdupz("Statsd chart");
                 chart->context = strdupz(s);
                 chart->family = strdupz("overview");
@@ -1022,6 +1024,7 @@ int statsd_readfile(const char *path, const char *filename) {
         if(!chart) {
             if(!strcmp(name, "name")) {
                 freez((void *)app->name);
+                netdata_fix_chart_name(value);
                 app->name = strdupz(value);
             }
             else if (!strcmp(name, "metrics")) {
@@ -1054,6 +1057,7 @@ int statsd_readfile(const char *path, const char *filename) {
         else {
             if(!strcmp(name, "name")) {
                 freez((void *)chart->name);
+                netdata_fix_chart_id(value);
                 chart->name = strdupz(value);
             }
             else if(!strcmp(name, "title")) {
@@ -1066,6 +1070,7 @@ int statsd_readfile(const char *path, const char *filename) {
             }
             else if (!strcmp(name, "context")) {
                 freez((void *)chart->context);
+                netdata_fix_chart_id(value);
                 chart->context = strdupz(value);
             }
             else if (!strcmp(name, "units")) {
@@ -1136,7 +1141,7 @@ int statsd_readfile(const char *path, const char *filename) {
                 chart->dimensions_count++;
 
                 debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divisor " COLLECTED_NUMBER_FORMAT,
-                    dim->name, chart->name, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divisor);
+                    dim->name, chart->id, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divisor);
             }
             else {
                 error("STATSD: ignoring line %zu ('%s') of file '%s/%s'. Unknown keyword for the [%s] section.", line, name, path, filename, chart->id);
@@ -1606,7 +1611,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                         }
                         else {
                             if (dim->value_type != STATSD_APP_CHART_DIM_VALUE_TYPE_LAST)
-                                error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->name, app->name, m->name);
+                                error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->id, app->name, m->name);
 
                             dim->value_ptr = &m->last;
                             dim->algorithm = statsd_algorithm_for_metric(m);
