@@ -464,34 +464,28 @@ RRDSET *rrdset_create_custom(
             }
             else {
                 if(strcmp(st->magic, RRDSET_MAGIC) != 0) {
-                    errno = 0;
                     info("Initializing file %s.", fullfilename);
                     memset(st, 0, size);
                 }
                 else if(strcmp(st->id, fullid) != 0) {
-                    errno = 0;
                     error("File %s contents are not for chart %s. Clearing it.", fullfilename, fullid);
                     // munmap(st, size);
                     // st = NULL;
                     memset(st, 0, size);
                 }
                 else if(st->memsize != size || st->entries != entries) {
-                    errno = 0;
                     error("File %s does not have the desired size. Clearing it.", fullfilename);
                     memset(st, 0, size);
                 }
                 else if(st->update_every != update_every) {
-                    errno = 0;
                     error("File %s does not have the desired update frequency. Clearing it.", fullfilename);
                     memset(st, 0, size);
                 }
                 else if((now - st->last_updated.tv_sec) > update_every * entries) {
-                    errno = 0;
                     error("File %s is too old. Clearing it.", fullfilename);
                     memset(st, 0, size);
                 }
                 else if(st->last_updated.tv_sec > now + update_every) {
-                    errno = 0;
                     error("File %s refers to the future. Clearing it.", fullfilename);
                     memset(st, 0, size);
                 }
