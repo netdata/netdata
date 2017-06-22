@@ -27,7 +27,8 @@ BuildRequires: systemd-rpm-macros \
 %global netdata_init_preun %service_del_preun netdata.service
 %global netdata_init_postun %service_del_postun netdata.service
 %else
-%global netdata_initd_buildrequires %{nil}
+%global netdata_initd_buildrequires \
+BuildRequires: systemd
 %global netdata_initd_requires \
 Requires(preun):  systemd-units \
 Requires(postun): systemd-units \
