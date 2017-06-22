@@ -134,41 +134,43 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                 memset(rd, 0, size);
             }
             else {
+                int reset = 0;
+
                 if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
-                    errno = 0;
                     info("Initializing file %s.", fullfilename);
                     memset(rd, 0, size);
+                    reset = 1;
                 }
                 else if(rd->memsize != size) {
-                    errno = 0;
-                    error("File %s does not have the desired size. Clearing it.", fullfilename);
+                    error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, rd->memsize);
                     memset(rd, 0, size);
-                }
-                else if(rd->multiplier != multiplier) {
-                    errno = 0;
-                    error("File %s does not have the same multiplier. Clearing it.", fullfilename);
-                    memset(rd, 0, size);
-                }
-                else if(rd->divisor != divisor) {
-                    errno = 0;
-                    error("File %s does not have the same divisor. Clearing it.", fullfilename);
-                    memset(rd, 0, size);
+                    reset = 1;
                 }
                 else if(rd->update_every != st->update_every) {
-                    errno = 0;
-                    error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
+                    error("File %s does not have the same update frequency, expected %d but found %d. Clearing it.", fullfilename, st->update_every, rd->update_every);
                     memset(rd, 0, size);
+                    reset = 1;
                 }
                 else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
-                    errno = 0;
-                    error("File %s is too old. Clearing it.", fullfilename);
+                    error("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd->last_collected_time) / USEC_PER_SEC, rd->entries * rd->update_every);
                     memset(rd, 0, size);
+                    reset = 1;
                 }
 
-                if(rd->algorithm && rd->algorithm != algorithm)
-                    error("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong."
-                          , fullfilename, algorithm, rrd_algorithm_name(algorithm), rd->algorithm, rrd_algorithm_name(
-                            rd->algorithm));
+                if(!reset) {
+                    if(rd->algorithm != algorithm) {
+                        info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
+                              fullfilename, algorithm, rrd_algorithm_name(algorithm), rd->algorithm, rrd_algorithm_name(rd->algorithm));
+                    }
+
+                    if(rd->multiplier != multiplier) {
+                        info("File %s does not have the expected multiplier (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT ". Previous values may be wrong.", fullfilename, multiplier, rd->multiplier);
+                    }
+
+                    if(rd->divisor != divisor) {
+                        info("File %s does not have the expected divisor (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT ". Previous values may be wrong.", fullfilename, divisor, rd->divisor);
+                    }
+                }
             }
 
             // make sure we have the right memory mode
