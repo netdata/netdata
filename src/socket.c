@@ -1078,6 +1078,10 @@ void poll_events(LISTEN_SOCKETS *sockets
                                     // accept ok
                                     info("POLLFD: LISTENER: client '[%s]:%s' connected to '%s'", client_ip, client_port, sockets->fds_names[i]);
                                     poll_add_fd(&p, nfd, SOCK_STREAM, POLLIN, POLLINFO_FLAG_CLIENT_SOCKET);
+
+                                    // it may have realloced them, so refresh our pointers
+                                    pf = &p.fds[i];
+                                    pi = &p.inf[i];
                                 }
                             } while (nfd != -1);
                             break;
