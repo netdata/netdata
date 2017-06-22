@@ -100,7 +100,7 @@ class Service(SimpleService):
             self.error("couldn't find a method to read cpufreq statistics")
             return False
 
-        for name in self.assignment.keys():
+        for name in sorted(self.assignment, key=lambda v: int(v[3:])):
             self.definitions[ORDER[0]]['lines'].append([name, name, 'absolute', 1, 1000])
 
         return True
