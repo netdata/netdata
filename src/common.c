@@ -1070,6 +1070,8 @@ void *mymmap(const char *filename, size_t size, int flags, int ksm) {
         mem = memory_file_mmap_ksm(filename, size, flags);
 
     if(mem == MAP_FAILED) return NULL;
+
+    errno = 0;
     return mem;
 }
 
