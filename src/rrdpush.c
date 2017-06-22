@@ -624,6 +624,9 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
     }
 
     rrdhost_wrlock(host);
+    if(host->connected_senders > 0)
+        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. If multiple netdata are pushing metrics for the same charts, at the same time, the result is unexpected.", host->hostname, client_ip, client_port);
+
     host->connected_senders++;
     rrdhost_flag_clear(host, RRDHOST_ORPHAN);
     if(health_enabled != CONFIG_BOOLEAN_NO)
