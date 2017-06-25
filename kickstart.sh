@@ -363,7 +363,7 @@ then
         if [ -x netdata-installer.sh ]
         then
             progress "Installing netdata..."
-            echo ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" || \
+            run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" || \
                 fatal "netdata-installer.sh exited with error"
         else
             fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh)."
