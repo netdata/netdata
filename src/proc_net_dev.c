@@ -2,6 +2,7 @@
 
 struct netdev {
     char *name;
+    char *id;
     uint32_t hash;
     size_t len;
 
@@ -83,6 +84,7 @@ static void netdev_free(struct netdev *d) {
 
     netdev_added--;
     freez(d->name);
+    freez(d->id);
     freez(d);
 }
 
@@ -93,7 +95,7 @@ static void netdev_cleanup() {
     struct netdev *d = netdev_root, *last = NULL;
     while(d) {
         if(unlikely(!d->updated)) {
-            // info("Removing network device '%s', linked after '%s'", d->name, last?last->name:"ROOT");
+            // info("Removing network device '%s', linked after '%s'", d->id, last?last->id:"ROOT");
 
             if(netdev_last_used == d)
                 netdev_last_used = last;
@@ -118,14 +120,14 @@ static void netdev_cleanup() {
     }
 }
 
-static struct netdev *get_netdev(const char *name) {
+static struct netdev *get_netdev(const char *id) {
     struct netdev *d;
 
-    uint32_t hash = simple_hash(name);
+    uint32_t hash = simple_hash(id);
 
     // search it, from the last position to the end
     for(d = netdev_last_used ; d ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
+        if(unlikely(hash == d->hash && !strcmp(id, d->id))) {
             netdev_last_used = d->next;
             return d;
         }
@@ -133,7 +135,7 @@ static struct netdev *get_netdev(const char *name) {
 
     // search it from the beginning to the last position we used
     for(d = netdev_root ; d != netdev_last_used ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
+        if(unlikely(hash == d->hash && !strcmp(id, d->id))) {
             netdev_last_used = d->next;
             return d;
         }
@@ -143,10 +145,11 @@ static struct netdev *get_netdev(const char *name) {
     d = callocz(1, sizeof(struct netdev));
 
     char var_name[512 + 1];
-    snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", name);
-    d->name = strdupz(config_get(var_name, "alias", name));
-    d->hash = simple_hash(d->name);
-    d->len = strlen(d->name);
+    snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", id);
+    d->id =  strdupz(id);
+    d->name = strdupz(config_get(var_name, "alias", id));
+    d->hash = simple_hash(d->id);
+    d->len = strlen(d->id);
     netdev_added++;
 
     // link it to the end
@@ -214,10 +217,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             d->enabled = enable_new_interfaces;
 
             if(d->enabled)
-                d->enabled = !simple_pattern_matches(disabled_list, d->name);
+                d->enabled = !simple_pattern_matches(disabled_list, d->id);
 
             char var_name[512 + 1];
-            snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", d->name);
+            snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", d->id);
             d->enabled = config_get_boolean_ondemand(var_name, "enabled", d->enabled);
 
             if(d->enabled == CONFIG_BOOLEAN_NO)
