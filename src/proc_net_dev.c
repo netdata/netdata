@@ -141,7 +141,10 @@ static struct netdev *get_netdev(const char *name) {
 
     // create a new one
     d = callocz(1, sizeof(struct netdev));
-    d->name = strdupz(name);
+
+    char var_name[512 + 1];
+    snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", d->name);
+    d->name = config_get(var_name, "alias", d->name);
     d->hash = simple_hash(d->name);
     d->len = strlen(d->name);
     netdev_added++;
