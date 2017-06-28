@@ -596,7 +596,7 @@ void rrdhost_cleanup(RRDHOST *host) {
     rrdset_foreach_write(st, host) {
         rrdset_rdlock(st);
 
-        if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
+        if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && rrdhost_flag_check(host, RRDHOST_DELETE_OBSOLETE_CHARTS))
             rrdset_delete(st);
         else
             rrdset_save(st);
