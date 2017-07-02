@@ -8,6 +8,7 @@ extern unsigned int remote_clock_resync_iterations;
 
 extern int rrdpush_init();
 extern void rrdset_done_push(RRDSET *st);
+extern void rrdset_push_chart_definition(RRDSET *st);
 extern void *rrdpush_sender_thread(void *ptr);
 
 extern int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url);
