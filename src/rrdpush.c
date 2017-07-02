@@ -79,7 +79,7 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
 static inline void send_chart_definition(RRDSET *st) {
     rrdset_flag_set(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 
-    buffer_sprintf(st->rrdhost->rrdpush_buffer, "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s\"\n"
+    buffer_sprintf(st->rrdhost->rrdpush_buffer, "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s\"\n"
                 , st->id
                 , st->name
                 , st->title
@@ -91,6 +91,7 @@ static inline void send_chart_definition(RRDSET *st) {
                 , st->update_every
                 , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
                 , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
+                , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
     );
 
     RRDDIM *rd;

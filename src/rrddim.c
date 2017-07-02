@@ -211,8 +211,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->entries = st->entries;
     rd->update_every = st->update_every;
 
-    // prevent incremental calculation spikes
-    rd->collections_counter = 0;
+    if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
+        rd->collections_counter = 1;
+    else
+        rd->collections_counter = 0;
+
     rd->updated = 0;
     rd->flags = 0x00000000;
 

@@ -236,14 +236,18 @@ inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
     return entries;
 }
 
-static inline void last_collected_time_align(struct timeval *tv, int update_every) {
-    tv->tv_sec -= tv->tv_sec % update_every;
-    tv->tv_usec = 500000;
+static inline void last_collected_time_align(RRDSET *st) {
+    st->last_collected_time.tv_sec -= st->last_collected_time.tv_sec % st->update_every;
+
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)))
+        st->last_collected_time.tv_usec = 0;
+    else
+        st->last_collected_time.tv_usec = 500000;
 }
 
-static inline void last_updated_time_align(struct timeval *tv, int update_every) {
-    tv->tv_sec -= tv->tv_sec % update_every;
-    tv->tv_usec = 0;
+static inline void last_updated_time_align(RRDSET *st) {
+    st->last_updated.tv_sec -= st->last_updated.tv_sec % st->update_every;
+    st->last_updated.tv_usec = 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -512,8 +516,10 @@ RRDSET *rrdset_create_custom(
                 }
 
                 // make sure the database is aligned
-                if(st->last_updated.tv_sec)
-                    last_updated_time_align(&st->last_updated, update_every);
+                if(st->last_updated.tv_sec) {
+                    st->update_every = update_every;
+                    last_updated_time_align(st);
+                }
             }
 
             // make sure we have the right memory mode
@@ -654,11 +660,11 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
             st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
             st->last_collected_time.tv_usec = now.tv_usec;
-            last_collected_time_align(&st->last_collected_time, st->update_every);
+            last_collected_time_align(st);
 
             st->last_updated.tv_sec  = now.tv_sec - st->update_every;
             st->last_updated.tv_usec = now.tv_usec;
-            last_updated_time_align(&st->last_updated, st->update_every);
+            last_updated_time_align(st);
 
             microseconds    = st->update_every * USEC_PER_SEC;
         }
@@ -683,7 +689,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
 
 static inline void rrdset_init_last_collected_time(RRDSET *st) {
     now_realtime_timeval(&st->last_collected_time);
-    last_collected_time_align(&st->last_collected_time, st->update_every);
+    last_collected_time_align(st);
 }
 
 static inline usec_t rrdset_update_last_collected_time(RRDSET *st) {
@@ -698,7 +704,11 @@ static inline void rrdset_init_last_updated_time(RRDSET *st) {
     // copy the last collected time to last updated time
     st->last_updated.tv_sec  = st->last_collected_time.tv_sec;
     st->last_updated.tv_usec = st->last_collected_time.tv_usec;
-    last_updated_time_align(&st->last_updated, st->update_every);
+
+    if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
+        st->last_updated.tv_sec -= st->update_every;
+
+    last_updated_time_align(st);
 }
 
 static inline void rrdset_done_push_exclusive(RRDSET *st) {
@@ -755,8 +765,8 @@ static inline size_t rrdset_done_interpolate(
         if(iterations < 0) { error("INTERNAL CHECK: %s: iterations calculation wrapped! first_ut = %llu, last_stored_ut = %llu, next_store_ut = %llu, now_collect_ut = %llu", st->name, first_ut, last_stored_ut, next_store_ut, now_collect_ut); }
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
-            debug(D_RRD_STATS, "%s: last_stored_ut = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/1000000.0);
-            debug(D_RRD_STATS, "%s: next_store_ut  = %0.3Lf (next interpolation point)", st->name, (long double)next_store_ut/1000000.0);
+            debug(D_RRD_STATS, "%s: last_stored_ut = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/USEC_PER_SEC);
+            debug(D_RRD_STATS, "%s: next_store_ut  = %0.3Lf (next interpolation point)", st->name, (long double)next_store_ut/USEC_PER_SEC);
         }
         #endif
 
@@ -803,7 +813,7 @@ static inline size_t rrdset_done_interpolate(
                             );
                         #endif
 
-                        new_value = new_value * (calculated_number)(st->update_every * 1000000) / (calculated_number)(next_store_ut - last_stored_ut);
+                        new_value = new_value * (calculated_number)(st->update_every * USEC_PER_SEC) / (calculated_number)(next_store_ut - last_stored_ut);
                     }
                     break;
 
@@ -981,7 +991,7 @@ void rrdset_done(RRDSET *st) {
 
     // check if the chart has a long time to be updated
     if(unlikely(st->usec_since_last_update > st->entries * update_every_ut)) {
-        info("host '%s', chart %s: took too long to be updated (%0.3Lf secs). Resetting it.", st->rrdhost->hostname, st->name, (long double)(st->usec_since_last_update / 1000000.0));
+        info("host '%s', chart %s: took too long to be updated (%0.3Lf secs). Resetting it.", st->rrdhost->hostname, st->name, (long double)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
         store_this_entry = 0;
@@ -1049,10 +1059,10 @@ void rrdset_done(RRDSET *st) {
     next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
-        debug(D_RRD_STATS, "%s: last_collect_ut = %0.3Lf (last collection time)", st->name, (long double)last_collect_ut/1000000.0);
-        debug(D_RRD_STATS, "%s: now_collect_ut  = %0.3Lf (current collection time)", st->name, (long double)now_collect_ut/1000000.0);
-        debug(D_RRD_STATS, "%s: last_stored_ut  = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/1000000.0);
-        debug(D_RRD_STATS, "%s: next_store_ut   = %0.3Lf (next interpolation point)", st->name, (long double)next_store_ut/1000000.0);
+        debug(D_RRD_STATS, "%s: last_collect_ut = %0.3Lf (last collection time)", st->name, (long double)last_collect_ut/USEC_PER_SEC);
+        debug(D_RRD_STATS, "%s: now_collect_ut  = %0.3Lf (current collection time)", st->name, (long double)now_collect_ut/USEC_PER_SEC);
+        debug(D_RRD_STATS, "%s: last_stored_ut  = %0.3Lf (last updated time)", st->name, (long double)last_stored_ut/USEC_PER_SEC);
+        debug(D_RRD_STATS, "%s: next_store_ut   = %0.3Lf (next interpolation point)", st->name, (long double)next_store_ut/USEC_PER_SEC);
     }
 
     if(unlikely(!st->counter_done)) {
@@ -1266,6 +1276,9 @@ void rrdset_done(RRDSET *st) {
         info("INTERNAL CHECK: host '%s', chart '%s' is collected in the same interpolation point: short by %llu microseconds", st->rrdhost->hostname, st->name, next_store_ut - now_collect_ut);
 #endif
     }
+
+    if(unlikely(!store_this_entry && rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)))
+        store_this_entry = 1;
 
     rrdset_done_interpolate(st
             , update_every_ut
