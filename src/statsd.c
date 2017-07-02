@@ -1246,7 +1246,7 @@ static inline RRDSET *statsd_private_rrdset_create(
     }
 
     statsd.private_charts++;
-    return rrdset_create_custom(
+    RRDSET *st = rrdset_create_custom(
             localhost
             , type
             , id
@@ -1261,6 +1261,8 @@ static inline RRDSET *statsd_private_rrdset_create(
             , memory_mode
             , history
     );
+    rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+    return st;
 }
 
 static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
@@ -1654,6 +1656,8 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , app->rrd_memory_mode
                 , app->rrd_history_entries
         );
+
+        rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);
     }
     else rrdset_next(chart->st);
 

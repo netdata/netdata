@@ -286,6 +286,11 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
                 else
                     rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+
+                if(strstr(options, "store_first"))
+                    rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+                else
+                    rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
             }
         }
         else if(likely(hash == DIMENSION_HASH && !strcmp(s, PLUGINSD_KEYWORD_DIMENSION))) {
