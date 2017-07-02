@@ -237,6 +237,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *chart = words[7];
             char *priority_s = words[8];
             char *update_every_s = words[9];
+            char *options = words[10];
 
             if(unlikely(!type || !*type || !id || !*id)) {
                 error("PLUGINSD: '%s' is requesting a CHART, without a type.id, on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
@@ -274,6 +275,18 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 cd->update_every = update_every;
             }
             else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
+
+            if(options && *options) {
+                if(strstr(options, "obsolete"))
+                    rrdset_is_obsolete(st);
+                else
+                    rrdset_isnot_obsolete(st);
+
+                if(strstr(options, "detail"))
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+                else
+                    rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+            }
         }
         else if(likely(hash == DIMENSION_HASH && !strcmp(s, PLUGINSD_KEYWORD_DIMENSION))) {
             char *id = words[1];

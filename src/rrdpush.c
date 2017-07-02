@@ -64,6 +64,9 @@ unsigned int remote_clock_resync_iterations = 60;
 
 // checks if the current chart definition has been sent
 static inline int need_to_send_chart_definition(RRDSET *st) {
+    if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_EXPOSED_UPSTREAM))))
+        return 1;
+
     RRDDIM *rd;
     rrddim_foreach_read(rd, st)
         if(!rd->exposed)
@@ -74,7 +77,7 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
 
 // sends the current chart definition
 static inline void send_chart_definition(RRDSET *st) {
-    buffer_sprintf(st->rrdhost->rrdpush_buffer, "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d\n"
+    buffer_sprintf(st->rrdhost->rrdpush_buffer, "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s\"\n"
                 , st->id
                 , st->name
                 , st->title
@@ -84,6 +87,8 @@ static inline void send_chart_definition(RRDSET *st) {
                 , rrdset_type_name(st->chart_type)
                 , st->priority
                 , st->update_every
+                , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
+                , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
     );
 
     RRDDIM *rd;
@@ -101,6 +106,7 @@ static inline void send_chart_definition(RRDSET *st) {
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
+    rrdset_flag_set(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 }
 
 // sends the current chart dimensions

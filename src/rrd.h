@@ -218,13 +218,14 @@ typedef struct rrddim RRDDIM;
 // and may lead to missing information.
 
 typedef enum rrdset_flags {
-    RRDSET_FLAG_ENABLED        = 1 << 0, // enables or disables a chart
-    RRDSET_FLAG_DETAIL         = 1 << 1, // if set, the data set should be considered as a detail of another
+    RRDSET_FLAG_ENABLED          = 1 << 0, // enables or disables a chart
+    RRDSET_FLAG_DETAIL           = 1 << 1, // if set, the data set should be considered as a detail of another
                                          // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG          = 1 << 2, // enables or disables debugging for a chart
-    RRDSET_FLAG_OBSOLETE       = 1 << 3, // this is marked by the collector/module as obsolete
-    RRDSET_FLAG_BACKEND_SEND   = 1 << 4,
-    RRDSET_FLAG_BACKEND_IGNORE = 1 << 5
+    RRDSET_FLAG_DEBUG            = 1 << 2, // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE         = 1 << 3, // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_BACKEND_SEND     = 1 << 4, // if set, this chart should be sent to backends
+    RRDSET_FLAG_BACKEND_IGNORE   = 1 << 5, // if set, this chart should not be sent to backends
+    RRDSET_FLAG_EXPOSED_UPSTREAM = 1 << 6  // if set, we have sent this chart to netdata master (streaming)
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -599,6 +600,9 @@ extern void rrdset_next_usec(RRDSET *st, usec_t microseconds);
 #define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
 extern void rrdset_done(RRDSET *st);
+
+extern void rrdset_is_obsolete(RRDSET *st);
+extern void rrdset_isnot_obsolete(RRDSET *st);
 
 // checks if the RRDSET should be offered to viewers
 #define rrdset_is_available_for_viewers(st) (rrdset_flag_check(st, RRDSET_FLAG_ENABLED) && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && (st)->dimensions && (st)->rrd_memory_mode != RRD_MEMORY_MODE_NONE)
