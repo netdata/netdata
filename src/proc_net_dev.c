@@ -73,13 +73,13 @@ static struct netdev *netdev_root = NULL, *netdev_last_used = NULL;
 static size_t netdev_added = 0, netdev_found = 0;
 
 static void netdev_free(struct netdev *d) {
-    if(d->st_bandwidth)  rrdset_flag_set(d->st_bandwidth,  RRDSET_FLAG_OBSOLETE);
-    if(d->st_packets)    rrdset_flag_set(d->st_packets,    RRDSET_FLAG_OBSOLETE);
-    if(d->st_errors)     rrdset_flag_set(d->st_errors,     RRDSET_FLAG_OBSOLETE);
-    if(d->st_drops)      rrdset_flag_set(d->st_drops,      RRDSET_FLAG_OBSOLETE);
-    if(d->st_fifo)       rrdset_flag_set(d->st_fifo,       RRDSET_FLAG_OBSOLETE);
-    if(d->st_compressed) rrdset_flag_set(d->st_compressed, RRDSET_FLAG_OBSOLETE);
-    if(d->st_events)     rrdset_flag_set(d->st_events,     RRDSET_FLAG_OBSOLETE);
+    if(d->st_bandwidth)  rrdset_is_obsolete(d->st_bandwidth);
+    if(d->st_packets)    rrdset_is_obsolete(d->st_packets);
+    if(d->st_errors)     rrdset_is_obsolete(d->st_errors);
+    if(d->st_drops)      rrdset_is_obsolete(d->st_drops);
+    if(d->st_fifo)       rrdset_is_obsolete(d->st_fifo);
+    if(d->st_compressed) rrdset_is_obsolete(d->st_compressed);
+    if(d->st_events)     rrdset_is_obsolete(d->st_events);
 
     netdev_added--;
     freez(d->name);

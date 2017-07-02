@@ -74,21 +74,21 @@ static size_t disks_added = 0, disks_found = 0;
 
 static void disk_free(struct disk *dm) {
     if (likely(dm->st_io))
-        rrdset_flag_set(dm->st_io,     RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(dm->st_io);
     if (likely(dm->st_ops))
-        rrdset_flag_set(dm->st_ops,    RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(dm->st_ops);
     if (likely(dm->st_qops))
-        rrdset_flag_set(dm->st_qops,   RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(dm->st_qops);
     if (likely(dm->st_util))
-        rrdset_flag_set(dm->st_util,   RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(dm->st_util);
     if (likely(dm->st_iotime))
-        rrdset_flag_set(dm->st_iotime, RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(dm->st_iotime);
     if (likely(dm->st_await))
-        rrdset_flag_set(dm->st_await,  RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(dm->st_await);
     if (likely(dm->st_avagsz))
-        rrdset_flag_set(dm->st_avagsz, RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(dm->st_avagsz);
     if (likely(dm->st_svctm))
-        rrdset_flag_set(dm->st_svctm,  RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(dm->st_svctm);
 
     disks_added--;
     freez(dm->name);

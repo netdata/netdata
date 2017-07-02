@@ -168,6 +168,19 @@ void rrdset_set_name(RRDSET *st, const char *name) {
         error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", st->name);
 }
 
+inline void rrdset_is_obsolete(RRDSET *st) {
+    if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
+        rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
+        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    }
+}
+
+inline void rrdset_isnot_obsolete(RRDSET *st) {
+    if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
+        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+    }
+}
 
 // ----------------------------------------------------------------------------
 // RRDSET - reset a chart
@@ -343,7 +356,7 @@ void rrdset_delete(RRDSET *st) {
 static inline RRDSET *rrdset_find_on_create(RRDHOST *host, const char *fullid) {
     RRDSET *st = rrdset_find(host, fullid);
     if(unlikely(st)) {
-        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+        rrdset_isnot_obsolete(st);
         debug(D_RRD_CALLS, "RRDSET '%s', already exists.", fullid);
         return st;
     }
@@ -539,6 +552,7 @@ RRDSET *rrdset_create_custom(
     rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
     rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
     rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+    rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 
     // if(!strcmp(st->id, "disk_util.dm-0")) {
     //     st->debug = 1;
@@ -954,7 +968,7 @@ void rrdset_done(RRDSET *st) {
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", st->id);
-        rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
+        rrdset_isnot_obsolete(st);
     }
 
     // check if the chart has a long time to be updated
