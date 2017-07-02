@@ -133,7 +133,7 @@ if [ -z "${NAME}" ]
         FILENAME="/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf"
         if [[ -f $FILENAME && -r $FILENAME ]]
             then
-            NAME=$(grep -e '^name: ' /etc/pve/qemu-server/${BASH_REMATCH[1]}.conf | head -1 | sed -rn 's|\s*name\s*:\s*(.*)?$|\1|p')
+            NAME="qemu_$(grep -e '^name: ' "/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf" | head -1 | sed -rn 's|\s*name\s*:\s*(.*)?$|\1|p')"
         else
             error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
         fi
