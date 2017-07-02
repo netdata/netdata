@@ -77,6 +77,8 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
 
 // sends the current chart definition
 static inline void send_chart_definition(RRDSET *st) {
+    rrdset_flag_set(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+
     buffer_sprintf(st->rrdhost->rrdpush_buffer, "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s\"\n"
                 , st->id
                 , st->name
@@ -106,7 +108,6 @@ static inline void send_chart_definition(RRDSET *st) {
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
-    rrdset_flag_set(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 }
 
 // sends the current chart dimensions
@@ -126,6 +127,16 @@ static inline void send_chart_metrics(RRDSET *st) {
 }
 
 static void rrdpush_sender_thread_spawn(RRDHOST *host);
+
+void rrdset_push_chart_definition(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+
+    rrdset_rdlock(st);
+    rrdpush_lock(host);
+    send_chart_definition(st);
+    rrdpush_unlock(host);
+    rrdset_unlock(st);
+}
 
 void rrdset_done_push(RRDSET *st) {
     RRDHOST *host = st->rrdhost;

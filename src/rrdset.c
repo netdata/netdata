@@ -172,6 +172,11 @@ inline void rrdset_is_obsolete(RRDSET *st) {
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+
+        // the chart will not get more updates (data collection)
+        // so, we have to push its definition now
+        if(unlikely(host->rrdpush_enabled))
+            rrdset_push_chart_definition(st);
     }
 }
 
@@ -179,6 +184,9 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
         rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
+
+        // the chart will be pushed upstream automatically
+        // due to data collection
     }
 }
 
