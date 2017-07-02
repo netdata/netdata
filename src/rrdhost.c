@@ -143,10 +143,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     avl_init_lock(&(host->variables_root_index),   rrdvar_compare);
 
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete obsolete charts files", 1))
-        rrdhost_flag_set(host, RRDHOST_DELETE_OBSOLETE_FILES);
+        rrdhost_flag_set(host, RRDHOST_DELETE_OBSOLETE_CHARTS);
 
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete orphan hosts files", 1) && !is_localhost)
-        rrdhost_flag_set(host, RRDHOST_DELETE_ORPHAN_FILES);
+        rrdhost_flag_set(host, RRDHOST_DELETE_ORPHAN_HOST);
 
 
     // ------------------------------------------------------------------------
@@ -348,12 +348,12 @@ RRDHOST *rrdhost_find_or_create(
     }
     rrd_unlock();
 
-    rrdhost_cleanup_orphan(host);
+    rrdhost_cleanup_orphan_hosts(host);
 
     return host;
 }
 
-static inline int rrdhost_should_be_deleted(RRDHOST *host, RRDHOST *protected, time_t now) {
+static inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now) {
     if(host != protected
        && host != localhost
        && !host->connected_senders
@@ -364,7 +364,7 @@ static inline int rrdhost_should_be_deleted(RRDHOST *host, RRDHOST *protected, t
     return 0;
 }
 
-void rrdhost_cleanup_orphan(RRDHOST *protected) {
+void rrdhost_cleanup_orphan_hosts(RRDHOST *protected) {
     time_t now = now_realtime_sec();
 
     rrd_wrlock();
@@ -373,10 +373,10 @@ void rrdhost_cleanup_orphan(RRDHOST *protected) {
 
 restart_after_removal:
     rrdhost_foreach_write(host) {
-        if(rrdhost_should_be_deleted(host, protected, now)) {
+        if(rrdhost_should_be_removed(host, protected, now)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
 
-            if(rrdset_flag_check(host, RRDHOST_ORPHAN))
+            if(rrdset_flag_check(host, RRDHOST_DELETE_ORPHAN_HOST) && rrdset_flag_check(host, RRDHOST_ORPHAN))
                 rrdhost_delete(host);
             else
                 rrdhost_save(host);
@@ -532,7 +532,7 @@ void rrdhost_free_all(void) {
 }
 
 // ----------------------------------------------------------------------------
-// RRDHOST - save
+// RRDHOST - save host files
 
 void rrdhost_save(RRDHOST *host) {
     if(!host) return;
@@ -555,7 +555,7 @@ void rrdhost_save(RRDHOST *host) {
 }
 
 // ----------------------------------------------------------------------------
-// RRDHOST - delete files
+// RRDHOST - delete host files
 
 void rrdhost_delete(RRDHOST *host) {
     if(!host) return;
@@ -579,6 +579,38 @@ void rrdhost_delete(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+// ----------------------------------------------------------------------------
+// RRDHOST - cleanup host files
+
+void rrdhost_cleanup(RRDHOST *host) {
+    if(!host) return;
+
+    info("Cleaning up database of host '%s'...", host->hostname);
+
+    RRDSET *st;
+
+    // we get a write lock
+    // to ensure only one thread is saving the database
+    rrdhost_wrlock(host);
+
+    rrdset_foreach_write(st, host) {
+        rrdset_rdlock(st);
+
+        if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && rrdhost_flag_check(host, RRDHOST_DELETE_OBSOLETE_CHARTS))
+            rrdset_delete(st);
+        else
+            rrdset_save(st);
+
+        rrdset_unlock(st);
+    }
+
+    rrdhost_unlock(host);
+}
+
+
+// ----------------------------------------------------------------------------
+// RRDHOST - save all hosts to disk
+
 void rrdhost_save_all(void) {
     info("Saving database [%zu hosts(s)]...", rrd_hosts_available);
 
@@ -591,7 +623,30 @@ void rrdhost_save_all(void) {
     rrd_unlock();
 }
 
-void rrdhost_cleanup_obsolete(RRDHOST *host) {
+// ----------------------------------------------------------------------------
+// RRDHOST - save or delete all hosts from disk
+
+void rrdhost_cleanup_all(void) {
+    info("Cleaning up database [%zu hosts(s)]...", rrd_hosts_available);
+
+    rrd_rdlock();
+
+    RRDHOST *host;
+    rrdhost_foreach_read(host) {
+        if(host != localhost && rrdhost_flag_check(host, RRDHOST_DELETE_OBSOLETE_CHARTS) && !host->connected_senders)
+            rrdhost_delete(host);
+        else
+            rrdhost_cleanup(host);
+    }
+
+    rrd_unlock();
+}
+
+
+// ----------------------------------------------------------------------------
+// RRDHOST - save or delete all the host charts from disk
+
+void rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
     time_t now = now_realtime_sec();
 
     RRDSET *st;
@@ -606,7 +661,7 @@ restart_after_removal:
 
             rrdset_rdlock(st);
 
-            if(rrdhost_flag_check(host, RRDHOST_DELETE_OBSOLETE_FILES))
+            if(rrdhost_flag_check(host, RRDHOST_DELETE_OBSOLETE_CHARTS))
                 rrdset_delete(st);
             else
                 rrdset_save(st);

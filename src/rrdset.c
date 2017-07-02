@@ -589,7 +589,7 @@ RRDSET *rrdset_create_custom(
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
 
-    rrdhost_cleanup_obsolete(host);
+    rrdhost_cleanup_obsolete_charts(host);
 
     rrdhost_unlock(host);
 

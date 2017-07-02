@@ -9,8 +9,8 @@ void netdata_cleanup_and_exit(int ret) {
 
     debug(D_EXIT, "Called: netdata_cleanup_and_exit()");
 
-    // save the database
-    rrdhost_save_all();
+    // cleanup the database
+    rrdhost_cleanup_all();
 
     // unlink the pid
     if(pidfile[0]) {
