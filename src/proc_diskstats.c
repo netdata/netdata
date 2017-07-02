@@ -44,7 +44,7 @@ static struct disk {
     struct disk *next;
 } *disk_root = NULL;
 
-#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE); st = NULL; } } while(st)
+#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); st = NULL; } } while(st)
 
 static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk) {
     static char path_to_get_hw_sector_size[FILENAME_MAX + 1] = "";

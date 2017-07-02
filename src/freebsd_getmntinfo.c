@@ -37,9 +37,9 @@ static size_t mount_points_added = 0, mount_points_found = 0;
 
 static void mount_point_free(struct mount_point *m) {
     if (likely(m->st_space))
-        rrdset_flag_set(m->st_space,  RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(m->st_space);
     if (likely(m->st_inodes))
-        rrdset_flag_set(m->st_inodes, RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(m->st_inodes);
 
     mount_points_added--;
     freez(m->name);

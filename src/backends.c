@@ -43,10 +43,22 @@ static inline calculated_number backend_calculate_value_from_stored_data(
     // find the edges of the rrd database for this chart
     time_t first_t = rrdset_first_entry_t(st);
     time_t last_t  = rrdset_last_entry_t(st);
+    time_t update_every = st->update_every;
+
+    // align the time-frame
+    // for 'after' also skip the first value by adding update_every
+    after  = after  - after  % update_every + update_every;
+    before = before - before % update_every;
+
+    if(unlikely(after = last_t + update_every)) {
+        // we missed an update, report the last one
+        after  -= update_every;
+        before -= update_every;
+    }
 
     if(unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
-        debug(D_BACKEND, "BACKEND: %s.%s.%s: requested timeframe %lu to %lu is outside the chart's database range %lu to %lu",
+        debug(D_BACKEND, "BACKEND: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
               st->rrdhost->hostname, st->id, rd->id,
               (unsigned long)after, (unsigned long)before,
               (unsigned long)first_t, (unsigned long)last_t
@@ -54,16 +66,11 @@ static inline calculated_number backend_calculate_value_from_stored_data(
         return NAN;
     }
 
-    // align the time-frame
-    // for 'after' also skip the first value by adding st->update_every
-    after  = after  - after  % st->update_every + st->update_every;
-    before = before - before % st->update_every;
-
     if(unlikely(after < first_t))
         after = first_t;
 
     if(unlikely(after > before))
-        // this can happen when st->update_every > before - after
+        // this can happen when update_every > before - after
         before = after;
 
     if(unlikely(before > last_t))

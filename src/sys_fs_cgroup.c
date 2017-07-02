@@ -901,20 +901,20 @@ static inline struct cgroup *cgroup_add(const char *id) {
 static inline void cgroup_free(struct cgroup *cg) {
     debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
-    if(cg->st_cpu)                   rrdset_flag_set(cg->st_cpu,                   RRDSET_FLAG_OBSOLETE);
-    if(cg->st_cpu_per_core)          rrdset_flag_set(cg->st_cpu_per_core,          RRDSET_FLAG_OBSOLETE);
-    if(cg->st_mem)                   rrdset_flag_set(cg->st_mem,                   RRDSET_FLAG_OBSOLETE);
-    if(cg->st_writeback)             rrdset_flag_set(cg->st_writeback,             RRDSET_FLAG_OBSOLETE);
-    if(cg->st_mem_activity)          rrdset_flag_set(cg->st_mem_activity,          RRDSET_FLAG_OBSOLETE);
-    if(cg->st_pgfaults)              rrdset_flag_set(cg->st_pgfaults,              RRDSET_FLAG_OBSOLETE);
-    if(cg->st_mem_usage)             rrdset_flag_set(cg->st_mem_usage,             RRDSET_FLAG_OBSOLETE);
-    if(cg->st_mem_failcnt)           rrdset_flag_set(cg->st_mem_failcnt,           RRDSET_FLAG_OBSOLETE);
-    if(cg->st_io)                    rrdset_flag_set(cg->st_io,                    RRDSET_FLAG_OBSOLETE);
-    if(cg->st_serviced_ops)          rrdset_flag_set(cg->st_serviced_ops,          RRDSET_FLAG_OBSOLETE);
-    if(cg->st_throttle_io)           rrdset_flag_set(cg->st_throttle_io,           RRDSET_FLAG_OBSOLETE);
-    if(cg->st_throttle_serviced_ops) rrdset_flag_set(cg->st_throttle_serviced_ops, RRDSET_FLAG_OBSOLETE);
-    if(cg->st_queued_ops)            rrdset_flag_set(cg->st_queued_ops,            RRDSET_FLAG_OBSOLETE);
-    if(cg->st_merged_ops)            rrdset_flag_set(cg->st_merged_ops,            RRDSET_FLAG_OBSOLETE);
+    if(cg->st_cpu)                   rrdset_is_obsolete(cg->st_cpu);
+    if(cg->st_cpu_per_core)          rrdset_is_obsolete(cg->st_cpu_per_core);
+    if(cg->st_mem)                   rrdset_is_obsolete(cg->st_mem);
+    if(cg->st_writeback)             rrdset_is_obsolete(cg->st_writeback);
+    if(cg->st_mem_activity)          rrdset_is_obsolete(cg->st_mem_activity);
+    if(cg->st_pgfaults)              rrdset_is_obsolete(cg->st_pgfaults);
+    if(cg->st_mem_usage)             rrdset_is_obsolete(cg->st_mem_usage);
+    if(cg->st_mem_failcnt)           rrdset_is_obsolete(cg->st_mem_failcnt);
+    if(cg->st_io)                    rrdset_is_obsolete(cg->st_io);
+    if(cg->st_serviced_ops)          rrdset_is_obsolete(cg->st_serviced_ops);
+    if(cg->st_throttle_io)           rrdset_is_obsolete(cg->st_throttle_io);
+    if(cg->st_throttle_serviced_ops) rrdset_is_obsolete(cg->st_throttle_serviced_ops);
+    if(cg->st_queued_ops)            rrdset_is_obsolete(cg->st_queued_ops);
+    if(cg->st_merged_ops)            rrdset_is_obsolete(cg->st_merged_ops);
 
     freez(cg->cpuacct_usage.cpu_percpu);
 
