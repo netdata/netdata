@@ -353,8 +353,8 @@ typedef struct rrdset RRDSET;
 
 typedef enum rrdhost_flags {
     RRDHOST_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
-    RRDHOST_DELETE_OBSOLETE_FILES  = 1 << 1, // delete files of obsolete charts
-    RRDHOST_DELETE_ORPHAN_FILES    = 1 << 2  // delete the entire host when orphan
+    RRDHOST_DELETE_OBSOLETE_CHARTS = 1 << 1, // delete files of obsolete charts
+    RRDHOST_DELETE_ORPHAN_HOST     = 1 << 2  // delete the entire host when orphan
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) ((host)->flags & flag)
@@ -560,8 +560,9 @@ extern RRDSET *rrdset_create_custom(RRDHOST *host
 
 extern void rrdhost_free_all(void);
 extern void rrdhost_save_all(void);
+extern void rrdhost_cleanup_all(void);
 
-extern void rrdhost_cleanup_orphan(RRDHOST *protected);
+extern void rrdhost_cleanup_orphan_hosts(RRDHOST *protected);
 extern void rrdhost_free(RRDHOST *host);
 extern void rrdhost_save(RRDHOST *host);
 extern void rrdhost_delete(RRDHOST *host);
@@ -669,7 +670,7 @@ extern void rrdset_reset(RRDSET *st);
 extern void rrdset_save(RRDSET *st);
 extern void rrdset_delete(RRDSET *st);
 
-extern void rrdhost_cleanup_obsolete(RRDHOST *host);
+extern void rrdhost_cleanup_obsolete_charts(RRDHOST *host);
 
 #endif /* NETDATA_RRD_INTERNALS */
 
