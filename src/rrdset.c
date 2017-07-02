@@ -175,7 +175,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
 
         // the chart will not get more updates (data collection)
         // so, we have to push its definition now
-        if(unlikely(host->rrdpush_enabled))
+        if(unlikely(st->rrdhost->rrdpush_enabled))
             rrdset_push_chart_definition(st);
     }
 }
