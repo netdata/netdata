@@ -103,9 +103,15 @@ typedef enum rrddim_flags {
     RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = 1 << 1   // do not offer RESET or OVERFLOW info to callers
 } RRDDIM_FLAGS;
 
+#ifdef HAVE_C___ATOMIC
+#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & flag)
+#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), flag, __ATOMIC_SEQ_CST)
+#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~flag, __ATOMIC_SEQ_CST)
+#else
 #define rrddim_flag_check(rd, flag) ((rd)->flags & flag)
 #define rrddim_flag_set(rd, flag)   (rd)->flags |= flag
 #define rrddim_flag_clear(rd, flag) (rd)->flags &= ~flag
+#endif
 
 
 // ----------------------------------------------------------------------------
@@ -221,9 +227,15 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_BACKEND_IGNORE = 1 << 5
 } RRDSET_FLAGS;
 
+#ifdef HAVE_C___ATOMIC
+#define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & flag)
+#define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
+#define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~flag, __ATOMIC_SEQ_CST)
+#else
 #define rrdset_flag_check(st, flag) ((st)->flags & flag)
 #define rrdset_flag_set(st, flag)   (st)->flags |= flag
 #define rrdset_flag_clear(st, flag) (st)->flags &= ~flag
+#endif
 
 struct rrdset {
     // ------------------------------------------------------------------------
@@ -357,9 +369,15 @@ typedef enum rrdhost_flags {
     RRDHOST_DELETE_ORPHAN_HOST     = 1 << 2  // delete the entire host when orphan
 } RRDHOST_FLAGS;
 
+#ifdef HAVE_C___ATOMIC
+#define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & flag)
+#define rrdhost_flag_set(host, flag)   __atomic_or_fetch(&((host)->flags), flag, __ATOMIC_SEQ_CST)
+#define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~flag, __ATOMIC_SEQ_CST)
+#else
 #define rrdhost_flag_check(host, flag) ((host)->flags & flag)
 #define rrdhost_flag_set(host, flag)   (host)->flags |= flag
 #define rrdhost_flag_clear(host, flag) (host)->flags &= ~flag
+#endif
 
 // ----------------------------------------------------------------------------
 // RRD HOST
