@@ -226,7 +226,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->collected_volume = 0;
     rd->stored_volume = 0;
     rd->last_stored_value = 0;
-    rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
+    rd->values[st->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
     rd->last_collected_time.tv_sec = 0;
     rd->last_collected_time.tv_usec = 0;
     rd->rrdset = st;

@@ -381,6 +381,14 @@ typedef enum rrdhost_flags {
 #define rrdhost_flag_clear(host, flag) (host)->flags &= ~flag
 #endif
 
+#ifdef NETDATA_INTERNAL_CHECKS
+#define rrdset_debug(st, fmt, args...) do { if(unlikely(debug_flags & D_RRD_STATS && rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) \
+            debug_int(__FILE__, __FUNCTION__, __LINE__, "%s: " fmt, st->name, ##args); } while(0)
+#else
+#define rrdset_debug(st, fmt, args...) debug_dummy()
+#endif
+
+
 // ----------------------------------------------------------------------------
 // RRD HOST
 
