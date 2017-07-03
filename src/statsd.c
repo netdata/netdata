@@ -1262,6 +1262,7 @@ static inline RRDSET *statsd_private_rrdset_create(
             , history
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+    // rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
     return st;
 }
 
@@ -1658,6 +1659,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
         );
 
         rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);
+        // rrdset_flag_set(chart->st, RRDSET_FLAG_DEBUG);
     }
     else rrdset_next(chart->st);
 
