@@ -3,28 +3,7 @@
 // This program will connect to one or more Fronius Symo Inverters.
 // to get the Solar Power Generated (current, today).
 
-// example configuration in /etc/netdata/node.d/fronius.conf
-/*
- {
- "enable_autodetect": false,
- "update_every": 5,
- "servers": [
- {
- "name": "plant1",
- "hostname": "10.0.1.1",
- "update_every": 10,
- "api_path": "/solar_api/v1/GetPowerFlowRealtimeData.fcgi"
- },
- {
- "name": "plant2",
- "hostname": "10.0.2.1",
- "update_every": 15,
- "api_path": "/solar_api/v1/GetPowerFlowRealtimeData.fcgi"
- }
- ]
- }
- */
-
+// example configuration in netdata/conf.d/node.d/fronius.conf.md
 
 var url = require('url');
 var http = require('http');
