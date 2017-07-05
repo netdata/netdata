@@ -25,7 +25,7 @@ var fronius = {
     autonomyId: 'rel_autonomy',
     consumptionSelfId: 'rel_selfconsumption',
 
-    createBasicDimension(id, name) {
+    createBasicDimension: function (id, name) {
         return {
             id: id,                                     // the unique id of the dimension
             name: name,                                 // the name of the dimension
@@ -37,7 +37,7 @@ var fronius = {
     },
 
     // Gets the site power chart. Will be created if not existing.
-    getSitePowerChart(service, id) {
+    getSitePowerChart: function (service, id) {
 
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
@@ -66,7 +66,7 @@ var fronius = {
     },
 
     // Gets the site consumption chart. Will be created if not existing.
-    getSiteConsumptionChart(service, id) {
+    getSiteConsumptionChart: function (service, id) {
 
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
@@ -93,7 +93,7 @@ var fronius = {
 
 
     // Gets the site consumption chart. Will be created if not existing.
-    getSiteAutonomyChart(service, id) {
+    getSiteAutonomyChart: function (service, id) {
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
@@ -120,7 +120,7 @@ var fronius = {
 
     // Gets the inverter power chart. Will be created if not existing.
     // Needs the array of inverters in order to create a chart with all inverters as dimensions
-    getInverterPowerChart(service, chartId, inverters) {
+    getInverterPowerChart: function (service, chartId, inverters) {
 
         var chart = fronius.charts[chartId];
         if (fronius.isDefined(chart)) return chart;
@@ -159,7 +159,7 @@ var fronius = {
 
     // Gets the inverter energy production chart for today. Will be created if not existing.
     // Needs the array of inverters in order to create a chart with all inverters as dimensions
-    getInverterEnergyTodayChart(service, chartId, inverters) {
+    getInverterEnergyTodayChart: function (service, chartId, inverters) {
 
         var chart = fronius.charts[chartId];
         if (fronius.isDefined(chart)) return chart;
@@ -204,7 +204,7 @@ var fronius = {
     },
 
 
-    processResponse(service, content) {
+    processResponse: function (service, content) {
         if (content === null) return;
         var json = JSON.parse(content);
         // validating response
@@ -262,7 +262,7 @@ var fronius = {
     // this function is called only from this module
     // its purpose is to prepare the request and call
     // netdata.serviceExecute()
-    serviceExecute(name, uri, update_every) {
+    serviceExecute: function (name, uri, update_every) {
         netdata.debug(this.name + ': ' + name + ': url: ' + uri + ', update_every: ' + update_every);
 
         var service = netdata.service({
@@ -276,7 +276,7 @@ var fronius = {
     },
 
 
-    configure(config) {
+    configure: function (config) {
         if (fronius.isUndefined(config.servers)) return 0;
         var added = 0;
         var len = config.servers.length;
@@ -294,18 +294,18 @@ var fronius = {
     // module.update()
     // this is called repeatedly to collect data, by calling
     // netdata.serviceExecute()
-    update(service, callback) {
+    update: function (service, callback) {
         service.execute(function (serv, data) {
             service.module.processResponse(serv, data);
             callback();
         });
     },
 
-    isUndefined(value) {
+    isUndefined: function (value) {
         return typeof value === 'undefined';
     },
 
-    isDefined(value) {
+    isDefined: function (value) {
         return typeof value !== 'undefined';
     }
 
