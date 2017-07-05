@@ -36,11 +36,13 @@ const power_grid_id = 'p_grid';
 const power_pv_id = 'p_pv';
 const power_accu_id = 'p_akku'; // not my typo! Using the ID from the API
 const consumption_load_id = 'p_load';
+const autonomy_id = 'rel_autonomy';
+const consumption_self_id = 'rel_selfconsumption';
 
 var fronius = {
-    name: __filename,
+    name: "Fronius",
     enable_autodetect: false,
-    update_every: 3,
+    update_every: 5,
     base_priority: 60000,
     charts: {},
 
@@ -73,7 +75,7 @@ var fronius = {
             units: 'W',                                   // the units of the chart dimensions
             family: 'Power',                                  // the family of the chart
             context: 'fronius.power',                // the context of the chart
-            type: netdata.chartTypes.line,                  // the type of the chart
+            type: netdata.chartTypes.area,                  // the type of the chart
             priority: fronius.base_priority + 1,             // the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
             dimensions: dim
@@ -101,6 +103,33 @@ var fronius = {
             context: 'fronius.consumption',                 // the context of the chart
             type: netdata.chartTypes.area,                  // the type of the chart
             priority: fronius.base_priority + 2,            // the priority relative to others in the same family
+            update_every: service.update_every,             // the expected update frequency of the chart
+            dimensions: dim
+        };
+        chart = service.chart(id, chart);
+        fronius.charts[id] = chart;
+
+        return chart;
+    },
+
+
+    // Gets the site consumption chart. Will be created if not existing.
+    getSiteAutonomyChart: function (service, id) {
+        var chart = fronius.charts[id];
+        if (fronius.isDefined(chart)) return chart;
+        var dim = {};
+        dim[autonomy_id] = this.createBasicDimension(autonomy_id, "Autonomy");
+        dim[consumption_self_id] = this.createBasicDimension(consumption_self_id, "Self Consumption");
+
+        chart = {
+            id: id,                                         // the unique id of the chart
+            name: '',                                       // the unique name of the chart
+            title: service.name + ' Current Autonomy',      // the title of the chart
+            units: '%',                                     // the units of the chart dimensions
+            family: 'Autonomy',                                  // the family of the chart
+            context: 'fronius.autonomy',                 // the context of the chart
+            type: netdata.chartTypes.area,                  // the type of the chart
+            priority: fronius.base_priority + 3,            // the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
             dimensions: dim
         };
@@ -139,7 +168,7 @@ var fronius = {
             family: 'Inverters',                                  // the family of the chart
             context: 'fronius.inverter',                // the context of the chart
             type: netdata.chartTypes.stacked,                  // the type of the chart
-            priority: fronius.base_priority + 3,             // the priority relative to others in the same family
+            priority: fronius.base_priority + 4,             // the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
             dimensions: dim
         };
@@ -185,7 +214,7 @@ var fronius = {
             family: 'Inverters',                                  // the family of the chart
             context: 'fronius.inverter',                // the context of the chart
             type: netdata.chartTypes.stacked,                  // the type of the chart
-            priority: fronius.base_priority + 4,             // the priority relative to others in the same family
+            priority: fronius.base_priority + 5,             // the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
             dimensions: dim
         };
@@ -206,8 +235,7 @@ var fronius = {
         if (fronius.isUndefined(json.Body.Data.Inverters)) return;
 
         // add the service
-        if (service.added !== true)
-            service.commit();
+        if (service.added !== true) service.commit();
 
         var site = json.Body.Data.Site;
 
@@ -225,6 +253,12 @@ var fronius = {
 
         service.begin(fronius.getSiteConsumptionChart(service, 'fronius_' + service.name + '.consumption'));
         service.set(consumption_load_id, Math.round(consumption));
+        service.end();
+
+        // Site Autonomy Chart
+        service.begin(fronius.getSiteAutonomyChart(service, 'fronius_' + service.name + '.autonomy'));
+        service.set(autonomy_id, Math.round(site.rel_Autonomy));
+        service.set(consumption_self_id, Math.round(site.rel_SelfConsumption));
         service.end();
 
         // Inverters
