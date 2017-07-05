@@ -24,7 +24,7 @@ md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -
 for x in $(find etc.new -type f)
 do
     # find it relative filename
-    f="${x/etc.new\//}"
+    f="${x/etc.new\/netdata\//}"
     t="${x/etc.new\//etc\/}"
     d=$(dirname "${t}")
 
