@@ -11,12 +11,12 @@ var netdata = require('netdata');
 
 netdata.debug('loaded ' + __filename + ' plugin');
 
-const power_grid_id = 'p_grid';
-const power_pv_id = 'p_pv';
-const power_accu_id = 'p_akku'; // not my typo! Using the ID from the API
-const consumption_load_id = 'p_load';
-const autonomy_id = 'rel_autonomy';
-const consumption_self_id = 'rel_selfconsumption';
+const powerGridId = 'p_grid';
+const powerPvId = 'p_pv';
+const powerAccuId = 'p_akku'; // not my typo! Using the ID from the API
+const consumptionLoadId = 'p_load';
+const autonomyId = 'rel_autonomy';
+const consumptionSelfId = 'rel_selfconsumption';
 
 var fronius = {
     name: "Fronius",
@@ -33,7 +33,7 @@ var fronius = {
             multiplier: 1,                              // the multiplier
             divisor: 1,                                 // the divisor
             hidden: false                               // is hidden (boolean)
-        }
+        };
     },
 
     // Gets the site power chart. Will be created if not existing.
@@ -43,9 +43,9 @@ var fronius = {
         if (fronius.isDefined(chart)) return chart;
 
         var dim = {};
-        dim[power_grid_id] = this.createBasicDimension(power_grid_id, "Grid");
-        dim[power_pv_id] = this.createBasicDimension(power_pv_id, "Photovoltaics");
-        dim[power_accu_id] = this.createBasicDimension(power_accu_id, "Accumulator");
+        dim[powerGridId] = this.createBasicDimension(powerGridId, "Grid");
+        dim[powerPvId] = this.createBasicDimension(powerPvId, "Photovoltaics");
+        dim[powerAccuId] = this.createBasicDimension(powerAccuId, "Accumulator");
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -71,7 +71,7 @@ var fronius = {
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[consumption_load_id] = this.createBasicDimension(consumption_load_id, "Load");
+        dim[consumptionLoadId] = this.createBasicDimension(consumptionLoadId, "Load");
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -97,8 +97,8 @@ var fronius = {
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[autonomy_id] = this.createBasicDimension(autonomy_id, "Autonomy");
-        dim[consumption_self_id] = this.createBasicDimension(consumption_self_id, "Self Consumption");
+        dim[autonomyId] = this.createBasicDimension(autonomyId, "Autonomy");
+        dim[consumptionSelfId] = this.createBasicDimension(consumptionSelfId, "Self Consumption");
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -127,10 +127,10 @@ var fronius = {
 
         var dim = {};
 
-        var inverter_count = Object.keys(inverters).length;
-        var inverter = inverters[inverter_count.toString()];
+        var inverterCount = Object.keys(inverters).length;
+        var inverter = inverters[inverterCount.toString()];
         var i = 1;
-        for (i; i <= inverter_count; i++) {
+        for (i; i <= inverterCount; i++) {
             if (fronius.isUndefined(inverter)) {
                 netdata.error("Expected an Inverter with a numerical name! " +
                     "Have a look at your JSON output to verify.");
@@ -166,10 +166,10 @@ var fronius = {
 
         var dim = {};
 
-        var inverter_count = Object.keys(inverters).length;
-        var inverter = inverters[inverter_count.toString()];
+        var inverterCount = Object.keys(inverters).length;
+        var inverter = inverters[inverterCount.toString()];
         var i = 1;
-        for (i; i <= inverter_count; i++) {
+        for (i; i <= inverterCount; i++) {
             if (fronius.isUndefined(inverter)) {
                 netdata.error("Expected an Inverter with a numerical name! " +
                     "Have a look at your JSON output to verify.");
@@ -220,9 +220,9 @@ var fronius = {
 
         // Site Current Power Chart
         service.begin(fronius.getSitePowerChart(service, 'fronius_' + service.name + '.power'));
-        service.set(power_grid_id, Math.round(site.P_Grid));
-        service.set(power_pv_id, Math.round(site.P_PV));
-        service.set(power_accu_id, Math.round(site.P_Akku));
+        service.set(powerGridId, Math.round(site.P_Grid));
+        service.set(powerPvId, Math.round(site.P_PV));
+        service.set(powerAccuId, Math.round(site.P_Akku));
         service.end();
 
         // Site Consumption Chart
@@ -231,21 +231,21 @@ var fronius = {
         consumption *= -1;
 
         service.begin(fronius.getSiteConsumptionChart(service, 'fronius_' + service.name + '.consumption'));
-        service.set(consumption_load_id, Math.round(consumption));
+        service.set(consumptionLoadId, Math.round(consumption));
         service.end();
 
         // Site Autonomy Chart
         service.begin(fronius.getSiteAutonomyChart(service, 'fronius_' + service.name + '.autonomy'));
-        service.set(autonomy_id, Math.round(site.rel_Autonomy));
-        service.set(consumption_self_id, Math.round(site.rel_SelfConsumption));
+        service.set(autonomyId, Math.round(site.rel_Autonomy));
+        service.set(consumptionSelfId, Math.round(site.rel_SelfConsumption));
         service.end();
 
         // Inverters
         var inverters = json.Body.Data.Inverters;
-        var inverter_count = Object.keys(inverters).length;
-        if (inverter_count <= 0) return;
+        var inverterCount = Object.keys(inverters).length;
+        if (inverterCount <= 0) return;
         var i = 1;
-        for (i; i <= inverter_count; i++) {
+        for (i; i <= inverterCount; i++) {
             var inverter = inverters[i];
             if (fronius.isUndefined(inverter)) continue;
             netdata.debug("Setting values");
