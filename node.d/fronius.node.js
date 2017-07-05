@@ -11,19 +11,19 @@ var netdata = require('netdata');
 
 netdata.debug('loaded ' + __filename + ' plugin');
 
-const powerGridId = 'p_grid';
-const powerPvId = 'p_pv';
-const powerAccuId = 'p_akku'; // not my typo! Using the ID from the API
-const consumptionLoadId = 'p_load';
-const autonomyId = 'rel_autonomy';
-const consumptionSelfId = 'rel_selfconsumption';
-
 var fronius = {
     name: "Fronius",
     enable_autodetect: false,
     update_every: 5,
     base_priority: 60000,
     charts: {},
+
+    powerGridId: "p_grid",
+    powerPvId: 'p_pv',
+    powerAccuId: 'p_akku', // not my typo! Using the ID from the AP
+    consumptionLoadId: 'p_load',
+    autonomyId: 'rel_autonomy',
+    consumptionSelfId: 'rel_selfconsumption',
 
     createBasicDimension(id, name) {
         return {
@@ -43,9 +43,9 @@ var fronius = {
         if (fronius.isDefined(chart)) return chart;
 
         var dim = {};
-        dim[powerGridId] = this.createBasicDimension(powerGridId, "Grid");
-        dim[powerPvId] = this.createBasicDimension(powerPvId, "Photovoltaics");
-        dim[powerAccuId] = this.createBasicDimension(powerAccuId, "Accumulator");
+        dim[fronius.powerGridId] = this.createBasicDimension(fronius.powerGridId, "Grid");
+        dim[fronius.powerPvId] = this.createBasicDimension(fronius.powerPvId, "Photovoltaics");
+        dim[fronius.powerAccuId] = this.createBasicDimension(fronius.powerAccuId, "Accumulator");
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -71,7 +71,7 @@ var fronius = {
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[consumptionLoadId] = this.createBasicDimension(consumptionLoadId, "Load");
+        dim[fronius.consumptionLoadId] = this.createBasicDimension(fronius.consumptionLoadId, "Load");
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -97,8 +97,8 @@ var fronius = {
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[autonomyId] = this.createBasicDimension(autonomyId, "Autonomy");
-        dim[consumptionSelfId] = this.createBasicDimension(consumptionSelfId, "Self Consumption");
+        dim[fronius.autonomyId] = this.createBasicDimension(fronius.autonomyId, "Autonomy");
+        dim[fronius.consumptionSelfId] = this.createBasicDimension(fronius.consumptionSelfId, "Self Consumption");
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -220,9 +220,9 @@ var fronius = {
 
         // Site Current Power Chart
         service.begin(fronius.getSitePowerChart(service, 'fronius_' + service.name + '.power'));
-        service.set(powerGridId, Math.round(site.P_Grid));
-        service.set(powerPvId, Math.round(site.P_PV));
-        service.set(powerAccuId, Math.round(site.P_Akku));
+        service.set(fronius.powerGridId, Math.round(site.P_Grid));
+        service.set(fronius.powerPvId, Math.round(site.P_PV));
+        service.set(fronius.powerAccuId, Math.round(site.P_Akku));
         service.end();
 
         // Site Consumption Chart
@@ -231,13 +231,13 @@ var fronius = {
         consumption *= -1;
 
         service.begin(fronius.getSiteConsumptionChart(service, 'fronius_' + service.name + '.consumption'));
-        service.set(consumptionLoadId, Math.round(consumption));
+        service.set(fronius.consumptionLoadId, Math.round(consumption));
         service.end();
 
         // Site Autonomy Chart
         service.begin(fronius.getSiteAutonomyChart(service, 'fronius_' + service.name + '.autonomy'));
-        service.set(autonomyId, Math.round(site.rel_Autonomy));
-        service.set(consumptionSelfId, Math.round(site.rel_SelfConsumption));
+        service.set(fronius.autonomyId, Math.round(site.rel_Autonomy));
+        service.set(fronius.consumptionSelfId, Math.round(site.rel_SelfConsumption));
         service.end();
 
         // Inverters
