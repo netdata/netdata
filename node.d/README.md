@@ -32,8 +32,8 @@ It produces per server:
  * Relative self consumption in %. The lower the better
 
 4. **Energy**
- * The energy produced during the current day
- * The energy produced during the current year
+ * The energy produced during the current day, in kWh
+ * The energy produced during the current year, in kWh
 
 5. **Inverter**
  * The current power output from the connected inverters, in W, one dimension per inverter. At least one is always present.
