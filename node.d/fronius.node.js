@@ -233,7 +233,8 @@ var fronius = {
         // Site Autonomy Chart
         service.begin(fronius.getSiteAutonomyChart(service, 'fronius_' + service.name + '.autonomy'));
         service.set(fronius.autonomyId, Math.round(site.rel_Autonomy));
-        service.set(fronius.consumptionSelfId, Math.round(site.rel_SelfConsumption));
+        var selfConsumption = site.rel_SelfConsumption;
+        service.set(fronius.consumptionSelfId, Math.round(selfConsumption === null ? 100 : selfConsumption));
         service.end();
 
         // Site Energy Today Chart
