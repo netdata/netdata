@@ -19,33 +19,34 @@ var fronius = {
     charts: {},
 
     powerGridId: "p_grid",
-    powerPvId: 'p_pv',
-    powerAccuId: 'p_akku', // not my typo! Using the ID from the AP
-    consumptionLoadId: 'p_load',
-    autonomyId: 'rel_autonomy',
-    consumptionSelfId: 'rel_selfconsumption',
+    powerPvId: "p_pv",
+    powerAccuId: "p_akku", // not my typo! Using the ID from the AP
+    consumptionLoadId: "p_load",
+    autonomyId: "rel_autonomy",
+    consumptionSelfId: "rel_selfconsumption",
+    energyTodayId: "e_day",
+    energyYearId: "e_year",
 
-    createBasicDimension: function (id, name) {
+    createBasicDimension: function (id, name, divisor) {
         return {
             id: id,                                     // the unique id of the dimension
             name: name,                                 // the name of the dimension
             algorithm: netdata.chartAlgorithms.absolute,// the id of the netdata algorithm
             multiplier: 1,                              // the multiplier
-            divisor: 1,                                 // the divisor
+            divisor: divisor,                           // the divisor
             hidden: false                               // is hidden (boolean)
         };
     },
 
     // Gets the site power chart. Will be created if not existing.
     getSitePowerChart: function (service, id) {
-
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
 
         var dim = {};
-        dim[fronius.powerGridId] = this.createBasicDimension(fronius.powerGridId, "Grid");
-        dim[fronius.powerPvId] = this.createBasicDimension(fronius.powerPvId, "Photovoltaics");
-        dim[fronius.powerAccuId] = this.createBasicDimension(fronius.powerAccuId, "Accumulator");
+        dim[fronius.powerGridId] = this.createBasicDimension(fronius.powerGridId, "Grid", 1);
+        dim[fronius.powerPvId] = this.createBasicDimension(fronius.powerPvId, "Photovoltaics", 1);
+        dim[fronius.powerAccuId] = this.createBasicDimension(fronius.powerAccuId, "Accumulator", 1);
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -67,11 +68,10 @@ var fronius = {
 
     // Gets the site consumption chart. Will be created if not existing.
     getSiteConsumptionChart: function (service, id) {
-
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[fronius.consumptionLoadId] = this.createBasicDimension(fronius.consumptionLoadId, "Load");
+        dim[fronius.consumptionLoadId] = this.createBasicDimension(fronius.consumptionLoadId, "Load", 1);
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -91,14 +91,13 @@ var fronius = {
         return chart;
     },
 
-
     // Gets the site consumption chart. Will be created if not existing.
     getSiteAutonomyChart: function (service, id) {
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[fronius.autonomyId] = this.createBasicDimension(fronius.autonomyId, "Autonomy");
-        dim[fronius.consumptionSelfId] = this.createBasicDimension(fronius.consumptionSelfId, "Self Consumption");
+        dim[fronius.autonomyId] = this.createBasicDimension(fronius.autonomyId, "Autonomy", 1);
+        dim[fronius.consumptionSelfId] = this.createBasicDimension(fronius.consumptionSelfId, "Self Consumption", 1);
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -114,6 +113,54 @@ var fronius = {
         };
         chart = service.chart(id, chart);
         fronius.charts[id] = chart;
+
+        return chart;
+    },
+
+    // Gets the site energy chart for today. Will be created if not existing.
+    getSiteEnergyTodayChart: function (service, chartId) {
+        var chart = fronius.charts[chartId];
+        if (fronius.isDefined(chart)) return chart;
+        var dim = {};
+        dim[fronius.energyTodayId] = this.createBasicDimension(fronius.energyTodayId, "Today", 1000);
+        chart = {
+            id: chartId,                                         // the unique id of the chart
+            name: '',                                       // the unique name of the chart
+            title: service.name + ' Energy production for today',    // the title of the chart
+            units: 'kWh',                                   // the units of the chart dimensions
+            family: 'Energy',                                  // the family of the chart
+            context: 'fronius.energy.today',                // the context of the chart
+            type: netdata.chartTypes.area,                  // the type of the chart
+            priority: fronius.base_priority + 4,             // the priority relative to others in the same family
+            update_every: service.update_every,             // the expected update frequency of the chart
+            dimensions: dim
+        };
+        chart = service.chart(chartId, chart);
+        fronius.charts[chartId] = chart;
+
+        return chart;
+    },
+
+    // Gets the site energy chart for today. Will be created if not existing.
+    getSiteEnergyYearChart: function (service, chartId) {
+        var chart = fronius.charts[chartId];
+        if (fronius.isDefined(chart)) return chart;
+        var dim = {};
+        dim[fronius.energyYearId] = this.createBasicDimension(fronius.energyYearId, "Year", 1000);
+        chart = {
+            id: chartId,                                         // the unique id of the chart
+            name: '',                                       // the unique name of the chart
+            title: service.name + ' Energy production for this year',    // the title of the chart
+            units: 'kWh',                                   // the units of the chart dimensions
+            family: 'Energy',                                  // the family of the chart
+            context: 'fronius.energy.year',                // the context of the chart
+            type: netdata.chartTypes.area,                  // the type of the chart
+            priority: fronius.base_priority + 5,             // the priority relative to others in the same family
+            update_every: service.update_every,             // the expected update frequency of the chart
+            dimensions: dim
+        };
+        chart = service.chart(chartId, chart);
+        fronius.charts[chartId] = chart;
 
         return chart;
     },
@@ -136,7 +183,7 @@ var fronius = {
                     "Have a look at your JSON output to verify.");
                 continue;
             }
-            dim[i.toString()] = this.createBasicDimension("inverter_" + i, "Inverter " + i);
+            dim[i.toString()] = this.createBasicDimension("inverter_" + i, "Inverter " + i, 1);
         }
 
         chart = {
@@ -145,9 +192,9 @@ var fronius = {
             title: service.name + ' Current Inverter Output',    // the title of the chart
             units: 'W',                                   // the units of the chart dimensions
             family: 'Inverters',                                  // the family of the chart
-            context: 'fronius.inverter',                // the context of the chart
+            context: 'fronius.inverter.output',                // the context of the chart
             type: netdata.chartTypes.stacked,                  // the type of the chart
-            priority: fronius.base_priority + 4,             // the priority relative to others in the same family
+            priority: fronius.base_priority + 6,             // the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
             dimensions: dim
         };
@@ -156,65 +203,14 @@ var fronius = {
 
         return chart;
     },
-
-    // Gets the inverter energy production chart for today. Will be created if not existing.
-    // Needs the array of inverters in order to create a chart with all inverters as dimensions
-    getInverterEnergyTodayChart: function (service, chartId, inverters) {
-
-        var chart = fronius.charts[chartId];
-        if (fronius.isDefined(chart)) return chart;
-
-        var dim = {};
-
-        var inverterCount = Object.keys(inverters).length;
-        var inverter = inverters[inverterCount.toString()];
-        var i = 1;
-        for (i; i <= inverterCount; i++) {
-            if (fronius.isUndefined(inverter)) {
-                netdata.error("Expected an Inverter with a numerical name! " +
-                    "Have a look at your JSON output to verify.");
-                continue;
-            }
-            dim[i.toString()] = {
-                id: 'inverter_' + i,           // the unique id of the dimension
-                name: 'Inverter ' + i,  // the name of the dimension
-                algorithm: netdata.chartAlgorithms.absolute,// the id of the netdata algorithm
-                multiplier: 1,                              // the multiplier
-                divisor: 1000,                                 // the divisor
-                hidden: false                               // is hidden (boolean)
-            };
-        }
-
-        chart = {
-            id: chartId,                                         // the unique id of the chart
-            name: '',                                       // the unique name of the chart
-            title: service.name + ' Inverter Energy production for today',    // the title of the chart
-            units: 'kWh',                                   // the units of the chart dimensions
-            family: 'Inverters',                                  // the family of the chart
-            context: 'fronius.inverter',                // the context of the chart
-            type: netdata.chartTypes.stacked,                  // the type of the chart
-            priority: fronius.base_priority + 5,             // the priority relative to others in the same family
-            update_every: service.update_every,             // the expected update frequency of the chart
-            dimensions: dim
-        };
-        chart = service.chart(chartId, chart);
-        fronius.charts[chartId] = chart;
-
-        return chart;
-    },
-
 
     processResponse: function (service, content) {
         if (content === null) return;
         var json = JSON.parse(content);
-        // validating response
-        if (fronius.isUndefined(json.Body)) return;
-        if (fronius.isUndefined(json.Body.Data)) return;
-        if (fronius.isUndefined(json.Body.Data.Site)) return;
-        if (fronius.isUndefined(json.Body.Data.Inverters)) return;
+        if (!fronius.isResponseValid(json)) return;
 
         // add the service
-        if (service.added !== true) service.commit();
+        service.commit();
 
         var site = json.Body.Data.Site;
 
@@ -240,22 +236,35 @@ var fronius = {
         service.set(fronius.consumptionSelfId, Math.round(site.rel_SelfConsumption));
         service.end();
 
+        // Site Energy Today Chart
+        service.begin(fronius.getSiteEnergyTodayChart(service, 'fronius_' + service.name + '.energy.today'));
+        service.set(fronius.energyTodayId, Math.round(site.E_Day));
+        service.end();
+
+        // Site Energy Year Chart
+        service.begin(fronius.getSiteEnergyYearChart(service, 'fronius_' + service.name + '.energy.year'));
+        service.set(fronius.energyYearId, Math.round(site.E_Year));
+        service.end();
+
         // Inverters
         var inverters = json.Body.Data.Inverters;
-        var inverterCount = Object.keys(inverters).length;
-        if (inverterCount <= 0) return;
-        var i = 1;
-        for (i; i <= inverterCount; i++) {
-            var inverter = inverters[i];
+        var inverterCount = Object.keys(inverters).length + 1;
+        while (inverterCount--) {
+            var inverter = inverters[inverterCount];
             if (fronius.isUndefined(inverter)) continue;
-            netdata.debug("Setting values");
             service.begin(fronius.getInverterPowerChart(service, 'fronius_' + service.name + '.inverters.output', inverters));
-            service.set(i.toString(), Math.round(inverter.P));
-            service.end();
-            service.begin(fronius.getInverterEnergyTodayChart(service, 'fronius_' + service.name + '.inverters.today', inverters));
-            service.set(i.toString(), Math.round(inverter.E_Day));
+            service.set(inverterCount.toString(), Math.round(inverter.P));
             service.end();
         }
+    },
+
+    // some basic validation
+    isResponseValid: function (json) {
+        if (fronius.isUndefined(json.Body)) return false;
+        if (fronius.isUndefined(json.Body.Data)) return false;
+        if (fronius.isUndefined(json.Body.Data.Site)) return false;
+        if (fronius.isUndefined(json.Body.Data.Inverters)) return false;
+        return true;
     },
 
     // module.serviceExecute()
@@ -271,7 +280,6 @@ var fronius = {
             update_every: update_every,
             module: this
         });
-        service.request.method = 'GET';
         service.execute(this.processResponse);
     },
 
@@ -308,8 +316,6 @@ var fronius = {
     isDefined: function (value) {
         return typeof value !== 'undefined';
     }
-
-
 };
 
 module.exports = fronius;
