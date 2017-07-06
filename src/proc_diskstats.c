@@ -53,49 +53,56 @@ static char *path_to_find_block_device = NULL;
 static char *path_to_device_mapper = NULL;
 
 static inline char *get_disk_name(unsigned long major, unsigned long minor, char *disk) {
-    (void)minor;
-
     static int enabled = 1;
 
-    // we can find names only for device mapper (253)
-    if(!enabled || major != 253) goto cleanup;
+    if(!enabled) goto cleanup;
 
     char filename[FILENAME_MAX + 1];
     char link[FILENAME_MAX + 1];
 
     DIR *dir = opendir(path_to_device_mapper);
     if (!dir) {
-        error("Cannot open directory '%s'.", path_to_device_mapper);
+        error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'. Disabling device-mapper support.", disk, major, minor, path_to_device_mapper);
         enabled = 0;
         goto cleanup;
     }
 
-    ssize_t dlen = strlen(disk);
     struct dirent *de = NULL;
     while ((de = readdir(dir))) {
+        if(de->d_type != DT_LNK) continue;
 
-        if((de->d_type == DT_LNK)) {
-            snprintfz(filename, FILENAME_MAX, "%s/%s", path_to_device_mapper, de->d_name);
-            ssize_t len = readlink(filename, link, FILENAME_MAX);
-
-            if(len > 0) {
-                link[len] = '\0';
-
-                if(len > dlen && link[len-dlen-1] == '/' && !strcmp(&link[len - dlen], disk)) {
-                    // we have a match
-                    // info("Disk '%s': filename '%s' ('%s') is linked to '%s'. MATCHED", disk, filename, de->d_name, link);
-                    strncpy(link, de->d_name, FILENAME_MAX);
-                    netdata_fix_chart_id(link);
-                    closedir(dir);
-
-                    return strdupz(link);
-                }
-                //else
-                //    info("Disk '%s': filename '%s' ('%s') is linked to '%s'. NOT MATCHED", disk, filename, de->d_name, link);
-            }
-            //else
-            //    error("Cannot read link '%s'", filename);
+        snprintfz(filename, FILENAME_MAX, "%s/%s", path_to_device_mapper, de->d_name);
+        ssize_t len = readlink(filename, link, FILENAME_MAX);
+        if(len <= 0) {
+            error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot read link '%s'.", disk, major, minor, filename);
+            continue;
         }
+
+        link[len] = '\0';
+        snprintfz(filename, FILENAME_MAX, "%s/%s", path_to_device_mapper, link);
+
+        struct stat sb;
+        if(stat(filename, &sb) == -1) {
+            error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot stat() file '%s'.", disk, major, minor, filename);
+            continue;
+        }
+
+        if((sb.st_mode & S_IFMT) != S_IFBLK) {
+            // info("DEVICE-MAPPER ('%s', %lu:%lu): file '%s' is not a block device.", disk, major, minor, filename);
+            continue;
+        }
+
+        if(major(sb.st_rdev) != major || minor(sb.st_rdev) != minor) {
+            // info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
+            continue;
+        }
+
+        // info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
+
+        strncpy(link, de->d_name, FILENAME_MAX);
+        netdata_fix_chart_name(link);
+        disk = link;
+        break;
     }
     closedir(dir);
 
@@ -138,28 +145,9 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         last->next = d;
     }
 
-    // ------------------------------------------------------------------------
-    // find the type of the device
-
-    char buffer[FILENAME_MAX + 1];
-
-    // get the default path for finding info about the block device
-    if(unlikely(!path_to_find_block_device)) {
-        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
-        path_to_find_block_device = config_get(CONFIG_SECTION_DISKSTATS, "path to get block device infos", buffer);
-
-        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/queue/hw_sector_size");
-        path_to_get_hw_sector_size = config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size", buffer);
-
-        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/subsystem/%s/../queue/hw_sector_size");
-        path_to_get_hw_sector_size_partitions = config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size for partitions", buffer);
-
-        snprintfz(buffer, FILENAME_MAX, "%s/dev/mapper", netdata_configured_host_prefix);
-        path_to_device_mapper = config_get(CONFIG_SECTION_DISKSTATS, "path to device mapper", buffer);
-    }
-
     // find if it is a partition
     // by checking if /sys/dev/block/MAJOR:MINOR/partition is readable.
+    char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, path_to_find_block_device, major, minor, "partition");
     if(likely(access(buffer, R_OK) == 0)) {
         d->type = DISK_TYPE_PARTITION;
@@ -285,6 +273,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 globals_initialized = 0;
 
     if(unlikely(!globals_initialized)) {
+        globals_initialized = 1;
+
         global_enable_new_disks_detected_at_runtime = config_get_boolean(CONFIG_SECTION_DISKSTATS, "enable new disks detected at runtime", global_enable_new_disks_detected_at_runtime);
         global_enable_performance_for_physical_disks = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for physical disks", global_enable_performance_for_physical_disks);
         global_enable_performance_for_virtual_disks = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for virtual disks", global_enable_performance_for_virtual_disks);
@@ -298,7 +288,19 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "utilization percentage for all disks", global_do_util);
         global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "backlog for all disks", global_do_backlog);
 
-        globals_initialized = 1;
+        char buffer[FILENAME_MAX + 1];
+
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
+        path_to_find_block_device = config_get(CONFIG_SECTION_DISKSTATS, "path to get block device infos", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/queue/hw_sector_size");
+        path_to_get_hw_sector_size = config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/subsystem/%s/../queue/hw_sector_size");
+        path_to_get_hw_sector_size_partitions = config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size for partitions", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s/dev/mapper", netdata_configured_host_prefix);
+        path_to_device_mapper = config_get(CONFIG_SECTION_DISKSTATS, "path to device mapper", buffer);
     }
 
     // --------------------------------------------------------------------------
