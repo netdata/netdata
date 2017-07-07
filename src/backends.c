@@ -37,7 +37,7 @@ static inline size_t backend_name_copy(char *d, const char *s, size_t usable) {
     for(n = 0; *s && n < usable ; d++, s++, n++) {
         char c = *s;
 
-        if(!isalnum(c)) *d = '_';
+        if(c != '.' && !isalnum(c)) *d = '_';
         else *d = c;
     }
     *d = '\0';
