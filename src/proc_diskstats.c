@@ -79,7 +79,10 @@ static inline char *get_disk_name(unsigned long major, unsigned long minor, char
         }
 
         link[len] = '\0';
-        snprintfz(filename, FILENAME_MAX, "%s/%s", path_to_device_mapper, link);
+        if(link[0] != '/')
+            snprintfz(filename, FILENAME_MAX, "%s/%s", path_to_device_mapper, link);
+        else
+            strncpyz(filename, link, FILENAME_MAX);
 
         struct stat sb;
         if(stat(filename, &sb) == -1) {
