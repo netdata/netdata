@@ -176,8 +176,28 @@ static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
     for(n = 0; *s && n < usable ; d++, s++, n++) {
         register char c = *s;
 
-        if(unlikely(c != '.' && !isalnum(c))) *d = '_';
+        if(!isalnum(c)) *d = '_';
         else *d = c;
+    }
+    *d = '\0';
+
+    return n;
+}
+
+static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable) {
+    size_t n;
+
+    // make sure we can escape one character without overflowing the buffer
+    usable--;
+
+    for(n = 0; *s && n < usable ; d++, s++, n++) {
+        register char c = *s;
+
+        if(unlikely(c == '"' || c == '\\' || c == '\n')) {
+            *d++ = '\\';
+            n++;
+        }
+        *d = c;
     }
     *d = '\0';
 
@@ -190,7 +210,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, in
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_name_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
 
     // for each chart
     RRDSET *st;
