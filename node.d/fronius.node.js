@@ -222,12 +222,8 @@ var fronius = {
         service.end();
 
         // Site Consumption Chart
-        var consumption = site.P_Load;
-        if (consumption === null) consumption = 0;
-        consumption *= -1;
-
         service.begin(fronius.getSiteConsumptionChart(service, 'fronius_' + service.name + '.consumption'));
-        service.set(fronius.consumptionLoadId, Math.round(consumption));
+        service.set(fronius.consumptionLoadId, Math.round(Math.abs(site.P_Load)));
         service.end();
 
         // Site Autonomy Chart
