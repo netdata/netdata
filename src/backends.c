@@ -26,6 +26,7 @@
 #define BACKEND_SOURCE_DATA_AVERAGE      0x00000002
 #define BACKEND_SOURCE_DATA_SUM          0x00000004
 
+int backend_send_names = 1;
 
 // ----------------------------------------------------------------------------
 // helper functions for backends
@@ -161,8 +162,8 @@ static inline int format_dimension_collected_graphite_plaintext(
             , "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n"
             , prefix
             , hostname
-            , st->id
-            , rd->id
+            , (backend_send_names && st->name)?st->name:st->id
+            , (backend_send_names && rd->name)?rd->name:rd->id
             , rd->last_collected_value
             , (uint32_t)rd->last_collected_time.tv_sec
     );
@@ -192,8 +193,8 @@ static inline int format_dimension_stored_graphite_plaintext(
                 , "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n"
                 , prefix
                 , hostname
-                , st->id
-                , rd->id
+                , (backend_send_names && st->name)?st->name:st->id
+                , (backend_send_names && rd->name)?rd->name:rd->id
                 , value
                 , (uint32_t) before
         );
@@ -231,8 +232,8 @@ static inline int format_dimension_collected_opentsdb_telnet(
             b
             , "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s%s%s\n"
             , prefix
-            , st->id
-            , rd->id
+            , (backend_send_names && st->name)?st->name:st->id
+            , (backend_send_names && rd->name)?rd->name:rd->id
             , (uint32_t)rd->last_collected_time.tv_sec
             , rd->last_collected_value
             , hostname
@@ -264,8 +265,8 @@ static inline int format_dimension_stored_opentsdb_telnet(
                 b
                 , "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s%s%s\n"
                 , prefix
-                , st->id
-                , rd->id
+                , (backend_send_names && st->name)?st->name:st->id
+                , (backend_send_names && rd->name)?rd->name:rd->id
                 , (uint32_t) before
                 , value
                 , hostname
@@ -464,6 +465,7 @@ void *backends_main(void *ptr) {
     int frequency           = (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", 10);
     int buffer_on_failures  = (int)config_get_number(CONFIG_SECTION_BACKEND, "buffer on failures", 10);
     long timeoutms          = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", frequency * 2 * 1000);
+    backend_send_names      = config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", backend_send_names);
 
     charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), SIMPLE_PATTERN_EXACT);
 
