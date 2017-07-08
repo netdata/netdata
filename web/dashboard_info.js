@@ -1367,7 +1367,7 @@ netdataDashboard.context = {
     'stiebeleltron.system.roomtemp': {
         commonMin: true,
         commonMax: true,
-        valueRange: "[0, 50]"
+        valueRange: "[0, null]"
     },
 
 };

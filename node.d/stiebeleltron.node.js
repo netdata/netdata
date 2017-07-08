@@ -1,6 +1,6 @@
 'use strict';
 
-// This program will connect to one Stiebel Eltron ISG for heatpump heating.
+// This program will connect to one Stiebel Eltron ISG for heatpump heating
 // to get the heat pump metrics.
 
 // example configuration in netdata/conf.d/node.d/stiebeleltron.conf.md
@@ -40,13 +40,13 @@ var stiebeleltron = {
         var categories = page.categories;
         var categoriesCount = categories.length;
         while (categoriesCount--) {
-            var category = categories[categoriesCount];
             var context = {
                 html: html,
                 service: service,
-                category: category,
+                category: categories[categoriesCount],
                 page: page,
-                chartDefinition: null
+                chartDefinition: null,
+                dimension: null
             };
             stiebeleltron.processCategory(context);
 
@@ -57,26 +57,38 @@ var stiebeleltron = {
         var charts = context.category.charts;
         var chartCount = charts.length;
         while (chartCount--) {
-            var chart = charts[chartCount];
-            context.chartDefinition = chart;
+            context.chartDefinition = charts[chartCount];
             stiebeleltron.processChart(context);
         }
     },
 
-
     processChart: function (context) {
         var dimensions = context.chartDefinition.dimensions;
         var dimensionCount = dimensions.length;
-        context.service.begin(stiebeleltron.getChartUsing(context));
+        context.service.begin(stiebeleltron.getChartFromContext(context));
 
-        while(dimensionCount--) {
-            var dimension = dimensions[dimensionCount];
-            stiebeleltron.processDimension(dimension, context);
+        while (dimensionCount--) {
+            context.dimension = dimensions[dimensionCount];
+            stiebeleltron.processDimension(context);
         }
         context.service.end();
     },
 
-    getChartUsing: function (context) {
+    processDimension: function (context) {
+        var dimension = context.dimension;
+        var match = new RegExp(dimension.regex).exec(context.html);
+        if (match === null) return;
+        var value = match[1].replace(",", ".");
+        // most values have a single digit by default, which requires the values to be multiplied. can be overridden.
+        if (stiebeleltron.isDefined(dimension.digits)) {
+            value *= Math.pow(10, dimension.digits);
+        } else {
+            value *= 10;
+        }
+        context.service.set(stiebeleltron.getDimensionId(context), value);
+    },
+
+    getChartFromContext: function (context) {
         var chartId = this.getChartId(context);
         var chart = stiebeleltron.charts[chartId];
         if (stiebeleltron.isDefined(chart)) return chart;
@@ -89,10 +101,12 @@ var stiebeleltron = {
         while (dimCount--) {
             var dim = chartDefinition.dimensions[dimCount];
             var multiplier = 1;
-            var divisor = 1;
+            var divisor = 10;
+            if (stiebeleltron.isDefined(dim.digits)) divisor = Math.pow(10, Math.max(0, dim.digits));
             if (stiebeleltron.isDefined(dim.multiplier)) multiplier = dim.multiplier;
             if (stiebeleltron.isDefined(dim.divisor)) divisor = dim.divisor;
-            var dimId = this.getDimensionId(context, dim);
+            context.dimension = dim;
+            var dimId = this.getDimensionId(context);
             dimensions[dimId] = this.createBasicDimension(dimId, dim.name, multiplier, divisor);
         }
 
@@ -102,7 +116,7 @@ var stiebeleltron = {
             title: chartDefinition.title,
             units: chartDefinition.unit,
             family: context.category.name,
-            context: 'stiebeleltron.' + context.category.id,
+            context: 'stiebeleltron.' + context.page.id + "." + context.category.id,
             type: chartDefinition.type,
             priority: stiebeleltron.base_priority + chartDefinition.prio,// the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
@@ -112,27 +126,6 @@ var stiebeleltron = {
         stiebeleltron.charts[chartId] = chart;
 
         return chart;
-    },
-
-    getChartId: function (context) {
-        return "stiebeleltron_" + context.page.id +
-            "." + context.category.id +
-            "." + context.chartDefinition.id;
-    },
-
-    getDimensionId: function (context, dimension) {
-        return this.getChartId(context) + "." + dimension.id;
-    },
-
-    processDimension: function (dimension, context) {
-        var value = stiebeleltron.parseRegex(dimension.regex, context.html);
-        netdata.debug(dimension.name + " : " + value);
-        context.service.set(stiebeleltron.getDimensionId(context, dimension), value);
-    },
-
-    parseRegex: function (regex, html) {
-        var match = new RegExp(regex).exec(html);
-        return match[1].replace(",", ".");
     },
 
     // module.serviceExecute()
@@ -148,7 +141,6 @@ var stiebeleltron = {
             update_every: update_every,
             module: this
         });
-        service.request.method = 'GET';
         service.execute(this.processResponse);
     },
 
@@ -180,6 +172,16 @@ var stiebeleltron = {
             service.module.processResponse(serv, data);
             callback();
         });
+    },
+
+    getChartId: function (context) {
+        return "stiebeleltron_" + context.page.id +
+            "." + context.category.id +
+            "." + context.chartDefinition.id;
+    },
+
+    getDimensionId: function (context) {
+        return this.getChartId(context) + "." + context.dimension.id;
     },
 
     isUndefined: function (value) {
