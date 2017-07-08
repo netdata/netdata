@@ -208,7 +208,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
 
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     int format = ALLMETRICS_SHELL;
-    int help = 0, types = 0; // prometheus options
+    int help = 0, types = 0, names = backend_send_names; // prometheus options
 
     while(url) {
         char *value = mystrsep(&url, "?&");
@@ -242,6 +242,12 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             else
                 types = 0;
         }
+        else if(!strcmp(name, "names")) {
+            if(!strcmp(value, "yes"))
+                names = 1;
+            else
+                names = 0;
+        }
     }
 
     buffer_flush(w->response.data);
@@ -260,12 +266,12 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus(host, w->response.data, help, types);
+            rrd_stats_api_v1_charts_allmetrics_prometheus(host, w->response.data, help, types, names);
             return 200;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(w->response.data, help, types);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(w->response.data, help, types, names);
             return 200;
 
         default:

@@ -176,8 +176,28 @@ static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
     for(n = 0; *s && n < usable ; d++, s++, n++) {
         register char c = *s;
 
-        if(unlikely(!isalnum(c))) *d = '_';
+        if(!isalnum(c)) *d = '_';
         else *d = c;
+    }
+    *d = '\0';
+
+    return n;
+}
+
+static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable) {
+    size_t n;
+
+    // make sure we can escape one character without overflowing the buffer
+    usable--;
+
+    for(n = 0; *s && n < usable ; d++, s++, n++) {
+        register char c = *s;
+
+        if(unlikely(c == '"' || c == '\\' || c == '\n')) {
+            *d++ = '\\';
+            n++;
+        }
+        *d = c;
     }
     *d = '\0';
 
@@ -186,17 +206,21 @@ static inline size_t prometheus_name_copy(char *d, const char *s, size_t usable)
 
 #define PROMETHEUS_ELEMENT_MAX 256
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, int help, int types) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, int help, int types, int names) {
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_name_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
 
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         char chart[PROMETHEUS_ELEMENT_MAX + 1];
-        prometheus_name_copy(chart, st->id, PROMETHEUS_ELEMENT_MAX);
+
+        if(unlikely(names && st->name))
+            prometheus_name_copy(chart, st->name, PROMETHEUS_ELEMENT_MAX);
+        else
+            prometheus_name_copy(chart, st->id, PROMETHEUS_ELEMENT_MAX);
 
         buffer_strcat(wb, "\n");
         if(rrdset_is_available_for_backends(st)) {
@@ -207,7 +231,11 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, in
             rrddim_foreach_read(rd, st) {
                 if(rd->collections_counter) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
-                    prometheus_name_copy(dimension, rd->id, PROMETHEUS_ELEMENT_MAX);
+
+                    if(unlikely(names && rd->name))
+                        prometheus_name_copy(dimension, rd->name, PROMETHEUS_ELEMENT_MAX);
+                    else
+                        prometheus_name_copy(dimension, rd->id, PROMETHEUS_ELEMENT_MAX);
 
                     const char *t = "gauge", *h = "gives";
                     if(rd->algorithm == RRD_ALGORITHM_INCREMENTAL || rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
@@ -216,7 +244,15 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, in
                     }
 
                     if(unlikely(help))
-                        buffer_sprintf(wb, "# HELP netdata chart %s, dimension %s, value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n", st->id, rd->id, rd->multiplier, rd->divisor, h, st->units, t);
+                        buffer_sprintf(wb, "# HELP netdata chart %s, dimension %s, value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
+                                       , (names && st->name)?st->name:st->id
+                                       , (names && rd->name)?rd->name:rd->id
+                                       , rd->multiplier
+                                       , rd->divisor
+                                       , h
+                                       , st->units
+                                       , t
+                        );
 
                     if(unlikely(types))
                         buffer_sprintf(wb, "# TYPE %s_%s %s\n", chart, dimension, t);
@@ -238,11 +274,11 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, in
     rrdhost_unlock(host);
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(BUFFER *wb, int help, int types) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(BUFFER *wb, int help, int types, int names) {
     RRDHOST *host;
     rrd_rdlock();
     rrdhost_foreach_read(host) {
-        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, help, types);
+        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, help, types, names);
     }
     rrd_unlock();
 }
@@ -275,7 +311,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
     rrdset_foreach_read(st, host) {
         calculated_number total = 0.0;
         char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, st->id, SHELL_ELEMENT_MAX);
+        shell_name_copy(chart, st->name?st->name:st->id, SHELL_ELEMENT_MAX);
 
         buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, st->name);
         if(rrdset_is_available_for_viewers(st)) {
@@ -286,7 +322,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
             rrddim_foreach_read(rd, st) {
                 if(rd->collections_counter) {
                     char dimension[SHELL_ELEMENT_MAX + 1];
-                    shell_name_copy(dimension, rd->id, SHELL_ELEMENT_MAX);
+                    shell_name_copy(dimension, rd->name?rd->name:rd->id, SHELL_ELEMENT_MAX);
 
                     calculated_number n = rd->last_stored_value;
 
@@ -314,7 +350,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
         if(!rc->rrdset) continue;
 
         char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, rc->rrdset->id, SHELL_ELEMENT_MAX);
+        shell_name_copy(chart, rc->rrdset->name?rc->rrdset->name:rc->rrdset->id, SHELL_ELEMENT_MAX);
 
         char alarm[SHELL_ELEMENT_MAX + 1];
         shell_name_copy(alarm, rc->name, SHELL_ELEMENT_MAX);
