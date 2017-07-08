@@ -230,7 +230,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, in
         char context[PROMETHEUS_ELEMENT_MAX + 1];
         char family[PROMETHEUS_ELEMENT_MAX + 1];
 
-        prometheus_name_copy(chart, (names && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
+        prometheus_label_copy(chart, (names && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
         prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
         prometheus_name_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
 
