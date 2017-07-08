@@ -266,7 +266,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus(host, w->response.data, help, types, names);
+            rrd_stats_api_v1_charts_allmetrics_prometheus(host, w->response.data, 0, help, types, names);
             return 200;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
