@@ -254,7 +254,8 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, in
                     }
 
                     if(unlikely(help))
-                        buffer_sprintf(wb, "# HELP netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
+                        buffer_sprintf(wb, "# HELP %s_%s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
+                                       , context, family, dimension
                                        , (names && st->name)?st->name:st->id
                                        , st->context
                                        , st->family
