@@ -19,18 +19,18 @@ var stiebeleltron = {
     charts: {},
     pages: {},
 
-    createBasicDimension(id, name) {
+    createBasicDimension: function (id, name, multiplier, divisor) {
         return {
             id: id,                                     // the unique id of the dimension
             name: name,                                 // the name of the dimension
             algorithm: netdata.chartAlgorithms.absolute,// the id of the netdata algorithm
-            multiplier: 1,                              // the multiplier
-            divisor: 1,                                 // the divisor
+            multiplier: multiplier,                     // the multiplier
+            divisor: divisor,                           // the divisor
             hidden: false                               // is hidden (boolean)
         };
     },
 
-    processResponse(service, html) {
+    processResponse: function (service, html) {
         if (html === null) return;
 
         // add the service
@@ -45,14 +45,15 @@ var stiebeleltron = {
                 html: html,
                 service: service,
                 category: category,
-                page: page
+                page: page,
+                chartDefinition: null
             };
             stiebeleltron.processCategory(context);
 
         }
     },
 
-    processCategory(context) {
+    processCategory: function (context) {
         var charts = context.category.charts;
         var chartCount = charts.length;
         while (chartCount--) {
@@ -63,7 +64,7 @@ var stiebeleltron = {
     },
 
 
-    processChart(context) {
+    processChart: function (context) {
         var dimensions = context.chartDefinition.dimensions;
         var dimensionCount = dimensions.length;
         context.service.begin(stiebeleltron.getChartUsing(context));
@@ -75,45 +76,37 @@ var stiebeleltron = {
         context.service.end();
     },
 
-    getChartUsing(context) {
-        var chartId = "stiebeleltron_" + context.page.id +
-            "." + context.category.id +
-            "." + context.chartDefinition.id;
+    getChartUsing: function (context) {
+        var chartId = this.getChartId(context);
         var chart = stiebeleltron.charts[chartId];
         if (stiebeleltron.isDefined(chart)) return chart;
 
-        var dim = {};
+        var chartDefinition = context.chartDefinition;
+        var service = context.service;
+        var dimensions = {};
 
-        var inverter_count = Object.keys(inverters).length;
-        var inverter = inverters[inverter_count.toString()];
-        var i = 1;
-        for (i; i <= inverter_count; i++) {
-            if (stiebeleltron.isUndefined(inverter)) {
-                netdata.error("Expected an Inverter with a numerical name! " +
-                    "Have a look at your JSON output to verify.");
-                continue;
-            }
-            dim[i.toString()] = {
-                id: 'inverter_' + i,           // the unique id of the dimension
-                name: 'Inverter ' + i,  // the name of the dimension
-                algorithm: netdata.chartAlgorithms.absolute,// the id of the netdata algorithm
-                multiplier: 1,                              // the multiplier
-                divisor: 1000,                                 // the divisor
-                hidden: false                               // is hidden (boolean)
-            };
+        var dimCount = chartDefinition.dimensions.length;
+        while (dimCount--) {
+            var dim = chartDefinition.dimensions[dimCount];
+            var multiplier = 1;
+            var divisor = 1;
+            if (stiebeleltron.isDefined(dim.multiplier)) multiplier = dim.multiplier;
+            if (stiebeleltron.isDefined(dim.divisor)) divisor = dim.divisor;
+            var dimId = this.getDimensionId(context, dim);
+            dimensions[dimId] = this.createBasicDimension(dimId, dim.name, multiplier, divisor);
         }
 
         chart = {
-            id: chartId,                                         // the unique id of the chart
-            name: '',                                       // the unique name of the chart
-            title: service.name + " " + chartDefinition.title,    // the title of the chart
-            units: chartDefinition.unit,                                   // the units of the chart dimensions
-            family: 'Inverters',                                  // the family of the chart
-            context: 'stiebeleltron.inverter',                // the context of the chart
-            type: netdata.chartTypes.stacked,                  // the type of the chart
-            priority: stiebeleltron.base_priority + 5,             // the priority relative to others in the same family
+            id: chartId,
+            name: '',
+            title: chartDefinition.title,
+            units: chartDefinition.unit,
+            family: context.category.name,
+            context: 'stiebeleltron.' + context.category.id,
+            type: chartDefinition.type,
+            priority: stiebeleltron.base_priority + chartDefinition.prio,// the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
-            dimensions: dim
+            dimensions: dimensions
         };
         chart = service.chart(chartId, chart);
         stiebeleltron.charts[chartId] = chart;
@@ -121,25 +114,37 @@ var stiebeleltron = {
         return chart;
     },
 
-    processDimension(dimension, context) {
-        var value = stiebeleltron.parseRegex(dimension.regex, context.html);
-        context.service.set(dimension.name, Math.round(value));
+    getChartId: function (context) {
+        return "stiebeleltron_" + context.page.id +
+            "." + context.category.id +
+            "." + context.chartDefinition.id;
     },
 
-    parseRegex(regex, html) {
+    getDimensionId: function (context, dimension) {
+        return this.getChartId(context) + "." + dimension.id;
+    },
 
+    processDimension: function (dimension, context) {
+        var value = stiebeleltron.parseRegex(dimension.regex, context.html);
+        netdata.debug(dimension.name + " : " + value);
+        context.service.set(stiebeleltron.getDimensionId(context, dimension), value);
+    },
+
+    parseRegex: function (regex, html) {
+        var match = new RegExp(regex).exec(html);
+        return match[1].replace(",", ".");
     },
 
     // module.serviceExecute()
     // this function is called only from this module
     // its purpose is to prepare the request and call
     // netdata.serviceExecute()
-    serviceExecute(name, uri, update_every) {
+    serviceExecute: function (name, uri, update_every) {
         netdata.debug(this.name + ': ' + name + ': url: ' + uri + ', update_every: ' + update_every);
 
         var service = netdata.service({
             name: name,
-            request: netdata.requestFromURL('http://' + uri),
+            request: netdata.requestFromURL(uri),
             update_every: update_every,
             module: this
         });
@@ -148,7 +153,7 @@ var stiebeleltron = {
     },
 
 
-    configure(config) {
+    configure: function (config) {
         if (stiebeleltron.isUndefined(config.pages)) return 0;
         var added = 0;
         var pageCount = config.pages.length;
@@ -160,7 +165,7 @@ var stiebeleltron = {
                 return 0;
             }
             if (stiebeleltron.isUndefined(page.update_every)) page.update_every = this.update_every;
-            this.pages[page.id] = page;
+            this.pages[page.name] = page;
             this.serviceExecute(page.name, page.url, page.update_every);
             added++;
         }
@@ -170,20 +175,20 @@ var stiebeleltron = {
     // module.update()
     // this is called repeatedly to collect data, by calling
     // netdata.serviceExecute()
-    update(service, callback) {
+    update: function (service, callback) {
         service.execute(function (serv, data) {
             service.module.processResponse(serv, data);
             callback();
         });
     },
 
-    isUndefined(value) {
+    isUndefined: function (value) {
         return typeof value === 'undefined';
     },
 
-    isDefined(value) {
+    isDefined: function (value) {
         return typeof value !== 'undefined';
-    },
+    }
 };
 
 module.exports = stiebeleltron;
