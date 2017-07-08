@@ -260,8 +260,7 @@ var fronius = {
         if (fronius.isUndefined(json.Body)) return false;
         if (fronius.isUndefined(json.Body.Data)) return false;
         if (fronius.isUndefined(json.Body.Data.Site)) return false;
-        if (fronius.isUndefined(json.Body.Data.Inverters)) return false;
-        return true;
+        return fronius.isDefined(json.Body.Data.Inverters);
     },
 
     // module.serviceExecute()
