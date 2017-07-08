@@ -125,6 +125,33 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             def_inodes = CONFIG_BOOLEAN_NO;
         }
 
+        // check if the mount point is a directory #2407
+        {
+            struct stat bs;
+            if(stat(mi->mount_point, &bs) == -1) {
+                error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
+                      , mi->mount_point
+                      , disk
+                      , mi->filesystem?mi->filesystem:""
+                      , mi->root?mi->root:""
+                );
+                def_space = CONFIG_BOOLEAN_NO;
+                def_inodes = CONFIG_BOOLEAN_NO;
+            }
+            else {
+                if((bs.st_mode & S_IFMT) != S_IFDIR) {
+                    error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
+                          , mi->mount_point
+                          , disk
+                          , mi->filesystem?mi->filesystem:""
+                          , mi->root?mi->root:""
+                    );
+                    def_space = CONFIG_BOOLEAN_NO;
+                    def_inodes = CONFIG_BOOLEAN_NO;
+                }
+            }
+        }
+
         do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
         do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
 
@@ -161,7 +188,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     struct statvfs buff_statvfs;
     if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
         if(!m->shown_error) {
-            error("Failed statvfs() for '%s' (disk '%s', filesystem '%s', root '%s')"
+            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
                   , mi->mount_point
                   , disk
                   , mi->filesystem?mi->filesystem:""
@@ -188,7 +215,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
-        error("Disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
+        error("DISKSPACE: disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
 #endif
 
     // --------------------------------------------------------------------------
@@ -201,7 +228,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
-        error("Disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
+        error("DISKSPACE: disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
 #endif
 
     // --------------------------------------------------------------------------
@@ -294,10 +321,10 @@ void *proc_diskspace_main(void *ptr) {
     info("DISKSPACE thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+        error("DISKSPACE: Cannot set pthread cancel type to DEFERRED.");
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+        error("DISKSPACE: Cannot set pthread cancel state to ENABLE.");
 
     int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
 
@@ -334,7 +361,7 @@ void *proc_diskspace_main(void *ptr) {
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
 
-            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND | MOUNTINFO_IS_SAME_DEV | MOUNTINFO_NO_STAT | MOUNTINFO_NO_SIZE)))
+            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
                 continue;
 
             do_disk_space_stats(mi, update_every);

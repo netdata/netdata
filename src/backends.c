@@ -26,9 +26,24 @@
 #define BACKEND_SOURCE_DATA_AVERAGE      0x00000002
 #define BACKEND_SOURCE_DATA_SUM          0x00000004
 
+int backend_send_names = 1;
 
 // ----------------------------------------------------------------------------
 // helper functions for backends
+
+static inline size_t backend_name_copy(char *d, const char *s, size_t usable) {
+    size_t n;
+
+    for(n = 0; *s && n < usable ; d++, s++, n++) {
+        char c = *s;
+
+        if(c != '.' && !isalnum(c)) *d = '_';
+        else *d = c;
+    }
+    *d = '\0';
+
+    return n;
+}
 
 // calculate the SUM or AVERAGE of a dimension, for any timeframe
 // may return NAN if the database does not have any value in the give timeframe
@@ -156,13 +171,18 @@ static inline int format_dimension_collected_graphite_plaintext(
     (void)before;
     (void)options;
 
+    char chart_name[RRD_ID_LENGTH_MAX + 1];
+    char dimension_name[RRD_ID_LENGTH_MAX + 1];
+    backend_name_copy(chart_name, (backend_send_names && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(dimension_name, (backend_send_names && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
+
     buffer_sprintf(
             b
             , "%s.%s.%s.%s " COLLECTED_NUMBER_FORMAT " %u\n"
             , prefix
             , hostname
-            , st->id
-            , rd->id
+            , chart_name
+            , dimension_name
             , rd->last_collected_value
             , (uint32_t)rd->last_collected_time.tv_sec
     );
@@ -183,6 +203,11 @@ static inline int format_dimension_stored_graphite_plaintext(
 ) {
     (void)host;
 
+    char chart_name[RRD_ID_LENGTH_MAX + 1];
+    char dimension_name[RRD_ID_LENGTH_MAX + 1];
+    backend_name_copy(chart_name, (backend_send_names && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(dimension_name, (backend_send_names && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
+
     calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
 
     if(!isnan(value)) {
@@ -192,8 +217,8 @@ static inline int format_dimension_stored_graphite_plaintext(
                 , "%s.%s.%s.%s " CALCULATED_NUMBER_FORMAT " %u\n"
                 , prefix
                 , hostname
-                , st->id
-                , rd->id
+                , chart_name
+                , dimension_name
                 , value
                 , (uint32_t) before
         );
@@ -227,12 +252,17 @@ static inline int format_dimension_collected_opentsdb_telnet(
     (void)before;
     (void)options;
 
+    char chart_name[RRD_ID_LENGTH_MAX + 1];
+    char dimension_name[RRD_ID_LENGTH_MAX + 1];
+    backend_name_copy(chart_name, (backend_send_names && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(dimension_name, (backend_send_names && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
+
     buffer_sprintf(
             b
             , "put %s.%s.%s %u " COLLECTED_NUMBER_FORMAT " host=%s%s%s\n"
             , prefix
-            , st->id
-            , rd->id
+            , chart_name
+            , dimension_name
             , (uint32_t)rd->last_collected_time.tv_sec
             , rd->last_collected_value
             , hostname
@@ -258,14 +288,19 @@ static inline int format_dimension_stored_opentsdb_telnet(
 
     calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
 
+    char chart_name[RRD_ID_LENGTH_MAX + 1];
+    char dimension_name[RRD_ID_LENGTH_MAX + 1];
+    backend_name_copy(chart_name, (backend_send_names && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
+    backend_name_copy(dimension_name, (backend_send_names && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
+
     if(!isnan(value)) {
 
         buffer_sprintf(
                 b
                 , "put %s.%s.%s %u " CALCULATED_NUMBER_FORMAT " host=%s%s%s\n"
                 , prefix
-                , st->id
-                , rd->id
+                , chart_name
+                , dimension_name
                 , (uint32_t) before
                 , value
                 , hostname
@@ -464,6 +499,7 @@ void *backends_main(void *ptr) {
     int frequency           = (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", 10);
     int buffer_on_failures  = (int)config_get_number(CONFIG_SECTION_BACKEND, "buffer on failures", 10);
     long timeoutms          = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", frequency * 2 * 1000);
+    backend_send_names      = config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", backend_send_names);
 
     charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), SIMPLE_PATTERN_EXACT);
 
