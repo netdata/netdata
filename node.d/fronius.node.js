@@ -53,7 +53,7 @@ var fronius = {
             name: '',                                       // the unique name of the chart
             title: service.name + ' Current Site Power',    // the title of the chart
             units: 'W',                                   // the units of the chart dimensions
-            family: 'Power',                                  // the family of the chart
+            family: 'power',                                  // the family of the chart
             context: 'fronius.power',                // the context of the chart
             type: netdata.chartTypes.area,                  // the type of the chart
             priority: fronius.base_priority + 1,             // the priority relative to others in the same family
@@ -78,7 +78,7 @@ var fronius = {
             name: '',                                       // the unique name of the chart
             title: service.name + ' Current Load',          // the title of the chart
             units: 'W',                                     // the units of the chart dimensions
-            family: 'Consumption',                                  // the family of the chart
+            family: 'consumption',                                  // the family of the chart
             context: 'fronius.consumption',                 // the context of the chart
             type: netdata.chartTypes.area,                  // the type of the chart
             priority: fronius.base_priority + 2,            // the priority relative to others in the same family
@@ -104,7 +104,7 @@ var fronius = {
             name: '',                                       // the unique name of the chart
             title: service.name + ' Current Autonomy',      // the title of the chart
             units: '%',                                     // the units of the chart dimensions
-            family: 'Autonomy',                                  // the family of the chart
+            family: 'autonomy',                                  // the family of the chart
             context: 'fronius.autonomy',                 // the context of the chart
             type: netdata.chartTypes.area,                  // the type of the chart
             priority: fronius.base_priority + 3,            // the priority relative to others in the same family
@@ -128,7 +128,7 @@ var fronius = {
             name: '',                                       // the unique name of the chart
             title: service.name + ' Energy production for today',    // the title of the chart
             units: 'kWh',                                   // the units of the chart dimensions
-            family: 'Energy',                                  // the family of the chart
+            family: 'energy',                                  // the family of the chart
             context: 'fronius.energy.today',                // the context of the chart
             type: netdata.chartTypes.area,                  // the type of the chart
             priority: fronius.base_priority + 4,             // the priority relative to others in the same family
@@ -152,7 +152,7 @@ var fronius = {
             name: '',                                       // the unique name of the chart
             title: service.name + ' Energy production for this year',    // the title of the chart
             units: 'kWh',                                   // the units of the chart dimensions
-            family: 'Energy',                                  // the family of the chart
+            family: 'energy',                                  // the family of the chart
             context: 'fronius.energy.year',                // the context of the chart
             type: netdata.chartTypes.area,                  // the type of the chart
             priority: fronius.base_priority + 5,             // the priority relative to others in the same family
@@ -191,7 +191,7 @@ var fronius = {
             name: '',                                       // the unique name of the chart
             title: service.name + ' Current Inverter Output',    // the title of the chart
             units: 'W',                                   // the units of the chart dimensions
-            family: 'Inverters',                                  // the family of the chart
+            family: 'inverters',                                  // the family of the chart
             context: 'fronius.inverter.output',                // the context of the chart
             type: netdata.chartTypes.stacked,                  // the type of the chart
             priority: fronius.base_priority + 6,             // the priority relative to others in the same family
