@@ -197,7 +197,7 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, uint32_t 
         else
             mode = "unknown";
 
-        buffer_sprintf(wb, "# HELP netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s\n"
+        buffer_sprintf(wb, "# HELP netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s"
                 , host->hostname
                 , (first_seen)?"FIRST SEEN ":""
                 , server
@@ -207,9 +207,9 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, uint32_t 
         );
 
         if(show_range)
-            buffer_sprintf(wb, "# HELP netdata values for time range %lu to %lu\n", (unsigned long)after, (unsigned long)now);
+            buffer_sprintf(wb, ", values for time range %lu to %lu", (unsigned long)after, (unsigned long)now);
 
-        buffer_strcat(wb, "\n");
+        buffer_strcat(wb, "\n\n");
     }
 
     return after;
