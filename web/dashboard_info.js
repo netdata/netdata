@@ -286,7 +286,7 @@ netdataDashboard.menu = {
     },
 
     'fronius': {
-        title: 'Solar Power',
+        title: 'Fronius',
         icon: '<i class="fa fa-sun-o" aria-hidden="true"></i>',
         info: undefined
     },
