@@ -44,6 +44,8 @@ netdata_SOURCES = \
 	appconfig.h \
 	avl.c \
 	avl.h \
+	backend_prometheus.c \
+	backend_prometheus.h \
 	backends.c \
 	backends.h \
 	clocks.c \

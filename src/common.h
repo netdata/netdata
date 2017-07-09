@@ -220,6 +220,7 @@
 #include "unit_test.h"
 #include "ipc.h"
 #include "backends.h"
+#include "backend_prometheus.h"
 #include "inlined.h"
 #include "adaptive_resortable_list.h"
 #include "rrdpush.h"
