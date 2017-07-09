@@ -181,7 +181,7 @@ var stiebeleltron = {
     },
 
     getDimensionId: function (context) {
-        return this.getChartId(context) + "." + context.dimension.id;
+        return context.dimension.id;
     },
 
     isUndefined: function (value) {
