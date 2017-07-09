@@ -216,9 +216,9 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, in
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     if(allhosts) {
         if(host->tags && *(host->tags))
-            snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\",%s", hostname, host->tags);
-        else
-            snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
+            buffer_sprintf(wb, "netdata_host_tags{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
+
+        snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
     }
     else {
         if(host->tags && *(host->tags))
