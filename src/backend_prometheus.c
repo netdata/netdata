@@ -124,14 +124,14 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, ui
                         }
 
                         if (unlikely(help))
-                            buffer_sprintf(wb, "# HELP %s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
+                            buffer_sprintf(wb, "# COMMENT HELP %s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
                                 context, dimension, (names && st->name) ? st->name : st->id, st->context,
                                 st->family, (names && rd->name) ? rd->name : rd->id, rd->multiplier,
                                 rd->divisor, h, st->units, t
                         );
 
                         if (unlikely(types))
-                            buffer_sprintf(wb, "# TYPE %s_%s %s\n", context, dimension, t);
+                            buffer_sprintf(wb, "# COMMENT TYPE %s_%s %s\n", context, dimension, t);
 
                         buffer_sprintf(wb, "%s_%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n",
                                 context, dimension, chart, family, labels, rd->last_collected_value,
@@ -147,14 +147,14 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, ui
                             prometheus_label_copy(dimension, (names && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(help))
-                                buffer_sprintf(wb, "# HELP %s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value gives %s (gauge)\n",
+                                buffer_sprintf(wb, "# COMMENT HELP %s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value gives %s (gauge)\n",
                                                context, (names && st->name) ? st->name : st->id, st->context,
                                                st->family, (names && rd->name) ? rd->name : rd->id,
                                                st->units
                                 );
 
                             if (unlikely(types))
-                                buffer_sprintf(wb, "# TYPE %s gauge\n", context);
+                                buffer_sprintf(wb, "# COMMENT TYPE %s gauge\n", context);
 
                             buffer_sprintf(wb, "%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n",
                                     context, chart, family, dimension, labels, value,
@@ -197,7 +197,7 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, uint32_t 
         else
             mode = "unknown";
 
-        buffer_sprintf(wb, "# HELP netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s"
+        buffer_sprintf(wb, "# COMMENT netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s"
                 , host->hostname
                 , (first_seen)?"FIRST SEEN ":""
                 , server
