@@ -211,6 +211,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     int help = 0, types = 0, names = backend_send_names; // prometheus options
     const char *prometheus_server = w->client_ip;
     uint32_t prometheus_options = backend_options;
+    const char *prometheus_prefix = backend_prefix;
 
     while(url) {
         char *value = mystrsep(&url, "?&");
@@ -253,6 +254,9 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
         else if(!strcmp(name, "server")) {
             prometheus_server = value;
         }
+        else if(!strcmp(name, "prefix")) {
+            prometheus_prefix = value;
+        }
         else if(!strcmp(name, "source")) {
             prometheus_options = backend_parse_data_source(value, prometheus_options);
         }
@@ -274,12 +278,12 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
         case ALLMETRICS_PROMETHEUS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(host, w->response.data, prometheus_server, prometheus_options, help, types, names);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names);
             return 200;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
-            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(host, w->response.data, prometheus_server, prometheus_options, help, types, names);
+            rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(host, w->response.data, prometheus_server, prometheus_prefix, prometheus_options, help, types, names);
             return 200;
 
         default:
