@@ -70,7 +70,7 @@ static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable
 #define PROMETHEUS_ELEMENT_MAX 256
 #define PROMETHEUS_LABELS_MAX 1024
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, uint32_t options, time_t after, time_t before, int allhosts, int help, int types, int names) {
+static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, uint32_t options, time_t after, time_t before, int allhosts, int help, int types, int names) {
     rrdhost_rdlock(host);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
@@ -125,7 +125,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, ui
 
                         if (unlikely(help))
                             buffer_sprintf(wb, "# COMMENT HELP %s_%s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
-                                           backend_prefix, context, dimension,
+                                           prefix, context, dimension,
                                            (names && st->name) ? st->name : st->id, st->context,
                                            st->family,
                                            (names && rd->name) ? rd->name : rd->id,
@@ -134,10 +134,10 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, ui
                         );
 
                         if (unlikely(types))
-                            buffer_sprintf(wb, "# COMMENT TYPE %s_%s_%s %s\n", backend_prefix, context, dimension, t);
+                            buffer_sprintf(wb, "# COMMENT TYPE %s_%s_%s %s\n", prefix, context, dimension, t);
 
                         buffer_sprintf(wb, "%s_%s_%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n",
-                                       backend_prefix, context, dimension,
+                                       prefix, context, dimension,
                                        chart, family, labels,
                                        rd->last_collected_value, timeval_msec(&rd->last_collected_time)
                         );
@@ -152,7 +152,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, ui
 
                             if (unlikely(help))
                                 buffer_sprintf(wb, "# COMMENT HELP %s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value gives %s (gauge)\n",
-                                               backend_prefix, context,
+                                               prefix, context,
                                                (names && st->name) ? st->name : st->id, st->context,
                                                st->family,
                                                (names && rd->name) ? rd->name : rd->id,
@@ -160,10 +160,10 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, ui
                                 );
 
                             if (unlikely(types))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s gauge\n", backend_prefix, context);
+                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s gauge\n", prefix, context);
 
                             buffer_sprintf(wb, "%s_%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n",
-                                           backend_prefix, context,
+                                           prefix, context,
                                            chart, family, dimension, labels,
                                            value, timeval_msec(&rd->last_collected_time)
                             );
@@ -222,20 +222,20 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, uint32_t 
     return after;
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, uint32_t options, int help, int types, int names) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, uint32_t options, int help, int types, int names) {
     time_t before = now_realtime_sec();
     time_t after = prometheus_preparation(host, wb, options, server, before, help);
 
-    rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, options, after, before, 0, help, types, names);
+    rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, options, after, before, 0, help, types, names);
 }
 
-void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, uint32_t options, int help, int types, int names) {
+void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, uint32_t options, int help, int types, int names) {
     time_t before = now_realtime_sec();
     time_t after = prometheus_preparation(host, wb, options, server, before, help);
 
     rrd_rdlock();
     rrdhost_foreach_read(host) {
-        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, options, after, before, 1, help, types, names);
+        rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, options, after, before, 1, help, types, names);
     }
     rrd_unlock();
 }
