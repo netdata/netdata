@@ -99,11 +99,11 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
         prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
 
-        if(unlikely(help || types))
-            buffer_strcat(wb, "\n");
-
-        if(rrdset_is_available_for_backends(st)) {
+        if(likely(backends_can_send_rrdset(options, st))) {
             rrdset_rdlock(st);
+
+            if(unlikely(help || types))
+                buffer_strcat(wb, "\n");
 
             // for each dimension
             RRDDIM *rd;

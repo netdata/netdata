@@ -14,6 +14,7 @@ extern const char *backend_prefix;
 
 extern void *backends_main(void *ptr);
 
+extern int backends_can_send_rrdset(uint32_t options, RRDSET *st);
 extern uint32_t backend_parse_data_source(const char *source, uint32_t mode);
 
 extern calculated_number backend_calculate_value_from_stored_data(

@@ -436,7 +436,7 @@ static inline int process_json_response(BUFFER *b) {
 
 static SIMPLE_PATTERN *charts_pattern = NULL;
 
-static inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
+inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
         return 0;
 
