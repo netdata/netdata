@@ -124,18 +124,22 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, ui
                         }
 
                         if (unlikely(help))
-                            buffer_sprintf(wb, "# COMMENT HELP %s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
-                                context, dimension, (names && st->name) ? st->name : st->id, st->context,
-                                st->family, (names && rd->name) ? rd->name : rd->id, rd->multiplier,
-                                rd->divisor, h, st->units, t
+                            buffer_sprintf(wb, "# COMMENT HELP %s_%s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
+                                           backend_prefix, context, dimension,
+                                           (names && st->name) ? st->name : st->id, st->context,
+                                           st->family,
+                                           (names && rd->name) ? rd->name : rd->id,
+                                           rd->multiplier, rd->divisor,
+                                           h, st->units, t
                         );
 
                         if (unlikely(types))
-                            buffer_sprintf(wb, "# COMMENT TYPE %s_%s %s\n", context, dimension, t);
+                            buffer_sprintf(wb, "# COMMENT TYPE %s_%s_%s %s\n", backend_prefix, context, dimension, t);
 
-                        buffer_sprintf(wb, "%s_%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n",
-                                context, dimension, chart, family, labels, rd->last_collected_value,
-                                timeval_msec(&rd->last_collected_time)
+                        buffer_sprintf(wb, "%s_%s_%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n",
+                                       backend_prefix, context, dimension,
+                                       chart, family, labels,
+                                       rd->last_collected_value, timeval_msec(&rd->last_collected_time)
                         );
                     }
                     else {
@@ -147,18 +151,21 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, ui
                             prometheus_label_copy(dimension, (names && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(help))
-                                buffer_sprintf(wb, "# COMMENT HELP %s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value gives %s (gauge)\n",
-                                               context, (names && st->name) ? st->name : st->id, st->context,
-                                               st->family, (names && rd->name) ? rd->name : rd->id,
+                                buffer_sprintf(wb, "# COMMENT HELP %s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value gives %s (gauge)\n",
+                                               backend_prefix, context,
+                                               (names && st->name) ? st->name : st->id, st->context,
+                                               st->family,
+                                               (names && rd->name) ? rd->name : rd->id,
                                                st->units
                                 );
 
                             if (unlikely(types))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s gauge\n", context);
+                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s gauge\n", backend_prefix, context);
 
-                            buffer_sprintf(wb, "%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n",
-                                    context, chart, family, dimension, labels, value,
-                                    timeval_msec(&rd->last_collected_time)
+                            buffer_sprintf(wb, "%s_%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n",
+                                           backend_prefix, context,
+                                           chart, family, dimension, labels,
+                                           value, timeval_msec(&rd->last_collected_time)
                             );
                         }
                     }

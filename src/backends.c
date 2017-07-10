@@ -22,6 +22,7 @@
 // 5. repeats the above forever.
 //
 
+const char *backend_prefix = "netdata";
 int backend_send_names = 1;
 int backend_update_every = 10;
 uint32_t backend_options = BACKEND_SOURCE_DATA_AVERAGE;
@@ -511,7 +512,7 @@ void *backends_main(void *ptr) {
     const char *source      = config_get(CONFIG_SECTION_BACKEND, "data source", "average");
     const char *type        = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
     const char *destination = config_get(CONFIG_SECTION_BACKEND, "destination", "localhost");
-    const char *prefix      = config_get(CONFIG_SECTION_BACKEND, "prefix", "netdata");
+    backend_prefix          = config_get(CONFIG_SECTION_BACKEND, "prefix", "netdata");
     const char *hostname    = config_get(CONFIG_SECTION_BACKEND, "hostname", localhost->hostname);
     backend_update_every    = (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", backend_update_every);
     int buffer_on_failures  = (int)config_get_number(CONFIG_SECTION_BACKEND, "buffer on failures", 10);
@@ -641,7 +642,7 @@ void *backends_main(void *ptr) {
     // ------------------------------------------------------------------------
     // prepare the backend main loop
 
-    info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, backend_update_every, hostname, prefix);
+    info("BACKEND: configured ('%s' on '%s' sending '%s' data, every %d seconds, as host '%s', with prefix '%s')", type, destination, source, backend_update_every, hostname, backend_prefix);
 
     usec_t step_ut = backend_update_every * USEC_PER_SEC;
     time_t after = now_realtime_sec();
@@ -692,7 +693,7 @@ void *backends_main(void *ptr) {
                     RRDDIM *rd;
                     rrddim_foreach_read(rd, st) {
                         if (likely(rd->last_collected_time.tv_sec >= after)) {
-                            chart_buffered_metrics += backend_request_formatter(b, prefix, host, __hostname, st, rd, after, before, backend_options);
+                            chart_buffered_metrics += backend_request_formatter(b, backend_prefix, host, __hostname, st, rd, after, before, backend_options);
                             count_dims++;
                         }
                         else {
