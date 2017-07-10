@@ -257,7 +257,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
         else if(!strcmp(name, "prefix")) {
             prometheus_prefix = value;
         }
-        else if(!strcmp(name, "source")) {
+        else if(!strcmp(name, "data") || !strcmp(name, "source") || !strcmp(name, "data source") || !strcmp(name, "data-source") || !strcmp(name, "data_source") || !strcmp(name, "datasource")) {
             prometheus_options = backend_parse_data_source(value, prometheus_options);
         }
     }
