@@ -10,6 +10,8 @@
 extern int backend_send_names;
 extern int backend_update_every;
 extern uint32_t backend_options;
+extern const char *backend_prefix;
+
 extern void *backends_main(void *ptr);
 
 extern uint32_t backend_parse_data_source(const char *source, uint32_t mode);
