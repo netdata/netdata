@@ -53,22 +53,36 @@ inline calculated_number backend_calculate_value_from_stored_data(
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
         , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , time_t *first_timestamp   // the first point of the database used in this response
+        , time_t *last_timestamp    // the timestamp that should be reported to backend
 ) {
     // find the edges of the rrd database for this chart
     time_t first_t = rrdset_first_entry_t(st);
     time_t last_t  = rrdset_last_entry_t(st);
     time_t update_every = st->update_every;
 
-    // align the time-frame
-    // for 'after' also skip the first value by adding update_every
-    after  = after  - after  % update_every + update_every;
-    before = before - before % update_every;
+    // step back a little, to make sure we have complete data collection
+    // for all metrics
+    after  -= update_every * 2;
+    before -= update_every * 2;
 
-    if(unlikely(after = last_t + update_every)) {
-        // we missed an update, report the last one
-        after  -= update_every;
-        before -= update_every;
-    }
+    // align the time-frame
+    after  = after  - (after  % update_every);
+    before = before - (before % update_every);
+
+    // for before, loose another iteration
+    // the latest point will be reported the next time
+    before -= update_every;
+
+    if(unlikely(after > before))
+        // this can happen when update_every > before - after
+        after = before;
+
+    if(unlikely(after < first_t))
+        after = first_t;
+
+    if(unlikely(before > last_t))
+        before = last_t;
 
     if(unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
@@ -80,15 +94,8 @@ inline calculated_number backend_calculate_value_from_stored_data(
         return NAN;
     }
 
-    if(unlikely(after < first_t))
-        after = first_t;
-
-    if(unlikely(after > before))
-        // this can happen when update_every > before - after
-        before = after;
-
-    if(unlikely(before > last_t))
-        before = last_t;
+    *first_timestamp = after;
+    *last_timestamp = before;
 
     size_t counter = 0;
     calculated_number sum = 0;
@@ -207,7 +214,8 @@ static inline int format_dimension_stored_graphite_plaintext(
     backend_name_copy(chart_name, (backend_send_names && st->name)?st->name:st->id, RRD_ID_LENGTH_MAX);
     backend_name_copy(dimension_name, (backend_send_names && rd->name)?rd->name:rd->id, RRD_ID_LENGTH_MAX);
 
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
+    time_t first_t = after, last_t = before;
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
 
     if(!isnan(value)) {
 
@@ -219,7 +227,7 @@ static inline int format_dimension_stored_graphite_plaintext(
                 , chart_name
                 , dimension_name
                 , value
-                , (uint32_t) before
+                , (uint32_t) last_t
         );
 
         return 1;
@@ -285,7 +293,8 @@ static inline int format_dimension_stored_opentsdb_telnet(
 ) {
     (void)host;
 
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
+    time_t first_t = after, last_t = before;
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     char dimension_name[RRD_ID_LENGTH_MAX + 1];
@@ -300,7 +309,7 @@ static inline int format_dimension_stored_opentsdb_telnet(
                 , prefix
                 , chart_name
                 , dimension_name
-                , (uint32_t) before
+                , (uint32_t) last_t
                 , value
                 , hostname
                 , (host->tags)?" ":""
@@ -385,7 +394,8 @@ static inline int format_dimension_stored_json_plaintext(
 ) {
     (void)host;
 
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
+    time_t first_t = after, last_t = before;
+    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
 
     if(!isnan(value)) {
         buffer_sprintf(b, "{"
@@ -418,7 +428,7 @@ static inline int format_dimension_stored_json_plaintext(
                 rd->name,
                 value, 
                 
-                (uint32_t)before
+                (uint32_t) last_t
         );
         
         return 1;

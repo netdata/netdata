@@ -102,8 +102,15 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         if(likely(backends_can_send_rrdset(options, st))) {
             rrdset_rdlock(st);
 
-            if(unlikely(help || types))
-                buffer_strcat(wb, "\n");
+            if(unlikely(help))
+                buffer_sprintf(wb, "\n# COMMENT chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n",
+                               prefix, context,
+                               (names && st->name) ? st->name : st->id,
+                               st->context,
+                               st->family,
+                               (names && rd->name) ? rd->name : rd->id,
+                               st->units
+                );
 
             // for each dimension
             RRDDIM *rd;
@@ -124,7 +131,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                         }
 
                         if (unlikely(help))
-                            buffer_sprintf(wb, "# COMMENT HELP %s_%s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
+                            buffer_sprintf(wb, "# COMMENT %s_%s_%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
                                            prefix, context, dimension,
                                            (names && st->name) ? st->name : st->id, st->context,
                                            st->family,
@@ -145,18 +152,18 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                     else {
                         // we need average or sum of the data
 
-                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options);
+                        time_t first_t = after, last_t = before;
+                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
 
                         if(!isnan(value) && !isinf(value)) {
                             prometheus_label_copy(dimension, (names && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(help))
-                                buffer_sprintf(wb, "# COMMENT HELP %s_%s netdata chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value gives %s (gauge)\n",
+                                buffer_sprintf(wb, "# COMMENT %s_%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n",
                                                prefix, context,
-                                               (names && st->name) ? st->name : st->id, st->context,
-                                               st->family,
                                                (names && rd->name) ? rd->name : rd->id,
-                                               st->units
+                                               st->units,
+                                               (unsigned long long)first_t, (unsigned long long)last_t
                                 );
 
                             if (unlikely(types))
@@ -165,7 +172,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                             buffer_sprintf(wb, "%s_%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n",
                                            prefix, context,
                                            chart, family, dimension, labels,
-                                           value, timeval_msec(&rd->last_collected_time)
+                                           value, last_t * MSEC_PER_SEC
                             );
                         }
                     }
@@ -188,6 +195,11 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, uint32_t 
     if(!after) {
         after = now - backend_update_every;
         first_seen = 1;
+    }
+
+    if(after > now) {
+        // oops! this should never happen
+        after = now - backend_update_every;
     }
 
     if(help) {
@@ -224,6 +236,8 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, uint32_t 
 
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, uint32_t options, int help, int types, int names) {
     time_t before = now_realtime_sec();
+
+    // we start at the point we had stopped before
     time_t after = prometheus_preparation(host, wb, options, server, before, help);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, options, after, before, 0, help, types, names);
@@ -231,6 +245,8 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *host, BU
 
 void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, uint32_t options, int help, int types, int names) {
     time_t before = now_realtime_sec();
+
+    // we start at the point we had stopped before
     time_t after = prometheus_preparation(host, wb, options, server, before, help);
 
     rrd_rdlock();
