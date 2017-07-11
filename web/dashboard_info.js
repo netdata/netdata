@@ -285,6 +285,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'fronius': {
+        title: 'Fronius',
+        icon: '<i class="fa fa-sun-o" aria-hidden="true"></i>',
+        info: undefined
+    },
+
     'snmp': {
         title: 'SNMP',
         icon: '<i class="fa fa-random" aria-hidden="true"></i>',
@@ -1324,5 +1330,28 @@ netdataDashboard.context = {
         info: 'These tags are optional and describe some error conditions which occured during response delivery (if any). ' +
         '<code>ABORTED</code> when the response was not completed due to the connection being aborted (usually by the client). ' +
         '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
+    },
+
+    // ------------------------------------------------------------------------
+    // Fronius Solar Power
+
+    'fronius.power': {
+        info: 'Positive <code>Grid</code> values mean that power is coming from the grid. Negative values are excess power that is going back into the grid, possibly selling it. ' +
+            '<code>Photovoltaics</code> is the power generated from the solar panels. ' +
+            '<code>Accumulator</code> is the stored power in the accumulator, if one is present.'
+    },
+
+    'fronius.autonomy': {
+        commonMin: true,
+        commonMax: true,
+        valueRange: "[0, 100]",
+        info: 'The <code>Autonomy</code> is the percentage of how autonomous the installation is. An autonomy of 100 % means that the installation is producing more energy than it is needed. ' +
+        'The <code>Self consumption</code> indicates the ratio between the current power generated and the current load. When it reaches 100 %, the <code>Autonomy</code> declines, since the solar panels can not produce enough energy and need support from the grid.'
+    },
+
+    'fronius.energy.today': {
+        commonMin: true,
+        commonMax: true,
+        valueRange: "[0, null]"
     }
 };
