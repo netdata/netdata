@@ -103,11 +103,11 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             rrdset_rdlock(st);
 
             if(unlikely(help))
-                buffer_sprintf(wb, "\n# COMMENT chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n",
-                               (names && st->name) ? st->name : st->id,
-                               st->context,
-                               st->family,
-                               st->units
+                buffer_sprintf(wb, "\n# COMMENT chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n"
+                               , (names && st->name) ? st->name : st->id
+                               , st->context
+                               , st->family
+                               , st->units
                 );
 
             // for each dimension
@@ -122,29 +122,46 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                         prometheus_name_copy(dimension, (names && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                         const char *t = "gauge", *h = "gives";
-                        if (rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
-                            rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
+                        if(rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
+                           rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
                             t = "counter";
                             h = "delta gives";
                         }
 
-                        if (unlikely(help))
-                            buffer_sprintf(wb, "# COMMENT %s_%s_%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n",
-                                           prefix, context, dimension,
-                                           (names && st->name) ? st->name : st->id, st->context,
-                                           st->family,
-                                           (names && rd->name) ? rd->name : rd->id,
-                                           rd->multiplier, rd->divisor,
-                                           h, st->units, t
-                        );
+                        if(unlikely(help))
+                            buffer_sprintf(wb
+                                           , "# COMMENT %s_%s_%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
+                                           , prefix
+                                           , context
+                                           , dimension
+                                           , (names && st->name) ? st->name : st->id
+                                           , st->context
+                                           , st->family
+                                           , (names && rd->name) ? rd->name : rd->id
+                                           , rd->multiplier
+                                           , rd->divisor
+                                           , h
+                                           , st->units
+                                           , t
+                            );
 
-                        if (unlikely(types))
-                            buffer_sprintf(wb, "# COMMENT TYPE %s_%s_%s %s\n", prefix, context, dimension, t);
+                        if(unlikely(types))
+                            buffer_sprintf(wb, "# COMMENT TYPE %s_%s_%s %s\n"
+                                           , prefix
+                                           , context
+                                           , dimension
+                                           , t
+                            );
 
-                        buffer_sprintf(wb, "%s_%s_%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n",
-                                       prefix, context, dimension,
-                                       chart, family, labels,
-                                       rd->last_collected_value, timeval_msec(&rd->last_collected_time)
+                        buffer_sprintf(wb, "%s_%s_%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
+                                       , prefix
+                                       , context
+                                       , dimension
+                                       , chart
+                                       , family
+                                       , labels
+                                       , rd->last_collected_value
+                                       , timeval_msec(&rd->last_collected_time)
                         );
                     }
                     else {
@@ -157,20 +174,27 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                             prometheus_label_copy(dimension, (names && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(help))
-                                buffer_sprintf(wb, "# COMMENT %s_%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n",
-                                               prefix, context,
-                                               (names && rd->name) ? rd->name : rd->id,
-                                               st->units,
-                                               (unsigned long long)first_t, (unsigned long long)last_t
+                                buffer_sprintf(wb, "# COMMENT %s_%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n"
+                                               , prefix
+                                               , context
+                                               , (names && rd->name) ? rd->name : rd->id
+                                               , st->units
+                                               , (unsigned long long)first_t
+                                               , (unsigned long long)last_t
                                 );
 
                             if (unlikely(types))
                                 buffer_sprintf(wb, "# COMMENT TYPE %s_%s gauge\n", prefix, context);
 
-                            buffer_sprintf(wb, "%s_%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n",
-                                           prefix, context,
-                                           chart, family, dimension, labels,
-                                           value, last_t * MSEC_PER_SEC
+                            buffer_sprintf(wb, "%s_%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
+                                           , prefix
+                                           , context
+                                           , chart
+                                           , family
+                                           , dimension
+                                           , labels
+                                           , value
+                                           , last_t * MSEC_PER_SEC
                             );
                         }
                     }
