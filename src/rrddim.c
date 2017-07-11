@@ -237,6 +237,23 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         st->dimensions = rd;
     else {
         RRDDIM *td = st->dimensions;
+
+        if(td->algorithm != rd->algorithm || abs(td->multiplier) != abs(rd->multiplier) || abs(td->divisor) != abs(rd->divisor)) {
+            if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
+                #ifdef NETDATA_INTERNAL_CHECKS
+                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
+                        rd->name,
+                        st->name,
+                        st->rrdhost->hostname,
+                        rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
+                        rd->multiplier, td->multiplier,
+                        rd->divisor, td->divisor
+                );
+                #endif
+                rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
+            }
+        }
+
         for(; td->next; td = td->next) ;
         td->next = rd;
     }
