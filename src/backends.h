@@ -23,6 +23,8 @@ extern calculated_number backend_calculate_value_from_stored_data(
         , time_t after              // the start timestamp
         , time_t before             // the end timestamp
         , uint32_t options          // BACKEND_SOURCE_* bitmap
+        , time_t *first_timestamp   // the timestamp of the first point used in this response
+        , time_t *last_timestamp    // the timestamp that should be reported to backend
 );
 
 #endif /* NETDATA_BACKENDS_H */
