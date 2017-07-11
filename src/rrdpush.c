@@ -564,7 +564,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
     rrdpush_api_key = appconfig_get(&stream_config, key, "default proxy api key", rrdpush_api_key);
     rrdpush_api_key = appconfig_get(&stream_config, machine_guid, "proxy api key", rrdpush_api_key);
 
-    tags = appconfig_get(&stream_config, machine_guid, "host tags", (tags)?tags:"");
+    tags = appconfig_set_default(&stream_config, machine_guid, "host tags", (tags)?tags:"");
     if(tags && !*tags) tags = NULL;
 
     if(!strcmp(machine_guid, "localhost"))
@@ -592,7 +592,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s"
+    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s, tags '%s'"
          , hostname
          , client_ip
          , client_port
@@ -602,6 +602,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
          , host->rrd_history_entries
          , rrd_memory_mode_name(host->rrd_memory_mode)
          , (health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
+         , host->tags
     );
 #endif // NETDATA_INTERNAL_CHECKS
 
