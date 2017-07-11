@@ -306,19 +306,19 @@ The charts are being generated using the configuration below. So if your install
                             ]
                         },
 						{
-                            "title": "heat pump",
-                            "id": "heatpumpoutput",
+                            "title": "Output",
+                            "id": "output",
                             "unit": "%",
                             "type": "line",
                             "prio": 5,
                             "dimensions": [
                                 {
-                                    "name": "Output Heat Pump",
+                                    "name": "Heat Pump",
                                     "id": "outputheatpump",
                                     "regex": "OUTPUT HP<\\\/td>\\s*<td.*>(-?[0-9]+,?[0-9]*).*<\\\/td>"
                                 },
 								{
-                                    "name": "Output Water Pump",
+                                    "name": "Water Pump",
                                     "id": "intpumprate",
                                     "regex": "INT PUMP RATE<\\\/td>\\s*<td.*>(-?[0-9]+,?[0-9]*).*<\\\/td>"
                                 }
