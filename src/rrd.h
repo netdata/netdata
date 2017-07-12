@@ -226,7 +226,8 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_BACKEND_SEND     = 1 << 4, // if set, this chart should be sent to backends
     RRDSET_FLAG_BACKEND_IGNORE   = 1 << 5, // if set, this chart should not be sent to backends
     RRDSET_FLAG_EXPOSED_UPSTREAM = 1 << 6, // if set, we have sent this chart to netdata master (streaming)
-    RRDSET_FLAG_STORE_FIRST      = 1 << 7  // if set, do not eliminate the first collection during interpolation
+    RRDSET_FLAG_STORE_FIRST      = 1 << 7, // if set, do not eliminate the first collection during interpolation
+    RRDSET_FLAG_HETEROGENEOUS    = 1 << 8  // if set, the chart is not homogeneus (dimensions in it have multiple algorithms, multipliers or dividers)
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
