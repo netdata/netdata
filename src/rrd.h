@@ -227,7 +227,8 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_BACKEND_IGNORE   = 1 << 5, // if set, this chart should not be sent to backends
     RRDSET_FLAG_EXPOSED_UPSTREAM = 1 << 6, // if set, we have sent this chart to netdata master (streaming)
     RRDSET_FLAG_STORE_FIRST      = 1 << 7, // if set, do not eliminate the first collection during interpolation
-    RRDSET_FLAG_HETEROGENEOUS    = 1 << 8  // if set, the chart is not homogeneus (dimensions in it have multiple algorithms, multipliers or dividers)
+    RRDSET_FLAG_HETEROGENEOUS    = 1 << 8, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
+    RRDSET_FLAG_HOMEGENEOUS_CHECK= 1 << 9  // if set, the chart should be checked to determine if the dimensions as homogeneous
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -595,6 +596,8 @@ extern void rrdhost_cleanup_orphan_hosts(RRDHOST *protected);
 extern void rrdhost_free(RRDHOST *host);
 extern void rrdhost_save(RRDHOST *host);
 extern void rrdhost_delete(RRDHOST *host);
+
+extern void rrdset_update_heterogeneous_flag(RRDSET *st);
 
 extern RRDSET *rrdset_find(RRDHOST *host, const char *id);
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)

@@ -67,6 +67,38 @@ static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable
     return n;
 }
 
+static inline char *prometheus_units_copy(char *d, const char *s, size_t usable) {
+    const char *sorig = s;
+    char *ret = d;
+    size_t n;
+
+    *d++ = '_';
+    for(n = 1; *s && n < usable ; d++, s++, n++) {
+        register char c = *s;
+
+        if(!isalnum(c)) *d = '_';
+        else *d = c;
+    }
+
+    if(n == 2 && sorig[0] == '%') {
+        n = 0;
+        d = ret;
+        s = "_percent";
+        for( ; *s && n < usable ; n++) *d++ = *s++;
+    }
+    else if(n > 3 && sorig[n-3] == '/' && sorig[n-2] == 's') {
+        n = n - 2;
+        d -= 2;
+        s = "_persec";
+        for( ; *s && n < usable ; n++) *d++ = *s++;
+    }
+
+    *d = '\0';
+
+    return ret;
+}
+
+
 #define PROMETHEUS_ELEMENT_MAX 256
 #define PROMETHEUS_LABELS_MAX 1024
 
@@ -94,6 +126,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         char chart[PROMETHEUS_ELEMENT_MAX + 1];
         char context[PROMETHEUS_ELEMENT_MAX + 1];
         char family[PROMETHEUS_ELEMENT_MAX + 1];
+        char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
 
         prometheus_label_copy(chart, (names && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
         prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
@@ -102,8 +135,23 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
         if(likely(backends_can_send_rrdset(options, st))) {
             rrdset_rdlock(st);
 
+            int as_collected = ((options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AS_COLLECTED);
+            int homogeneus = 1;
+            if(as_collected) {
+                if(rrdset_flag_check(st, RRDSET_FLAG_HOMEGENEOUS_CHECK))
+                    rrdset_update_heterogeneous_flag(st);
+
+                if(rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
+                    homogeneus = 0;
+            }
+            else {
+                if((options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AVERAGE)
+                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX);
+            }
+
             if(unlikely(help))
-                buffer_sprintf(wb, "\n# COMMENT chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n"
+                buffer_sprintf(wb, "\n# COMMENT %s chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n"
+                               , (homogeneus)?"homogeneus":"heterogeneous"
                                , (names && st->name) ? st->name : st->id
                                , st->context
                                , st->family
@@ -115,54 +163,109 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             rrddim_foreach_read(rd, st) {
                 if(rd->collections_counter) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
+                    char *suffix = "";
 
-                    if ((options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AS_COLLECTED) {
+                    if (as_collected) {
                         // we need as-collected / raw data
-
-                        prometheus_name_copy(dimension, (names && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                         const char *t = "gauge", *h = "gives";
                         if(rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
                            rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
                             t = "counter";
                             h = "delta gives";
+                            suffix = "_total";
                         }
 
-                        if(unlikely(help))
+                        if(homogeneus) {
+                            // all the dimensions of the chart, has the same algorithm, multiplier and divisor
+                            // we add all dimensions as labels
+
+                            prometheus_label_copy(dimension, (names && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+
+                            if(unlikely(help))
+                                buffer_sprintf(wb
+                                               , "# COMMENT %s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
+                                               , prefix
+                                               , context
+                                               , suffix
+                                               , (names && st->name) ? st->name : st->id
+                                               , st->context
+                                               , st->family
+                                               , (names && rd->name) ? rd->name : rd->id
+                                               , rd->multiplier
+                                               , rd->divisor
+                                               , h
+                                               , st->units
+                                               , t
+                                );
+
+                            if(unlikely(types))
+                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s %s\n"
+                                               , prefix
+                                               , context
+                                               , suffix
+                                               , t
+                                );
+
                             buffer_sprintf(wb
-                                           , "# COMMENT %s_%s_%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
+                                           , "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
+                                           , prefix
+                                           , context
+                                           , suffix
+                                           , chart
+                                           , family
+                                           , dimension
+                                           , labels
+                                           , rd->last_collected_value
+                                           , timeval_msec(&rd->last_collected_time)
+                            );
+                        }
+                        else {
+                            // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
+                            // we create a metric per dimension
+
+                            prometheus_name_copy(dimension, (names && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+
+                            if(unlikely(help))
+                                buffer_sprintf(wb
+                                               , "# COMMENT %s_%s_%s%s: chart \"%s\", context \"%s\", family \"%s\", dimension \"%s\", value * " COLLECTED_NUMBER_FORMAT " / " COLLECTED_NUMBER_FORMAT " %s %s (%s)\n"
+                                               , prefix
+                                               , context
+                                               , dimension
+                                               , suffix
+                                               , (names && st->name) ? st->name : st->id
+                                               , st->context
+                                               , st->family
+                                               , (names && rd->name) ? rd->name : rd->id
+                                               , rd->multiplier
+                                               , rd->divisor
+                                               , h
+                                               , st->units
+                                               , t
+                                );
+
+                            if(unlikely(types))
+                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s_%s%s %s\n"
+                                               , prefix
+                                               , context
+                                               , dimension
+                                               , suffix
+                                               , t
+                                );
+
+                            buffer_sprintf(wb
+                                           , "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
                                            , prefix
                                            , context
                                            , dimension
-                                           , (names && st->name) ? st->name : st->id
-                                           , st->context
-                                           , st->family
-                                           , (names && rd->name) ? rd->name : rd->id
-                                           , rd->multiplier
-                                           , rd->divisor
-                                           , h
-                                           , st->units
-                                           , t
+                                           , suffix
+                                           , chart
+                                           , family
+                                           , labels
+                                           , rd->last_collected_value
+                                           , timeval_msec(&rd->last_collected_time)
                             );
-
-                        if(unlikely(types))
-                            buffer_sprintf(wb, "# COMMENT TYPE %s_%s_%s %s\n"
-                                           , prefix
-                                           , context
-                                           , dimension
-                                           , t
-                            );
-
-                        buffer_sprintf(wb, "%s_%s_%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
-                                       , prefix
-                                       , context
-                                       , dimension
-                                       , chart
-                                       , family
-                                       , labels
-                                       , rd->last_collected_value
-                                       , timeval_msec(&rd->last_collected_time)
-                        );
+                        }
                     }
                     else {
                         // we need average or sum of the data
@@ -171,12 +274,20 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                         calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, options, &first_t, &last_t);
 
                         if(!isnan(value) && !isinf(value)) {
+
+                            if((options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AVERAGE)
+                                suffix = "_average";
+                            else if((options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_SUM)
+                                suffix = "_sum";
+
                             prometheus_label_copy(dimension, (names && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(help))
-                                buffer_sprintf(wb, "# COMMENT %s_%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n"
+                                buffer_sprintf(wb, "# COMMENT %s_%s%s%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n"
                                                , prefix
                                                , context
+                                               , units
+                                               , suffix
                                                , (names && rd->name) ? rd->name : rd->id
                                                , st->units
                                                , (unsigned long long)first_t
@@ -184,11 +295,18 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                                 );
 
                             if (unlikely(types))
-                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s gauge\n", prefix, context);
+                                buffer_sprintf(wb, "# COMMENT TYPE %s_%s%s%s gauge\n"
+                                               , prefix
+                                               , context
+                                               , units
+                                               , suffix
+                                );
 
-                            buffer_sprintf(wb, "%s_%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
+                            buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
                                            , prefix
                                            , context
+                                           , units
+                                           , suffix
                                            , chart
                                            , family
                                            , dimension
