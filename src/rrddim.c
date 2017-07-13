@@ -57,6 +57,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", st->id, rd->name, rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
     rd->algorithm = algorithm;
     rd->exposed = 0;
+    rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
     return 1;
 }
 
@@ -67,6 +68,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
     debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->multiplier, multiplier);
     rd->multiplier = multiplier;
     rd->exposed = 0;
+    rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
     return 1;
 }
 
@@ -77,6 +79,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
     debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->divisor, divisor);
     rd->divisor = divisor;
     rd->exposed = 0;
+    rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
     return 1;
 }
 
