@@ -19,7 +19,7 @@ except ImportError:
 priority = 60000
 retries = 60
 
-REPLSET_STATES = [
+REPL_SET_STATES = [
     ('1', 'primary'),
     ('8', 'down'),
     ('2', 'secondary'),
@@ -358,8 +358,8 @@ CHARTS = {
         'options': [None, 'Lock on the oplog. Number of times the lock was acquired in the specified mode',
                     'locks', 'locks metrics', 'mongodb.locks_oplog', 'stacked'],
         'lines': [
-            ['Metadata_r', 'intent_shared', 'incremental'],
-            ['Metadata_w', 'intent_exclusive', 'incremental']
+            ['oplog_r', 'intent_shared', 'incremental'],
+            ['oplog_w', 'intent_exclusive', 'incremental']
         ]}
 }
 
@@ -395,14 +395,12 @@ class Service(SimpleService):
         except (LookupError, SyntaxError, AttributeError):
             self.error('Type: %s, error: %s' % (str(exc_info()[0]), str(exc_info()[1])))
             return False
-        else:
-            if isinstance(data, dict) and data:
-                self._data_from_check = data
-                self.create_charts_(server_status)
-                return True
-            else:
-                self.error('_get_data() returned no data or type is not <dict>')
-                return False
+        if isinstance(data, dict) and data:
+            self._data_from_check = data
+            self.create_charts_(server_status)
+            return True
+        self.error('_get_data() returned no data or type is not <dict>')
+        return False
 
     def build_metrics_to_collect_(self, server_status):
 
@@ -508,19 +506,19 @@ class Service(SimpleService):
                 self.definitions[chart_name] = {
                     'options': [None, 'Replica set member (%s) current state' % host, 'state',
                                 'replication and oplog', 'mongodb.replication_state', 'line'],
-                    'lines': create_state_lines(REPLSET_STATES)}
+                    'lines': create_state_lines(REPL_SET_STATES)}
 
     def _get_raw_data(self):
         raw_data = dict()
 
-        raw_data.update(self.get_serverstatus_() or dict())
-        raw_data.update(self.get_dbstats_() or dict())
-        raw_data.update(self.get_replsetgetstatus_() or dict())
-        raw_data.update(self.get_getreplicationinfo_() or dict())
+        raw_data.update(self.get_server_status() or dict())
+        raw_data.update(self.get_db_stats() or dict())
+        raw_data.update(self.get_repl_set_get_status() or dict())
+        raw_data.update(self.get_get_replication_info() or dict())
 
         return raw_data or None
 
-    def get_serverstatus_(self):
+    def get_server_status(self):
         raw_data = dict()
         try:
             raw_data['serverStatus'] = self.connection.admin.command('serverStatus')
@@ -529,7 +527,7 @@ class Service(SimpleService):
         else:
             return raw_data
 
-    def get_dbstats_(self):
+    def get_db_stats(self):
         if not self.databases:
             return None
 
@@ -538,24 +536,22 @@ class Service(SimpleService):
         try:
             for dbase in self.databases:
                 raw_data['dbStats'][dbase] = self.connection[dbase].command('dbStats')
+            return raw_data
         except PyMongoError:
             return None
-        else:
-            return raw_data
 
-    def get_replsetgetstatus_(self):
+    def get_repl_set_get_status(self):
         if not self.do_replica:
             return None
 
         raw_data = dict()
         try:
             raw_data['replSetGetStatus'] = self.connection.admin.command('replSetGetStatus')
+            return raw_data
         except PyMongoError:
             return None
-        else:
-            return raw_data
 
-    def get_getreplicationinfo_(self):
+    def get_get_replication_info(self):
         if not (self.do_replica and 'local' in self.databases):
             return None
 
@@ -566,10 +562,9 @@ class Service(SimpleService):
                 "$natural", ASCENDING).limit(1)[0]
             raw_data['getReplicationInfo']['DESCENDING'] = self.connection.local.oplog.rs.find().sort(
                 "$natural", DESCENDING).limit(1)[0]
+            return raw_data
         except PyMongoError:
             return None
-        else:
-            return raw_data
 
     def _get_data(self):
         """
@@ -588,7 +583,7 @@ class Service(SimpleService):
         utc_now = datetime.utcnow()
 
         # serverStatus
-        for metric, new_name, function in self.metrics_to_collect:
+        for metric, new_name, func in self.metrics_to_collect:
             value = serverStatus
             for key in metric.split('.'):
                 try:
@@ -597,7 +592,7 @@ class Service(SimpleService):
                     break
 
             if not isinstance(value, dict) and key:
-                to_netdata[new_name or key] = value if not function else function(value)
+                to_netdata[new_name or key] = value if not func else func(value)
 
         to_netdata['nonmapped'] = to_netdata['virtual'] - serverStatus['mem'].get('mappedWithJournal',
                                                                                   to_netdata['mapped'])
@@ -631,7 +626,7 @@ class Service(SimpleService):
                                                                                 multiplier=1000))})
                 # Replica set members state
                 member_state = member['name'] + '_state'
-                for elem in REPLSET_STATES:
+                for elem in REPL_SET_STATES:
                     state = elem[0]
                     to_netdata.update({'_'.join([member_state, state]): 0})
                 to_netdata.update({'_'.join([member_state, str(member['state'])]): member['state']})
@@ -673,5 +668,4 @@ class Service(SimpleService):
 def delta_calculation(delta, multiplier=1):
     if hasattr(delta, 'total_seconds'):
         return delta.total_seconds() * multiplier
-    else:
-        return (delta.microseconds + (delta.seconds + delta.days * 24 * 3600) * 10 ** 6) / 10.0 ** 6 * multiplier
+    return (delta.microseconds + (delta.seconds + delta.days * 24 * 3600) * 10 ** 6) / 10.0 ** 6 * multiplier
