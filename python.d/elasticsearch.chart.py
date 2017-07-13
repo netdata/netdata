@@ -438,7 +438,7 @@ class Service(UrlService):
                                                  key=key)
             except KeyError:
                 continue
-        if 'open_file_descriptors' in to_netdata:
+        if 'open_file_descriptors' in to_netdata and 'max_file_descriptors' in to_netdata:
             to_netdata['file_descriptors_used'] = round(float(to_netdata['open_file_descriptors'])
                                                         / to_netdata['max_file_descriptors'] * 1000)
 
