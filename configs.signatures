@@ -135,6 +135,7 @@ declare -A configs_signatures=(
   ['4a448831776de8acf2e0bdc4cc994cb4']='apps_groups.conf'
   ['4b775fb31342f1478b3773d041a72911']='python.d.conf'
   ['4ccb06fff1ce06dc5bc80e0a9f568f6e']='charts.d.conf'
+  ['4cd585f5dfdacaf287413ad037b4e60a']='apps_groups.conf'
   ['4d13684cadfa90e73ab465409bf7263b']='health.d/mysql.conf'
   ['4d91ee6fe4c887ea3865ef36ac63da3c']='health.d/mysql.conf'
   ['4e995acb0d6fd77403a2a9dca984b55b']='charts.d.conf'
