@@ -34,14 +34,18 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
 <a href="https://octoverse.github.com/" target="_blank"><img src="https://cloud.githubusercontent.com/assets/2662304/21743260/23ebe62c-d507-11e6-80c0-76b95f53e464.png"/></a>
 </p>
 
-`Mar 20th, 2017` - **[netdata v1.6.0 released!](https://github.com/firehol/netdata/releases)**
+`Jul 16th, 2017` - **[netdata v1.7.0 released!](https://github.com/firehol/netdata/releases)**
 
- - central netdata is here! headless collectors, proxies, streaming of metrics, etc.
- - [monitoring ephemeral nodes (auto-scaled VMs)](https://github.com/firehol/netdata/wiki/monitoring-ephemeral-nodes)
- - [monitoring ephemeral containers and VM guests](https://github.com/firehol/netdata/wiki/monitoring-ephemeral-containers)
- - [monitoring web servers](https://github.com/firehol/netdata/wiki/The-spectacles-of-a-web-server-log-file)
- - apps.plugin ported for FreeBSD
- - [monitoring IPMI](https://github.com/firehol/netdata/wiki/monitoring-IPMI)
+ - netdata is now a fully featured **statsd** server - [read more here](https://github.com/firehol/netdata/wiki/statsd)
+ - netdata now monitors **ZFS** of Linux and FreeBSD
+ - netdata now monitors **ElasticSearch**
+ - netdata now monitors **RabbitMQ**
+ - netdata now monitors **Go applications** (via `expvar`) - [read more here](https://github.com/firehol/netdata/wiki/Monitoring-Go-Applications)
+ - netdata now monitors **squid logs**
+ - netdata now monitors **samba**
+ - several **backends** improvements and enhancements, including **metrics filtering**
+ - **prometheus** backend support has been rewritten
+ - alarm notifications now support **custom hooks** to execute shell commands in parallel with all other notification methods
  - dozens of new and improved plugins
  - dozens of new and improved alarms
  - dozens more improvements and performance optimizations
