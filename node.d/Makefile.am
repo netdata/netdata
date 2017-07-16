@@ -3,6 +3,7 @@ MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 dist_node_DATA = \
 	README.md \
 	named.node.js \
+	fronius.node.js \
 	sma_webbox.node.js \
 	snmp.node.js \
 	$(NULL)
