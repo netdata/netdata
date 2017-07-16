@@ -1857,7 +1857,7 @@ void *statsd_main(void *ptr) {
 
     pthread_cleanup_push(statsd_main_cleanup, &threads);
 
-            // ----------------------------------------------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------------------------------------------
     // statsd monitoring charts
 
     RRDSET *st_metrics = rrdset_create_localhost(
