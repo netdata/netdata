@@ -1,3 +1,55 @@
+netdata (1.7.0) - 2017-07-16
+
+ * netdata is still spreading fast
+
+   we are at 320.000 users and 132.000 servers
+
+   Almost 100k new users, 52k new installations and 800k docker pulls
+   since the previous release, 4 and a half months ago.
+
+   netdata user base grows at about 1000 new users and 600 new servers
+   per day. Thank you. You are awesome.
+
+ * The next release (v1.8) will be focused on providing a global health
+   monitoring service, for all netdata users, for free.
+
+ * netdata is now a (very fast) fully featured statsd server and the
+   only one with automatic visualization: push a statsd metric and hit
+   F5 on the netdata dashboard: your metric visualized. It also supports
+   synthetic charts, defined by you, so that you can correlate and
+   visualize your application the way you like it.
+
+ * netdata got new installation options
+   It is now easier than ever to install netdata - we also distribute a
+   statically linked netdata x86_64 binary, including key dependencies
+   (like bash, curl, etc) that can run everywhere a Linux kernel runs
+   (CoreOS, CirrOS, etc).
+
+ * metrics streaming and replication has been improved significantly.
+   All known issues have been solved and key enhancements have been added.
+   Headless collectors and proxies can now send metrics to backends when
+   data source = as collected.
+
+ * backends have got quite a few enhancements, including host tags and
+   metrics filtering at the netdata side;
+   prometheus support has been re-written to utilize more prometheus
+   features and provide more flexibility and integration options.
+
+ * netdata now monitors ZFS (on Linux and FreeBSD), ElasticSearch,
+   RabbitMQ, Go applications (via expvar), ipfw (on FreeBSD 11), samba,
+   squid logs (with web_log plugin).
+
+ * netdata dashboard loading times have been improved significantly
+   (hit F5 a few times on a netdata dashboard - it is now amazingly fast),
+   to support dashboards with thousands of charts.
+
+ * netdata alarms now support custom hooks, so you can run whatever you
+   like in parallel with netdata alarms.
+
+ * As usual, this release brings dozens of more improvements, enhancements
+   and compatibility fixes.
+
+
 netdata (1.6.0) - 2017-03-20
 
  * birthday release: 1 year netdata

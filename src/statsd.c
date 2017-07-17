@@ -874,7 +874,6 @@ void statsd_collector_thread_cleanup(void *data) {
 #endif
 
     freez(d);
-    listen_sockets_close(&statsd.sockets);
 }
 
 void *statsd_collector_thread(void *ptr) {
@@ -1735,6 +1734,16 @@ int statsd_listen_sockets_setup(void) {
     return listen_sockets_setup(&statsd.sockets);
 }
 
+void statsd_main_cleanup(void *data) {
+    pthread_t *threads = data;
+
+    int i;
+    for(i = 0; i < statsd.threads ;i++)
+        pthread_cancel(threads[i]);
+
+    listen_sockets_close(&statsd.sockets);
+}
+
 void *statsd_main(void *ptr) {
     (void)ptr;
 
@@ -1845,6 +1854,8 @@ void *statsd_main(void *ptr) {
         else if(pthread_detach(threads[i]))
             error("STATSD: cannot request detach of child thread.");
     }
+
+    pthread_cleanup_push(statsd_main_cleanup, &threads);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd monitoring charts
@@ -2023,8 +2034,7 @@ void *statsd_main(void *ptr) {
             break;
     }
 
-    for(i = 0; i < statsd.threads ;i++)
-        pthread_cancel(threads[i]);
+    pthread_cleanup_pop(1);
 
     pthread_exit(NULL);
     return NULL;
