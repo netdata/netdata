@@ -17,6 +17,7 @@ dist_config_DATA = \
 nodeconfigdir=$(configdir)/node.d
 dist_nodeconfig_DATA = \
     node.d/README.md \
+    node.d/fronius.conf.md \
     node.d/named.conf.md \
     node.d/sma_webbox.conf.md \
     node.d/snmp.conf.md \

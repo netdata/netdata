@@ -516,7 +516,7 @@ p {
     and that you have chown it to be owned by netdata:netdata
 -->
 <!-- <script type="text/javascript" src="http://my.server:19999/dashboard.js"></script> -->
-<script type="text/javascript" src="dashboard.js?v20170105-7"></script>
+<script type="text/javascript" src="dashboard.js?v20170715-1"></script>
 
 <script>
     // --- OPTIONS FOR THE CHARTS --
@@ -550,6 +550,14 @@ p {
         display: inline-block;
     }
 
+    .mygauge-combo20 {
+        display: inline-block;
+        min-width: 150px;
+        width: 49%;
+        padding-top: 40px;
+        text-align: center;
+    }
+
     .mygauge-combo30 {
         display: inline-block;
         min-width: 150px;
@@ -562,7 +570,7 @@ p {
         position: relative;
         display: block;
         width: 171px;
-        height: 105px;
+        /* height: 150px; */
     }
 
     .mygauge-button {
@@ -744,7 +752,6 @@ p {
                     ></div>
                 </div>
                 <div class="mygauge-button">
-                    <br/>&nbsp;<br/>
                     <a class="btn btn-alt mygauge-legend-button" href=//london.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoLondon><strong>Enter London!</strong></a>
                     <div class="mygause-donation">
                         Donated by DigitalOcean.com
@@ -766,7 +773,6 @@ p {
                     ></div>
                 </div>
                 <div class="mygauge-button">
-                    <br/>&nbsp;<br/>
                     <a class="btn btn-alt mygauge-legend-button" href=//atlanta.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoAtlanta><strong>Enter Atlanta!</strong></a>
                     <div class="mygause-donation">
                         Donated by CDN77.com
@@ -788,7 +794,6 @@ p {
                     ></div>
                 </div>
                 <div class="mygauge-button">
-                    <br/>&nbsp;<br/>
                     <a class="btn btn-alt mygauge-legend-button" href=//sanfrancisco.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoSanfrancisco><strong>Enter California!</strong></a>
                     <div class="mygause-donation">
                         Donated by DigitalOcean.com
@@ -810,7 +815,6 @@ p {
                     ></div>
                 </div>
                 <div class="mygauge-button">
-                    <br/>&nbsp;<br/>
                     <a class="btn btn-alt mygauge-legend-button" href=//toronto.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoToronto><strong>Enter Canada!</strong></a>
                     <div class="mygause-donation">
                         Donated by DigitalOcean.com
@@ -833,7 +837,6 @@ p {
                     ></div>
                 </div>
                 <div class="mygauge-button">
-                    <br/>&nbsp;<br/>
                     <a class="btn btn-alt mygauge-legend-button" href=//frankfurt.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoFrankfurt><strong>Enter Germany!</strong></a>
                     <div class="mygause-donation">
                         Donated by DigitalOcean.com
@@ -855,7 +858,6 @@ p {
                     ></div>
                 </div>
                 <div class="mygauge-button">
-                    <br/>&nbsp;<br/>
                     <a class="btn btn-alt mygauge-legend-button" href=//newyork.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoNewYork><strong>Enter New York!</strong></a>
                     <div class="mygause-donation">
                         Donated by DigitalOcean.com
@@ -877,7 +879,6 @@ p {
                     ></div>
                 </div>
                 <div class="mygauge-button">
-                    <br/>&nbsp;<br/>
                     <a class="btn btn-alt mygauge-legend-button" href=//singapore.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoSingapore><strong>Enter Singapore!</strong></a>
                     <div class="mygause-donation">
                         Donated by DigitalOcean.com
@@ -899,7 +900,6 @@ p {
                     ></div>
                 </div>
                 <div class="mygauge-button">
-                    <br/>&nbsp;<br/>
                     <a class="btn btn-alt mygauge-legend-button" href=//bangalore.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoBangalore><strong>Enter India!</strong></a>
                     <div class="mygause-donation">
                         Donated by DigitalOcean.com
@@ -911,10 +911,6 @@ p {
             Charts are coming from all servers, <b>in parallel</b>.
             <br/>
             The servers are <b>not aware</b> of this multi-server dashboard.
-            <br/>
-            Each server is <b>not aware</b> of the other servers.
-            <br/>
-            But on this dashboard <b>they are one</b>! (hover on the chart below)
         </div>
 
         <div class="container" style="padding-top: 40px; padding-bottom: 40px; text-align: center;">
@@ -941,7 +937,11 @@ p {
             </div>
         </div>
 
-        <h3>special demos</h3>
+        <div class="container" style="padding-top: 0px; text-align: center;">
+            Each server is <b>not aware</b> of the other servers.
+            <br/>
+            But on this dashboard <b>they are one</b>! (hover on the chart above)
+        </div>
 
         <div class="mygauge-combo30">
             <div style="padding-bottom: 20px;">
@@ -1039,6 +1039,117 @@ p {
                 <a class="btn btn-alt mygauge-legend-button" href=//alpine.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoAlpine><strong>Enter Alpine!</strong></a>
                 <div class="mygause-donation">
                     Donated by Azure
+                </div>
+            </div>
+        </div>
+
+        <div style="padding-top: 20px">
+            <h2>netdata global health monitoring</h2>
+
+            <div>
+                We are building a global netdata health monitoring service<br/>
+                <b>available for free</b> to all netdata users,<br/>
+                thanks to VMs donated by these companies.<br/>
+                &nbsp;<br/>
+                This service will be activated with the v1.8 release of netdata.
+                &nbsp;<br/>
+                You can help: <a href="https://github.com/firehol/netdata/issues/2466">join this movement</a>.
+            </div>
+
+            <div class="mygauge-combo30">
+                <div style="padding-bottom: 20px;">
+                    <b>digitalocean.com</b>
+                </div>
+                <div class="mysparkline">
+                    <div class="mysparkline-overchart-label">
+                        requests/s
+                    </div>
+                    <div class="mysparkline-overchart-value" id="digitalocean.requests.netdata" >
+                    </div>
+                    <div data-netdata="netdata.requests"
+                         data-dimensions="requests"
+                         data-host="//registry.my-netdata.io"
+                         data-common-max="top-gauges2"
+                         data-decimal-digits="0"
+                         data-chart-library="dygraph"
+                         data-dygraph-theme="sparkline"
+                         data-dygraph-type="area"
+                         data-width="100%"
+                         data-height="100%"
+                         data-after="-300"
+                         data-colors="#4BFF91"
+                         data-show-value-of-requests-at="digitalocean.requests.netdata"
+                    ></div>
+                </div>
+                <div class="mygauge-button">
+                    <a class="btn btn-alt mygauge-legend-button" href=//registry.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoDigitalOcean><strong>Enter digitalocean!</strong></a>
+                    <div class="mygause-donation">
+                        Donated by digitalocean.com
+                    </div>
+                </div>
+            </div>
+            <div class="mygauge-combo30">
+                <div style="padding-bottom: 20px;">
+                    <b>ventureer.com</b>
+                </div>
+                <div class="mysparkline">
+                    <div class="mysparkline-overchart-label">
+                        requests/s
+                    </div>
+                    <div class="mysparkline-overchart-value" id="ventureer.requests.netdata" >
+                    </div>
+                    <div data-netdata="netdata.requests"
+                         data-dimensions="requests"
+                         data-host="//ventureer.my-netdata.io"
+                         data-common-max="top-gauges2"
+                         data-decimal-digits="0"
+                         data-chart-library="dygraph"
+                         data-dygraph-theme="sparkline"
+                         data-dygraph-type="area"
+                         data-width="100%"
+                         data-height="100%"
+                         data-after="-300"
+                         data-colors="#FF4B91"
+                         data-show-value-of-requests-at="ventureer.requests.netdata"
+                    ></div>
+                </div>
+                <div class="mygauge-button">
+                    <a class="btn btn-alt mygauge-legend-button" href=//ventureer.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoVentureer><strong>Enter ventureer!</strong></a>
+                    <div class="mygause-donation">
+                        Donated by ventureer.com
+                    </div>
+                </div>
+            </div>
+            <div class="mygauge-combo30">
+                <div style="padding-bottom: 20px;">
+                    <b>stackscale.com</b>
+                </div>
+                <div class="mysparkline">
+                    <div class="mysparkline-overchart-label">
+                        requests/s
+                    </div>
+                    <div class="mysparkline-overchart-value" id="stackscale.requests.netdata" >
+                    </div>
+                    <div data-netdata="netdata.requests"
+                         data-dimensions="requests"
+                         data-host="//stackscale.my-netdata.io"
+                         data-common-max="top-gauges2"
+                         data-decimal-digits="0"
+                         data-chart-library="dygraph"
+                         data-dygraph-theme="sparkline"
+                         data-dygraph-type="area"
+                         data-width="100%"
+                         data-height="100%"
+                         data-after="-300"
+                         data-colors="#4B91FF"
+                         data-show-value-of-requests-at="stackscale.requests.netdata"
+                    ></div>
+                </div>
+                <div class="mygauge-button">
+                    <a class="btn btn-alt mygauge-legend-button" href=//stackscale.my-netdata.io/default.html data-ga-category="Outbound links" data-ga-action="Nav click" data-ga-label=DemoStackScale><strong>Enter stackscale!</strong></a>
+                    <div class="mygause-donation">
+                        Donated by stackscale.com
+                    </div>
                 </div>
             </div>
         </div>
