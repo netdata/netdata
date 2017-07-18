@@ -205,9 +205,8 @@ var fronius = {
     },
 
     processResponse: function (service, content) {
-        if (content === null) return;
-        var json = JSON.parse(content);
-        if (!fronius.isResponseValid(json)) return;
+        var json = fronius.parseResponse(content);
+        if (json === null) return;
 
         // add the service
         service.commit();
@@ -255,12 +254,19 @@ var fronius = {
         }
     },
 
+    parseResponse: function (httpBody) {
+        if (httpBody === null) return null;
+        var json = httpBody;
+        if (typeof httpBody !== "object") json = JSON.parse(httpBody);
+        return this.isResponseValid(json) ? json : null;
+    },
+
     // some basic validation
     isResponseValid: function (json) {
-        if (fronius.isUndefined(json.Body)) return false;
-        if (fronius.isUndefined(json.Body.Data)) return false;
-        if (fronius.isUndefined(json.Body.Data.Site)) return false;
-        return fronius.isDefined(json.Body.Data.Inverters);
+        if (this.isUndefined(json.Body)) return false;
+        if (this.isUndefined(json.Body.Data)) return false;
+        if (this.isUndefined(json.Body.Data.Site)) return false;
+        return this.isDefined(json.Body.Data.Inverters);
     },
 
     // module.serviceExecute()
@@ -287,6 +293,7 @@ var fronius = {
         while (len--) {
             var server = config.servers[len];
             if (fronius.isUndefined(server.update_every)) server.update_every = this.update_every;
+            if (fronius.areUndefined([server.name, server.hostname, server.api_path])) continue;
 
             var url = server.hostname + server.api_path;
             this.serviceExecute(server.name, url, server.update_every);
@@ -307,6 +314,14 @@ var fronius = {
 
     isUndefined: function (value) {
         return typeof value === 'undefined';
+    },
+
+    areUndefined: function (valueArray) {
+        var i = 0;
+        for (i; i < valueArray.length; i++) {
+            if (this.isUndefined(valueArray[i])) return true;
+        }
+        return false;
     },
 
     isDefined: function (value) {
