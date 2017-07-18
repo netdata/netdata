@@ -1,18 +1,29 @@
 // delete these comments if not needed anymore.
 
+function createState(min, max) {
+    // create a fake state with only needed properties? Spying? not figured it out yet...
+    return {
+        tmp: {
+            easyPieChartMin: min,
+            easyPieChartMax: max
+        }
+    };
+}
+
+
 describe("percentage calculations for easy pie charts", function () {
 
     // some easy functions to test. incomplete yet.
     it('should return 50 if positive value between min and max', function () {
         // act
-        var result = NETDATA.easypiechartPercentFromValueMinMax(1, 0, 2);
+        var result = NETDATA.easypiechartPercentFromValueMinMax(createState(0, 0), 1, 0, 2);
         // assert
         expect(result).toBe(50);
     });
 
     it('should return 0.1 if value is zero', function () {
         // act
-        var result = NETDATA.easypiechartPercentFromValueMinMax(0, 0, 2);
+        var result = NETDATA.easypiechartPercentFromValueMinMax(createState(0, 0), 0, 0, 2);
         // assert
         expect(result).toBe(0.1);
     });
@@ -45,14 +56,5 @@ describe('creation of easy pie charts', function () {
         // assert
         expect(result).toBe(true);
     });
-
-    function createState() {
-        // create a fake state with only needed properties? Spying? not figured it out yet...
-        return {
-            tmp: {
-
-            }
-        };
-    }
 
 });
