@@ -77,12 +77,6 @@ Also it is recommended to install WebStorm IDE Extension/Addon to Chrome/Chromiu
    - JavaScript file: node_modules/jasmine-node/bin/jasmine-node
    - Application parameters: --captureExceptions tests/node.d
 
-**ATTENTION**
-
-The jasmine-node npm package includes an outdated jasmine on version 1.3.1.
-
-I haven't figured out yet how to switch to newer 2.6 versions. So it may contain bugs or lacks features.
-
 # Running
 
 ## In WebStorm
