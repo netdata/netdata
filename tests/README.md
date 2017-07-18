@@ -12,8 +12,9 @@ Make sure you are the user who is developer (permissions, except sudo ofc)
 sudo apt-get install nodejs npm chromium-browser
 
 cd /path/to/your/netdata
-
 npm install
+cd node_modules
+git clone https://github.com/BrainDoctor/jasmine-node.git
 ```
 
 That should install the necessary node modules.
