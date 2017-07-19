@@ -418,7 +418,7 @@ install_non_systemd_init() {
 
     if [ -d /etc/init.d -a ! -f /etc/init.d/netdata ]
         then
-        if [ "${key}" = "gentoo" ]
+        if [[ "${key}" =~ ^(gentoo|alpine).* ]]
             then
             echo >&2 "Installing OpenRC init file..."
             run cp system/netdata-openrc /etc/init.d/netdata && \
