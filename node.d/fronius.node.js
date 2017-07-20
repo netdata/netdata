@@ -179,9 +179,11 @@ var fronius = {
 
         var dim = {};
         for (var key in inverters) {
-            var name = key;
-            if (!isNaN(key)) name = "Inverter " + key;
-            dim[key] = this.createBasicDimension("inverter_" + key, name, 1);
+            if (inverters.hasOwnProperty(key)) {
+                var name = key;
+                if (!isNaN(key)) name = "Inverter " + key;
+                dim[key] = this.createBasicDimension("inverter_" + key, name, 1);
+            }
         }
 
         chart = {
@@ -276,7 +278,9 @@ var fronius = {
     parseInverterChart: function (service, inverters) {
         var dimensions = [];
         for (var key in inverters) {
-            dimensions.push(this.getDimension(key, Math.round(inverters[key].P)));
+            if (inverters.hasOwnProperty(key)) {
+                dimensions.push(this.getDimension(key, Math.round(inverters[key].P)));
+            }
         }
         return this.getChart(this.getInverterPowerChart(service, "inverters.output", inverters), dimensions);
     },
