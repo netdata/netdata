@@ -1,15 +1,15 @@
-'use strict';
+"use strict";
 
 // This program will connect to one or more Fronius Symo Inverters.
 // to get the Solar Power Generated (current, today).
 
 // example configuration in netdata/conf.d/node.d/fronius.conf.md
 
-var url = require('url');
-var http = require('http');
-var netdata = require('netdata');
+var url = require("url");
+var http = require("http");
+var netdata = require("netdata");
 
-netdata.debug('loaded ' + __filename + ' plugin');
+netdata.debug("loaded " + __filename + " plugin");
 
 var fronius = {
     name: "Fronius",
@@ -39,7 +39,8 @@ var fronius = {
     },
 
     // Gets the site power chart. Will be created if not existing.
-    getSitePowerChart: function (service, id) {
+    getSitePowerChart: function (service, suffix) {
+        var id = this.getChartId(service, suffix);
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
 
@@ -50,13 +51,13 @@ var fronius = {
 
         chart = {
             id: id,                                         // the unique id of the chart
-            name: '',                                       // the unique name of the chart
-            title: service.name + ' Current Site Power',    // the title of the chart
-            units: 'W',                                   // the units of the chart dimensions
-            family: 'power',                                  // the family of the chart
-            context: 'fronius.power',                // the context of the chart
+            name: "",                                       // the unique name of the chart
+            title: service.name + " Current Site Power",    // the title of the chart
+            units: "W",                                     // the units of the chart dimensions
+            family: "power",                                // the family of the chart
+            context: "fronius.power",                       // the context of the chart
             type: netdata.chartTypes.area,                  // the type of the chart
-            priority: fronius.base_priority + 1,             // the priority relative to others in the same family
+            priority: fronius.base_priority + 1,            // the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
             dimensions: dim
         };
@@ -67,7 +68,8 @@ var fronius = {
     },
 
     // Gets the site consumption chart. Will be created if not existing.
-    getSiteConsumptionChart: function (service, id) {
+    getSiteConsumptionChart: function (service, suffix) {
+        var id = this.getChartId(service, suffix);
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
@@ -75,11 +77,11 @@ var fronius = {
 
         chart = {
             id: id,                                         // the unique id of the chart
-            name: '',                                       // the unique name of the chart
-            title: service.name + ' Current Load',          // the title of the chart
-            units: 'W',                                     // the units of the chart dimensions
-            family: 'consumption',                                  // the family of the chart
-            context: 'fronius.consumption',                 // the context of the chart
+            name: "",                                       // the unique name of the chart
+            title: service.name + " Current Load",          // the title of the chart
+            units: "W",                                     // the units of the chart dimensions
+            family: "consumption",                          // the family of the chart
+            context: "fronius.consumption",                 // the context of the chart
             type: netdata.chartTypes.area,                  // the type of the chart
             priority: fronius.base_priority + 2,            // the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
@@ -92,7 +94,8 @@ var fronius = {
     },
 
     // Gets the site consumption chart. Will be created if not existing.
-    getSiteAutonomyChart: function (service, id) {
+    getSiteAutonomyChart: function (service, suffix) {
+        var id = this.getChartId(service, suffix);
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
@@ -101,11 +104,11 @@ var fronius = {
 
         chart = {
             id: id,                                         // the unique id of the chart
-            name: '',                                       // the unique name of the chart
-            title: service.name + ' Current Autonomy',      // the title of the chart
-            units: '%',                                     // the units of the chart dimensions
-            family: 'autonomy',                                  // the family of the chart
-            context: 'fronius.autonomy',                 // the context of the chart
+            name: "",                                       // the unique name of the chart
+            title: service.name + " Current Autonomy",      // the title of the chart
+            units: "%",                                     // the units of the chart dimensions
+            family: "autonomy",                             // the family of the chart
+            context: "fronius.autonomy",                    // the context of the chart
             type: netdata.chartTypes.area,                  // the type of the chart
             priority: fronius.base_priority + 3,            // the priority relative to others in the same family
             update_every: service.update_every,             // the expected update frequency of the chart
@@ -118,21 +121,22 @@ var fronius = {
     },
 
     // Gets the site energy chart for today. Will be created if not existing.
-    getSiteEnergyTodayChart: function (service, chartId) {
+    getSiteEnergyTodayChart: function (service, suffix) {
+        var chartId = this.getChartId(service, suffix);
         var chart = fronius.charts[chartId];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
         dim[fronius.energyTodayId] = this.createBasicDimension(fronius.energyTodayId, "Today", 1000);
         chart = {
             id: chartId,                                         // the unique id of the chart
-            name: '',                                       // the unique name of the chart
-            title: service.name + ' Energy production for today',    // the title of the chart
-            units: 'kWh',                                   // the units of the chart dimensions
-            family: 'energy',                                  // the family of the chart
-            context: 'fronius.energy.today',                // the context of the chart
-            type: netdata.chartTypes.area,                  // the type of the chart
-            priority: fronius.base_priority + 4,             // the priority relative to others in the same family
-            update_every: service.update_every,             // the expected update frequency of the chart
+            name: "",                                            // the unique name of the chart
+            title: service.name + " Energy production for today",// the title of the chart
+            units: "kWh",                                        // the units of the chart dimensions
+            family: "energy",                                    // the family of the chart
+            context: "fronius.energy.today",                     // the context of the chart
+            type: netdata.chartTypes.area,                       // the type of the chart
+            priority: fronius.base_priority + 4,                 // the priority relative to others in the same family
+            update_every: service.update_every,                  // the expected update frequency of the chart
             dimensions: dim
         };
         chart = service.chart(chartId, chart);
@@ -142,21 +146,22 @@ var fronius = {
     },
 
     // Gets the site energy chart for today. Will be created if not existing.
-    getSiteEnergyYearChart: function (service, chartId) {
+    getSiteEnergyYearChart: function (service, suffix) {
+        var chartId = this.getChartId(service, suffix);
         var chart = fronius.charts[chartId];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
         dim[fronius.energyYearId] = this.createBasicDimension(fronius.energyYearId, "Year", 1000);
         chart = {
-            id: chartId,                                         // the unique id of the chart
-            name: '',                                       // the unique name of the chart
-            title: service.name + ' Energy production for this year',    // the title of the chart
-            units: 'kWh',                                   // the units of the chart dimensions
-            family: 'energy',                                  // the family of the chart
-            context: 'fronius.energy.year',                // the context of the chart
-            type: netdata.chartTypes.area,                  // the type of the chart
-            priority: fronius.base_priority + 5,             // the priority relative to others in the same family
-            update_every: service.update_every,             // the expected update frequency of the chart
+            id: chartId,                                             // the unique id of the chart
+            name: "",                                                // the unique name of the chart
+            title: service.name + " Energy production for this year",// the title of the chart
+            units: "kWh",                                            // the units of the chart dimensions
+            family: "energy",                                        // the family of the chart
+            context: "fronius.energy.year",                          // the context of the chart
+            type: netdata.chartTypes.area,                           // the type of the chart
+            priority: fronius.base_priority + 5,                     // the priority relative to others in the same family
+            update_every: service.update_every,                      // the expected update frequency of the chart
             dimensions: dim
         };
         chart = service.chart(chartId, chart);
@@ -167,35 +172,28 @@ var fronius = {
 
     // Gets the inverter power chart. Will be created if not existing.
     // Needs the array of inverters in order to create a chart with all inverters as dimensions
-    getInverterPowerChart: function (service, chartId, inverters) {
-
+    getInverterPowerChart: function (service, suffix, inverters) {
+        var chartId = this.getChartId(service, suffix);
         var chart = fronius.charts[chartId];
         if (fronius.isDefined(chart)) return chart;
 
         var dim = {};
-
-        var inverterCount = Object.keys(inverters).length;
-        var inverter = inverters[inverterCount.toString()];
-        var i = 1;
-        for (i; i <= inverterCount; i++) {
-            if (fronius.isUndefined(inverter)) {
-                netdata.error("Expected an Inverter with a numerical name! " +
-                    "Have a look at your JSON output to verify.");
-                continue;
-            }
-            dim[i.toString()] = this.createBasicDimension("inverter_" + i, "Inverter " + i, 1);
+        for (var key in inverters) {
+            var name = key;
+            if (!isNaN(key)) name = "Inverter " + key;
+            dim[key] = this.createBasicDimension("inverter_" + key, name, 1);
         }
 
         chart = {
-            id: chartId,                                         // the unique id of the chart
-            name: '',                                       // the unique name of the chart
-            title: service.name + ' Current Inverter Output',    // the title of the chart
-            units: 'W',                                   // the units of the chart dimensions
-            family: 'inverters',                                  // the family of the chart
-            context: 'fronius.inverter.output',                // the context of the chart
-            type: netdata.chartTypes.stacked,                  // the type of the chart
+            id: chartId,                                     // the unique id of the chart
+            name: "",                                        // the unique name of the chart
+            title: service.name + " Current Inverter Output",// the title of the chart
+            units: "W",                                      // the units of the chart dimensions
+            family: "inverters",                             // the family of the chart
+            context: "fronius.inverter.output",              // the context of the chart
+            type: netdata.chartTypes.stacked,                // the type of the chart
             priority: fronius.base_priority + 6,             // the priority relative to others in the same family
-            update_every: service.update_every,             // the expected update frequency of the chart
+            update_every: service.update_every,              // the expected update frequency of the chart
             dimensions: dim
         };
         chart = service.chart(chartId, chart);
@@ -205,59 +203,115 @@ var fronius = {
     },
 
     processResponse: function (service, content) {
-        var json = fronius.parseResponse(content);
+        var json = fronius.convertToJson(content);
         if (json === null) return;
 
         // add the service
         service.commit();
 
-        var site = json.Body.Data.Site;
-
-        // Site Current Power Chart
-        service.begin(fronius.getSitePowerChart(service, 'fronius_' + service.name + '.power'));
-        service.set(fronius.powerGridId, Math.round(site.P_Grid));
-        service.set(fronius.powerPvId, Math.round(site.P_PV));
-        service.set(fronius.powerAccuId, Math.round(site.P_Akku));
-        service.end();
-
-        // Site Consumption Chart
-        service.begin(fronius.getSiteConsumptionChart(service, 'fronius_' + service.name + '.consumption'));
-        service.set(fronius.consumptionLoadId, Math.round(Math.abs(site.P_Load)));
-        service.end();
-
-        // Site Autonomy Chart
-        service.begin(fronius.getSiteAutonomyChart(service, 'fronius_' + service.name + '.autonomy'));
-        service.set(fronius.autonomyId, Math.round(site.rel_Autonomy));
-        var selfConsumption = site.rel_SelfConsumption;
-        service.set(fronius.consumptionSelfId, Math.round(selfConsumption === null ? 100 : selfConsumption));
-        service.end();
-
-        // Site Energy Today Chart
-        service.begin(fronius.getSiteEnergyTodayChart(service, 'fronius_' + service.name + '.energy.today'));
-        service.set(fronius.energyTodayId, Math.round(site.E_Day));
-        service.end();
-
-        // Site Energy Year Chart
-        service.begin(fronius.getSiteEnergyYearChart(service, 'fronius_' + service.name + '.energy.year'));
-        service.set(fronius.energyYearId, Math.round(site.E_Year));
-        service.end();
-
-        // Inverters
-        var inverters = json.Body.Data.Inverters;
-        var inverterCount = Object.keys(inverters).length + 1;
-        while (inverterCount--) {
-            var inverter = inverters[inverterCount];
-            if (fronius.isUndefined(inverter)) continue;
-            service.begin(fronius.getInverterPowerChart(service, 'fronius_' + service.name + '.inverters.output', inverters));
-            service.set(inverterCount.toString(), Math.round(inverter.P));
+        var chartDefinitions = fronius.parseCharts(service, json);
+        var chartCount = chartDefinitions.length;
+        while (chartCount--) {
+            var chartObj = chartDefinitions[chartCount];
+            service.begin(chartObj.chart);
+            var dimCount = chartObj.dimensions.length;
+            while (dimCount--) {
+                var dim = chartObj.dimensions[dimCount];
+                service.set(dim.name, dim.value);
+            }
             service.end();
         }
     },
 
-    parseResponse: function (httpBody) {
+    parseCharts: function (service, json) {
+        var site = json.Body.Data.Site;
+        return [
+            this.parsePowerChart(service, site),
+            this.parseConsumptionChart(service, site),
+            this.parseAutonomyChart(service, site),
+            this.parseEnergyTodayChart(service, site),
+            this.parseEnergyYearChart(service, site),
+            this.parseInverterChart(service, json.Body.Data.Inverters)
+        ];
+    },
+
+    parsePowerChart: function (service, site) {
+        return this.getChart(this.getSitePowerChart(service, "power"),
+            [
+                this.getDimension(this.powerGridId, Math.round(site.P_Grid)),
+                this.getDimension(this.powerPvId, Math.round(Math.max(site.P_PV, 0))),
+                this.getDimension(this.powerAccuId, Math.round(site.P_Akku))
+            ]
+        );
+    },
+
+    parseConsumptionChart: function (service, site) {
+        return this.getChart(this.getSiteConsumptionChart(service, "consumption"),
+            [this.getDimension(this.consumptionLoadId, Math.round(Math.abs(site.P_Load)))]
+        );
+    },
+
+    parseAutonomyChart: function (service, site) {
+        var selfConsumption = site.rel_SelfConsumption;
+        return this.getChart(this.getSiteAutonomyChart(service, "autonomy"),
+            [
+                this.getDimension(this.autonomyId, Math.round(site.rel_Autonomy)),
+                this.getDimension(this.consumptionSelfId, Math.round(selfConsumption === null ? 100 : selfConsumption))
+            ]
+        );
+    },
+
+    parseEnergyTodayChart: function (service, site) {
+        return this.getChart(this.getSiteEnergyTodayChart(service, "energy.today"),
+            [this.getDimension(this.energyTodayId, Math.round(Math.max(site.E_Day, 0)))]
+        );
+    },
+
+    parseEnergyYearChart: function (service, site) {
+        return this.getChart(this.getSiteEnergyYearChart(service, "energy.year"),
+            [this.getDimension(this.energyYearId, Math.round(Math.max(site.E_Year, 0)))]
+        );
+    },
+
+    parseInverterChart: function (service, inverters) {
+        var dimensions = [];
+        for (var key in inverters) {
+            dimensions.push(this.getDimension(key, Math.round(inverters[key].P)));
+        }
+        return this.getChart(this.getInverterPowerChart(service, "inverters.output", inverters), dimensions);
+    },
+
+    getDimension: function (name, value) {
+        return {
+            name: name,
+            value: value
+        };
+    },
+
+    getChart: function (chart, dimensions) {
+        return {
+            chart: chart,
+            dimensions: dimensions
+        };
+    },
+
+    getChartId: function (service, suffix) {
+        return "fronius_" + service.name + "." + suffix;
+    },
+
+    convertToJson: function (httpBody) {
         if (httpBody === null) return null;
         var json = httpBody;
-        if (typeof httpBody !== "object") json = JSON.parse(httpBody);
+        // can't parse if it's already a json object,
+        // the check enables easier testing if the httpBody is already valid JSON.
+        if (typeof httpBody !== "object") {
+            try {
+                json = JSON.parse(httpBody);
+            } catch (error) {
+                netdata.error("fronius: Got a response, but it is not valid JSON. Ignoring. Error: " + error.message);
+                return null;
+            }
+        }
         return this.isResponseValid(json) ? json : null;
     },
 
@@ -274,11 +328,11 @@ var fronius = {
     // its purpose is to prepare the request and call
     // netdata.serviceExecute()
     serviceExecute: function (name, uri, update_every) {
-        netdata.debug(this.name + ': ' + name + ': url: ' + uri + ', update_every: ' + update_every);
+        netdata.debug(this.name + ": " + name + ": url: " + uri + ", update_every: " + update_every);
 
         var service = netdata.service({
             name: name,
-            request: netdata.requestFromURL('http://' + uri),
+            request: netdata.requestFromURL("http://" + uri),
             update_every: update_every,
             module: this
         });
@@ -313,7 +367,7 @@ var fronius = {
     },
 
     isUndefined: function (value) {
-        return typeof value === 'undefined';
+        return typeof value === "undefined";
     },
 
     areUndefined: function (valueArray) {
@@ -325,7 +379,7 @@ var fronius = {
     },
 
     isDefined: function (value) {
-        return typeof value !== 'undefined';
+        return typeof value !== "undefined";
     }
 };
 

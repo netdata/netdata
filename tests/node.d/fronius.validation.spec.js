@@ -5,25 +5,11 @@ var netdata = require("../../node.d/node_modules/netdata");
 var subject = require("../../node.d/fronius.node");
 
 var service = netdata.service({
-    name: "fronius",
+    name: "validation",
     module: this
 });
 
 describe("fronius response validation", function () {
-
-    // this is a faked JSON response from the server.
-    // Used with freeformatter.com/json-escape.html to escape the json and turn it into a string.
-    var fakeResponse = "{\r\n\t\"Head\" : {\r\n\t\t\"RequestArguments\" : {},\r\n\t\t\"Status\" " +
-        ": {\r\n\t\t\t\"Code\" : 0,\r\n\t\t\t\"Reason\" : \"\",\r\n\t\t\t\"UserMessage\" : " +
-        "\"\"\r\n\t\t},\r\n\t\t\"Timestamp\" : \"2017-07-17T16:01:04+02:00\"\r\n\t},\r\n\t\"Body\" : " +
-        "{\r\n\t\t\"Data\" : {\r\n\t\t\t\"Site\" : {\r\n\t\t\t\t\"Mode\" : \"meter\",\r\n\t\t\t\t\"P_Grid\" " +
-        ": -3430.729923,\r\n\t\t\t\t\"P_Load\" : -910.270077,\r\n\t\t\t\t\"P_Akku\" : " +
-        "null,\r\n\t\t\t\t\"P_PV\" : 4341,\r\n\t\t\t\t\"rel_SelfConsumption\" : " +
-        "20.969133,\r\n\t\t\t\t\"rel_Autonomy\" : 100,\r\n\t\t\t\t\"E_Day\" : 57230,\r\n\t\t\t\t\"E_Year\" " +
-        ": 6425915.5,\r\n\t\t\t\t\"E_Total\" : 15388710,\r\n\t\t\t\t\"Meter_Location\" : " +
-        "\"grid\"\r\n\t\t\t},\r\n\t\t\t\"Inverters\" : {\r\n\t\t\t\t\"1\" : {\r\n\t\t\t\t\t\"DT\" : " +
-        "123,\r\n\t\t\t\t\t\"P\" : 4341,\r\n\t\t\t\t\t\"E_Day\" : 57230,\r\n\t\t\t\t\t\"E_Year\" : " +
-        "6425915.5,\r\n\t\t\t\t\t\"E_Total\" : 15388710\r\n\t\t\t\t}\r\n\t\t\t}\r\n\t\t}\r\n\t}\r\n}";
 
     it("should do nothing if response is null", function () {
         netdata.send = jasmine.createSpy("send");
@@ -35,9 +21,19 @@ describe("fronius response validation", function () {
     });
 
     it("should return null if response is null", function () {
-        var result = subject.parseResponse(null);
+        var result = subject.convertToJson(null);
 
         expect(result).toBeNull();
+    });
+
+    it("should return null and log error if response cannot be parsed", function () {
+        netdata.error = jasmine.createSpy("error");
+
+        // trailing commas are enough to create syntax exceptions
+        var result = subject.convertToJson("{name,}");
+
+        expect(result).toBeNull();
+        expect(netdata.error.calls.count()).toBe(1);
     });
 
     it("should return true if response is valid", function () {

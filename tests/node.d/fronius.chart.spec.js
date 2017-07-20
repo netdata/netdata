@@ -5,15 +5,21 @@ var netdata = require("../../node.d/node_modules/netdata");
 var subject = require("../../node.d/fronius.node");
 
 var service = netdata.service({
-    name: "fronius",
+    name: "chart",
     module: this
 });
 
 describe("fronius chart creation", function () {
 
+    var chartPrefix = "fronius_chart.";
+
     beforeAll(function () {
         // change this to enable debug log
         netdata.options.DEBUG = false;
+    });
+
+    afterAll(function () {
+        deleteProperties(subject.charts)
     });
 
     it("should return a basic chart dimension", function () {
@@ -26,10 +32,10 @@ describe("fronius chart creation", function () {
     });
 
     it("should return the power chart definition", function () {
-        var id = "power";
-        var result = subject.getSitePowerChart(service, id);
+        var suffix = "power";
+        var result = subject.getSitePowerChart(service, suffix);
 
-        expect(result.id).toBe(id);
+        expect(result.id).toBe(chartPrefix + suffix);
         expect(result.units).toBe("W");
         expect(result.type).toBe(netdata.chartTypes.area);
         expect(result.family).toBe("power");
@@ -41,10 +47,10 @@ describe("fronius chart creation", function () {
     });
 
     it("should return the consumption chart definition", function () {
-        var id = "Load";
-        var result = subject.getSiteConsumptionChart(service, id);
+        var suffix = "Load";
+        var result = subject.getSiteConsumptionChart(service, suffix);
 
-        expect(result.id).toBe(id);
+        expect(result.id).toBe(chartPrefix + suffix);
         expect(result.units).toBe("W");
         expect(result.type).toBe(netdata.chartTypes.area);
         expect(result.family).toBe("consumption");
@@ -54,10 +60,10 @@ describe("fronius chart creation", function () {
     });
 
     it("should return the autonomy chart definition", function () {
-        var id = "Autonomy";
-        var result = subject.getSiteAutonomyChart(service, id);
+        var suffix = "Autonomy";
+        var result = subject.getSiteAutonomyChart(service, suffix);
 
-        expect(result.id).toBe(id);
+        expect(result.id).toBe(chartPrefix + suffix);
         expect(result.units).toBe("%");
         expect(result.type).toBe(netdata.chartTypes.area);
         expect(result.family).toBe("autonomy");
@@ -68,10 +74,10 @@ describe("fronius chart creation", function () {
     });
 
     it("should return the energy today chart definition", function () {
-        var id = "Energy today";
-        var result = subject.getSiteEnergyTodayChart(service, id);
+        var suffix = "Energy today";
+        var result = subject.getSiteEnergyTodayChart(service, suffix);
 
-        expect(result.id).toBe(id);
+        expect(result.id).toBe(chartPrefix + suffix);
         expect(result.units).toBe("kWh");
         expect(result.type).toBe(netdata.chartTypes.area);
         expect(result.family).toBe("energy");
@@ -81,16 +87,69 @@ describe("fronius chart creation", function () {
     });
 
     it("should return the energy year chart definition", function () {
-        var id = "Energy year";
-        var result = subject.getSiteEnergyYearChart(service, id);
+        var suffix = "Energy year";
+        var result = subject.getSiteEnergyYearChart(service, suffix);
 
-        expect(result.id).toBe(id);
+        expect(result.id).toBe(chartPrefix + suffix);
         expect(result.units).toBe("kWh");
         expect(result.type).toBe(netdata.chartTypes.area);
         expect(result.family).toBe("energy");
         expect(result.context).toBe("fronius.energy.year");
         expect(Object.keys(result.dimensions).length).toBe(1);
         expect(result.dimensions[subject.energyYearId].name).toBe("Year");
+    });
+
+    it("should return the inverter chart definition with a single numerical inverter", function () {
+        var inverters = {
+            "1": {}
+        };
+        var suffix = "numerical";
+        var result = subject.getInverterPowerChart(service, suffix, inverters);
+
+        expect(result.id).toBe(chartPrefix + suffix);
+        expect(result.units).toBe("W");
+        expect(result.type).toBe(netdata.chartTypes.stacked);
+        expect(result.family).toBe("inverters");
+        expect(result.context).toBe("fronius.inverter.output");
+        expect(Object.keys(result.dimensions).length).toBe(1);
+        expect(result.dimensions["1"].name).toBe("Inverter 1");
+    });
+
+    it("should return the inverter chart definition with a single alphabetical inverter", function () {
+        var key = "Cellar";
+        var inverters = {
+            "Cellar": {}
+        };
+        var suffix = "alphabetical";
+        var result = subject.getInverterPowerChart(service, suffix, inverters);
+
+        expect(result.id).toBe(chartPrefix + suffix);
+        expect(result.units).toBe("W");
+        expect(result.type).toBe(netdata.chartTypes.stacked);
+        expect(result.family).toBe("inverters");
+        expect(result.context).toBe("fronius.inverter.output");
+        expect(Object.keys(result.dimensions).length).toBe(1);
+        expect(result.dimensions[key].name).toBe(key);
+    });
+
+    it("should return the inverter chart definition with multiple alphanumerical inverter", function () {
+        var alpha = "Cellar";
+        var numerical = 1;
+        var inverters = {
+            "Cellar": {},
+            "1": {}
+        };
+        var suffix = "alphanumerical";
+        var result = subject.getInverterPowerChart(service, suffix, inverters);
+
+        expect(result.id).toBe(chartPrefix + suffix);
+        expect(result.units).toBe("W");
+        expect(result.type).toBe(netdata.chartTypes.stacked);
+        expect(result.family).toBe("inverters");
+        expect(result.context).toBe("fronius.inverter.output");
+        expect(Object.keys(result.dimensions).length).toBe(2);
+        expect(result.dimensions[alpha].name).toBe(alpha);
+        expect(result.dimensions[numerical].name).toBe("Inverter " + numerical);
     });
 
     it("should return the same chart definition on second call for lazy loading", function () {
