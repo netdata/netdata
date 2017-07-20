@@ -1,0 +1,5 @@
+---
+exclude_paths:
+  - python.d/python_modules/pyyaml2/
+  - python.d/python_modules/pyyaml3/
+  - python.d/python_modules/urllib3/
