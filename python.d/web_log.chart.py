@@ -475,7 +475,6 @@ class Web(Mixin):
         unique_current = set()
         timings = defaultdict(lambda: dict(minimum=None, maximum=0, summary=0, count=0))
 
-        ip_address_counter = {'unique_cur_ip': 0}
         for line in filtered_data:
             match = self.storage['regex'].search(line)
             if match:
@@ -529,10 +528,11 @@ class Web(Mixin):
                 proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
                 self.data['req_' + proto] += 1
                 # unique clients ips
-                if address_not_in_pool(pool=self.storage['unique_all_time'],
-                                       address=match_dict['address'],
-                                       pool_size=self.data['unique_tot_ipv4'] + self.data['unique_tot_ipv6']):
-                    self.data['unique_tot_' + proto] += 1
+                if self.conf.get('all_time', True):
+                    if address_not_in_pool(pool=self.storage['unique_all_time'],
+                                           address=match_dict['address'],
+                                           pool_size=self.data['unique_tot_ipv4'] + self.data['unique_tot_ipv6']):
+                        self.data['unique_tot_' + proto] += 1
                 if match_dict['address'] not in unique_current:
                     self.data['unique_cur_' + proto] += 1
                     unique_current.add(match_dict['address'])
