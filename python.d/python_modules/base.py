@@ -499,35 +499,38 @@ class UrlService(SimpleService):
         self.url = self.configuration.get('url')
         self.user = self.configuration.get('user')
         self.password = self.configuration.get('pass')
-        self.proxy_url = self.configuration.get('proxy')
+        self.proxy_user = self.configuration.get('proxy_user')
+        self.proxy_password = self.configuration.get('proxy_pass')
+        self.proxy_url = self.configuration.get('proxy_url')
         self._manager = None
 
-    def __make_headers(self, user=None, password=None, proxy_url=None):
-        user = user or self.user
-        password = password or self.password
-        proxy_url = proxy_url or self.proxy_url
-        params = dict(keep_alive=True)
+    def __make_headers(self, **header_kw):
+        user = header_kw.get('user') or self.user
+        password = header_kw.get('pass') or self.password
+        proxy_user = header_kw.get('proxy_user') or self.proxy_user
+        proxy_password = header_kw.get('proxy_pass') or self.proxy_password
+        header_params = dict(keep_alive=True)
+        proxy_header_params = dict()
         if user and password:
-            key = 'basic_auth' if not proxy_url else 'proxy_basic_auth'
-            params[key] = '{user}:{password}'.format(user=user, password=password)
-        return urllib3.make_headers(**params)
-
-    def _build_header(self, **header_kw):
+            header_params['basic_auth'] = '{user}:{password}'.format(user=user,
+                                                                     password=password)
+        if proxy_user and proxy_password:
+            proxy_header_params['proxy_basic_auth'] = '{user}:{password}'.format(user=proxy_user,
+                                                                                 password=proxy_password)
         try:
-            return self.__make_headers(**header_kw)
+            return urllib3.make_headers(**header_params), urllib3.make_headers(**proxy_header_params)
         except TypeError as error:
             self.error('build_header() error: {error}'.format(error=error))
-            return None
+            return None, None
 
-    def _build_manager(self, proxy_url=None, header_params=None):
-        header_params = header_params or dict()
-        header_params['proxy_url'] = proxy_url or self.proxy_url
-        header = self._build_header(**header_params)
-        if not header:
+    def _build_manager(self, **header_kw):
+        header, proxy_header = self.__make_headers(**header_kw)
+        if header is None or proxy_header is None:
             return None
-        if header_params['proxy_url']:
+        proxy_url = header_kw.get('proxy_url') or self.proxy_url
+        if proxy_url:
             manager = urllib3.ProxyManager
-            params = dict(proxy_url=header_params['proxy_url'], proxy_headers=header)
+            params = dict(proxy_url=proxy_url, headers=header, proxy_headers=proxy_header)
         else:
             manager = urllib3.PoolManager
             params = dict(headers=header)
@@ -545,6 +548,7 @@ class UrlService(SimpleService):
         try:
             url = url or self.url
             manager = manager or self._manager
+            # TODO: timeout, retries and method hardcoded..
             response = manager.request(method='GET',
                                        url=url,
                                        timeout=1,
@@ -554,8 +558,8 @@ class UrlService(SimpleService):
             self.error('Url: {url}. Error: {error}'.format(url=url, error=error))
             return None
         if response.status == 200:
-            return response.data.decode() or None
-        self.error('Url: {url}. Http response status code: {code}'.format(url=url, code=response.status))
+            return response.data.decode()
+        self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=response.status))
         return None
 
     def check(self):
