@@ -269,6 +269,34 @@ int unit_test_str2ld() {
     return 0;
 }
 
+int unit_test_buffer() {
+    BUFFER *wb = buffer_create(1);
+    char string[2048 + 1];
+    char final[9000 + 1];
+    int i;
+
+    for(i = 0; i < 2048; i++)
+        string[i] = (char)((i % 24) + 'a');
+    string[2048] = '\0';
+
+    const char *fmt = "string1: %s\nstring2: %s\nstring3: %s\nstring4: %s";
+    buffer_sprintf(wb, fmt, string, string, string, string);
+    snprintfz(final, 9000, fmt, string, string, string, string);
+
+    const char *s = buffer_tostring(wb);
+
+    if(buffer_strlen(wb) != strlen(final) || strcmp(s, final) != 0) {
+        fprintf(stderr, "\nbuffer_sprintf() is faulty.\n");
+        fprintf(stderr, "\nstring  : %s (length %zu)\n", string, strlen(string));
+        fprintf(stderr, "\nbuffer  : %s (length %zu)\n", s, buffer_strlen(wb));
+        fprintf(stderr, "\nexpected: %s (length %zu)\n", final, strlen(final));
+        return -1;
+    }
+
+    fprintf(stderr, "buffer_sprintf() works as expected.\n");
+    return 0;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 struct feed_values {

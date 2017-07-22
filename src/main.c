@@ -635,6 +635,7 @@ int main(int argc, char **argv) {
                         char* debug_flags_string = "debug_flags=";
 
                         if(strcmp(optarg, "unittest") == 0) {
+                            if(unit_test_buffer()) exit(1);
                             if(unit_test_str2ld()) exit(1);
                             //default_rrd_update_every = 1;
                             //default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
