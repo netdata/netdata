@@ -2,7 +2,6 @@
 # Description: haproxy netdata python.d module
 # Author: l2isbad
 
-from base import UrlService, SocketService
 from collections import defaultdict
 from re import compile as re_compile
 
@@ -10,6 +9,8 @@ try:
     from urlparse import urlparse
 except ImportError:
     from urllib.parse import urlparse
+
+from base import UrlService, SocketService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -73,7 +74,8 @@ METRICS = {'bin': {'algorithm': 'incremental', 'divisor': 1024},
            'scur': {'algorithm': 'absolute', 'divisor': 1},
            'qcur': {'algorithm': 'absolute', 'divisor': 1}}
 
-REGEX = dict(url=re_compile(r'idle = (?P<idle>[0-9]+)'), socket=re_compile(r'Idle_pct: (?P<idle>[0-9]+)'))
+REGEX = dict(url=re_compile(r'idle = (?P<idle>[0-9]+)'),
+             socket=re_compile(r'Idle_pct: (?P<idle>[0-9]+)'))
 
 
 class Service(UrlService, SocketService):
@@ -81,11 +83,15 @@ class Service(UrlService, SocketService):
         if 'socket' in configuration:
             SocketService.__init__(self, configuration=configuration, name=name)
             self.poll = SocketService
-            self.options_ = dict(regex=REGEX['socket'], stat='show stat\n', info='show info\n')
+            self.options_ = dict(regex=REGEX['socket'],
+                                 stat='show stat\n'.encode(),
+                                 info='show info\n'.encode())
         else:
             UrlService.__init__(self, configuration=configuration, name=name)
             self.poll = UrlService
-            self.options_ = dict(regex=REGEX['url'], stat=self.url, info=url_remove_params(self.url))
+            self.options_ = dict(regex=REGEX['url'],
+                                 stat=self.url,
+                                 info=url_remove_params(self.url))
         self.order = ORDER
         self.definitions = CHARTS
 
@@ -208,4 +214,4 @@ def server_down(server, backend_name):
 
 def url_remove_params(url):
     parsed = urlparse(url or str())
-    return '%s://%s%s' % (parsed.scheme, parsed.netloc, parsed.path)
+    return '{scheme}://{netloc}{path}'.format(scheme=parsed.scheme, netloc=parsed.netloc, path=parsed.path)
