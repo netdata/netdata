@@ -6,6 +6,7 @@
 
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
+static int cleanup_mount_points = 1;
 
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
@@ -58,7 +59,7 @@ int mount_point_cleanup(void *entry, void *data) {
         return 0;
     }
 
-    if(likely(mp->collected)) {
+    if(likely(cleanup_mount_points && mp->collected)) {
         mp->collected = 0;
         mp->updated = 0;
         mp->shown_error = 0;
@@ -327,6 +328,8 @@ void *proc_diskspace_main(void *ptr) {
         error("DISKSPACE: Cannot set pthread cancel state to ENABLE.");
 
     int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
+
+    cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
     int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
     if(update_every < localhost->rrd_update_every)

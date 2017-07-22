@@ -273,7 +273,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 global_do_qops = CONFIG_BOOLEAN_AUTO,
                 global_do_util = CONFIG_BOOLEAN_AUTO,
                 global_do_backlog = CONFIG_BOOLEAN_AUTO,
-                globals_initialized = 0;
+                globals_initialized = 0,
+                global_cleanup_removed_disks = 1;
 
     if(unlikely(!globals_initialized)) {
         globals_initialized = 1;
@@ -291,6 +292,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "utilization percentage for all disks", global_do_util);
         global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "backlog for all disks", global_do_backlog);
 
+        global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
+        
         char buffer[FILENAME_MAX + 1];
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
@@ -806,7 +809,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
     struct disk *d = disk_root, *last = NULL;
     while(d) {
-        if(unlikely(!d->updated)) {
+        if(unlikely(global_cleanup_removed_disks && !d->updated)) {
             struct disk *t = d;
 
             rrdset_obsolete_and_pointer_null(d->st_avgsz);
