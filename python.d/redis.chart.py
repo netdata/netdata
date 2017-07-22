@@ -68,7 +68,8 @@ CHARTS = {
             ['connected_slaves', 'connected', 'absolute']
         ]},
     'persistence': {
-        'options': [None, 'Redis Persistence Changes Since Last Save', 'changes', 'persistence', 'redis.rdb_changes', 'line'],
+        'options': [None, 'Redis Persistence Changes Since Last Save', 'changes', 'persistence',
+                    'redis.rdb_changes', 'line'],
         'lines': [
             ['rdb_changes_since_last_save', 'changes', 'absolute']
         ]}
@@ -78,34 +79,30 @@ CHARTS = {
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
-        self.request = "INFO\r\n"
         self.order = ORDER
         self.definitions = CHARTS
         self._keep_alive = True
         self.chart_name = ""
-        self.passwd = None
-        self.port = 6379
-        if 'port' in configuration:
-            self.port = configuration['port']
-        if 'pass' in configuration:
-            self.passwd = configuration['pass']
-        if 'host' in configuration:
-            self.host = configuration['host']
-        if 'socket' in configuration:
-            self.unix_socket = configuration['socket']
+        self.host = self.configuration.get('host', 'localhost')
+        self.port = self.configuration.get('port', 6379)
+        self.unix_socket = self.configuration.get('socket')
+        password = self.configuration.get('pass', str())
+        self.requests = dict(request='INFO\r\n'.encode(),
+                             password=' '.join(['AUTH', password, '\r\n']).encode() if password else None)
+        self.request = self.requests['request']
 
     def _get_data(self):
         """
         Get data from socket
         :return: dict
         """
-        if self.passwd:
-            self.request = "AUTH " + self.passwd + "\r\n"
+        if self.requests['password']:
+            self.request = self.requests['password']
             raw = self._get_raw_data().strip()
             if raw != "+OK":
                 self.error("invalid password")
                 return None
-            self.request = "INFO\r\n"
+            self.request = self.requests['request']
         response = self._get_raw_data()
         if response is None:
             # error has already been logged
@@ -117,7 +114,7 @@ class Service(SocketService):
             self.error("response is invalid/empty")
             return None
 
-        data = {}
+        data = dict()
         for line in parsed:
             if len(line) < 5 or line[0] == '$' or line[0] == '#':
                 continue
@@ -140,8 +137,9 @@ class Service(SocketService):
             return None
 
         try:
-            data['hit_rate'] = (int(data['keyspace_hits']) * 100) / (int(data['keyspace_hits']) + int(data['keyspace_misses']))
-        except:
+            data['hit_rate'] = (int(data['keyspace_hits']) * 100) / (int(data['keyspace_hits'])
+                                                                     + int(data['keyspace_misses']))
+        except (KeyError, ZeroDivisionError, TypeError):
             data['hit_rate'] = 0
 
         return data
@@ -172,7 +170,6 @@ class Service(SocketService):
         Parse configuration, check if redis is available, and dynamically create chart lines data
         :return: boolean
         """
-        self._parse_config()
         if self.name == "":
             self.name = "local"
             self.chart_name += "_" + self.name
@@ -183,5 +180,4 @@ class Service(SocketService):
         for name in data:
             if name.startswith('db'):
                 self.definitions['keys']['lines'].append([name, None, 'absolute'])
-
         return True
