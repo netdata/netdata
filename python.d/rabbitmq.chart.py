@@ -2,40 +2,41 @@
 # Description: rabbitmq netdata python.d module
 # Author: l2isbad
 
-from base import UrlService
+from collections import namedtuple
+from json import loads
 from socket import gethostbyname, gaierror
+from threading import Thread
 try:
         from queue import Queue
 except ImportError:
         from Queue import Queue
-from threading import Thread
-from collections import namedtuple
-from json import loads
+
+from base import UrlService
 
 # default module values (can be overridden per job in `config`)
 update_every = 1
 priority = 60000
 retries = 60
 
-METHODS = namedtuple('METHODS', ['get_data_function', 'url', 'stats'])
+METHODS = namedtuple('METHODS', ['get_data', 'url', 'stats'])
 
-NODE_STATS = [('fd_used', None),
-              ('mem_used', None),
-              ('sockets_used', None),
-              ('proc_used', None),
-              ('disk_free', None)
+NODE_STATS = ['fd_used',
+              'mem_used',
+              'sockets_used',
+              'proc_used',
+              'disk_free'
               ]
-OVERVIEW_STATS = [('object_totals.channels', None),
-                  ('object_totals.consumers', None),
-                  ('object_totals.connections', None),
-                  ('object_totals.queues', None),
-                  ('object_totals.exchanges', None),
-                  ('queue_totals.messages_ready', None),
-                  ('queue_totals.messages_unacknowledged', None),
-                  ('message_stats.ack', None),
-                  ('message_stats.redeliver', None),
-                  ('message_stats.deliver', None),
-                  ('message_stats.publish', None)
+OVERVIEW_STATS = ['object_totals.channels',
+                  'object_totals.consumers',
+                  'object_totals.connections',
+                  'object_totals.queues',
+                  'object_totals.exchanges',
+                  'queue_totals.messages_ready',
+                  'queue_totals.messages_unacknowledged',
+                  'message_stats.ack',
+                  'message_stats.redeliver',
+                  'message_stats.deliver',
+                  'message_stats.publish'
                   ]
 ORDER = ['queued_messages', 'message_rates', 'global_counts',
          'file_descriptors', 'socket_descriptors', 'erlang_processes', 'memory', 'disk_space']
@@ -75,27 +76,27 @@ CHARTS = {
         'options': [None, 'Global Counts', 'counts', 'overview',
                     'rabbitmq.global_counts', 'line'],
         'lines': [
-            ['channels', None, 'absolute'],
-            ['consumers', None, 'absolute'],
-            ['connections', None, 'absolute'],
-            ['queues', None, 'absolute'],
-            ['exchanges', None, 'absolute']
+            ['object_totals_channels', 'channels', 'absolute'],
+            ['object_totals_consumers', 'consumers', 'absolute'],
+            ['object_totals_connections', 'connections', 'absolute'],
+            ['object_totals_queues', 'queues', 'absolute'],
+            ['object_totals_exchanges', 'exchanges', 'absolute']
         ]},
     'queued_messages': {
         'options': [None, 'Queued Messages', 'messages', 'overview',
                     'rabbitmq.queued_messages', 'stacked'],
         'lines': [
-            ['messages_ready', 'ready', 'absolute'],
-            ['messages_unacknowledged', 'unacknowledged', 'absolute']
+            ['queue_totals_messages_ready', 'ready', 'absolute'],
+            ['queue_totals_messages_unacknowledged', 'unacknowledged', 'absolute']
         ]},
     'message_rates': {
         'options': [None, 'Message Rates', 'messages/s', 'overview',
                     'rabbitmq.message_rates', 'stacked'],
         'lines': [
-            ['ack', None, 'incremental'],
-            ['redeliver', None, 'incremental'],
-            ['deliver', None, 'incremental'],
-            ['publish', None, 'incremental']
+            ['message_stats_ack', 'ack', 'incremental'],
+            ['message_stats_redeliver', 'redeliver', 'incremental'],
+            ['message_stats_deliver', 'deliver', 'incremental'],
+            ['message_stats_publish', 'publish', 'incremental']
         ]}
 }
 
@@ -123,22 +124,19 @@ class Service(UrlService):
             return False
 
         # Add handlers (auth, self signed cert accept)
-        url = '%s://%s:%s/api' % (self.scheme, self.host, self.port)
-        self.opener = self._build_opener(url=url)
-        if not self.opener:
-            return False
+        self.url = '{scheme}://{host}:{port}/api'.format(scheme=self.scheme,
+                                                         host=self.host,
+                                                         port=self.port)
         # Add methods
-        api_node = url + '/nodes'
-        api_overview = url + '/overview'
-        self.methods = [METHODS(get_data_function=self._get_overview_stats, url=api_node, stats=NODE_STATS),
-                        METHODS(get_data_function=self._get_overview_stats, url=api_overview, stats=OVERVIEW_STATS)]
-
-        result = self._get_data()
-        if not result:
-            self.error('_get_data() returned no data')
-            return False
-        self._data_from_check = result
-        return True
+        api_node = self.url + '/nodes'
+        api_overview = self.url + '/overview'
+        self.methods = [METHODS(get_data=self._get_overview_stats,
+                                url=api_node,
+                                stats=NODE_STATS),
+                        METHODS(get_data=self._get_overview_stats,
+                                url=api_overview,
+                                stats=OVERVIEW_STATS)]
+        return UrlService.check(self)
 
     def _get_data(self):
         threads = list()
@@ -146,7 +144,8 @@ class Service(UrlService):
         result = dict()
 
         for method in self.methods:
-            th = Thread(target=method.get_data_function, args=(queue, method.url, method.stats))
+            th = Thread(target=method.get_data,
+                        args=(queue, method.url, method.stats))
             th.start()
             threads.append(th)
 
@@ -169,19 +168,19 @@ class Service(UrlService):
         data = loads(raw_data)
         data = data[0] if isinstance(data, list) else data
 
-        to_netdata = fetch_data_(raw_data=data, metrics_list=stats)
+        to_netdata = fetch_data(raw_data=data, metrics=stats)
         return queue.put(to_netdata)
 
 
-def fetch_data_(raw_data, metrics_list):
-    to_netdata = dict()
-    for metric, new_name in metrics_list:
+def fetch_data(raw_data, metrics):
+    data = dict()
+    for metric in metrics:
         value = raw_data
-        for key in metric.split('.'):
-            try:
-                value = value[key]
-            except (KeyError, TypeError):
-                break
-        if not isinstance(value, dict):
-            to_netdata[new_name or key] = value
-    return to_netdata
+        metrics_list = metric.split('.')
+        try:
+            for m in metrics_list:
+                value = value[m]
+        except KeyError:
+            continue
+        data['_'.join(metrics_list)] = value
+    return data

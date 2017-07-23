@@ -17,38 +17,33 @@
 #
 # using ".encode()" in one thread can block other threads as well (only in python2)
 
-import time
 import os
+import re
 import socket
+import time
 import threading
-import ssl
+
+import urllib3
+
+from glob import glob
 from subprocess import Popen, PIPE
 from sys import exc_info
-from glob import glob
-import re
-try:
-    from urlparse import urlparse
-except ImportError:
-    from urllib.parse import urlparse
-try:
-    import urllib.request as urllib2
-except ImportError:
-    import urllib2
+
 try:
     import MySQLdb
-    PYMYSQL = True
+    PY_MYSQL = True
 except ImportError:
     try:
         import pymysql as MySQLdb
-        PYMYSQL = True
+        PY_MYSQL = True
     except ImportError:
-        PYMYSQL = False
+        PY_MYSQL = False
+
 import msg
 
-try:
-    PATH = os.getenv('PATH').split(':')
-except AttributeError:
-    PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'.split(':')
+
+PATH = os.getenv('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin').split(':')
+urllib3.disable_warnings()
 
 
 # class BaseService(threading.Thread):
@@ -504,75 +499,68 @@ class UrlService(SimpleService):
         self.url = self.configuration.get('url')
         self.user = self.configuration.get('user')
         self.password = self.configuration.get('pass')
-        self.ss_cert = self.configuration.get('ss_cert')
-        self.proxy = self.configuration.get('proxy')
+        self.proxy_user = self.configuration.get('proxy_user')
+        self.proxy_password = self.configuration.get('proxy_pass')
+        self.proxy_url = self.configuration.get('proxy_url')
+        self._manager = None
 
-    def __add_openers(self, user=None, password=None, ss_cert=None, proxy=None, url=None):
-        user = user or self.user
-        password = password or self.password
-        ss_cert = ss_cert or self.ss_cert
-        proxy = proxy or self.proxy
-
-        handlers = list()
-
-        # HTTP Basic Auth handler
-        if all([user, password, isinstance(user, str), isinstance(password, str)]):
-            url = url or self.url
-            url_parse = urlparse(url)
-            top_level_url = '://'.join([url_parse.scheme, url_parse.netloc])
-            passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
-            passman.add_password(None, top_level_url, user, password)
-            handlers.append(urllib2.HTTPBasicAuthHandler(passman))
-            self.debug("Enabling HTTP basic auth")
-
-        # HTTPS handler
-        # Self-signed certificate ignore
-        if ss_cert:
-            try:
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-            except AttributeError:
-                self.error('HTTPS self-signed certificate ignore not enabled')
-            else:
-                handlers.append(urllib2.HTTPSHandler(context=ctx))
-                self.debug("Enabling HTTP self-signed certificate ignore")
-
-        # PROXY handler
-        if proxy and isinstance(proxy, str) and not ss_cert:
-            handlers.append(urllib2.ProxyHandler(dict(http=proxy)))
-            self.debug("Enabling HTTP proxy handler (%s)" % proxy)
-
-        opener = urllib2.build_opener(*handlers)
-        return opener
-
-    def _build_opener(self, **kwargs):
+    def __make_headers(self, **header_kw):
+        user = header_kw.get('user') or self.user
+        password = header_kw.get('pass') or self.password
+        proxy_user = header_kw.get('proxy_user') or self.proxy_user
+        proxy_password = header_kw.get('proxy_pass') or self.proxy_password
+        header_params = dict(keep_alive=True)
+        proxy_header_params = dict()
+        if user and password:
+            header_params['basic_auth'] = '{user}:{password}'.format(user=user,
+                                                                     password=password)
+        if proxy_user and proxy_password:
+            proxy_header_params['proxy_basic_auth'] = '{user}:{password}'.format(user=proxy_user,
+                                                                                 password=proxy_password)
         try:
-            return self.__add_openers(**kwargs)
+            return urllib3.make_headers(**header_params), urllib3.make_headers(**proxy_header_params)
         except TypeError as error:
-            self.error('build_opener() error:', str(error))
+            self.error('build_header() error: {error}'.format(error=error))
+            return None, None
+
+    def _build_manager(self, **header_kw):
+        header, proxy_header = self.__make_headers(**header_kw)
+        if header is None or proxy_header is None:
+            return None
+        proxy_url = header_kw.get('proxy_url') or self.proxy_url
+        if proxy_url:
+            manager = urllib3.ProxyManager
+            params = dict(proxy_url=proxy_url, headers=header, proxy_headers=proxy_header)
+        else:
+            manager = urllib3.PoolManager
+            params = dict(headers=header)
+        try:
+            return manager(**params)
+        except (urllib3.exceptions.ProxySchemeUnknown, TypeError) as error:
+            self.error('build_manager() error:', str(error))
             return None
 
-    def _get_raw_data(self, url=None, opener=None):
+    def _get_raw_data(self, url=None, manager=None):
         """
         Get raw data from http request
         :return: str
         """
-        data = None
         try:
-            opener = opener or self.opener
-            data = opener.open(url or self.url, timeout=self.update_every * 2)
-            raw_data = data.read().decode('utf-8', 'ignore')
-        except urllib2.URLError as error:
-            self.error('Url: %s. Error: %s' % (url or self.url, str(error)))
+            url = url or self.url
+            manager = manager or self._manager
+            # TODO: timeout, retries and method hardcoded..
+            response = manager.request(method='GET',
+                                       url=url,
+                                       timeout=1,
+                                       retries=1,
+                                       headers=manager.headers)
+        except (urllib3.exceptions.HTTPError, TypeError, AttributeError) as error:
+            self.error('Url: {url}. Error: {error}'.format(url=url, error=error))
             return None
-        except Exception as error:
-            self.error(str(error))
-            return None
-        finally:
-            if data is not None:
-                data.close()
-        return raw_data or None
+        if response.status == 200:
+            return response.data.decode()
+        self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=response.status))
+        return None
 
     def check(self):
         """
@@ -583,20 +571,21 @@ class UrlService(SimpleService):
             self.error('URL is not defined or type is not <str>')
             return False
 
-        self.opener = self.__add_openers()
+        self._manager = self._build_manager()
+        if not self._manager:
+            return False
 
         try:
             data = self._get_data()
         except Exception as error:
-            self.error('_get_data() failed. Url: %s. Error: %s' % (self.url, error))
+            self.error('_get_data() failed. Url: {url}. Error: {error}'.format(url=self.url, error=error))
             return False
 
         if isinstance(data, dict) and data:
             self._data_from_check = data
             return True
-        else:
-            self.error("_get_data() returned no data or type is not <dict>")
-            return False
+        self.error('_get_data() returned no data or type is not <dict>')
+        return False
 
 
 class SocketService(SimpleService):
@@ -1046,7 +1035,7 @@ class MySQLService(SimpleService):
                 log_error('Unsupported "queries" format. Must be not empty <dict>')
                 return None
 
-        if not PYMYSQL:
+        if not PY_MYSQL:
             self.error('MySQLdb or PyMySQL module is needed to use mysql.chart.py plugin')
             return False
 
