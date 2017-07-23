@@ -5565,17 +5565,8 @@ var NETDATA = window.NETDATA || {};
         if(state.tmp.easyPieChartMin === null && min > 0) min = 0;
         if(state.tmp.easyPieChartMax === null && max < 0) max = 0;
 
-        var pcent = 0;
-        if(value >= 0) {
-            if(max !== 0)
-                pcent = Math.round(value * 100 / max);
-            if(pcent === 0) pcent = 0.1;
-        }
-        else {
-            if(min !== 0)
-                pcent = Math.round(-value * 100 / min);
-            if(pcent === 0) pcent = -0.1;
-        }
+        var pcent = Math.round((value - min) * 100 / (max - min));
+        if(pcent === 0) pcent = 0.1;
 
         return pcent;
     };
