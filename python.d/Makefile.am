@@ -101,3 +101,68 @@ dist_pythonyaml3_DATA = \
     python_modules/pyyaml3/serializer.py \
     python_modules/pyyaml3/tokens.py \
     $(NULL)
+
+python_urllib3dir=$(pythonmodulesdir)/urllib3
+dist_python_urllib3_DATA = \
+    python_modules/urllib3/__init__.py \
+    python_modules/urllib3/_collections.py \
+    python_modules/urllib3/connection.py \
+    python_modules/urllib3/connectionpool.py \
+    python_modules/urllib3/exceptions.py \
+    python_modules/urllib3/fields.py \
+    python_modules/urllib3/filepost.py \
+    python_modules/urllib3/response.py \
+    python_modules/urllib3/poolmanager.py \
+    python_modules/urllib3/request.py \
+    $(NULL)
+
+python_urllib3_utildir=$(python_urllib3dir)/util
+dist_python_urllib3_util_DATA = \
+    python_modules/urllib3/util/__init__.py \
+    python_modules/urllib3/util/connection.py \
+    python_modules/urllib3/util/request.py \
+    python_modules/urllib3/util/response.py \
+    python_modules/urllib3/util/retry.py \
+    python_modules/urllib3/util/selectors.py \
+    python_modules/urllib3/util/ssl_.py \
+    python_modules/urllib3/util/timeout.py \
+    python_modules/urllib3/util/url.py \
+    python_modules/urllib3/util/wait.py \
+    $(NULL)
+
+python_urllib3_packagesdir=$(python_urllib3dir)/packages
+dist_python_urllib3_packages_DATA = \
+    python_modules/urllib3/packages/__init__.py \
+    python_modules/urllib3/packages/ordered_dict.py \
+    python_modules/urllib3/packages/six.py \
+    $(NULL)
+
+python_urllib3_backportsdir=$(python_urllib3_packagesdir)/backports
+dist_python_urllib3_backports_DATA = \
+    python_modules/urllib3/packages/backports/__init__.py \
+    python_modules/urllib3/packages/backports/makefile.py \
+    $(NULL)
+
+python_urllib3_ssl_match_hostnamedir=$(python_urllib3_packagesdir)/ssl_match_hostname
+dist_python_urllib3_ssl_match_hostname_DATA = \
+    python_modules/urllib3/packages/ssl_match_hostname/__init__.py \
+    python_modules/urllib3/packages/ssl_match_hostname/_implementation.py \
+    $(NULL)
+
+python_urllib3_contribdir=$(python_urllib3dir)/contrib
+dist_python_urllib3_contrib_DATA = \
+    python_modules/urllib3/contrib/__init__.py \
+    python_modules/urllib3/contrib/appengine.py \
+    python_modules/urllib3/contrib/ntlmpool.py \
+    python_modules/urllib3/contrib/pyopenssl.py \
+    python_modules/urllib3/contrib/securetransport.py \
+    python_modules/urllib3/contrib/socks.py \
+    $(NULL)
+
+python_urllib3_securetransportdir=$(python_urllib3_contribdir)/_securetransport
+dist_python_urllib3_securetransport_DATA = \
+    python_modules/urllib3/contrib/_securetransport/__init__.py \
+    python_modules/urllib3/contrib/_securetransport/bindings.py \
+    python_modules/urllib3/contrib/_securetransport/low_level.py \
+    $(NULL)
+
