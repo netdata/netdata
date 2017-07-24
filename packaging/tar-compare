@@ -50,16 +50,16 @@ diff -r "$1" $MYTMP/unpack/* | grep "^Only" | sed \
 	-e '/: README\.md$/d' \
 	-e '/: tmp-anchor-links$/d' \
 	-e '/: tmp-manproc$/d' \
-	-e '/: .*\.tar\.\(gz\|bz2\|xz\)$/d' \
+	-e '/: .*\.tar\.gz$/d' \
+	-e '/: .*\.tar\.bz2$/d' \
+	-e '/: .*\.tar\.xz$/d' \
 	-e '/: unittest$/d' \
 	-e '/: iprange$/d' \
 	-e '/: .*\.o$/d' \
 	-e '/: CMakeLists.txt/d' \
-	-e '/: .travis.yml/d' \
 	-e '/: profile$/d' \
 	-e '/python.d: python-modules-installer\.sh\.in$/d' \
-	-e '/sbin: \(firehol\|fireqos\|link-balancer\)$/d' \
-	-e '/sbin: \(update-ipsets\|vnetbuild\|commands.sed\)$/d' > $MYTMP/out
+	-e '/: .travis.yml/d' > $MYTMP/out
 
 cat $MYTMP/out
 test -s $MYTMP/out && exit 1
