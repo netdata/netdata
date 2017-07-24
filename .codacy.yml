@@ -3,3 +3,13 @@ exclude_paths:
   - python.d/python_modules/pyyaml2/**
   - python.d/python_modules/pyyaml3/**
   - python.d/python_modules/urllib3/**
+  - python.d/python_modules/lm_sensors.py
+  - web/css/**
+  - web/lib/**
+  - web/old/**
+  - node.d/node_modules/ber/**
+  - node.d/node_modules/ber/asn1.js
+  - node.d/node_modules/ber/extend.js
+  - node.d/node_modules/net-snmp.js
+  - node.d/node_modules/ber/pixl-xml.js
+  - tests/**
