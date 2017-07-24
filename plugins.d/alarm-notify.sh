@@ -99,11 +99,41 @@ fatal() {
     exit 1
 }
 
-debug=0
+debug=${NETDATA_ALARM_NOTIFY_DEBUG-0}
 debug() {
-    [ ${debug} -eq 1 ] && log DEBUG "${@}"
+    [ "${debug}" = "1" ] && log DEBUG "${@}"
 }
 
+docurl() {
+    if [ -z "${curl}" ]
+        then
+        error "\${curl} is unset."
+        return 1
+    fi
+
+    if [ "${debug}" = "1" ]
+        then
+        echo >&2 "--- BEGIN curl command ---"
+        printf >&2 "%q " ${curl} "${@}"
+        echo >&2
+        echo >&2 "--- END curl command ---"
+
+        local out=$(mktemp /tmp/netdata-health-alarm-notify-XXXXXXXX)
+        local code=$(${curl} --write-out %{http_code} --output "${out}" --silent --show-error "${@}")
+        local ret=$?
+        echo >&2 "--- BEGIN received response ---"
+        cat >&2 "${out}"
+        echo >&2
+        echo >&2 "--- END received response ---"
+        echo >&2 "RECEIVED HTTP RESPONSE CODE: ${code}"
+        rm "${out}"
+        echo "${code}"
+        return ${ret}
+    fi
+
+    ${curl} --write-out %{http_code} --output /dev/null --silent --show-error "${@}"
+    return $?
+}
 
 # -----------------------------------------------------------------------------
 # this is to be overwritten by the config file
@@ -266,6 +296,8 @@ declare -A role_recipients_email=()
 if [ -f "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf" ]
     then
     source "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf"
+else
+    error "Cannot find file ${NETDATA_CONFIG_DIR}/health_alarm_notify.conf. Using internal defaults."
 fi
 
 # -----------------------------------------------------------------------------
@@ -508,8 +540,7 @@ if [ "${SEND_PD}" = "YES" ]
     pd_send="$(which pd-send 2>/dev/null || command -v pd-send 2>/dev/null)"
     if [ -z "${pd_send}" ]
         then
-        # no pd-send available
-        # disable pagerduty.com
+        error "Cannot find pd-send command in the system path. Disabling pagerduty.com notifications."
         SEND_PD="NO"
     fi
 fi
@@ -530,8 +561,7 @@ if [ \( \
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
     if [ -z "${curl}" ]
         then
-        # no curl available
-        # disable all curl based methods
+        error "Cannot find curl command in the system path. Disabling all curl based notifications."
         SEND_PUSHOVER="NO"
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
@@ -548,7 +578,11 @@ fi
 if [ "${SEND_EMAIL}" = "YES" -a -z "${sendmail}" ]
     then
     sendmail="$(which sendmail 2>/dev/null || command -v sendmail 2>/dev/null)"
-    [ -z "${sendmail}" ] && SEND_EMAIL="NO"
+    if [ -z "${sendmail}" ]
+        then
+        debug "Cannot find sendmail command in the system path. Disabling email notifications."
+        SEND_EMAIL="NO"
+    fi
 fi
 
 # check that we have at least a method enabled
@@ -699,7 +733,7 @@ send_pushover() {
 
         for user in ${usertokens}
         do
-            httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
+            httpcode=$(docurl \
                 --form-string "token=${apptoken}" \
                 --form-string "user=${user}" \
                 --form-string "html=1" \
@@ -736,7 +770,7 @@ send_pushbullet() {
         #https://docs.pushbullet.com/#create-push
         for user in ${recipients}
         do
-            httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null \
+            httpcode=$(docurl \
               --header 'Access-Token: '${userapikey}'' \
               --header 'Content-Type: application/json' \
               --data-binary  @<(cat <<EOF
@@ -769,7 +803,7 @@ send_kafka() {
     local httpcode sent=0 
     if [ "${SEND_KAFKA}" = "YES" ]
         then
-            httpcode=$(${curl} -X POST --write-out %{http_code} --silent --output /dev/null \
+            httpcode=$(docurl -X POST \
                 --data "{host_ip:\"${KAFKA_SENDER_IP}\",when:${when},name:\"${name}\",chart:\"${chart}\",family:\"${family}\",status:\"${status}\",old_status:\"${old_status}\",value:${value},old_value:${old_value},duration:${duration},non_clear_duration:${non_clear_duration},units:\"${units}\",info:\"${info}\"}" \
                 "${KAFKA_URL}")
 
@@ -853,7 +887,7 @@ send_twilio() {
         #https://www.twilio.com/packages/labs/code/bash/twilio-sms
         for user in ${recipients}
         do
-            httpcode=$(${curl} -X POST --write-out %{http_code} --silent --output /dev/null \
+            httpcode=$(docurl -X POST \
                 --data-urlencode "From=${twilionumber}" \
                 --data-urlencode "To=${user}" \
                 --data-urlencode "Body=${title} ${message}" \
@@ -907,7 +941,7 @@ send_hipchat() {
 
         for room in ${recipients}
         do
-            httpcode=$(${curl} -X POST --write-out %{http_code} --silent --output /dev/null \
+            httpcode=$(docurl -X POST \
                     -H "Content-type: application/json" \
                     -H "Authorization: Bearer ${authtoken}" \
                     -d "{\"color\": \"${color}\", \"from\": \"${netdata}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
@@ -939,7 +973,7 @@ send_messagebird() {
         #https://developers.messagebird.com/docs/messaging
         for user in ${recipients}
         do
-            httpcode=$(${curl} -X POST --write-out %{http_code} --silent --output /dev/null \
+            httpcode=$(docurl -X POST \
                 --data-urlencode "originator=${messagebirdnumber}" \
                 --data-urlencode "recipients=${user}" \
                 --data-urlencode "body=${title} ${message}" \
@@ -982,7 +1016,7 @@ send_telegram() {
         for chatid in ${chatids}
         do
             # https://core.telegram.org/bots/api#sendmessage
-            httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null ${disableNotification} \
+            httpcode=$(docurl ${disableNotification} \
                 --data-urlencode "parse_mode=HTML" \
                 --data-urlencode "disable_web_page_preview=true" \
                 --data-urlencode "text=${emoji} ${message}" \
@@ -1055,7 +1089,7 @@ send_slack() {
 EOF
         )"
 
-        httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode "payload=${payload}" "${webhook}")
+        httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
         if [ "${httpcode}" == "200" ]
         then
             info "sent slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
@@ -1118,7 +1152,7 @@ send_discord() {
 EOF
         )"
 
-        httpcode=$(${curl} --write-out %{http_code} --silent --output /dev/null -X POST --data-urlencode "payload=${payload}" "${webhook}")
+        httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
         if [ "${httpcode}" == "200" ]
         then
             info "sent discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
