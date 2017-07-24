@@ -1,11 +1,21 @@
 {
   "devDependencies": {
+    "coffee-script": "^1.12.7",
     "jasmine": "^2.6.0",
     "jasmine-core": "^2.6.4",
     "karma": "^1.7.0",
     "karma-chrome-launcher": "^2.2.0",
     "karma-coverage": "^1.1.1",
     "karma-firefox-launcher": "^1.0.1",
-    "karma-jasmine": "^1.1.0"
+    "karma-jasmine": "^1.1.0",
+    "walkdir": "~0.0.7",
+    "underscore": "~1.6.0",
+    "gaze": "~0.5.1",
+    "mkdirp": "~0.3.5",
+    "minimist": "~0.0.8",
+    "jasmine-growl-reporter": "~0.2.0",
+    "xml2js": "~0.4.1",
+    "grunt-exec": "~0.4.5",
+    "jasmine-reporters": "~2.0.6"
   }
 }
