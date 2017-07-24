@@ -43,7 +43,10 @@ import msg
 
 
 PATH = os.getenv('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin').split(':')
-urllib3.disable_warnings()
+try:
+    urllib3.disable_warnings()
+except AttributeError:
+    msg.error('urllib3: warnings were not disabled')
 
 
 # class BaseService(threading.Thread):
