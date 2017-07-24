@@ -19,12 +19,28 @@ describe("percentage calculations for easy pie charts with dynamic range", funct
         expect(result).toBe(-60);
     });
 
-    it("should return 0.1 if value is zero and min/max undefined", function () {
+    it("should return 0 if value is zero and min negative, max positive", function () {
         var state = createState(null, null);
 
         var result = NETDATA.easypiechartPercentFromValueMinMax(state, 0, -1, 2);
 
+        expect(result).toBe(0);
+    });
+
+    it("should return 0.1 if value and min are zero and max positive", function () {
+        var state = createState(null, null);
+
+        var result = NETDATA.easypiechartPercentFromValueMinMax(state, 0, 0, 2);
+
         expect(result).toBe(0.1);
+    });
+
+    it("should return -0.1 if value is zero, max and min negative", function () {
+        var state = createState(null, null);
+
+        var result = NETDATA.easypiechartPercentFromValueMinMax(state, 0, -2, -1);
+
+        expect(result).toBe(-0.1);
     });
 
     it("should return positive value, if max is user-defined", function () {
@@ -85,6 +101,33 @@ describe("percentage calculations for easy pie charts with fixed range", functio
         var result = NETDATA.easypiechartPercentFromValueMinMax(state, -50.1, -20, -45);
 
         expect(result).toBe(-100);
+    });
+});
+
+describe("percentage calculations for easy pie charts with invalid input", function () {
+
+    it("should return 0.1 if value undefined", function () {
+        var state = createState(null, null);
+
+        var result = NETDATA.easypiechartPercentFromValueMinMax(state, null, 40, 50);
+
+        expect(result).toBe(0.1);
+    });
+
+    it("should return positive value if min is undefined", function () {
+        var state = createState(null, null);
+
+        var result = NETDATA.easypiechartPercentFromValueMinMax(state, 1, null, 2);
+
+        expect(result).toBe(50);
+    });
+
+    it("should return positive if max is undefined", function () {
+        var state = createState(null, null);
+
+        var result = NETDATA.easypiechartPercentFromValueMinMax(state, 21, 42, null);
+
+        expect(result).toBe(50);
     });
 });
 
