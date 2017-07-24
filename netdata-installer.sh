@@ -1046,6 +1046,18 @@ if [ -f /etc/init.d/netdata ]
     rm -i /etc/init.d/netdata
 fi
 
+if [ -f /etc/periodic/daily/netdata-updater ]
+    then
+    echo "Deleting /etc/periodic/daily/netdata-updater ..."
+    rm -i /etc/periodic/daily/netdata-updater
+fi
+
+if [ -f /etc/cron.daily/netdata-updater ]
+    then
+    echo "Deleting /etc/cron.daily/netdata-updater ..."
+    rm -i /etc/cron.daily/netdata-updater
+fi
+
 getent passwd netdata > /dev/null
 if [ $? -eq 0 ]
     then
