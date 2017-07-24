@@ -51,6 +51,7 @@ code {
     justify-content: center;
     -moz--webkit-justify-content: center;
     -moz-justify-content: center;
+    padding-top: 10px;
 }
 
 .netdata-container {
