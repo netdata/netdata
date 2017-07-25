@@ -492,7 +492,10 @@ AC_CONFIG_FILES([
     src/Makefile
     system/Makefile
     web/Makefile
+    diagrams/Makefile
+    makeself/Makefile
     contrib/Makefile
+    tests/Makefile
 ])
 AC_OUTPUT
 
