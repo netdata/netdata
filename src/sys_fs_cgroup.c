@@ -41,7 +41,7 @@ static char *cgroup_memory_base = NULL;
 static char *cgroup_devices_base = NULL;
 
 static int cgroup_root_count = 0;
-static int cgroup_root_max = 500;
+static int cgroup_root_max = 1000;
 static int cgroup_max_depth = 0;
 
 static SIMPLE_PATTERN *enabled_cgroup_patterns = NULL;
