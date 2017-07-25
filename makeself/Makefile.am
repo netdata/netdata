@@ -1,9 +1,9 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 
-nodist_noinst_DATA = \
-    $(NULL)
+dist_noinst_DATA = \
+	$(NULL)
 
-nodist_noinst_SCRIPTS = \
+dist_noinst_SCRIPTS = \
 	build.sh \
 	makeself.sh \
 	makeself-license.txt \
@@ -22,4 +22,4 @@ nodist_noinst_SCRIPTS = \
 	makeself-help-header.txt \
 	makeself.lsm \
 	functions.sh \
-    $(NULL)
+	$(NULL)
