@@ -37,6 +37,7 @@ body {
     justify-content: center;
     -webkit-justify-content: center;
     -moz-justify-content: center;
+    padding-top: 10px;
 }
 
 .netdata-container {

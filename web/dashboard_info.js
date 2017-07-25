@@ -1020,6 +1020,83 @@ netdataDashboard.context = {
         height: 0.5
     },
 
+
+    // ------------------------------------------------------------------------
+    // containers
+
+    'cgroup.cpu': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="CPU"'
+                    + ' data-units="%"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'cgroup.mem_usage': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Memory"'
+                    + ' data-units="MB"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'cgroup.throttle_io': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="read"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Read Disk I/O"'
+                    + ' data-units="KB/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' role="application"></div>';
+            },
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="write"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Write Disk I/O"'
+                    + ' data-units="KB/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
     // ------------------------------------------------------------------------
     // web_log
 

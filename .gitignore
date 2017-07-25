@@ -103,3 +103,5 @@ diagrams/*.atxt
 diagrams/plantuml.jar
 
 netdata.cppcheck
+
+profile/statsd-stress

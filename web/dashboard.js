@@ -144,7 +144,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.themes = {
         white: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20170605-2',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20170725-1',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#F0F0F0',
@@ -161,7 +161,7 @@ var NETDATA = window.NETDATA || {};
         },
         slate: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20170605-2',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20170725-1',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
