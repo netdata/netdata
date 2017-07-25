@@ -14,7 +14,7 @@ describe("creation of easy pie charts", function () {
         // arrange
         // Theoretically we can load some html. What about jquery? could this work?
         // https://stackoverflow.com/questions/5337481/spying-on-jquery-selectors-in-jasmine
-        loadFixtures("easypiechart.creation.fixture1.html");
+        loadFixtures("easypiechart.chart.fixture1.html");
 
         // for easy pie chart, we can fake the data result:
         var data = {
