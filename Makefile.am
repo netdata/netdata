@@ -62,6 +62,7 @@ dist_noinst_DATA= \
 	configs.signatures \
 	Dockerfile \
 	netdata.spec \
+	package.json \
 	$(NULL)
 
 # until integrated within build
