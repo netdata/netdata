@@ -20,7 +20,7 @@ class Service(SimpleService):
                                            r'(?P<total_disks>[0-9]+)/'
                                            r'(?P<inuse_disks>[0-9])\]'),
                           status=re_compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+ '
-                                            r'(?P<operation>[a-z]+) = '
+                                            r'(?P<operation>[a-z]+) =[ ]{1,2}'
                                             r'(?P<operation_status>[0-9.]+).+finish='
                                             r'(?P<finish>([0-9.]+))min speed='
                                             r'(?P<speed>[0-9]+)'))
