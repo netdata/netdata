@@ -291,6 +291,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'stiebeleltron': {
+        title: 'Stiebel Eltron',
+        icon: '<i class="fa fa-thermometer-full" aria-hidden="true"></i>',
+        info: undefined
+    },
+
     'snmp': {
         title: 'SNMP',
         icon: '<i class="fa fa-random" aria-hidden="true"></i>',
@@ -1430,5 +1436,15 @@ netdataDashboard.context = {
         commonMin: true,
         commonMax: true,
         valueRange: "[0, null]"
-    }
+    },
+
+    // ------------------------------------------------------------------------
+    // Stiebel Eltron Heat pump installation
+
+    'stiebeleltron.system.roomtemp': {
+        commonMin: true,
+        commonMax: true,
+        valueRange: "[0, null]"
+    },
+
 };
