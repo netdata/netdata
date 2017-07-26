@@ -237,6 +237,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *chart = words[7];
             char *priority_s = words[8];
             char *update_every_s = words[9];
+            char *options = words[10];
 
             if(unlikely(!type || !*type || !id || !*id)) {
                 error("PLUGINSD: '%s' is requesting a CHART, without a type.id, on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
@@ -274,6 +275,23 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 cd->update_every = update_every;
             }
             else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
+
+            if(options && *options) {
+                if(strstr(options, "obsolete"))
+                    rrdset_is_obsolete(st);
+                else
+                    rrdset_isnot_obsolete(st);
+
+                if(strstr(options, "detail"))
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+                else
+                    rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+
+                if(strstr(options, "store_first"))
+                    rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+                else
+                    rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+            }
         }
         else if(likely(hash == DIMENSION_HASH && !strcmp(s, PLUGINSD_KEYWORD_DIMENSION))) {
             char *id = words[1];
@@ -316,19 +334,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                       , options?options:""
                 );
 
-            RRDDIM *rd = rrddim_find(st, id);
-            if(unlikely(!rd)) {
-                rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
-                rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
-                rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-                if(options && *options) {
-                    if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
-                    if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-                    if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
-                }
+            RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
+            rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
+            rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+            if(options && *options) {
+                if(strstr(options, "hidden") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_HIDDEN);
+                if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
+                if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
             }
-            else if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                debug(D_PLUGINSD, "PLUGINSD: dimension %s/%s already exists. Not adding it again.", st->id, id);
         }
         else if(unlikely(hash == DISABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_DISABLE))) {
             info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);

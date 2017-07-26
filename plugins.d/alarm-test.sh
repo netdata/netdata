@@ -2,7 +2,7 @@
 
 # netdata
 # real-time performance and health monitoring, done right!
-# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
 # GPL v3+
 #
 # Script to test alarm notifications for netdata

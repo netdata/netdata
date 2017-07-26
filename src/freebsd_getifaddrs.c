@@ -50,15 +50,15 @@ static size_t network_interfaces_added = 0, network_interfaces_found = 0;
 
 static void network_interface_free(struct network_interface *ifm) {
     if (likely(ifm->st_bandwidth))
-        rrdset_flag_set(ifm->st_bandwidth, RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(ifm->st_bandwidth);
     if (likely(ifm->st_packets))
-        rrdset_flag_set(ifm->st_packets,   RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(ifm->st_packets);
     if (likely(ifm->st_errors))
-        rrdset_flag_set(ifm->st_errors,    RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(ifm->st_errors);
     if (likely(ifm->st_drops))
-        rrdset_flag_set(ifm->st_drops,     RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(ifm->st_drops);
     if (likely(ifm->st_events))
-        rrdset_flag_set(ifm->st_events,    RRDSET_FLAG_OBSOLETE);
+        rrdset_is_obsolete(ifm->st_events);
 
     network_interfaces_added--;
     freez(ifm->name);

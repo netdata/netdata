@@ -2,7 +2,7 @@
 
 # netdata
 # real-time performance and health monitoring, done right!
-# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
 # GPL v3+
 #
 # This plugin requires a latest version of fping.
@@ -129,7 +129,7 @@ update_every="${1-1}"
 
 # the netdata configuration directory
 # passed by netdata as an environment variable
-NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
+[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
 
 # -----------------------------------------------------------------------------
 # configuration options

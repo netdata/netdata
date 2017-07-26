@@ -861,6 +861,21 @@ static int statsd_snd_callback(int fd, int socktype, void *data, short int *even
 // --------------------------------------------------------------------------------------------------------------------
 // statsd child thread to collect metrics from network
 
+void statsd_collector_thread_cleanup(void *data) {
+    struct statsd_udp *d = data;
+
+#ifdef HAVE_RECVMMSG
+    size_t i;
+    for (i = 0; i < d->size; i++)
+        freez(d->iovecs[i].iov_base);
+
+    freez(d->iovecs);
+    freez(d->msgs);
+#endif
+
+    freez(d);
+}
+
 void *statsd_collector_thread(void *ptr) {
     int id = *((int *)ptr);
 
@@ -873,6 +888,7 @@ void *statsd_collector_thread(void *ptr) {
         error("Cannot set pthread cancel state to ENABLE.");
 
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
+    pthread_cleanup_push(statsd_collector_thread_cleanup, d);
 
 #ifdef HAVE_RECVMMSG
     d->type = STATSD_SOCKET_DATA_TYPE_UDP;
@@ -897,19 +913,9 @@ void *statsd_collector_thread(void *ptr) {
             , (void *)d
     );
 
-#ifdef HAVE_RECVMMSG
-    for (i = 0; i < d->size; i++)
-        freez(d->iovecs[i].iov_base);
-
-    freez(d->iovecs);
-    freez(d->msgs);
-#endif
-
-    freez(d);
+    pthread_cleanup_pop(1);
 
     debug(D_WEB_CLIENT, "STATSD: exit!");
-    listen_sockets_close(&statsd.sockets);
-
     pthread_exit(NULL);
     return NULL;
 }
@@ -969,7 +975,9 @@ int statsd_readfile(const char *path, const char *filename) {
             else if(app) {
                 // a new chart
                 chart = callocz(sizeof(STATSD_APP_CHART), 1);
+                netdata_fix_chart_id(s);
                 chart->id = strdupz(s);
+                chart->name = strdupz(s);
                 chart->title = strdupz("Statsd chart");
                 chart->context = strdupz(s);
                 chart->family = strdupz("overview");
@@ -1015,6 +1023,7 @@ int statsd_readfile(const char *path, const char *filename) {
         if(!chart) {
             if(!strcmp(name, "name")) {
                 freez((void *)app->name);
+                netdata_fix_chart_name(value);
                 app->name = strdupz(value);
             }
             else if (!strcmp(name, "metrics")) {
@@ -1047,6 +1056,7 @@ int statsd_readfile(const char *path, const char *filename) {
         else {
             if(!strcmp(name, "name")) {
                 freez((void *)chart->name);
+                netdata_fix_chart_id(value);
                 chart->name = strdupz(value);
             }
             else if(!strcmp(name, "title")) {
@@ -1059,6 +1069,7 @@ int statsd_readfile(const char *path, const char *filename) {
             }
             else if (!strcmp(name, "context")) {
                 freez((void *)chart->context);
+                netdata_fix_chart_id(value);
                 chart->context = strdupz(value);
             }
             else if (!strcmp(name, "units")) {
@@ -1129,7 +1140,7 @@ int statsd_readfile(const char *path, const char *filename) {
                 chart->dimensions_count++;
 
                 debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divisor " COLLECTED_NUMBER_FORMAT,
-                    dim->name, chart->name, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divisor);
+                    dim->name, chart->id, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divisor);
             }
             else {
                 error("STATSD: ignoring line %zu ('%s') of file '%s/%s'. Unknown keyword for the [%s] section.", line, name, path, filename, chart->id);
@@ -1234,7 +1245,7 @@ static inline RRDSET *statsd_private_rrdset_create(
     }
 
     statsd.private_charts++;
-    return rrdset_create_custom(
+    RRDSET *st = rrdset_create_custom(
             localhost
             , type
             , id
@@ -1249,6 +1260,9 @@ static inline RRDSET *statsd_private_rrdset_create(
             , memory_mode
             , history
     );
+    rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
+    // rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
+    return st;
 }
 
 static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
@@ -1599,13 +1613,19 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                         }
                         else {
                             if (dim->value_type != STATSD_APP_CHART_DIM_VALUE_TYPE_LAST)
-                                error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->name, app->name, m->name);
+                                error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->id, app->name, m->name);
 
                             dim->value_ptr = &m->last;
                             dim->algorithm = statsd_algorithm_for_metric(m);
 
                             if(m->type == STATSD_METRIC_TYPE_GAUGE)
                                 dim->divisor *= STATSD_DECIMAL_DETAIL;
+                        }
+
+                        if(unlikely(chart->st && dim->rd)) {
+                            rrddim_set_algorithm(chart->st, dim->rd, dim->algorithm);
+                            rrddim_set_multiplier(chart->st, dim->rd, dim->multiplier);
+                            rrddim_set_divisor(chart->st, dim->rd, dim->divisor);
                         }
 
                         chart->dimensions_linked_count++;
@@ -1636,6 +1656,9 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , app->rrd_memory_mode
                 , app->rrd_history_entries
         );
+
+        rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);
+        // rrdset_flag_set(chart->st, RRDSET_FLAG_DEBUG);
     }
     else rrdset_next(chart->st);
 
@@ -1645,11 +1668,6 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
             dim->rd = rrddim_add(chart->st, dim->name, NULL, dim->multiplier, dim->divisor, dim->algorithm);
 
         if(unlikely(dim->value_ptr)) {
-            // FIXME: this is anorthodox, we should an API call at RRDDIM to overwrite these settings
-            dim->rd->algorithm = dim->algorithm;
-            dim->rd->multiplier = dim->multiplier;
-            dim->rd->divisor = dim->divisor;
-
             debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
             rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
         }
@@ -1714,6 +1732,16 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
 
 int statsd_listen_sockets_setup(void) {
     return listen_sockets_setup(&statsd.sockets);
+}
+
+void statsd_main_cleanup(void *data) {
+    pthread_t *threads = data;
+
+    int i;
+    for(i = 0; i < statsd.threads ;i++)
+        pthread_cancel(threads[i]);
+
+    listen_sockets_close(&statsd.sockets);
 }
 
 void *statsd_main(void *ptr) {
@@ -1826,6 +1854,8 @@ void *statsd_main(void *ptr) {
         else if(pthread_detach(threads[i]))
             error("STATSD: cannot request detach of child thread.");
     }
+
+    pthread_cleanup_push(statsd_main_cleanup, &threads);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd monitoring charts
@@ -2004,8 +2034,7 @@ void *statsd_main(void *ptr) {
             break;
     }
 
-    for(i = 0; i < statsd.threads ;i++)
-        pthread_cancel(threads[i]);
+    pthread_cleanup_pop(1);
 
     pthread_exit(NULL);
     return NULL;

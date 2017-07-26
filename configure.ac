@@ -4,7 +4,7 @@
 AC_PREREQ(2.60)
 
 define([VERSION_MAJOR], [1])
-define([VERSION_MINOR], [6])
+define([VERSION_MINOR], [7])
 define([VERSION_FIX], [1])
 define([VERSION_NUMBER], VERSION_MAJOR[.]VERSION_MINOR[.]VERSION_FIX)
 define([VERSION_SUFFIX], [_rolling])
@@ -492,7 +492,10 @@ AC_CONFIG_FILES([
     src/Makefile
     system/Makefile
     web/Makefile
+    diagrams/Makefile
+    makeself/Makefile
     contrib/Makefile
+    tests/Makefile
 ])
 AC_OUTPUT
 

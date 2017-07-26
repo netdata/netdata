@@ -35,9 +35,9 @@ inline RRDDIM *rrddim_find(RRDSET *st, const char *id) {
 // ----------------------------------------------------------------------------
 // RRDDIM rename a dimension
 
-inline void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
-    if(unlikely(!strcmp(rd->name, name)))
-        return;
+inline int rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
+    if(unlikely(!name || !*name || !strcmp(rd->name, name)))
+        return 0;
 
     debug(D_RRD_CALLS, "rrddim_set_name() from %s.%s to %s.%s", st->name, rd->name, st->name, name);
 
@@ -45,10 +45,43 @@ inline void rrddim_set_name(RRDSET *st, RRDDIM *rd, const char *name) {
     snprintfz(varname, CONFIG_MAX_NAME, "dim %s name", rd->id);
     rd->name = config_set_default(st->config_section, varname, name);
     rd->hash_name = simple_hash(rd->name);
-
     rrddimvar_rename_all(rd);
+    rd->exposed = 0;
+    return 1;
 }
 
+inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm) {
+    if(unlikely(rd->algorithm == algorithm))
+        return 0;
+
+    debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", st->id, rd->name, rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
+    rd->algorithm = algorithm;
+    rd->exposed = 0;
+    rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    return 1;
+}
+
+inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multiplier) {
+    if(unlikely(rd->multiplier == multiplier))
+        return 0;
+
+    debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->multiplier, multiplier);
+    rd->multiplier = multiplier;
+    rd->exposed = 0;
+    rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    return 1;
+}
+
+inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) {
+    if(unlikely(rd->divisor == divisor))
+        return 0;
+
+    debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->divisor, divisor);
+    rd->divisor = divisor;
+    rd->exposed = 0;
+    rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    return 1;
+}
 
 // ----------------------------------------------------------------------------
 // RRDDIM create a dimension
@@ -57,6 +90,12 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(rd)) {
         debug(D_RRD_CALLS, "Cannot create rrd dimension '%s/%s', it already exists.", st->id, name?name:"<NONAME>");
+
+        rrddim_set_name(st, rd, name);
+        rrddim_set_algorithm(st, rd, algorithm);
+        rrddim_set_multiplier(st, rd, multiplier);
+        rrddim_set_divisor(st, rd, divisor);
+
         return rd;
     }
 
@@ -71,8 +110,14 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rrdset_strncpyz_name(filename, id, FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP) {
-        rd = (RRDDIM *)mymmap(fullfilename, size, ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
+    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP || memory_mode == RRD_MEMORY_MODE_RAM) {
+        rd = (RRDDIM *)mymmap(
+                  (memory_mode == RRD_MEMORY_MODE_RAM)?NULL:fullfilename
+                , size
+                , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
+                , 1
+        );
+
         if(likely(rd)) {
             // we have a file mapped for rd
 
@@ -88,41 +133,48 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             struct timeval now;
             now_realtime_timeval(&now);
 
-            if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
-                errno = 0;
-                info("Initializing file %s.", fullfilename);
+            if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(rd, 0, size);
             }
-            else if(rd->memsize != size) {
-                errno = 0;
-                error("File %s does not have the desired size. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
-            else if(rd->multiplier != multiplier) {
-                errno = 0;
-                error("File %s does not have the same multiplier. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
-            else if(rd->divisor != divisor) {
-                errno = 0;
-                error("File %s does not have the same divisor. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
-            else if(rd->update_every != st->update_every) {
-                errno = 0;
-                error("File %s does not have the same refresh frequency. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
-            else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
-                errno = 0;
-                error("File %s is too old. Clearing it.", fullfilename);
-                memset(rd, 0, size);
-            }
+            else {
+                int reset = 0;
 
-            if(rd->algorithm && rd->algorithm != algorithm)
-                error("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong."
-                      , fullfilename, algorithm, rrd_algorithm_name(algorithm), rd->algorithm,
-                        rrd_algorithm_name(rd->algorithm));
+                if(strcmp(rd->magic, RRDDIMENSION_MAGIC) != 0) {
+                    info("Initializing file %s.", fullfilename);
+                    memset(rd, 0, size);
+                    reset = 1;
+                }
+                else if(rd->memsize != size) {
+                    error("File %s does not have the desired size, expected %lu but found %lu. Clearing it.", fullfilename, size, rd->memsize);
+                    memset(rd, 0, size);
+                    reset = 1;
+                }
+                else if(rd->update_every != st->update_every) {
+                    error("File %s does not have the same update frequency, expected %d but found %d. Clearing it.", fullfilename, st->update_every, rd->update_every);
+                    memset(rd, 0, size);
+                    reset = 1;
+                }
+                else if(dt_usec(&now, &rd->last_collected_time) > (rd->entries * rd->update_every * USEC_PER_SEC)) {
+                    error("File %s is too old (last collected %llu seconds ago, but the database is %ld seconds). Clearing it.", fullfilename, dt_usec(&now, &rd->last_collected_time) / USEC_PER_SEC, rd->entries * rd->update_every);
+                    memset(rd, 0, size);
+                    reset = 1;
+                }
+
+                if(!reset) {
+                    if(rd->algorithm != algorithm) {
+                        info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
+                              fullfilename, algorithm, rrd_algorithm_name(algorithm), rd->algorithm, rrd_algorithm_name(rd->algorithm));
+                    }
+
+                    if(rd->multiplier != multiplier) {
+                        info("File %s does not have the expected multiplier (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT ". Previous values may be wrong.", fullfilename, multiplier, rd->multiplier);
+                    }
+
+                    if(rd->divisor != divisor) {
+                        info("File %s does not have the expected divisor (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT ". Previous values may be wrong.", fullfilename, divisor, rd->divisor);
+                    }
+                }
+            }
 
             // make sure we have the right memory mode
             // even if we cleared the memory
@@ -133,7 +185,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(!rd)) {
         // if we didn't manage to get a mmap'd dimension, just create one
         rd = callocz(1, size);
-        rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_RAM;
+        rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
 
     rd->memsize = size;
@@ -162,8 +214,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->entries = st->entries;
     rd->update_every = st->update_every;
 
-    // prevent incremental calculation spikes
-    rd->collections_counter = 0;
+    if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
+        rd->collections_counter = 1;
+    else
+        rd->collections_counter = 0;
+
     rd->updated = 0;
     rd->flags = 0x00000000;
 
@@ -174,7 +229,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->collected_volume = 0;
     rd->stored_volume = 0;
     rd->last_stored_value = 0;
-    rd->values[st->current_entry] = pack_storage_number(0, SN_NOT_EXISTS);
+    rd->values[st->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
     rd->last_collected_time.tv_sec = 0;
     rd->last_collected_time.tv_usec = 0;
     rd->rrdset = st;
@@ -185,6 +240,23 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         st->dimensions = rd;
     else {
         RRDDIM *td = st->dimensions;
+
+        if(td->algorithm != rd->algorithm || abs(td->multiplier) != abs(rd->multiplier) || abs(td->divisor) != abs(rd->divisor)) {
+            if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
+                #ifdef NETDATA_INTERNAL_CHECKS
+                info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
+                        rd->name,
+                        st->name,
+                        st->rrdhost->hostname,
+                        rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
+                        rd->multiplier, td->multiplier,
+                        rd->divisor, td->divisor
+                );
+                #endif
+                rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
+            }
+        }
+
         for(; td->next; td = td->next) ;
         td->next = rd;
     }
@@ -234,14 +306,15 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
     switch(rd->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
+        case RRD_MEMORY_MODE_RAM:
             debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);
             munmap(rd, rd->memsize);
             break;
 
+        case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
-        case RRD_MEMORY_MODE_RAM:
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);

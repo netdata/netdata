@@ -226,6 +226,13 @@ void json_escape_string(char *dst, const char *src, size_t size) {
     *d = '\0';
 }
 
+void json_fix_string(char *s) {
+    for( ; *s ;s++) {
+        if(unlikely(*s == '\\')) *s = '/';
+        else if(unlikely(*s == '"')) *s = '\'';
+    }
+}
+
 int sleep_usec(usec_t usec) {
 
 #ifndef NETDATA_WITH_USLEEP
@@ -943,105 +950,132 @@ inline char *trim_all(char *buffer) {
     return buffer;
 }
 
-void *mymmap(const char *filename, size_t size, int flags, int ksm) {
-#ifndef MADV_MERGEABLE
-    (void)ksm;
-#endif
-    static int log_madvise_1 = 1;
-#ifdef MADV_MERGEABLE
-    static int log_madvise_2 = 1, log_madvise_3 = 1;
-#endif
-    void *mem = NULL;
+static int memory_file_open(const char *filename, size_t size) {
+    // info("memory_file_open('%s', %zu", filename, size);
 
-    errno = 0;
     int fd = open(filename, O_RDWR | O_CREAT | O_NOATIME, 0664);
     if (fd != -1) {
         if (lseek(fd, size, SEEK_SET) == (off_t) size) {
             if (write(fd, "", 1) == 1) {
                 if (ftruncate(fd, size))
                     error("Cannot truncate file '%s' to size %zu. Will use the larger file.", filename, size);
-
-#ifdef MADV_MERGEABLE
-                if (flags & MAP_SHARED || !enable_ksm || !ksm) {
-#endif
-                    mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd, 0);
-                    if (mem == MAP_FAILED) {
-                        error("Cannot allocate SHARED memory for file '%s'.", filename);
-                        mem = NULL;
-                    }
-                    else {
-#ifdef NETDATA_LOG_ALLOCATIONS
-                        mmap_accounting(size);
-#endif
-                        int advise = MADV_SEQUENTIAL | MADV_DONTFORK;
-                        if (flags & MAP_SHARED) advise |= MADV_WILLNEED;
-
-                        if (madvise(mem, size, advise) != 0 && log_madvise_1) {
-                            error("Cannot advise the kernel about the memory usage of file '%s'.", filename);
-                            log_madvise_1--;
-                        }
-                    }
-#ifdef MADV_MERGEABLE
-                }
-                else {
-/*
-                    // test - load the file into memory
-                    mem = calloc(1, size);
-                    if(mem) {
-                        if(lseek(fd, 0, SEEK_SET) == 0) {
-                            if(read(fd, mem, size) != (ssize_t)size)
-                                error("Cannot read from file '%s'", filename);
-                        }
-                        else
-                            error("Cannot seek to beginning of file '%s'.", filename);
-                    }
-*/
-                    mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags | MAP_ANONYMOUS, -1, 0);
-                    if (mem == MAP_FAILED) {
-                        error("Cannot allocate PRIVATE ANONYMOUS memory for KSM for file '%s'.", filename);
-                        mem = NULL;
-                    }
-                    else {
-#ifdef NETDATA_LOG_ALLOCATIONS
-                        mmap_accounting(size);
-#endif
-                        if (lseek(fd, 0, SEEK_SET) == 0) {
-                            if (read(fd, mem, size) != (ssize_t) size)
-                                error("Cannot read from file '%s'", filename);
-                        } else
-                            error("Cannot seek to beginning of file '%s'.", filename);
-
-                        // don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
-                        if (madvise(mem, size, MADV_SEQUENTIAL | MADV_DONTFORK) != 0 && log_madvise_2) {
-                            error("Cannot advise the kernel about the memory usage (MADV_SEQUENTIAL|MADV_DONTFORK) of file '%s'.",
-                                  filename);
-                            log_madvise_2--;
-                        }
-
-                        if (madvise(mem, size, MADV_MERGEABLE) != 0 && log_madvise_3) {
-                            error("Cannot advise the kernel about the memory usage (MADV_MERGEABLE) of file '%s'.",
-                                  filename);
-                            log_madvise_3--;
-                        }
-                    }
-                }
-#endif
             }
-            else
-                error("Cannot write to file '%s' at position %zu.", filename, size);
+            else error("Cannot write to file '%s' at position %zu.", filename, size);
         }
-        else
-            error("Cannot seek file '%s' to size %zu.", filename, size);
-
-        close(fd);
+        else error("Cannot seek file '%s' to size %zu.", filename, size);
     }
-    else
-        error("Cannot create/open file '%s'.", filename);
+    else error("Cannot create/open file '%s'.", filename);
+
+    return fd;
+}
+
+// mmap_shared is used for memory mode = map
+static void *memory_file_mmap(const char *filename, size_t size, int flags) {
+    // info("memory_file_mmap('%s', %zu", filename, size);
+    static int log_madvise = 1;
+
+    int fd = -1;
+    if(filename) {
+        fd = memory_file_open(filename, size);
+        if(fd == -1) return MAP_FAILED;
+    }
+
+    void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd, 0);
+    if (mem != MAP_FAILED) {
+#ifdef NETDATA_LOG_ALLOCATIONS
+        mmap_accounting(size);
+#endif
+        int advise = MADV_SEQUENTIAL | MADV_DONTFORK;
+        if (flags & MAP_SHARED) advise |= MADV_WILLNEED;
+
+        if (madvise(mem, size, advise) != 0 && log_madvise) {
+            error("Cannot advise the kernel about shared memory usage.");
+            log_madvise--;
+        }
+    }
+
+    if(fd != -1)
+        close(fd);
 
     return mem;
 }
 
-int savememory(const char *filename, void *mem, size_t size) {
+#ifdef MADV_MERGEABLE
+static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) {
+    // info("memory_file_mmap_ksm('%s', %zu", filename, size);
+    static int log_madvise_2 = 1, log_madvise_3 = 1;
+
+    int fd = -1;
+    if(filename) {
+        fd = memory_file_open(filename, size);
+        if(fd == -1) return MAP_FAILED;
+    }
+
+    void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags | MAP_ANONYMOUS, -1, 0);
+    if (mem != MAP_FAILED) {
+#ifdef NETDATA_LOG_ALLOCATIONS
+        mmap_accounting(size);
+#endif
+        if(fd != -1) {
+            if (lseek(fd, 0, SEEK_SET) == 0) {
+                if (read(fd, mem, size) != (ssize_t) size)
+                    error("Cannot read from file '%s'", filename);
+            }
+            else error("Cannot seek to beginning of file '%s'.", filename);
+        }
+
+        // don't use MADV_SEQUENTIAL|MADV_DONTFORK, they disable MADV_MERGEABLE
+        if (madvise(mem, size, MADV_SEQUENTIAL | MADV_DONTFORK) != 0 && log_madvise_2) {
+            error("Cannot advise the kernel about the memory usage (MADV_SEQUENTIAL|MADV_DONTFORK) of file '%s'.", filename);
+            log_madvise_2--;
+        }
+
+        if (madvise(mem, size, MADV_MERGEABLE) != 0 && log_madvise_3) {
+            error("Cannot advise the kernel about the memory usage (MADV_MERGEABLE) of file '%s'.", filename);
+            log_madvise_3--;
+        }
+    }
+
+    if(fd != -1)
+        close(fd);
+
+    return mem;
+}
+#else
+static void *memory_file_mmap_ksm(const char *filename, size_t size, int flags) {
+    // info("memory_file_mmap_ksm FALLBACK ('%s', %zu", filename, size);
+
+    if(filename)
+        return memory_file_mmap(filename, size, flags);
+
+    // when KSM is not available and no filename is given (memory mode = ram),
+    // we just report failure
+    return MAP_FAILED;
+}
+#endif
+
+void *mymmap(const char *filename, size_t size, int flags, int ksm) {
+    void *mem = NULL;
+
+    if (filename && (flags & MAP_SHARED || !enable_ksm || !ksm))
+        // memory mode = map | save
+        // when KSM is not enabled
+        // MAP_SHARED is used for memory mode = map (no KSM possible)
+        mem = memory_file_mmap(filename, size, flags);
+
+    else
+        // memory mode = save | ram
+        // when KSM is enabled
+        // for memory mode = ram, the filename is NULL
+        mem = memory_file_mmap_ksm(filename, size, flags);
+
+    if(mem == MAP_FAILED) return NULL;
+
+    errno = 0;
+    return mem;
+}
+
+int memory_file_save(const char *filename, void *mem, size_t size) {
     char tmpfilename[FILENAME_MAX + 1];
 
     snprintfz(tmpfilename, FILENAME_MAX, "%s.%ld.tmp", filename, (long) getpid());

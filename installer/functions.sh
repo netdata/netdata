@@ -411,14 +411,14 @@ install_non_systemd_init() {
         source /etc/os-release || return 1
         key="${ID}-${VERSION_ID}"
 
-    elif [ -f /etc/centos-release ]
+    elif [ -f /etc/redhat-release ]
         then
-        key=$(</etc/centos-release)
+        key=$(</etc/redhat-release)
     fi
 
     if [ -d /etc/init.d -a ! -f /etc/init.d/netdata ]
         then
-        if [ "${key}" = "gentoo" ]
+        if [[ "${key}" =~ ^(gentoo|alpine).* ]]
             then
             echo >&2 "Installing OpenRC init file..."
             run cp system/netdata-openrc /etc/init.d/netdata && \
@@ -437,7 +437,7 @@ install_non_systemd_init() {
             run update-rc.d netdata defaults && \
             run update-rc.d netdata enable && \
             return 0
-        elif [[ "${key}" =~ ^(amzn-201[567]|CentOS release 6).* ]]
+        elif [[ "${key}" =~ ^(amzn-201[567]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6).* ]]
             then
             echo >&2 "Installing init.d file..."
             run cp system/netdata-init-d /etc/init.d/netdata && \

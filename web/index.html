@@ -1226,6 +1226,14 @@
                         chart.menu_pattern = 'cgroup';
                     break;
 
+                case 'go':
+                    chart.menu = chart.type;
+                    if(parts.length > 2 && parts[1] === 'expvar')
+                        chart.menu_pattern = tmp + '_' + parts[1];
+                    else if(parts.length > 1)
+                        chart.menu_pattern = tmp;
+                    break;
+
                 case 'isc':
                     chart.menu = chart.type;
                     if(parts.length > 2 && parts[1] === 'dhcpd')
@@ -2722,9 +2730,12 @@
             });
 
             /* activate bootstrap scrollspy (needed for sidebar) */
+            var scrollspyOffset = $(window).height() / 5;
+            if(scrollspyOffset > 200) scrollspyOffset = 200;
+            if(scrollspyOffset < 50) scrollspyOffset = 50;
             $(document.body).scrollspy({
                 target: '#sidebar',
-                offset: $(window).height() / 5 // controls the diff of the <hX> element to the top, to select it
+                offset: scrollspyOffset // controls the diff of the <hX> element to the top, to select it
             });
 
             // change the URL based on the current position of the screen
@@ -2950,7 +2961,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'dashboard_info.js?v20170530-1',
+                url: NETDATA.serverDefault + 'dashboard_info.js?v20170725-1',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
@@ -3578,4 +3589,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170605-2"></script>
+<script type="text/javascript" src="dashboard.js?v20170725-1"></script>

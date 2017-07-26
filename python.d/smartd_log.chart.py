@@ -197,12 +197,13 @@ class Service(SimpleService):
                 result.append(['_'.join([name, attrid]), name[:name.index('.')], 'absolute'])
             return result
 
-        # Add additional smart attributes to the ORDER. If something goes wrong we don't care.
+        # Use configured attributes, if present. If something goes wrong we don't care.
+        order = ORDER
         try:
-            ORDER.extend(list(set(self.attr.split()) & SMART_ATTR.keys() - set(ORDER)))
+            order = [attr for attr in self.attr.split() if attr in SMART_ATTR.keys()] or ORDER
         except Exception:
             pass
-        self.order = [''.join(['attrid', i]) for i in ORDER]
+        self.order = [''.join(['attrid', i]) for i in order]
         self.definitions = dict()
         units = 'raw' if self.raw_values else 'normalized'
 

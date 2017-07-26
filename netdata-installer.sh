@@ -555,7 +555,7 @@ config_signature_matches() {
 
 # backup user configurations
 installer_backup_suffix="${PID}.${RANDOM}"
-for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
+for x in $(find -L "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
     if [ -f "${x}" ]
         then
@@ -566,7 +566,7 @@ do
             then
             # we don't have md5sum - keep it
             echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
-            run cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+            run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
         else
             # find it relative filename
             f="${x/*\/etc\/netdata\//}"
@@ -587,7 +587,7 @@ do
             else
                 # edited by user - keep it
                 echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED} has been edited by user${TPUT_RESET}. Keeping it."
-                run cp -p "${x}" "${x}.installer_backup.${installer_backup_suffix}"
+                run cp -a "${x}" "${x}.installer_backup.${installer_backup_suffix}"
             fi
         fi
 
@@ -607,11 +607,11 @@ run make install || exit 1
 # -----------------------------------------------------------------------------
 progress "Restore user edited netdata configuration files"
 
-for x in $(find "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
+for x in $(find -L "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
 do
     if [ -f "${x}.installer_backup.${installer_backup_suffix}" ]
         then
-        run cp -p "${x}.installer_backup.${installer_backup_suffix}" "${x}" && \
+        run cp -a "${x}.installer_backup.${installer_backup_suffix}" "${x}" && \
             run rm -f "${x}.installer_backup.${installer_backup_suffix}"
     fi
 done
@@ -1044,6 +1044,18 @@ if [ -f /etc/init.d/netdata ]
     then
     echo "Deleting /etc/init.d/netdata ..."
     rm -i /etc/init.d/netdata
+fi
+
+if [ -f /etc/periodic/daily/netdata-updater ]
+    then
+    echo "Deleting /etc/periodic/daily/netdata-updater ..."
+    rm -i /etc/periodic/daily/netdata-updater
+fi
+
+if [ -f /etc/cron.daily/netdata-updater ]
+    then
+    echo "Deleting /etc/cron.daily/netdata-updater ..."
+    rm -i /etc/cron.daily/netdata-updater
 fi
 
 getent passwd netdata > /dev/null

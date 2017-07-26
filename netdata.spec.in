@@ -27,7 +27,8 @@ BuildRequires: systemd-rpm-macros \
 %global netdata_init_preun %service_del_preun netdata.service
 %global netdata_init_postun %service_del_postun netdata.service
 %else
-%global netdata_initd_buildrequires %{nil}
+%global netdata_initd_buildrequires \
+BuildRequires: systemd
 %global netdata_initd_requires \
 Requires(preun):  systemd-units \
 Requires(postun): systemd-units \
@@ -206,6 +207,21 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_datadir}/%{name}/web
 
 %changelog
+* Mon Jul 16 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.7.0-1
+- netdata is now a fully featured statsd server
+- new installation options
+- metrics streaming and replication improvements
+- backends improvements - prometheus support rewritten
+- netdata now monitors ZFS (on Linux and FreeBSD)
+- netdata now monitors ElasticSearch
+- netdata now monitors RabbitMQ
+- netdata now monitors Go applications (via expvar)
+- netdata now monitors ipfw (on FreeBSD 11)
+- netdata now monitors samba
+- netdata now monitors squid logs
+- netdata dashboard loading times have been improved significantly
+- netdata alarms now support custom hooks
+- dozens more improvements and bug fixes
 * Mon Mar 20 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.6.0-1
 - central netdata
 - monitoring ephemeral nodes

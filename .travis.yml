@@ -20,6 +20,7 @@ addons:
     - libcap2-bin
     - zlib1g-dev
     - uuid-dev
+    - fakeroot
 #
 # Setup environment
 before_install:

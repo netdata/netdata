@@ -8,6 +8,11 @@
 #
 # bash <(curl -Ss https://my-netdata.io/kickstart.sh) all
 #
+# Other options:
+#  --src-dir PATH    keep netdata.git at PATH/netdata.git
+#  --dont-wait       do not prompt for user input
+#  --non-interactive do not prompt for user input
+#  --no-updates      do not install script for daily updates
 #
 # This script will:
 #
@@ -20,6 +25,7 @@
 
 umask 022
 
+[ -z "${UID}" ] && UID="$(id -u)"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from installer/functions.sh
@@ -218,12 +224,44 @@ sudo=""
 # ---------------------------------------------------------------------------------------------------------------------
 # install required system packages
 
-KICKSTART_OPTIONS="netdata"
-if [ "${1}" = "all" ]
+INTERACTIVE=1
+PACKAGES_INSTALLER_OPTIONS="netdata"
+NETDATA_INSTALLER_OPTIONS=""
+NETDATA_UPDATES="-u"
+SOURCE_DST="/usr/src"
+while [ ! -z "${1}" ]
+do
+    if [ "${1}" = "all" ]
+    then
+        PACKAGES_INSTALLER_OPTIONS="netdata-all"
+        shift 1
+    elif [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" ]
+    then
+        INTERACTIVE=0
+        shift 1
+    elif [ "${1}" = "--src-dir" ]
+    then
+        SOURCE_DST="${2}"
+        # echo >&2 "netdata source will be installed at ${SOURCE_DST}/netdata.git"
+        shift 2
+    elif [ "${1}" = "--no-updates" ]
+    then
+        # echo >&2 "netdata will not auto-update"
+        NETDATA_UPDATES=
+        shift 1
+    else
+        break
+    fi
+done
+
+if [ "${INTERACTIVE}" = "0" ]
 then
-    KICKSTART_OPTIONS="netdata-all"
-    shift 1
+    PACKAGES_INSTALLER_OPTIONS="--dont-wait --non-interactive ${PACKAGES_INSTALLER_OPTIONS}"
+    NETDATA_INSTALLER_OPTIONS="--dont-wait"
 fi
+
+# echo "PACKAGES_INSTALLER_OPTIONS=${PACKAGES_INSTALLER_OPTIONS}"
+# echo "NETDATA_INSTALLER_OPTIONS=${NETDATA_INSTALLER_OPTIONS} ${*}"
 
 if [ "${OS}" = "GNU/Linux" -o "${SYSTEM}" = "Linux" ]
 then
@@ -248,7 +286,7 @@ then
         if [ -s "${tmp}" ]
         then
             progress "Running downloaded script to detect required packages..."
-            run ${sudo} "${bash}" "${tmp}" ${KICKSTART_OPTIONS} || ask=1
+            run ${sudo} "${bash}" "${tmp}" ${PACKAGES_INSTALLER_OPTIONS} || ask=1
             rm "${tmp}"
         else
             rm "${tmp}"
@@ -278,13 +316,12 @@ fi
 # ---------------------------------------------------------------------------------------------------------------------
 # download netdata source
 
+# this has to checked after we have installed the required packages
 git="$(which_cmd git)"
 
 NETDATA_SOURCE_DIR=
 if [ ! -z "${git}" -a -x "${git}" ]
 then
-    SOURCE_DST="/usr/src"
-
     [ ! -d "${SOURCE_DST}" ] && run ${sudo} mkdir -p "${SOURCE_DST}"
 
     if [ ! -d "${SOURCE_DST}/netdata.git" ]
@@ -326,7 +363,8 @@ then
         if [ -x netdata-installer.sh ]
         then
             progress "Installing netdata..."
-            run ${sudo} ./netdata-installer.sh -u "${@}" || fatal "netdata-installer.sh exited with error"
+            run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" || \
+                fatal "netdata-installer.sh exited with error"
         else
             fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh)."
         fi

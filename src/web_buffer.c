@@ -201,29 +201,25 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 {
     if(unlikely(!fmt || !*fmt)) return;
 
-    buffer_need_bytes(wb, 2);
-
-    size_t len = wb->size - wb->len - 1;
-    size_t wrote;
-
     va_list args;
-    va_start(args, fmt);
-    wrote = (size_t) vsnprintfz(&wb->buffer[wb->len], len, fmt, args);
-    va_end(args);
+    size_t wrote = 0, need = 2, multiplier = 0, len;
 
-    if(unlikely(wrote >= len)) {
-        // truncated
-        buffer_overflow_check(wb);
+    do {
+        need += wrote + multiplier * WEB_DATA_LENGTH_INCREASE_STEP;
+        multiplier++;
 
-        debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu\n", wb->len, wb->size);
-        buffer_need_bytes(wb, len + WEB_DATA_LENGTH_INCREASE_STEP);
+        debug(D_WEB_BUFFER, "web_buffer_sprintf(): increasing web_buffer at position %zu, size = %zu, by %zu bytes (wrote = %zu)\n", wb->len, wb->size, need, wrote);
+        buffer_need_bytes(wb, need);
+
+        len = wb->size - wb->len - 1;
 
         va_start(args, fmt);
-        buffer_vsprintf(wb, fmt, args);
+        wrote = (size_t) vsnprintfz(&wb->buffer[wb->len], len, fmt, args);
         va_end(args);
-    }
-    else
-        wb->len += wrote;
+
+    } while(wrote >= len);
+
+    wb->len += wrote;
 
     // the buffer is \0 terminated by vsnprintf
 }

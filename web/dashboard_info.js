@@ -61,6 +61,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics of the netfilter components.'
     },
 
+    'ipfw': {
+        title: 'Firewall (ipfw)',
+        icon: '<i class="fa fa-shield" aria-hidden="true"></i>',
+        info: 'Counters and memory usage for the ipfw rules.'
+    },
+
     'cpu': {
         title: 'CPUs',
         icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
@@ -237,6 +243,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'lighttpd': {
+        title: 'Lighttpd',
+        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        info: undefined
+    },
+
     'web_log': {
         title: undefined,
         icon: '<i class="fa fa-file-text-o" aria-hidden="true"></i>',
@@ -273,10 +285,28 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'fronius': {
+        title: 'Fronius',
+        icon: '<i class="fa fa-sun-o" aria-hidden="true"></i>',
+        info: undefined
+    },
+
+    'stiebeleltron': {
+        title: 'Stiebel Eltron',
+        icon: '<i class="fa fa-thermometer-full" aria-hidden="true"></i>',
+        info: undefined
+    },
+
     'snmp': {
         title: 'SNMP',
         icon: '<i class="fa fa-random" aria-hidden="true"></i>',
         info: undefined
+    },
+
+    'go_expvar': {
+        title: 'Go - expvars',
+        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        info: 'Statistics about running Go applications exposed by the <a href="https://golang.org/pkg/expvar/" target="_blank">expvar package</a>.'
     }
 };
 
@@ -371,6 +401,11 @@ netdataDashboard.submenu = {
         info: 'DDoS protection performance metrics. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> is a TCP SYN packets proxy. It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. It is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections. It can be used for any kind of TCP traffic (even encrypted), since it does not interfere with the content itself.'
     },
 
+    'ipfw.dynamic_rules': {
+        title: 'dynamic rules',
+        info: 'Number of dynamic rules, created by correspondent stateful firewall rules.'
+    },
+
     'system.softnet_stat': {
         title: 'softnet',
         info: function(os) {
@@ -389,6 +424,11 @@ netdataDashboard.submenu = {
             else
                 return 'Statistics for per CPUs core SoftIRQs related to network receive work. Total for all CPU cores can be found at <a href="#menu_system_submenu_softnet_stat">System / softnet statistics</a>.';
         }
+    },
+
+    'go_expvar.memstats': {
+        title: 'Memory statistics',
+        info: 'Go runtime memory statistics. See <a href="https://golang.org/pkg/runtime/#MemStats" target="_blank">runtime.MemStats</a> documentation for more info about each chart and the values.'
     }
 };
 
@@ -856,6 +896,66 @@ netdataDashboard.context = {
 
 
     // ------------------------------------------------------------------------
+    // LIGHTTPD
+
+    'lighttpd.connections': {
+        colors: NETDATA.colors[4],
+        mainheads: [
+            netdataDashboard.gaugeChart('Connections', '12%', '', NETDATA.colors[4])
+        ]
+    },
+
+    'lighttpd.requests': {
+        colors: NETDATA.colors[0],
+        mainheads: [
+            netdataDashboard.gaugeChart('Requests', '12%', '', NETDATA.colors[0])
+        ]
+    },
+
+    'lighttpd.net': {
+        colors: NETDATA.colors[3],
+        mainheads: [
+            netdataDashboard.gaugeChart('Bandwidth', '12%', '', NETDATA.colors[3])
+        ]
+    },
+
+    'lighttpd.workers': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="busy"'
+                    + ' data-append-options="percentage"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Servers Utilization"'
+                    + ' data-units="percentage %"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'lighttpd.bytesperreq': {
+        colors: NETDATA.colors[3],
+        height: 0.5
+    },
+
+    'lighttpd.reqpersec': {
+        colors: NETDATA.colors[4],
+        height: 0.5
+    },
+
+    'lighttpd.bytespersec': {
+        colors: NETDATA.colors[6],
+        height: 0.5
+    },
+
+    // ------------------------------------------------------------------------
     // NGINX
 
     'nginx.connections': {
@@ -924,6 +1024,83 @@ netdataDashboard.context = {
 
     'fping.packets': {
         height: 0.5
+    },
+
+
+    // ------------------------------------------------------------------------
+    // containers
+
+    'cgroup.cpu': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="CPU"'
+                    + ' data-units="%"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'cgroup.mem_usage': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Memory"'
+                    + ' data-units="MB"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[1] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'cgroup.throttle_io': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="read"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Read Disk I/O"'
+                    + ' data-units="KB/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' role="application"></div>';
+            },
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="write"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Write Disk I/O"'
+                    + ' data-units="KB/s"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[3] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
     },
 
     // ------------------------------------------------------------------------
@@ -1236,5 +1413,38 @@ netdataDashboard.context = {
         info: 'These tags are optional and describe some error conditions which occured during response delivery (if any). ' +
         '<code>ABORTED</code> when the response was not completed due to the connection being aborted (usually by the client). ' +
         '<code>TIMEOUT</code>, when the response was not completed due to a connection timeout.'
-    }
+    },
+
+    // ------------------------------------------------------------------------
+    // Fronius Solar Power
+
+    'fronius.power': {
+        info: 'Positive <code>Grid</code> values mean that power is coming from the grid. Negative values are excess power that is going back into the grid, possibly selling it. ' +
+            '<code>Photovoltaics</code> is the power generated from the solar panels. ' +
+            '<code>Accumulator</code> is the stored power in the accumulator, if one is present.'
+    },
+
+    'fronius.autonomy': {
+        commonMin: true,
+        commonMax: true,
+        valueRange: "[0, 100]",
+        info: 'The <code>Autonomy</code> is the percentage of how autonomous the installation is. An autonomy of 100 % means that the installation is producing more energy than it is needed. ' +
+        'The <code>Self consumption</code> indicates the ratio between the current power generated and the current load. When it reaches 100 %, the <code>Autonomy</code> declines, since the solar panels can not produce enough energy and need support from the grid.'
+    },
+
+    'fronius.energy.today': {
+        commonMin: true,
+        commonMax: true,
+        valueRange: "[0, null]"
+    },
+
+    // ------------------------------------------------------------------------
+    // Stiebel Eltron Heat pump installation
+
+    'stiebeleltron.system.roomtemp': {
+        commonMin: true,
+        commonMax: true,
+        valueRange: "[0, null]"
+    },
+
 };

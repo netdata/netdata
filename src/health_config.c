@@ -32,8 +32,8 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
         return 0;
     }
 
-    if(!RRDCALC_HAS_DB_LOOKUP(rc) && !rc->warning && !rc->critical) {
-        error("Health configuration for alarm '%s.%s' is useless (no calculation, no warning and no critical evaluation)", rc->chart?rc->chart:"NOCHART", rc->name);
+    if(!RRDCALC_HAS_DB_LOOKUP(rc) && !rc->calculation && !rc->warning && !rc->critical) {
+        error("Health configuration for alarm '%s.%s' is useless (no db lookup, no calculation, no warning and no critical expressions)", rc->chart?rc->chart:"NOCHART", rc->name);
         return 0;
     }
 
