@@ -44,6 +44,8 @@ netdata_SOURCES = \
 	appconfig.h \
 	avl.c \
 	avl.h \
+	backend_prometheus.c \
+	backend_prometheus.h \
 	backends.c \
 	backends.h \
 	clocks.c \
@@ -156,6 +158,7 @@ netdata_SOURCES += \
 	zfs_common.c \
 	zfs_common.h \
 	freebsd_kstat_zfs.c \
+	freebsd_ipfw.c \
 	$(NULL)
 else
 if MACOS

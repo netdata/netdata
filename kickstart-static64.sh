@@ -212,11 +212,17 @@ fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 
+opts=
+if [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" ]
+then
+    opts="--accept"
+fi
+
 progress "Installing netdata"
 
 sudo=
 [ "${UID}" != "0" ] && sudo="sudo"
-run ${sudo} sh "/tmp/${LATEST}"
+run ${sudo} sh "/tmp/${LATEST}" ${opts}
 
 if [ $? -eq 0 ]
 	then

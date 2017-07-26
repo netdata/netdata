@@ -41,7 +41,7 @@ static char *cgroup_memory_base = NULL;
 static char *cgroup_devices_base = NULL;
 
 static int cgroup_root_count = 0;
-static int cgroup_root_max = 500;
+static int cgroup_root_max = 1000;
 static int cgroup_max_depth = 0;
 
 static SIMPLE_PATTERN *enabled_cgroup_patterns = NULL;
@@ -103,7 +103,7 @@ void read_cgroup_plugin_configuration() {
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
     if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
     if(!mi) {
-        error("Cannot find cgroup cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
+        error("CGROUP: cannot find cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
         s = "/sys/fs/cgroup/cpuacct";
     }
     else s = mi->mount_point;
@@ -113,7 +113,7 @@ void read_cgroup_plugin_configuration() {
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
     if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
     if(!mi) {
-        error("Cannot find cgroup blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
+        error("CGROUP: cannot find blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
         s = "/sys/fs/cgroup/blkio";
     }
     else s = mi->mount_point;
@@ -123,7 +123,7 @@ void read_cgroup_plugin_configuration() {
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
     if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
     if(!mi) {
-        error("Cannot find cgroup memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
+        error("CGROUP: cannot find memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
         s = "/sys/fs/cgroup/memory";
     }
     else s = mi->mount_point;
@@ -133,7 +133,7 @@ void read_cgroup_plugin_configuration() {
     mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
     if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
     if(!mi) {
-        error("Cannot find cgroup devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
+        error("CGROUP: cannot find devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
         s = "/sys/fs/cgroup/devices";
     }
     else s = mi->mount_point;
@@ -184,6 +184,7 @@ void read_cgroup_plugin_configuration() {
                     " !/systemd "
                     " !/user "
                     " !/user.slice "
+                    " !/lxc/*/ns/* "                       //  #2161
                     " * "
             ), SIMPLE_PATTERN_EXACT);
 
@@ -432,7 +433,7 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
         unsigned long i, lines = procfile_lines(ff);
 
         if(unlikely(lines < 1)) {
-            error("File '%s' should have 1+ lines.", cp->filename);
+            error("CGROUP: file '%s' should have 1+ lines.", cp->filename);
             cp->updated = 0;
             return;
         }
@@ -474,7 +475,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
         }
 
         if(unlikely(procfile_lines(ff) < 1)) {
-            error("File '%s' should have 1+ lines but has %zu.", ca->filename, procfile_lines(ff));
+            error("CGROUP: file '%s' should have 1+ lines but has %zu.", ca->filename, procfile_lines(ff));
             ca->updated = 0;
             return;
         }
@@ -538,7 +539,7 @@ static inline void cgroup_read_blkio(struct blkio *io) {
         unsigned long i, lines = procfile_lines(ff);
 
         if(unlikely(lines < 1)) {
-            error("File '%s' should have 1+ lines.", io->filename);
+            error("CGROUP: file '%s' should have 1+ lines.", io->filename);
             io->updated = 0;
             return;
         }
@@ -611,7 +612,7 @@ static inline void cgroup_read_memory(struct memory *mem) {
         unsigned long i, lines = procfile_lines(ff);
 
         if(unlikely(lines < 1)) {
-            error("File '%s' should have 1+ lines.", mem->filename_detailed);
+            error("CGROUP: file '%s' should have 1+ lines.", mem->filename_detailed);
             mem->updated_detailed = 0;
             goto memory_next;
         }
@@ -774,7 +775,7 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
         }
     }
     else
-        error("CGROUP: Cannot popen(\"%s\", \"r\").", buffer);
+        error("CGROUP: cannot popen(\"%s\", \"r\").", buffer);
 }
 
 static inline struct cgroup *cgroup_add(const char *id) {
@@ -782,7 +783,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
     debug(D_CGROUP, "adding to list, cgroup with id '%s'", id);
 
     if(cgroup_root_count >= cgroup_root_max) {
-        info("Maximum number of cgroups reached (%d). Not adding cgroup '%s'", cgroup_root_count, id);
+        info("CGROUP: maximum number of cgroups reached (%d). Not adding cgroup '%s'", cgroup_root_count, id);
         return NULL;
     }
 
@@ -871,7 +872,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
         for (t = cgroup_root; t; t = t->next) {
             if (t != cg && t->enabled && t->hash_chart == cg->hash_chart && !strcmp(t->chart_id, cg->chart_id)) {
                 if (!strncmp(t->chart_id, "/system.slice/", 14) && !strncmp(cg->chart_id, "/init.scope/system.slice/", 25)) {
-                    error("Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
+                    error("CGROUP: chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
                           cg->chart_id, t->id, cg->id, t->id);
                     debug(D_CGROUP, "Control group with chart id '%s' already exists with id '%s' and is enabled. Swapping them by enabling cgroup with id '%s' and disabling cgroup with id '%s'.",
                           cg->chart_id, t->id, cg->id, t->id);
@@ -879,7 +880,7 @@ static inline struct cgroup *cgroup_add(const char *id) {
                     t->options |= CGROUP_OPTIONS_DISABLED_DUPLICATE;
                 }
                 else {
-                    error("Control group with chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
+                    error("CGROUP: chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
                           cg->chart_id, t->id, cg->id);
                     debug(D_CGROUP, "Control group with chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
                           cg->chart_id, t->id, cg->id);
@@ -900,20 +901,20 @@ static inline struct cgroup *cgroup_add(const char *id) {
 static inline void cgroup_free(struct cgroup *cg) {
     debug(D_CGROUP, "Removing cgroup '%s' with chart id '%s' (was %s and %s)", cg->id, cg->chart_id, (cg->enabled)?"enabled":"disabled", (cg->available)?"available":"not available");
 
-    if(cg->st_cpu)                   rrdset_flag_set(cg->st_cpu,                   RRDSET_FLAG_OBSOLETE);
-    if(cg->st_cpu_per_core)          rrdset_flag_set(cg->st_cpu_per_core,          RRDSET_FLAG_OBSOLETE);
-    if(cg->st_mem)                   rrdset_flag_set(cg->st_mem,                   RRDSET_FLAG_OBSOLETE);
-    if(cg->st_writeback)             rrdset_flag_set(cg->st_writeback,             RRDSET_FLAG_OBSOLETE);
-    if(cg->st_mem_activity)          rrdset_flag_set(cg->st_mem_activity,          RRDSET_FLAG_OBSOLETE);
-    if(cg->st_pgfaults)              rrdset_flag_set(cg->st_pgfaults,              RRDSET_FLAG_OBSOLETE);
-    if(cg->st_mem_usage)             rrdset_flag_set(cg->st_mem_usage,             RRDSET_FLAG_OBSOLETE);
-    if(cg->st_mem_failcnt)           rrdset_flag_set(cg->st_mem_failcnt,           RRDSET_FLAG_OBSOLETE);
-    if(cg->st_io)                    rrdset_flag_set(cg->st_io,                    RRDSET_FLAG_OBSOLETE);
-    if(cg->st_serviced_ops)          rrdset_flag_set(cg->st_serviced_ops,          RRDSET_FLAG_OBSOLETE);
-    if(cg->st_throttle_io)           rrdset_flag_set(cg->st_throttle_io,           RRDSET_FLAG_OBSOLETE);
-    if(cg->st_throttle_serviced_ops) rrdset_flag_set(cg->st_throttle_serviced_ops, RRDSET_FLAG_OBSOLETE);
-    if(cg->st_queued_ops)            rrdset_flag_set(cg->st_queued_ops,            RRDSET_FLAG_OBSOLETE);
-    if(cg->st_merged_ops)            rrdset_flag_set(cg->st_merged_ops,            RRDSET_FLAG_OBSOLETE);
+    if(cg->st_cpu)                   rrdset_is_obsolete(cg->st_cpu);
+    if(cg->st_cpu_per_core)          rrdset_is_obsolete(cg->st_cpu_per_core);
+    if(cg->st_mem)                   rrdset_is_obsolete(cg->st_mem);
+    if(cg->st_writeback)             rrdset_is_obsolete(cg->st_writeback);
+    if(cg->st_mem_activity)          rrdset_is_obsolete(cg->st_mem_activity);
+    if(cg->st_pgfaults)              rrdset_is_obsolete(cg->st_pgfaults);
+    if(cg->st_mem_usage)             rrdset_is_obsolete(cg->st_mem_usage);
+    if(cg->st_mem_failcnt)           rrdset_is_obsolete(cg->st_mem_failcnt);
+    if(cg->st_io)                    rrdset_is_obsolete(cg->st_io);
+    if(cg->st_serviced_ops)          rrdset_is_obsolete(cg->st_serviced_ops);
+    if(cg->st_throttle_io)           rrdset_is_obsolete(cg->st_throttle_io);
+    if(cg->st_throttle_serviced_ops) rrdset_is_obsolete(cg->st_throttle_serviced_ops);
+    if(cg->st_queued_ops)            rrdset_is_obsolete(cg->st_queued_ops);
+    if(cg->st_merged_ops)            rrdset_is_obsolete(cg->st_merged_ops);
 
     freez(cg->cpuacct_usage.cpu_percpu);
 
@@ -978,7 +979,7 @@ static inline void found_subdir_in_dir(const char *dir) {
                     depth++;
 
             if(depth > cgroup_max_depth) {
-                info("cgroup '%s' is too deep (%d, while max is %d)", dir, depth, cgroup_max_depth);
+                info("CGROUP: '%s' is too deep (%d, while max is %d)", dir, depth, cgroup_max_depth);
                 return;
             }
         }
@@ -1003,7 +1004,7 @@ static inline int find_dir_in_subdirs(const char *base, const char *this, void (
 
     DIR *dir = opendir(this);
     if(!dir) {
-        error("Cannot read cgroups directory '%s'", base);
+        error("CGROUP: cannot read directory '%s'", base);
         return ret;
     }
     ret = 1;
@@ -1109,7 +1110,7 @@ static inline void find_all_cgroups() {
         if(find_dir_in_subdirs(cgroup_cpuacct_base, NULL, found_subdir_in_dir) == -1) {
             cgroup_enable_cpuacct_stat =
             cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_NO;
-            error("disabled CGROUP cpu statistics.");
+            error("CGROUP: disabled cpu statistics.");
         }
     }
 
@@ -1121,7 +1122,7 @@ static inline void find_all_cgroups() {
             cgroup_enable_blkio_throttle_ops =
             cgroup_enable_blkio_merged_ops =
             cgroup_enable_blkio_queued_ops = CONFIG_BOOLEAN_NO;
-            error("disabled CGROUP blkio statistics.");
+            error("CGROUP: disabled blkio statistics.");
         }
     }
 
@@ -1131,14 +1132,14 @@ static inline void find_all_cgroups() {
             cgroup_enable_detailed_memory =
             cgroup_enable_swap =
             cgroup_enable_memory_failcnt = CONFIG_BOOLEAN_NO;
-            error("disabled CGROUP memory statistics.");
+            error("CGROUP: disabled memory statistics.");
         }
     }
 
     if(cgroup_search_in_devices) {
         if(find_dir_in_subdirs(cgroup_devices_base, NULL, found_subdir_in_dir) == -1) {
             cgroup_search_in_devices = 0;
-            error("disabled CGROUP devices statistics.");
+            error("CGROUP: disabled devices statistics.");
         }
     }
 
@@ -2507,13 +2508,13 @@ void update_cgroup_charts(int update_every) {
 void *cgroups_main(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
-    info("CGROUP Plugin thread created with task id %d", gettid());
+    info("CGROUP plugin thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+        error("CGROUP: cannot set pthread cancel type to DEFERRED.");
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+        error("CGROUP: cannot set pthread cancel state to ENABLE.");
 
     struct rusage thread;
 

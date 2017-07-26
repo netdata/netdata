@@ -35,6 +35,7 @@ set(NETDATA_SOURCE_FILES
         src/zfs_common.c
         src/zfs_common.h
         src/freebsd_kstat_zfs.c
+        src/freebsd_ipfw.c
         src/global_statistics.c
         src/global_statistics.h
         src/health.c
@@ -151,7 +152,7 @@ set(NETDATA_SOURCE_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        src/locks.h src/statsd.c src/statsd.h src/statistical.c src/statistical.h)
+        src/locks.h src/statsd.c src/statsd.h src/statistical.c src/statistical.h src/backend_prometheus.c src/backend_prometheus.h)
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c

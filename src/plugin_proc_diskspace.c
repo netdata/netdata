@@ -6,6 +6,7 @@
 
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
+static int cleanup_mount_points = 1;
 
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
@@ -45,7 +46,7 @@ struct mount_point_metadata {
 
 static DICTIONARY *dict_mountpoints = NULL;
 
-#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE); st = NULL; } } while(st)
+#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); st = NULL; } } while(st)
 
 int mount_point_cleanup(void *entry, void *data) {
     (void)data;
@@ -58,7 +59,7 @@ int mount_point_cleanup(void *entry, void *data) {
         return 0;
     }
 
-    if(likely(mp->collected)) {
+    if(likely(cleanup_mount_points && mp->collected)) {
         mp->collected = 0;
         mp->updated = 0;
         mp->shown_error = 0;
@@ -125,6 +126,33 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             def_inodes = CONFIG_BOOLEAN_NO;
         }
 
+        // check if the mount point is a directory #2407
+        {
+            struct stat bs;
+            if(stat(mi->mount_point, &bs) == -1) {
+                error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
+                      , mi->mount_point
+                      , disk
+                      , mi->filesystem?mi->filesystem:""
+                      , mi->root?mi->root:""
+                );
+                def_space = CONFIG_BOOLEAN_NO;
+                def_inodes = CONFIG_BOOLEAN_NO;
+            }
+            else {
+                if((bs.st_mode & S_IFMT) != S_IFDIR) {
+                    error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
+                          , mi->mount_point
+                          , disk
+                          , mi->filesystem?mi->filesystem:""
+                          , mi->root?mi->root:""
+                    );
+                    def_space = CONFIG_BOOLEAN_NO;
+                    def_inodes = CONFIG_BOOLEAN_NO;
+                }
+            }
+        }
+
         do_space = config_get_boolean_ondemand(var_name, "space usage", def_space);
         do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
 
@@ -161,7 +189,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     struct statvfs buff_statvfs;
     if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
         if(!m->shown_error) {
-            error("Failed statvfs() for '%s' (disk '%s', filesystem '%s', root '%s')"
+            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
                   , mi->mount_point
                   , disk
                   , mi->filesystem?mi->filesystem:""
@@ -188,7 +216,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
-        error("Disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
+        error("DISKSPACE: disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
 #endif
 
     // --------------------------------------------------------------------------
@@ -201,7 +229,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
-        error("Disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
+        error("DISKSPACE: disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
 #endif
 
     // --------------------------------------------------------------------------
@@ -294,12 +322,14 @@ void *proc_diskspace_main(void *ptr) {
     info("DISKSPACE thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+        error("DISKSPACE: Cannot set pthread cancel type to DEFERRED.");
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+        error("DISKSPACE: Cannot set pthread cancel state to ENABLE.");
 
     int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
+
+    cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
     int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
     if(update_every < localhost->rrd_update_every)
@@ -334,7 +364,7 @@ void *proc_diskspace_main(void *ptr) {
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
 
-            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND | MOUNTINFO_IS_SAME_DEV | MOUNTINFO_NO_STAT | MOUNTINFO_NO_SIZE)))
+            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
                 continue;
 
             do_disk_space_stats(mi, update_every);

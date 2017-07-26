@@ -10,7 +10,8 @@
 #define DELAULT_EXLUDED_DISKS "loop* ram*"
 
 static struct disk {
-    char *disk;             // the name of the disk (sda, sdb, etc)
+    char *disk;             // the name of the disk (sda, sdb, etc, after being looked up)
+    char *device;           // the device of the disk (before being looked up)
     unsigned long major;
     unsigned long minor;
     int sector_size;
@@ -44,12 +45,75 @@ static struct disk {
     struct disk *next;
 } *disk_root = NULL;
 
-#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE); st = NULL; } } while(st)
+#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); st = NULL; } } while(st)
+
+static char *path_to_get_hw_sector_size = NULL;
+static char *path_to_get_hw_sector_size_partitions = NULL;
+static char *path_to_find_block_device = NULL;
+static char *path_to_device_mapper = NULL;
+
+static inline char *get_disk_name(unsigned long major, unsigned long minor, char *disk) {
+    static int enabled = 1;
+
+    if(!enabled) goto cleanup;
+
+    char filename[FILENAME_MAX + 1];
+    char link[FILENAME_MAX + 1];
+
+    DIR *dir = opendir(path_to_device_mapper);
+    if (!dir) {
+        error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'. Disabling device-mapper support.", disk, major, minor, path_to_device_mapper);
+        enabled = 0;
+        goto cleanup;
+    }
+
+    struct dirent *de = NULL;
+    while ((de = readdir(dir))) {
+        if(de->d_type != DT_LNK) continue;
+
+        snprintfz(filename, FILENAME_MAX, "%s/%s", path_to_device_mapper, de->d_name);
+        ssize_t len = readlink(filename, link, FILENAME_MAX);
+        if(len <= 0) {
+            error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot read link '%s'.", disk, major, minor, filename);
+            continue;
+        }
+
+        link[len] = '\0';
+        if(link[0] != '/')
+            snprintfz(filename, FILENAME_MAX, "%s/%s", path_to_device_mapper, link);
+        else
+            strncpyz(filename, link, FILENAME_MAX);
+
+        struct stat sb;
+        if(stat(filename, &sb) == -1) {
+            error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot stat() file '%s'.", disk, major, minor, filename);
+            continue;
+        }
+
+        if((sb.st_mode & S_IFMT) != S_IFBLK) {
+            // info("DEVICE-MAPPER ('%s', %lu:%lu): file '%s' is not a block device.", disk, major, minor, filename);
+            continue;
+        }
+
+        if(major(sb.st_rdev) != major || minor(sb.st_rdev) != minor) {
+            // info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
+            continue;
+        }
+
+        // info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
+
+        strncpy(link, de->d_name, FILENAME_MAX);
+        netdata_fix_chart_name(link);
+        disk = link;
+        break;
+    }
+    closedir(dir);
+
+cleanup:
+    return strdupz(disk);
+}
 
 static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk) {
-    static char path_to_get_hw_sector_size[FILENAME_MAX + 1] = "";
-    static char path_to_get_hw_sector_size_partitions[FILENAME_MAX + 1] = "";
-    static char path_find_block_device[FILENAME_MAX + 1] = "";
     static struct mountinfo *disk_mountinfo_root = NULL;
 
     struct disk *d;
@@ -66,7 +130,8 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // create a new disk structure
     d = (struct disk *)callocz(1, sizeof(struct disk));
 
-    d->disk = strdupz(disk);
+    d->disk = get_disk_name(major, minor, disk);
+    d->device = strdupz(disk);
     d->major = major;
     d->minor = minor;
     d->type = DISK_TYPE_PHYSICAL; // Default type. Changed later if not correct.
@@ -83,27 +148,17 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         last->next = d;
     }
 
-    // ------------------------------------------------------------------------
-    // find the type of the device
-
-    char buffer[FILENAME_MAX + 1];
-
-    // get the default path for finding info about the block device
-    if(unlikely(!path_find_block_device[0])) {
-        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
-        snprintfz(path_find_block_device, FILENAME_MAX, "%s", config_get(CONFIG_SECTION_DISKSTATS, "path to get block device infos", buffer));
-    }
-
     // find if it is a partition
     // by checking if /sys/dev/block/MAJOR:MINOR/partition is readable.
-    snprintfz(buffer, FILENAME_MAX, path_find_block_device, major, minor, "partition");
+    char buffer[FILENAME_MAX + 1];
+    snprintfz(buffer, FILENAME_MAX, path_to_find_block_device, major, minor, "partition");
     if(likely(access(buffer, R_OK) == 0)) {
         d->type = DISK_TYPE_PARTITION;
     }
     else {
         // find if it is a container
         // by checking if /sys/dev/block/MAJOR:MINOR/slaves has entries
-        snprintfz(buffer, FILENAME_MAX, path_find_block_device, major, minor, "slaves/");
+        snprintfz(buffer, FILENAME_MAX, path_to_find_block_device, major, minor, "slaves/");
         DIR *dirp = opendir(buffer);
         if(likely(dirp != NULL)) {
             struct dirent *dp;
@@ -143,18 +198,9 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // ------------------------------------------------------------------------
     // find the disk sector size
 
-    if(unlikely(!path_to_get_hw_sector_size[0])) {
-        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/queue/hw_sector_size");
-        snprintfz(path_to_get_hw_sector_size, FILENAME_MAX, "%s", config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size", buffer));
-    }
-    if(unlikely(!path_to_get_hw_sector_size_partitions[0])) {
-        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/subsystem/%s/../queue/hw_sector_size");
-        snprintfz(path_to_get_hw_sector_size_partitions, FILENAME_MAX, "%s", config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size for partitions", buffer));
-    }
-
     {
         char tf[FILENAME_MAX + 1], *t;
-        strncpyz(tf, d->disk, FILENAME_MAX);
+        strncpyz(tf, d->device, FILENAME_MAX);
 
         // replace all / with !
         for(t = tf; *t ;t++)
@@ -173,15 +219,15 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
             if(likely(tmp)) {
                 d->sector_size = str2i(tmp);
                 if(unlikely(d->sector_size <= 0)) {
-                    error("Invalid sector size %d for device %s in %s. Assuming 512.", d->sector_size, d->disk, buffer);
+                    error("Invalid sector size %d for device %s in %s. Assuming 512.", d->sector_size, d->device, buffer);
                     d->sector_size = 512;
                 }
             }
-            else error("Cannot read data for sector size for device %s from %s. Assuming 512.", d->disk, buffer);
+            else error("Cannot read data for sector size for device %s from %s. Assuming 512.", d->device, buffer);
 
             fclose(fpss);
         }
-        else error("Cannot read sector size for device %s from %s. Assuming 512.", d->disk, buffer);
+        else error("Cannot read sector size for device %s from %s. Assuming 512.", d->device, buffer);
     }
 
     return d;
@@ -227,9 +273,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 global_do_qops = CONFIG_BOOLEAN_AUTO,
                 global_do_util = CONFIG_BOOLEAN_AUTO,
                 global_do_backlog = CONFIG_BOOLEAN_AUTO,
-                globals_initialized = 0;
+                globals_initialized = 0,
+                global_cleanup_removed_disks = 1;
 
     if(unlikely(!globals_initialized)) {
+        globals_initialized = 1;
+
         global_enable_new_disks_detected_at_runtime = config_get_boolean(CONFIG_SECTION_DISKSTATS, "enable new disks detected at runtime", global_enable_new_disks_detected_at_runtime);
         global_enable_performance_for_physical_disks = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for physical disks", global_enable_performance_for_physical_disks);
         global_enable_performance_for_virtual_disks = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "performance metrics for virtual disks", global_enable_performance_for_virtual_disks);
@@ -243,7 +292,21 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_do_util    = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "utilization percentage for all disks", global_do_util);
         global_do_backlog = config_get_boolean_ondemand(CONFIG_SECTION_DISKSTATS, "backlog for all disks", global_do_backlog);
 
-        globals_initialized = 1;
+        global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
+        
+        char buffer[FILENAME_MAX + 1];
+
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
+        path_to_find_block_device = config_get(CONFIG_SECTION_DISKSTATS, "path to get block device infos", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/queue/hw_sector_size");
+        path_to_get_hw_sector_size = config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/subsystem/%s/../queue/hw_sector_size");
+        path_to_get_hw_sector_size_partitions = config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size for partitions", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s/dev/mapper", netdata_configured_host_prefix);
+        path_to_device_mapper = config_get(CONFIG_SECTION_DISKSTATS, "path to device mapper", buffer);
     }
 
     // --------------------------------------------------------------------------
@@ -339,7 +402,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // Set its family based on mount point
 
         char *family = d->mount_point;
-        if(!family) family = disk;
+        if(!family) family = d->disk;
 
 
         // --------------------------------------------------------------------------
@@ -359,11 +422,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             int def_enable = global_enable_new_disks_detected_at_runtime;
 
-            if(def_enable != CONFIG_BOOLEAN_NO && simple_pattern_matches(excluded_disks, disk))
+            if(def_enable != CONFIG_BOOLEAN_NO && (simple_pattern_matches(excluded_disks, d->device) || simple_pattern_matches(excluded_disks, d->disk)))
                 def_enable = CONFIG_BOOLEAN_NO;
 
             char var_name[4096 + 1];
-            snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", disk);
+            snprintfz(var_name, 4096, "plugin:proc:/proc/diskstats:%s", d->disk);
 
             def_enable = config_get_boolean_ondemand(var_name, "enable", def_enable);
             if(unlikely(def_enable == CONFIG_BOOLEAN_NO)) {
@@ -449,8 +512,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_io)) {
                 d->st_io = rrdset_create_localhost(
                         RRD_TYPE_DISK
-                        , disk
-                        , NULL
+                        , d->device
+                        , d->disk
                         , family
                         , "disk.io"
                         , "Disk I/O Bandwidth"
@@ -478,8 +541,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_ops)) {
                 d->st_ops = rrdset_create_localhost(
                         "disk_ops"
-                        , disk
-                        , NULL
+                        , d->device
+                        , d->disk
                         , family
                         , "disk.ops"
                         , "Disk Completed I/O Operations"
@@ -509,8 +572,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_qops)) {
                 d->st_qops = rrdset_create_localhost(
                         "disk_qops"
-                        , disk
-                        , NULL
+                        , d->device
+                        , d->disk
                         , family
                         , "disk.qops"
                         , "Disk Current I/O Operations"
@@ -538,8 +601,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_backlog)) {
                 d->st_backlog = rrdset_create_localhost(
                         "disk_backlog"
-                        , disk
-                        , NULL
+                        , d->device
+                        , d->disk
                         , family
                         , "disk.backlog"
                         , "Disk Backlog"
@@ -567,8 +630,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_util)) {
                 d->st_util = rrdset_create_localhost(
                         "disk_util"
-                        , disk
-                        , NULL
+                        , d->device
+                        , d->disk
                         , family
                         , "disk.util"
                         , "Disk Utilization Time"
@@ -596,8 +659,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_mops)) {
                 d->st_mops = rrdset_create_localhost(
                         "disk_mops"
-                        , disk
-                        , NULL
+                        , d->device
+                        , d->disk
                         , family
                         , "disk.mops"
                         , "Disk Merged Operations"
@@ -627,8 +690,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             if(unlikely(!d->st_iotime)) {
                 d->st_iotime = rrdset_create_localhost(
                         "disk_iotime"
-                        , disk
-                        , NULL
+                        , d->device
+                        , d->disk
                         , family
                         , "disk.iotime"
                         , "Disk Total I/O Time"
@@ -661,8 +724,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_await)) {
                     d->st_await = rrdset_create_localhost(
                             "disk_await"
-                            , disk
-                            , NULL
+                            , d->device
+                            , d->disk
                             , family
                             , "disk.await"
                             , "Average Completed I/O Operation Time"
@@ -690,8 +753,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_avgsz)) {
                     d->st_avgsz = rrdset_create_localhost(
                             "disk_avgsz"
-                            , disk
-                            , NULL
+                            , d->device
+                            , d->disk
                             , family
                             , "disk.avgsz"
                             , "Average Completed I/O Operation Bandwidth"
@@ -719,8 +782,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 if(unlikely(!d->st_svctm)) {
                     d->st_svctm = rrdset_create_localhost(
                             "disk_svctm"
-                            , disk
-                            , NULL
+                            , d->device
+                            , d->disk
                             , family
                             , "disk.svctm"
                             , "Average Service Time"
@@ -746,7 +809,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
     struct disk *d = disk_root, *last = NULL;
     while(d) {
-        if(unlikely(!d->updated)) {
+        if(unlikely(global_cleanup_removed_disks && !d->updated)) {
             struct disk *t = d;
 
             rrdset_obsolete_and_pointer_null(d->st_avgsz);
@@ -769,6 +832,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             }
 
             freez(t->disk);
+            freez(t->device);
             freez(t->mount_point);
             freez(t);
         }

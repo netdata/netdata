@@ -63,6 +63,7 @@ exclude_paths:
 - web/old/
 - python.d/python_modules/pyyaml2/
 - python.d/python_modules/pyyaml3/
+- python.d/python_modules/urllib3/
 - node.d/node_modules/ber/
 - node.d/node_modules/asn1.js
 - node.d/node_modules/extend.js

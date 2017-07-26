@@ -1,0 +1,23 @@
+{
+  "devDependencies": {
+    "coffee-script": "^1.12.7",
+    "jasmine": "^2.6.0",
+    "jasmine-core": "^2.6.4",
+    "karma": "^1.7.0",
+    "karma-chrome-launcher": "^2.2.0",
+    "karma-coverage": "^1.1.1",
+    "karma-firefox-launcher": "^1.0.1",
+    "karma-jasmine": "^1.1.0",
+    "walkdir": "^0.0.11",
+    "underscore": "^1.8.3",
+    "gaze": "^1.1.2",
+    "mkdirp": "^0.5.1",
+    "minimist": "^1.2.0",
+    "jasmine-growl-reporter": "^1.0.1",
+    "xml2js": "^0.4.17",
+    "grunt": "^1.0.1",
+    "grunt-exec": "^2.0.0",
+    "jasmine-reporters": "^2.2.1",
+    "jasmine-node": "BrainDoctor/jasmine-node"
+  }
+}

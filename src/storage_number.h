@@ -29,6 +29,7 @@ typedef uint32_t storage_number;
 
 // extract the flags
 #define get_storage_number_flags(value) ((((storage_number)value) & (1 << 24)) | (((storage_number)value) & (2 << 24)) | (((storage_number)value) & (4 << 24)))
+#define SN_EMPTY_SLOT 0x00000000
 
 // checks
 #define does_storage_number_exist(value) ((get_storage_number_flags(value) != 0)?1:0)

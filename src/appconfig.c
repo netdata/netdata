@@ -214,7 +214,8 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     if(!co_new) co_new = appconfig_section_create(root, section_new);
 
     config_section_wrlock(co_old);
-    config_section_wrlock(co_new);
+    if(co_old != co_new)
+        config_section_wrlock(co_new);
 
     cv_old = appconfig_option_index_find(co_old, name_old, 0);
     if(!cv_old) goto cleanup;
@@ -251,7 +252,8 @@ int appconfig_move(struct config *root, const char *section_old, const char *nam
     ret = 0;
 
 cleanup:
-    config_section_unlock(co_new);
+    if(co_old != co_new)
+        config_section_unlock(co_new);
     config_section_unlock(co_old);
     return ret;
 }
@@ -315,7 +317,7 @@ int appconfig_get_boolean(struct config *root, const char *section, const char *
     s = appconfig_get(root, section, name, s);
     if(!s) return value;
 
-    if(!strcmp(s, "yes") || !strcmp(s, "auto") || !strcmp(s, "on demand")) return 1;
+    if(!strcasecmp(s, "yes") || !strcasecmp(s, "true") || !strcasecmp(s, "on") || !strcasecmp(s, "auto") || !strcasecmp(s, "on demand")) return 1;
     return 0;
 }
 

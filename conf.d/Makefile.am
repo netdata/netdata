@@ -17,6 +17,7 @@ dist_config_DATA = \
 nodeconfigdir=$(configdir)/node.d
 dist_nodeconfig_DATA = \
     node.d/README.md \
+    node.d/fronius.conf.md \
     node.d/named.conf.md \
     node.d/sma_webbox.conf.md \
     node.d/snmp.conf.md \
@@ -35,6 +36,7 @@ dist_pythonconfig_DATA = \
     python.d/exim.conf \
     python.d/fail2ban.conf \
     python.d/freeradius.conf \
+    python.d/go_expvar.conf \
     python.d/haproxy.conf \
     python.d/hddtemp.conf \
     python.d/ipfs.conf \
@@ -73,6 +75,7 @@ dist_healthconfig_DATA = \
     health.d/ipfs.conf \
     health.d/ipmi.conf \
     health.d/isc_dhcpd.conf \
+    health.d/lighttpd.conf \
     health.d/mdstat.conf \
     health.d/memcached.conf \
     health.d/mysql.conf \

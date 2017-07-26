@@ -9,8 +9,8 @@ void netdata_cleanup_and_exit(int ret) {
 
     debug(D_EXIT, "Called: netdata_cleanup_and_exit()");
 
-    // save the database
-    rrdhost_save_all();
+    // cleanup the database
+    rrdhost_cleanup_all();
 
     // unlink the pid
     if(pidfile[0]) {
@@ -410,6 +410,9 @@ static void backwards_compatible_config() {
 
     config_move(CONFIG_SECTION_GLOBAL, "web files group",
                 CONFIG_SECTION_WEB,    "web files group");
+
+    config_move(CONFIG_SECTION_BACKEND, "opentsdb host tags",
+                CONFIG_SECTION_BACKEND, "host tags");
 }
 
 static void get_netdata_configured_variables() {
@@ -632,6 +635,7 @@ int main(int argc, char **argv) {
                         char* debug_flags_string = "debug_flags=";
 
                         if(strcmp(optarg, "unittest") == 0) {
+                            if(unit_test_buffer()) exit(1);
                             if(unit_test_str2ld()) exit(1);
                             //default_rrd_update_every = 1;
                             //default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;

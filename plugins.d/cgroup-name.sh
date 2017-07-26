@@ -51,7 +51,7 @@ debug() {
 
 # -----------------------------------------------------------------------------
 
-NETDATA_CONFIG_DIR="${NETDATA_CONFIG_DIR-/etc/netdata}"
+[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
 CONFIG="${NETDATA_CONFIG_DIR}/cgroups-names.conf"
 CGROUP="${1}"
 NAME=
@@ -74,22 +74,22 @@ if [ -f "${CONFIG}" ]
 #   info "configuration file '${CONFIG}' is not available."
 fi
 
-function get_name_classic {
-    local DOCKERID="$1"
-    info "Running command: docker ps --filter=id=\"${DOCKERID}\" --format=\"{{.Names}}\""
-    NAME="$( docker ps --filter=id="${DOCKERID}" --format="{{.Names}}" )"
+function docker_get_name_classic {
+    local id="${1}"
+    info "Running command: docker ps --filter=id=\"${id}\" --format=\"{{.Names}}\""
+    NAME="$( docker ps --filter=id="${id}" --format="{{.Names}}" )"
     return 0
 }
 
-function get_name_api {
-    local DOCKERID="$1"
+function docker_get_name_api {
+    local id="${1}"
     if [ ! -S "/var/run/docker.sock" ]
         then
         warning "Can't find /var/run/docker.sock"
         return 1
     fi
-    info "Running API command: /containers/${DOCKERID}/json"
-    JSON=$(echo -e "GET /containers/${DOCKERID}/json HTTP/1.0\r\n" | nc -U /var/run/docker.sock | grep '^{.*')
+    info "Running API command: /containers/${id}/json"
+    JSON=$(echo -e "GET /containers/${id}/json HTTP/1.0\r\n" | nc -U /var/run/docker.sock | grep '^{.*')
     NAME=$(echo $JSON | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
     return 0
 }
@@ -107,9 +107,9 @@ if [ -z "${NAME}" ]
             then
             if hash docker 2>/dev/null
                 then
-                get_name_classic $DOCKERID
+                docker_get_name_classic ${DOCKERID}
             else
-                get_name_api $DOCKERID || get_name_classic $DOCKERID
+                docker_get_name_api ${DOCKERID} || docker_get_name_classic ${DOCKERID}
             fi
             if [ -z "${NAME}" ]
                 then
@@ -123,7 +123,31 @@ if [ -z "${NAME}" ]
         then
         # libvirtd / qemu virtual machines
 
-        NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
+        # NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
+        NAME="qemu_$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
+
+    elif [[ "${CGROUP}" =~ qemu.slice_([0-9]+).scope && -d /etc/pve ]]
+        then
+        # Proxmox VMs
+
+        FILENAME="/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf"
+        if [[ -f $FILENAME && -r $FILENAME ]]
+            then
+            NAME="qemu_$(grep -e '^name: ' "/etc/pve/qemu-server/${BASH_REMATCH[1]}.conf" | head -1 | sed -rn 's|\s*name\s*:\s*(.*)?$|\1|p')"
+        else
+            error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
+        fi
+    elif [[ "${CGROUP}" =~ lxc_([0-9]+) && -d /etc/pve ]]
+        then
+        # Proxmox Containers (LXC)
+
+        FILENAME="/etc/pve/lxc/${BASH_REMATCH[1]}.conf"
+        if [[ -f ${FILENAME} && -r ${FILENAME} ]]
+            then
+            NAME=$(grep -e '^hostname: ' /etc/pve/lxc/${BASH_REMATCH[1]}.conf | head -1 | sed -rn 's|\s*hostname\s*:\s*(.*)?$|\1|p')
+        else
+            error "proxmox config file missing ${FILENAME} or netdata does not have read access.  Please ensure netdata is a member of www-data group."
+        fi
     fi
 
     [ -z "${NAME}" ] && NAME="${CGROUP}"

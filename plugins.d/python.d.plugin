@@ -20,8 +20,11 @@ BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
                'retries': 10}
 
 MODULES_DIR = os.path.abspath(os.getenv('NETDATA_PLUGINS_DIR',
-                                        os.path.dirname(__file__)) + "/../python.d") + "/"
-CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR', "/etc/netdata/")
+                        os.path.dirname(__file__)) + "/../python.d") + "/"
+
+CONFIG_DIR = os.getenv('NETDATA_CONFIG_DIR',
+                       os.path.dirname(__file__) + "/../../../../etc/netdata")
+
 # directories should end with '/'
 if CONFIG_DIR[-1] != "/":
     CONFIG_DIR += "/"
@@ -307,7 +310,7 @@ class PythonCharts(object):
                               ("/" + str(name) if name is not None else "") +
                               ": cannot start job: '" +
                               str(e))
-                    return None
+                    continue
                 else:
                     # set chart_name (needed to plot run time graphs)
                     job.chart_name = module.__name__

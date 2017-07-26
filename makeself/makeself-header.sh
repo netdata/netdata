@@ -22,7 +22,9 @@ filesizes="$filesizes"
 keep="$KEEP"
 nooverwrite="$NOOVERWRITE"
 quiet="n"
+accept="n"
 nodiskspace="n"
+export_conf="$EXPORT_CONF"
 
 print_cmd_arg=""
 if type printf > /dev/null; then
@@ -49,18 +51,20 @@ MS_PrintLicense()
 {
   if test x"\$licensetxt" != x; then
     echo "\$licensetxt"
-    while true
-    do
-      MS_Printf "Please type y to accept, n otherwise: "
-      read yn
-      if test x"\$yn" = xn; then
-        keep=n
-	eval \$finish; exit 1
-        break;
-      elif test x"\$yn" = xy; then
-        break;
-      fi
-    done
+    if test x"\$accept" != xy; then
+      while true
+      do
+        MS_Printf "Please type y to accept, n otherwise: "
+        read yn
+        if test x"\$yn" = xn; then
+          keep=n
+          eval \$finish; exit 1
+          break;
+        elif test x"\$yn" = xy; then
+          break;
+        fi
+      done
+    fi
   fi
 }
 
@@ -140,6 +144,7 @@ MS_Help()
   with following options (in that order)
   --confirm             Ask before running embedded script
   --quiet		Do not print anything except error messages
+  --accept              Accept the license
   --noexec              Do not run embedded script
   --keep                Do not erase target directory after running
 			the embedded script
@@ -213,10 +218,10 @@ MS_Check()
 UnTAR()
 {
     if test x"\$quiet" = xn; then
-		tar \$1vf - 2>&1 || { echo Extraction failed. > /dev/tty; kill -15 \$$; }
+		tar \$1 "$UNTAR_EXTRA" -vf - 2>&1 || { echo Extraction failed. > /dev/tty; kill -15 \$$; }
     else
 
-		tar \$1f - 2>&1 || { echo Extraction failed. > /dev/tty; kill -15 \$$; }
+		tar \$1 "$UNTAR_EXTRA" -f - 2>&1 || { echo Extraction failed. > /dev/tty; kill -15 \$$; }
     fi
 }
 
@@ -240,6 +245,10 @@ do
     -q | --quiet)
 	quiet=y
 	noprogress=y
+	shift
+	;;
+	--accept)
+	accept=y
 	shift
 	;;
     --info)
@@ -511,6 +520,19 @@ fi
 cd "\$tmpdir"
 res=0
 if test x"\$script" != x; then
+    if test x"\$export_conf" = x"y"; then
+        MS_BUNDLE="\$0"
+        MS_LABEL="\$label"
+        MS_SCRIPT="\$script"
+        MS_SCRIPTARGS="\$scriptargs"
+        MS_ARCHDIRNAME="\$archdirname"
+        MS_KEEP="\$KEEP"
+        MS_NOOVERWRITE="\$NOOVERWRITE"
+        MS_COMPRESS="\$COMPRESS"
+        export MS_BUNDLE MS_LABEL MS_SCRIPT MS_SCRIPTARGS
+        export MS_ARCHDIRNAME MS_KEEP MS_NOOVERWRITE MS_COMPRESS
+    fi
+
     if test x"\$verbose" = x"y"; then
 		MS_Printf "OK to execute: \$script \$scriptargs \$* ? [Y/n] "
 		read yn

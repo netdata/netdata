@@ -2,7 +2,7 @@
 
 # netdata
 # real-time performance and health monitoring, done right!
-# (C) 2016 Costa Tsaousis <costa@tsaousis.gr>
+# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
 # GPL v3+
 #
 # charts.d.plugin allows easy development of BASH plugins
@@ -115,10 +115,11 @@ info "started from '$PROGRAM_FILE' with options: $*"
 # internal defaults
 # netdata exposes a few environment variables for us
 
-pluginsd="${NETDATA_PLUGINS_DIR}"
-[ -z "$pluginsd" ] && pluginsd="$( dirname $PROGRAM_FILE )"
+[ -z "${NETDATA_PLUGINS_DIR}" ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
+[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
 
-confd="${NETDATA_CONFIG_DIR-/etc/netdata}"
+pluginsd="${NETDATA_PLUGINS_DIR}"
+confd="${NETDATA_CONFIG_DIR}"
 chartsd="$pluginsd/../charts.d"
 
 myconfig="$confd/$PROGRAM_NAME.conf"

@@ -144,7 +144,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.themes = {
         white: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20170605-2',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20170725-1',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#F0F0F0',
@@ -161,7 +161,7 @@ var NETDATA = window.NETDATA || {};
         },
         slate: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20170605-2',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20170725-1',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
@@ -5552,27 +5552,39 @@ var NETDATA = window.NETDATA || {};
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    NETDATA.easypiechartPercentFromValueMinMax = function(value, min, max) {
+    NETDATA.easypiechartPercentFromValueMinMax = function(state, value, min, max) {
         if(typeof value !== 'number') value = 0;
         if(typeof min !== 'number') min = 0;
         if(typeof max !== 'number') max = 0;
 
+        if(min > max) {
+            var t = min;
+            min = max;
+            max = t;
+        }
+
         if(min > value) min = value;
         if(max < value) max = value;
 
-        // make sure it is zero based
-        if(min > 0) min = 0;
-        if(max < 0) max = 0;
+        if(state.tmp.easyPieChartMin === null && min > 0) min = 0;
+        if(state.tmp.easyPieChartMax === null && max < 0) max = 0;
 
-        var pcent = 0;
-        if(value >= 0) {
-            if(max !== 0)
-                pcent = Math.round(value * 100 / max);
+        var pcent;
+
+        if(min < 0 && max > 0) {
+            // it is both positive and negative
+            // zero at the top center of the chart
+            max = (-min > max)? -min : max;
+            pcent = Math.round(value * 100 / max);
+        }
+        else if(value >= 0 && min >= 0 && max >= 0) {
+            // clockwise
+            pcent = Math.round((value - min) * 100 / (max - min));
             if(pcent === 0) pcent = 0.1;
         }
         else {
-            if(min !== 0)
-                pcent = Math.round(-value * 100 / min);
+            // counter clockwise
+            pcent = Math.round((value - max) * 100 / (max - min));
             if(pcent === 0) pcent = -0.1;
         }
 
@@ -5649,7 +5661,7 @@ var NETDATA = window.NETDATA || {};
         var value = state.data.result[state.data.result.length - 1 - slot];
         var min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
         var max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
-        var pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
+        var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
 
         state.tmp.easyPieChartEvent.value = value;
         state.tmp.easyPieChartEvent.pcent = pcent;
@@ -5678,7 +5690,7 @@ var NETDATA = window.NETDATA || {};
             value = data.result[0];
             min = (state.tmp.easyPieChartMin === null)?NETDATA.commonMin.get(state):state.tmp.easyPieChartMin;
             max = (state.tmp.easyPieChartMax === null)?NETDATA.commonMax.get(state):state.tmp.easyPieChartMax;
-            pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
+            pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
         }
 
         state.tmp.easyPieChartLabel.innerText = state.legendFormatValue(value);
@@ -5707,7 +5719,7 @@ var NETDATA = window.NETDATA || {};
         else
             state.tmp.easyPieChartMax = max;
 
-        var pcent = NETDATA.easypiechartPercentFromValueMinMax(value, min, max);
+        var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
 
         chart.data('data-percent', pcent);
 
@@ -5919,8 +5931,9 @@ var NETDATA = window.NETDATA || {};
         var max = (state.tmp.gaugeMax === null)?NETDATA.commonMax.get(state):state.tmp.gaugeMax;
 
         // make sure it is zero based
-        if(min > 0) min = 0;
-        if(max < 0) max = 0;
+        // but only if it has not been set by the user
+        if(state.tmp.gaugeMin === null && min > 0) min = 0;
+        if(state.tmp.gaugeMax === null && max < 0) max = 0;
 
         state.tmp.gaugeEvent.value = value;
         state.tmp.gaugeEvent.min = min;
@@ -5956,8 +5969,9 @@ var NETDATA = window.NETDATA || {};
             if(value > max) max = value;
 
             // make sure it is zero based
-            if(min > 0) min = 0;
-            if(max < 0) max = 0;
+            // but only if it has not been set by the user
+            if(state.tmp.gaugeMin === null && min > 0) min = 0;
+            if(state.tmp.gaugeMax === null && max < 0) max = 0;
 
             NETDATA.gaugeSetLabels(state, value, min, max);
         }
@@ -5994,8 +6008,9 @@ var NETDATA = window.NETDATA || {};
             state.tmp.gaugeMax = max;
 
         // make sure it is zero based
-        if(min > 0) min = 0;
-        if(max < 0) max = 0;
+        // but only if it has not been set by the user
+        if(state.tmp.gaugeMin === null && min > 0) min = 0;
+        if(state.tmp.gaugeMax === null && max < 0) max = 0;
 
         var width = state.chartWidth(), height = state.chartHeight(); //, ratio = 1.5;
         // console.log('gauge width: ' + width.toString() + ', height: ' + height.toString());
