@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 # Description: tomcat netdata python.d module
 # Author: Pawel Krupa (paulfantom)
-# Update author: Wing924
 
 from base import UrlService
-from re import compile
 import xml.etree.ElementTree as ET
 
 try:
@@ -47,7 +45,7 @@ CHARTS = {
     'jvm': {
         'options': [None, "JVM Memory Pool Usage", "MB", "memory", "tomcat.jvm", "stacked"],
         'lines': [
-            ["free",  'free', "absolute", 1, 1048576],
+            ["free", 'free', "absolute", 1, 1048576],
             ["eden_used", 'eden', "absolute", 1, 1048576],
             ["survivor_used", 'survivor', "absolute", 1, 1048576],
             ["tenured_used", 'tenured', "absolute", 1, 1048576],
@@ -86,9 +84,6 @@ class Service(UrlService):
         self.order = ORDER
         self.definitions = CHARTS
 
-    def check(self):
-        return UrlService.check(self) and self._get_data() != None
-
     def _get_data(self):
         """
         Format data received from http request
@@ -114,7 +109,6 @@ class Service(UrlService):
             memory = jvm.find('memory')
             data['free']  = memory.get('free')
             data['total'] = memory.get('total')
-            data['used']  = int(data['total']) - int(data['free'])
 
             for pool in jvm.findall('memorypool'):
                 name = pool.get('name')
