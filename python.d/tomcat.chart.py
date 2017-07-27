@@ -87,7 +87,12 @@ class Service(UrlService):
         data = None
         raw_data = self._get_raw_data()
         if raw_data:
-            xml = ET.fromstring(raw_data)
+            xml = None
+            try:
+                xml = ET.fromstring(raw_data)
+            except ET.ParseError:
+                self.debug('%s is not a vaild XML page. Please add "?XML=true" to tomcat status page.' % self.url)
+                return None
             data = {}
 
             jvm = xml.find('jvm')
