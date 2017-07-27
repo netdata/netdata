@@ -5,11 +5,6 @@
 from base import UrlService
 import xml.etree.ElementTree as ET
 
-try:
-    from urlparse import urlparse
-except ImportError:
-    from urllib.parse import urlparse
-
 # default module values (can be overridden per job in `config`)
 # update_every = 2
 priority = 60000
