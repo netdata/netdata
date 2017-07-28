@@ -2,7 +2,6 @@
 # Description: example netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-import re
 from base import ExecutableService
 
 # default module values
@@ -40,13 +39,12 @@ class Service(ExecutableService):
         raw_data = self._get_raw_data()
         if not raw_data:
             return None
-        ptn = re.compile(r'\s+')
         data = {}
         for key in ['ESTABLISHED', 'SYN_SENT', 'SYN_RECV', 'FIN_WAIT1', 'FIN_WAIT2', 'TIME_WAIT', 'CLOSE', 'CLOSE_WAIT', 'LISTEN', 'CLOSING']:
             data[key] = 0
 
         for line in raw_data:
-            tk = ptn.split(line)
+            tk = line.split()
             if tk[0] != 'tcp':
                 continue
             data[tk[5]] += 1
