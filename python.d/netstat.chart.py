@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Description: example netdata python.d module
-# Author: Pawel Krupa (paulfantom)
+# Description: netstat python.d module
+# Author: Wing924
 
 from base import ExecutableService
 
