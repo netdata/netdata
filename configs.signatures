@@ -328,6 +328,7 @@ declare -A configs_signatures=(
   ['acaa6731a272f6d251afb357e99b518f']='apps_groups.conf'
   ['ade389c1b6efe0cff47c33e662731f0a']='python.d/squid.conf'
   ['ae5ac0a3521e50aa6f6eda2a330b4075']='python.d/example.conf'
+  ['af12051cf57dd4e484ef8e64502b7549']='health.d/net.conf'
   ['af14667ee7993acea810f6d50923bdc9']='health.d/web_log.conf'
   ['af44cc53aa2bc5cc8935667119567522']='python.d.conf'
   ['afdae4646c755ff2d117527fbf761c8e']='health.d/disks.conf'
