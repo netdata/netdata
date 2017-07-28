@@ -117,7 +117,10 @@ GLOBAL_STATS = [
  'Connection_errors_tcpwrap']
 
 def slave_seconds(value):
-    return value if value is not '' else -1
+    try:
+        return int(value)
+    except ValueError:
+        return -1
 
 def slave_running(value):
     return 1 if value == 'Yes' else -1
