@@ -42,8 +42,8 @@ CHARTS = {
     'context_switches': {
         'options': [None, "Dovecot Context Switches", '', 'context switches', 'dovecot.context_switches', 'line'],
         'lines': [
-            ['vol_cs', 'volountary', 'absolute'],
-            ['invol_cs', 'involountary', 'absolute']
+            ['vol_cs', 'voluntary', 'absolute'],
+            ['invol_cs', 'involuntary', 'absolute']
         ]},
     'io': {
         'options': [None, "Dovecot Disk I/O", 'kilobytes/s', 'disk', 'dovecot.io', 'area'],
