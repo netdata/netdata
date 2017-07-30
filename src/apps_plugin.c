@@ -3197,7 +3197,7 @@ static void parse_args(int argc, char **argv)
             }
         }
 
-        if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
+        if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
             printf("apps.plugin %s\n", VERSION);
             exit(0);
         }

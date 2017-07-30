@@ -138,7 +138,7 @@ run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 # -----------------------------------------------------------------------------
 progress "fix plugin permissions"
 
-for x in apps.plugin freeipmi.plugin
+for x in apps.plugin freeipmi.plugin cgroup-network
 do
     f="usr/libexec/netdata/plugins.d/${x}"
 

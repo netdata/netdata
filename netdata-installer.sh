@@ -782,6 +782,12 @@ if [ ${UID} -eq 0 ]
         run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin"
     fi
 
+    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]
+        then
+        run chown root "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
+        run chmod 4755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
+    fi
+
 else
     run chown "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_LOG_DIR}"
     run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${NETDATA_PREFIX}/usr/libexec/netdata"
