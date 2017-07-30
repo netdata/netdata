@@ -80,7 +80,7 @@ struct iface *read_proc_net_dev(const char *prefix) {
     return root;
 }
 
-inline int iface_is_eligible(struct iface *iface) {
+int iface_is_eligible(struct iface *iface) {
     if(iface->iflink != iface->ifindex)
         return 1;
 
