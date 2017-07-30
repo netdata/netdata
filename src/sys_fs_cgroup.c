@@ -50,6 +50,7 @@ static SIMPLE_PATTERN *enabled_cgroup_renames = NULL;
 static SIMPLE_PATTERN *systemd_services_cgroups = NULL;
 
 static char *cgroups_rename_script = NULL;
+static char *cgroups_network_interface_script = NULL;
 
 static int cgroups_check = 0;
 
@@ -191,6 +192,9 @@ void read_cgroup_plugin_configuration() {
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_plugins_dir);
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", filename);
 
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup-network", netdata_configured_plugins_dir);
+    cgroups_network_interface_script = config_get("plugin:cgroups", "script to get cgroup network interfaces", filename);
+
     enabled_cgroup_renames = simple_pattern_create(
             config_get("plugin:cgroups", "run script to rename cgroups matching",
                     " *.scope "
@@ -329,6 +333,12 @@ struct cpuacct_usage {
     unsigned long long *cpu_percpu;
 };
 
+struct cgroup_network_interface {
+    const char *host_device;
+    const char *container_device;
+    struct cgroup_network_interface *next;
+};
+
 #define CGROUP_OPTIONS_DISABLED_DUPLICATE   0x00000001
 #define CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE 0x00000002
 
@@ -359,6 +369,8 @@ struct cgroup {
 
     struct blkio io_merged;                     // operations
     struct blkio io_queued;                     // operations
+
+    struct cgroup_network_interface *interfaces;
 
     // per cgroup charts
     RRDSET *st_cpu;
@@ -718,6 +730,77 @@ static inline void read_all_cgroups(struct cgroup *root) {
 }
 
 // ----------------------------------------------------------------------------
+// cgroup network interfaces
+
+#define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
+static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
+    debug(D_CGROUP, "looking for the network interfaces of cgroup '%s' with chart id '%s' and title '%s'", cg->id, cg->chart_id, cg->chart_title);
+
+    pid_t cgroup_pid;
+    char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+
+    snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s --cgroup '%s%s'", cgroups_network_interface_script, cgroup_cpuacct_base, cg->id);
+
+    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", buffer, cg->id);
+    FILE *fp = mypopen(buffer, &cgroup_pid);
+    if(fp) {
+        char *s;
+        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+            trim(s);
+
+            if(*s && *s != '\n') {
+                char *t = s;
+                while(*t && *t != ' ') t++;
+                if(*t == ' ') {
+                    *t = '\0';
+                    t++;
+                }
+
+                if(!*s) {
+                    error("CGROUP: empty host interface returned by script");
+                    continue;
+                }
+
+                if(!*t) {
+                    error("CGROUP: empty container interface returned by script");
+                    continue;
+                }
+
+                struct cgroup_network_interface *i = callocz(1, sizeof(struct cgroup_network_interface));
+                i->host_device = strdupz(s);
+                i->container_device = strdupz(t);
+                i->next = cg->interfaces;
+                cg->interfaces = i;
+
+                info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
+
+                // register a device rename to proc_net_dev.c
+                netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id);
+            }
+        }
+
+        mypclose(fp, cgroup_pid);
+        // debug(D_CGROUP, "closed command for cgroup '%s'", cg->id);
+    }
+    else
+        error("CGROUP: cannot popen(\"%s\", \"r\").", buffer);
+}
+
+static inline void free_cgroup_network_interfaces(struct cgroup *cg) {
+    while(cg->interfaces) {
+        struct cgroup_network_interface *i = cg->interfaces;
+        cg->interfaces = i->next;
+
+        // delete the registration of proc_net_dev rename
+        netdev_rename_device_del(i->host_device);
+
+        freez((void *)i->host_device);
+        freez((void *)i->container_device);
+        freez((void *)i);
+    }
+}
+
+// ----------------------------------------------------------------------------
 // add/remove/find cgroup objects
 
 #define CGROUP_CHARTID_LINE_MAX 1024
@@ -893,6 +976,9 @@ static inline struct cgroup *cgroup_add(const char *id) {
         }
     }
 
+    if(cg->enabled && !(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE))
+        read_cgroup_network_interfaces(cg);
+
     debug(D_CGROUP, "ADDED CGROUP: '%s' with chart id '%s' and title '%s' as %s (default was %s)", cg->id, cg->chart_id, cg->chart_title, (cg->enabled)?"enabled":"disabled", (def)?"enabled":"disabled");
 
     return cg;
@@ -915,6 +1001,8 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_throttle_serviced_ops) rrdset_is_obsolete(cg->st_throttle_serviced_ops);
     if(cg->st_queued_ops)            rrdset_is_obsolete(cg->st_queued_ops);
     if(cg->st_merged_ops)            rrdset_is_obsolete(cg->st_merged_ops);
+
+    free_cgroup_network_interfaces(cg);
 
     freez(cg->cpuacct_usage.cpu_percpu);
 
