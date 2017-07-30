@@ -286,7 +286,7 @@ int main(int argc, char **argv) {
         if(iface_is_eligible(h)) {
             for (c = cgroup; c; c = c->next) {
                 if(iface_is_eligible(c) && h->ifindex == c->iflink && h->iflink == c->ifindex) {
-                    printf("%s\n", h->device);
+                    printf("%s %s\n", h->device, c->device);
                     found++;
                 }
             }
