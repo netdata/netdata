@@ -256,7 +256,6 @@ cgroup_network_SOURCES = \
     inlined.h \
     log.c log.h \
 	procfile.c procfile.h \
-	web_buffer.c web_buffer.h \
     $(NULL)
 
 cgroup_network_LDADD = \
