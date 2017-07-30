@@ -1433,7 +1433,7 @@ int main (int argc, char **argv) {
                 continue;
             }
         }
-        else if(strcmp("version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
+        else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
             printf("freeipmi.plugin %s\n", VERSION);
             exit(0);
         }

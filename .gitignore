@@ -109,3 +109,5 @@ diagrams/plantuml.jar
 netdata.cppcheck
 
 profile/statsd-stress
+src/cgroup-network
+vgcore.*
