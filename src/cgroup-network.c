@@ -176,6 +176,9 @@ int switch_namespace(const char *prefix, pid_t pid) {
     // 2 passes - found it at nsenter source code
     // this is related CLONE_NEWUSER functionality
 
+    // FIXME: this code cannot switch user namespace
+    // Fortunately, we don't need it.
+
     int pass, errors = 0;
     for(pass = 0; pass < 2 ;pass++) {
         for(i = 0; all_ns[i].name ; i++) {
@@ -237,8 +240,35 @@ int switch_namespace(const char *prefix, pid_t pid) {
 #endif
 }
 
+pid_t read_pid_from_cgroup(const char *path) {
+    char buffer[FILENAME_MAX + 1];
+
+    snprintfz(buffer, FILENAME_MAX, "%s/cgroup.procs", path);
+    FILE *fp = fopen(buffer, "r");
+    if(!fp) {
+        error("Cannot read file '%s'.", buffer);
+        snprintfz(buffer, FILENAME_MAX, "%s/tasks", path);
+        fp = fopen(buffer, "r");
+    }
+
+    if(!fp) {
+        error("Cannot read file '%s'.", buffer);
+        return 0;
+    }
+
+    pid_t pid = 0;
+    char *s;
+    while((s = fgets(buffer, FILENAME_MAX, fp))) {
+        pid = atoi(s);
+        if(pid > 0) break;
+    }
+
+    fclose(fp);
+    return pid;
+}
+
 void usage(void) {
-    fprintf(stderr, "%s -p PID\n", program_name);
+    fprintf(stderr, "%s [ -p PID | --pid PID | --cgroup /path/to/cgroup ]\n", program_name);
     exit(1);
 }
 
@@ -254,10 +284,18 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
-    if(argc != 3 || strcmp(argv[1], "-p") != 0)
+    if(argc != 3)
         usage();
 
-    pid = atoi(argv[2]);
+    if(!strcmp(argv[1], "-p") || !strcmp(argv[1], "--pid")) {
+        pid = atoi(argv[2]);
+    }
+    else if(!strcmp(argv[1], "--cgroup")) {
+        pid = read_pid_from_cgroup(argv[2]);
+    }
+    else
+        usage();
+
     if(pid <= 0)
         fatal("Invalid pid %d", (int)pid);
 
