@@ -709,9 +709,53 @@ netdataDashboard.context = {
     // NETWORK INTERFACES
 
     'net.net': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                if(id.match(/^cgroup_.*/)) {
+                    var iface;
+                    try {
+                        iface = id.substring(id.lastIndexOf('.net_') + 5, id.length) + ' ';
+                    }
+                    catch (e) {
+                        iface = '';
+                    }
+                    return netdataDashboard.gaugeChart(iface + 'Received', '12%', 'received');
+                }
+                else
+                    return '';
+            },
+            function(os, id) {
+                void(os);
+                if(id.match(/^cgroup_.*/)) {
+                    var iface;
+                    try {
+                        iface = id.substring(id.lastIndexOf('.net_') + 5, id.length) + ' ';
+                    }
+                    catch (e) {
+                        iface = '';
+                    }
+                    return netdataDashboard.gaugeChart(iface + 'Sent', '12%', 'sent');
+                }
+                else
+                    return '';
+            }
+        ],
         heads: [
-            netdataDashboard.gaugeChart('Received', '12%', 'received'),
-            netdataDashboard.gaugeChart('Sent', '12%', 'sent')
+            function(os, id) {
+                void(os);
+                if(!id.match(/^cgroup_.*/))
+                    return netdataDashboard.gaugeChart('Received', '12%', 'received');
+                else
+                    return '';
+            },
+            function(os, id) {
+                void(os);
+                if(!id.match(/^cgroup_.*/))
+                    return netdataDashboard.gaugeChart('Sent', '12%', 'sent');
+                else
+                    return '';
+            }
         ]
     },
 
