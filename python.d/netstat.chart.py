@@ -72,5 +72,5 @@ class Service(SimpleService):
     def _st_name(self, st_code):
         try:
             return ST_CODES[int(st_code, 16) - 1]
-        except:
+        except Exception:
             return None
