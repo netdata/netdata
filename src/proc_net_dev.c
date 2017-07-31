@@ -556,8 +556,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , RRDSET_TYPE_AREA
                 );
 
-                d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL,  8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
 
                 if(d->flipped) {
                     // flip receive/trasmit

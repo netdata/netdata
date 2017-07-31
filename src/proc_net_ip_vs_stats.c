@@ -80,8 +80,8 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
             st = rrdset_create_localhost(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS Bandwidth"
                                          , "kilobits/s", 3100, update_every, RRDSET_TYPE_AREA);
 
-            rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "received", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "sent", NULL,    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 

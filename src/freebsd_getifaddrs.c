@@ -233,8 +233,8 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                  RRDSET_TYPE_AREA
                     );
 
-                    rd_in  = rrddim_add(st, "InOctets",  "received", 8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out = rrddim_add(st, "OutOctets", "sent",    -8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in  = rrddim_add(st, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -270,8 +270,8 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                  RRDSET_TYPE_AREA
                     );
 
-                    rd_in  = rrddim_add(st, "received", NULL,  8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out = rrddim_add(st, "sent",     NULL, -8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in  = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -338,10 +338,8 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                     RRDSET_TYPE_AREA
                         );
 
-                        ifm->rd_bandwidth_in  = rrddim_add(ifm->st_bandwidth, "received", NULL,  8, KILO_FACTOR,
-                                                           RRD_ALGORITHM_INCREMENTAL);
-                        ifm->rd_bandwidth_out = rrddim_add(ifm->st_bandwidth, "sent",     NULL, -8, KILO_FACTOR,
-                                                           RRD_ALGORITHM_INCREMENTAL);
+                        ifm->rd_bandwidth_in  = rrddim_add(ifm->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                        ifm->rd_bandwidth_out = rrddim_add(ifm->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                     } else
                         rrdset_next(ifm->st_bandwidth);
 
