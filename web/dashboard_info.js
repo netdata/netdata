@@ -715,12 +715,12 @@ netdataDashboard.context = {
                 if(id.match(/^cgroup_.*/)) {
                     var iface;
                     try {
-                        iface = id.substring(id.lastIndexOf('.net_') + 5, id.length) + ' ';
+                        iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
                     }
                     catch (e) {
                         iface = '';
                     }
-                    return netdataDashboard.gaugeChart(iface + 'Received', '12%', 'received');
+                    return netdataDashboard.gaugeChart('Received' + iface, '12%', 'received');
                 }
                 else
                     return '';
@@ -730,12 +730,12 @@ netdataDashboard.context = {
                 if(id.match(/^cgroup_.*/)) {
                     var iface;
                     try {
-                        iface = id.substring(id.lastIndexOf('.net_') + 5, id.length) + ' ';
+                        iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
                     }
                     catch (e) {
                         iface = '';
                     }
-                    return netdataDashboard.gaugeChart(iface + 'Sent', '12%', 'sent');
+                    return netdataDashboard.gaugeChart('Sent' + iface, '12%', 'sent');
                 }
                 else
                     return '';
@@ -1087,7 +1087,7 @@ netdataDashboard.context = {
                     + ' data-before="0"'
                     + ' data-after="-CHART_DURATION"'
                     + ' data-points="CHART_DURATION"'
-                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
                     + ' role="application"></div>';
             }
         ]
