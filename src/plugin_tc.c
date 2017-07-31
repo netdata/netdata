@@ -392,7 +392,7 @@ static inline void tc_device_commit(struct tc_device *d) {
             if(unlikely(!c->render)) continue;
 
             if(unlikely(!c->rd_bytes))
-                c->rd_bytes = rrddim_add(d->st_bytes, c->id, c->name?c->name:c->id, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                c->rd_bytes = rrddim_add(d->st_bytes, c->id, c->name?c->name:c->id, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             else if(unlikely(c->name_updated))
                 rrddim_set_name(d->st_bytes, c->rd_bytes, c->name);
 
