@@ -2,7 +2,7 @@
 # Description: netstat python.d module
 # Author: Wing924
 
-from base import ExecutableService
+from base import SimpleService
 
 # default module values
 # update_every = 4
@@ -15,38 +15,62 @@ CHARTS = {
     'tcp': {
         'options': [None, 'TCP netstat', 'connections', 'netstat', 'netstat.tcp', 'area'],
         'lines': [
-            ['ESTABLISHED', 'established'],
-            ['SYN_SENT',    'syn_sent'],
-            ['SYN_RECV',    'syn_recv'],
-            ['FIN_WAIT1',   'fin_wait1'],
-            ['FIN_WAIT2',   'fin_wait2'],
-            ['TIME_WAIT',   'time_wait'],
-            ['CLOSE',       'close'],
-            ['CLOSE_WAIT',  'close_wait'],
-            ['LISTEN',      'listen'],
-            ['CLOSING',     'closing'],
+            ['established'],
+            ['syn_sent'],
+            ['syn_recv'],
+            ['fin_wait1'],
+            ['fin_wait2'],
+            ['time_wait'],
+            ['close'],
+            ['close_wait'],
+            ['last_ack'],
+            ['listen'],
+            ['closing'],
+        	['new_syn_recv'],
         ]},
 }
 
-class Service(ExecutableService):
+ST_CODES = [
+    'established',
+    'syn_sent',
+    'syn_recv',
+    'fin_wait1',
+    'fin_wait2',
+    'time_wait',
+    'close',
+    'close_wait',
+    'last_ack',
+    'listen',
+    'closing',
+	'new_syn_recv',
+]
+
+class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
-        super(self.__class__,self).__init__(configuration=configuration, name=name)
-        self.command = 'netstat -tan'
+        SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
 
     def _get_data(self):
-        raw_data = self._get_raw_data()
+        with open('/proc/net/tcp') as f:
+            raw_data = f.readlines()
+
         if not raw_data:
             return None
         data = {}
-        for key in ['ESTABLISHED', 'SYN_SENT', 'SYN_RECV', 'FIN_WAIT1', 'FIN_WAIT2', 'TIME_WAIT', 'CLOSE', 'CLOSE_WAIT', 'LISTEN', 'CLOSING']:
+        for key in ST_CODES:
             data[key] = 0
 
         for line in raw_data:
             tk = line.split()
-            if tk[0] != 'tcp':
-                continue
-            data[tk[5]] += 1
+            st_name = self._st_name(tk[3])
+            if st_name:
+                data[st_name] += 1
 
         return data
+
+    def _st_name(self, st_code):
+        try:
+            return ST_CODES[int(st_code, 16) - 1]
+        except:
+            return None
