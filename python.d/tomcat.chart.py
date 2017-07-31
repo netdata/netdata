@@ -3,12 +3,7 @@
 # Author: Pawel Krupa (paulfantom)
 
 from base import UrlService
-from re import compile
-
-try:
-    from urlparse import urlparse
-except ImportError:
-    from urllib.parse import urlparse
+import xml.etree.ElementTree as ET
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -16,61 +11,142 @@ priority = 60000
 retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['accesses', 'volume', 'threads', 'jvm']
+ORDER = ['accesses', 'bandwidth', 'processing_time', 'threads', 'jvm', 'jvm_eden', 'jvm_survivor', 'jvm_tenured']
 
 CHARTS = {
     'accesses': {
         'options': [None, "Requests", "requests/s", "statistics", "tomcat.accesses", "area"],
         'lines': [
-            ["requestCount", 'accesses', 'incremental']
+            ["requestCount", 'accesses', 'incremental'],
+            ["errorCount", 'errors', 'incremental'],
         ]},
-    'volume': {
-        'options': [None, "Volume", "KB/s", "volume", "tomcat.volume", "area"],
+    'bandwidth': {
+        'options': [None, "Bandwidth", "KB/s", "statistics", "tomcat.bandwidth", "area"],
         'lines': [
-            ["bytesSent", 'volume', 'incremental', 1, 1024]
+            ["bytesSent", 'sent', 'incremental', 1, 1024],
+            ["bytesReceived", 'received', 'incremental', 1, 1024],
+        ]},
+    'processing_time': {
+        'options': [None, "processing time", "seconds", "statistics", "tomcat.processing_time", "area"],
+        'lines': [
+            ["processingTime", 'processing time', 'incremental', 1, 1000]
         ]},
     'threads': {
-        'options': [None, "Threads", "current threads", "statistics", "tomcat.threads", "line"],
+        'options': [None, "Threads", "current threads", "statistics", "tomcat.threads", "area"],
         'lines': [
             ["currentThreadCount", 'current', "absolute"],
             ["currentThreadsBusy", 'busy', "absolute"]
         ]},
     'jvm': {
-        'options': [None, "JVM Free Memory", "MB", "statistics", "tomcat.jvm", "area"],
+        'options': [None, "JVM Memory Pool Usage", "MB", "memory", "tomcat.jvm", "stacked"],
         'lines': [
-            ["free", None, "absolute", 1, 1048576]
-        ]}
+            ["free", 'free', "absolute", 1, 1048576],
+            ["eden_used", 'eden', "absolute", 1, 1048576],
+            ["survivor_used", 'survivor', "absolute", 1, 1048576],
+            ["tenured_used", 'tenured', "absolute", 1, 1048576],
+            ["code_cache_used", 'code cache', "absolute", 1, 1048576],
+            ["compressed_used", 'compressed', "absolute", 1, 1048576],
+            ["metaspace_used", 'metaspace', "absolute", 1, 1048576],
+        ]},
+    'jvm_eden': {
+        'options': [None, "Eden Memory Usage", "MB", "memory", "tomcat.jvm_eden", "area"],
+        'lines': [
+            ["eden_used", 'used', "absolute", 1, 1048576],
+            ["eden_commited", 'commited', "absolute", 1, 1048576],
+            ["eden_max", 'max', "absolute", 1, 1048576]
+        ]},
+    'jvm_survivor': {
+        'options': [None, "Survivor Memory Usage", "MB", "memory", "tomcat.jvm_survivor", "area"],
+        'lines': [
+            ["survivor_used", 'used', "absolute", 1, 1048576],
+            ["survivor_commited", 'commited', "absolute", 1, 1048576],
+            ["survivor_max", 'max', "absolute", 1, 1048576]
+        ]},
+    'jvm_tenured': {
+        'options': [None, "Tenured Memory Usage", "MB", "memory", "tomcat.jvm_tenured", "area"],
+        'lines': [
+            ["tenured_used", 'used', "absolute", 1, 1048576],
+            ["tenured_commited", 'commited', "absolute", 1, 1048576],
+            ["tenured_max", 'max', "absolute", 1, 1048576]
+        ]},
 }
-
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.url = self.configuration.get('url', "http://127.0.0.1:8080/manager/status?XML=true")
+        self.connector_name = self.configuration.get('connector_name', None)
         self.order = ORDER
         self.definitions = CHARTS
-
-    def check(self):
-        netloc = urlparse(self.url).netloc.rpartition(':')
-        if netloc[1] == ':': port = netloc[2]
-        else: port = 80
-        
-        self.regex_jvm = compile(r'<jvm>.*?</jvm>')
-        self.regex_connector = compile(r'[a-z-]+%s.*?/connector' % port)
-        self.regex = compile(r'([\w]+)=\\?[\'\"](\d+)\\?[\'\"]')
-        
-        return UrlService.check(self)
 
     def _get_data(self):
         """
         Format data received from http request
         :return: dict
         """
-        data = self._get_raw_data()
-        if data:
-            jvm = self.regex_jvm.findall(data) or ['']
-            connector = self.regex_connector.findall(data) or ['']
-            data = dict(self.regex.findall(''.join([jvm[0], connector[0]])))
-        
-        return data or None
+        data = None
+        raw_data = self._get_raw_data()
+        if raw_data:
+            xml = None
+            try:
+                xml = ET.fromstring(raw_data)
+            except ET.ParseError:
+                self.debug('%s is not a vaild XML page. Please add "?XML=true" to tomcat status page.' % self.url)
+                return None
+            data = {}
 
+            jvm = xml.find('jvm')
+
+            connector = None
+            if self.connector_name:
+                for conn in xml.findall('connector'):
+                    if conn.get('name') == self.connector_name:
+                        connector = conn
+                        break
+            else:
+                connector = xml.find('connector')
+
+            memory = jvm.find('memory')
+            data['free']  = memory.get('free')
+            data['total'] = memory.get('total')
+
+            for pool in jvm.findall('memorypool'):
+                name = pool.get('name')
+                if name == 'Eden Space':
+                    data['eden_used'] = pool.get('usageUsed')
+                    data['eden_commited'] = pool.get('usageCommitted')
+                    data['eden_max'] = pool.get('usageMax')
+                elif name == 'Survivor Space':
+                    data['survivor_used'] = pool.get('usageUsed')
+                    data['survivor_commited'] = pool.get('usageCommitted')
+                    data['survivor_max'] = pool.get('usageMax')
+                elif name == 'Tenured Gen':
+                    data['tenured_used'] = pool.get('usageUsed')
+                    data['tenured_commited'] = pool.get('usageCommitted')
+                    data['tenured_max'] = pool.get('usageMax')
+                elif name == 'Code Cache':
+                    data['code_cache_used'] = pool.get('usageUsed')
+                    data['code_cache_commited'] = pool.get('usageCommitted')
+                    data['code_cache_max'] = pool.get('usageMax')
+                elif name == 'Compressed':
+                    data['compressed_used'] = pool.get('usageUsed')
+                    data['compressed_commited'] = pool.get('usageCommitted')
+                    data['compressed_max'] = pool.get('usageMax')
+                elif name == 'Metaspace':
+                    data['metaspace_used'] = pool.get('usageUsed')
+                    data['metaspace_commited'] = pool.get('usageCommitted')
+                    data['metaspace_max'] = pool.get('usageMax')
+
+            if connector:
+                thread_info = connector.find('threadInfo')
+                data['currentThreadsBusy'] = thread_info.get('currentThreadsBusy')
+                data['currentThreadCount'] = thread_info.get('currentThreadCount')
+
+                request_info = connector.find('requestInfo')
+                data['processingTime'] = request_info.get('processingTime')
+                data['requestCount']   = request_info.get('requestCount')
+                data['errorCount']     = request_info.get('errorCount')
+                data['bytesReceived']  = request_info.get('bytesReceived')
+                data['bytesSent']      = request_info.get('bytesSent')
+
+        return data or None
