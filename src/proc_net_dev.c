@@ -292,7 +292,9 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_packets_%s", r->container_device);
     d->chart_id_net_packets    = strdupz(buffer);
 
-    d->chart_family = strdupz("net");
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net %s", r->container_device);
+    d->chart_family = strdupz(buffer);
+
     d->priority = 43000;
     d->flipped = 1;
 }
