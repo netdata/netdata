@@ -244,10 +244,10 @@ class Service(SimpleService):
         self.database_poll = configuration.pop('database_poll', None)
         self.configuration = configuration
         self.connection = False
-        self.is_superuser = False
         self.data = dict()
         self.locks_zeroed = dict()
         self.databases = list()
+        self.queries = QUERY_STATS.copy()
 
     def _connect(self):
         params = dict(user='postgres',
@@ -294,12 +294,12 @@ class Service(SimpleService):
 
     def add_additional_queries_(self, is_superuser):
         if self.index_stats:
-            QUERY_STATS[QUERIES['INDEX_STATS']] = METRICS['INDEX_STATS']
+            self.queries[QUERIES['INDEX_STATS']] = METRICS['INDEX_STATS']
         if self.table_stats:
-            QUERY_STATS[QUERIES['TABLE_STATS']] = METRICS['TABLE_STATS']
+            self.queries[QUERIES['TABLE_STATS']] = METRICS['TABLE_STATS']
         if is_superuser:
-            QUERY_STATS[QUERIES['BGWRITER']] = METRICS['BGWRITER']
-            QUERY_STATS[QUERIES['ARCHIVE']] = METRICS['ARCHIVE']
+            self.queries[QUERIES['BGWRITER']] = METRICS['BGWRITER']
+            self.queries[QUERIES['ARCHIVE']] = METRICS['ARCHIVE']
 
     def create_dynamic_charts_(self):
 
@@ -318,7 +318,7 @@ class Service(SimpleService):
             cursor = self.connection.cursor(cursor_factory=DictCursor)
             try:
                 self.data.update(self.locks_zeroed)
-                for query, metrics in QUERY_STATS.items():
+                for query, metrics in self.queries.items():
                     self.query_stats_(cursor, query, metrics)
 
             except OperationalError:
@@ -398,13 +398,3 @@ def add_database_stat_chart_(order, definitions, name, database_name):
     definitions[chart_name] = {
                'options': [name, title + ': ' + database_name,  units, 'db ' + database_name, context,  chart_type],
                'lines': create_lines(database_name, chart_template['lines'])}
-
-
-#
-#    def add_replication_stats(self, cursor):
-#        cursor.execute(REPLICATION)
-#        temp = cursor.fetchall()
-#        for row in temp:
-#            self.add_gauge_value('Replication/%s' % row.get('client_addr', 'Unknown'),
-#                                 'byte_lag',
-#                                 int(row.get('byte_lag', 0)))
