@@ -290,10 +290,12 @@ int unit_test_buffer() {
         fprintf(stderr, "\nstring  : %s (length %zu)\n", string, strlen(string));
         fprintf(stderr, "\nbuffer  : %s (length %zu)\n", s, buffer_strlen(wb));
         fprintf(stderr, "\nexpected: %s (length %zu)\n", final, strlen(final));
+        buffer_free(wb);
         return -1;
     }
 
     fprintf(stderr, "buffer_sprintf() works as expected.\n");
+    buffer_free(wb);
     return 0;
 }
 

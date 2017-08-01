@@ -77,6 +77,8 @@ struct iface *read_proc_net_dev(const char *prefix) {
         root = t;
     }
 
+    procfile_close(ff);
+
     return root;
 }
 
