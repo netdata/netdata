@@ -1922,13 +1922,13 @@ void *statsd_main(void *ptr) {
             , "statsd"
             , NULL
             , "Bytes read by the netdata statsd server"
-            , "kbps"
+            , "kilobits/s"
             , 132003
             , statsd.update_every
             , RRDSET_TYPE_STACKED
     );
-    RRDDIM *rd_bytes_tcp = rrddim_add(st_bytes, "tcp", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-    RRDDIM *rd_bytes_udp = rrddim_add(st_bytes, "udp", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_bytes_tcp = rrddim_add(st_bytes, "tcp", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_bytes_udp = rrddim_add(st_bytes, "udp", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
 
     RRDSET *st_packets = rrdset_create_localhost(
             "netdata"

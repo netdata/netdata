@@ -283,8 +283,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             st = rrdset_create_localhost("system", "ipv6", NULL, "network", NULL, "IPv6 Bandwidth", "kilobits/s", 500
                                          , update_every, RRDSET_TYPE_AREA);
 
-            rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -536,8 +536,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                                          , RRDSET_TYPE_AREA);
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
@@ -557,8 +557,8 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                                          , RRDSET_TYPE_AREA);
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 

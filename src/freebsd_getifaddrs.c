@@ -2,7 +2,7 @@
 
 #include <ifaddrs.h>
 
-struct network_interface {
+struct cgroup_network_interface {
     char *name;
     uint32_t hash;
     size_t len;
@@ -41,14 +41,14 @@ struct network_interface {
     RRDSET *st_events;
     RRDDIM *rd_events_coll;
 
-    struct network_interface *next;
+    struct cgroup_network_interface *next;
 };
 
-static struct network_interface *network_interfaces_root = NULL, *network_interfaces_last_used = NULL;
+static struct cgroup_network_interface *network_interfaces_root = NULL, *network_interfaces_last_used = NULL;
 
 static size_t network_interfaces_added = 0, network_interfaces_found = 0;
 
-static void network_interface_free(struct network_interface *ifm) {
+static void network_interface_free(struct cgroup_network_interface *ifm) {
     if (likely(ifm->st_bandwidth))
         rrdset_is_obsolete(ifm->st_bandwidth);
     if (likely(ifm->st_packets))
@@ -68,7 +68,7 @@ static void network_interface_free(struct network_interface *ifm) {
 static void network_interfaces_cleanup() {
     if (likely(network_interfaces_found == network_interfaces_added)) return;
 
-    struct network_interface *ifm = network_interfaces_root, *last = NULL;
+    struct cgroup_network_interface *ifm = network_interfaces_root, *last = NULL;
     while(ifm) {
         if (unlikely(!ifm->updated)) {
             // info("Removing network interface '%s', linked after '%s'", ifm->name, last?last->name:"ROOT");
@@ -76,7 +76,7 @@ static void network_interfaces_cleanup() {
             if (network_interfaces_last_used == ifm)
                 network_interfaces_last_used = last;
 
-            struct network_interface *t = ifm;
+            struct cgroup_network_interface *t = ifm;
 
             if (ifm == network_interfaces_root || !last)
                 network_interfaces_root = ifm = ifm->next;
@@ -95,8 +95,8 @@ static void network_interfaces_cleanup() {
     }
 }
 
-static struct network_interface *get_network_interface(const char *name) {
-    struct network_interface *ifm;
+static struct cgroup_network_interface *get_network_interface(const char *name) {
+    struct cgroup_network_interface *ifm;
 
     uint32_t hash = simple_hash(name);
 
@@ -117,7 +117,7 @@ static struct network_interface *get_network_interface(const char *name) {
     }
 
     // create a new one
-    ifm = callocz(1, sizeof(struct network_interface));
+    ifm = callocz(1, sizeof(struct cgroup_network_interface));
     ifm->name = strdupz(name);
     ifm->hash = simple_hash(ifm->name);
     ifm->len = strlen(ifm->name);
@@ -125,7 +125,7 @@ static struct network_interface *get_network_interface(const char *name) {
 
     // link it to the end
     if (network_interfaces_root) {
-        struct network_interface *e;
+        struct cgroup_network_interface *e;
         for(e = network_interfaces_root; e->next ; e = e->next) ;
         e->next = ifm;
     }
@@ -233,8 +233,8 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                  RRDSET_TYPE_AREA
                     );
 
-                    rd_in  = rrddim_add(st, "InOctets",  "received", 8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out = rrddim_add(st, "OutOctets", "sent",    -8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in  = rrddim_add(st, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -270,8 +270,8 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                  RRDSET_TYPE_AREA
                     );
 
-                    rd_in  = rrddim_add(st, "received", NULL,  8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
-                    rd_out = rrddim_add(st, "sent",     NULL, -8, KILO_FACTOR, RRD_ALGORITHM_INCREMENTAL);
+                    rd_in  = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 } else
                     rrdset_next(st);
 
@@ -288,7 +288,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 if (ifa->ifa_addr->sa_family != AF_LINK)
                     continue;
 
-                struct network_interface *ifm = get_network_interface(ifa->ifa_name);
+                struct cgroup_network_interface *ifm = get_network_interface(ifa->ifa_name);
                 ifm->updated = 1;
                 network_interfaces_found++;
 
@@ -338,10 +338,8 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                                     RRDSET_TYPE_AREA
                         );
 
-                        ifm->rd_bandwidth_in  = rrddim_add(ifm->st_bandwidth, "received", NULL,  8, KILO_FACTOR,
-                                                           RRD_ALGORITHM_INCREMENTAL);
-                        ifm->rd_bandwidth_out = rrddim_add(ifm->st_bandwidth, "sent",     NULL, -8, KILO_FACTOR,
-                                                           RRD_ALGORITHM_INCREMENTAL);
+                        ifm->rd_bandwidth_in  = rrddim_add(ifm->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                        ifm->rd_bandwidth_out = rrddim_add(ifm->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                     } else
                         rrdset_next(ifm->st_bandwidth);
 

@@ -420,8 +420,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     st = rrdset_create_localhost("net", ifa->ifa_name, NULL, ifa->ifa_name, "net.net", "Bandwidth"
                                                  , "kilobits/s", 7000, update_every, RRDSET_TYPE_AREA);
 
-                    rrddim_add(st, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 

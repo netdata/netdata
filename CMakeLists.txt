@@ -188,6 +188,22 @@ set(FREEIPMI_PLUGIN_SOURCE_FILES
         config.h
         )
 
+set(CGROUP_NETWORK_SOURCE_FILES
+        src/cgroup-network.c
+        src/common.c
+        src/common.h
+        src/clocks.c
+        src/clocks.h
+        src/inlined.h
+        src/log.c
+        src/log.h
+        src/procfile.c
+        src/procfile.h
+        src/web_buffer.c
+        src/web_buffer.h
+        config.h
+        )
+
 include_directories(AFTER .)
 
 add_definitions(-DHAVE_CONFIG_H -DCACHE_DIR="/var/cache/netdata" -DCONFIG_DIR="/etc/netdata" -DLOG_DIR="/var/log/netdata" -DPLUGINS_DIR="/usr/libexec/netdata" -DWEB_DIR="/usr/share/netdata" -DVARLIB_DIR="/var/lib/netdata")
@@ -200,3 +216,6 @@ target_link_libraries (apps.plugin m ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_SOURCE_FILES})
 target_link_libraries (freeipmi.plugin ipmimonitoring)
+
+add_executable(cgroup-network ${CGROUP_NETWORK_SOURCE_FILES})
+target_link_libraries (cgroup-network m ${CMAKE_THREAD_LIBS_INIT})
