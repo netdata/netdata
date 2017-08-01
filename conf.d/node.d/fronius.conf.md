@@ -16,7 +16,7 @@ The module supports any number of servers. Sometimes there is a lag when collect
     "update_every": 5,
     "servers": [
         {
-            "name": "Solar",
+            "name": "solar",
             "hostname": "symo.ip.or.dns",
             "update_every": 5,
             "api_path": "/solar_api/v1/GetPowerFlowRealtimeData.fcgi"
