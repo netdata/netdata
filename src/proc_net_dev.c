@@ -1,6 +1,9 @@
 #include "common.h"
 
-struct netdev {
+// ----------------------------------------------------------------------------
+// netdev list
+
+static struct netdev {
     char *name;
     uint32_t hash;
     size_t len;
@@ -17,6 +20,27 @@ struct netdev {
     int do_fifo;
     int do_compressed;
     int do_events;
+
+    const char *chart_type_net_bytes;
+    const char *chart_type_net_packets;
+    const char *chart_type_net_errors;
+    const char *chart_type_net_fifo;
+    const char *chart_type_net_events;
+    const char *chart_type_net_drops;
+    const char *chart_type_net_compressed;
+
+    const char *chart_id_net_bytes;
+    const char *chart_id_net_packets;
+    const char *chart_id_net_errors;
+    const char *chart_id_net_fifo;
+    const char *chart_id_net_events;
+    const char *chart_id_net_drops;
+    const char *chart_id_net_compressed;
+
+    const char *chart_family;
+
+    int flipped;
+    unsigned long priority;
 
     // data collected
     kernel_uint_t rbytes;
@@ -66,13 +90,13 @@ struct netdev {
     RRDDIM *rd_tcompressed;
 
     struct netdev *next;
-};
-
-static struct netdev *netdev_root = NULL, *netdev_last_used = NULL;
+} *netdev_root = NULL, *netdev_last_used = NULL;
 
 static size_t netdev_added = 0, netdev_found = 0;
 
-static void netdev_free(struct netdev *d) {
+// ----------------------------------------------------------------------------
+
+static void netdev_charts_release(struct netdev *d) {
     if(d->st_bandwidth)  rrdset_is_obsolete(d->st_bandwidth);
     if(d->st_packets)    rrdset_is_obsolete(d->st_packets);
     if(d->st_errors)     rrdset_is_obsolete(d->st_errors);
@@ -81,10 +105,228 @@ static void netdev_free(struct netdev *d) {
     if(d->st_compressed) rrdset_is_obsolete(d->st_compressed);
     if(d->st_events)     rrdset_is_obsolete(d->st_events);
 
-    netdev_added--;
-    freez(d->name);
-    freez(d);
+    d->st_bandwidth   = NULL;
+    d->st_compressed  = NULL;
+    d->st_drops       = NULL;
+    d->st_errors      = NULL;
+    d->st_events      = NULL;
+    d->st_fifo        = NULL;
+    d->st_packets     = NULL;
+
+    d->rd_rbytes      = NULL;
+    d->rd_rpackets    = NULL;
+    d->rd_rerrors     = NULL;
+    d->rd_rdrops      = NULL;
+    d->rd_rfifo       = NULL;
+    d->rd_rframe      = NULL;
+    d->rd_rcompressed = NULL;
+    d->rd_rmulticast  = NULL;
+
+    d->rd_tbytes      = NULL;
+    d->rd_tpackets    = NULL;
+    d->rd_terrors     = NULL;
+    d->rd_tdrops      = NULL;
+    d->rd_tfifo       = NULL;
+    d->rd_tcollisions = NULL;
+    d->rd_tcarrier    = NULL;
+    d->rd_tcompressed = NULL;
 }
+
+static void netdev_free_strings(struct netdev *d) {
+    freez((void *)d->chart_type_net_bytes);
+    freez((void *)d->chart_type_net_compressed);
+    freez((void *)d->chart_type_net_drops);
+    freez((void *)d->chart_type_net_errors);
+    freez((void *)d->chart_type_net_events);
+    freez((void *)d->chart_type_net_fifo);
+    freez((void *)d->chart_type_net_packets);
+
+    freez((void *)d->chart_id_net_bytes);
+    freez((void *)d->chart_id_net_compressed);
+    freez((void *)d->chart_id_net_drops);
+    freez((void *)d->chart_id_net_errors);
+    freez((void *)d->chart_id_net_events);
+    freez((void *)d->chart_id_net_fifo);
+    freez((void *)d->chart_id_net_packets);
+
+    freez((void *)d->chart_family);
+}
+
+static void netdev_free(struct netdev *d) {
+    netdev_charts_release(d);
+    netdev_free_strings(d);
+
+    freez((void *)d->name);
+    freez((void *)d);
+    netdev_added--;
+}
+
+
+// ----------------------------------------------------------------------------
+// netdev renames
+
+static struct netdev_rename {
+    const char *host_device;
+    uint32_t hash;
+
+    const char *container_device;
+    const char *container_name;
+
+    int processed;
+
+    struct netdev_rename *next;
+} *netdev_rename_root = NULL;
+
+static int netdev_pending_renames = 0;
+static netdata_mutex_t netdev_rename_mutex = NETDATA_MUTEX_INITIALIZER;
+
+static struct netdev_rename *netdev_rename_find(const char *host_device, uint32_t hash) {
+    struct netdev_rename *r;
+
+    for(r = netdev_rename_root; r ; r = r->next)
+        if(r->hash == hash && !strcmp(host_device, r->host_device))
+            return r;
+
+    return NULL;
+}
+
+// other threads can call this function to register a rename to a netdev
+void netdev_rename_device_add(const char *host_device, const char *container_device, const char *container_name) {
+    netdata_mutex_lock(&netdev_rename_mutex);
+
+    uint32_t hash = simple_hash(host_device);
+    struct netdev_rename *r = netdev_rename_find(host_device, hash);
+    if(!r) {
+        r = callocz(1, sizeof(struct netdev_rename));
+        r->host_device      = strdupz(host_device);
+        r->container_device = strdupz(container_device);
+        r->container_name   = strdupz(container_name);
+        r->hash             = hash;
+        r->next             = netdev_rename_root;
+        r->processed        = 0;
+        netdev_rename_root  = r;
+        netdev_pending_renames++;
+        info("CGROUP: registered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
+    }
+    else {
+        if(strcmp(r->container_device, container_device) != 0 || strcmp(r->container_name, container_name) != 0) {
+            freez((void *) r->container_device);
+            freez((void *) r->container_name);
+
+            r->container_device = strdupz(container_device);
+            r->container_name   = strdupz(container_name);
+            r->processed        = 0;
+            netdev_pending_renames++;
+            info("CGROUP: altered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
+        }
+    }
+
+    netdata_mutex_unlock(&netdev_rename_mutex);
+}
+
+// other threads can call this function to delete a rename to a netdev
+void netdev_rename_device_del(const char *host_device) {
+    netdata_mutex_lock(&netdev_rename_mutex);
+
+    struct netdev_rename *r, *last = NULL;
+
+    uint32_t hash = simple_hash(host_device);
+    for(r = netdev_rename_root; r ; last = r, r = r->next) {
+        if (r->hash == hash && !strcmp(host_device, r->host_device)) {
+            if (netdev_rename_root == r)
+                netdev_rename_root = r->next;
+            else if (last)
+                last->next = r->next;
+
+            if(!r->processed)
+                netdev_pending_renames--;
+
+            info("CGROUP: unregistered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
+
+            freez((void *) r->host_device);
+            freez((void *) r->container_name);
+            freez((void *) r->container_device);
+            freez((void *) r);
+            break;
+        }
+    }
+
+    netdata_mutex_unlock(&netdev_rename_mutex);
+}
+
+static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *r) {
+    info("CGROUP: renaming network interface '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
+
+    netdev_charts_release(d);
+    netdev_free_strings(d);
+
+    char buffer[RRD_ID_LENGTH_MAX + 1];
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "cgroup_%s", r->container_name);
+    d->chart_type_net_bytes      = strdupz(buffer);
+    d->chart_type_net_compressed = strdupz(buffer);
+    d->chart_type_net_drops      = strdupz(buffer);
+    d->chart_type_net_errors     = strdupz(buffer);
+    d->chart_type_net_events     = strdupz(buffer);
+    d->chart_type_net_fifo       = strdupz(buffer);
+    d->chart_type_net_packets    = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_%s", r->container_device);
+    d->chart_id_net_bytes      = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_compressed_%s", r->container_device);
+    d->chart_id_net_compressed = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_drops_%s", r->container_device);
+    d->chart_id_net_drops      = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_errors_%s", r->container_device);
+    d->chart_id_net_errors     = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_events_%s", r->container_device);
+    d->chart_id_net_events     = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_fifo_%s", r->container_device);
+    d->chart_id_net_fifo       = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net_packets_%s", r->container_device);
+    d->chart_id_net_packets    = strdupz(buffer);
+
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net %s", r->container_device);
+    d->chart_family = strdupz(buffer);
+
+    d->priority = 43000;
+    d->flipped = 1;
+}
+
+static inline void netdev_rename(struct netdev *d) {
+    struct netdev_rename *r = netdev_rename_find(d->name, d->hash);
+    if(unlikely(r && !r->processed)) {
+        netdev_rename_cgroup(d, r);
+        r->processed = 1;
+        netdev_pending_renames--;
+    }
+}
+
+static inline void netdev_rename_lock(struct netdev *d) {
+    netdata_mutex_lock(&netdev_rename_mutex);
+    netdev_rename(d);
+    netdata_mutex_unlock(&netdev_rename_mutex);
+}
+
+static inline void netdev_rename_all_lock(void) {
+    netdata_mutex_lock(&netdev_rename_mutex);
+
+    struct netdev *d;
+    for(d = netdev_root; d ; d = d->next)
+        netdev_rename(d);
+
+    netdev_pending_renames = 0;
+    netdata_mutex_unlock(&netdev_rename_mutex);
+}
+
+// ----------------------------------------------------------------------------
+// netdev data collection
 
 static void netdev_cleanup() {
     if(likely(netdev_found == netdev_added)) return;
@@ -144,6 +386,28 @@ static struct netdev *get_netdev(const char *name) {
     d->name = strdupz(name);
     d->hash = simple_hash(d->name);
     d->len = strlen(d->name);
+
+    d->chart_type_net_bytes      = strdupz("net");
+    d->chart_type_net_compressed = strdupz("net_compressed");
+    d->chart_type_net_drops      = strdupz("net_drops");
+    d->chart_type_net_errors     = strdupz("net_errors");
+    d->chart_type_net_events     = strdupz("net_events");
+    d->chart_type_net_fifo       = strdupz("net_fifo");
+    d->chart_type_net_packets    = strdupz("net_packets");
+
+    d->chart_id_net_bytes      = strdupz(d->name);
+    d->chart_id_net_compressed = strdupz(d->name);
+    d->chart_id_net_drops      = strdupz(d->name);
+    d->chart_id_net_errors     = strdupz(d->name);
+    d->chart_id_net_events     = strdupz(d->name);
+    d->chart_id_net_fifo       = strdupz(d->name);
+    d->chart_id_net_packets    = strdupz(d->name);
+
+    d->chart_family = strdupz(d->name);
+    d->priority = 7000;
+
+    netdev_rename_lock(d);
+
     netdev_added++;
 
     // link it to the end
@@ -176,9 +440,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         do_compressed   = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "compressed packets for all interfaces", CONFIG_BOOLEAN_AUTO);
         do_events       = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "frames, collisions, carrier counters for all interfaces", CONFIG_BOOLEAN_AUTO);
 
-        disabled_list = simple_pattern_create(
-                config_get("plugin:proc:/proc/net/dev", "disable by default interfaces matching", "lo fireqos* *-ifb")
-                , SIMPLE_PATTERN_EXACT);
+        disabled_list = simple_pattern_create(config_get("plugin:proc:/proc/net/dev", "disable by default interfaces matching", "lo fireqos* *-ifb"), SIMPLE_PATTERN_EXACT);
     }
 
     if(unlikely(!ff)) {
@@ -190,6 +452,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
+
+    // rename all the devices, if we have pending renames
+    if(unlikely(netdev_pending_renames))
+        netdev_rename_all_lock();
 
     netdev_found = 0;
 
@@ -220,13 +486,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(d->enabled == CONFIG_BOOLEAN_NO)
                 continue;
 
-            d->do_bandwidth  = config_get_boolean_ondemand(var_name, "bandwidth", do_bandwidth);
-            d->do_packets    = config_get_boolean_ondemand(var_name, "packets", do_packets);
-            d->do_errors     = config_get_boolean_ondemand(var_name, "errors", do_errors);
-            d->do_drops      = config_get_boolean_ondemand(var_name, "drops", do_drops);
-            d->do_fifo       = config_get_boolean_ondemand(var_name, "fifo", do_fifo);
+            d->do_bandwidth  = config_get_boolean_ondemand(var_name, "bandwidth",  do_bandwidth);
+            d->do_packets    = config_get_boolean_ondemand(var_name, "packets",    do_packets);
+            d->do_errors     = config_get_boolean_ondemand(var_name, "errors",     do_errors);
+            d->do_drops      = config_get_boolean_ondemand(var_name, "drops",      do_drops);
+            d->do_fifo       = config_get_boolean_ondemand(var_name, "fifo",       do_fifo);
             d->do_compressed = config_get_boolean_ondemand(var_name, "compressed", do_compressed);
-            d->do_events     = config_get_boolean_ondemand(var_name, "events", do_events);
+            d->do_events     = config_get_boolean_ondemand(var_name, "events",     do_events);
         }
 
         if(unlikely(!d->enabled))
@@ -278,20 +544,28 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_bandwidth)) {
 
                 d->st_bandwidth = rrdset_create_localhost(
-                        "net"
-                        , d->name
+                        d->chart_type_net_bytes
+                        , d->chart_id_net_bytes
                         , NULL
-                        , d->name
+                        , d->chart_family
                         , "net.net"
                         , "Bandwidth"
                         , "kilobits/s"
-                        , 7000
+                        , d->priority
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
 
-                d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_rbytes = rrddim_add(d->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_tbytes = rrddim_add(d->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+
+                if(d->flipped) {
+                    // flip receive/trasmit
+
+                    RRDDIM *td = d->rd_rbytes;
+                    d->rd_rbytes = d->rd_tbytes;
+                    d->rd_tbytes = td;
+                }
             }
             else rrdset_next(d->st_bandwidth);
 
@@ -309,23 +583,31 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_packets)) {
 
                 d->st_packets = rrdset_create_localhost(
-                        "net_packets"
-                        , d->name
+                        d->chart_type_net_packets
+                        , d->chart_id_net_packets
                         , NULL
-                        , d->name
+                        , d->chart_family
                         , "net.packets"
                         , "Packets"
                         , "packets/s"
-                        , 7001
+                        , d->priority + 1
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
 
                 rrdset_flag_set(d->st_packets, RRDSET_FLAG_DETAIL);
 
-                d->rd_rpackets = rrddim_add(d->st_packets, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                d->rd_tpackets = rrddim_add(d->st_packets, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                d->rd_rmulticast = rrddim_add(d->st_packets, "multicast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_rpackets   = rrddim_add(d->st_packets, "received",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_tpackets   = rrddim_add(d->st_packets, "sent",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_rmulticast = rrddim_add(d->st_packets, "multicast", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                if(d->flipped) {
+                    // flip receive/trasmit
+
+                    RRDDIM *td = d->rd_rpackets;
+                    d->rd_rpackets = d->rd_tpackets;
+                    d->rd_tpackets = td;
+                }
             }
             else rrdset_next(d->st_packets);
 
@@ -344,22 +626,30 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_errors)) {
 
                 d->st_errors = rrdset_create_localhost(
-                        "net_errors"
-                        , d->name
+                        d->chart_type_net_errors
+                        , d->chart_id_net_errors
                         , NULL
-                        , d->name
+                        , d->chart_family
                         , "net.errors"
                         , "Interface Errors"
                         , "errors/s"
-                        , 7002
+                        , d->priority + 2
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
 
                 rrdset_flag_set(d->st_errors, RRDSET_FLAG_DETAIL);
 
-                d->rd_rerrors = rrddim_add(d->st_errors, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_rerrors = rrddim_add(d->st_errors, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_terrors = rrddim_add(d->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                if(d->flipped) {
+                    // flip receive/trasmit
+
+                    RRDDIM *td = d->rd_rerrors;
+                    d->rd_rerrors = d->rd_terrors;
+                    d->rd_terrors = td;
+                }
             }
             else rrdset_next(d->st_errors);
 
@@ -377,22 +667,30 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_drops)) {
 
                 d->st_drops = rrdset_create_localhost(
-                        "net_drops"
-                        , d->name
+                        d->chart_type_net_drops
+                        , d->chart_id_net_drops
                         , NULL
-                        , d->name
+                        , d->chart_family
                         , "net.drops"
                         , "Interface Drops"
                         , "drops/s"
-                        , 7003
+                        , d->priority + 3
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
 
                 rrdset_flag_set(d->st_drops, RRDSET_FLAG_DETAIL);
 
-                d->rd_rdrops = rrddim_add(d->st_drops, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_rdrops = rrddim_add(d->st_drops, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tdrops = rrddim_add(d->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                if(d->flipped) {
+                    // flip receive/trasmit
+
+                    RRDDIM *td = d->rd_rdrops;
+                    d->rd_rdrops = d->rd_tdrops;
+                    d->rd_tdrops = td;
+                }
             }
             else rrdset_next(d->st_drops);
 
@@ -410,22 +708,30 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_fifo)) {
 
                 d->st_fifo = rrdset_create_localhost(
-                        "net_fifo"
-                        , d->name
+                        d->chart_type_net_fifo
+                        , d->chart_id_net_fifo
                         , NULL
-                        , d->name
+                        , d->chart_family
                         , "net.fifo"
                         , "Interface FIFO Buffer Errors"
                         , "errors"
-                        , 7004
+                        , d->priority + 4
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
 
                 rrdset_flag_set(d->st_fifo, RRDSET_FLAG_DETAIL);
 
-                d->rd_rfifo = rrddim_add(d->st_fifo, "receive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_rfifo = rrddim_add(d->st_fifo, "receive",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tfifo = rrddim_add(d->st_fifo, "transmit", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                if(d->flipped) {
+                    // flip receive/trasmit
+
+                    RRDDIM *td = d->rd_rfifo;
+                    d->rd_rfifo = d->rd_tfifo;
+                    d->rd_tfifo = td;
+                }
             }
             else rrdset_next(d->st_fifo);
 
@@ -443,22 +749,30 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_compressed)) {
 
                 d->st_compressed = rrdset_create_localhost(
-                        "net_compressed"
-                        , d->name
+                        d->chart_type_net_compressed
+                        , d->chart_id_net_compressed
                         , NULL
-                        , d->name
+                        , d->chart_family
                         , "net.compressed"
                         , "Compressed Packets"
                         , "packets/s"
-                        , 7005
+                        , d->priority + 5
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
 
                 rrdset_flag_set(d->st_compressed, RRDSET_FLAG_DETAIL);
 
-                d->rd_rcompressed = rrddim_add(d->st_compressed, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                d->rd_tcompressed = rrddim_add(d->st_compressed, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_rcompressed = rrddim_add(d->st_compressed, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_tcompressed = rrddim_add(d->st_compressed, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                if(d->flipped) {
+                    // flip receive/trasmit
+
+                    RRDDIM *td = d->rd_rcompressed;
+                    d->rd_rcompressed = d->rd_tcompressed;
+                    d->rd_tcompressed = td;
+                }
             }
             else rrdset_next(d->st_compressed);
 
@@ -476,23 +790,23 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(unlikely(!d->st_events)) {
 
                 d->st_events = rrdset_create_localhost(
-                        "net_events"
-                        , d->name
+                        d->chart_type_net_events
+                        , d->chart_id_net_events
                         , NULL
-                        , d->name
+                        , d->chart_family
                         , "net.events"
                         , "Network Interface Events"
                         , "events/s"
-                        , 7006
+                        , d->priority + 6
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
 
                 rrdset_flag_set(d->st_events, RRDSET_FLAG_DETAIL);
 
-                d->rd_rframe      = rrddim_add(d->st_events, "frames", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_rframe      = rrddim_add(d->st_events, "frames",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcollisions = rrddim_add(d->st_events, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                d->rd_tcarrier    = rrddim_add(d->st_events, "carrier", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_tcarrier    = rrddim_add(d->st_events, "carrier",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(d->st_events);
 

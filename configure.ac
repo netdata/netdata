@@ -148,7 +148,6 @@ AC_HEADER_RESOLV
 
 AC_CHECK_HEADERS_ONCE([sys/prctl.h])
 
-
 # -----------------------------------------------------------------------------
 # operating system detection
 
@@ -423,6 +422,21 @@ else
 fi
 AC_MSG_RESULT([${enable_plugin_nfacct}])
 AM_CONDITIONAL([ENABLE_PLUGIN_NFACCT], [test "${enable_plugin_nfacct}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
+# check for setns() - cgroup-network
+
+AC_CHECK_FUNC([setns])
+AC_MSG_CHECKING([if cgroup-network can be enabled])
+if test "$ac_cv_func_setns" = "yes" ; then
+    have_setns="yes"
+    AC_DEFINE([HAVE_SETNS], [1], [Define 1 if you have setns() function])
+else
+    have_setns="no"
+fi
+AC_MSG_RESULT([${have_setns}])
+AM_CONDITIONAL([ENABLE_PLUGIN_CGROUP_NETWORK], [test "${have_setns}" = "yes"])
 
 
 # -----------------------------------------------------------------------------

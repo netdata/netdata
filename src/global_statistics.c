@@ -199,8 +199,8 @@ void global_statistics_charts(void) {
         stbytes = rrdset_create_localhost("netdata", "net", NULL, "netdata", NULL, "NetData Network Traffic"
                                           , "kilobits/s", 130000, localhost->rrd_update_every, RRDSET_TYPE_AREA);
 
-        rrddim_add(stbytes, "in", NULL, 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-        rrddim_add(stbytes, "out", NULL, -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(stbytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(stbytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
     } else rrdset_next(stbytes);
 
     rrddim_set(stbytes, "in", (collected_number) gs.bytes_received);

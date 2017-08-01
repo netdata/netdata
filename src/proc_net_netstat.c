@@ -243,8 +243,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     st = rrdset_create_localhost("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s"
                                                  , 500, update_every, RRDSET_TYPE_AREA);
 
-                    rrddim_add(st, "InOctets", "received", 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutOctets", "sent", -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -285,8 +285,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                                                  , "kilobits/s", 9000, update_every, RRDSET_TYPE_AREA);
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(st, "InMcastOctets", "received", 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutMcastOctets", "sent", -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InMcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutMcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
@@ -305,8 +305,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                                                  , "kilobits/s", 8000, update_every, RRDSET_TYPE_AREA);
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(st, "InBcastOctets", "received", 8, 1024, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutBcastOctets", "sent", -8, 1024, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "InBcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(st, "OutBcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 

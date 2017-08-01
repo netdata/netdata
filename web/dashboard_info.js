@@ -709,9 +709,53 @@ netdataDashboard.context = {
     // NETWORK INTERFACES
 
     'net.net': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                if(id.match(/^cgroup_.*/)) {
+                    var iface;
+                    try {
+                        iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
+                    }
+                    catch (e) {
+                        iface = '';
+                    }
+                    return netdataDashboard.gaugeChart('Received' + iface, '12%', 'received');
+                }
+                else
+                    return '';
+            },
+            function(os, id) {
+                void(os);
+                if(id.match(/^cgroup_.*/)) {
+                    var iface;
+                    try {
+                        iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
+                    }
+                    catch (e) {
+                        iface = '';
+                    }
+                    return netdataDashboard.gaugeChart('Sent' + iface, '12%', 'sent');
+                }
+                else
+                    return '';
+            }
+        ],
         heads: [
-            netdataDashboard.gaugeChart('Received', '12%', 'received'),
-            netdataDashboard.gaugeChart('Sent', '12%', 'sent')
+            function(os, id) {
+                void(os);
+                if(!id.match(/^cgroup_.*/))
+                    return netdataDashboard.gaugeChart('Received', '12%', 'received');
+                else
+                    return '';
+            },
+            function(os, id) {
+                void(os);
+                if(!id.match(/^cgroup_.*/))
+                    return netdataDashboard.gaugeChart('Sent', '12%', 'sent');
+                else
+                    return '';
+            }
         ]
     },
 
@@ -1043,7 +1087,7 @@ netdataDashboard.context = {
                     + ' data-before="0"'
                     + ' data-after="-CHART_DURATION"'
                     + ' data-points="CHART_DURATION"'
-                    + ' data-colors="' + NETDATA.colors[0] + '"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
                     + ' role="application"></div>';
             }
         ]

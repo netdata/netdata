@@ -309,4 +309,6 @@ extern const char *program_version;
 #endif
 #endif
 
+#define BITS_IN_A_KILOBIT 1000
+
 #endif /* NETDATA_COMMON_H */
