@@ -45,9 +45,9 @@ var fronius = {
         if (fronius.isDefined(chart)) return chart;
 
         var dim = {};
-        dim[fronius.powerGridId] = this.createBasicDimension(fronius.powerGridId, "Grid", 1);
-        dim[fronius.powerPvId] = this.createBasicDimension(fronius.powerPvId, "Photovoltaics", 1);
-        dim[fronius.powerAccuId] = this.createBasicDimension(fronius.powerAccuId, "Accumulator", 1);
+        dim[fronius.powerGridId] = this.createBasicDimension(fronius.powerGridId, "grid", 1);
+        dim[fronius.powerPvId] = this.createBasicDimension(fronius.powerPvId, "photovoltaics", 1);
+        dim[fronius.powerAccuId] = this.createBasicDimension(fronius.powerAccuId, "accumulator", 1);
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -73,7 +73,7 @@ var fronius = {
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[fronius.consumptionLoadId] = this.createBasicDimension(fronius.consumptionLoadId, "Load", 1);
+        dim[fronius.consumptionLoadId] = this.createBasicDimension(fronius.consumptionLoadId, "load", 1);
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -99,8 +99,8 @@ var fronius = {
         var chart = fronius.charts[id];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[fronius.autonomyId] = this.createBasicDimension(fronius.autonomyId, "Autonomy", 1);
-        dim[fronius.consumptionSelfId] = this.createBasicDimension(fronius.consumptionSelfId, "Self Consumption", 1);
+        dim[fronius.autonomyId] = this.createBasicDimension(fronius.autonomyId, "autonomy", 1);
+        dim[fronius.consumptionSelfId] = this.createBasicDimension(fronius.consumptionSelfId, "self_consumption", 1);
 
         chart = {
             id: id,                                         // the unique id of the chart
@@ -126,7 +126,7 @@ var fronius = {
         var chart = fronius.charts[chartId];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[fronius.energyTodayId] = this.createBasicDimension(fronius.energyTodayId, "Today", 1000);
+        dim[fronius.energyTodayId] = this.createBasicDimension(fronius.energyTodayId, "today", 1000);
         chart = {
             id: chartId,                                         // the unique id of the chart
             name: "",                                            // the unique name of the chart
@@ -151,7 +151,7 @@ var fronius = {
         var chart = fronius.charts[chartId];
         if (fronius.isDefined(chart)) return chart;
         var dim = {};
-        dim[fronius.energyYearId] = this.createBasicDimension(fronius.energyYearId, "Year", 1000);
+        dim[fronius.energyYearId] = this.createBasicDimension(fronius.energyYearId, "year", 1000);
         chart = {
             id: chartId,                                             // the unique id of the chart
             name: "",                                                // the unique name of the chart
@@ -181,7 +181,7 @@ var fronius = {
         for (var key in inverters) {
             if (inverters.hasOwnProperty(key)) {
                 var name = key;
-                if (!isNaN(key)) name = "Inverter " + key;
+                if (!isNaN(key)) name = "inverter_" + key;
                 dim[key] = this.createBasicDimension("inverter_" + key, name, 1);
             }
         }

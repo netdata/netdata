@@ -40,9 +40,9 @@ describe("fronius chart creation", function () {
         expect(result.type).toBe(netdata.chartTypes.area);
         expect(result.family).toBe("power");
         expect(result.context).toBe("fronius.power");
-        expect(result.dimensions[subject.powerGridId].name).toBe("Grid");
-        expect(result.dimensions[subject.powerPvId].name).toBe("Photovoltaics");
-        expect(result.dimensions[subject.powerAccuId].name).toBe("Accumulator");
+        expect(result.dimensions[subject.powerGridId].name).toBe("grid");
+        expect(result.dimensions[subject.powerPvId].name).toBe("photovoltaics");
+        expect(result.dimensions[subject.powerAccuId].name).toBe("accumulator");
         expect(Object.keys(result.dimensions).length).toBe(3);
     });
 
@@ -56,7 +56,7 @@ describe("fronius chart creation", function () {
         expect(result.family).toBe("consumption");
         expect(result.context).toBe("fronius.consumption");
         expect(Object.keys(result.dimensions).length).toBe(1);
-        expect(result.dimensions[subject.consumptionLoadId].name).toBe("Load");
+        expect(result.dimensions[subject.consumptionLoadId].name).toBe("load");
     });
 
     it("should return the autonomy chart definition", function () {
@@ -69,8 +69,8 @@ describe("fronius chart creation", function () {
         expect(result.family).toBe("autonomy");
         expect(result.context).toBe("fronius.autonomy");
         expect(Object.keys(result.dimensions).length).toBe(2);
-        expect(result.dimensions[subject.autonomyId].name).toBe("Autonomy");
-        expect(result.dimensions[subject.consumptionSelfId].name).toBe("Self Consumption");
+        expect(result.dimensions[subject.autonomyId].name).toBe("autonomy");
+        expect(result.dimensions[subject.consumptionSelfId].name).toBe("self_consumption");
     });
 
     it("should return the energy today chart definition", function () {
@@ -83,7 +83,7 @@ describe("fronius chart creation", function () {
         expect(result.family).toBe("energy");
         expect(result.context).toBe("fronius.energy.today");
         expect(Object.keys(result.dimensions).length).toBe(1);
-        expect(result.dimensions[subject.energyTodayId].name).toBe("Today");
+        expect(result.dimensions[subject.energyTodayId].name).toBe("today");
     });
 
     it("should return the energy year chart definition", function () {
@@ -96,7 +96,7 @@ describe("fronius chart creation", function () {
         expect(result.family).toBe("energy");
         expect(result.context).toBe("fronius.energy.year");
         expect(Object.keys(result.dimensions).length).toBe(1);
-        expect(result.dimensions[subject.energyYearId].name).toBe("Year");
+        expect(result.dimensions[subject.energyYearId].name).toBe("year");
     });
 
     it("should return the inverter chart definition with a single numerical inverter", function () {
@@ -112,7 +112,7 @@ describe("fronius chart creation", function () {
         expect(result.family).toBe("inverters");
         expect(result.context).toBe("fronius.inverter.output");
         expect(Object.keys(result.dimensions).length).toBe(1);
-        expect(result.dimensions["1"].name).toBe("Inverter 1");
+        expect(result.dimensions["1"].name).toBe("inverter_1");
     });
 
     it("should return the inverter chart definition with a single alphabetical inverter", function () {
@@ -149,7 +149,7 @@ describe("fronius chart creation", function () {
         expect(result.context).toBe("fronius.inverter.output");
         expect(Object.keys(result.dimensions).length).toBe(2);
         expect(result.dimensions[alpha].name).toBe(alpha);
-        expect(result.dimensions[numerical].name).toBe("Inverter " + numerical);
+        expect(result.dimensions[numerical].name).toBe("inverter_" + numerical);
     });
 
     it("should return the same chart definition on second call for lazy loading", function () {
