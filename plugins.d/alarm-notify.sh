@@ -288,6 +288,7 @@ DEFAULT_RECIPIENT_CUSTOM=
 declare -A role_recipients_custom=()
 
 # email configs
+EMAIL_SENDER=""
 DEFAULT_RECIPIENT_EMAIL="root"
 declare -A role_recipients_email=()
 
@@ -1388,7 +1389,10 @@ SENT_HIPCHAT=$?
 # -----------------------------------------------------------------------------
 # send the email
 
+[ -z "${EMAIL_SENDER}" ] && EMAIL_SENDER="${USER-netdata}"
+
 send_email <<EOF
+From: ${EMAIL_SENDER}
 To: ${to_email}
 Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
 MIME-Version: 1.0
