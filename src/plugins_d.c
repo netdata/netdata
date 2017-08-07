@@ -246,10 +246,10 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             }
 
             int priority = 1000;
-            if(likely(priority_s)) priority = str2i(priority_s);
+            if(likely(priority_s && *priority_s)) priority = str2i(priority_s);
 
             int update_every = cd->update_every;
-            if(likely(update_every_s)) update_every = str2i(update_every_s);
+            if(likely(update_every_s && *update_every_s)) update_every = str2i(update_every_s);
             if(unlikely(!update_every)) update_every = cd->update_every;
 
             RRDSET_TYPE chart_type = RRDSET_TYPE_LINE;
@@ -258,6 +258,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             if(unlikely(noname || !name || !*name || strcasecmp(name, "NULL") == 0 || strcasecmp(name, "(NULL)") == 0)) name = NULL;
             if(unlikely(!family || !*family)) family = NULL;
             if(unlikely(!context || !*context)) context = NULL;
+            if(unlikely(!title)) title = "";
+            if(unlikely(!units)) units = "unknown";
 
             st = rrdset_find_bytype(host, type, id);
             if(unlikely(!st)) {
