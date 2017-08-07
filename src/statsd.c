@@ -232,6 +232,7 @@ static struct statsd {
     int update_every;
     SIMPLE_PATTERN *charts_for;
 
+    size_t decimal_detail;
     size_t private_charts;
     size_t max_private_charts;
     size_t max_private_charts_hard;
@@ -250,6 +251,7 @@ static struct statsd {
         .max_private_charts = 200,
         .max_private_charts_hard = 1000,
         .recvmmsg_size = 10,
+        .decimal_detail = STATSD_DECIMAL_DETAIL,
 
         .gauges     = {
                 .name = "gauge",
@@ -1286,7 +1288,7 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
                 , RRDSET_TYPE_LINE
         );
 
-        m->rd_value = rrddim_add(m->st, "gauge",  NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value = rrddim_add(m->st, "gauge",  NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1,    RRD_ALGORITHM_INCREMENTAL);
@@ -1394,13 +1396,13 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
                 , RRDSET_TYPE_AREA
         );
 
-        m->histogram.ext->rd_min = rrddim_add(m->st, "min", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_max = rrddim_add(m->st, "max", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
-        m->rd_value              = rrddim_add(m->st, "average", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_percentile = rrddim_add(m->st, statsd.histogram_percentile_str, NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_median = rrddim_add(m->st, "median", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_stddev = rrddim_add(m->st, "stddev", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
-        m->histogram.ext->rd_sum = rrddim_add(m->st, "sum", NULL, 1, STATSD_DECIMAL_DETAIL, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_min = rrddim_add(m->st, "min", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_max = rrddim_add(m->st, "max", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
+        m->rd_value              = rrddim_add(m->st, "average", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_percentile = rrddim_add(m->st, statsd.histogram_percentile_str, NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_median = rrddim_add(m->st, "median", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_stddev = rrddim_add(m->st, "stddev", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
+        m->histogram.ext->rd_sum = rrddim_add(m->st, "sum", NULL, 1, statsd.decimal_detail, RRD_ALGORITHM_ABSOLUTE);
 
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1429,7 +1431,7 @@ static inline void statsd_flush_gauge(STATSD_METRIC *m) {
 
     int updated = 0;
     if(m->count && !m->reset) {
-        m->last = (collected_number) (m->gauge.value * STATSD_DECIMAL_DETAIL);
+        m->last = (collected_number) (m->gauge.value * statsd.decimal_detail);
 
         m->reset = 1;
         updated = 1;
@@ -1488,18 +1490,18 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         long double *series = m->histogram.ext->values;
         sort_series(series, len);
 
-        m->histogram.ext->last_min = (collected_number)roundl(series[0] * STATSD_DECIMAL_DETAIL);
-        m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * STATSD_DECIMAL_DETAIL);
-        m->last = (collected_number)roundl(average(series, len) * STATSD_DECIMAL_DETAIL);
-        m->histogram.ext->last_median = (collected_number)roundl(median_on_sorted_series(series, len) * STATSD_DECIMAL_DETAIL);
-        m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * STATSD_DECIMAL_DETAIL);
-        m->histogram.ext->last_sum = (collected_number)roundl(sum(series, len) * STATSD_DECIMAL_DETAIL);
+        m->histogram.ext->last_min = (collected_number)roundl(series[0] * statsd.decimal_detail);
+        m->histogram.ext->last_max = (collected_number)roundl(series[len - 1] * statsd.decimal_detail);
+        m->last = (collected_number)roundl(average(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_median = (collected_number)roundl(median_on_sorted_series(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_stddev = (collected_number)roundl(standard_deviation(series, len) * statsd.decimal_detail);
+        m->histogram.ext->last_sum = (collected_number)roundl(sum(series, len) * statsd.decimal_detail);
 
         size_t pct_len = (size_t)floor((double)len * statsd.histogram_percentile / 100.0);
         if(pct_len < 1)
-            m->histogram.ext->last_percentile = (collected_number)(series[0] * STATSD_DECIMAL_DETAIL);
+            m->histogram.ext->last_percentile = (collected_number)(series[0] * statsd.decimal_detail);
         else
-            m->histogram.ext->last_percentile = (collected_number)roundl(average(series, pct_len) * STATSD_DECIMAL_DETAIL);
+            m->histogram.ext->last_percentile = (collected_number)roundl(average(series, pct_len) * statsd.decimal_detail);
 
         debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
               dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
@@ -1574,7 +1576,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                         }
                         else if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
                             dim->algorithm = RRD_ALGORITHM_ABSOLUTE;
-                            dim->divisor *= STATSD_DECIMAL_DETAIL;
+                            dim->divisor *= statsd.decimal_detail;
 
                             switch(dim->value_type) {
                                 case STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS:
@@ -1619,7 +1621,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                             dim->algorithm = statsd_algorithm_for_metric(m);
 
                             if(m->type == STATSD_METRIC_TYPE_GAUGE)
-                                dim->divisor *= STATSD_DECIMAL_DETAIL;
+                                dim->divisor *= statsd.decimal_detail;
                         }
 
                         if(unlikely(chart->st && dim->rd)) {
@@ -1776,6 +1778,7 @@ void *statsd_main(void *ptr) {
     statsd.max_private_charts_hard = (size_t)config_get_number(CONFIG_SECTION_STATSD, "max private charts hard limit", (long long)statsd.max_private_charts * 5);
     statsd.private_charts_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_STATSD, "private charts memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
     statsd.private_charts_rrd_history_entries = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
+    statsd.decimal_detail = (size_t)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
 
     statsd.histogram_percentile = (double)config_get_float(CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
     if(isless(statsd.histogram_percentile, 0) || isgreater(statsd.histogram_percentile, 100)) {
