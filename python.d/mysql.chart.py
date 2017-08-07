@@ -119,7 +119,7 @@ GLOBAL_STATS = [
 def slave_seconds(value):
     try:
         return int(value)
-    except ValueError:
+    except (TypeError, ValueError):
         return -1
 
 def slave_running(value):
