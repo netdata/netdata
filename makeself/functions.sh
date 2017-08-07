@@ -7,7 +7,7 @@
 [ -z "${NETDATA_MAKESELF_PATH}" ] && export NETDATA_MAKESELF_PATH="$(dirname "${0}")/.."
 [ "${NETDATA_MAKESELF_PATH:0:1}" != "/" ] && export NETDATA_MAKESELF_PATH="$(pwd)/${NETDATA_MAKESELF_PATH}"
 [ -z "${NETDATA_SOURCE_PATH}" ] && export NETDATA_SOURCE_PATH="${NETDATA_MAKESELF_PATH}/.."
-[ -z "${PROCESSORS}" ] && export PROCESSORS=$(cat /proc/cpuinfo 2>/dev/null | grep ^processor | wc -l)
+[ -z "${PROCESSORS}" ] && export PROCESSORS=$(grep -c ^processor /proc/cpuinfo)
 [ -z "${PROCESSORS}" -o $((PROCESSORS)) -lt 1 ] && export PROCESSORS=1
 export NULL=
 
