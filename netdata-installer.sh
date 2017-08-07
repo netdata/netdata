@@ -49,7 +49,7 @@ umask 002
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
 
-processors=$(cat /proc/cpuinfo 2>/dev/null | grep ^processor | wc -l)
+processors=$(grep -c ^processor /proc/cpuinfo)
 [ $(( processors )) -lt 1 ] && processors=1
 
 # you can set CFLAGS before running installer

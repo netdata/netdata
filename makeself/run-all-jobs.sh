@@ -22,11 +22,6 @@ fi
 # netdata source directory
 export NETDATA_SOURCE_PATH="${NETDATA_MAKESELF_PATH}/.."
 
-# number of processors this system has
-PROCESSORS=$(cat /proc/cpuinfo 2>/dev/null | grep ^processor | wc -l)
-[ -z "${PROCESSORS}" -o $(( PROCESSORS )) -lt 1 ] && PROCESSORS=1
-export PROCESSORS
-
 # make sure ${NULL} is empty
 export NULL=
 
