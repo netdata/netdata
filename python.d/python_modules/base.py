@@ -999,17 +999,20 @@ class MySQLService(SimpleService):
     def check(self):
         def get_connection_properties(conf, extra_conf):
             properties = dict()
-            if 'user' in conf and conf['user']:
+            if conf.get('user'):
                 properties['user'] = conf['user']
-            if 'pass' in conf and conf['pass']:
+            if conf.get('pass'):
                 properties['passwd'] = conf['pass']
-            if 'socket' in conf and conf['socket']:
+            if conf.get('socket'):
                 properties['unix_socket'] = conf['socket']
-            elif 'host' in conf and conf['host']:
+            elif conf.get('host'):
                 properties['host'] = conf['host']
                 properties['port'] = int(conf.get('port', 3306))
-            elif 'my.cnf' in conf and conf['my.cnf']:
-                properties['read_default_file'] = conf['my.cnf']
+            elif conf.get('my.cnf'):
+                if MySQLdb.__name__ == 'pymysql':
+                    self.error('"my.cnf" parsing is not working for pymysql')
+                else:
+                    properties['read_default_file'] = conf['my.cnf']
             if isinstance(extra_conf, dict) and extra_conf:
                 properties.update(extra_conf)
 
