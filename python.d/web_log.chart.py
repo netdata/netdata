@@ -1,17 +1,20 @@
 # -*- coding: utf-8 -*-
 # Description: web log netdata python.d module
 # Author: l2isbad
-import re
+
 import bisect
-from os import access, R_OK
-from os.path import getsize
+import re
+
 from collections import namedtuple, defaultdict
 from copy import deepcopy
+from os import access, R_OK
+from os.path import getsize
 
 try:
     from itertools import filterfalse
 except ImportError:
     from itertools import ifilterfalse as filterfalse
+
 from base import LogService
 import msg
 
@@ -937,18 +940,21 @@ class Squid(Mixin):
         :return:
         """
         if code not in self.data:
-            self.add_new_dimension(dimension_id=code, chart_key='squid_code')
+            self.add_new_dimension(dimension_id=code,
+                                   chart_key='squid_code')
         self.data[code] += 1
-        if '_' not in code:
-            return
+
         for tag in code.split('_'):
             try:
                 chart_key = SQUID_CODES[tag]
             except KeyError:
                 continue
-            if tag not in self.data:
-                self.add_new_dimension(dimension_id=tag, chart_key=chart_key)
-            self.data[tag] += 1
+            dimension_id = '_'.join(['code_detailed', tag])
+            if dimension_id not in self.data:
+                self.add_new_dimension(dimension_id=dimension_id,
+                                       dimension=tag,
+                                       chart_key=chart_key)
+            self.data[dimension_id] += 1
 
 
 def get_timings(timings, time):
