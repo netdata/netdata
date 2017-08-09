@@ -392,8 +392,10 @@ if [ ${DONOTWAIT} -eq 0 ]
     if [ ! -z "${NETDATA_PREFIX}" ]
         then
         eval "read >&2 -ep \$'\001${TPUT_BOLD}${TPUT_GREEN}\002Press ENTER to build and install netdata to \'\001${TPUT_CYAN}\002${NETDATA_PREFIX}\001${TPUT_YELLOW}\002\'\001${TPUT_RESET}\002 > ' -e -r REPLY"
+        [ $? -ne 0 ] && exit 1
     else
         eval "read >&2 -ep \$'\001${TPUT_BOLD}${TPUT_GREEN}\002Press ENTER to build and install netdata to your system\001${TPUT_RESET}\002 > ' -e -r REPLY"
+        [ $? -ne 0 ] && exit 1
     fi
 fi
 
