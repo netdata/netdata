@@ -41,8 +41,8 @@ calculated_number unpack_storage_number(storage_number value);
 int print_calculated_number(char *str, calculated_number value);
 
 #define STORAGE_NUMBER_POSITIVE_MAX 167772150000000.0
-#define STORAGE_NUMBER_POSITIVE_MIN 0.00001
-#define STORAGE_NUMBER_NEGATIVE_MAX -0.00001
+#define STORAGE_NUMBER_POSITIVE_MIN 0.0000001
+#define STORAGE_NUMBER_NEGATIVE_MAX -0.0000001
 #define STORAGE_NUMBER_NEGATIVE_MIN -167772150000000.0
 
 // accepted accuracy loss
