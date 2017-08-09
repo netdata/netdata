@@ -2,12 +2,13 @@
 
 extern char *print_number_lu_r(char *str, unsigned long uvalue);
 extern char *print_number_llu_r(char *str, unsigned long long uvalue);
+extern char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 
 storage_number pack_storage_number(calculated_number value, uint32_t flags)
 {
     // bit 32 = sign 0:positive, 1:negative
     // bit 31 = 0:divide, 1:multiply
-    // bit 30, 29, 28 = (multiplier or divider) 0-6 (7 total)
+    // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
     // bit 27, 26, 25 flags
     // bit 24 to bit 1 = the value
 
@@ -105,6 +106,7 @@ calculated_number unpack_storage_number(storage_number value)
     return n;
 }
 
+/*
 int print_calculated_number(char *str, calculated_number value)
 {
     char *wstr = str;
@@ -113,21 +115,14 @@ int print_calculated_number(char *str, calculated_number value)
     if(sign) value = -value;
 
 #ifdef STORAGE_WITH_MATH
-    // without llrint() there are rounding problems
+    // without llrintl() there are rounding problems
     // for example 0.9 becomes 0.89
-    unsigned long long uvalue = (unsigned long long int) llrint(value * (calculated_number)100000);
+    unsigned long long uvalue = (unsigned long long int) llrintl(value * (calculated_number)100000);
 #else
     unsigned long long uvalue = value * (calculated_number)100000;
 #endif
 
-#ifdef ENVIRONMENT32
-    if(uvalue > (unsigned long long)0xffffffff)
-        wstr = print_number_llu_r(str, uvalue);
-    else
-        wstr = print_number_lu_r(str, uvalue);
-#else
-    do *wstr++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
-#endif
+    wstr = print_number_llu_r_smart(str, uvalue);
 
     // make sure we have 6 bytes at least
     while((wstr - str) < 6) *wstr++ = '0';
@@ -165,4 +160,63 @@ int print_calculated_number(char *str, calculated_number value)
 
     // return the buffer length
     return (int) ((wstr - str) + 2 + decimal );
+}
+*/
+
+int print_calculated_number(char *str, calculated_number value) {
+    char integral_str[50], fractional_str[50];
+
+    char *wstr = str;
+
+    if(unlikely(value < 0)) {
+        *wstr++ = '-';
+        value = -value;
+    }
+
+    calculated_number integral, fractional;
+
+#ifdef STORAGE_WITH_MATH
+    fractional = modfl(value, &integral) * 10000000.0;
+#else
+    fractional = ((unsigned long long)(value * 10000000ULL) % 10000000ULL);
+#endif
+
+    char *istre;
+    if(integral == 0.0) {
+        integral_str[0] = '0';
+        istre = &integral_str[1];
+    }
+    else
+        // convert the integral part to string (reversed)
+        istre = print_number_llu_r_smart(integral_str, (unsigned long long)integral);
+
+    // copy reversed the integral string
+    istre--;
+    while( istre >= integral_str ) *wstr++ = *istre--;
+
+    if(fractional != 0.0) {
+        // add a dot
+        *wstr++ = '.';
+
+        // convert the fractional part to string (reversed)
+        char *fstre = print_number_llu_r_smart(fractional_str, (unsigned long long)llrintl(fractional));
+
+        // prepend zeros to reach 7 digits length
+        int decimal = 7;
+        int len = (int)(fstre - fractional_str);
+        while(len < decimal) {
+            *wstr++ = '0';
+            len++;
+        }
+
+        char *begin = fractional_str;
+        while(*begin == '0' && begin < fstre) begin++;
+
+        // copy reversed the fractional string
+        fstre--;
+        while( fstre >= begin ) *wstr++ = *fstre--;
+    }
+
+    *wstr = '\0';
+    return (int)(wstr - str);
 }
