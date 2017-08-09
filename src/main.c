@@ -940,11 +940,6 @@ int main(int argc, char **argv) {
             user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
         }
 
-        // IMPORTANT: these have to run once, while single threaded
-        web_files_uid(); // IMPORTANT: web_files_uid() before web_files_gid()
-        web_files_gid();
-
-
         // --------------------------------------------------------------------
         // create the listening sockets
 
@@ -974,6 +969,11 @@ int main(int argc, char **argv) {
         fatal("Cannot daemonize myself.");
 
     info("netdata started on pid %d.", getpid());
+
+    // IMPORTANT: these have to run once, while single threaded
+    // but after we have switched user
+    web_files_uid();
+    web_files_gid();
 
 
     // ------------------------------------------------------------------------
