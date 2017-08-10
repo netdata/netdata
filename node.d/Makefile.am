@@ -6,6 +6,7 @@ dist_node_DATA = \
 	fronius.node.js \
 	sma_webbox.node.js \
 	snmp.node.js \
+	stiebeleltron.node.js \
 	$(NULL)
 
 nodemodulesdir=$(nodedir)/node_modules
