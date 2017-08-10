@@ -118,29 +118,14 @@ GROUP BY datname, mode
 ORDER BY datname, mode;
 """,
     FIND_DATABASES="""
-SELECT datname FROM pg_stat_database WHERE NOT datname ~* '^template\d+'
+SELECT datname
+FROM pg_stat_database
+WHERE has_database_privilege((SELECT current_user), datname, 'connect')
+AND NOT datname ~* '^template\d+';
 """,
     IF_SUPERUSER="""
 SELECT current_setting('is_superuser') = 'on' AS is_superuser;
     """)
-
-# REPLICATION = """
-# SELECT
-#    client_hostname,
-#    client_addr,
-#    state,
-#    sent_offset - (
-#        replay_offset - (sent_xlog - replay_xlog) * 255 * 16 ^ 6 ) AS byte_lag
-# FROM (
-#    SELECT
-#        client_addr, client_hostname, state,
-#        ('x' || lpad(split_part(sent_location::text,   '/', 1), 8, '0'))::bit(32)::bigint AS sent_xlog,
-#        ('x' || lpad(split_part(replay_location::text, '/', 1), 8, '0'))::bit(32)::bigint AS replay_xlog,
-#        ('x' || lpad(split_part(sent_location::text,   '/', 2), 8, '0'))::bit(32)::bigint AS sent_offset,
-#        ('x' || lpad(split_part(replay_location::text, '/', 2), 8, '0'))::bit(32)::bigint AS replay_offset
-#    FROM pg_stat_replication
-# ) AS s;
-# """
 
 
 QUERY_STATS = {
