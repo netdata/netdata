@@ -60,50 +60,50 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
 
  - **Stunning interactive bootstrap dashboards**<br/>
    mouse and touch friendly, in 2 themes: dark, light
-   
+
  - **Amazingly fast**<br/>
    responds to all queries in less than 0.5 ms per metric,
    even on low-end hardware
-   
+
  - **Highly efficient**<br/>
    collects thousands of metrics per server per second,
    with just 1% CPU utilization of a single core, a few MB of RAM and no disk I/O at all
-   
+
  - **Sophisticated alarming**<br/>
    hundreds of alarms, **out of the box**!<br/>
    supports dynamic thresholds, hysteresis, alarm templates,
    multiple role-based notification methods (such as email, slack.com,
    pushover.net, pushbullet.com, telegram.org, twilio.com, messagebird.com)
-   
+
  - **Extensible**<br/>
    you can monitor anything you can get a metric for,
    using its Plugin API (anything can be a netdata plugin,
    BASH, python, perl, node.js, java, Go, ruby, etc)
-   
+
  - **Embeddable**<br/>
    it can run anywhere a Linux kernel runs (even IoT)
    and its charts can be embedded on your web pages too
-   
+
  - **Customizable**<br/>
    custom dashboards can be built using simple HTML (no javascript necessary)
-   
+
  - **Zero configuration**<br/>
    auto-detects everything, it can collect up to 5000 metrics
    per server out of the box
-   
+
  - **Zero dependencies**<br/>
    it is even its own web server, for its static web files and its web API
-   
+
  - **Zero maintenance**<br/>
    you just run it, it does the rest
-   
+
  - **scales to infinity**<br/>
    requiring minimal central resources
-   
+
  - **several operating modes**<br/>
    autonomous host monitoring, headless data collector, forwarding proxy, store and forward proxy, central multi-host monitoring, in all possible configurations.
    Each node may have different metrics retention policy and run with or without health monitoring.
-   
+
  - **time-series back-ends supported**<br/>
    can archive its metrics on `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower detail
    (lower: to prevent it from congesting these servers due to the amount of data collected)
@@ -311,6 +311,13 @@ It should run on **any Linux** system (including IoT). It has been tested on:
 - RedHat Enterprise Linux
 - SUSE
 - Ubuntu
+
+---
+
+## Interaction with netdata
+
+After installation, you can interact with netdata using **[CLI](https://github.com/firehol/netdata/wiki/Command-Line-Options)** and web dashboards.
+The default port of dashboard is 19999. To access the web dashboard on localhost, use: http://localhost:19999
 
 ---
 
