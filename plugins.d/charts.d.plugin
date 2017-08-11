@@ -25,6 +25,8 @@ MODULE_NAME="main"
 debug=0
 TMP_DIR=
 chartsd_cleanup() {
+    trap '' EXIT QUIT HUP INT TERM
+
     if [ ! -z "$TMP_DIR" -a -d "$TMP_DIR" ]
     then
         [ $debug -eq 1 ] && echo >&2 "$PROGRAM_NAME: cleaning up temporary directory $TMP_DIR ..."
@@ -32,9 +34,7 @@ chartsd_cleanup() {
     fi
     exit 0
 }
-trap chartsd_cleanup EXIT
-trap chartsd_cleanup SIGHUP
-trap chartsd_cleanup INT
+trap chartsd_cleanup EXIT QUIT HUP INT TERM
 
 if [ $UID = "0" ]
 then
