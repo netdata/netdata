@@ -323,6 +323,23 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     return 1;
 }
 
+static inline int check_if_resumed_from_suspention(void) {
+    static usec_t last_realtime = 0, last_monotonic = 0;
+    usec_t realtime = now_realtime_usec(), monotonic = now_monotonic_usec();
+    int ret = 0;
+
+    // detect if monotonic and realtime have twice the difference
+    // in which case we assume the system was just waken from hibernation
+
+    if(last_realtime && last_monotonic && realtime - last_realtime > 2 * (monotonic - last_monotonic))
+        ret = 1;
+
+    last_realtime = realtime;
+    last_monotonic = monotonic;
+
+    return ret;
+}
+
 void *health_main(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
@@ -339,11 +356,8 @@ void *health_main(void *ptr) {
 
     BUFFER *wb = buffer_create(100);
 
-    time_t now               = now_realtime_sec();
-    time_t now_boottime      = now_boottime_sec();
-    time_t last_now          = now;
-    time_t last_now_boottime = now_boottime;
-    time_t hibernation_delay = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
+    time_t now                = now_realtime_sec();
+    time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
     unsigned int loop = 0;
     while(!netdata_exit) {
@@ -354,20 +368,13 @@ void *health_main(void *ptr) {
         time_t next_run = now + min_run_every;
         RRDCALC *rc;
 
-        // detect if boottime and realtime have twice the difference
-        // in which case we assume the system was just waken from hibernation
-        if(unlikely(now - last_now > 2 * (now_boottime - last_now_boottime))) {
+        if(unlikely(check_if_resumed_from_suspention())) {
             apply_hibernation_delay = 1;
 
-            info("Postponing alarm checks for %ld seconds, due to boottime discrepancy (realtime dt: %ld, boottime dt: %ld)."
+            info("Postponing alarm checks for %ld seconds, because it seems that the system was just resumed from suspension."
             , hibernation_delay
-            , (long)(now - last_now)
-            , (long)(now_boottime - last_now_boottime)
             );
         }
-
-        last_now = now;
-        last_now_boottime = now_boottime;
 
         if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate) != 0))
             error("Cannot set pthread cancel state to DISABLE.");
@@ -381,7 +388,7 @@ void *health_main(void *ptr) {
 
             if(unlikely(apply_hibernation_delay)) {
 
-                info("Postponing alarm checks for %ld seconds, on host '%s'."
+                info("Postponing health checks for %ld seconds, on host '%s'."
                      , hibernation_delay
                      , host->hostname
                 );
@@ -389,8 +396,13 @@ void *health_main(void *ptr) {
                 host->health_delay_up_to = now + hibernation_delay;
             }
 
-            if(unlikely(!host->health_enabled || now < host->health_delay_up_to))
-                continue;
+            if(unlikely(host->health_delay_up_to)) {
+                if(unlikely(now < host->health_delay_up_to))
+                    continue;
+
+                info("Resuming health checks on host '%s'.", host->hostname);
+                host->health_delay_up_to = 0;
+            }
 
             rrdhost_rdlock(host);
 
@@ -725,8 +737,6 @@ void *health_main(void *ptr) {
         }
         else
             debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);
-
-        now_boottime = now_boottime_sec();
 
     } // forever
 
