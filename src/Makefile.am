@@ -133,7 +133,6 @@ netdata_SOURCES = \
 	storage_number.h \
 	sys_devices_system_edac_mc.c \
 	sys_devices_system_node.c \
-	sys_fs_cgroup.c \
 	unit_test.c \
 	unit_test.h \
 	url.c url.h \
@@ -203,6 +202,7 @@ netdata_SOURCES += \
 	proc_vmstat.c \
 	proc_uptime.c \
 	sys_kernel_mm_ksm.c \
+	sys_fs_cgroup.c \
 	$(NULL)
 endif
 endif
