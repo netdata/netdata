@@ -373,6 +373,70 @@ int do_kern_cp_times(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// dev.cpu.temperature
+
+int do_dev_cpu_temperature(int update_every, usec_t dt) {
+    (void)dt;
+
+    int i;
+    static int mib[4] = {0, 0, 0, 0};
+    static long *pcpu_temperature = NULL;
+    static int old_number_of_cpus = 0;
+    char char_mib[MAX_INT_DIGITS + 21];
+    char char_rd[MAX_INT_DIGITS + 9];
+
+    if(unlikely(number_of_cpus != old_number_of_cpus))
+        pcpu_temperature = reallocz(pcpu_temperature, sizeof(long) * number_of_cpus);
+    for (i = 0; i < number_of_cpus; i++) {
+        mib[2] = i;
+        sprintf(char_mib, "dev.cpu.%d.temperature", i);
+        if (unlikely(GETSYSCTL_SIMPLE(char_mib, mib, pcpu_temperature[i]))) {
+            error("DISABLED: cpu.temperature chart");
+            error("DISABLED: dev.cpu.temperature module");
+            return 1;
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    static RRDSET *st;
+    static RRDDIM **rd_pcpu_temperature;
+
+    if(unlikely(number_of_cpus != old_number_of_cpus)) {
+        rd_pcpu_temperature = reallocz(rd_pcpu_temperature, sizeof(RRDDIM) * number_of_cpus);
+        if (unlikely(number_of_cpus > old_number_of_cpus))
+            memset(&rd_pcpu_temperature[old_number_of_cpus], 0, sizeof(RRDDIM) * (number_of_cpus - old_number_of_cpus));
+    }
+
+    for (i = 0; i < number_of_cpus; i++) {
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("cpu",
+                                         "temperature",
+                                         NULL,
+                                         "temperature",
+                                         "cpu.temperatute",
+                                         "Core temperature",
+                                         "degree",
+                                         1050,
+                                         update_every,
+                                         RRDSET_TYPE_STACKED
+            );
+
+
+            sprintf(char_rd, "cpu%d.temp", i);
+            rd_pcpu_temperature[i] = rrddim_add(st, char_rd, NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+        } else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd_pcpu_temperature[i], pcpu_temperature[i]);
+        rrdset_done(st);
+    }
+
+    old_number_of_cpus = number_of_cpus;
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // hw.intrcnt
 
 int do_hw_intcnt(int update_every, usec_t dt) {
