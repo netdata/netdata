@@ -697,7 +697,7 @@ class Web(Mixin):
         optional_dict = {'resp_length': r'\d+',
                          'resp_time': r'[\d.]+',
                          'resp_time_upstream': r'[\d.-]+',
-                         'http_version': r'\d\.\d'}
+                         'http_version': r'\d(\.\d)?'}
 
         mandatory_values = set(mandatory_dict) - set(match_dict)
         if mandatory_values:
