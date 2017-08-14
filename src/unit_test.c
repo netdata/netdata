@@ -31,8 +31,8 @@ int check_storage_number(calculated_number n, int debug) {
             CALCULATED_NUMBER_FORMAT " re-parsed from printed (diff " CALCULATED_NUMBER_FORMAT ", " CALCULATED_NUMBER_FORMAT "%%)\n\n",
             n,
             d, s, ddiff, dcdiff,
-            buffer,
-            len, p, pdiff, pcdiff
+            buffer, len,
+            p, pdiff, pcdiff
         );
         if(len != strlen(buffer)) fprintf(stderr, "ERROR: printed number %s is reported to have length %zu but it has %zu\n", buffer, len, strlen(buffer));
         if(dcdiff > ACCURACY_LOSS) fprintf(stderr, "WARNING: packing number " CALCULATED_NUMBER_FORMAT " has accuracy loss %0.7Lf %%\n", n, dcdiff);
@@ -43,6 +43,19 @@ int check_storage_number(calculated_number n, int debug) {
     if(dcdiff > ACCURACY_LOSS) return 3;
     if(pcdiff > ACCURACY_LOSS) return 4;
     return 0;
+}
+
+calculated_number storage_number_min(calculated_number n) {
+    calculated_number r = 1, last;
+
+    do {
+        last = n;
+        n /= 2.0;
+        storage_number t = pack_storage_number(n, SN_EXISTS);
+        r = unpack_storage_number(t);
+    } while(r != 0.0 && r != last);
+
+    return last;
 }
 
 void benchmark_storage_number(int loop, int multiplier) {
@@ -73,10 +86,10 @@ void benchmark_storage_number(int loop, int multiplier) {
     }
 
     fprintf(stderr, "\nNETDATA FLOATING POINT\n");
-    fprintf(stderr, "MIN POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_POSITIVE_MIN);
+    fprintf(stderr, "MIN POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", storage_number_min(1));
     fprintf(stderr, "MAX POSITIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_POSITIVE_MAX);
     fprintf(stderr, "MIN NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_NEGATIVE_MIN);
-    fprintf(stderr, "MAX NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", (calculated_number)STORAGE_NUMBER_NEGATIVE_MAX);
+    fprintf(stderr, "MAX NEGATIVE VALUE " CALCULATED_NUMBER_FORMAT "\n", -storage_number_min(1));
     fprintf(stderr, "Maximum accuracy loss: " CALCULATED_NUMBER_FORMAT "%%\n\n\n", (calculated_number)ACCURACY_LOSS);
 
     // ------------------------------------------------------------------------
@@ -231,7 +244,7 @@ int unit_test_storage()
 
 int unit_test_str2ld() {
     char *values[] = {
-            "1.234567", "-35.6", "0.00123", "23842384234234.2", ".1", "1.2e-10",
+            "1.2345678", "-35.6", "0.00123", "23842384234234.2", ".1", "1.2e-10",
             "hello", "1wrong", "nan", "inf", NULL
     };
 

@@ -71,6 +71,7 @@ extern void buffer_char_replace(BUFFER *wb, char from, char to);
 
 extern char *print_number_lu_r(char *str, unsigned long uvalue);
 extern char *print_number_llu_r(char *str, unsigned long long uvalue);
+extern char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 
 extern void buffer_print_llu(BUFFER *wb, unsigned long long uvalue);
 

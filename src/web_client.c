@@ -210,14 +210,18 @@ uid_t web_files_uid(void) {
     static uid_t owner_uid = 0;
 
     if(unlikely(!web_owner)) {
-        web_owner = config_get(CONFIG_SECTION_WEB, "web files owner", config_get(CONFIG_SECTION_GLOBAL, "run as user", ""));
+        // getpwuid() is not thread safe,
+        // but we have called this function once
+        // while single threaded
+        struct passwd *pw = getpwuid(geteuid());
+        web_owner = config_get(CONFIG_SECTION_WEB, "web files owner", (pw)?(pw->pw_name?pw->pw_name:""):"");
         if(!web_owner || !*web_owner)
             owner_uid = geteuid();
         else {
             // getpwnam() is not thread safe,
             // but we have called this function once
             // while single threaded
-            struct passwd *pw = getpwnam(web_owner);
+            pw = getpwnam(web_owner);
             if(!pw) {
                 error("User '%s' is not present. Ignoring option.", web_owner);
                 owner_uid = geteuid();
@@ -237,14 +241,18 @@ gid_t web_files_gid(void) {
     static gid_t owner_gid = 0;
 
     if(unlikely(!web_group)) {
-        web_group = config_get(CONFIG_SECTION_WEB, "web files group", config_get(CONFIG_SECTION_WEB, "web files owner", ""));
+        // getgrgid() is not thread safe,
+        // but we have called this function once
+        // while single threaded
+        struct group *gr = getgrgid(getegid());
+        web_group = config_get(CONFIG_SECTION_WEB, "web files group", (gr)?(gr->gr_name?gr->gr_name:""):"");
         if(!web_group || !*web_group)
             owner_gid = getegid();
         else {
             // getgrnam() is not thread safe,
             // but we have called this function once
             // while single threaded
-            struct group *gr = getgrnam(web_group);
+            gr = getgrnam(web_group);
             if(!gr) {
                 error("Group '%s' is not present. Ignoring option.", web_group);
                 owner_gid = getegid();
