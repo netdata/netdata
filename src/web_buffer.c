@@ -84,6 +84,19 @@ inline char *print_number_llu_r(char *str, unsigned long long uvalue) {
     return wstr;
 }
 
+inline char *print_number_llu_r_smart(char *str, unsigned long long uvalue) {
+#ifdef ENVIRONMENT32
+    if(uvalue > (unsigned long long)0xffffffff)
+        str = print_number_llu_r(str, uvalue);
+    else
+        str = print_number_lu_r(str, uvalue);
+#else
+    do *str++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
+#endif
+
+    return str;
+}
+
 void buffer_print_llu(BUFFER *wb, unsigned long long uvalue)
 {
     buffer_need_bytes(wb, 50);

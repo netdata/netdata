@@ -2554,11 +2554,14 @@ var NETDATA = window.NETDATA || {};
                 else
                     delta = Math.abs(max - min);
 
-                if (delta > 1000)     __legendFormatValueChartDecimals = 0;
-                else if (delta > 10)  __legendFormatValueChartDecimals = 1;
-                else if (delta > 1)   __legendFormatValueChartDecimals = 2;
-                else if (delta > 0.1) __legendFormatValueChartDecimals = 2;
-                else                  __legendFormatValueChartDecimals = 4;
+                if (delta > 1000)        __legendFormatValueChartDecimals = 0;
+                else if (delta > 10)     __legendFormatValueChartDecimals = 1;
+                else if (delta > 1)      __legendFormatValueChartDecimals = 2;
+                else if (delta > 0.1)    __legendFormatValueChartDecimals = 2;
+                else if (delta > 0.01)   __legendFormatValueChartDecimals = 4;
+                else if (delta > 0.001)  __legendFormatValueChartDecimals = 5;
+                else if (delta > 0.0001) __legendFormatValueChartDecimals = 6;
+                else                     __legendFormatValueChartDecimals = 7;
             }
 
             if(__legendFormatValueChartDecimals !== old) {
@@ -2585,11 +2588,14 @@ var NETDATA = window.NETDATA || {};
             else {
                 dmin = 0;
                 var abs = (value < 0) ? -value : value;
-                if (abs > 1000)     dmax = 0;
-                else if (abs > 10)  dmax = 1;
-                else if (abs > 1)   dmax = 2;
-                else if (abs > 0.1) dmax = 2;
-                else                dmax = 4;
+                if (abs > 1000)        dmax = 0;
+                else if (abs > 10)     dmax = 1;
+                else if (abs > 1)      dmax = 2;
+                else if (abs > 0.1)    dmax = 2;
+                else if (abs > 0.01)   dmax = 4;
+                else if (abs > 0.001)  dmax = 5;
+                else if (abs > 0.0001) dmax = 6;
+                else                   dmax = 7;
             }
 
             return NETDATA.fastNumberFormat.get(dmin, dmax).format(value);

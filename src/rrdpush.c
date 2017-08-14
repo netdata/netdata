@@ -648,8 +648,15 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
 
     host->connected_senders++;
     rrdhost_flag_clear(host, RRDHOST_ORPHAN);
-    if(health_enabled != CONFIG_BOOLEAN_NO)
-        host->health_delay_up_to = now_realtime_sec() + alarms_delay;
+    if(health_enabled != CONFIG_BOOLEAN_NO) {
+        if(alarms_delay > 0) {
+            host->health_delay_up_to = now_realtime_sec() + alarms_delay;
+            info("Postponing health checks for %ld seconds, on host '%s', because it was just connected."
+            , alarms_delay
+            , host->hostname
+            );
+        }
+    }
     rrdhost_unlock(host);
 
     // call the plugins.d processor to receive the metrics
