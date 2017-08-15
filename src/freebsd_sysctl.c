@@ -408,28 +408,30 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
             memset(&rd_pcpu_temperature[old_number_of_cpus], 0, sizeof(RRDDIM) * (number_of_cpus - old_number_of_cpus));
     }
 
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost("cpu",
+                                     "temperature",
+                                     NULL,
+                                     "temperature",
+                                     "cpu.temperatute",
+                                     "Core temperature",
+                                     "degree",
+                                     1050,
+                                     update_every,
+                                     RRDSET_TYPE_STACKED
+        );
+    } else rrdset_next(st);
+
     for (i = 0; i < number_of_cpus; i++) {
-        if (unlikely(!st)) {
-            st = rrdset_create_localhost("cpu",
-                                         "temperature",
-                                         NULL,
-                                         "temperature",
-                                         "cpu.temperatute",
-                                         "Core temperature",
-                                         "degree",
-                                         1050,
-                                         update_every,
-                                         RRDSET_TYPE_STACKED
-            );
-
-
+        if (unlikely(!rd_pcpu_temperature[i])) {
             sprintf(char_rd, "cpu%d.temp", i);
             rd_pcpu_temperature[i] = rrddim_add(st, char_rd, NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-        } else rrdset_next(st);
+        }
 
         rrddim_set_by_pointer(st, rd_pcpu_temperature[i], pcpu_temperature[i]);
-        rrdset_done(st);
     }
+
+    rrdset_done(st);
 
     old_number_of_cpus = number_of_cpus;
 
