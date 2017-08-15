@@ -51,7 +51,7 @@
 
 var NETDATA = window.NETDATA || {};
 
-(function(window, document) {
+(function(window, document, $, undefined) {
     // ------------------------------------------------------------------------
     // compatibility fixes
 
@@ -3932,14 +3932,20 @@ var NETDATA = window.NETDATA || {};
 
             // script.onabort = onError;
             script.onerror = function() { NETDATA.error(101, NETDATA.jQuery); };
-            if(typeof callback === "function")
-                script.onload = callback;
+            if(typeof callback === "function") {
+                script.onload = function () {
+                    $ = jQuery;
+                    return callback();
+                };
+            }
 
             var s = document.getElementsByTagName('script')[0];
             s.parentNode.insertBefore(script, s);
         }
-        else if(typeof callback === "function")
+        else if(typeof callback === "function") {
+            $ = jQuery;
             return callback();
+        }
     };
 
     NETDATA._loadCSS = function(filename) {
@@ -7086,4 +7092,4 @@ var NETDATA = window.NETDATA || {};
             }
         });
     });
-})(window, document);
+})(window, document, (typeof jQuery === 'function')?jQuery:undefined);
