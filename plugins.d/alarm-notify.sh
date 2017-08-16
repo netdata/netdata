@@ -290,6 +290,7 @@ declare -A role_recipients_custom=()
 # email configs
 EMAIL_SENDER=""
 DEFAULT_RECIPIENT_EMAIL="root"
+EMAIL_CHARSET=$(locale charmap 2>/dev/null)
 declare -A role_recipients_email=()
 
 # load the user configuration
@@ -299,6 +300,14 @@ if [ -f "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf" ]
     source "${NETDATA_CONFIG_DIR}/health_alarm_notify.conf"
 else
     error "Cannot find file ${NETDATA_CONFIG_DIR}/health_alarm_notify.conf. Using internal defaults."
+fi
+
+# If we didn't autodetect the character set for e-mail and it wasn't
+# set by the user, we need to set it to a reasonable default.  UTF-8
+# should be correct for almost all modern UNIX systems.
+if [ -z ${EMAIL_CHARSET} ]
+    then
+    EMAIL_CHARSET="UTF-8"
 fi
 
 # -----------------------------------------------------------------------------
@@ -1401,7 +1410,9 @@ Content-Type: multipart/alternative; boundary="multipart-boundary"
 This is a MIME-encoded multipart message
 
 --multipart-boundary
-Content-Type: text/plain
+Content-Type: text/plain; encoding=${EMAIL_CHARSET}
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
 
 ${host} ${status_message}
 
@@ -1417,7 +1428,9 @@ Date    : ${date}
 Notification generated on ${this_host}
 
 --multipart-boundary
-Content-Type: text/html
+Content-Type: text/html; encoding=${EMAIL_CHARSET}
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px; margin: 0; padding: 0;">
