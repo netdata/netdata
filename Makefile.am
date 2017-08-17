@@ -48,6 +48,8 @@ EXTRA_DIST = \
 SUBDIRS = \
 	charts.d \
 	conf.d \
+	diagrams \
+	makeself \
 	node.d \
 	plugins.d \
 	python.d \
