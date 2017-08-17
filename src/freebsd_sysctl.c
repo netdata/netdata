@@ -379,18 +379,21 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
     (void)dt;
 
     int i;
-    static int mib[4] = {0, 0, 0, 0};
-    static long *pcpu_temperature = NULL;
+    static int *mib = NULL;
+    static int *pcpu_temperature = NULL;
     static int old_number_of_cpus = 0;
     char char_mib[MAX_INT_DIGITS + 21];
     char char_rd[MAX_INT_DIGITS + 9];
 
-    if(unlikely(number_of_cpus != old_number_of_cpus))
-        pcpu_temperature = reallocz(pcpu_temperature, sizeof(long) * number_of_cpus);
+    if(unlikely(number_of_cpus != old_number_of_cpus)) {
+        pcpu_temperature = reallocz(pcpu_temperature, sizeof(int) * number_of_cpus);
+        mib = reallocz(mib, sizeof(int) * number_of_cpus * 4);
+        if (unlikely(number_of_cpus > old_number_of_cpus))
+            memset(&mib[old_number_of_cpus * 4], 0, sizeof(RRDDIM) * (number_of_cpus - old_number_of_cpus));
+    }
     for (i = 0; i < number_of_cpus; i++) {
-        mib[2] = i;
         sprintf(char_mib, "dev.cpu.%d.temperature", i);
-        if (unlikely(GETSYSCTL_SIMPLE(char_mib, mib, pcpu_temperature[i]))) {
+        if (unlikely(getsysctl_simple(char_mib, &mib[i * 4], 4, &pcpu_temperature[i], sizeof(int)))) {
             error("DISABLED: cpu.temperature chart");
             error("DISABLED: dev.cpu.temperature module");
             return 1;
@@ -418,17 +421,17 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
                                      "degree",
                                      1050,
                                      update_every,
-                                     RRDSET_TYPE_STACKED
+                                     RRDSET_TYPE_LINE
         );
     } else rrdset_next(st);
 
     for (i = 0; i < number_of_cpus; i++) {
         if (unlikely(!rd_pcpu_temperature[i])) {
             sprintf(char_rd, "cpu%d.temp", i);
-            rd_pcpu_temperature[i] = rrddim_add(st, char_rd, NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+            rd_pcpu_temperature[i] = rrddim_add(st, char_rd, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(st, rd_pcpu_temperature[i], pcpu_temperature[i]);
+        rrddim_set_by_pointer(st, rd_pcpu_temperature[i], (collected_number) ((double)pcpu_temperature[i] / 10 - 273.15));
     }
 
     rrdset_done(st);
