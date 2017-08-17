@@ -21,6 +21,7 @@ dist_nodeconfig_DATA = \
     node.d/named.conf.md \
     node.d/sma_webbox.conf.md \
     node.d/snmp.conf.md \
+    node.d/stiebeleltron.conf.md \
     $(NULL)
 
 pythonconfigdir=$(configdir)/python.d
