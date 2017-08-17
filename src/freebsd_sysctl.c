@@ -385,14 +385,15 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
     char char_mib[MAX_INT_DIGITS + 21];
     char char_rd[MAX_INT_DIGITS + 9];
 
-    if(unlikely(number_of_cpus != old_number_of_cpus)) {
+    if (unlikely(number_of_cpus != old_number_of_cpus)) {
         pcpu_temperature = reallocz(pcpu_temperature, sizeof(int) * number_of_cpus);
         mib = reallocz(mib, sizeof(int) * number_of_cpus * 4);
         if (unlikely(number_of_cpus > old_number_of_cpus))
             memset(&mib[old_number_of_cpus * 4], 0, sizeof(RRDDIM) * (number_of_cpus - old_number_of_cpus));
     }
     for (i = 0; i < number_of_cpus; i++) {
-        sprintf(char_mib, "dev.cpu.%d.temperature", i);
+        if (unlikely(!(mib[i * 4])))
+            sprintf(char_mib, "dev.cpu.%d.temperature", i);
         if (unlikely(getsysctl_simple(char_mib, &mib[i * 4], 4, &pcpu_temperature[i], sizeof(int)))) {
             error("DISABLED: cpu.temperature chart");
             error("DISABLED: dev.cpu.temperature module");
@@ -405,7 +406,7 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
     static RRDSET *st;
     static RRDDIM **rd_pcpu_temperature;
 
-    if(unlikely(number_of_cpus != old_number_of_cpus)) {
+    if (unlikely(number_of_cpus != old_number_of_cpus)) {
         rd_pcpu_temperature = reallocz(rd_pcpu_temperature, sizeof(RRDDIM) * number_of_cpus);
         if (unlikely(number_of_cpus > old_number_of_cpus))
             memset(&rd_pcpu_temperature[old_number_of_cpus], 0, sizeof(RRDDIM) * (number_of_cpus - old_number_of_cpus));
