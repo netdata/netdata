@@ -373,7 +373,8 @@ void *proc_diskspace_main(void *ptr) {
 
         if(unlikely(netdata_exit)) break;
 
-        dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
+        if(dict_mountpoints)
+            dictionary_get_all(dict_mountpoints, mount_point_cleanup, NULL);
 
         if(vdo_cpu_netdata) {
             static RRDSET *stcpu_thread = NULL, *st_duration = NULL;
