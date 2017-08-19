@@ -288,7 +288,7 @@ DEFAULT_RECIPIENT_CUSTOM=
 declare -A role_recipients_custom=()
 
 # email configs
-EMAIL_SENDER=""
+EMAIL_SENDER=
 DEFAULT_RECIPIENT_EMAIL="root"
 EMAIL_CHARSET=$(locale charmap 2>/dev/null)
 declare -A role_recipients_email=()
@@ -703,11 +703,35 @@ duration4human() {
 # email sender
 
 send_email() {
-    local ret=
+    local ret= opts=
     if [ "${SEND_EMAIL}" = "YES" ]
         then
 
-        "${sendmail}" -t
+        if [ ! -z "${EMAIL_SENDER}" ]
+            then
+            if [[ "${EMAIL_SENDER}" =~ \".*\"\ \<.*\> ]]
+                then
+                opts=" -f '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)' -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
+            elif [[ "${EMAIL_SENDER}" =~ \'.*\'\ \<.*\> ]]
+                then
+                opts=" -f '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)' -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
+            elif [[ "${EMAIL_SENDER}" =~ .*\ \<.*\> ]]
+                then
+                opts=" -f '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)' -F '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)'"
+            else
+                opts=" -f '${EMAIL_SENDER}'"
+            fi
+        fi
+
+        if [ "${debug}" = "1" ]
+            then
+            echo >&2 "--- BEGIN sendmail command ---"
+            printf >&2 "%q " "${sendmail}" -t ${opts}
+            echo >&2
+            echo >&2 "--- END sendmail command ---"
+        fi
+
+        "${sendmail}" -t ${opts}
         ret=$?
 
         if [ ${ret} -eq 0 ]
@@ -1398,10 +1422,7 @@ SENT_HIPCHAT=$?
 # -----------------------------------------------------------------------------
 # send the email
 
-[ -z "${EMAIL_SENDER}" ] && EMAIL_SENDER="${USER-netdata}"
-
 send_email <<EOF
-From: ${EMAIL_SENDER}
 To: ${to_email}
 Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
 MIME-Version: 1.0
