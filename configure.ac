@@ -49,21 +49,27 @@ AC_USE_SYSTEM_EXTENSIONS
 
 AC_ARG_ENABLE(
     [plugin-nfacct],
-    [AS_HELP_STRING([--enable-plugin-nfacct], [enable nfacct plugin, requires root])],
+    [AS_HELP_STRING([--enable-plugin-nfacct], [enable nfacct plugin, requires running netdata as root @<:@default disabled@:>@])],
     ,
     [enable_plugin_nfacct="no"]
 )
 AC_ARG_ENABLE(
     [plugin-freeipmi],
-    [AS_HELP_STRING([--enable-plugin-freeipmi], [enable freeipmi plugin])],
+    [AS_HELP_STRING([--enable-plugin-freeipmi], [enable freeipmi plugin @<:@default autodetect@:>@])],
     ,
     [enable_plugin_freeipmi="detect"]
 )
 AC_ARG_ENABLE(
     [pedantic],
-    [AS_HELP_STRING([--enable-pedantic], [enable pedantic compiler warnings])],
+    [AS_HELP_STRING([--enable-pedantic], [enable pedantic compiler warnings @<:@default disabled@:>@])],
     ,
     [enable_pedantic="no"]
+)
+AC_ARG_ENABLE(
+    [accept4],
+    [AS_HELP_STRING([--disable-accept4], [System does not have accept4 @<:@default autodetect@:>@])],
+    ,
+    [enable_accept4="detect"]
 )
 AC_ARG_WITH(
     [webdir],
@@ -73,25 +79,25 @@ AC_ARG_WITH(
 )
 AC_ARG_WITH(
     [libcap],
-    [AS_HELP_STRING([--with-libcap], [build with libcap])],
+    [AS_HELP_STRING([--with-libcap], [build with libcap @<:@default autodetect@:>@])],
     ,
     [with_libcap="detect"]
 )
 AC_ARG_WITH(
     [zlib],
-    [AS_HELP_STRING([--with-zlib], [build with zlib])],
+    [AS_HELP_STRING([--without-zlib], [build without zlib @<:@default enabled@:>@])],
     ,
     [with_zlib="yes"]
 )
 AC_ARG_WITH(
     [math],
-    [AS_HELP_STRING([--with-math], [build with math])],
+    [AS_HELP_STRING([--without-math], [build without math @<:@default enabled@:>@])],
     ,
     [with_math="yes"]
 )
 AC_ARG_WITH(
     [user],
-    [AS_HELP_STRING([--with-user], [use this user to drop privilege])],
+    [AS_HELP_STRING([--with-user], [use this user to drop privilege @<:@default nobody@:>@])],
     ,
     [with_user="nobody"]
 )
@@ -103,7 +109,7 @@ AC_ARG_ENABLE(
 )
 AC_ARG_ENABLE(
     [lto],
-    [AS_HELP_STRING([--disable-lto], [Link Time Optimizations @<:@default enabled@:>@])],
+    [AS_HELP_STRING([--disable-lto], [Link Time Optimizations @<:@default autodetect@:>@])],
     ,
     [enable_lto="detect"]
 )
@@ -121,7 +127,6 @@ AX_GCC_FUNC_ATTRIBUTE([noreturn])
 AX_GCC_FUNC_ATTRIBUTE([format])
 AX_GCC_FUNC_ATTRIBUTE([warn_unused_result])
 
-AC_CHECK_FUNCS_ONCE(accept4)
 AC_CHECK_TYPES([struct timespec, clockid_t], [], [], [[#include <time.h>]])
 AC_SEARCH_LIBS([clock_gettime], [rt posix4])
 AC_CHECK_FUNCS([clock_gettime])
@@ -147,6 +152,10 @@ AC_HEADER_MAJOR
 AC_HEADER_RESOLV
 
 AC_CHECK_HEADERS_ONCE([sys/prctl.h])
+
+if test "${enable_accept4}" != "no"; then
+    AC_CHECK_FUNCS_ONCE(accept4)
+fi
 
 # -----------------------------------------------------------------------------
 # operating system detection
