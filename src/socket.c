@@ -747,7 +747,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     socklen_t addrlen = sizeof(sadr);
 
     int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags);
-    if (nfd >= 0) {
+    if (likely(nfd >= 0)) {
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize, client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
             error("LISTENER: cannot getnameinfo() on received client connection.");
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
@@ -775,6 +775,10 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 break;
         }
     }
+#ifdef HAVE_ACCEPT4
+    else if(errno == ENOSYS)
+        error("netdata has been compiled with the assumption that the system has the accept4() call, but it is not here. Recompile netdata like this: ./configure --disable-accept4 ...");
+#endif
 
     return nfd;
 }
