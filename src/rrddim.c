@@ -167,11 +167,11 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                     }
 
                     if(rd->multiplier != multiplier) {
-                        info("File %s does not have the expected multiplier (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT ". Previous values may be wrong.", fullfilename, multiplier, rd->multiplier);
+                        info("File %s does not have the expected multiplier (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT "). Previous values may be wrong.", fullfilename, multiplier, rd->multiplier);
                     }
 
                     if(rd->divisor != divisor) {
-                        info("File %s does not have the expected divisor (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT ". Previous values may be wrong.", fullfilename, divisor, rd->divisor);
+                        info("File %s does not have the expected divisor (expected " COLLECTED_NUMBER_FORMAT ", found " COLLECTED_NUMBER_FORMAT "). Previous values may be wrong.", fullfilename, divisor, rd->divisor);
                     }
                 }
             }
