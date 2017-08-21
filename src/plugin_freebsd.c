@@ -36,6 +36,7 @@ static struct freebsd_module {
 
         // CPU metrics
         { .name = "kern.cp_times",         .dim = "cp_times",       .enabled = 1, .func = do_kern_cp_times },
+        { .name = "dev.cpu.temperature",   .dim = "cpu_temperature", .enabled = 1, .func = do_dev_cpu_temperature },
 
         // disk metrics
         { .name = "kern.devstat",          .dim = "kern_devstat",   .enabled = 1, .func = do_kern_devstat },
