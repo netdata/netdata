@@ -10,7 +10,7 @@
 
 # The timeout in seconds to wait for netdata
 # to save its database on disk and exit.
-: ${NETDATA_WAIT_EXIT_TIMEOUT:=15}
+: ${NETDATA_WAIT_EXIT_TIMEOUT:=60}
 
 # When set to 1, if netdata does not exit in
 # NETDATA_WAIT_EXIT_TIMEOUT, we will force it
