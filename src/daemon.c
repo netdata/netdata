@@ -167,34 +167,70 @@ int become_user(const char *username, int pid_fd) {
 #endif
 
 static void oom_score_adj(void) {
-    char buf[10 + 1];
-    snprintfz(buf, 10, "%d", OOM_SCORE_ADJ_MAX);
+    char buf[30 + 1];
+    long long int old_score, wanted_score = OOM_SCORE_ADJ_MAX, final_score = 0;
 
-    // check the environment
-    char *s = getenv("OOMScoreAdjust");
-    if(!s || !*s) s = buf;
-
-    // check netdata.conf configuration
-    s = config_get(CONFIG_SECTION_GLOBAL, "OOM score", s);
-    if(!s || !*s) s = buf;
-
-    if(!isdigit(*s) && *s != '-' && *s != '+') {
-        info("Out-Of-Memory score not changed due to setting: '%s'", s);
+    // read the existing score
+    if(read_single_signed_number_file("/proc/self/oom_score_adj", &old_score)) {
+        error("Out-Of-Memory (OOM) score setting is not supported on this system.");
         return;
     }
 
-    int done = 0;
-    int fd = open("/proc/self/oom_score_adj", O_WRONLY);
-    if(fd != -1) {
-        ssize_t len = strlen(s);
-        if(len > 0 && write(fd, buf, (size_t)len) == len) done = 1;
-        close(fd);
+    if(old_score != 0)
+        wanted_score = old_score;
+
+    // check the environment
+    char *s = getenv("OOMScoreAdjust");
+    if(!s || !*s) {
+        snprintfz(buf, 30, "%d", (int)wanted_score);
+        s = buf;
     }
 
-    if(!done)
-        error("Cannot adjust my Out-Of-Memory score to '%s'.", s);
+    // check netdata.conf configuration
+    s = config_get(CONFIG_SECTION_GLOBAL, "OOM score", s);
+    if(s && *s && (isdigit(*s) || *s == '-' || *s == '+'))
+        wanted_score = atoll(s);
+    else {
+        info("Out-Of-Memory (OOM) score not changed due to non-numeric setting: '%s' (running with %d)", s, (int)old_score);
+        return;
+    }
+
+    if(wanted_score < OOM_SCORE_ADJ_MIN) {
+        error("Wanted Out-Of-Memory (OOM) score %d is too small. Using %d", (int)wanted_score, (int)OOM_SCORE_ADJ_MIN);
+        wanted_score = OOM_SCORE_ADJ_MIN;
+    }
+
+    if(wanted_score > OOM_SCORE_ADJ_MAX) {
+        error("Wanted Out-Of-Memory (OOM) score %d is too big. Using %d", (int)wanted_score, (int)OOM_SCORE_ADJ_MAX);
+        wanted_score = OOM_SCORE_ADJ_MAX;
+    }
+
+    if(old_score == wanted_score) {
+        info("Out-Of-Memory (OOM) score is already set to the wanted value %d", (int)old_score);
+        return;
+    }
+
+    int written = 0;
+    int fd = open("/proc/self/oom_score_adj", O_WRONLY);
+    if(fd != -1) {
+        snprintfz(buf, 30, "%d", (int)wanted_score);
+        ssize_t len = strlen(buf);
+        if(len > 0 && write(fd, buf, (size_t)len) == len) written = 1;
+        close(fd);
+
+        if(written) {
+            if(read_single_signed_number_file("/proc/self/oom_score_adj", &final_score))
+                error("Adjusted my Out-Of-Memory (OOM) score to %d, but cannot verify it.", (int)wanted_score);
+            else if(final_score == wanted_score)
+                info("Adjusted my Out-Of-Memory (OOM) score from %d to %d.", (int)old_score, (int)final_score);
+            else
+                error("Adjusted my Out-Of-Memory (OOM) score from %d to %d, but it has been set to %d.", (int)old_score, (int)wanted_score, (int)final_score);
+        }
+        else
+            error("Failed to adjust my Out-Of-Memory (OOM) score to %d. Running with %d. (systemd systems may change it via netdata.service)", (int)wanted_score, (int)old_score);
+    }
     else
-        info("Adjusted my Out-Of-Memory score to '%s'.", s);
+        error("Failed to adjust my Out-Of-Memory (OOM) score. Cannot open /proc/self/oom_score_adj for writing.");
 }
 
 static void process_nice_level(void) {

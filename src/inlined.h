@@ -244,25 +244,47 @@ static inline char *strncpyz(char *dst, const char *src, size_t n) {
     return p;
 }
 
-static inline int read_single_number_file(const char *filename, unsigned long long *result) {
-    char buffer[30 + 1];
-
+static inline int read_file(const char *filename, char *buffer, size_t size) {
     int fd = open(filename, O_RDONLY, 0666);
-    if(unlikely(fd == -1)) {
-        *result = 0;
+    if(unlikely(fd == -1))
         return 1;
-    }
 
-    ssize_t r = read(fd, buffer, 30);
+    ssize_t r = read(fd, buffer, size);
     if(unlikely(r == -1)) {
-        *result = 0;
         close(fd);
         return 2;
     }
+    buffer[r] = '\0';
 
     close(fd);
+    return 0;
+}
+
+static inline int read_single_number_file(const char *filename, unsigned long long *result) {
+    char buffer[30 + 1];
+
+    int ret = read_file(filename, buffer, 30);
+    if(unlikely(ret)) {
+        *result = 0;
+        return ret;
+    }
+
     buffer[30] = '\0';
     *result = str2ull(buffer);
+    return 0;
+}
+
+static inline int read_single_signed_number_file(const char *filename, long long *result) {
+    char buffer[30 + 1];
+
+    int ret = read_file(filename, buffer, 30);
+    if(unlikely(ret)) {
+        *result = 0;
+        return ret;
+    }
+
+    buffer[30] = '\0';
+    *result = atoll(buffer);
     return 0;
 }
 

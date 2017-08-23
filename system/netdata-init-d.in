@@ -15,7 +15,7 @@ DAEMON="netdata"
 DAEMON_PATH=@sbindir_POST@
 PIDFILE=@localstatedir_POST@/run/$DAEMON.pid
 DAEMONOPTS="-P $PIDFILE"
-STOP_TIMEOUT="10"
+STOP_TIMEOUT="60"
 
 [ -e /etc/sysconfig/$DAEMON ] && . /etc/sysconfig/$DAEMON
 
