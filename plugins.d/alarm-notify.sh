@@ -43,7 +43,7 @@ then
 
     id=1
     last="CLEAR"
-    for x in "CRITICAL" "WARNING" "CLEAR"
+    for x in "WARNING" "CRITICAL"  "CLEAR"
     do
         echo >&2
         echo >&2 "# SENDING TEST ${x} ALARM TO ROLE: ${recipient}"
@@ -152,33 +152,33 @@ custom_sender() {
 # -----------------------------------------------------------------------------
 # defaults to allow running this script by hand
 
-[ -z "${NETDATA_CONFIG_DIR}" ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
-[ -z "${NETDATA_CACHE_DIR}" ] && NETDATA_CACHE_DIR="$(dirname "${0}")/../../../../var/cache/netdata"
+[ -z "${NETDATA_CONFIG_DIR}"   ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
+[ -z "${NETDATA_CACHE_DIR}"    ] && NETDATA_CACHE_DIR="$(dirname "${0}")/../../../../var/cache/netdata"
 [ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
 
 # -----------------------------------------------------------------------------
 # parse command line parameters
 
-roles="${1}"       # the roles that should be notified for this event
-host="${2}"        # the host generated this event
-unique_id="${3}"   # the unique id of this event
-alarm_id="${4}"    # the unique id of the alarm that generated this event
-event_id="${5}"    # the incremental id of the event, for this alarm id
-when="${6}"        # the timestamp this event occurred
-name="${7}"        # the name of the alarm, as given in netdata health.d entries
-chart="${8}"       # the name of the chart (type.id)
-family="${9}"      # the family of the chart
-status="${10}"     # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-old_status="${11}" # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
-value="${12}"      # the current value of the alarm
-old_value="${13}"  # the previous value of the alarm
-src="${14}"        # the line number and file the alarm has been configured
-duration="${15}"   # the duration in seconds of the previous alarm state
+roles="${1}"               # the roles that should be notified for this event
+host="${2}"                # the host generated this event
+unique_id="${3}"           # the unique id of this event
+alarm_id="${4}"            # the unique id of the alarm that generated this event
+event_id="${5}"            # the incremental id of the event, for this alarm id
+when="${6}"                # the timestamp this event occurred
+name="${7}"                # the name of the alarm, as given in netdata health.d entries
+chart="${8}"               # the name of the chart (type.id)
+family="${9}"              # the family of the chart
+status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
+value="${12}"              # the current value of the alarm
+old_value="${13}"          # the previous value of the alarm
+src="${14}"                # the line number and file the alarm has been configured
+duration="${15}"           # the duration in seconds of the previous alarm state
 non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
-units="${17}"      # the units of the value
-info="${18}"       # a short description of the alarm
-value_string="${19}"        # friendly value (with units)
-old_value_string="${20}"    # friendly old value (with units)
+units="${17}"              # the units of the value
+info="${18}"               # a short description of the alarm
+value_string="${19}"       # friendly value (with units)
+old_value_string="${20}"   # friendly old value (with units)
 
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
@@ -281,6 +281,7 @@ KAFKA_SENDER_IP=
 
 # pagerduty.com configs
 PD_SERVICE_KEY=
+DEFAULT_RECIPIENT_PD=
 declare -A role_recipients_pd=()
 
 # custom configs
@@ -325,28 +326,45 @@ filter_recipient_by_criticality() {
 
     # the severity is invalid
     s="${s^^}"
-    [ "${s}" != "CRITICAL" ] && return 0
-
-    # the new or the old status matches the severity
-    if [ "${s}" = "${status}" -o "${s}" = "${old_status}" ]
-        then
-        [ ! -d "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}" ] && \
-            mkdir -p "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}"
-
-        # we need to keep track of the notifications we sent
-        # so that the same user will receive the recovery
-        # even if old_status does not match the required severity
-        touch "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
+    if [ "${s}" != "CRITICAL" ]
+    then
+        error "SEVERITY FILTERING for ${x} VIA ${method}: invalid severity '${s,,}', only 'critical' is supported."
         return 0
     fi
 
-    # it is a cleared alarm we have sent notification for
-    if [ "${status}" != "WARNING" -a "${status}" != "CRITICAL" -a -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]
-        then
-        rm "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
-        return 0
-    fi
+    # create the status tracking directory for this user
+    [ ! -d "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}" ] && \
+        mkdir -p "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}"
 
+    case "${status}" in
+        CRITICAL)
+            # make sure he will get future notifications for this alarm too
+            touch "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
+            debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: the alarm is CRITICAL (will now receive next status change)"
+            return 0
+            ;;
+
+        WARNING)
+            if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]
+            then
+                # we do not remove the file, so that he will get future notifications of this alarm
+                debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (will still receive next status change)"
+                return 0
+            fi
+            ;;
+
+        *)
+            if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]
+            then
+                # remove the file, so that he will only receive notifications for CRITICAL states for this alarm
+                rm "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
+                debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm (will only receive CRITICAL notifications from now on)"
+                return 0
+            fi
+            ;;
+    esac
+
+    debug "SEVERITY FILTERING for ${x} VIA ${method}: BLOCK: recipient should not receive this notification"
     return 1
 }
 
@@ -363,6 +381,7 @@ declare -A arr_telegram=()
 declare -A arr_pd=()
 declare -A arr_email=()
 declare -A arr_custom=()
+declare -A arr_messagebird=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
