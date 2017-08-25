@@ -407,7 +407,7 @@ build_error() {
 
 Sorry! netdata failed to build...
 
-You many need to check these:
+You may need to check these:
 
 1. The package uuid-dev (or libuuid-devel) has to be installed.
 
