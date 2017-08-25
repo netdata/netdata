@@ -1,7 +1,7 @@
 
 // Copyright 2013 Stephen Vickers <stephen.vickers.sv@gmail.com>
 
-var ber = require ("asn1").Ber;
+var ber = require ("asn1-ber").Ber;
 var dgram = require ("dgram");
 var events = require ("events");
 var util = require ("util");

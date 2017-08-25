@@ -15,14 +15,14 @@ dist_nodemodules_DATA = \
 	node_modules/extend.js \
 	node_modules/pixl-xml.js \
 	node_modules/net-snmp.js \
-	node_modules/asn1.js \
+	node_modules/asn1-ber.js \
 	$(NULL)
 
-nodemodulesberdir=$(nodedir)/node_modules/ber
-dist_nodemodulesber_DATA = \
-	node_modules/ber/index.js \
-	node_modules/ber/errors.js \
-	node_modules/ber/reader.js \
-	node_modules/ber/types.js \
-	node_modules/ber/writer.js \
+nodemoduleslibberdir=$(nodedir)/node_modules/lib/ber
+dist_nodemoduleslibber_DATA = \
+	node_modules/lib/ber/index.js \
+	node_modules/lib/ber/errors.js \
+	node_modules/lib/ber/reader.js \
+	node_modules/lib/ber/types.js \
+	node_modules/lib/ber/writer.js \
 	$(NULL)
