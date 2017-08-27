@@ -269,13 +269,36 @@ netdata.processors.snmp = {
                         failed++;
                     }
                     else {
-                        if(__DEBUG === true)
-                            netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + " = " + varbinds[i].value);
+                        // test fom Counter64
+                        // varbinds[i].type = net_snmp.ObjectType.Counter64;
+                        // varbinds[i].value = new Buffer([0x34, 0x49, 0x2e, 0xdc, 0xd1]);
 
-                        if(varbinds[i].type === net_snmp.ObjectType.OctetString && service.snmp_oids_index[varbinds[i].oid].type !== 'title')
-                            value = parseFloat(varbinds[i].value) * 1000;
-                        else
-                            value = varbinds[i].value;
+                        switch(varbinds[i].type) {
+                            case net_snmp.ObjectType.OctetString:
+                                if(service.snmp_oids_index[varbinds[i].oid].type !== 'title')
+                                    // parse floating point values, exposed as strings
+                                    value = parseFloat(varbinds[i].value) * 1000;
+                                    if(__DEBUG === true) netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + ", ObjectType " + net_snmp.ObjectType[varbinds[i].type] + " (" + netdata.stringify(varbinds[i].type) + "), typeof(" + typeof(varbinds[i].value) + "), in JSON: " + netdata.stringify(varbinds[i].value) + ", value = " + value.toString() + " (parsed as float in string)");
+                                else
+                                    // just use the string
+                                    value = varbinds[i].value;
+                                    if(__DEBUG === true) netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + ", ObjectType " + net_snmp.ObjectType[varbinds[i].type] + " (" + netdata.stringify(varbinds[i].type) + "), typeof(" + typeof(varbinds[i].value) + "), in JSON: " + netdata.stringify(varbinds[i].value) + ", value = " + value.toString() + " (parsed as string)");
+                                break;
+
+                            case net_snmp.ObjectType.Counter64:
+                                // copy the buffer
+                                value = '0x' + varbinds[i].value.toString('hex');
+                                if(__DEBUG === true) netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + ", ObjectType " + net_snmp.ObjectType[varbinds[i].type] + " (" + netdata.stringify(varbinds[i].type) + "), typeof(" + typeof(varbinds[i].value) + "), in JSON: " + netdata.stringify(varbinds[i].value) + ", value = " + value.toString() + " (parsed as buffer)");
+                                break;
+
+                            case net_snmp.ObjectType.Integer:
+                            case net_snmp.ObjectType.Counter:
+                            case net_snmp.ObjectType.Gauge:
+                            default:
+                                value = varbinds[i].value;
+                                if(__DEBUG === true) netdata.debug(service.module.name + ': ' + service.name + ': found ' + service.module.name + ' value of OIDs ' + varbinds[i].oid + ", ObjectType " + net_snmp.ObjectType[varbinds[i].type] + " (" + netdata.stringify(varbinds[i].type) + "), typeof(" + typeof(varbinds[i].value) + "), in JSON: " + netdata.stringify(varbinds[i].value) + ", value = " + value.toString() + " (parsed as number)");
+                                break;
+                        }
 
                         ok++;
                     }
