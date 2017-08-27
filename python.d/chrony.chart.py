@@ -69,7 +69,6 @@ class Service(ExecutableService):
         self.command = "chronyc -n tracking"
         self.order = ORDER
         self.definitions = CHARTS
-        self.error("Chrony netdata started")
 
     def _get_data(self):
         """
@@ -77,7 +76,6 @@ class Service(ExecutableService):
         :return: dict
         """
         try:
-            # self.error("Chrony:" + self._get_raw_data())
             chrony_dict = {ln.split(':', 1)[0].strip(): ln.split(':', 1)[1].strip().split(' ')[0]
                            for ln in self._get_raw_data()[1:]}
             return {'timediff': int(float(chrony_dict['System time']) * 1e9),
@@ -90,5 +88,5 @@ class Service(ExecutableService):
                     'residualfreq': int(float(chrony_dict['Residual freq']) * 1e3)
                     }
         except (ValueError, AttributeError):
-            self.error("Chrony parser exception")
+            self.error("Chrony data parser exception")
             return None
