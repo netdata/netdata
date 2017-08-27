@@ -7,9 +7,9 @@ exclude_paths:
   - web/css/**
   - web/lib/**
   - web/old/**
-  - node.d/node_modules/ber/**
-  - node.d/node_modules/ber/asn1.js
-  - node.d/node_modules/ber/extend.js
+  - node.d/node_modules/lib/**
+  - node.d/node_modules/asn1-ber.js
   - node.d/node_modules/net-snmp.js
-  - node.d/node_modules/ber/pixl-xml.js
+  - node.d/node_modules/pixl-xml.js
+  - node.d/node_modules/extend.js
   - tests/**

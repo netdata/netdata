@@ -127,10 +127,11 @@ connectivity is not available.
     [MIT License](https://github.com/stephenwvickers/node-net-snmp)
     
 
-- [node-asn1](https://github.com/mcavage/node-asn1)
+- [node-asn1-ber](https://github.com/stephenwvickers/node-asn1-ber)
 
+    Copyright 2017, Stephen Vickers
     Copyright 2011, Mark Cavage
-    [MIT License](https://github.com/mcavage/node-asn1)
+    [MIT License](https://github.com/stephenwvickers/node-asn1-ber)
     
 
 - [pixl-xml](https://github.com/jhuckaby/pixl-xml)

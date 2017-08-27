@@ -64,8 +64,8 @@ exclude_paths:
 - python.d/python_modules/pyyaml2/
 - python.d/python_modules/pyyaml3/
 - python.d/python_modules/urllib3/
-- node.d/node_modules/ber/
-- node.d/node_modules/asn1.js
+- node.d/node_modules/lib/
+- node.d/node_modules/asn1-ber.js
 - node.d/node_modules/extend.js
 - node.d/node_modules/pixl-xml.js
 - node.d/node_modules/net-snmp.js
