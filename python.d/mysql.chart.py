@@ -10,8 +10,31 @@ priority = 90000
 retries = 60
 
 # query executed on MySQL server
+QUERY_VAR = 'SHOW VARIABLES;'
 QUERY_GLOBAL = 'SHOW GLOBAL STATUS;'
 QUERY_SLAVE = 'SHOW SLAVE STATUS;'
+
+GLOBAL_VARS = [
+ 'back_log',
+ 'binlog_cache_size',
+ 'host_cache_size',
+ 'innodb_buffer_pool_size',
+ 'innodb_log_buffer_size',
+ 'innodb_log_file_size',
+ 'join_buffer_size',
+ 'key_buffer_size',
+ 'max_connections',
+ 'max_heap_table_size',
+ 'myisam_sort_buffer_size',
+ 'query_cache_size',
+ 'read_buffer_size',
+ 'read_rnd_buffer_size',
+ 'slow_launch_time',
+ 'sort_buffer_size',
+ 'table_definition_cache',
+ 'table_open_cache',
+ 'thread_cache_size',
+ 'tmp_table_size']
 
 GLOBAL_STATS = [
  'Bytes_received',
@@ -224,6 +247,7 @@ CHARTS = {
     'threads': {
         'options': [None, 'mysql Threads', 'threads', 'threads', 'mysql.threads', 'line'],
         'lines': [
+            ['var_max_connections', 'max', 'absolute'],
             ['Threads_connected', 'connected', 'absolute'],
             ['Threads_created', 'created', 'incremental'],
             ['Threads_cached', 'cached', 'absolute', -1, 1],
@@ -409,7 +433,10 @@ class Service(MySQLService):
         MySQLService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.queries = dict(global_status=QUERY_GLOBAL, slave_status=QUERY_SLAVE)
+        self.queries = dict(
+            global_vars=QUERY_VAR,
+            global_status=QUERY_GLOBAL,
+            slave_status=QUERY_SLAVE)
 
     def _get_data(self):
 
@@ -419,6 +446,13 @@ class Service(MySQLService):
            return None
 
         to_netdata = dict()
+
+        if 'global_vars' in raw_data:
+            global_vars = dict(raw_data['global_vars'][0])
+            for key in GLOBAL_VARS:
+                if key in global_vars:
+                    var_key = 'var_%s' % key
+                    to_netdata[var_key] = global_vars[key]
 
         if 'global_status' in raw_data:
             global_status = dict(raw_data['global_status'][0])
