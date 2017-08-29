@@ -1501,7 +1501,7 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
         if(pct_len < 1)
             m->histogram.ext->last_percentile = (collected_number)(series[0] * statsd.decimal_detail);
         else
-            m->histogram.ext->last_percentile = (collected_number)roundl(average(series, pct_len) * statsd.decimal_detail);
+            m->histogram.ext->last_percentile = (collected_number)roundl(series[pct_len - 1] * statsd.decimal_detail);
 
         debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
               dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
