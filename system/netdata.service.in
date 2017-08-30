@@ -6,13 +6,9 @@ After=network.target httpd.service squid.service nfs-server.service mysqld.servi
 Type=simple
 User=netdata
 Group=netdata
-ExecStart=@sbindir_POST@/netdata -D
-
-# The minimum netdata Out-Of-Memory (OOM) score.
-# netdata (via [global].OOM score in netdata.conf) can only increase the value set here.
-# To decrease it, set the minimum here and set the same or a higher value in netdata.conf.
-# Valid values: -1000 (never kill netdata) to 1000 (always kill netdata).
-OOMScoreAdjust=0
+RuntimeDirectory=netdata
+RuntimeDirectoryMode=0775
+ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D
 
 # saving a big db on slow disks may need some time
 TimeoutStopSec=60
@@ -20,6 +16,26 @@ TimeoutStopSec=60
 # restart netdata if it crashes
 Restart=on-failure
 RestartSec=30
+
+# The minimum netdata Out-Of-Memory (OOM) score.
+# netdata (via [global].OOM score in netdata.conf) can only increase the value set here.
+# To decrease it, set the minimum here and set the same or a higher value in netdata.conf.
+# Valid values: -1000 (never kill netdata) to 1000 (always kill netdata).
+#OOMScoreAdjust=0
+
+# By default netdata switches to scheduling policy idle, which makes it use CPU, only
+# when there is spare available.
+# Valid policies: other (the system default) | batch | idle | fifo | rr
+#CPUSchedulingPolicy=other
+
+# This sets the maximum scheduling priority netdata can set (for policies: rr and fifo).
+# netdata (via [global].process scheduling priority in netdata.conf) can only lower this value.
+# Priority gets values 1 (lowest) to 99 (highest).
+#CPUSchedulingPriority=1
+
+# For scheduling policy 'other' and 'batch', this sets the lowest niceness of netdata.
+# netdata (via [global].process nice level in netdata.conf) can only increase the value set here.
+#Nice=0
 
 [Install]
 WantedBy=multi-user.target
