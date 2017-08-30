@@ -15,7 +15,8 @@ typedef struct listen_sockets {
     size_t failed;                      // the number of sockets attempted to open, but failed
     int fds[MAX_LISTEN_FDS];            // the open sockets
     char *fds_names[MAX_LISTEN_FDS];    // descriptions for the open sockets
-    int fds_types[MAX_LISTEN_FDS];      // the socktype for the open sockets
+    int fds_types[MAX_LISTEN_FDS];      // the socktype for the open sockets (SOCK_STREAM, SOCK_DGRAM)
+    int fds_families[MAX_LISTEN_FDS];   // the family of the open sockets (AF_UNIX, AF_INET, AF_INET6)
 } LISTEN_SOCKETS;
 
 extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
