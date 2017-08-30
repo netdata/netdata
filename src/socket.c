@@ -80,6 +80,43 @@ int sock_enlarge_out(int fd) {
 // --------------------------------------------------------------------------------------------------------------------
 // listening sockets
 
+int create_listen_socket_unix(const char *path, int listen_backlog) {
+    int sock;
+
+    debug(D_LISTENER, "LISTENER: UNIX creating new listening socket on path '%s'", path);
+
+    sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if(sock < 0) {
+        error("LISTENER: UNIX socket() on path '%s' failed.", path);
+        return -1;
+    }
+
+    sock_setnonblock(sock);
+    sock_enlarge_in(sock);
+
+    struct sockaddr_un name;
+    memset(&name, 0, sizeof(struct sockaddr_un));
+    name.sun_family = AF_UNIX;
+    strncpy(name.sun_path, path, sizeof(name.sun_path)-1);
+
+    unlink(path);
+
+    if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
+        close(sock);
+        error("LISTENER: UNIX bind() on path '%s' failed.", path);
+        return -1;
+    }
+
+    if(listen(sock, listen_backlog) < 0) {
+        close(sock);
+        error("LISTENER: UNIX listen() on path '%s' failed.", path);
+        return -1;
+    }
+
+    debug(D_LISTENER, "LISTENER: Listening on UNIX path '%s'", path);
+    return sock;
+}
+
 int create_listen_socket4(int socktype, const char *ip, int port, int listen_backlog) {
     int sock;
 
@@ -186,7 +223,12 @@ static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int sockty
     sockets->fds[sockets->opened] = fd;
 
     char buffer[100 + 1];
-    snprintfz(buffer, 100, "%s:[%s]:%d", protocol, ip, port);
+
+    if(port)
+        snprintfz(buffer, 100, "%s:[%s]:%d", protocol, ip, port);
+    else
+        snprintfz(buffer, 100, "%s:[%s]", protocol, ip);
+
     sockets->fds_names[sockets->opened] = strdupz(buffer);
     sockets->fds_types[sockets->opened] = socktype;
 
@@ -230,7 +272,7 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
     sockets->failed = 0;
 }
 
-static inline int bind_to_one(LISTEN_SOCKETS *sockets, const char *definition, int default_port, int listen_backlog) {
+static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, int default_port, int listen_backlog) {
     int added = 0;
     struct addrinfo hints;
     struct addrinfo *result = NULL, *rp = NULL;
@@ -257,6 +299,22 @@ static inline int bind_to_one(LISTEN_SOCKETS *sockets, const char *definition, i
         protocol = IPPROTO_UDP;
         socktype = SOCK_DGRAM;
         protocol_str = "udp";
+    }
+    else if(strncmp(ip, "unix:", 5) == 0) {
+        char *path = ip + 5;
+        socktype = SOCK_STREAM;
+        protocol_str = "unix";
+
+        int fd = create_listen_socket_unix(path, listen_backlog);
+        if (fd == -1) {
+            error("LISTENER: Cannot create unix socket '%s'", path);
+            sockets->failed++;
+        }
+        else {
+            listen_sockets_add(sockets, fd, socktype, protocol_str, path, 0);
+            added++;
+        }
+        return added;
     }
 
     char *e = ip;
@@ -385,7 +443,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 
         char buf[e - s + 1];
         strncpyz(buf, s, e - s);
-        bind_to_one(sockets, buf, sockets->default_port, sockets->backlog);
+        bind_to_this(sockets, buf, sockets->default_port, sockets->backlog);
 
         s = e;
     }
@@ -403,7 +461,35 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 // --------------------------------------------------------------------------------------------------------------------
 // connect to another host/port
 
-// _connect_to()
+// connect_to_this_unix()
+// path        the path of the unix socket
+// timeout     the timeout for establishing a connection
+
+static inline int connect_to_unix(const char *path, struct timeval *timeout) {
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+    if(timeout) {
+        if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
+            error("Failed to set timeout on UNIX socket '%s'", path);
+    }
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path)-1);
+
+    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        error("Cannot connect to UNIX socket on path '%s'.", path);
+        close(fd);
+        return -1;
+    }
+
+    debug(D_CONNECT_TO, "Connected to UNIX socket on path '%s'.", path);
+
+    return fd;
+}
+
+// connect_to_this_ip46()
 // protocol    IPPROTO_TCP, IPPROTO_UDP
 // socktype    SOCK_STREAM, SOCK_DGRAM
 // host        the destination hostname or IP address (IPv4 or IPv6) to connect to
@@ -413,7 +499,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 // service     the service name or port to connect to
 // timeout     the timeout for establishing a connection
 
-static inline int _connect_to(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout) {
+static inline int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t scope_id, const char *service, struct timeval *timeout) {
     struct addrinfo hints;
     struct addrinfo *ai_head = NULL, *ai = NULL;
 
@@ -519,7 +605,7 @@ static inline int _connect_to(int protocol, int socktype, const char *host, uint
     return fd;
 }
 
-// connect_to()
+// connect_to_this()
 //
 // definition format:
 //
@@ -530,7 +616,7 @@ static inline int _connect_to(int protocol, int socktype, const char *host, uint
 // INTERFACE = for IPv6 only, the network interface to use
 // PORT      = port number or service name
 
-int connect_to(const char *definition, int default_port, struct timeval *timeout) {
+int connect_to_this(const char *definition, int default_port, struct timeval *timeout) {
     char buffer[strlen(definition) + 1];
     strcpy(buffer, definition);
 
@@ -550,6 +636,10 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
         host += 4;
         protocol = IPPROTO_UDP;
         socktype = SOCK_DGRAM;
+    }
+    else if(strncmp(host, "unix:", 5) == 0) {
+        char *path = host + 5;
+        return connect_to_unix(path, timeout);
     }
 
     char *e = host;
@@ -595,7 +685,7 @@ int connect_to(const char *definition, int default_port, struct timeval *timeout
         service = default_service;
 
 
-    return _connect_to(protocol, socktype, host, scope_id, service, timeout);
+    return connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout);
 }
 
 int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
@@ -617,7 +707,7 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
         char buf[e - s + 1];
         strncpyz(buf, s, e - s);
         if(reconnects_counter) *reconnects_counter += 1;
-        sock = connect_to(buf, default_port, timeout);
+        sock = connect_to_this(buf, default_port, timeout);
         if(sock != -1) {
             if(connected_to && connected_to_size) {
                 strncpy(connected_to, buf, connected_to_size);
