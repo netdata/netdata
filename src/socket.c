@@ -99,6 +99,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, path, sizeof(name.sun_path)-1);
 
+    // we have to delete any old socket, or bind() will fail
     unlink(path);
 
     if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
@@ -106,6 +107,10 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
         error("LISTENER: UNIX bind() on path '%s' failed.", path);
         return -1;
     }
+
+    // we have to chmod this to 0777 so that the client will be able
+    // to read from and write to this socket.
+    chmod(path, 0777);
 
     if(listen(sock, listen_backlog) < 0) {
         close(sock);
@@ -213,7 +218,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     return sock;
 }
 
-static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int socktype, const char *protocol, const char *ip, int port) {
+static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int family, int socktype, const char *protocol, const char *ip, int port) {
     if(sockets->opened >= MAX_LISTEN_FDS) {
         error("LISTENER: Too many listening sockets. Failed to add listening %s socket at ip '%s' port %d, protocol %s, socktype %d", protocol, ip, port, protocol, socktype);
         close(fd);
@@ -221,16 +226,27 @@ static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int sockty
     }
 
     sockets->fds[sockets->opened] = fd;
+    sockets->fds_types[sockets->opened] = socktype;
+    sockets->fds_families[sockets->opened] = family;
 
     char buffer[100 + 1];
 
-    if(port)
-        snprintfz(buffer, 100, "%s:[%s]:%d", protocol, ip, port);
-    else
-        snprintfz(buffer, 100, "%s:[%s]", protocol, ip);
+    switch(family) {
+        case AF_INET:
+            snprintfz(buffer, 100, "%s:%s:%d", protocol, ip, port);
+            break;
+
+        case AF_INET6:
+        default:
+            snprintfz(buffer, 100, "%s:[%s]:%d", protocol, ip, port);
+            break;
+
+        case AF_UNIX:
+            snprintfz(buffer, 100, "%s:%s", protocol, ip);
+            break;
+    }
 
     sockets->fds_names[sockets->opened] = strdupz(buffer);
-    sockets->fds_types[sockets->opened] = socktype;
 
     sockets->opened++;
     return 0;
@@ -311,7 +327,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             sockets->failed++;
         }
         else {
-            listen_sockets_add(sockets, fd, socktype, protocol_str, path, 0);
+            listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0);
             added++;
         }
         return added;
@@ -372,11 +388,13 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
 
     for (rp = result; rp != NULL; rp = rp->ai_next) {
         int fd = -1;
+        int family = -1;
 
         char rip[INET_ADDRSTRLEN + INET6_ADDRSTRLEN] = "INVALID";
         int rport = default_port;
 
-        switch (rp->ai_addr->sa_family) {
+        family = rp->ai_addr->sa_family;
+        switch (family) {
             case AF_INET: {
                 struct sockaddr_in *sin = (struct sockaddr_in *) rp->ai_addr;
                 inet_ntop(AF_INET, &sin->sin_addr, rip, INET_ADDRSTRLEN);
@@ -396,7 +414,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             }
 
             default:
-                debug(D_LISTENER, "LISTENER: Unknown socket family %d", rp->ai_addr->sa_family);
+                debug(D_LISTENER, "LISTENER: Unknown socket family %d", family);
                 break;
         }
 
@@ -405,7 +423,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             sockets->failed++;
         }
         else {
-            listen_sockets_add(sockets, fd, socktype, protocol_str, rip, rport);
+            listen_sockets_add(sockets, fd, family, socktype, protocol_str, rip, rport);
             added++;
         }
     }
