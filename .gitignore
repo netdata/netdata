@@ -33,6 +33,14 @@ apps.plugin
 freeipmi.plugin
 cgroup-network
 
+*.class
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+java.d/.classpath
+java.d/.project
+java.d/.settings/
+target/
+
 # netdata makeself archives
 *.tar.*
 *.run
