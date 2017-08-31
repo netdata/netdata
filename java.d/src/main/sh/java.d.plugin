@@ -1,0 +1,1 @@
+java -Djava.util.logging.SimpleFormatter.format='%1$tF %1$TT: java.d: %4$s: %3$s: %5$s%6$s%n' -jar /tmp/java-daemon-0.1.0-SNAPSHOT.jar 

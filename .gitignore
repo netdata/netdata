@@ -28,6 +28,7 @@ netdata.spec
 
 # netdata binaries
 netdata
+!netdata/
 apps.plugin
 freeipmi.plugin
 cgroup-network

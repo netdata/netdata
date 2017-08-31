@@ -1,0 +1,2 @@
+exclude_paths:
+  - installer/functions.sh
