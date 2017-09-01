@@ -7,11 +7,17 @@ dist_config_DATA = \
     apps_groups.conf \
     charts.d.conf \
     fping.conf \
+    java.d.conf \
     node.d.conf \
     python.d.conf \
     health_alarm_notify.conf \
     health_email_recipients.conf \
     stream.conf \
+    $(NULL)
+
+javaconfigdir=$(configdir)/java.d
+dist_javaconfig_DATA = \
+    java.d/jmx.conf \
     $(NULL)
 
 nodeconfigdir=$(configdir)/node.d
