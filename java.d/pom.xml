@@ -1,11 +1,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.firehol.netdata.plugin</groupId>
-	<artifactId>java-daemon</artifactId>
+	<groupId>org.firehol.netdata</groupId>
+	<artifactId>java-plugin</artifactId>
 	<packaging>jar</packaging>
 	<version>0.1.0-SNAPSHOT</version>
-	<name>netdata-plugin-java-daemon</name>
+	<name>netdata-java-plugin</name>
 	<url>http://netdata.firehol.org</url>
 	<dependencies>
 		<dependency>
@@ -51,6 +51,7 @@
 		<maven.compiler.target>1.8</maven.compiler.target>
 	</properties>
 	<build>
+		<finalName>${project.artifactId}</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -87,7 +88,7 @@
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.7.9</version>
-				<executions>
+								<executions>
 					<execution>
 						<id>jacoco-initialize</id>
 						<goals>
@@ -122,13 +123,13 @@
 		<url>http://firehol.org</url>
 	</organization>
 	<scm>
-		<url>https://github.com/simonnagl/netdata-plugin-java-daemon</url>
-		<connection>scm:git:https://github.com/simonnagl/netdata-plugin-java-daemon.git</connection>
-		<developerConnection>scm:git:https://github.com/simonnagl/netdata-plugin-java-daemon.git</developerConnection>
+		<url>https://github.com/firehol/netdata</url>
+		<connection>scm:git:https://github.com/firehol/netdata.git</connection>
+		<developerConnection>scm:git:https://github.com/firehol/netdata.git</developerConnection>
 		<tag>HEAD</tag>
 	</scm>
 	<issueManagement>
 		<system>GitHub</system>
-		<url>https://github.com/simonnagl/netdata-plugin-java-daemon/issues</url>
+		<url>https://github.com/firehol/netdataq/issues</url>
 	</issueManagement>
 </project>
