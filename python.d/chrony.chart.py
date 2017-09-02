@@ -79,7 +79,7 @@ class Service(ExecutableService):
             lines = self._get_raw_data()
             if lines is not None:
                 chrony_dict = {}
-                for line in lines:
+                for line in lines[1:]:
                     lparts = line.split(':', 1)
                     value = lparts[1].strip().split(' ')[0]
                     chrony_dict[lparts[0].strip()] = value
