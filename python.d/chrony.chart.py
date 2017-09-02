@@ -76,17 +76,25 @@ class Service(ExecutableService):
         :return: dict
         """
         try:
-            chrony_dict = {ln.split(':', 1)[0].strip(): ln.split(':', 1)[1].strip().split(' ')[0]
-                           for ln in self._get_raw_data()[1:]}
-            return {'timediff': int(float(chrony_dict['System time']) * 1e9),
-                    'lastoffset': int(float(chrony_dict['Last offset']) * 1e9),
-                    'rmsoffset': int(float(chrony_dict['RMS offset']) * 1e9),
-                    'rootdelay': int(float(chrony_dict['Root delay']) * 1e9),
-                    'rootdispersion': int(float(chrony_dict['Root dispersion']) * 1e9),
-                    'skew': int(float(chrony_dict['Skew']) * 1e3),
-                    'frequency': int(float(chrony_dict['Frequency']) * 1e3),
-                    'residualfreq': int(float(chrony_dict['Residual freq']) * 1e3)
-                    }
+            lines = self._get_raw_data()
+            if lines is not None:
+                chrony_dict = {}
+                for line in lines:
+                    lparts = line.split(':', 1)
+                    value = lparts[1].strip().split(' ')[0]
+                    chrony_dict[lparts[0].strip()] = value
+                return {'timediff': int(float(chrony_dict['System time']) * 1e9),
+                        'lastoffset': int(float(chrony_dict['Last offset']) * 1e9),
+                        'rmsoffset': int(float(chrony_dict['RMS offset']) * 1e9),
+                        'rootdelay': int(float(chrony_dict['Root delay']) * 1e9),
+                        'rootdispersion': int(float(chrony_dict['Root dispersion']) * 1e9),
+                        'skew': int(float(chrony_dict['Skew']) * 1e3),
+                        'frequency': int(float(chrony_dict['Frequency']) * 1e3),
+                        'residualfreq': int(float(chrony_dict['Residual freq']) * 1e3)
+                        }
+            else:
+                self.error("No valid chronyc output")
+                return None
         except (ValueError, AttributeError):
-            self.error("Chrony data parser exception")
+            self.error("Chronyc data parser exception")
             return None
