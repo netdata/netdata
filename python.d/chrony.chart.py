@@ -81,8 +81,9 @@ class Service(ExecutableService):
                 chrony_dict = {}
                 for line in lines[1:]:
                     lparts = line.split(':', 1)
-                    value = lparts[1].strip().split(' ')[0]
-                    chrony_dict[lparts[0].strip()] = value
+                    if (len(lparts) > 1):
+                        value = lparts[1].strip().split(' ')[0]
+                        chrony_dict[lparts[0].strip()] = value
                 return {'timediff': int(float(chrony_dict['System time']) * 1e9),
                         'lastoffset': int(float(chrony_dict['Last offset']) * 1e9),
                         'rmsoffset': int(float(chrony_dict['RMS offset']) * 1e9),
@@ -95,6 +96,6 @@ class Service(ExecutableService):
             else:
                 self.error("No valid chronyc output")
                 return None
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, KeyError):
             self.error("Chronyc data parser exception")
             return None
