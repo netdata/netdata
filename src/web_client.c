@@ -17,10 +17,11 @@ unsigned long long web_clients_count = 0;
 
 static inline int web_client_crock_socket(struct web_client *w) {
 #ifdef TCP_CORK
-    if(likely(!w->tcp_cork && w->ofd != -1)) {
+    if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
         w->tcp_cork = 1;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             error("%llu: failed to enable TCP_CORK on socket.", w->id);
+
             w->tcp_cork = 0;
             return -1;
         }
@@ -78,7 +79,7 @@ struct web_client *web_client_create(int listener) {
     w->response.header = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
     w->response.header_output = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
     w->origin[0] = '*';
-    w->wait_receive = 1;
+    web_client_enable_wait_receive(w);
 
     if(web_clients) web_clients->prev = w;
     w->next = web_clients;
@@ -150,9 +151,9 @@ void web_client_reset(struct web_client *w) {
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
     w->tcp_cork = 0;
-    w->donottrack = 0;
-    w->tracking_required = 0;
-    w->keepalive = 0;
+    web_client_disable_donottrack(w);
+    web_client_disable_tracking_required(w);
+    web_client_disable_keepalive(w);
     w->decoded_url[0] = '\0';
 
     buffer_reset(w->response.header_output);
@@ -162,8 +163,8 @@ void web_client_reset(struct web_client *w) {
     w->response.sent = 0;
     w->response.code = 0;
 
-    w->wait_receive = 1;
-    w->wait_send = 0;
+    web_client_enable_wait_receive(w);
+    web_client_disable_wait_send(w);
 
     w->response.zoutput = 0;
 
@@ -391,8 +392,8 @@ int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, stat.st_size, w->ifd, w->ofd);
 
     w->mode = WEB_CLIENT_MODE_FILECOPY;
-    w->wait_receive = 1;
-    w->wait_send = 0;
+    web_client_enable_wait_receive(w);
+    web_client_disable_wait_send(w);
     buffer_flush(w->response.data);
     w->response.rlen = stat.st_size;
 #ifdef __APPLE__
@@ -731,11 +732,11 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 
     else if(hash == hash_connection && !strcasecmp(s, "Connection")) {
         if(strcasestr(v, "keep-alive"))
-            w->keepalive = 1;
+            web_client_enable_keepalive(w);
     }
     else if(respect_web_browser_do_not_track_policy && hash == hash_donottrack && !strcasecmp(s, "DNT")) {
-        if(*v == '0') w->donottrack = 0;
-        else if(*v == '1') w->donottrack = 1;
+        if(*v == '0') web_client_disable_donottrack(w);
+        else if(*v == '1') web_client_enable_donottrack(w);
     }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
@@ -784,7 +785,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {
-        w->wait_receive = 0;
+        web_client_disable_wait_receive(w);
         return HTTP_VALIDATION_NOT_SUPPORTED;
     }
 
@@ -800,7 +801,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     // incomplete requests
     if(unlikely(!*s)) {
-        w->wait_receive = 1;
+        web_client_enable_wait_receive(w);
         return HTTP_VALIDATION_INCOMPLETE;
     }
 
@@ -831,7 +832,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // FIXME -- we should avoid it
                 strncpyz(w->last_url, w->decoded_url, URL_MAX);
 
-                w->wait_receive = 0;
+                web_client_disable_wait_receive(w);
                 return HTTP_VALIDATION_OK;
             }
 
@@ -841,7 +842,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     }
 
     // incomplete request
-    w->wait_receive = 1;
+    web_client_enable_wait_receive(w);
     return HTTP_VALIDATION_INCOMPLETE;
 }
 
@@ -884,7 +885,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
                     "Content-Type: %s\r\n"
                     "Date: %s\r\n"
                    , w->response.code, code_msg
-                   , w->keepalive?"keep-alive":"close"
+                   , web_client_has_keepalive(w)?"keep-alive":"close"
                    , w->origin
                    , content_type_string
                    , date
@@ -912,7 +913,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     }
     else {
         if(respect_web_browser_do_not_track_policy) {
-            if(w->tracking_required)
+            if(web_client_has_tracking_required(w))
                 buffer_sprintf(w->response.header_output,
                         "Tk: T;cookies\r\n");
             else
@@ -954,7 +955,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
         }
         else {
             // we don't know the content length, disable keep-alive
-            w->keepalive = 0;
+            web_client_disable_keepalive(w);
         }
     }
 
@@ -1242,8 +1243,8 @@ void web_client_process_request(struct web_client *w) {
     web_client_send_http_header(w);
 
     // enable sending immediately if we have data
-    if(w->response.data->len) w->wait_send = 1;
-    else w->wait_send = 0;
+    if(w->response.data->len) web_client_enable_wait_send(w);
+    else web_client_disable_wait_send(w);
 
     switch(w->mode) {
         case WEB_CLIENT_MODE_STREAM:
@@ -1261,7 +1262,7 @@ void web_client_process_request(struct web_client *w) {
         case WEB_CLIENT_MODE_FILECOPY:
             if(w->response.rlen) {
                 debug(D_WEB_CLIENT, "%llu: Done preparing the response. Will be sending data file of %zu bytes to client.", w->id, w->response.rlen);
-                w->wait_receive = 1;
+                web_client_enable_wait_receive(w);
 
                 /*
                 // utilize the kernel sendfile() for copying the file to the socket.
@@ -1376,14 +1377,14 @@ ssize_t web_client_send_deflate(struct web_client *w)
             if(t < 0) return t;
         }
 
-        if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->response.rlen && w->response.rlen > w->response.data->len) {
+        if(w->mode == WEB_CLIENT_MODE_FILECOPY && web_client_has_wait_receive(w) && w->response.rlen && w->response.rlen > w->response.data->len) {
             // we have to wait, more data will come
             debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
-            w->wait_send = 0;
+            web_client_disable_wait_send(w);
             return t;
         }
 
-        if(unlikely(!w->keepalive)) {
+        if(unlikely(!web_client_has_keepalive(w))) {
             debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %zu bytes sent.", w->id, w->response.sent);
             WEB_CLIENT_IS_DEAD(w);
             return t;
@@ -1419,7 +1420,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
         // ask for FINISH if we have all the input
         int flush = Z_SYNC_FLUSH;
         if(w->mode == WEB_CLIENT_MODE_NORMAL
-            || (w->mode == WEB_CLIENT_MODE_FILECOPY && !w->wait_receive && w->response.data->len == w->response.rlen)) {
+            || (w->mode == WEB_CLIENT_MODE_FILECOPY && !web_client_has_wait_receive(w) && w->response.data->len == w->response.rlen)) {
             flush = Z_FINISH;
             debug(D_DEFLATE, "%llu: Requesting Z_FINISH, if possible.", w->id);
         }
@@ -1488,14 +1489,14 @@ ssize_t web_client_send(struct web_client *w) {
         // A. we have done everything
         // B. we temporarily have nothing to send, waiting for the buffer to be filled by ifd
 
-        if(w->mode == WEB_CLIENT_MODE_FILECOPY && w->wait_receive && w->response.rlen && w->response.rlen > w->response.data->len) {
+        if(w->mode == WEB_CLIENT_MODE_FILECOPY && web_client_has_wait_receive(w) && w->response.rlen && w->response.rlen > w->response.data->len) {
             // we have to wait, more data will come
             debug(D_WEB_CLIENT, "%llu: Waiting for more data to become available.", w->id);
-            w->wait_send = 0;
+            web_client_disable_wait_send(w);
             return 0;
         }
 
-        if(unlikely(!w->keepalive)) {
+        if(unlikely(!web_client_has_keepalive(w))) {
             debug(D_WEB_CLIENT, "%llu: Closing (keep-alive is not enabled). %zu bytes sent.", w->id, w->response.sent);
             WEB_CLIENT_IS_DEAD(w);
             return 0;
@@ -1549,10 +1550,10 @@ ssize_t web_client_receive(struct web_client *w)
         debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
 
         if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
-            w->wait_send = 1;
+            web_client_enable_wait_send(w);
 
             if(w->response.rlen && w->response.data->len >= w->response.rlen)
-                w->wait_receive = 0;
+                web_client_disable_wait_receive(w);
         }
     }
     else if(likely(bytes == 0)) {
@@ -1565,7 +1566,7 @@ ssize_t web_client_receive(struct web_client *w)
         if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
             // we are copying data from ifd to ofd
             // let it finish copying...
-            w->wait_receive = 0;
+            web_client_disable_wait_receive(w);
 
             debug(D_WEB_CLIENT, "%llu: Read the whole file.", w->id);
             if(w->ifd != w->ofd) close(w->ifd);
@@ -1611,11 +1612,11 @@ void *web_client_main(void *ptr)
     for(;;) {
         if(unlikely(netdata_exit)) break;
 
-        if(unlikely(w->dead)) {
+        if(unlikely(web_client_check_dead(w))) {
             debug(D_WEB_CLIENT, "%llu: client is dead.", w->id);
             break;
         }
-        else if(unlikely(!w->wait_receive && !w->wait_send)) {
+        else if(unlikely(!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))) {
             debug(D_WEB_CLIENT, "%llu: client is not set for neither receiving nor sending data.", w->id);
             break;
         }
@@ -1630,8 +1631,8 @@ void *web_client_main(void *ptr)
             fds[0].events = 0;
             fds[0].revents = 0;
 
-            if(w->wait_receive) fds[0].events |= POLLIN;
-            if(w->wait_send)    fds[0].events |= POLLOUT;
+            if(web_client_has_wait_receive(w)) fds[0].events |= POLLIN;
+            if(web_client_has_wait_send(w))    fds[0].events |= POLLOUT;
 
             fds[1].fd = -1;
             fds[1].events = 0;
@@ -1645,19 +1646,19 @@ void *web_client_main(void *ptr)
             fds[0].fd = w->ifd;
             fds[0].events = 0;
             fds[0].revents = 0;
-            if(w->wait_receive) fds[0].events |= POLLIN;
+            if(web_client_has_wait_receive(w)) fds[0].events |= POLLIN;
             ifd = &fds[0];
 
             fds[1].fd = w->ofd;
             fds[1].events = 0;
             fds[1].revents = 0;
-            if(w->wait_send)    fds[1].events |= POLLOUT;
+            if(web_client_has_wait_send(w))    fds[1].events |= POLLOUT;
             ofd = &fds[1];
 
             fdmax = 2;
         }
 
-        debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, w->wait_receive?"INPUT":"", w->wait_send?"OUTPUT":"");
+        debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, web_client_has_wait_receive(w)?"INPUT":"", web_client_has_wait_send(w)?"OUTPUT":"");
         errno = 0;
         timeout = web_client_timeout * 1000;
         retval = poll(fds, fdmax, timeout);
@@ -1674,14 +1675,14 @@ void *web_client_main(void *ptr)
             break;
         }
         else if(unlikely(!retval)) {
-            debug(D_WEB_CLIENT, "%llu: Timeout while waiting socket async I/O for %s %s", w->id, w->wait_receive?"INPUT":"", w->wait_send?"OUTPUT":"");
+            debug(D_WEB_CLIENT, "%llu: Timeout while waiting socket async I/O for %s %s", w->id, web_client_has_wait_receive(w)?"INPUT":"", web_client_has_wait_send(w)?"OUTPUT":"");
             break;
         }
 
         if(unlikely(netdata_exit)) break;
 
         int used = 0;
-        if(w->wait_send && ofd->revents & POLLOUT) {
+        if(web_client_has_wait_send(w) && ofd->revents & POLLOUT) {
             used++;
             if(web_client_send(w) < 0) {
                 debug(D_WEB_CLIENT, "%llu: Cannot send data to client. Closing client.", w->id);
@@ -1691,7 +1692,7 @@ void *web_client_main(void *ptr)
 
         if(unlikely(netdata_exit)) break;
 
-        if(w->wait_receive && (ifd->revents & POLLIN || ifd->revents & POLLPRI)) {
+        if(web_client_has_wait_receive(w) && (ifd->revents & POLLIN || ifd->revents & POLLPRI)) {
             used++;
             if(web_client_receive(w) < 0) {
                 debug(D_WEB_CLIENT, "%llu: Cannot receive data from client. Closing client.", w->id);
@@ -1732,7 +1733,7 @@ void *web_client_main(void *ptr)
     w->ifd = -1;
     w->ofd = -1;
 
-    w->obsolete = 1;
+    WEB_CLIENT_IS_OBSOLETE(w);
 
     pthread_exit(NULL);
     return NULL;
