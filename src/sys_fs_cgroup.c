@@ -185,7 +185,7 @@ void read_cgroup_plugin_configuration() {
                     " !/systemd "
                     " !/user "
                     " !/user.slice "
-                    " !/lxc/*/*/* "                       //  #2161 #2649
+                    " !/lxc/*/* "                         //  #2161 #2649
                     " * "
             ), SIMPLE_PATTERN_EXACT);
 
