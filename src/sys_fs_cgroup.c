@@ -167,7 +167,7 @@ void read_cgroup_plugin_configuration() {
                     " !/docker "
                     " !/libvirt "
                     " !/lxc "
-                    " !/lxc/*/ns "                         //  #1397
+                    " !/lxc/*/* "                          //  #1397 #2649
                     " !/machine "
                     " !/qemu "
                     " !/system "
@@ -185,7 +185,7 @@ void read_cgroup_plugin_configuration() {
                     " !/systemd "
                     " !/user "
                     " !/user.slice "
-                    " !/lxc/*/ns/* "                       //  #2161
+                    " !/lxc/*/*/* "                       //  #2161 #2649
                     " * "
             ), SIMPLE_PATTERN_EXACT);
 
