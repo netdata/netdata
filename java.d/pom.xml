@@ -7,6 +7,28 @@
 	<version>0.1.0-SNAPSHOT</version>
 	<name>netdata-java-plugin</name>
 	<url>http://netdata.firehol.org</url>
+
+	<organization>
+		<name>Firehol</name>
+		<url>http://firehol.org</url>
+	</organization>
+	<scm>
+		<url>https://github.com/firehol/netdata</url>
+		<connection>scm:git:https://github.com/firehol/netdata.git</connection>
+		<developerConnection>scm:git:https://github.com/firehol/netdata.git</developerConnection>
+		<tag>HEAD</tag>
+	</scm>
+	<issueManagement>
+		<system>GitHub</system>
+		<url>https://github.com/firehol/netdataq/issues</url>
+	</issueManagement>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+	</properties>
+
 	<dependencies>
 		<dependency>
 			<groupId>com.sun</groupId>
@@ -45,11 +67,7 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven.compiler.source>1.8</maven.compiler.source>
-		<maven.compiler.target>1.8</maven.compiler.target>
-	</properties>
+
 	<build>
 		<finalName>${project.artifactId}</finalName>
 		<plugins>
@@ -88,7 +106,7 @@
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.7.9</version>
-								<executions>
+				<executions>
 					<execution>
 						<id>jacoco-initialize</id>
 						<goals>
@@ -106,6 +124,7 @@
 			</plugin>
 		</plugins>
 	</build>
+
 	<reporting>
 		<plugins>
 			<plugin>
@@ -118,18 +137,4 @@
 		</plugins>
 	</reporting>
 
-	<organization>
-		<name>Firehol</name>
-		<url>http://firehol.org</url>
-	</organization>
-	<scm>
-		<url>https://github.com/firehol/netdata</url>
-		<connection>scm:git:https://github.com/firehol/netdata.git</connection>
-		<developerConnection>scm:git:https://github.com/firehol/netdata.git</developerConnection>
-		<tag>HEAD</tag>
-	</scm>
-	<issueManagement>
-		<system>GitHub</system>
-		<url>https://github.com/firehol/netdataq/issues</url>
-	</issueManagement>
 </project>
