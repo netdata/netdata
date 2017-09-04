@@ -188,7 +188,7 @@ If no configuration is given, module will attempt to read named.stats file  at `
 
 # chrony
 
-This module monitors the precision and statitics of a local chronyd server.
+This module monitors the precision and statistics of a local chronyd server.
 
 It produces:
 
