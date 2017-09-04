@@ -96,7 +96,7 @@ class Service(ExecutableService):
                 key, value = (l.strip() for l in line)
             except ValueError:
                 continue
-            if len(value) > 0:
+            if value:
                 parsed[key] = value.split()[0]
 
         for key, dim_id, multiplier in CHRONY:
