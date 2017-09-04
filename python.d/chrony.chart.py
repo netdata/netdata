@@ -70,32 +70,39 @@ class Service(ExecutableService):
         self.order = ORDER
         self.definitions = CHARTS
 
+    CHRONY = [('Frequency', 'frequency', 1e3),
+              ('Last offset', 'lastoffset', 1e9),
+              ('RMS offset', 'rmsoffset', 1e9),
+              ('Residual freq', 'residualfreq', 1e3),
+              ('Root delay', 'rootdelay', 1e9),
+              ('Root dispersion', 'rootdispersion', 1e9),
+              ('Skew', 'skew', 1e3),
+              ('System time', 'timediff', 1e9)]
+
     def _get_data(self):
         """
         Format data received from shell command
         :return: dict
         """
-        try:
-            lines = self._get_raw_data()
-            if lines is not None:
-                chrony_dict = {}
-                for line in lines[1:]:
-                    lparts = line.split(':', 1)
-                    if (len(lparts) > 1):
-                        value = lparts[1].strip().split(' ')[0]
-                        chrony_dict[lparts[0].strip()] = value
-                return {'timediff': int(float(chrony_dict['System time']) * 1e9),
-                        'lastoffset': int(float(chrony_dict['Last offset']) * 1e9),
-                        'rmsoffset': int(float(chrony_dict['RMS offset']) * 1e9),
-                        'rootdelay': int(float(chrony_dict['Root delay']) * 1e9),
-                        'rootdispersion': int(float(chrony_dict['Root dispersion']) * 1e9),
-                        'skew': int(float(chrony_dict['Skew']) * 1e3),
-                        'frequency': int(float(chrony_dict['Frequency']) * 1e3),
-                        'residualfreq': int(float(chrony_dict['Residual freq']) * 1e3)
-                        }
-            else:
-                self.error("No valid chronyc output")
-                return None
-        except (ValueError, AttributeError, KeyError):
-            self.error("Chronyc data parser exception")
+        raw_data = self._get_raw_data()
+        if not raw_data:
             return None
+
+        raw_data = (line.split(':', 1) for line in raw_data)
+        parsed, data = dict(), dict()
+
+        for line in raw_data:
+            try:
+                key, value = (l.strip() for l in line)
+            except ValueError:
+                continue
+            if len(value) > 0:
+                parsed[key] = value.split()[0]
+
+        for key, dim_id, multiplier in self.CHRONY:
+            try:
+                data[dim_id] = int(float(parsed[key]) * multiplier)
+            except (KeyError, ValueError):
+                continue
+
+        return data or None
