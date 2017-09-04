@@ -61,6 +61,15 @@ CHARTS = {
         ]}
 }
 
+CHRONY = [('Frequency', 'frequency', 1e3),
+          ('Last offset', 'lastoffset', 1e9),
+          ('RMS offset', 'rmsoffset', 1e9),
+          ('Residual freq', 'residualfreq', 1e3),
+          ('Root delay', 'rootdelay', 1e9),
+          ('Root dispersion', 'rootdispersion', 1e9),
+          ('Skew', 'skew', 1e3),
+          ('System time', 'timediff', 1e9)]
+
 
 class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
@@ -69,15 +78,6 @@ class Service(ExecutableService):
         self.command = "chronyc -n tracking"
         self.order = ORDER
         self.definitions = CHARTS
-
-    CHRONY = [('Frequency', 'frequency', 1e3),
-              ('Last offset', 'lastoffset', 1e9),
-              ('RMS offset', 'rmsoffset', 1e9),
-              ('Residual freq', 'residualfreq', 1e3),
-              ('Root delay', 'rootdelay', 1e9),
-              ('Root dispersion', 'rootdispersion', 1e9),
-              ('Skew', 'skew', 1e3),
-              ('System time', 'timediff', 1e9)]
 
     def _get_data(self):
         """
@@ -99,7 +99,7 @@ class Service(ExecutableService):
             if len(value) > 0:
                 parsed[key] = value.split()[0]
 
-        for key, dim_id, multiplier in self.CHRONY:
+        for key, dim_id, multiplier in CHRONY:
             try:
                 data[dim_id] = int(float(parsed[key]) * multiplier)
             except (KeyError, ValueError):
