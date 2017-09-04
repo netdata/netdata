@@ -29,6 +29,7 @@ dist_pythonconfig_DATA = \
     python.d/apache.conf \
     python.d/apache_cache.conf \
     python.d/bind_rndc.conf \
+    python.d/chrony.conf \
     python.d/cpufreq.conf \
     python.d/dns_query_time.conf \
     python.d/dovecot.conf \
