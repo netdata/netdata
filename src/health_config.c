@@ -6,7 +6,7 @@
 #define HEALTH_ALARM_KEY "alarm"
 #define HEALTH_TEMPLATE_KEY "template"
 #define HEALTH_ON_KEY "on"
-#define HEALTH_HOST_KEY "host"
+#define HEALTH_HOST_KEY "hosts"
 #define HEALTH_OS_KEY "os"
 #define HEALTH_FAMILIES_KEY "families"
 #define HEALTH_LOOKUP_KEY "lookup"
