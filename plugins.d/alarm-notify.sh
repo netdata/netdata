@@ -730,15 +730,19 @@ send_email() {
             then
             if [[ "${EMAIL_SENDER}" =~ \".*\"\ \<.*\> ]]
                 then
-                opts=" -f '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)' -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
+                # the name includes single quotes
+                opts=" -f $(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1) -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
             elif [[ "${EMAIL_SENDER}" =~ \'.*\'\ \<.*\> ]]
                 then
-                opts=" -f '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)' -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
+                # the name includes double quotes
+                opts=" -f $(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1) -F $(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)"
             elif [[ "${EMAIL_SENDER}" =~ .*\ \<.*\> ]]
                 then
-                opts=" -f '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1)' -F '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)'"
+                # the name does not have any quotes
+                opts=" -f $(echo "${EMAIL_SENDER}" | cut -d '<' -f 2 | cut -d '>' -f 1) -F '$(echo "${EMAIL_SENDER}" | cut -d '<' -f 1)'"
             else
-                opts=" -f '${EMAIL_SENDER}'"
+                # no name at all
+                opts=" -f ${EMAIL_SENDER}"
             fi
         fi
 
