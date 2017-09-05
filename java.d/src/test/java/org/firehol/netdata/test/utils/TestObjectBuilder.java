@@ -16,7 +16,7 @@
  *
  */
 
-package org.firehol.netdata.testutils;
+package org.firehol.netdata.test.utils;
 
 import org.firehol.netdata.model.Chart;
 import org.firehol.netdata.model.ChartType;

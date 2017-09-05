@@ -16,7 +16,7 @@
  *
  */
 
-package org.firehol.netdata.testutils;
+package org.firehol.netdata.test.utils;
 
 /**
  * A Security Manager that allowes everything but throws an ExitException on calls to System.exit()

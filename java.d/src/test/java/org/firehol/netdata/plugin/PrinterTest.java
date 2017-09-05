@@ -23,7 +23,7 @@ import static org.junit.Assert.assertNull;
 
 import org.firehol.netdata.model.Chart;
 import org.firehol.netdata.model.Dimension;
-import org.firehol.netdata.testutils.TestObjectBuilder;
+import org.firehol.netdata.test.utils.TestObjectBuilder;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.contrib.java.lang.system.SystemOutRule;

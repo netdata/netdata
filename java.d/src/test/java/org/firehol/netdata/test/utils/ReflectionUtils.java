@@ -16,7 +16,7 @@
  *
  */
 
-package org.firehol.netdata.testutils;
+package org.firehol.netdata.test.utils;
 
 import java.lang.reflect.Field;
 

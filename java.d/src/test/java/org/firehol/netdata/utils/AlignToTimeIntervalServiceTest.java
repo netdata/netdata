@@ -20,7 +20,7 @@ package org.firehol.netdata.utils;
 
 import static org.junit.Assert.assertEquals;
 
-import org.firehol.netdata.testutils.ReflectionUtils;
+import org.firehol.netdata.test.utils.ReflectionUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.contrib.java.lang.system.SystemErrRule;
