@@ -15,26 +15,27 @@ QUERY_GLOBAL = 'SHOW GLOBAL STATUS;'
 QUERY_SLAVE = 'SHOW SLAVE STATUS;'
 
 GLOBAL_VARS = [
- 'back_log',
- 'binlog_cache_size',
- 'host_cache_size',
- 'innodb_buffer_pool_size',
- 'innodb_log_buffer_size',
- 'innodb_log_file_size',
- 'join_buffer_size',
- 'key_buffer_size',
  'max_connections',
- 'max_heap_table_size',
- 'myisam_sort_buffer_size',
- 'query_cache_size',
- 'read_buffer_size',
- 'read_rnd_buffer_size',
- 'slow_launch_time',
- 'sort_buffer_size',
- 'table_definition_cache',
- 'table_open_cache',
- 'thread_cache_size',
- 'tmp_table_size']
+ # 'back_log',
+ # 'binlog_cache_size',
+ # 'host_cache_size',
+ # 'innodb_buffer_pool_size',
+ # 'innodb_log_buffer_size',
+ # 'innodb_log_file_size',
+ # 'join_buffer_size',
+ # 'key_buffer_size',
+ # 'max_heap_table_size',
+ # 'myisam_sort_buffer_size',
+ # 'query_cache_size',
+ # 'read_buffer_size',
+ # 'read_rnd_buffer_size',
+ # 'slow_launch_time',
+ # 'sort_buffer_size',
+ # 'table_definition_cache',
+ # 'table_open_cache',
+ # 'thread_cache_size',
+ # 'tmp_table_size'
+]
 
 GLOBAL_STATS = [
  'Bytes_received',

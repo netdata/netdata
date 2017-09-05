@@ -835,12 +835,12 @@ netdataDashboard.context = {
         info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
     },
 
+    // ------------------------------------------------------------------------
+    // MYSQL
+
     'mysql.net': {
         info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
     },
-
-    // ------------------------------------------------------------------------
-    // MYSQL
 
     'mysql.queries': {
         info: 'The number of statements executed by the server.<ul>' +
@@ -876,6 +876,12 @@ netdataDashboard.context = {
         '<li><strong>immediate</strong>, the number of times that a request for a table lock could be granted immediately.</li>' +
         '<li><strong>waited</strong>, the number of times that a request for a table lock could not be granted immediately and a wait was needed. If this is high and you have performance problems, you should first optimize your queries, and then either split your table or tables or use replication.</li>' +
         '</ul>'
+    },
+
+    'mysql.threads': {
+        mainheads: [
+            netdataDashboard.gaugeChart('Threads_connected', '12%', '', NETDATA.colors[0])
+        ]
     },
 
     // ------------------------------------------------------------------------
