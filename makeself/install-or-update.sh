@@ -149,6 +149,12 @@ do
     fi
 done
 
+# fix the fping binary
+if [ -f bin/fping ]
+then
+    run chown root:${NETDATA_GROUP} bin/fping
+    run chmod 4750 bin/fping
+fi
 
 # -----------------------------------------------------------------------------
 progress "starting netdata"
