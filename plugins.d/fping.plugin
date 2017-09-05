@@ -181,6 +181,7 @@ fi
 options=( -N -l -Q ${update_every} -p ${ping_every} ${fping_opts} ${hosts} )
 
 # execute fping
+info "starting fping: ${fping} ${options[*]}"
 exec "${fping}" "${options[@]}"
 
 # if we cannot execute fping, stop
