@@ -66,38 +66,39 @@ int do_proc_stat(int update_every, usec_t dt) {
                 continue;
             }
 
-            char *id;
-            unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0, guest = 0, guest_nice = 0;
-
             size_t core    = (row_key[3] == '\0') ? 0 : str2ul(&row_key[3]) + 1;
-            id          = row_key;
-            user        = str2ull(procfile_lineword(ff, l, 1));
-            nice        = str2ull(procfile_lineword(ff, l, 2));
-            system      = str2ull(procfile_lineword(ff, l, 3));
-            idle        = str2ull(procfile_lineword(ff, l, 4));
-            iowait      = str2ull(procfile_lineword(ff, l, 5));
-            irq         = str2ull(procfile_lineword(ff, l, 6));
-            softirq     = str2ull(procfile_lineword(ff, l, 7));
-            steal       = str2ull(procfile_lineword(ff, l, 8));
-
-            guest       = str2ull(procfile_lineword(ff, l, 9));
-            user -= guest;
-
-            guest_nice  = str2ull(procfile_lineword(ff, l, 10));
-            nice -= guest_nice;
-
-            char *title, *type, *context, *family;
-            long priority;
-
-            if(core >= all_cpu_charts_size) {
-                size_t old_cpu_charts_size = all_cpu_charts_size;
-                all_cpu_charts_size = core + 1;
-                all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * all_cpu_charts_size);
-                memset(&all_cpu_charts[old_cpu_charts_size], 0, sizeof(struct cpu_chart) * (all_cpu_charts_size - old_cpu_charts_size));
-            }
-            struct cpu_chart *cpu_chart = &all_cpu_charts[core];
 
             if(likely((core == 0 && do_cpu) || (core > 0 && do_cpu_cores))) {
+                char *id;
+                unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0, guest = 0, guest_nice = 0;
+
+                id          = row_key;
+                user        = str2ull(procfile_lineword(ff, l, 1));
+                nice        = str2ull(procfile_lineword(ff, l, 2));
+                system      = str2ull(procfile_lineword(ff, l, 3));
+                idle        = str2ull(procfile_lineword(ff, l, 4));
+                iowait      = str2ull(procfile_lineword(ff, l, 5));
+                irq         = str2ull(procfile_lineword(ff, l, 6));
+                softirq     = str2ull(procfile_lineword(ff, l, 7));
+                steal       = str2ull(procfile_lineword(ff, l, 8));
+
+                guest       = str2ull(procfile_lineword(ff, l, 9));
+                user -= guest;
+
+                guest_nice  = str2ull(procfile_lineword(ff, l, 10));
+                nice -= guest_nice;
+
+                char *title, *type, *context, *family;
+                long priority;
+
+                if(core >= all_cpu_charts_size) {
+                    size_t old_cpu_charts_size = all_cpu_charts_size;
+                    all_cpu_charts_size = core + 1;
+                    all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * all_cpu_charts_size);
+                    memset(&all_cpu_charts[old_cpu_charts_size], 0, sizeof(struct cpu_chart) * (all_cpu_charts_size - old_cpu_charts_size));
+                }
+                struct cpu_chart *cpu_chart = &all_cpu_charts[core];
+
                 if(unlikely(!cpu_chart->st)) {
                     if(core == 0) {
                         title = "Total CPU utilization";
