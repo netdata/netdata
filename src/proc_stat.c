@@ -1,8 +1,25 @@
 #include "common.h"
 
+struct cpu_chart {
+    RRDSET *st;
+    RRDDIM *rd_user;
+    RRDDIM *rd_nice;
+    RRDDIM *rd_system;
+    RRDDIM *rd_idle;
+    RRDDIM *rd_iowait;
+    RRDDIM *rd_irq;
+    RRDDIM *rd_softirq;
+    RRDDIM *rd_steal;
+    RRDDIM *rd_guest;
+    RRDDIM *rd_guest_nice;
+
+};
+
 int do_proc_stat(int update_every, usec_t dt) {
     (void)dt;
 
+    static struct cpu_chart *all_cpu_charts = NULL;
+    static size_t all_cpu_charts_size = 0;
     static procfile *ff = NULL;
     static int do_cpu = -1, do_cpu_cores = -1, do_interrupts = -1, do_context = -1, do_forks = -1, do_processes = -1;
     static uint32_t hash_intr, hash_ctxt, hash_processes, hash_procs_running, hash_procs_blocked;
@@ -36,7 +53,6 @@ int do_proc_stat(int update_every, usec_t dt) {
     size_t words;
 
     unsigned long long processes = 0, running = 0 , blocked = 0;
-    RRDSET *st;
 
     for(l = 0; l < lines ;l++) {
         char *row_key = procfile_lineword(ff, l, 0);
@@ -53,6 +69,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             char *id;
             unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0, guest = 0, guest_nice = 0;
 
+            size_t core    = (row_key[3] == '\0') ? 0 : str2ul(&row_key[3]) + 1;
             id          = row_key;
             user        = str2ull(procfile_lineword(ff, l, 1));
             nice        = str2ull(procfile_lineword(ff, l, 2));
@@ -71,99 +88,104 @@ int do_proc_stat(int update_every, usec_t dt) {
 
             char *title, *type, *context, *family;
             long priority;
-            int isthistotal;
 
-            if(unlikely(strcmp(id, "cpu")) == 0) {
-                title = "Total CPU utilization";
-                type = "system";
-                context = "system.cpu";
-                family = id;
-                priority = 100;
-                isthistotal = 1;
+            if(core >= all_cpu_charts_size) {
+                size_t old_cpu_charts_size = all_cpu_charts_size;
+                all_cpu_charts_size = core + 1;
+                all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * all_cpu_charts_size);
+                memset(&all_cpu_charts[old_cpu_charts_size], 0, sizeof(struct cpu_chart) * (all_cpu_charts_size - old_cpu_charts_size));
             }
-            else {
-                title = "Core utilization";
-                type = "cpu";
-                context = "cpu.cpu";
-                family = "utilization";
-                priority = 1000;
-                isthistotal = 0;
-            }
+            struct cpu_chart *cpu_chart = &all_cpu_charts[core];
 
-            if(likely((isthistotal && do_cpu) || (!isthistotal && do_cpu_cores))) {
-                st = rrdset_find_bytype_localhost(type, id);
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost(type, id, NULL, family, context, title, "percentage", priority
-                                                 , update_every, RRDSET_TYPE_STACKED);
+            if(likely((core == 0 && do_cpu) || (core > 0 && do_cpu_cores))) {
+                if(unlikely(!cpu_chart->st)) {
+                    if(core == 0) {
+                        title = "Total CPU utilization";
+                        type = "system";
+                        context = "system.cpu";
+                        family = id;
+                        priority = 100;
+                    }
+                    else {
+                        title = "Core utilization";
+                        type = "cpu";
+                        context = "cpu.cpu";
+                        family = "utilization";
+                        priority = 1000;
+
+                        // FIXME: check for /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq
+                        // FIXME: check for /sys/devices/system/cpu/cpu*/cpufreq/stats/time_in_state
+                        // FIXME: check for /sys/devices/system/cpu/cpu*/thermal_throttle/core_throttle_count
+                        // FIXME: check for /sys/devices/system/cpu/cpu*/thermal_throttle/package_throttle_count
+                    }
+
+                    cpu_chart->st = rrdset_create_localhost(type, id, NULL, family, context, title, "percentage", priority, update_every, RRDSET_TYPE_STACKED);
 
                     long multiplier = 1;
                     long divisor = 1; // sysconf(_SC_CLK_TCK);
 
-                    rrddim_add(st, "guest_nice", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "guest", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "steal", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "softirq", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "irq", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "user", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "system", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "nice", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_add(st, "iowait", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-
-                    rrddim_add(st, "idle", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
-                    rrddim_hide(st, "idle");
+                    cpu_chart->rd_guest_nice = rrddim_add(cpu_chart->st, "guest_nice", NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    cpu_chart->rd_guest      = rrddim_add(cpu_chart->st, "guest",      NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    cpu_chart->rd_steal      = rrddim_add(cpu_chart->st, "steal",      NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    cpu_chart->rd_softirq    = rrddim_add(cpu_chart->st, "softirq",    NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    cpu_chart->rd_irq        = rrddim_add(cpu_chart->st, "irq",        NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    cpu_chart->rd_user       = rrddim_add(cpu_chart->st, "user",       NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    cpu_chart->rd_system     = rrddim_add(cpu_chart->st, "system",     NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    cpu_chart->rd_nice       = rrddim_add(cpu_chart->st, "nice",       NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    cpu_chart->rd_iowait     = rrddim_add(cpu_chart->st, "iowait",     NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    cpu_chart->rd_idle       = rrddim_add(cpu_chart->st, "idle",       NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
+                    rrddim_hide(cpu_chart->st, "idle");
                 }
-                else rrdset_next(st);
+                else rrdset_next(cpu_chart->st);
 
-                rrddim_set(st, "user", user);
-                rrddim_set(st, "nice", nice);
-                rrddim_set(st, "system", system);
-                rrddim_set(st, "idle", idle);
-                rrddim_set(st, "iowait", iowait);
-                rrddim_set(st, "irq", irq);
-                rrddim_set(st, "softirq", softirq);
-                rrddim_set(st, "steal", steal);
-                rrddim_set(st, "guest", guest);
-                rrddim_set(st, "guest_nice", guest_nice);
-                rrdset_done(st);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_user, user);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_nice, nice);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_system, system);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_idle, idle);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_iowait, iowait);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_irq, irq);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_softirq, softirq);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_steal, steal);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_guest, guest);
+                rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_guest_nice, guest_nice);
+                rrdset_done(cpu_chart->st);
             }
         }
         else if(unlikely(hash == hash_intr && strcmp(row_key, "intr") == 0)) {
-            unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
-
-            // --------------------------------------------------------------------
-
             if(likely(do_interrupts)) {
-                st = rrdset_find_bytype_localhost("system", "intr");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "intr", NULL, "interrupts", NULL, "CPU Interrupts"
+                static RRDSET *st_intr = NULL;
+                static RRDDIM *rd_interrupts = NULL;
+                unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
+
+                if(unlikely(!st_intr)) {
+                    st_intr = rrdset_create_localhost("system", "intr", NULL, "interrupts", NULL, "CPU Interrupts"
                                                  , "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+                    rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(st, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_interrupts = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else rrdset_next(st_intr);
 
-                rrddim_set(st, "interrupts", value);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_intr, rd_interrupts, value);
+                rrdset_done(st_intr);
             }
         }
         else if(unlikely(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0)) {
-            unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
-
-            // --------------------------------------------------------------------
-
             if(likely(do_context)) {
-                st = rrdset_find_bytype_localhost("system", "ctxt");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ctxt", NULL, "processes", NULL, "CPU Context Switches"
+                static RRDSET *st_ctxt = NULL;
+                static RRDDIM *rd_switches = NULL;
+                unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
+
+                if(unlikely(!st_ctxt)) {
+                    st_ctxt = rrdset_create_localhost("system", "ctxt", NULL, "processes", NULL, "CPU Context Switches"
                                                  , "context switches/s", 800, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_switches = rrddim_add(st_ctxt, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else rrdset_next(st_ctxt);
 
-                rrddim_set(st, "switches", value);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_ctxt, rd_switches, value);
+                rrdset_done(st_ctxt);
             }
         }
         else if(unlikely(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0)) {
@@ -180,36 +202,41 @@ int do_proc_stat(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(likely(do_forks)) {
-        st = rrdset_find_bytype_localhost("system", "forks");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s"
+        static RRDSET *st_forks = NULL;
+        static RRDDIM *rd_started = NULL;
+
+        if(unlikely(!st_forks)) {
+            st_forks = rrdset_create_localhost("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s"
                                          , 700, update_every, RRDSET_TYPE_LINE);
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+            rrdset_flag_set(st_forks, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_started = rrddim_add(st_forks, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
+        else rrdset_next(st_forks);
 
-        rrddim_set(st, "started", processes);
-        rrdset_done(st);
+        rrddim_set_by_pointer(st_forks, rd_started, processes);
+        rrdset_done(st_forks);
     }
 
     // --------------------------------------------------------------------
 
     if(likely(do_processes)) {
-        st = rrdset_find_bytype_localhost("system", "processes");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost("system", "processes", NULL, "processes", NULL, "System Processes", "processes"
+        static RRDSET *st_processes = NULL;
+        static RRDDIM *rd_running = NULL;
+        static RRDDIM *rd_blocked = NULL;
+
+        if(unlikely(!st_processes)) {
+            st_processes = rrdset_create_localhost("system", "processes", NULL, "processes", NULL, "System Processes", "processes"
                                          , 600, update_every, RRDSET_TYPE_LINE);
 
-            rrddim_add(st, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_running = rrddim_add(st_processes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_blocked = rrddim_add(st_processes, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else rrdset_next(st_processes);
 
-        rrddim_set(st, "running", running);
-        rrddim_set(st, "blocked", blocked);
-        rrdset_done(st);
+        rrddim_set_by_pointer(st_processes, rd_running, running);
+        rrddim_set_by_pointer(st_processes, rd_blocked, blocked);
+        rrdset_done(st_processes);
     }
 
     return 0;
