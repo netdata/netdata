@@ -99,12 +99,9 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, path, sizeof(name.sun_path)-1);
 
-    struct stat stbuf;
-    if(stat(path, &stbuf) == 0) {
-        // we have to delete any old socket, or bind() will fail
-        if (unlink(path) == -1)
-            error("LISTENER: failed to remove existing (probably obsolete or left-over) file on UNIX socket path '%s'.", path);
-    }
+    errno = 0;
+    if (unlink(path) == -1 && errno != ENOENT)
+        error("LISTENER: failed to remove existing (probably obsolete or left-over) file on UNIX socket path '%s'.", path);
 
     if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
         close(sock);
