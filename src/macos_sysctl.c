@@ -588,7 +588,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             if (likely(do_icmpmsg)) {
                 st = rrdset_find_localhost("ipv4.icmpmsg");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages"
+                    st = rrdset_create_localhost("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messages"
                                                  , "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
 
                     rrddim_add(st, "InEchoReps", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
