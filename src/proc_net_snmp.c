@@ -554,7 +554,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
                 st = rrdset_find_localhost(RRD_TYPE_NET_SNMP ".icmpmsg");
                 if(!st) {
-                    st = rrdset_create_localhost(RRD_TYPE_NET_SNMP, "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages"
+                    st = rrdset_create_localhost(RRD_TYPE_NET_SNMP, "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messages"
                                                  , "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
 
                     for(i = 0; icmpmsg_data[i].name ;i++)
