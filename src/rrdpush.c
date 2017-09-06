@@ -504,19 +504,19 @@ void *rrdpush_sender_thread(void *ptr) {
 
             if(unlikely(ofd->revents & POLLERR)) {
                 debug(D_STREAM, "STREAM: Send failed (POLLERR) - closing socket...");
-                error("STREAM %s [send to %s]: connection reports errors (POLLERR) - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                error("STREAM %s [send to %s]: connection reports errors (POLLERR), closing it - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
                 close(host->rrdpush_socket);
                 host->rrdpush_socket = -1;
             }
             else if(unlikely(ofd->revents & POLLHUP)) {
                 debug(D_STREAM, "STREAM: Send failed (POLLHUP) - closing socket...");
-                error("STREAM %s [send to %s]: connection closed (POLLHUP) - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                error("STREAM %s [send to %s]: connection closed by remote end (POLLHUP) - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
                 close(host->rrdpush_socket);
                 host->rrdpush_socket = -1;
             }
             else if(unlikely(ofd->revents & POLLNVAL)) {
                 debug(D_STREAM, "STREAM: Send failed (POLLNVAL) - closing socket...");
-                error("STREAM %s [send to %s]: connection is invalid (POLLNVAL) - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                error("STREAM %s [send to %s]: connection is invalid (POLLNVAL), closing it - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
                 close(host->rrdpush_socket);
                 host->rrdpush_socket = -1;
             }
