@@ -528,7 +528,7 @@ class Web(Mixin):
                     get_timings(timings=timings['resp_time_upstream'],
                                 time=self.storage['func_resp_time'](float(match_dict['resp_time_upstream'])))
                 # requests per ip proto
-                proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
+                proto = 'ipv6' if ':' in match_dict['address'] else 'ipv4'
                 self.data['req_' + proto] += 1
                 # unique clients ips
                 if self.conf.get('all_time', True):
@@ -561,14 +561,14 @@ class Web(Mixin):
         """
         # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
         # 5. Bytes sent 6. Response length 7. Response process time
-        default = re.compile(r'(?P<address>[\da-f.:]+)'
+        default = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
                              r' -.*?"(?P<method>[A-Z]+)'
                              r' (?P<url>[^ ]+)'
                              r' [A-Z]+/(?P<http_version>\d\.\d)"'
                              r' (?P<code>[1-9]\d{2})'
                              r' (?P<bytes_sent>\d+|-)')
 
-        apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
+        apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
                                        r' -.*?"(?P<method>[A-Z]+)'
                                        r' (?P<url>[^ ]+)'
                                        r' [A-Z]+/(?P<http_version>\d\.\d)"'
@@ -577,7 +577,7 @@ class Web(Mixin):
                                        r' (?P<resp_length>\d+)'
                                        r' (?P<resp_time>\d+) ')
 
-        apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
+        apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
                                        r' -.*?"(?P<method>[A-Z]+)'
                                        r' (?P<url>[^ ]+)'
                                        r' [A-Z]+/(?P<http_version>\d\.\d)"'
@@ -693,7 +693,7 @@ class Web(Mixin):
         if match_dict is None:
             return find_regex_return(msg='Custom log: search OK but contains no named subgroups'
                                          ' (you need to use ?P<subgroup_name>)')
-        mandatory_dict = {'address': r'[\da-f.:]+',
+        mandatory_dict = {'address': r'[\da-f.:]+|localhost',
                           'code': r'[1-9]\d{2}',
                           'method': r'[A-Z]+',
                           'bytes_sent': r'\d+|-'}
