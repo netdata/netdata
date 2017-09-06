@@ -2055,7 +2055,7 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                 static RRDDIM *rd_in_reps = NULL, *rd_out_reps = NULL, *rd_in = NULL, *rd_out = NULL;
 
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messsages",
+                    st = rrdset_create_localhost("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messages",
                                                  "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
 
                     rd_in_reps  = rrddim_add(st, "InEchoReps",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
