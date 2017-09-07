@@ -6,6 +6,8 @@
 #define HEALTH_ALARM_KEY "alarm"
 #define HEALTH_TEMPLATE_KEY "template"
 #define HEALTH_ON_KEY "on"
+#define HEALTH_HOST_KEY "hosts"
+#define HEALTH_OS_KEY "os"
 #define HEALTH_FAMILIES_KEY "families"
 #define HEALTH_LOOKUP_KEY "lookup"
 #define HEALTH_CALC_KEY "calc"
@@ -88,7 +90,10 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
 
     RRDCALCTEMPLATE *t, *last = NULL;
     for (t = host->templates; t ; last = t, t = t->next) {
-        if(unlikely(t->hash_name == rt->hash_name && !strcmp(t->name, rt->name))) {
+        if(unlikely(t->hash_name == rt->hash_name
+                    && !strcmp(t->name, rt->name)
+                    && !strcmp(t->family_match?t->family_match:"*", rt->family_match?rt->family_match:"*")
+        )) {
             error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
             return 0;
         }
@@ -400,7 +405,9 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
     static uint32_t
             hash_alarm = 0,
             hash_template = 0,
+            hash_os = 0,
             hash_on = 0,
+            hash_host = 0,
             hash_families = 0,
             hash_calc = 0,
             hash_green = 0,
@@ -422,6 +429,8 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
         hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
         hash_on = simple_uhash(HEALTH_ON_KEY);
+        hash_os = simple_uhash(HEALTH_OS_KEY);
+        hash_host = simple_uhash(HEALTH_HOST_KEY);
         hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
         hash_calc = simple_uhash(HEALTH_CALC_KEY);
         hash_lookup = simple_uhash(HEALTH_LOOKUP_KEY);
@@ -448,6 +457,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
     RRDCALC *rc = NULL;
     RRDCALCTEMPLATE *rt = NULL;
 
+    int ignore_this = 0;
     size_t line = 0, append = 0;
     char *s;
     while((s = fgets(&buffer[append], (int)(HEALTH_CONF_MAX_LINE - append), fp)) || append) {
@@ -494,11 +504,11 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         uint32_t hash = simple_uhash(key);
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
-            if(rc && !rrdcalc_add_alarm_from_config(host, rc))
+            if (rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
                 rrdcalc_free(host, rc);
 
             if(rt) {
-                if (!rrdcalctemplate_add_template_from_config(host, rt))
+                if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
                     rrdcalctemplate_free(host, rt);
                 rt = NULL;
             }
@@ -516,15 +526,17 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
 
             if(rrdvar_fix_name(rc->name))
                 error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
+
+            ignore_this = 0;
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
-                if(!rrdcalc_add_alarm_from_config(host, rc))
+                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc))
                     rrdcalc_free(host, rc);
                 rc = NULL;
             }
 
-            if(rt && !rrdcalctemplate_add_template_from_config(host, rt))
+            if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
                 rrdcalctemplate_free(host, rt);
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
@@ -537,6 +549,40 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
 
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);
+
+            ignore_this = 0;
+        }
+        else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
+            char *os_match = value;
+            SIMPLE_PATTERN *os_pattern = simple_pattern_create(os_match, SIMPLE_PATTERN_EXACT);
+
+            if(!simple_pattern_matches(os_pattern, host->os)) {
+                if(rc)
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s/%s: host O/S does not match '%s'", host->hostname, rc->name, line, path, filename, os_match);
+
+                if(rt)
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s/%s: host O/S does not match '%s'", host->hostname, rt->name, line, path, filename, os_match);
+
+                ignore_this = 1;
+            }
+
+            simple_pattern_free(os_pattern);
+        }
+        else if(hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
+            char *host_match = value;
+            SIMPLE_PATTERN *host_pattern = simple_pattern_create(host_match, SIMPLE_PATTERN_EXACT);
+
+            if(!simple_pattern_matches(host_pattern, host->hostname)) {
+                if(rc)
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring alarm '%s' defined at %zu@%s/%s: hostname does not match '%s'", host->hostname, rc->name, line, path, filename, host_match);
+
+                if(rt)
+                    debug(D_HEALTH, "HEALTH on '%s' ignoring template '%s' defined at %zu@%s/%s: hostname does not match '%s'", host->hostname, rt->name, line, path, filename, host_match);
+
+                ignore_this = 1;
+            }
+
+            simple_pattern_free(host_pattern);
         }
         else if(rc) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
@@ -786,10 +832,10 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         }
     }
 
-    if(rc && !rrdcalc_add_alarm_from_config(host, rc))
+    if(rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
         rrdcalc_free(host, rc);
 
-    if(rt && !rrdcalctemplate_add_template_from_config(host, rt))
+    if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
         rrdcalctemplate_free(host, rt);
 
     fclose(fp);

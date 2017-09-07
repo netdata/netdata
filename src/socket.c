@@ -99,8 +99,9 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, path, sizeof(name.sun_path)-1);
 
-    // we have to delete any old socket, or bind() will fail
-    unlink(path);
+    errno = 0;
+    if (unlink(path) == -1 && errno != ENOENT)
+        error("LISTENER: failed to remove existing (probably obsolete or left-over) file on UNIX socket path '%s'.", path);
 
     if(bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
         close(sock);
@@ -110,7 +111,8 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
 
     // we have to chmod this to 0777 so that the client will be able
     // to read from and write to this socket.
-    chmod(path, 0777);
+    if(chmod(path, 0777) == -1)
+        error("LISTENER: failed to chmod() socket file '%s'.", path);
 
     if(listen(sock, listen_backlog) < 0) {
         close(sock);
@@ -485,6 +487,10 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 
 static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if(fd == -1) {
+        error("Failed to create UNIX socket() for '%s'", path);
+        return -1;
+    }
 
     if(timeout) {
         if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
