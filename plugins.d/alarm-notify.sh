@@ -1001,7 +1001,7 @@ send_hipchat() {
             httpcode=$(docurl -X POST \
                     -H "Content-type: application/json" \
                     -H "Authorization: Bearer ${authtoken}" \
-                    -d "{\"color\": \"${color}\", \"from\": \"${netdata}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
+                    -d "{\"color\": \"${color}\", \"from\": \"${host}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
                     "https://${HIPCHAT_SERVER}/v2/room/${room}/notification")
  
             if [ "${httpcode}" == "204" ]
@@ -1138,7 +1138,7 @@ send_slack() {
                         }
                     ],
                     "thumb_url": "${image}",
-                    "footer": "<${goto_url}|${host}>",
+                    "footer": "by <${goto_url}|${this_host}>",
                     "ts": ${when}
                 }
             ]
@@ -1201,7 +1201,7 @@ send_discord() {
                     ],
                     "thumb_url": "${image}",
                     "footer_icon": "${images_base_url}/images/seo-performance-128.png",
-                    "footer": "${host}",
+                    "footer": "${this_host}",
                     "ts": ${when}
                 }
             ]
