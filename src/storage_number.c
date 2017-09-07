@@ -210,7 +210,7 @@ int print_calculated_number(char *str, calculated_number value) {
         }
 
         char *begin = fractional_str;
-        while(*begin == '0' && begin < fstre) begin++;
+        while(begin < fstre && *begin == '0') begin++;
 
         // copy reversed the fractional string
         fstre--;

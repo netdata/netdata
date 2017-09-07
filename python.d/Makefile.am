@@ -16,6 +16,7 @@ dist_python_DATA = \
     apache.chart.py \
     apache_cache.chart.py \
     bind_rndc.chart.py \
+    chrony.chart.py \
     cpufreq.chart.py \
     cpuidle.chart.py \
     dns_query_time.chart.py \

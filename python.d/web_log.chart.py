@@ -1,17 +1,20 @@
 # -*- coding: utf-8 -*-
 # Description: web log netdata python.d module
 # Author: l2isbad
-import re
+
 import bisect
-from os import access, R_OK
-from os.path import getsize
+import re
+
 from collections import namedtuple, defaultdict
 from copy import deepcopy
+from os import access, R_OK
+from os.path import getsize
 
 try:
     from itertools import filterfalse
 except ImportError:
     from itertools import ifilterfalse as filterfalse
+
 from base import LogService
 import msg
 
@@ -525,7 +528,7 @@ class Web(Mixin):
                     get_timings(timings=timings['resp_time_upstream'],
                                 time=self.storage['func_resp_time'](float(match_dict['resp_time_upstream'])))
                 # requests per ip proto
-                proto = 'ipv4' if '.' in match_dict['address'] else 'ipv6'
+                proto = 'ipv6' if ':' in match_dict['address'] else 'ipv4'
                 self.data['req_' + proto] += 1
                 # unique clients ips
                 if self.conf.get('all_time', True):
@@ -558,14 +561,14 @@ class Web(Mixin):
         """
         # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
         # 5. Bytes sent 6. Response length 7. Response process time
-        default = re.compile(r'(?P<address>[\da-f.:]+)'
+        default = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
                              r' -.*?"(?P<method>[A-Z]+)'
                              r' (?P<url>[^ ]+)'
                              r' [A-Z]+/(?P<http_version>\d\.\d)"'
                              r' (?P<code>[1-9]\d{2})'
                              r' (?P<bytes_sent>\d+|-)')
 
-        apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
+        apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
                                        r' -.*?"(?P<method>[A-Z]+)'
                                        r' (?P<url>[^ ]+)'
                                        r' [A-Z]+/(?P<http_version>\d\.\d)"'
@@ -574,7 +577,7 @@ class Web(Mixin):
                                        r' (?P<resp_length>\d+)'
                                        r' (?P<resp_time>\d+) ')
 
-        apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
+        apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
                                        r' -.*?"(?P<method>[A-Z]+)'
                                        r' (?P<url>[^ ]+)'
                                        r' [A-Z]+/(?P<http_version>\d\.\d)"'
@@ -690,7 +693,7 @@ class Web(Mixin):
         if match_dict is None:
             return find_regex_return(msg='Custom log: search OK but contains no named subgroups'
                                          ' (you need to use ?P<subgroup_name>)')
-        mandatory_dict = {'address': r'[\da-f.:]+',
+        mandatory_dict = {'address': r'[\da-f.:]+|localhost',
                           'code': r'[1-9]\d{2}',
                           'method': r'[A-Z]+',
                           'bytes_sent': r'\d+|-'}
@@ -937,18 +940,21 @@ class Squid(Mixin):
         :return:
         """
         if code not in self.data:
-            self.add_new_dimension(dimension_id=code, chart_key='squid_code')
+            self.add_new_dimension(dimension_id=code,
+                                   chart_key='squid_code')
         self.data[code] += 1
-        if '_' not in code:
-            return
+
         for tag in code.split('_'):
             try:
                 chart_key = SQUID_CODES[tag]
             except KeyError:
                 continue
-            if tag not in self.data:
-                self.add_new_dimension(dimension_id=tag, chart_key=chart_key)
-            self.data[tag] += 1
+            dimension_id = '_'.join(['code_detailed', tag])
+            if dimension_id not in self.data:
+                self.add_new_dimension(dimension_id=dimension_id,
+                                       dimension=tag,
+                                       chart_key=chart_key)
+            self.data[dimension_id] += 1
 
 
 def get_timings(timings, time):

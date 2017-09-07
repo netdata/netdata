@@ -15,13 +15,14 @@ typedef struct listen_sockets {
     size_t failed;                      // the number of sockets attempted to open, but failed
     int fds[MAX_LISTEN_FDS];            // the open sockets
     char *fds_names[MAX_LISTEN_FDS];    // descriptions for the open sockets
-    int fds_types[MAX_LISTEN_FDS];      // the socktype for the open sockets
+    int fds_types[MAX_LISTEN_FDS];      // the socktype for the open sockets (SOCK_STREAM, SOCK_DGRAM)
+    int fds_families[MAX_LISTEN_FDS];   // the family of the open sockets (AF_UNIX, AF_INET, AF_INET6)
 } LISTEN_SOCKETS;
 
 extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
 extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
 
-extern int connect_to(const char *definition, int default_port, struct timeval *timeout);
+extern int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
 extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 
 extern ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);

@@ -88,11 +88,11 @@ HEALTH_STATS = [
 
 LATENCY = {
     'query_latency':
-        {'total': 'query_total',
-         'spent_time': 'query_time_in_millis'},
+        {'total': 'indices_search_query_total',
+         'spent_time': 'indices_search_query_time_in_millis'},
     'fetch_latency':
-        {'total': 'fetch_total',
-         'spent_time': 'fetch_time_in_millis'},
+        {'total': 'indices_search_fetch_total',
+         'spent_time': 'indices_search_fetch_time_in_millis'},
     'indexing_latency':
         {'total': 'indices_indexing_index_total',
          'spent_time': 'indices_indexing_index_time_in_millis'},

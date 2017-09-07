@@ -89,7 +89,7 @@ static inline void cleanup_web_clients(void) {
     struct web_client *w;
 
     for (w = web_clients; w;) {
-        if (w->obsolete) {
+        if (web_client_check_obsolete(w)) {
             debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
             // pthread_cancel(w->thread);
             // pthread_join(w->thread, NULL);
@@ -170,11 +170,11 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 
                 if(pthread_create(&w->thread, NULL, web_client_main, w) != 0) {
                     error("%llu: failed to create new thread for web client.", w->id);
-                    w->obsolete = 1;
+                    WEB_CLIENT_IS_OBSOLETE(w);
                 }
                 else if(pthread_detach(w->thread) != 0) {
                     error("%llu: Cannot request detach of newly created web client thread.", w->id);
-                    w->obsolete = 1;
+                    WEB_CLIENT_IS_OBSOLETE(w);
                 }
             }
         }
@@ -200,7 +200,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
 struct web_client *single_threaded_clients[FD_SETSIZE];
 
 static inline int single_threaded_link_client(struct web_client *w, fd_set *ifds, fd_set *ofds, fd_set *efds, int *max) {
-    if(unlikely(w->obsolete || w->dead || (!w->wait_receive && !w->wait_send)))
+    if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
         return 1;
 
     if(unlikely(w->ifd < 0 || w->ifd >= FD_SETSIZE || w->ofd < 0 || w->ofd >= FD_SETSIZE)) {
@@ -216,8 +216,8 @@ static inline int single_threaded_link_client(struct web_client *w, fd_set *ifds
         FD_SET(w->ofd, efds);
     }
 
-    if(w->wait_receive) FD_SET(w->ifd, ifds);
-    if(w->wait_send)    FD_SET(w->ofd, ofds);
+    if(web_client_has_wait_receive(w)) FD_SET(w->ifd, ifds);
+    if(web_client_has_wait_send(w))    FD_SET(w->ofd, ofds);
 
     single_threaded_clients[w->ifd] = w;
     single_threaded_clients[w->ofd] = w;
@@ -229,13 +229,13 @@ static inline int single_threaded_unlink_client(struct web_client *w, fd_set *if
     FD_CLR(w->ifd, efds);
     if(unlikely(w->ifd != w->ofd)) FD_CLR(w->ofd, efds);
 
-    if(w->wait_receive) FD_CLR(w->ifd, ifds);
-    if(w->wait_send)    FD_CLR(w->ofd, ofds);
+    if(web_client_has_wait_receive(w)) FD_CLR(w->ifd, ifds);
+    if(web_client_has_wait_send(w))    FD_CLR(w->ofd, ofds);
 
     single_threaded_clients[w->ifd] = NULL;
     single_threaded_clients[w->ofd] = NULL;
 
-    if(unlikely(w->obsolete || w->dead || (!w->wait_receive && !w->wait_send)))
+    if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
         return 1;
 
     return 0;
@@ -302,6 +302,12 @@ void *socket_listen_main_single_threaded(void *ptr) {
                 if (FD_ISSET(api_sockets.fds[i], &rifds)) {
                     debug(D_WEB_CLIENT_ACCESS, "LISTENER: new connection.");
                     w = web_client_create(api_sockets.fds[i]);
+
+                    if(api_sockets.fds_families[i] == AF_UNIX)
+                        web_client_set_unix(w);
+                    else
+                        web_client_set_tcp(w);
+
                     if (single_threaded_link_client(w, &ifds, &ofds, &ifds, &fdmax) != 0) {
                         web_client_free(w);
                     }
@@ -326,7 +332,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
                     continue;
                 }
 
-                if (unlikely(w->wait_receive && FD_ISSET(w->ifd, &rifds))) {
+                if (unlikely(web_client_has_wait_receive(w) && FD_ISSET(w->ifd, &rifds))) {
                     if (unlikely(web_client_receive(w) < 0)) {
                         web_client_free(w);
                         continue;
@@ -338,7 +344,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
                     }
                 }
 
-                if (unlikely(w->wait_send && FD_ISSET(w->ofd, &rofds))) {
+                if (unlikely(web_client_has_wait_send(w) && FD_ISSET(w->ofd, &rofds))) {
                     if (unlikely(web_client_send(w) < 0)) {
                         debug(D_WEB_CLIENT, "%llu: Cannot send data to client. Closing client.", w->id);
                         web_client_free(w);

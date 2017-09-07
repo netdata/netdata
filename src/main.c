@@ -172,7 +172,7 @@ void kill_childs()
         // it is detached
         // pthread_join(w->thread, NULL);
 
-        w->obsolete = 1;
+        WEB_CLIENT_IS_OBSOLETE(w);
     }
 
     int i;
