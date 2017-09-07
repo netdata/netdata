@@ -448,9 +448,9 @@ class Service(MySQLService):
             if 'Threads_created' in to_netdata and 'Connections' in to_netdata:
                 to_netdata['Thread_cache_misses'] = round(int(to_netdata['Threads_created']) / float(to_netdata['Connections']) * 10000)
             if 'Innodb_buffer_pool_bytes_data' in to_netdata and 'var_innodb_buffer_pool_size' in to_netdata:
-                to_netdata['Innodb_buffer_pool_utilization'] = round(int(to_netdata['Innodb_buffer_pool_bytes_data']) / float(to_netdata['var_innodb_buffer_pool_size']))
-            if 'Connections' in to_netdata and 'var_max_connections' in to_netdata:
-                to_netdata['Max_connections_ratio'] = round(int(to_netdata['Connections']) / float(to_netdata['var_max_connections']))
+                to_netdata['Innodb_buffer_pool_utilization'] = (int(to_netdata['Innodb_buffer_pool_bytes_data']) / float(to_netdata['var_innodb_buffer_pool_size']))*100
+            if 'Threads_connected' in to_netdata and 'var_max_connections' in to_netdata:
+                to_netdata['Max_connections_ratio'] = (int(to_netdata['Threads_connected']) / float(to_netdata['var_max_connections']))*100
 
         if 'slave_status' in raw_data:
             if raw_data['slave_status'][0]:

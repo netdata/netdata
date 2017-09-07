@@ -844,7 +844,8 @@ netdataDashboard.context = {
 
     'mysql.queries': {
         mainheads: [
-            netdataDashboard.gaugeChart('Queries', '12%', 'Queries', NETDATA.colors[0]),
+            netdataDashboard.gaugeChart('Total Queries', '12%', 'Queries', NETDATA.colors[0]),
+            netdataDashboard.gaugeChart('Slow Queries', '12%', 'Slow_queries', NETDATA.colors[3]),
         ],
         info: 'The number of statements executed by the server.<ul>' +
         '<li><strong>queries</strong> counts the statements executed within stored SQL programs.</li>' +
@@ -885,18 +886,17 @@ netdataDashboard.context = {
         mainheads: [
             function(os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return  '<div style="margin-right: 1%;" data-netdata="' + id + '"'
                     + ' data-dimensions="Max_connections_ratio"'
-                    + ' data-append-options="percentage"'
                     + ' data-chart-library="easypiechart"'
-                    + ' data-title="Connections"'
+                    + ' data-title="Connection Utilization"'
                     + ' data-units="%"'
                     + ' data-easypiechart-max-value="100"'
-                    + ' data-width="12%"'
+                    + ' data-width="9%"'
                     + ' data-before="0"'
                     + ' data-after="-CHART_DURATION"'
                     + ' data-points="CHART_DURATION"'
-                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
                     + ' role="application"></div>';
             }
         ]
@@ -906,18 +906,17 @@ netdataDashboard.context = {
         mainheads: [
             function(os, id) {
                 void(os);
-                return  '<div data-netdata="' + id + '"'
+                return  '<div style="margin-right: 1%;" data-netdata="' + id + '"'
                     + ' data-dimensions="Innodb_buffer_pool_utilization"'
-                    + ' data-append-options="percentage"'
                     + ' data-chart-library="easypiechart"'
                     + ' data-title="InnoDB Buffer Pool Utilization"'
                     + ' data-units="%"'
                     + ' data-easypiechart-max-value="100"'
-                    + ' data-width="12%"'
+                    + ' data-width="9%"'
                     + ' data-before="0"'
                     + ' data-after="-CHART_DURATION"'
                     + ' data-points="CHART_DURATION"'
-                    + ' data-colors="' + NETDATA.colors[6] + '"'
+                    + ' data-colors="' + NETDATA.colors[5] + '"'
                     + ' role="application"></div>';
             }
         ]
