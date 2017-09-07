@@ -204,14 +204,13 @@ static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) 
 }
 
 static inline void health_alarm_log_process(RRDHOST *host) {
-    static uint32_t stop_at_id = 0;
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
     time_t now = now_realtime_sec();
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     ALARM_ENTRY *ae;
-    for(ae = host->health_log.alarms; ae && ae->unique_id >= stop_at_id ; ae = ae->next) {
+    for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id ; ae = ae->next) {
         if(unlikely(
             !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
             !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
@@ -226,7 +225,7 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     }
 
     // remember this for the next iteration
-    stop_at_id = first_waiting;
+    host->health_last_processed_id = first_waiting;
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 

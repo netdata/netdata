@@ -462,6 +462,7 @@ struct rrdhost {
     RRDCALC *alarms;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
+    uint32_t health_last_processed_id;              // the last processed health id from the log
 
     // templates of alarms
     // these are used to create alarms when charts
