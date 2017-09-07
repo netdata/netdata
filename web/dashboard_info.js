@@ -835,14 +835,18 @@ netdataDashboard.context = {
         info: 'inodes (or index nodes) are filesystem objects (e.g. files and directories). On many types of file system implementations, the maximum number of inodes is fixed at filesystem creation, limiting the maximum number of files the filesystem can hold. It is possible for a device to run out of inodes. When this happens, new files cannot be created on the device, even though there may be free space available.'
     },
 
+    // ------------------------------------------------------------------------
+    // MYSQL
+
     'mysql.net': {
         info: 'The amount of data sent to mysql clients (<strong>out</strong>) and received from mysql clients (<strong>in</strong>).'
     },
 
-    // ------------------------------------------------------------------------
-    // MYSQL
-
     'mysql.queries': {
+        mainheads: [
+            netdataDashboard.gaugeChart('Total Queries', '12%', 'Queries', NETDATA.colors[0]),
+            netdataDashboard.gaugeChart('Slow Queries', '12%', 'Slow_queries', NETDATA.colors[3])
+        ],
         info: 'The number of statements executed by the server.<ul>' +
         '<li><strong>queries</strong> counts the statements executed within stored SQL programs.</li>' +
         '<li><strong>questions</strong> counts the statements sent to the mysql server by mysql clients.</li>' +
@@ -877,6 +881,50 @@ netdataDashboard.context = {
         '<li><strong>waited</strong>, the number of times that a request for a table lock could not be granted immediately and a wait was needed. If this is high and you have performance problems, you should first optimize your queries, and then either split your table or tables or use replication.</li>' +
         '</ul>'
     },
+
+    'mysql.threads': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="Max_connections_ratio"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="Connection Utilization"'
+                    + ' data-units="percentage %"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[4] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'mysql.innodb_buffer_pool_bytes': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="Innodb_buffer_pool_utilization"'
+                    + ' data-gauge-max-value="100"'
+                    + ' data-chart-library="gauge"'
+                    + ' data-title="InnoDB Buffer Pool Utilization"'
+                    + ' data-units="percentage %"'
+                    + ' data-gauge-adjust="width"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[5] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+
 
     // ------------------------------------------------------------------------
     // APACHE

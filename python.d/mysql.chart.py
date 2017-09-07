@@ -10,8 +10,15 @@ priority = 90000
 retries = 60
 
 # query executed on MySQL server
+QUERY_VAR = 'SHOW VARIABLES;'
 QUERY_GLOBAL = 'SHOW GLOBAL STATUS;'
 QUERY_SLAVE = 'SHOW SLAVE STATUS;'
+
+# GLOBAL_VARS can be expanded to contain any
+# results from the 'SHOW VARIABLES;' MySQL query
+GLOBAL_VARS = [
+ 'max_connections',
+ 'innodb_buffer_pool_size']
 
 GLOBAL_STATS = [
  'Bytes_received',
@@ -224,10 +231,12 @@ CHARTS = {
     'threads': {
         'options': [None, 'mysql Threads', 'threads', 'threads', 'mysql.threads', 'line'],
         'lines': [
+            ['var_max_connections', 'max', 'absolute'],
             ['Threads_connected', 'connected', 'absolute'],
             ['Threads_created', 'created', 'incremental'],
             ['Threads_cached', 'cached', 'absolute', -1, 1],
             ['Threads_running', 'running', 'absolute'],
+            ['Max_connections_ratio', 'ratio', 'absolute', 1, 1, True]
         ]},
     'thread_cache_misses': {
         'options': [None, 'mysql Threads Cache Misses', 'misses', 'threads', 'mysql.thread_cache_misses', 'area'],
@@ -300,7 +309,8 @@ CHARTS = {
         'options': [None, 'mysql InnoDB Buffer Pool Bytes', 'MB', 'innodb', 'mysql.innodb_buffer_pool_bytes', 'area'],
         'lines': [
             ['Innodb_buffer_pool_bytes_data', 'data', 'absolute', 1, 1024 * 1024],
-            ['Innodb_buffer_pool_bytes_dirty', 'dirty', 'absolute', -1, 1024 * 1024]
+            ['Innodb_buffer_pool_bytes_dirty', 'dirty', 'absolute', -1, 1024 * 1024],
+            ['Innodb_buffer_pool_utilization', 'ratio', 'absolute', 1, 1, True]
         ]},
     'innodb_buffer_pool_read_ahead': {
         'options': [None, 'mysql InnoDB Buffer Pool Read Ahead', 'operations/s', 'innodb', 'mysql.innodb_buffer_pool_read_ahead', 'area'],
@@ -409,7 +419,10 @@ class Service(MySQLService):
         MySQLService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.queries = dict(global_status=QUERY_GLOBAL, slave_status=QUERY_SLAVE)
+        self.queries = dict(
+            global_vars=QUERY_VAR,
+            global_status=QUERY_GLOBAL,
+            slave_status=QUERY_SLAVE)
 
     def _get_data(self):
 
@@ -420,6 +433,13 @@ class Service(MySQLService):
 
         to_netdata = dict()
 
+        if 'global_vars' in raw_data:
+            global_vars = dict(raw_data['global_vars'][0])
+            for key in GLOBAL_VARS:
+                if key in global_vars:
+                    var_key = 'var_%s' % key
+                    to_netdata[var_key] = global_vars[key]
+
         if 'global_status' in raw_data:
             global_status = dict(raw_data['global_status'][0])
             for key in GLOBAL_STATS:
@@ -427,6 +447,10 @@ class Service(MySQLService):
                     to_netdata[key] = global_status[key]
             if 'Threads_created' in to_netdata and 'Connections' in to_netdata:
                 to_netdata['Thread_cache_misses'] = round(int(to_netdata['Threads_created']) / float(to_netdata['Connections']) * 10000)
+            if 'Innodb_buffer_pool_bytes_data' in to_netdata and 'var_innodb_buffer_pool_size' in to_netdata:
+                to_netdata['Innodb_buffer_pool_utilization'] = (int(to_netdata['Innodb_buffer_pool_bytes_data']) / float(to_netdata['var_innodb_buffer_pool_size']))*100
+            if 'Threads_connected' in to_netdata and 'var_max_connections' in to_netdata:
+                to_netdata['Max_connections_ratio'] = (int(to_netdata['Threads_connected']) / float(to_netdata['var_max_connections']))*100
 
         if 'slave_status' in raw_data:
             if raw_data['slave_status'][0]:
