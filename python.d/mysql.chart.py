@@ -14,28 +14,11 @@ QUERY_VAR = 'SHOW VARIABLES;'
 QUERY_GLOBAL = 'SHOW GLOBAL STATUS;'
 QUERY_SLAVE = 'SHOW SLAVE STATUS;'
 
+# GLOBAL_VARS can be expanded to contain any
+# results from the 'SHOW VARIABLES;' MySQL query
 GLOBAL_VARS = [
  'max_connections',
- # 'back_log',
- # 'binlog_cache_size',
- # 'host_cache_size',
- # 'innodb_buffer_pool_size',
- # 'innodb_log_buffer_size',
- # 'innodb_log_file_size',
- # 'join_buffer_size',
- # 'key_buffer_size',
- # 'max_heap_table_size',
- # 'myisam_sort_buffer_size',
- # 'query_cache_size',
- # 'read_buffer_size',
- # 'read_rnd_buffer_size',
- # 'slow_launch_time',
- # 'sort_buffer_size',
- # 'table_definition_cache',
- # 'table_open_cache',
- # 'thread_cache_size',
- # 'tmp_table_size'
-]
+ 'innodb_buffer_pool_size']
 
 GLOBAL_STATS = [
  'Bytes_received',
@@ -253,6 +236,7 @@ CHARTS = {
             ['Threads_created', 'created', 'incremental'],
             ['Threads_cached', 'cached', 'absolute', -1, 1],
             ['Threads_running', 'running', 'absolute'],
+            ['Max_connections_ratio', 'ratio', 'absolute', 1, 1, True]
         ]},
     'thread_cache_misses': {
         'options': [None, 'mysql Threads Cache Misses', 'misses', 'threads', 'mysql.thread_cache_misses', 'area'],
@@ -325,7 +309,8 @@ CHARTS = {
         'options': [None, 'mysql InnoDB Buffer Pool Bytes', 'MB', 'innodb', 'mysql.innodb_buffer_pool_bytes', 'area'],
         'lines': [
             ['Innodb_buffer_pool_bytes_data', 'data', 'absolute', 1, 1024 * 1024],
-            ['Innodb_buffer_pool_bytes_dirty', 'dirty', 'absolute', -1, 1024 * 1024]
+            ['Innodb_buffer_pool_bytes_dirty', 'dirty', 'absolute', -1, 1024 * 1024],
+            ['Innodb_buffer_pool_utilization', 'ratio', 'absolute', 1, 1, True]
         ]},
     'innodb_buffer_pool_read_ahead': {
         'options': [None, 'mysql InnoDB Buffer Pool Read Ahead', 'operations/s', 'innodb', 'mysql.innodb_buffer_pool_read_ahead', 'area'],
@@ -462,6 +447,10 @@ class Service(MySQLService):
                     to_netdata[key] = global_status[key]
             if 'Threads_created' in to_netdata and 'Connections' in to_netdata:
                 to_netdata['Thread_cache_misses'] = round(int(to_netdata['Threads_created']) / float(to_netdata['Connections']) * 10000)
+            if 'Innodb_buffer_pool_bytes_data' in to_netdata and 'var_innodb_buffer_pool_size' in to_netdata:
+                to_netdata['Innodb_buffer_pool_utilization'] = round(int(to_netdata['Innodb_buffer_pool_bytes_data']) / float(to_netdata['var_innodb_buffer_pool_size']))
+            if 'Connections' in to_netdata and 'var_max_connections' in to_netdata:
+                to_netdata['Max_connections_ratio'] = round(int(to_netdata['Connections']) / float(to_netdata['var_max_connections']))
 
         if 'slave_status' in raw_data:
             if raw_data['slave_status'][0]:

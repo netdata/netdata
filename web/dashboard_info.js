@@ -843,6 +843,9 @@ netdataDashboard.context = {
     },
 
     'mysql.queries': {
+        mainheads: [
+            netdataDashboard.gaugeChart('Queries', '12%', 'Queries', NETDATA.colors[0]),
+        ],
         info: 'The number of statements executed by the server.<ul>' +
         '<li><strong>queries</strong> counts the statements executed within stored SQL programs.</li>' +
         '<li><strong>questions</strong> counts the statements sent to the mysql server by mysql clients.</li>' +
@@ -880,7 +883,43 @@ netdataDashboard.context = {
 
     'mysql.threads': {
         mainheads: [
-            netdataDashboard.gaugeChart('Threads_connected', '12%', '', NETDATA.colors[0])
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="Max_connections_ratio"'
+                    + ' data-append-options="percentage"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="Connections"'
+                    + ' data-units="%"'
+                    + ' data-easypiechart-max-value="100"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[2] + '"'
+                    + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'mysql.innodb_buffer_pool_bytes': {
+        mainheads: [
+            function(os, id) {
+                void(os);
+                return  '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="Innodb_buffer_pool_utilization"'
+                    + ' data-append-options="percentage"'
+                    + ' data-chart-library="easypiechart"'
+                    + ' data-title="InnoDB Buffer Pool Utilization"'
+                    + ' data-units="%"'
+                    + ' data-easypiechart-max-value="100"'
+                    + ' data-width="12%"'
+                    + ' data-before="0"'
+                    + ' data-after="-CHART_DURATION"'
+                    + ' data-points="CHART_DURATION"'
+                    + ' data-colors="' + NETDATA.colors[6] + '"'
+                    + ' role="application"></div>';
+            }
         ]
     },
 
