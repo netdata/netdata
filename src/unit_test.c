@@ -1037,7 +1037,7 @@ int run_test(struct test *test)
     for(c = 0 ; c < max ; c++) {
         calculated_number v = unpack_storage_number(rd->values[c]);
         calculated_number n = test->results[c];
-        int same = (roundl(v * 10000000.0) == roundl(n * 10000000.0))?1:0;
+        int same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
         fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
             test->name, rd->name, c+1,
             (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
@@ -1048,7 +1048,7 @@ int run_test(struct test *test)
         if(rd2) {
             v = unpack_storage_number(rd2->values[c]);
             n = test->results2[c];
-            same = (roundl(v * 10000000.0) == roundl(n * 10000000.0))?1:0;
+            same = (calculated_number_round(v * 10000000.0) == calculated_number_round(n * 10000000.0))?1:0;
             fprintf(stderr, "    %s/%s: checking position %lu (at %lu secs), expecting value " CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", %s\n",
                 test->name, rd2->name, c+1,
                 (rrdset_first_entry_t(st) + c * st->update_every) - time_start,
@@ -1062,8 +1062,7 @@ int run_test(struct test *test)
 
 static int test_variable_renames(void) {
     fprintf(stderr, "Creating chart\n");
-    RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", 1, 1
-                                         , RRDSET_TYPE_LINE);
+    RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
     fprintf(stderr, "Created chart with id '%s', name '%s'\n", st->id, st->name);
 
     fprintf(stderr, "Creating dimension DIM1\n");
