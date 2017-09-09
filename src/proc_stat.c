@@ -31,6 +31,7 @@ struct cpu_chart {
     struct per_core_single_number_file files[PER_CORE_FILES];
 };
 
+static int keep_per_core_fds_open = CONFIG_BOOLEAN_YES;
 
 static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, size_t index) {
     char buf[50 + 1];
@@ -53,17 +54,28 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
 
         ssize_t ret = read(f->fd, buf, 50);
         if(unlikely(ret == -1)) {
+            // cannot read that file
+
             error("Cannot read file '%s'", f->filename);
             close(f->fd);
             f->fd = -1;
             continue;
         }
-        buf[ret] = '\0';
+        else {
+            // successful read
 
-        if(lseek(f->fd, 0, SEEK_SET) == -1) {
-            error("Cannot seek in file '%s'", f->filename);
-            close(f->fd);
-            f->fd = -1;
+            // terminate the buffer
+            buf[ret] = '\0';
+
+            if(unlikely(keep_per_core_fds_open != CONFIG_BOOLEAN_YES)) {
+                close(f->fd);
+                f->fd = -1;
+            }
+            else if(lseek(f->fd, 0, SEEK_SET) == -1) {
+                error("Cannot seek in file '%s'", f->filename);
+                close(f->fd);
+                f->fd = -1;
+            }
         }
 
         files_read++;
@@ -110,15 +122,33 @@ int do_proc_stat(int update_every, usec_t dt) {
     static char *core_throttle_count_filename = NULL, *package_throttle_count_filename = NULL, *scaling_cur_freq_filename = NULL;
 
     if(unlikely(do_cpu == -1)) {
-        do_cpu                    = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", 1);
-        do_cpu_cores              = config_get_boolean("plugin:proc:/proc/stat", "per cpu core utilization", 1);
-        do_interrupts             = config_get_boolean("plugin:proc:/proc/stat", "cpu interrupts", 1);
-        do_context                = config_get_boolean("plugin:proc:/proc/stat", "context switches", 1);
-        do_forks                  = config_get_boolean("plugin:proc:/proc/stat", "processes started", 1);
-        do_processes              = config_get_boolean("plugin:proc:/proc/stat", "processes running", 1);
-        do_core_throttle_count    = config_get_boolean_ondemand("plugin:proc:/proc/stat", "core_throttle_count", CONFIG_BOOLEAN_AUTO);
-        do_package_throttle_count = config_get_boolean_ondemand("plugin:proc:/proc/stat", "package_throttle_count", CONFIG_BOOLEAN_NO);
-        do_scaling_cur_freq       = config_get_boolean_ondemand("plugin:proc:/proc/stat", "scaling_cur_freq", CONFIG_BOOLEAN_NO);
+        do_cpu                    = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", CONFIG_BOOLEAN_YES);
+        do_cpu_cores              = config_get_boolean("plugin:proc:/proc/stat", "per cpu core utilization", CONFIG_BOOLEAN_YES);
+        do_interrupts             = config_get_boolean("plugin:proc:/proc/stat", "cpu interrupts", CONFIG_BOOLEAN_YES);
+        do_context                = config_get_boolean("plugin:proc:/proc/stat", "context switches", CONFIG_BOOLEAN_YES);
+        do_forks                  = config_get_boolean("plugin:proc:/proc/stat", "processes started", CONFIG_BOOLEAN_YES);
+        do_processes              = config_get_boolean("plugin:proc:/proc/stat", "processes running", CONFIG_BOOLEAN_YES);
+
+        // give sane defaults based on the number of processors
+        if(processors > 50) {
+            // the system has too many processors
+            keep_per_core_fds_open = CONFIG_BOOLEAN_NO;
+            do_core_throttle_count = CONFIG_BOOLEAN_NO;
+            do_package_throttle_count = CONFIG_BOOLEAN_NO;
+            do_scaling_cur_freq = CONFIG_BOOLEAN_NO;
+        }
+        else {
+            // the system has a reasonable number of processors
+            keep_per_core_fds_open = CONFIG_BOOLEAN_YES;
+            do_core_throttle_count = CONFIG_BOOLEAN_AUTO;
+            do_package_throttle_count = CONFIG_BOOLEAN_NO;
+            do_scaling_cur_freq = CONFIG_BOOLEAN_NO;
+        }
+
+        keep_per_core_fds_open    = config_get_boolean("plugin:proc:/proc/stat", "keep per core files open", keep_per_core_fds_open);
+        do_core_throttle_count    = config_get_boolean_ondemand("plugin:proc:/proc/stat", "core_throttle_count", do_core_throttle_count);
+        do_package_throttle_count = config_get_boolean_ondemand("plugin:proc:/proc/stat", "package_throttle_count", do_package_throttle_count);
+        do_scaling_cur_freq       = config_get_boolean_ondemand("plugin:proc:/proc/stat", "scaling_cur_freq", do_scaling_cur_freq);
 
         hash_intr = simple_hash("intr");
         hash_ctxt = simple_hash("ctxt");
