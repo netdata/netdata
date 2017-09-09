@@ -213,14 +213,14 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
                         buffer_sprintf(wb, "NETDATA_%s_%s=\"\"      # %s\n", chart, dimension, st->units);
                     else {
                         if(rd->multiplier < 0 || rd->divisor < 0) n = -n;
-                        n = roundl(n);
+                        n = calculated_number_round(n);
                         if(!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) total += n;
                         buffer_sprintf(wb, "NETDATA_%s_%s=\"%0.0Lf\"      # %s\n", chart, dimension, n, st->units);
                     }
                 }
             }
 
-            total = roundl(total);
+            total = calculated_number_round(total);
             buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"%0.0Lf\"      # %s\n", chart, total, st->units);
             rrdset_unlock(st);
         }
@@ -243,7 +243,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
         if(isnan(n) || isinf(n))
             buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"\"      # %s\n", chart, alarm, rc->units);
         else {
-            n = roundl(n);
+            n = calculated_number_round(n);
             buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"%0.0Lf\"      # %s\n", chart, alarm, n, rc->units);
         }
 
@@ -1573,13 +1573,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
             switch(group_method) {
                 case GROUP_MIN:
                     if(unlikely(isnan(group_values[c])) ||
-                            fabsl(value) < fabsl(group_values[c]))
+                            calculated_number_fabs(value) < calculated_number_fabs(group_values[c]))
                         group_values[c] = value;
                     break;
 
                 case GROUP_MAX:
                     if(unlikely(isnan(group_values[c])) ||
-                            fabsl(value) > fabsl(group_values[c]))
+                            calculated_number_fabs(value) > calculated_number_fabs(group_values[c]))
                         group_values[c] = value;
                     break;
 

@@ -445,7 +445,7 @@ static inline void statsd_process_counter(STATSD_METRIC *m, const char *value, c
 
     if(unlikely(m->reset)) statsd_reset_metric(m);
 
-    m->counter.value += roundl((long double)statsd_parse_int(value, 1) / statsd_parse_float(sampling, 1.0));
+    m->counter.value += llrintl((long double)statsd_parse_int(value, 1) / statsd_parse_float(sampling, 1.0));
 
     m->events++;
     m->count++;

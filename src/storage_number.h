@@ -14,6 +14,10 @@ typedef long double collected_number;
 #define COLLECTED_NUMBER_FORMAT "%0.7Lf"
 */
 
+#define calculated_number_llrint(x) llrintl(x)
+#define calculated_number_round(x) roundl(x)
+#define calculated_number_fabs(x) fabsl(x)
+
 typedef uint32_t storage_number;
 #define STORAGE_NUMBER_FORMAT "%u"
 
