@@ -117,8 +117,8 @@ int do_proc_stat(int update_every, usec_t dt) {
         do_forks                  = config_get_boolean("plugin:proc:/proc/stat", "processes started", 1);
         do_processes              = config_get_boolean("plugin:proc:/proc/stat", "processes running", 1);
         do_core_throttle_count    = config_get_boolean_ondemand("plugin:proc:/proc/stat", "core_throttle_count", CONFIG_BOOLEAN_AUTO);
-        do_package_throttle_count = config_get_boolean_ondemand("plugin:proc:/proc/stat", "package_throttle_count", CONFIG_BOOLEAN_AUTO);
-        do_scaling_cur_freq       = config_get_boolean_ondemand("plugin:proc:/proc/stat", "scaling_cur_freq", CONFIG_BOOLEAN_AUTO);
+        do_package_throttle_count = config_get_boolean_ondemand("plugin:proc:/proc/stat", "package_throttle_count", CONFIG_BOOLEAN_NO);
+        do_scaling_cur_freq       = config_get_boolean_ondemand("plugin:proc:/proc/stat", "scaling_cur_freq", CONFIG_BOOLEAN_NO);
 
         hash_intr = simple_hash("intr");
         hash_ctxt = simple_hash("ctxt");
