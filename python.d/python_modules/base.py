@@ -505,6 +505,7 @@ class UrlService(SimpleService):
         self.proxy_user = self.configuration.get('proxy_user')
         self.proxy_password = self.configuration.get('proxy_pass')
         self.proxy_url = self.configuration.get('proxy_url')
+        self.header = self.configuration.get('header')
         self._manager = None
 
     def __make_headers(self, **header_kw):
@@ -512,6 +513,7 @@ class UrlService(SimpleService):
         password = header_kw.get('pass') or self.password
         proxy_user = header_kw.get('proxy_user') or self.proxy_user
         proxy_password = header_kw.get('proxy_pass') or self.proxy_password
+        custom_header = header_kw.get('header') or self.header
         header_params = dict(keep_alive=True)
         proxy_header_params = dict()
         if user and password:
@@ -521,10 +523,13 @@ class UrlService(SimpleService):
             proxy_header_params['proxy_basic_auth'] = '{user}:{password}'.format(user=proxy_user,
                                                                                  password=proxy_password)
         try:
-            return urllib3.make_headers(**header_params), urllib3.make_headers(**proxy_header_params)
+            header, proxy_header = urllib3.make_headers(**header_params), urllib3.make_headers(**proxy_header_params)
         except TypeError as error:
             self.error('build_header() error: {error}'.format(error=error))
             return None, None
+        else:
+            header.update(custom_header or dict())
+            return header, proxy_header
 
     def _build_manager(self, **header_kw):
         header, proxy_header = self.__make_headers(**header_kw)
