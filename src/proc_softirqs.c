@@ -124,77 +124,117 @@ int do_proc_softirqs(int update_every, usec_t dt) {
         irr->used = 1;
     }
 
-    RRDSET *st;
-
     // --------------------------------------------------------------------
 
-    st = rrdset_find_bytype_localhost("system", "softirqs");
-    if(unlikely(!st)) st = rrdset_create_localhost("system", "softirqs", NULL, "softirqs", NULL, "System softirqs"
-                                                   , "softirqs/s", 950, update_every, RRDSET_TYPE_STACKED);
-    else rrdset_next(st);
+    static RRDSET *st_system_softirqs = NULL;
+    if(unlikely(!st_system_softirqs))
+        st_system_softirqs = rrdset_create_localhost(
+                "system"
+                , "softirqs"
+                , NULL
+                , "softirqs"
+                , NULL
+                , "System softirqs"
+                , "softirqs/s"
+                , 950
+                , update_every
+                , RRDSET_TYPE_STACKED
+        );
+    else rrdset_next(st_system_softirqs);
 
     for(l = 0; l < lines ;l++) {
         struct interrupt *irr = irrindex(irrs, l, cpus);
+
         if(unlikely(!irr->used)) continue;
+
         // some interrupt may have changed without changing the total number of lines
         // if the same number of interrupts have been added and removed between two
         // calls of this function.
         if(unlikely(!irr->rd || strncmp(irr->name, irr->rd->name, MAX_INTERRUPT_NAME) != 0)) {
-            irr->rd = rrddim_find(st, irr->id);
+            irr->rd = rrddim_find(st_system_softirqs, irr->id);
+
             if(unlikely(!irr->rd))
-                irr->rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                irr->rd = rrddim_add(st_system_softirqs, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else
-                rrddim_set_name(st, irr->rd, irr->name);
+                rrddim_set_name(st_system_softirqs, irr->rd, irr->name);
 
             // also reset per cpu RRDDIMs to avoid repeating strncmp() in the per core loop
             if(likely(do_per_core)) {
                 int c;
-                for (c = 0; c < cpus ;c++)
-                    irr->cpu[c].rd = NULL;
+                for (c = 0; c < cpus ;c++) irr->cpu[c].rd = NULL;
             }
         }
-        rrddim_set_by_pointer(st, irr->rd, irr->total);
+
+        rrddim_set_by_pointer(st_system_softirqs, irr->rd, irr->total);
     }
-    rrdset_done(st);
+    rrdset_done(st_system_softirqs);
+
+    // --------------------------------------------------------------------
 
     if(do_per_core) {
+        static RRDSET **core_st = NULL;
+        static int old_cpus = 0;
+
+        if(old_cpus < cpus) {
+            core_st = reallocz(core_st, sizeof(RRDSET *) * cpus);
+            memset(&core_st[old_cpus], 0, sizeof(RRDSET *) * (cpus - old_cpus));
+            old_cpus = cpus;
+        }
+
         int c;
 
         for(c = 0; c < cpus ; c++) {
-            char id[50+1];
-            snprintfz(id, 50, "cpu%d_softirqs", c);
+            if(unlikely(!core_st[c])) {
+                // find if everything is just zero
+                unsigned long long core_sum = 0;
 
-            st = rrdset_find_bytype_localhost("cpu", id);
-            if(unlikely(!st)) {
-                // find if everything is zero
-                unsigned long long core_sum = 0 ;
-                for(l = 0; l < lines ;l++) {
+                for (l = 0; l < lines; l++) {
                     struct interrupt *irr = irrindex(irrs, l, cpus);
-                    if(unlikely(!irr->used)) continue;
+                    if (unlikely(!irr->used)) continue;
                     core_sum += irr->cpu[c].value;
                 }
-                if(unlikely(core_sum == 0)) continue; // try next core
 
-                char title[100+1];
+                if (unlikely(core_sum == 0)) continue; // try next core
+
+                char id[50 + 1];
+                snprintfz(id, 50, "cpu%d_softirqs", c);
+
+                char title[100 + 1];
                 snprintfz(title, 100, "CPU%d softirqs", c);
-                st = rrdset_create_localhost("cpu", id, NULL, "softirqs", "cpu.softirqs", title, "softirqs/s", 3000 + c
-                                             , update_every, RRDSET_TYPE_STACKED);
+
+                core_st[c] = rrdset_create_localhost(
+                        "cpu"
+                        , id
+                        , NULL
+                        , "softirqs"
+                        , "cpu.softirqs"
+                        , title
+                        , "softirqs/s"
+                        , 3000 + c
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
             }
-            else rrdset_next(st);
+            else rrdset_next(core_st[c]);
 
             for(l = 0; l < lines ;l++) {
                 struct interrupt *irr = irrindex(irrs, l, cpus);
+
                 if(unlikely(!irr->used)) continue;
+
                 if(unlikely(!irr->cpu[c].rd)) {
-                    irr->cpu[c].rd = rrddim_find(st, irr->id);
+                    irr->cpu[c].rd = rrddim_find(core_st[c], irr->id);
+
                     if(unlikely(!irr->cpu[c].rd))
-                        irr->cpu[c].rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                        irr->cpu[c].rd = rrddim_add(core_st[c], irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     else
-                        rrddim_set_name(st, irr->cpu[c].rd, irr->name);
+                        rrddim_set_name(core_st[c], irr->cpu[c].rd, irr->name);
                 }
-                rrddim_set_by_pointer(st, irr->cpu[c].rd, irr->cpu[c].value);
+
+                rrddim_set_by_pointer(core_st[c], irr->cpu[c].rd, irr->cpu[c].value);
             }
-            rrdset_done(st);
+
+            rrdset_done(core_st[c]);
         }
     }
 
