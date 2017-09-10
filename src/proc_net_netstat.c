@@ -232,151 +232,255 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             parse_line_pair(ff, arl_ipext, h, l);
 
-            RRDSET *st;
-
             // --------------------------------------------------------------------
 
             if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO && (ipext_InOctets || ipext_OutOctets))) {
                 do_bandwidth = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("system.ipv4");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ipv4", NULL, "network", NULL, "IPv4 Bandwidth", "kilobits/s"
-                                                 , 500, update_every, RRDSET_TYPE_AREA);
+                static RRDSET *st_system_ipv4 = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-                    rrddim_add(st, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                if(unlikely(!st_system_ipv4)) {
+                    st_system_ipv4 = rrdset_create_localhost(
+                            "system"
+                            , "ipv4"
+                            , NULL
+                            , "network"
+                            , NULL
+                            , "IPv4 Bandwidth"
+                            , "kilobits/s"
+                            , 500
+                            , update_every
+                            , RRDSET_TYPE_AREA
+                    );
+
+                    rd_in  = rrddim_add(st_system_ipv4, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st_system_ipv4, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_system_ipv4);
 
-                rrddim_set(st, "InOctets", ipext_InOctets);
-                rrddim_set(st, "OutOctets", ipext_OutOctets);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_system_ipv4, rd_in,  ipext_InOctets);
+                rrddim_set_by_pointer(st_system_ipv4, rd_out, ipext_OutOctets);
+
+                rrdset_done(st_system_ipv4);
             }
 
             // --------------------------------------------------------------------
 
             if(do_inerrors == CONFIG_BOOLEAN_YES || (do_inerrors == CONFIG_BOOLEAN_AUTO && (ipext_InNoRoutes || ipext_InTruncatedPkts))) {
                 do_inerrors = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.inerrors");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "inerrors", NULL, "errors", NULL, "IPv4 Input Errors"
-                                                 , "packets/s", 4000, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+                static RRDSET *st_ipv4_inerrors = NULL;
+                static RRDDIM *rd_noroutes = NULL, *rd_truncated = NULL, *rd_checksum = NULL;
 
-                    rrddim_add(st, "InNoRoutes", "noroutes", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "InTruncatedPkts", "truncated", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "InCsumErrors", "checksum", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                if(unlikely(!st_ipv4_inerrors)) {
+                    st_ipv4_inerrors = rrdset_create_localhost(
+                            "ipv4"
+                            , "inerrors"
+                            , NULL
+                            , "errors"
+                            , NULL
+                            , "IPv4 Input Errors"
+                            , "packets/s"
+                            , 4000
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rrdset_flag_set(st_ipv4_inerrors, RRDSET_FLAG_DETAIL);
+
+                    rd_noroutes  = rrddim_add(st_ipv4_inerrors, "InNoRoutes",      "noroutes",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_truncated = rrddim_add(st_ipv4_inerrors, "InTruncatedPkts", "truncated", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_checksum  = rrddim_add(st_ipv4_inerrors, "InCsumErrors",    "checksum",  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_ipv4_inerrors);
 
-                rrddim_set(st, "InNoRoutes", ipext_InNoRoutes);
-                rrddim_set(st, "InTruncatedPkts", ipext_InTruncatedPkts);
-                rrddim_set(st, "InCsumErrors", ipext_InCsumErrors);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_ipv4_inerrors, rd_noroutes,  ipext_InNoRoutes);
+                rrddim_set_by_pointer(st_ipv4_inerrors, rd_truncated, ipext_InTruncatedPkts);
+                rrddim_set_by_pointer(st_ipv4_inerrors, rd_checksum,  ipext_InCsumErrors);
+
+                rrdset_done(st_ipv4_inerrors);
             }
 
             // --------------------------------------------------------------------
 
             if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO && (ipext_InMcastOctets || ipext_OutMcastOctets))) {
                 do_mcast = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.mcast");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "mcast", NULL, "multicast", NULL, "IPv4 Multicast Bandwidth"
-                                                 , "kilobits/s", 9000, update_every, RRDSET_TYPE_AREA);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+                static RRDSET *st_ipv4_mcast = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-                    rrddim_add(st, "InMcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutMcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                if(unlikely(!st_ipv4_mcast)) {
+                    st_ipv4_mcast = rrdset_create_localhost(
+                            "ipv4"
+                            , "mcast"
+                            , NULL
+                            , "multicast"
+                            , NULL
+                            , "IPv4 Multicast Bandwidth"
+                            , "kilobits/s"
+                            , 9000
+                            , update_every
+                            , RRDSET_TYPE_AREA
+                    );
+
+                    rrdset_flag_set(st_ipv4_mcast, RRDSET_FLAG_DETAIL);
+
+                    rd_in  = rrddim_add(st_ipv4_mcast, "InMcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st_ipv4_mcast, "OutMcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_ipv4_mcast);
 
-                rrddim_set(st, "InMcastOctets", ipext_InMcastOctets);
-                rrddim_set(st, "OutMcastOctets", ipext_OutMcastOctets);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_ipv4_mcast, rd_in,  ipext_InMcastOctets);
+                rrddim_set_by_pointer(st_ipv4_mcast, rd_out, ipext_OutMcastOctets);
+
+                rrdset_done(st_ipv4_mcast);
             }
 
             // --------------------------------------------------------------------
 
             if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO && (ipext_InBcastOctets || ipext_OutBcastOctets))) {
                 do_bcast = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.bcast");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "bcast", NULL, "broadcast", NULL, "IPv4 Broadcast Bandwidth"
-                                                 , "kilobits/s", 8000, update_every, RRDSET_TYPE_AREA);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(st, "InBcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutBcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                static RRDSET *st_ipv4_bcast = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+                if(unlikely(!st_ipv4_bcast)) {
+                    st_ipv4_bcast = rrdset_create_localhost(
+                            "ipv4"
+                            , "bcast"
+                            , NULL
+                            , "broadcast"
+                            , NULL
+                            , "IPv4 Broadcast Bandwidth"
+                            , "kilobits/s"
+                            , 8000
+                            , update_every
+                            , RRDSET_TYPE_AREA
+                    );
+
+                    rrdset_flag_set(st_ipv4_bcast, RRDSET_FLAG_DETAIL);
+
+                    rd_in  = rrddim_add(st_ipv4_bcast, "InBcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st_ipv4_bcast, "OutBcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_ipv4_bcast);
 
-                rrddim_set(st, "InBcastOctets", ipext_InBcastOctets);
-                rrddim_set(st, "OutBcastOctets", ipext_OutBcastOctets);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_ipv4_bcast, rd_in,  ipext_InBcastOctets);
+                rrddim_set_by_pointer(st_ipv4_bcast, rd_out, ipext_OutBcastOctets);
+
+                rrdset_done(st_ipv4_bcast);
             }
 
             // --------------------------------------------------------------------
 
             if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO && (ipext_InMcastPkts || ipext_OutMcastPkts))) {
                 do_mcast_p = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.mcastpkts");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "mcastpkts", NULL, "multicast", NULL, "IPv4 Multicast Packets"
-                                                 , "packets/s", 8600, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(st, "InMcastPkts", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutMcastPkts", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                static RRDSET *st_ipv4_mcastpkts = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+                if(unlikely(!st_ipv4_mcastpkts)) {
+                    st_ipv4_mcastpkts = rrdset_create_localhost(
+                            "ipv4"
+                            , "mcastpkts"
+                            , NULL
+                            , "multicast"
+                            , NULL
+                            , "IPv4 Multicast Packets"
+                            , "packets/s"
+                            , 8600
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rrdset_flag_set(st_ipv4_mcastpkts, RRDSET_FLAG_DETAIL);
+
+                    rd_in  = rrddim_add(st_ipv4_mcastpkts, "InMcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st_ipv4_mcastpkts, "OutMcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else rrdset_next(st_ipv4_mcastpkts);
 
-                rrddim_set(st, "InMcastPkts", ipext_InMcastPkts);
-                rrddim_set(st, "OutMcastPkts", ipext_OutMcastPkts);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_ipv4_mcastpkts, rd_in,  ipext_InMcastPkts);
+                rrddim_set_by_pointer(st_ipv4_mcastpkts, rd_out, ipext_OutMcastPkts);
+
+                rrdset_done(st_ipv4_mcastpkts);
             }
 
             // --------------------------------------------------------------------
 
             if(do_bcast_p == CONFIG_BOOLEAN_YES || (do_bcast_p == CONFIG_BOOLEAN_AUTO && (ipext_InBcastPkts || ipext_OutBcastPkts))) {
                 do_bcast_p = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.bcastpkts");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "bcastpkts", NULL, "broadcast", NULL, "IPv4 Broadcast Packets"
-                                                 , "packets/s", 8500, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(st, "InBcastPkts", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OutBcastPkts", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                static RRDSET *st_ipv4_bcastpkts = NULL;
+                static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+                if(unlikely(!st_ipv4_bcastpkts)) {
+                    st_ipv4_bcastpkts = rrdset_create_localhost(
+                            "ipv4"
+                            , "bcastpkts"
+                            , NULL
+                            , "broadcast"
+                            , NULL
+                            , "IPv4 Broadcast Packets"
+                            , "packets/s"
+                            , 8500
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rrdset_flag_set(st_ipv4_bcastpkts, RRDSET_FLAG_DETAIL);
+
+                    rd_in  = rrddim_add(st_ipv4_bcastpkts, "InBcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_out = rrddim_add(st_ipv4_bcastpkts, "OutBcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_ipv4_bcastpkts);
 
-                rrddim_set(st, "InBcastPkts", ipext_InBcastPkts);
-                rrddim_set(st, "OutBcastPkts", ipext_OutBcastPkts);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_ipv4_bcastpkts, rd_in,  ipext_InBcastPkts);
+                rrddim_set_by_pointer(st_ipv4_bcastpkts, rd_out, ipext_OutBcastPkts);
+
+                rrdset_done(st_ipv4_bcastpkts);
             }
 
             // --------------------------------------------------------------------
 
             if(do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO && (ipext_InCEPkts || ipext_InECT0Pkts || ipext_InECT1Pkts || ipext_InNoECTPkts))) {
                 do_ecn = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.ecnpkts");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics"
-                                                 , "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
-                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "InECT0Pkts", "ECTP0", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "InECT1Pkts", "ECTP1", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                static RRDSET *st_ecnpkts = NULL;
+                static RRDDIM *rd_cep = NULL, *rd_noectp = NULL, *rd_ectp0 = NULL, *rd_ectp1 = NULL;
+
+                if(unlikely(!st_ecnpkts)) {
+                    st_ecnpkts = rrdset_create_localhost(
+                            "ipv4"
+                            , "ecnpkts"
+                            , NULL
+                            , "ecn"
+                            , NULL
+                            , "IPv4 ECN Statistics"
+                            , "packets/s"
+                            , 8700
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rrdset_flag_set(st_ecnpkts, RRDSET_FLAG_DETAIL);
+
+                    rd_cep    = rrddim_add(st_ecnpkts, "InCEPkts",    "CEP",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_noectp = rrddim_add(st_ecnpkts, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_ectp0  = rrddim_add(st_ecnpkts, "InECT0Pkts",  "ECTP0",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_ectp1  = rrddim_add(st_ecnpkts, "InECT1Pkts",  "ECTP1",   1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else rrdset_next(st_ecnpkts);
 
-                rrddim_set(st, "InCEPkts", ipext_InCEPkts);
-                rrddim_set(st, "InNoECTPkts", ipext_InNoECTPkts);
-                rrddim_set(st, "InECT0Pkts", ipext_InECT0Pkts);
-                rrddim_set(st, "InECT1Pkts", ipext_InECT1Pkts);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_ecnpkts, rd_cep,    ipext_InCEPkts);
+                rrddim_set_by_pointer(st_ecnpkts, rd_noectp, ipext_InNoECTPkts);
+                rrddim_set_by_pointer(st_ecnpkts, rd_ectp0,  ipext_InECT0Pkts);
+                rrddim_set_by_pointer(st_ecnpkts, rd_ectp1,  ipext_InECT1Pkts);
+
+                rrdset_done(st_ecnpkts);
             }
         }
         else if(unlikely(hash == hash_tcpext && strcmp(key, "TcpExt") == 0)) {
@@ -390,117 +494,192 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             parse_line_pair(ff, arl_tcpext, h, l);
 
-            RRDSET *st;
-
             // --------------------------------------------------------------------
 
             if(do_tcpext_memory == CONFIG_BOOLEAN_YES || (do_tcpext_memory == CONFIG_BOOLEAN_AUTO && (tcpext_TCPMemoryPressures))) {
                 do_tcpext_memory = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.tcpmemorypressures");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "tcpmemorypressures", NULL, "tcp", NULL, "TCP Memory Pressures"
-                                                 , "events/s", 3000, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPMemoryPressures",   "pressures",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                static RRDSET *st_tcpmemorypressures = NULL;
+                static RRDDIM *rd_pressures = NULL;
+
+                if(unlikely(!st_tcpmemorypressures)) {
+                    st_tcpmemorypressures = rrdset_create_localhost(
+                            "ipv4"
+                            , "tcpmemorypressures"
+                            , NULL
+                            , "tcp"
+                            , NULL
+                            , "TCP Memory Pressures"
+                            , "events/s"
+                            , 3000
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rd_pressures = rrddim_add(st_tcpmemorypressures, "TCPMemoryPressures",   "pressures",  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_tcpmemorypressures);
 
-                rrddim_set(st, "TCPMemoryPressures", tcpext_TCPMemoryPressures);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_tcpmemorypressures, rd_pressures, tcpext_TCPMemoryPressures);
+
+                rrdset_done(st_tcpmemorypressures);
             }
 
             // --------------------------------------------------------------------
 
             if(do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO && (tcpext_TCPAbortOnData || tcpext_TCPAbortOnClose || tcpext_TCPAbortOnMemory || tcpext_TCPAbortOnTimeout || tcpext_TCPAbortOnLinger || tcpext_TCPAbortFailed))) {
                 do_tcpext_connaborts = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.tcpconnaborts");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "tcpconnaborts", NULL, "tcp", NULL, "TCP Connection Aborts"
-                                                 , "connections/s", 3010, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPAbortOnData",    "baddata",     1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnClose",   "userclosed",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnMemory",  "nomemory",    1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortOnLinger",  "linger",      1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPAbortFailed",    "failed",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                static RRDSET *st_tcpconnaborts = NULL;
+                static RRDDIM *rd_baddata = NULL, *rd_userclosed = NULL, *rd_nomemory = NULL, *rd_timeout = NULL, *rd_linger = NULL, *rd_failed = NULL;
+
+                if(unlikely(!st_tcpconnaborts)) {
+                    st_tcpconnaborts = rrdset_create_localhost(
+                            "ipv4"
+                            , "tcpconnaborts"
+                            , NULL
+                            , "tcp"
+                            , NULL
+                            , "TCP Connection Aborts"
+                            , "connections/s"
+                            , 3010
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rd_baddata    = rrddim_add(st_tcpconnaborts, "TCPAbortOnData",    "baddata",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_userclosed = rrddim_add(st_tcpconnaborts, "TCPAbortOnClose",   "userclosed",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_nomemory   = rrddim_add(st_tcpconnaborts, "TCPAbortOnMemory",  "nomemory",    1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_timeout    = rrddim_add(st_tcpconnaborts, "TCPAbortOnTimeout", "timeout",     1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_linger     = rrddim_add(st_tcpconnaborts, "TCPAbortOnLinger",  "linger",      1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_failed     = rrddim_add(st_tcpconnaborts, "TCPAbortFailed",    "failed",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_tcpconnaborts);
 
-                rrddim_set(st, "TCPAbortOnData",    tcpext_TCPAbortOnData);
-                rrddim_set(st, "TCPAbortOnClose",   tcpext_TCPAbortOnClose);
-                rrddim_set(st, "TCPAbortOnMemory",  tcpext_TCPAbortOnMemory);
-                rrddim_set(st, "TCPAbortOnTimeout", tcpext_TCPAbortOnTimeout);
-                rrddim_set(st, "TCPAbortOnLinger",  tcpext_TCPAbortOnLinger);
-                rrddim_set(st, "TCPAbortFailed",    tcpext_TCPAbortFailed);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_tcpconnaborts, rd_baddata,    tcpext_TCPAbortOnData);
+                rrddim_set_by_pointer(st_tcpconnaborts, rd_userclosed, tcpext_TCPAbortOnClose);
+                rrddim_set_by_pointer(st_tcpconnaborts, rd_nomemory,   tcpext_TCPAbortOnMemory);
+                rrddim_set_by_pointer(st_tcpconnaborts, rd_timeout,    tcpext_TCPAbortOnTimeout);
+                rrddim_set_by_pointer(st_tcpconnaborts, rd_linger,     tcpext_TCPAbortOnLinger);
+                rrddim_set_by_pointer(st_tcpconnaborts, rd_failed,     tcpext_TCPAbortFailed);
+
+                rrdset_done(st_tcpconnaborts);
             }
+
             // --------------------------------------------------------------------
 
             if(do_tcpext_reorder == CONFIG_BOOLEAN_YES || (do_tcpext_reorder == CONFIG_BOOLEAN_AUTO && (tcpext_TCPRenoReorder || tcpext_TCPFACKReorder || tcpext_TCPSACKReorder || tcpext_TCPTSReorder))) {
                 do_tcpext_reorder = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.tcpreorders");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "tcpreorders", NULL, "tcp", NULL
-                                                 , "TCP Reordered Packets by Detection Method", "packets/s", 3020
-                                                 , update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPTSReorder",   "timestamp",   1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPSACKReorder", "sack",        1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPFACKReorder", "fack",        1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPRenoReorder", "reno",        1, 1, RRD_ALGORITHM_INCREMENTAL);
+                static RRDSET *st_tcpreorders = NULL;
+                static RRDDIM *rd_timestamp = NULL, *rd_sack = NULL, *rd_fack = NULL, *rd_reno = NULL;
+
+                if(unlikely(!st_tcpreorders)) {
+                    st_tcpreorders = rrdset_create_localhost(
+                            "ipv4"
+                            , "tcpreorders"
+                            , NULL
+                            , "tcp"
+                            , NULL
+                            , "TCP Reordered Packets by Detection Method"
+                            , "packets/s"
+                            , 3020
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rd_timestamp = rrddim_add(st_tcpreorders, "TCPTSReorder",   "timestamp",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_sack      = rrddim_add(st_tcpreorders, "TCPSACKReorder", "sack",        1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_fack      = rrddim_add(st_tcpreorders, "TCPFACKReorder", "fack",        1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_reno      = rrddim_add(st_tcpreorders, "TCPRenoReorder", "reno",        1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_tcpreorders);
 
-                rrddim_set(st, "TCPTSReorder",   tcpext_TCPTSReorder);
-                rrddim_set(st, "TCPSACKReorder", tcpext_TCPSACKReorder);
-                rrddim_set(st, "TCPFACKReorder", tcpext_TCPFACKReorder);
-                rrddim_set(st, "TCPRenoReorder", tcpext_TCPRenoReorder);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_tcpreorders, rd_timestamp, tcpext_TCPTSReorder);
+                rrddim_set_by_pointer(st_tcpreorders, rd_sack,      tcpext_TCPSACKReorder);
+                rrddim_set_by_pointer(st_tcpreorders, rd_fack,      tcpext_TCPFACKReorder);
+                rrddim_set_by_pointer(st_tcpreorders, rd_reno,      tcpext_TCPRenoReorder);
+
+                rrdset_done(st_tcpreorders);
             }
 
             // --------------------------------------------------------------------
 
             if(do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO && (tcpext_TCPOFOQueue || tcpext_TCPOFODrop || tcpext_TCPOFOMerge))) {
                 do_tcpext_ofo = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.tcpofo");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "tcpofo", NULL, "tcp", NULL, "TCP Out-Of-Order Queue"
-                                                 , "packets/s", 3050, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPOFODrop",  "dropped", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "TCPOFOMerge", "merged",   1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "OfoPruned",   "pruned",  -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                static RRDSET *st_ipv4_tcpofo = NULL;
+                static RRDDIM *rd_inqueue = NULL, *rd_dropped = NULL, *rd_merged = NULL, *rd_pruned = NULL;
+
+                if(unlikely(!st_ipv4_tcpofo)) {
+
+                    st_ipv4_tcpofo = rrdset_create_localhost(
+                            "ipv4"
+                            , "tcpofo"
+                            , NULL
+                            , "tcp"
+                            , NULL
+                            , "TCP Out-Of-Order Queue"
+                            , "packets/s"
+                            , 3050
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rd_inqueue = rrddim_add(st_ipv4_tcpofo, "TCPOFOQueue", "inqueue",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_dropped = rrddim_add(st_ipv4_tcpofo, "TCPOFODrop",  "dropped", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_merged  = rrddim_add(st_ipv4_tcpofo, "TCPOFOMerge", "merged",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pruned  = rrddim_add(st_ipv4_tcpofo, "OfoPruned",   "pruned",  -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_ipv4_tcpofo);
 
-                rrddim_set(st, "TCPOFOQueue",   tcpext_TCPOFOQueue);
-                rrddim_set(st, "TCPOFODrop",    tcpext_TCPOFODrop);
-                rrddim_set(st, "TCPOFOMerge",   tcpext_TCPOFOMerge);
-                rrddim_set(st, "OfoPruned",     tcpext_OfoPruned);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_ipv4_tcpofo, rd_inqueue, tcpext_TCPOFOQueue);
+                rrddim_set_by_pointer(st_ipv4_tcpofo, rd_dropped, tcpext_TCPOFODrop);
+                rrddim_set_by_pointer(st_ipv4_tcpofo, rd_merged,  tcpext_TCPOFOMerge);
+                rrddim_set_by_pointer(st_ipv4_tcpofo, rd_pruned,  tcpext_OfoPruned);
+
+                rrdset_done(st_ipv4_tcpofo);
             }
 
             // --------------------------------------------------------------------
 
             if(do_tcpext_syscookies == CONFIG_BOOLEAN_YES || (do_tcpext_syscookies == CONFIG_BOOLEAN_AUTO && (tcpext_SyncookiesSent || tcpext_SyncookiesRecv || tcpext_SyncookiesFailed))) {
                 do_tcpext_syscookies = CONFIG_BOOLEAN_YES;
-                st = rrdset_find_localhost("ipv4.tcpsyncookies");
-                if(unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "tcpsyncookies", NULL, "tcp", NULL, "TCP SYN Cookies"
-                                                 , "packets/s", 3100, update_every, RRDSET_TYPE_LINE);
 
-                    rrddim_add(st, "SyncookiesRecv",   "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                static RRDSET *st_syncookies = NULL;
+                static RRDDIM *rd_received = NULL, *rd_sent = NULL, *rd_failed = NULL;
+
+                if(unlikely(!st_syncookies)) {
+
+                    st_syncookies = rrdset_create_localhost(
+                            "ipv4"
+                            , "tcpsyncookies"
+                            , NULL
+                            , "tcp"
+                            , NULL
+                            , "TCP SYN Cookies"
+                            , "packets/s"
+                            , 3100
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
+                    rd_received = rrddim_add(st_syncookies, "SyncookiesRecv",   "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_sent     = rrddim_add(st_syncookies, "SyncookiesSent",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_failed   = rrddim_add(st_syncookies, "SyncookiesFailed", "failed",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
+                else
+                    rrdset_next(st_syncookies);
 
-                rrddim_set(st, "SyncookiesRecv",   tcpext_SyncookiesRecv);
-                rrddim_set(st, "SyncookiesSent",   tcpext_SyncookiesSent);
-                rrddim_set(st, "SyncookiesFailed", tcpext_SyncookiesFailed);
-                rrdset_done(st);
+                rrddim_set_by_pointer(st_syncookies, rd_received, tcpext_SyncookiesRecv);
+                rrddim_set_by_pointer(st_syncookies, rd_sent,     tcpext_SyncookiesSent);
+                rrddim_set_by_pointer(st_syncookies, rd_failed,   tcpext_SyncookiesFailed);
+
+                rrdset_done(st_syncookies);
             }
 
         }

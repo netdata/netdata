@@ -18,10 +18,10 @@ struct interrupt {
 
 // since each interrupt is variable in size
 // we use this to calculate its record size
-#define recordsize(cpus) (sizeof(struct interrupt) + (cpus * sizeof(struct cpu_interrupt)))
+#define recordsize(cpus) (sizeof(struct interrupt) + ((cpus) * sizeof(struct cpu_interrupt)))
 
 // given a base, get a pointer to each record
-#define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[line * recordsize(cpus)])
+#define irrindex(base, line, cpus) ((struct interrupt *)&((char *)(base))[(line) * recordsize(cpus)])
 
 static inline struct interrupt *get_interrupts_array(size_t lines, int cpus) {
     static struct interrupt *irrs = NULL;
@@ -142,68 +142,106 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         irr->used = 1;
     }
 
-    RRDSET *st;
-
     // --------------------------------------------------------------------
 
-    st = rrdset_find_bytype_localhost("system", "interrupts");
-    if(unlikely(!st)) st = rrdset_create_localhost("system", "interrupts", NULL, "interrupts", NULL, "System interrupts"
-                                                   , "interrupts/s", 1000, update_every, RRDSET_TYPE_STACKED);
-    else rrdset_next(st);
+    static RRDSET *st_system_interrupts = NULL;
+    if(unlikely(!st_system_interrupts))
+        st_system_interrupts = rrdset_create_localhost(
+                "system"
+                , "interrupts"
+                , NULL
+                , "interrupts"
+                , NULL
+                , "System interrupts"
+                , "interrupts/s"
+                , 1000
+                , update_every
+                , RRDSET_TYPE_STACKED
+        );
+    else
+        rrdset_next(st_system_interrupts);
 
     for(l = 0; l < lines ;l++) {
         struct interrupt *irr = irrindex(irrs, l, cpus);
         if(unlikely(!irr->used)) continue;
+
         // some interrupt may have changed without changing the total number of lines
         // if the same number of interrupts have been added and removed between two
         // calls of this function.
         if(unlikely(!irr->rd || strncmp(irr->rd->name, irr->name, MAX_INTERRUPT_NAME) != 0)) {
-            irr->rd = rrddim_find(st, irr->id);
+            irr->rd = rrddim_find(st_system_interrupts, irr->id);
+
             if(unlikely(!irr->rd))
-                irr->rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                irr->rd = rrddim_add(st_system_interrupts, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             else
-                rrddim_set_name(st, irr->rd, irr->name);
+                rrddim_set_name(st_system_interrupts, irr->rd, irr->name);
 
             // also reset per cpu RRDDIMs to avoid repeating strncmp() in the per core loop
             if(likely(do_per_core)) {
                 int c;
-                for (c = 0; c < cpus ;c++)
-                    irr->cpu[c].rd = NULL;
+                for (c = 0; c < cpus ;c++) irr->cpu[c].rd = NULL;
             }
         }
-        rrddim_set_by_pointer(st, irr->rd, irr->total);
+
+        rrddim_set_by_pointer(st_system_interrupts, irr->rd, irr->total);
     }
-    rrdset_done(st);
+
+    rrdset_done(st_system_interrupts);
+
+    // --------------------------------------------------------------------
 
     if(likely(do_per_core)) {
+        static RRDSET **core_st = NULL;
+        static int old_cpus = 0;
+
+        if(old_cpus < cpus) {
+            core_st = reallocz(core_st, sizeof(RRDSET *) * cpus);
+            memset(&core_st[old_cpus], 0, sizeof(RRDSET *) * (cpus - old_cpus));
+            old_cpus = cpus;
+        }
+
         int c;
 
         for(c = 0; c < cpus ;c++) {
-            char id[50+1];
-            snprintfz(id, 50, "cpu%d_interrupts", c);
+            if(unlikely(!core_st[c])) {
+                char id[50+1];
+                snprintfz(id, 50, "cpu%d_interrupts", c);
 
-            st = rrdset_find_bytype_localhost("cpu", id);
-            if(unlikely(!st)) {
                 char title[100+1];
                 snprintfz(title, 100, "CPU%d Interrupts", c);
-                st = rrdset_create_localhost("cpu", id, NULL, "interrupts", "cpu.interrupts", title, "interrupts/s",
-                        1100 + c, update_every, RRDSET_TYPE_STACKED);
+                core_st[c] = rrdset_create_localhost(
+                        "cpu"
+                        , id
+                        , NULL
+                        , "interrupts"
+                        , "cpu.interrupts"
+                        , title
+                        , "interrupts/s"
+                        , 1100 + c
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
             }
-            else rrdset_next(st);
+            else rrdset_next(core_st[c]);
 
             for(l = 0; l < lines ;l++) {
                 struct interrupt *irr = irrindex(irrs, l, cpus);
+
                 if(unlikely(!irr->used)) continue;
+
                 if(unlikely(!irr->cpu[c].rd)) {
-                    irr->cpu[c].rd = rrddim_find(st, irr->id);
+                    irr->cpu[c].rd = rrddim_find(core_st[c], irr->id);
+
                     if(unlikely(!irr->cpu[c].rd))
-                        irr->cpu[c].rd = rrddim_add(st, irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                        irr->cpu[c].rd = rrddim_add(core_st[c], irr->id, irr->name, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     else
-                        rrddim_set_name(st, irr->cpu[c].rd, irr->name);
+                        rrddim_set_name(core_st[c], irr->cpu[c].rd, irr->name);
                 }
-                rrddim_set_by_pointer(st, irr->cpu[c].rd, irr->cpu[c].value);
+
+                rrddim_set_by_pointer(core_st[c], irr->cpu[c].rd, irr->cpu[c].value);
             }
-            rrdset_done(st);
+
+            rrdset_done(core_st[c]);
         }
     }
 
