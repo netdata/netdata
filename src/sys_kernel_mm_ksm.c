@@ -85,7 +85,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     offered = pages_sharing + pages_shared + pages_unshared + pages_volatile;
     saved = pages_sharing - pages_shared;
 
-    if(!offered || !pages_to_scan) return 0;
+    if(unlikely(!offered || !pages_to_scan)) return 0;
 
     // --------------------------------------------------------------------
 

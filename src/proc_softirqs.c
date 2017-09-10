@@ -140,7 +140,8 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 , update_every
                 , RRDSET_TYPE_STACKED
         );
-    else rrdset_next(st_system_softirqs);
+    else
+        rrdset_next(st_system_softirqs);
 
     for(l = 0; l < lines ;l++) {
         struct interrupt *irr = irrindex(irrs, l, cpus);
@@ -167,6 +168,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
 
         rrddim_set_by_pointer(st_system_softirqs, irr->rd, irr->total);
     }
+
     rrdset_done(st_system_softirqs);
 
     // --------------------------------------------------------------------
@@ -215,7 +217,8 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                         , RRDSET_TYPE_STACKED
                 );
             }
-            else rrdset_next(core_st[c]);
+            else
+                rrdset_next(core_st[c]);
 
             for(l = 0; l < lines ;l++) {
                 struct interrupt *irr = irrindex(irrs, l, cpus);

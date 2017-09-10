@@ -278,7 +278,18 @@ int do_proc_stat(int update_every, usec_t dt) {
                         }
                     }
 
-                    cpu_chart->st = rrdset_create_localhost(type, id, NULL, family, context, title, "percentage", priority, update_every, RRDSET_TYPE_STACKED);
+                    cpu_chart->st = rrdset_create_localhost(
+                            type
+                            , id
+                            , NULL
+                            , family
+                            , context
+                            , title
+                            , "percentage"
+                            , priority
+                            , update_every
+                            , RRDSET_TYPE_STACKED
+                    );
 
                     long multiplier = 1;
                     long divisor = 1; // sysconf(_SC_CLK_TCK);
@@ -317,8 +328,19 @@ int do_proc_stat(int update_every, usec_t dt) {
                 unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
 
                 if(unlikely(!st_intr)) {
-                    st_intr = rrdset_create_localhost("system", "intr", NULL, "interrupts", NULL, "CPU Interrupts"
-                                                 , "interrupts/s", 900, update_every, RRDSET_TYPE_LINE);
+                    st_intr = rrdset_create_localhost(
+                            "system"
+                            , "intr"
+                            , NULL
+                            , "interrupts"
+                            , NULL
+                            , "CPU Interrupts"
+                            , "interrupts/s"
+                            , 900
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+
                     rrdset_flag_set(st_intr, RRDSET_FLAG_DETAIL);
 
                     rd_interrupts = rrddim_add(st_intr, "interrupts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -336,8 +358,18 @@ int do_proc_stat(int update_every, usec_t dt) {
                 unsigned long long value = str2ull(procfile_lineword(ff, l, 1));
 
                 if(unlikely(!st_ctxt)) {
-                    st_ctxt = rrdset_create_localhost("system", "ctxt", NULL, "processes", NULL, "CPU Context Switches"
-                                                 , "context switches/s", 800, update_every, RRDSET_TYPE_LINE);
+                    st_ctxt = rrdset_create_localhost(
+                            "system"
+                            , "ctxt"
+                            , NULL
+                            , "processes"
+                            , NULL
+                            , "CPU Context Switches"
+                            , "context switches/s"
+                            , 800
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
 
                     rd_switches = rrddim_add(st_ctxt, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
@@ -365,8 +397,18 @@ int do_proc_stat(int update_every, usec_t dt) {
         static RRDDIM *rd_started = NULL;
 
         if(unlikely(!st_forks)) {
-            st_forks = rrdset_create_localhost("system", "forks", NULL, "processes", NULL, "Started Processes", "processes/s"
-                                         , 700, update_every, RRDSET_TYPE_LINE);
+            st_forks = rrdset_create_localhost(
+                    "system"
+                    , "forks"
+                    , NULL
+                    , "processes"
+                    , NULL
+                    , "Started Processes"
+                    , "processes/s"
+                    , 700
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
             rrdset_flag_set(st_forks, RRDSET_FLAG_DETAIL);
 
             rd_started = rrddim_add(st_forks, "started", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -385,8 +427,18 @@ int do_proc_stat(int update_every, usec_t dt) {
         static RRDDIM *rd_blocked = NULL;
 
         if(unlikely(!st_processes)) {
-            st_processes = rrdset_create_localhost("system", "processes", NULL, "processes", NULL, "System Processes", "processes"
-                                         , 600, update_every, RRDSET_TYPE_LINE);
+            st_processes = rrdset_create_localhost(
+                    "system"
+                    , "processes"
+                    , NULL
+                    , "processes"
+                    , NULL
+                    , "System Processes"
+                    , "processes"
+                    , 600
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
 
             rd_running = rrddim_add(st_processes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_blocked = rrddim_add(st_processes, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);

@@ -3,7 +3,6 @@
 int do_proc_uptime(int update_every, usec_t dt) {
     (void)dt;
 
-    static RRDSET *st = NULL;
     collected_number uptime = 0;
 
 #ifdef CLOCK_BOOTTIME_IS_AVAILABLE
@@ -38,17 +37,31 @@ int do_proc_uptime(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(unlikely(!st))
-        st = rrdset_find_localhost("system.uptime");
+    static RRDSET *st = NULL;
+    static RRDDIM *rd = NULL;
 
     if(unlikely(!st)) {
-        st = rrdset_create_localhost("system", "uptime", NULL, "uptime", NULL, "System Uptime", "seconds", 1000
-                                     , update_every, RRDSET_TYPE_LINE);
-        rrddim_add(st, "uptime", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-    }
-    else rrdset_next(st);
 
-    rrddim_set(st, "uptime", uptime);
+        st = rrdset_create_localhost(
+                "system"
+                , "uptime"
+                , NULL
+                , "uptime"
+                , NULL
+                , "System Uptime"
+                , "seconds"
+                , 1000
+                , update_every
+                , RRDSET_TYPE_LINE
+        );
+
+        rd = rrddim_add(st, "uptime", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+    }
+    else
+        rrdset_next(st);
+
+    rrddim_set_by_pointer(st, rd, uptime);
+
     rrdset_done(st);
 
     return 0;
