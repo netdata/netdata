@@ -38,20 +38,31 @@ class Service(SimpleService):
         data = {}
 
         if self.accurate_exists:
-            elapsed = time.time() - self.timetable['last']
-
             accurate_ok = True
 
             for name, paths in self.assignment.items():
                 last = self.accurate_last[name]
-                current = 0
+
+                current = {}
+                deltas = {}
+                ticks_since_last = 0
+
                 for line in open(paths['accurate'], 'r'):
                     line = list(map(int, line.split()))
-                    current += (line[0] * line[1]) / 100
-                delta = current - last
-                data[name] = delta
+                    current[line[0]] = line[1]
+                    ticks = line[1] - last.get(line[0], 0)
+                    ticks_since_last += ticks
+                    deltas[line[0]] = line[1] - last.get(line[0], 0)
+
+                avg_freq = 0
+                if ticks_since_last != 0:
+                    for frequency, ticks in deltas.items():
+                        avg_freq += frequency * ticks
+                    avg_freq /= ticks_since_last
+
+                data[name] = avg_freq
                 self.accurate_last[name] = current
-                if delta == 0 or abs(delta) > 1e7:
+                if avg_freq == 0 or ticks_since_last == 0:
                     # Delta is either too large or nonexistent, fall back to
                     # less accurate reading. This can happen if we switch
                     # to/from the 'schedutil' governor, which doesn't report
@@ -81,7 +92,7 @@ class Service(SimpleService):
             if cpu not in self.assignment:
                 self.assignment[cpu] = {}
             self.assignment[cpu]['accurate'] = path
-            self.accurate_last[cpu] = 0
+            self.accurate_last[cpu] = {}
 
         if len(self.assignment) == 0:
             self.accurate_exists = False
