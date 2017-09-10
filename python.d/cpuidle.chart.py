@@ -26,6 +26,7 @@ class Service(SimpleService):
         self.definitions = {}
         self._orig_name = ""
         self.assignment = {}
+        self.last_schedstat = None
 
     def __gettid(self):
         # This is horrendous. We need the *thread id* (not the *process id*),
@@ -42,13 +43,13 @@ class Service(SimpleService):
         tid = syscall(syscalls[platform.machine()])
         return tid
 
-    def __wake_cpus(self):
+    def __wake_cpus(self, cpus):
         # Requires Python 3.3+. This will "tickle" each CPU to force it to
         # update its idle counters.
         if hasattr(os, 'sched_setaffinity'):
             pid = self.__gettid()
             save_affinity = os.sched_getaffinity(pid)
-            for idx in range(0, len(self.assignment)):
+            for idx in cpus:
                 os.sched_setaffinity(pid, [idx])
                 os.sched_getaffinity(pid)
             os.sched_setaffinity(pid, save_affinity)
@@ -67,13 +68,26 @@ class Service(SimpleService):
     def _get_data(self):
         results = {}
 
-        # This line is critical for the stats to update. If we don't "tickle"
-        # all the CPUs, then all the counters stop counting.
-        self.__wake_cpus()
-
         # Use the kernel scheduler stats to determine how much time was spent
         # in C0 (active).
         schedstat = self.__read_schedstat()
+
+        # Determine if any of the CPUs are idle. If they are, then we need to
+        # tickle them in order to update their C-state residency statistics.
+        if self.last_schedstat is None:
+            needs_tickle = list(self.assignment.keys())
+        else:
+            needs_tickle = []
+            for cpu, active_time in self.last_schedstat.items():
+                delta = schedstat[cpu] - active_time
+                if delta < 1:
+                    needs_tickle.append(cpu)
+        self.last_schedstat = schedstat
+
+        if needs_tickle:
+            # This line is critical for the stats to update. If we don't "tickle"
+            # idle CPUs, then the counters for those CPUs stop counting.
+            self.__wake_cpus([int(cpu[3:]) for cpu in needs_tickle])
 
         for cpu, metrics in self.assignment.items():
             update_time = schedstat[cpu]
