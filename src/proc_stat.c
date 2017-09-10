@@ -47,9 +47,10 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
 
         if(unlikely(f->fd == -1)) {
             f->fd = open(f->filename, O_RDONLY);
-            if (unlikely(f->fd == -1))
+            if (unlikely(f->fd == -1)) {
                 error("Cannot open file '%s'", f->filename);
                 continue;
+            }
         }
 
         ssize_t ret = read(f->fd, buf, 50);
