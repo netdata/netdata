@@ -17,15 +17,28 @@ int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt) {
 
     unsigned long long entropy = str2ull(procfile_lineword(ff, 0, 0));
 
-    RRDSET *st = rrdset_find_bytype_localhost("system", "entropy");
+    static RRDSET *st = NULL;
+    static RRDDIM *rd = NULL;
+
     if(unlikely(!st)) {
-        st = rrdset_create_localhost("system", "entropy", NULL, "entropy", NULL, "Available Entropy", "entropy", 1000
-                                     , update_every, RRDSET_TYPE_LINE);
-        rrddim_add(st, "entropy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        st = rrdset_create_localhost(
+                "system"
+                , "entropy"
+                , NULL
+                , "entropy"
+                , NULL
+                , "Available Entropy"
+                , "entropy"
+                , 1000
+                , update_every
+                , RRDSET_TYPE_LINE
+        );
+
+        rd = rrddim_add(st, "entropy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
     else rrdset_next(st);
 
-    rrddim_set(st, "entropy", entropy);
+    rrddim_set_by_pointer(st, rd, entropy);
     rrdset_done(st);
 
     return 0;

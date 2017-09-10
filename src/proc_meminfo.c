@@ -132,54 +132,79 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                 procfile_lineword(ff, l, 1)))) break;
     }
 
-    RRDSET *st;
-
     // --------------------------------------------------------------------
 
     // http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
     unsigned long long MemUsed = MemTotal - MemFree - Cached - Buffers;
 
     if(do_ram) {
-        st = rrdset_find_localhost("system.ram");
-        if(!st) {
-            st = rrdset_create_localhost("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200, update_every
-                                         , RRDSET_TYPE_STACKED);
+        static RRDSET *st_system_ram = NULL;
+        static RRDDIM *rd_free = NULL, *rd_used = NULL, *rd_cached = NULL, *rd_buffers = NULL;
 
-            rrddim_add(st, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "cached",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "buffers", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        if(unlikely(!st_system_ram)) {
+            st_system_ram = rrdset_create_localhost(
+                    "system"
+                    , "ram"
+                    , NULL
+                    , "ram"
+                    , NULL
+                    , "System RAM"
+                    , "MB"
+                    , 200
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_free    = rrddim_add(st_system_ram, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_used    = rrddim_add(st_system_ram, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_cached  = rrddim_add(st_system_ram, "cached",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers = rrddim_add(st_system_ram, "buffers", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else rrdset_next(st_system_ram);
 
-        rrddim_set(st, "free", MemFree);
-        rrddim_set(st, "used", MemUsed);
-        rrddim_set(st, "cached", Cached);
-        rrddim_set(st, "buffers", Buffers);
-        rrdset_done(st);
+        rrddim_set_by_pointer(st_system_ram, rd_free,    MemFree);
+        rrddim_set_by_pointer(st_system_ram, rd_used,    MemUsed);
+        rrddim_set_by_pointer(st_system_ram, rd_cached,  Cached);
+        rrddim_set_by_pointer(st_system_ram, rd_buffers, Buffers);
+
+        rrdset_done(st_system_ram);
     }
 
     // --------------------------------------------------------------------
 
     unsigned long long SwapUsed = SwapTotal - SwapFree;
 
-    if(SwapTotal || SwapUsed || SwapFree || do_swap == CONFIG_BOOLEAN_YES) {
+    if(do_swap == CONFIG_BOOLEAN_YES || SwapTotal || SwapUsed || SwapFree) {
         do_swap = CONFIG_BOOLEAN_YES;
 
-        st = rrdset_find_localhost("system.swap");
-        if(!st) {
-            st = rrdset_create_localhost("system", "swap", NULL, "swap", NULL, "System Swap", "MB", 201, update_every
-                                         , RRDSET_TYPE_STACKED);
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+        static RRDSET *st_system_swap = NULL;
+        static RRDDIM *rd_free = NULL, *rd_used = NULL;
 
-            rrddim_add(st, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        if(unlikely(!st_system_swap)) {
+            st_system_swap = rrdset_create_localhost(
+                    "system"
+                    , "swap"
+                    , NULL
+                    , "swap"
+                    , NULL
+                    , "System Swap"
+                    , "MB"
+                    , 201
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rrdset_flag_set(st_system_swap, RRDSET_FLAG_DETAIL);
+
+            rd_free = rrddim_add(st_system_swap, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_used = rrddim_add(st_system_swap, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else rrdset_next(st_system_swap);
 
-        rrddim_set(st, "used", SwapUsed);
-        rrddim_set(st, "free", SwapFree);
-        rrdset_done(st);
+        rrddim_set_by_pointer(st_system_swap, rd_used, SwapUsed);
+        rrddim_set_by_pointer(st_system_swap, rd_free, SwapFree);
+
+        rrdset_done(st_system_swap);
     }
 
     // --------------------------------------------------------------------
@@ -187,102 +212,171 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     if(arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND && (do_hwcorrupt == CONFIG_BOOLEAN_YES || (do_hwcorrupt == CONFIG_BOOLEAN_AUTO && HardwareCorrupted > 0))) {
         do_hwcorrupt = CONFIG_BOOLEAN_YES;
 
-        st = rrdset_find_localhost("mem.hwcorrupt");
-        if(!st) {
-            st = rrdset_create_localhost("mem", "hwcorrupt", NULL, "ecc", NULL, "Hardware Corrupted ECC", "MB", 9000
-                                         , update_every, RRDSET_TYPE_LINE);
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+        static RRDSET *st_mem_hwcorrupt = NULL;
+        static RRDDIM *rd_corrupted = NULL;
 
-            rrddim_add(st, "HardwareCorrupted", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        if(unlikely(!st_mem_hwcorrupt)) {
+            st_mem_hwcorrupt = rrdset_create_localhost(
+                    "mem"
+                    , "hwcorrupt"
+                    , NULL
+                    , "ecc"
+                    , NULL
+                    , "Corrupted Memory, detected by ECC"
+                    , "MB"
+                    , 9000
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rrdset_flag_set(st_mem_hwcorrupt, RRDSET_FLAG_DETAIL);
+
+            rd_corrupted = rrddim_add(st_mem_hwcorrupt, "HardwareCorrupted", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else rrdset_next(st_mem_hwcorrupt);
 
-        rrddim_set(st, "HardwareCorrupted", HardwareCorrupted);
-        rrdset_done(st);
+        rrddim_set_by_pointer(st_mem_hwcorrupt, rd_corrupted, HardwareCorrupted);
+
+        rrdset_done(st_mem_hwcorrupt);
     }
 
     // --------------------------------------------------------------------
 
     if(do_committed) {
-        st = rrdset_find_localhost("mem.committed");
-        if(!st) {
-            st = rrdset_create_localhost("mem", "committed", NULL, "system", NULL, "Committed (Allocated) Memory", "MB"
-                                         , 5000, update_every, RRDSET_TYPE_AREA);
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+        static RRDSET *st_mem_committed = NULL;
+        static RRDDIM *rd_committed = NULL;
 
-            rrddim_add(st, "Committed_AS", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        if(unlikely(!st_mem_committed)) {
+            st_mem_committed = rrdset_create_localhost(
+                    "mem"
+                    , "committed"
+                    , NULL
+                    , "system"
+                    , NULL
+                    , "Committed (Allocated) Memory"
+                    , "MB"
+                    , 5000
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rrdset_flag_set(st_mem_committed, RRDSET_FLAG_DETAIL);
+
+            rd_committed = rrddim_add(st_mem_committed, "Committed_AS", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else rrdset_next(st_mem_committed);
 
-        rrddim_set(st, "Committed_AS", Committed_AS);
-        rrdset_done(st);
+        rrddim_set_by_pointer(st_mem_committed, rd_committed, Committed_AS);
+
+        rrdset_done(st_mem_committed);
     }
 
     // --------------------------------------------------------------------
 
     if(do_writeback) {
-        st = rrdset_find_localhost("mem.writeback");
-        if(!st) {
-            st = rrdset_create_localhost("mem", "writeback", NULL, "kernel", NULL, "Writeback Memory", "MB", 4000
-                                         , update_every, RRDSET_TYPE_LINE);
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+        static RRDSET *st_mem_writeback = NULL;
+        static RRDDIM *rd_dirty = NULL, *rd_writeback = NULL, *rd_fusewriteback = NULL, *rd_nfs_writeback = NULL, *rd_bounce = NULL;
 
-            rrddim_add(st, "Dirty", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "Writeback", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "FuseWriteback", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "NfsWriteback", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "Bounce", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        if(unlikely(!st_mem_writeback)) {
+            st_mem_writeback = rrdset_create_localhost(
+                    "mem"
+                    , "writeback"
+                    , NULL
+                    , "kernel"
+                    , NULL
+                    , "Writeback Memory"
+                    , "MB"
+                    , 4000
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+            rrdset_flag_set(st_mem_writeback, RRDSET_FLAG_DETAIL);
+
+            rd_dirty         = rrddim_add(st_mem_writeback, "Dirty",         NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_writeback     = rrddim_add(st_mem_writeback, "Writeback",     NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_fusewriteback = rrddim_add(st_mem_writeback, "FuseWriteback", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_nfs_writeback = rrddim_add(st_mem_writeback, "NfsWriteback",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_bounce        = rrddim_add(st_mem_writeback, "Bounce",        NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else rrdset_next(st_mem_writeback);
 
-        rrddim_set(st, "Dirty", Dirty);
-        rrddim_set(st, "Writeback", Writeback);
-        rrddim_set(st, "FuseWriteback", WritebackTmp);
-        rrddim_set(st, "NfsWriteback", NFS_Unstable);
-        rrddim_set(st, "Bounce", Bounce);
-        rrdset_done(st);
+        rrddim_set_by_pointer(st_mem_writeback, rd_dirty,         Dirty);
+        rrddim_set_by_pointer(st_mem_writeback, rd_writeback,     Writeback);
+        rrddim_set_by_pointer(st_mem_writeback, rd_fusewriteback, WritebackTmp);
+        rrddim_set_by_pointer(st_mem_writeback, rd_nfs_writeback, NFS_Unstable);
+        rrddim_set_by_pointer(st_mem_writeback, rd_bounce,        Bounce);
+
+        rrdset_done(st_mem_writeback);
     }
 
     // --------------------------------------------------------------------
 
     if(do_kernel) {
-        st = rrdset_find_localhost("mem.kernel");
-        if(!st) {
-            st = rrdset_create_localhost("mem", "kernel", NULL, "kernel", NULL, "Memory Used by Kernel", "MB", 6000
-                                         , update_every, RRDSET_TYPE_STACKED);
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+        static RRDSET *st_mem_kernel = NULL;
+        static RRDDIM *rd_slab = NULL, *rd_kernelstack = NULL, *rd_pagetables = NULL, *rd_vmallocused = NULL;
 
-            rrddim_add(st, "Slab", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "KernelStack", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "PageTables", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "VmallocUsed", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        if(unlikely(!st_mem_kernel)) {
+            st_mem_kernel = rrdset_create_localhost(
+                    "mem"
+                    , "kernel"
+                    , NULL
+                    , "kernel"
+                    , NULL
+                    , "Memory Used by Kernel"
+                    , "MB"
+                    , 6000
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rrdset_flag_set(st_mem_kernel, RRDSET_FLAG_DETAIL);
+
+            rd_slab        = rrddim_add(st_mem_kernel, "Slab",        NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_kernelstack = rrddim_add(st_mem_kernel, "KernelStack", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_pagetables  = rrddim_add(st_mem_kernel, "PageTables",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_vmallocused = rrddim_add(st_mem_kernel, "VmallocUsed", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else rrdset_next(st_mem_kernel);
 
-        rrddim_set(st, "KernelStack", KernelStack);
-        rrddim_set(st, "Slab", Slab);
-        rrddim_set(st, "PageTables", PageTables);
-        rrddim_set(st, "VmallocUsed", VmallocUsed);
-        rrdset_done(st);
+        rrddim_set_by_pointer(st_mem_kernel, rd_slab,        Slab);
+        rrddim_set_by_pointer(st_mem_kernel, rd_kernelstack, KernelStack);
+        rrddim_set_by_pointer(st_mem_kernel, rd_pagetables,  PageTables);
+        rrddim_set_by_pointer(st_mem_kernel, rd_vmallocused, VmallocUsed);
+
+        rrdset_done(st_mem_kernel);
     }
 
     // --------------------------------------------------------------------
 
     if(do_slab) {
-        st = rrdset_find_localhost("mem.slab");
-        if(!st) {
-            st = rrdset_create_localhost("mem", "slab", NULL, "slab", NULL, "Reclaimable Kernel Memory", "MB", 6500
-                                         , update_every, RRDSET_TYPE_STACKED);
-            rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+        static RRDSET *st_mem_slab = NULL;
+        static RRDDIM *rd_reclaimable = NULL, *rd_unreclaimable = NULL;
 
-            rrddim_add(st, "reclaimable", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_add(st, "unreclaimable", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        if(unlikely(!st_mem_slab)) {
+            st_mem_slab = rrdset_create_localhost(
+                    "mem"
+                    , "slab"
+                    , NULL
+                    , "slab"
+                    , NULL
+                    , "Reclaimable Kernel Memory"
+                    , "MB"
+                    , 6500
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rrdset_flag_set(st_mem_slab, RRDSET_FLAG_DETAIL);
+
+            rd_reclaimable   = rrddim_add(st_mem_slab, "reclaimable",   NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_unreclaimable = rrddim_add(st_mem_slab, "unreclaimable", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
+        else rrdset_next(st_mem_slab);
 
-        rrddim_set(st, "reclaimable", SReclaimable);
-        rrddim_set(st, "unreclaimable", SUnreclaim);
-        rrdset_done(st);
+        rrddim_set_by_pointer(st_mem_slab, rd_reclaimable, SReclaimable);
+        rrddim_set_by_pointer(st_mem_slab, rd_unreclaimable, SUnreclaim);
+
+        rrdset_done(st_mem_slab);
     }
 
     return 0;

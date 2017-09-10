@@ -91,17 +91,29 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         do_swapio = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_swapio = NULL;
-        if(unlikely(!st_swapio)) {
-            st_swapio = rrdset_create_localhost("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250
-                                                , update_every, RRDSET_TYPE_AREA);
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-            rrddim_add(st_swapio, "in",  NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_swapio, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st_swapio)) {
+            st_swapio = rrdset_create_localhost(
+                    "system"
+                    , "swapio"
+                    , NULL
+                    , "swap"
+                    , NULL
+                    , "Swap I/O"
+                    , "kilobytes/s"
+                    , 250
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_in  = rrddim_add(st_swapio, "in",  NULL,  sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_swapio, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_swapio);
 
-        rrddim_set(st_swapio, "in", pswpin);
-        rrddim_set(st_swapio, "out", pswpout);
+        rrddim_set_by_pointer(st_swapio, rd_in, pswpin);
+        rrddim_set_by_pointer(st_swapio, rd_out, pswpout);
         rrdset_done(st_swapio);
     }
 
@@ -109,17 +121,29 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     if(do_io) {
         static RRDSET *st_io = NULL;
-        if(unlikely(!st_io)) {
-            st_io = rrdset_create_localhost("system", "io", NULL, "disk", NULL, "Disk I/O", "kilobytes/s", 150
-                                            , update_every, RRDSET_TYPE_AREA);
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
-            rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st_io)) {
+            st_io = rrdset_create_localhost(
+                    "system"
+                    , "io"
+                    , NULL
+                    , "disk"
+                    , NULL
+                    , "Disk I/O"
+                    , "kilobytes/s"
+                    , 150
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_in  = rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_io);
 
-        rrddim_set(st_io, "in", pgpgin);
-        rrddim_set(st_io, "out", pgpgout);
+        rrddim_set_by_pointer(st_io, rd_in, pgpgin);
+        rrddim_set_by_pointer(st_io, rd_out, pgpgout);
         rrdset_done(st_io);
     }
 
@@ -127,18 +151,31 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     if(do_pgfaults) {
         static RRDSET *st_pgfaults = NULL;
+        static RRDDIM *rd_minor = NULL, *rd_major = NULL;
+
         if(unlikely(!st_pgfaults)) {
-            st_pgfaults = rrdset_create_localhost("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults"
-                                                  , "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
+            st_pgfaults = rrdset_create_localhost(
+                    "mem"
+                    , "pgfaults"
+                    , NULL
+                    , "system"
+                    , NULL
+                    , "Memory Page Faults"
+                    , "page faults/s"
+                    , 500
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
             rrdset_flag_set(st_pgfaults, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st_pgfaults, "minor",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_minor = rrddim_add(st_pgfaults, "minor", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_major = rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_pgfaults);
 
-        rrddim_set(st_pgfaults, "minor", pgfault);
-        rrddim_set(st_pgfaults, "major", pgmajfault);
+        rrddim_set_by_pointer(st_pgfaults, rd_minor, pgfault);
+        rrddim_set_by_pointer(st_pgfaults, rd_major, pgmajfault);
         rrdset_done(st_pgfaults);
     }
 
@@ -149,6 +186,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     // single-node systems have uninteresting statistics (since all accesses
     // are local).
     if(unlikely(has_numa == -1))
+
         has_numa = (numa_local || numa_foreign || numa_interleave || numa_other || numa_pte_updates ||
                      numa_huge_pte_updates || numa_hint_faults || numa_hint_faults_local || numa_pages_migrated) ? 1 : 0;
 
@@ -156,37 +194,50 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         do_numa = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_numa = NULL;
+        static RRDDIM *rd_local = NULL, *rd_foreign = NULL, *rd_interleave = NULL, *rd_other = NULL, *rd_pte_updates = NULL, *rd_huge_pte_updates = NULL, *rd_hint_faults = NULL, *rd_hint_faults_local = NULL, *rd_pages_migrated = NULL;
+
         if(unlikely(!st_numa)) {
-            st_numa = rrdset_create_localhost("mem", "numa", NULL, "numa", NULL, "NUMA events", "events/s", 800
-                                              , update_every, RRDSET_TYPE_LINE);
+            st_numa = rrdset_create_localhost(
+                    "mem"
+                    , "numa"
+                    , NULL
+                    , "numa"
+                    , NULL
+                    , "NUMA events"
+                    , "events/s"
+                    , 800
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
             rrdset_flag_set(st_numa, RRDSET_FLAG_DETAIL);
 
             // These depend on CONFIG_NUMA in the kernel.
-            rrddim_add(st_numa, "local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "foreign", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "interleave", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "other", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_local             = rrddim_add(st_numa, "local",             NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_foreign           = rrddim_add(st_numa, "foreign",           NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_interleave        = rrddim_add(st_numa, "interleave",        NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_other             = rrddim_add(st_numa, "other",             NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             // The following stats depend on CONFIG_NUMA_BALANCING in the
             // kernel.
-            rrddim_add(st_numa, "pte_updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "huge_pte_updates", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "hint_faults", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "hint_faults_local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st_numa, "pages_migrated", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pte_updates       = rrddim_add(st_numa, "pte_updates",       NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_huge_pte_updates  = rrddim_add(st_numa, "huge_pte_updates",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_hint_faults       = rrddim_add(st_numa, "hint_faults",       NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_hint_faults_local = rrddim_add(st_numa, "hint_faults_local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pages_migrated    = rrddim_add(st_numa, "pages_migrated",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st_numa);
 
-        rrddim_set(st_numa, "local", numa_local);
-        rrddim_set(st_numa, "foreign", numa_foreign);
-        rrddim_set(st_numa, "interleave", numa_interleave);
-        rrddim_set(st_numa, "other", numa_other);
+        rrddim_set_by_pointer(st_numa, rd_local,             numa_local);
+        rrddim_set_by_pointer(st_numa, rd_foreign,           numa_foreign);
+        rrddim_set_by_pointer(st_numa, rd_interleave,        numa_interleave);
+        rrddim_set_by_pointer(st_numa, rd_other,             numa_other);
 
-        rrddim_set(st_numa, "pte_updates", numa_pte_updates);
-        rrddim_set(st_numa, "huge_pte_updates", numa_huge_pte_updates);
-        rrddim_set(st_numa, "hint_faults", numa_hint_faults);
-        rrddim_set(st_numa, "hint_faults_local", numa_hint_faults_local);
-        rrddim_set(st_numa, "pages_migrated", numa_pages_migrated);
+        rrddim_set_by_pointer(st_numa, rd_pte_updates,       numa_pte_updates);
+        rrddim_set_by_pointer(st_numa, rd_huge_pte_updates,  numa_huge_pte_updates);
+        rrddim_set_by_pointer(st_numa, rd_hint_faults,       numa_hint_faults);
+        rrddim_set_by_pointer(st_numa, rd_hint_faults_local, numa_hint_faults_local);
+        rrddim_set_by_pointer(st_numa, rd_pages_migrated,    numa_pages_migrated);
 
         rrdset_done(st_numa);
     }

@@ -7,7 +7,6 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int do_loadavg = -1, do_all_processes = -1;
     static usec_t next_loadavg_dt = 0;
-    static RRDSET *load_chart = NULL, *processes_chart = NULL;
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
@@ -49,24 +48,33 @@ int do_proc_loadavg(int update_every, usec_t dt) {
 
     if(next_loadavg_dt <= dt) {
         if(likely(do_loadavg)) {
+            static RRDSET *load_chart = NULL;
+            static RRDDIM *rd_load1 = NULL, *rd_load5 = NULL, *rd_load15 = NULL;
+
             if(unlikely(!load_chart)) {
-                load_chart = rrdset_find_byname_localhost("system.load");
-                if(unlikely(!load_chart)) {
-                    load_chart = rrdset_create_localhost("system", "load", NULL, "load", NULL, "System Load Average"
-                                                         , "load", 100, (update_every < MIN_LOADAVG_UPDATE_EVERY)
-                                                                        ? MIN_LOADAVG_UPDATE_EVERY : update_every
-                                                         , RRDSET_TYPE_LINE);
-                    rrddim_add(load_chart, "load1", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                    rrddim_add(load_chart, "load5", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                    rrddim_add(load_chart, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                }
+                load_chart = rrdset_create_localhost(
+                        "system"
+                        , "load"
+                        , NULL
+                        , "load"
+                        , NULL
+                        , "System Load Average"
+                        , "load"
+                        , 100
+                        , (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rd_load1  = rrddim_add(load_chart, "load1",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                rd_load5  = rrddim_add(load_chart, "load5",  NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+                rd_load15 = rrddim_add(load_chart, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             }
             else
                 rrdset_next(load_chart);
 
-            rrddim_set(load_chart, "load1", (collected_number) (load1 * 1000));
-            rrddim_set(load_chart, "load5", (collected_number) (load5 * 1000));
-            rrddim_set(load_chart, "load15", (collected_number) (load15 * 1000));
+            rrddim_set_by_pointer(load_chart, rd_load1, (collected_number) (load1 * 1000));
+            rrddim_set_by_pointer(load_chart, rd_load5, (collected_number) (load5 * 1000));
+            rrddim_set_by_pointer(load_chart, rd_load15, (collected_number) (load15 * 1000));
             rrdset_done(load_chart);
 
             next_loadavg_dt = load_chart->update_every * USEC_PER_SEC;
@@ -78,18 +86,28 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(likely(do_all_processes)) {
+        static RRDSET *processes_chart = NULL;
+        static RRDDIM *rd_active = NULL;
+
         if(unlikely(!processes_chart)) {
-            processes_chart = rrdset_find_byname_localhost("system.active_processes");
-            if(unlikely(!processes_chart)) {
-                processes_chart = rrdset_create_localhost("system", "active_processes", NULL, "processes", NULL
-                                                          , "System Active Processes", "processes", 750, update_every
-                                                          , RRDSET_TYPE_LINE);
-                rrddim_add(processes_chart, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            }
+            processes_chart = rrdset_create_localhost(
+                    "system"
+                    , "active_processes"
+                    , NULL
+                    , "processes"
+                    , NULL
+                    , "System Active Processes"
+                    , "processes"
+                    , 750
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_active = rrddim_add(processes_chart, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(processes_chart);
 
-        rrddim_set(processes_chart, "active", active_processes);
+        rrddim_set_by_pointer(processes_chart, rd_active, active_processes);
         rrdset_done(processes_chart);
     }
 
