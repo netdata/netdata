@@ -27,7 +27,7 @@ static void find_all_mc() {
     char *dirname = config_get("plugin:proc:/sys/devices/system/edac/mc", "directory to monitor", name);
 
     DIR *dir = opendir(dirname);
-    if(!dir) {
+    if(unlikely(!dir)) {
         error("Cannot read ECC memory errors directory '%s'", dirname);
         return;
     }
@@ -132,21 +132,30 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
         static RRDSET *ce_st = NULL;
 
         if(unlikely(!ce_st)) {
-            ce_st = rrdset_find_localhost("mem.ecc_ce");
-            if(unlikely(!ce_st))
-                ce_st = rrdset_create_localhost("mem", "ecc_ce", NULL, "ecc", NULL, "ECC Memory Correctable Errors"
-                                                , "errors", 6600, update_every, RRDSET_TYPE_LINE);
-
-            for(m = mc_root; m; m = m->next)
-                if(m->ce_count_filename)
-                    m->ce_rd = rrddim_add(ce_st, m->name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ce_st = rrdset_create_localhost(
+                    "mem"
+                    , "ecc_ce"
+                    , NULL
+                    , "ecc"
+                    , NULL
+                    , "ECC Memory Correctable Errors"
+                    , "errors"
+                    , 6600
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
         }
         else
             rrdset_next(ce_st);
 
-        for(m = mc_root; m; m = m->next)
-            if(m->ce_count_filename && m->ce_updated)
+        for(m = mc_root; m; m = m->next) {
+            if (m->ce_count_filename && m->ce_updated) {
+                if(unlikely(!m->ce_rd))
+                    m->ce_rd = rrddim_add(ce_st, m->name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
                 rrddim_set_by_pointer(ce_st, m->ce_rd, m->ce_count);
+            }
+        }
 
         rrdset_done(ce_st);
     }
@@ -159,22 +168,30 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
         static RRDSET *ue_st = NULL;
 
         if(unlikely(!ue_st)) {
-            ue_st = rrdset_find_localhost("mem.ecc_ue");
-
-            if(unlikely(!ue_st))
-                ue_st = rrdset_create_localhost("mem", "ecc_ue", NULL, "ecc", NULL, "ECC Memory Uncorrectable Errors"
-                                                , "errors", 6610, update_every, RRDSET_TYPE_LINE);
-
-            for(m = mc_root; m; m = m->next)
-                if(m->ue_count_filename)
-                    m->ue_rd = rrddim_add(ue_st, m->name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ue_st = rrdset_create_localhost(
+                    "mem"
+                    , "ecc_ue"
+                    , NULL
+                    , "ecc"
+                    , NULL
+                    , "ECC Memory Uncorrectable Errors"
+                    , "errors"
+                    , 6610
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
         }
         else
             rrdset_next(ue_st);
 
-        for(m = mc_root; m; m = m->next)
-            if(m->ue_count_filename && m->ue_updated)
+        for(m = mc_root; m; m = m->next) {
+            if (m->ue_count_filename && m->ue_updated) {
+                if(unlikely(!m->ue_rd))
+                    m->ue_rd = rrddim_add(ue_st, m->name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
                 rrddim_set_by_pointer(ue_st, m->ue_rd, m->ue_count);
+            }
+        }
 
         rrdset_done(ue_st);
     }
