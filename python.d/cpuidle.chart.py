@@ -82,12 +82,16 @@ class Service(SimpleService):
                 delta = schedstat[cpu] - active_time
                 if delta < 1:
                     needs_tickle.append(cpu)
-        self.last_schedstat = schedstat
 
         if needs_tickle:
             # This line is critical for the stats to update. If we don't "tickle"
             # idle CPUs, then the counters for those CPUs stop counting.
             self.__wake_cpus([int(cpu[3:]) for cpu in needs_tickle])
+
+            # Re-read schedstat now that we've tickled any idlers.
+            schedstat = self.__read_schedstat()
+
+        self.last_schedstat = schedstat
 
         for cpu, metrics in self.assignment.items():
             update_time = schedstat[cpu]
