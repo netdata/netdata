@@ -667,7 +667,7 @@ class Web(Mixin):
         if match_dict is None:
             return find_regex_return(msg='Custom log: search OK but contains no named subgroups'
                                          ' (you need to use ?P<subgroup_name>)')
-        mandatory_dict = {'address': r'[\da-f.:]+|localhost',
+        mandatory_dict = {'address': r'[\w.:-]+',
                           'code': r'[1-9]\d{2}',
                           'bytes_sent': r'\d+|-'}
         optional_dict = {'resp_length': r'\d+',
