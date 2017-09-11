@@ -41,6 +41,7 @@ dist_python_DATA = \
     phpfpm.chart.py \
     postfix.chart.py \
     postgres.chart.py \
+    powerdns.chart.py \
     rabbitmq.chart.py \
     redis.chart.py \
     retroshare.chart.py \
