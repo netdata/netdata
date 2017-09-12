@@ -312,6 +312,11 @@ netdataDashboard.menu = {
     'chrony': {
         icon: '<i class="fa fa-clock-o" aria-hidden="true"></i>',
         info: 'chronyd parameters about the system’s clock performance.'
+    },
+
+    'couchdb': {
+        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        info: 'Performance metrics for <b><a href="https://couchdb.apache.org/">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
     }
 };
 
@@ -434,6 +439,30 @@ netdataDashboard.submenu = {
     'go_expvar.memstats': {
         title: 'Memory statistics',
         info: 'Go runtime memory statistics. See <a href="https://golang.org/pkg/runtime/#MemStats" target="_blank">runtime.MemStats</a> documentation for more info about each chart and the values.'
+    },
+
+    'couchdb.dbactivity': {
+        title: 'DB activity',
+        info: 'Overall database reads and writes for the entire server. This includes any external HTTP traffic, as well as internal replication traffic performed in a cluster to ensure node consistency.'
+    },
+
+    'couchdb.httptraffic': {
+        title: 'HTTP traffic breakdown',
+        info: 'All HTTP traffic, broken down by type of request (<tt>GET</tt>, <tt>PUT</tt>, <tt>POST</tt>, etc.) and response status code (<tt>200</tt>, <tt>201</tt>, <tt>4xx</tt>, etc.)<br/><br/>Any <tt>5xx</tt> errors here indicate a likely CouchDB bug; check the logfile for further information.'
+    },
+
+    'couchdb.ops': {
+        title: 'Server operations'
+    },
+
+    'couchdb.perdbstats': {
+        title: 'Per-DB statistics',
+        info: 'Statistics per database. This includes <a href="http://docs.couchdb.org/en/latest/api/database/common.html#get--db">3 size graphs per database</a>: active (the size of live data in the database), external (the uncompressed size of the database contents), and file (the size of the file on disk, exclusive of any views and indexes). It also includes the number of documents and number of deleted documents per database.'
+    },
+
+    'couchdb.erlang': {
+        title: 'Erlang statistics',
+        info: 'Detailed information about the status of the Erlang VM that hosts CouchDB. These are intended for advanced users only. High values of the peak message queue (>10e6) generally indicate an overload condition.'
     }
 };
 
@@ -1534,5 +1563,17 @@ netdataDashboard.context = {
         info: 'The estimated error bound on the frequency.',
         height: 0.5,
         colors: NETDATA.colors[5]
+    },
+
+    'couchdb.active_tasks': {
+        info: 'Active tasks running on this CouchDB <b>cluster</b>. Four types of tasks currently exist: indexer (view building), replication, database compaction and view compaction.'
+    },
+
+    'couchdb.replicator_jobs': {
+        info: 'Detailed breakdown of any replication jobs in progress on this node. For more information, see the <a href="http://docs.couchdb.org/en/latest/replication/replicator.html">replicator documentation</a>.'
+    },
+
+    'couchdb.open_files': {
+        info: 'Count of all files held open by CouchDB. If this value seems pegged at 1024 or 4096, your server process is probably hitting the open file handle limit and <a href="http://docs.couchdb.org/en/latest/maintenance/performance.html#pam-and-ulimit">needs to be increased.</a>'
     }
 };
