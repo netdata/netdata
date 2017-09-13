@@ -1182,6 +1182,13 @@
                     return def * this.context[id].height;
                 else
                     return def;
+            },
+
+            contextDecimalDigits: function(id, def) {
+                if(typeof this.context[id] !== 'undefined' && typeof this.context[id].decimalDigits !== 'undefined')
+                    return this.context[id].decimalDigits;
+                else
+                    return def;
             }
         };
 
@@ -1514,6 +1521,7 @@
                             + ' data-after="-' + duration.toString() + '"'
                             + ' data-id="' + NETDATA.name2id(options.hostname + '/' + chart.id) + '"'
                             + ' data-colors="' + netdataDashboard.anyAttribute(netdataDashboard.context, 'colors', chart.context, '') + '"'
+                            + ' data-decimal-digits="' + netdataDashboard.contextDecimalDigits(chart.context, -1) + '"'
                             + chartCommonMin(chart.family, chart.context, chart.units)
                             + chartCommonMax(chart.family, chart.context, chart.units)
                             + ' role="application"></div>';
@@ -2961,7 +2969,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'dashboard_info.js?v20170731-8',
+                url: NETDATA.serverDefault + 'dashboard_info.js?v20170913-9',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
