@@ -19,7 +19,8 @@ retries = 60
 #             'unix_socket': None
 #          }}
 
-ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'net', 'connections', 'clients', 'slaves', 'persistence']
+ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'net', 'connections', 'clients', 'slaves', 'persistence',
+         'bgsave_now', 'bgsave_health']
 
 CHARTS = {
     'operations': {
@@ -72,6 +73,18 @@ CHARTS = {
                     'redis.rdb_changes', 'line'],
         'lines': [
             ['rdb_changes_since_last_save', 'changes', 'absolute']
+        ]},
+    'bgsave_now': {
+        'options': [None, 'Duration of the RDB Save Operation', 'seconds', 'persistence',
+                    'redis.bgsave_now', 'absolute'],
+        'lines': [
+            ['rdb_bgsave_in_progress', 'rdb save', 'absolute']
+        ]},
+    'bgsave_health': {
+        'options': [None, 'Status of the Last RDB Save Operation', 'status', 'persistence',
+                    'redis.bgsave_health', 'line'],
+        'lines': [
+            ['rdb_last_bgsave_status', 'rdb save', 'absolute']
         ]}
 }
 
@@ -87,6 +100,7 @@ class Service(SocketService):
         self.port = self.configuration.get('port', 6379)
         self.unix_socket = self.configuration.get('socket')
         password = self.configuration.get('pass', str())
+        self.bgsave_time = 0
         self.requests = dict(request='INFO\r\n'.encode(),
                              password=' '.join(['AUTH', password, '\r\n']).encode() if password else None)
         self.request = self.requests['request']
@@ -132,7 +146,7 @@ class Service(SocketService):
                 self.debug("invalid line received: " + str(line))
                 pass
 
-        if len(data) == 0:
+        if not data:
             self.error("received data doesn't have any records")
             return None
 
@@ -141,6 +155,14 @@ class Service(SocketService):
                                                                      + int(data['keyspace_misses']))
         except (KeyError, ZeroDivisionError, TypeError):
             data['hit_rate'] = 0
+
+        if data['rdb_bgsave_in_progress'] != '0\r':
+            self.bgsave_time += self.update_every
+        else:
+            self.bgsave_time = 0
+
+        data['rdb_last_bgsave_status'] = 0 if data['rdb_last_bgsave_status'] == 'ok\r' else 1
+        data['rdb_bgsave_in_progress'] = self.bgsave_time
 
         return data
 
