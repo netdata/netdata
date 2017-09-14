@@ -2,31 +2,31 @@
 # Description: ntp readvar python.d module
 # Author: Sven Mäder (rda)
 
-#import os
+import os
 from base import SimpleService
 from subprocess import Popen, PIPE
 
-#NAME = os.path.basename(__file__).replace(".chart.py", "")
+NAME = os.path.basename(__file__).replace(".chart.py", "")
 
 # default module values
 update_every = 10
 priority = 90000
 retries = 1
 
-ORDER = ['ntp.peer_stratum',
-        'ntp.peer_precision',
-        'ntp.peer_rootdelay',
-        'ntp.peer_rootdisp',
-        'ntp.peer_hmode',
-        'ntp.peer_pmode',
-        'ntp.peer_hpoll',
-        'ntp.peer_ppoll',
-        'ntp.peer_headway',
-        'ntp.peer_offset',
-        'ntp.peer_delay',
-        'ntp.peer_dispersion',
-        'ntp.peer_jitter',
-        'ntp.peer_xleave']
+ORDER = ['peer_stratum',
+        'peer_precision',
+        'peer_rootdelay',
+        'peer_rootdisp',
+        'peer_hmode',
+        'peer_pmode',
+        'peer_hpoll',
+        'peer_ppoll',
+        'peer_headway',
+        'peer_offset',
+        'peer_delay',
+        'peer_dispersion',
+        'peer_jitter',
+        'peer_xleave']
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
@@ -185,45 +185,45 @@ class Service(SimpleService):
                 lines_jitter.append([''.join([peer, '_jitter']), None, 'absolute', 1, 1000])
                 lines_xleave.append([''.join([peer, '_xleave']), None, 'absolute', 1, 1000])
 
-        self.definitions.update({'ntp.peer_stratum': {
-            'options': [None, 'stratum (0-15)', "1", 'peers', 'ntp.stratum', 'line'],
+        self.definitions.update({'peer_stratum': {
+            'options': [None, 'stratum (0-15)', "1", 'peer', 'stratum', 'line'],
             'lines': lines_stratum}})
-        self.definitions.update({'ntp.peer_precision': {
-            'options': [None, 'precision', "log2 s", 'peers', 'ntp.precision', 'line'],
+        self.definitions.update({'peer_precision': {
+            'options': [None, 'precision', "log2 s", 'peer', 'precision', 'line'],
             'lines': lines_precision}})
-        self.definitions.update({'ntp.peer_rootdelay': {
-            'options': [None, 'total roundtrip delay to the primary reference clock', "ms", 'peers', 'ntp.rootdelay', 'line'],
+        self.definitions.update({'peer_rootdelay': {
+            'options': [None, 'total roundtrip delay to the primary reference clock', "ms", 'peer', 'rootdelay', 'line'],
             'lines': lines_rootdelay}})
-        self.definitions.update({'ntp.peer_rootdisp': {
-            'options': [None, 'total root dispersion to the primary reference clock', "ms", 'peers', 'ntp.rootdisp', 'line'],
+        self.definitions.update({'peer_rootdisp': {
+            'options': [None, 'total root dispersion to the primary reference clock', "ms", 'peer', 'rootdisp', 'line'],
             'lines': lines_rootdisp}})
-        self.definitions.update({'ntp.peer_hmode': {
-            'options': [None, 'host mode(1-6)', "1", 'peers', 'ntp.hmode', 'line'],
+        self.definitions.update({'peer_hmode': {
+            'options': [None, 'host mode(1-6)', "1", 'peer', 'hmode', 'line'],
             'lines': lines_hmode}})
-        self.definitions.update({'ntp.peer_pmode': {
-            'options': [None, 'peer mode (1-5)', "1", 'peers', 'ntp.pmode', 'line'],
+        self.definitions.update({'peer_pmode': {
+            'options': [None, 'peer mode (1-5)', "1", 'peer', 'pmode', 'line'],
             'lines': lines_pmode}})
-        self.definitions.update({'ntp.peer_hpoll': {
-            'options': [None, 'host poll exponent (3-17)', "log2 s", 'peers', 'ntp.hpoll', 'line'],
+        self.definitions.update({'peer_hpoll': {
+            'options': [None, 'host poll exponent (3-17)', "log2 s", 'peer', 'hpoll', 'line'],
             'lines': lines_hpoll}})
-        self.definitions.update({'ntp.peer_ppoll': {
-            'options': [None, 'peer poll exponent (3-17)', "log2 s", 'peers', 'ntp.ppoll', 'line'],
+        self.definitions.update({'peer_ppoll': {
+            'options': [None, 'peer poll exponent (3-17)', "log2 s", 'peer', 'ppoll', 'line'],
             'lines': lines_ppoll}})
-        self.definitions.update({'ntp.peer_headway': {
-            'options': [None, 'headway', "1", 'peers', 'ntp.headway', 'line'],
+        self.definitions.update({'peer_headway': {
+            'options': [None, 'headway', "1", 'peer', 'headway', 'line'],
             'lines': lines_headway}})
-        self.definitions.update({'ntp.peer_offset': {
-            'options': [None, 'filter offset', "ms", 'peers', 'ntp.offset', 'line'],
+        self.definitions.update({'peer_offset': {
+            'options': [None, 'filter offset', "ms", 'peer', 'offset', 'line'],
             'lines': lines_offset}})
-        self.definitions.update({'ntp.peer_delay': {
-            'options': [None, 'filter delay', "ms", 'peers', 'ntp.delay', 'line'],
+        self.definitions.update({'peer_delay': {
+            'options': [None, 'filter delay', "ms", 'peer', 'delay', 'line'],
             'lines': lines_delay}})
-        self.definitions.update({'ntp.peer_dispersion': {
-            'options': [None, 'filter dispersion', "ms", 'peers', 'ntp.dispersion', 'line'],
+        self.definitions.update({'peer_dispersion': {
+            'options': [None, 'filter dispersion', "ms", 'peer', 'dispersion', 'line'],
             'lines': lines_dispersion}})
-        self.definitions.update({'ntp.peer_jitter': {
-            'options': [None, 'filter jitter', "ms", 'peers', 'ntp.jitter', 'line'],
+        self.definitions.update({'peer_jitter': {
+            'options': [None, 'filter jitter', "ms", 'peer', 'jitter', 'line'],
             'lines': lines_jitter}})
-        self.definitions.update({'ntp.peer_xleave': {
-            'options': [None, 'interleave delay', "ms", 'peers', 'ntp.xleave', 'line'],
+        self.definitions.update({'peer_xleave': {
+            'options': [None, 'interleave delay', "ms", 'peer', 'xleave', 'line'],
             'lines': lines_xleave}})

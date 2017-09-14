@@ -2,83 +2,83 @@
 # Description: ntp readlist python.d module
 # Author: Sven Mäder (rda)
 
-#import os
+import os
 from base import ExecutableService
 
-#NAME = os.path.basename(__file__).replace(".chart.py", "")
+NAME = os.path.basename(__file__).replace(".chart.py", "")
 
 # default module values
 update_every = 10
 priority = 90000
 retries = 60
 
-ORDER = ['ntp.system_frequency',
-        'ntp.system_offset',
-        'ntp.system_rootdelay',
-        'ntp.system_rootdisp',
-        'ntp.system_sys_jitter',
-        'ntp.system_clk_jitter',
-        'ntp.system_clk_wander',
-        'ntp.system_precision',
-        'ntp.system_stratum',
-        'ntp.system_tc',
-        'ntp.system_mintc']
+ORDER = ['frequency',
+        'offset',
+        'rootdelay',
+        'rootdisp',
+        'sys_jitter',
+        'clk_jitter',
+        'clk_wander',
+        'precision',
+        'stratum',
+        'tc',
+        'mintc']
 
 CHARTS = {
-    'ntp.system_frequency': {
+    'frequency': {
         'options': [None, "frequency offset relative to hardware clock", "ppm", 'system', 'ntp.frequency', 'area'],
         'lines': [
-            ['system_frequency', 'frequency', 'absolute', 1, 1000]
+            ['frequency', 'frequency', 'absolute', 1, 1000]
         ]},
-    'ntp.system_offset': {
+    'offset': {
         'options': [None, "combined offset of server relative to this host", "ms", 'system', 'ntp.offset', 'area'],
         'lines': [
-            ['system_offset', 'offset', 'absolute', 1, 1000000]
+            ['offset', 'offset', 'absolute', 1, 1000000]
         ]},
-    'ntp.system_rootdelay': {
+    'rootdelay': {
         'options': [None, "total roundtrip delay to the primary reference clock", "ms", 'system', 'ntp.rootdelay', 'area'],
         'lines': [
-            ['system_rootdelay', 'rootdelay', 'absolute', 1, 1000]
+            ['rootdelay', 'rootdelay', 'absolute', 1, 1000]
         ]},
-    'ntp.system_rootdisp': {
+    'rootdisp': {
         'options': [None, "total dispersion to the primary reference clock", "ms", 'system', 'ntp.rootdisp', 'area'],
         'lines': [
-            ['system_rootdisp', 'rootdisp', 'absolute', 1, 1000]
+            ['rootdisp', 'rootdisp', 'absolute', 1, 1000]
         ]},
-    'ntp.system_sys_jitter': {
+    'sys_jitter': {
         'options': [None, "combined system jitter", "ms", 'system', 'ntp.sys_jitter', 'area'],
         'lines': [
-            ['system_sys_jitter', 'sys_jitter', 'absolute', 1, 1000000]
+            ['sys_jitter', 'sys_jitter', 'absolute', 1, 1000000]
         ]},
-    'ntp.system_clk_jitter': {
+    'clk_jitter': {
         'options': [None, "clock jitter", "ms", 'system', 'ntp.clk_jitter', 'area'],
         'lines': [
-            ['system_clk_jitter', 'clk_jitter', 'absolute', 1, 1000]
+            ['clk_jitter', 'clk_jitter', 'absolute', 1, 1000]
         ]},
-    'ntp.system_clk_wander': {
+    'clk_wander': {
         'options': [None, "clock frequency wander", "ppm", 'system', 'ntp.clk_wander', 'area'],
         'lines': [
-            ['system_clk_wander', 'clk_wander', 'absolute', 1, 1000]
+            ['clk_wander', 'clk_wander', 'absolute', 1, 1000]
         ]},
-    'ntp.system_precision': {
+    'precision': {
         'options': [None, "precision", "log2 s", 'system', 'ntp.precision', 'line'],
         'lines': [
-            ['system_precision', 'precision', 'absolute', 1, 1]
+            ['precision', 'precision', 'absolute', 1, 1]
         ]},
-    'ntp.system_stratum': {
+    'stratum': {
         'options': [None, "stratum (1-15)", "1", 'system', 'ntp.stratum', 'line'],
         'lines': [
-            ['system_stratum', 'stratum', 'absolute', 1, 1]
+            ['stratum', 'stratum', 'absolute', 1, 1]
         ]},
-    'ntp.system_tc': {
+    'tc': {
         'options': [None, "time constant and poll exponent (3-17)", "log2 s", 'system', 'ntp.tc', 'line'],
         'lines': [
-            ['system_tc', 'tc', 'absolute', 1, 1]
+            ['tc', 'tc', 'absolute', 1, 1]
         ]},
-    'ntp.system_mintc': {
+    'mintc': {
         'options': [None, "minimum time constant (3-10)", "log2 s", 'system', 'ntp.mintc', 'line'],
         'lines': [
-            ['system_mintc', 'mintc', 'absolute', 1, 1]
+            ['mintc', 'mintc', 'absolute', 1, 1]
         ]}
 }
 
@@ -114,17 +114,17 @@ class Service(ExecutableService):
             clk_jitter = float(data[23].split('=')[1])
             clk_wander = float(data[24].split('=')[1])
 
-            return {'system_frequency': frequency * 1000,
-                    'system_offset': offset * 1000000,
-                    'system_rootdelay': rootdelay * 1000,
-                    'system_rootdisp': rootdisp * 1000,
-                    'system_sys_jitter': sys_jitter * 1000000,
-                    'system_clk_jitter': clk_jitter * 1000,
-                    'system_clk_wander': clk_wander * 1000,
-                    'system_precision': precision,
-                    'system_stratum': stratum,
-                    'system_tc': tc,
-                    'system_mintc': mintc}
+            return {'frequency': frequency * 1000,
+                    'offset': offset * 1000000,
+                    'rootdelay': rootdelay * 1000,
+                    'rootdisp': rootdisp * 1000,
+                    'sys_jitter': sys_jitter * 1000000,
+                    'clk_jitter': clk_jitter * 1000,
+                    'clk_wander': clk_wander * 1000,
+                    'precision': precision,
+                    'stratum': stratum,
+                    'tc': tc,
+                    'mintc': mintc}
         except (ValueError, AttributeError):
             return None
 
