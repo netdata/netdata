@@ -10,8 +10,7 @@ priority = 60000
 retries = 10
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['timediff', 'lastoffset', 'rmsoffset', 'rootdelay',
-         'rootdispersion', 'skew', 'frequency', 'residualfreq']
+ORDER = ['system', 'offsets', 'stratum', 'root', 'frequency', 'residualfreq', 'skew']
 
 CHARTS = {
     # id: {
@@ -19,45 +18,42 @@ CHARTS = {
     #     'lines': [
     #         [unique_dimension_name, name, algorithm, multiplier, divisor]
     #     ]}
-    'timediff': {
-        'options': [None, "Difference system time to NTP", "us", 'chrony', 'chrony.timediff', 'line'],
+    'system': {
+        'options': [None, "Chrony System Time Deltas", "microseconds", 'system', 'chrony.system', 'area'],
         'lines': [
-            ['timediff', None, 'absolute', 1, 1000]
+            ['timediff',   'system time', 'absolute', 1, 1000]
         ]},
-    'lastoffset': {
-        'options': [None, "Last offset", "us", 'chrony', 'chrony.lastoffset', 'line'],
+    'offsets': {
+        'options': [None, "Chrony System Time Offsets", "microseconds", 'system', 'chrony.offsets', 'area'],
         'lines': [
-            ['lastoffset', None, 'absolute', 1, 1000]
+            ['lastoffset', 'last offset', 'absolute', 1, 1000],
+            ['rmsoffset',  'RMS offset',  'absolute', 1, 1000]
         ]},
-    'rmsoffset': {
-        'options': [None, "RMS offset", "us", 'chrony', 'chrony.rmsoffset', 'line'],
+    'stratum': {
+        'options': [None, "Chrony Stratum", "stratum", 'root', 'chrony.stratum', 'line'],
         'lines': [
-            ['rmsoffset', None, 'absolute', 1, 1000]
+            ['stratum', None, 'absolute', 1, 1]
         ]},
-    'rootdelay': {
-        'options': [None, "Root delay", "us", 'chrony', 'chrony.rootdelay', 'line'],
+    'root': {
+        'options': [None, "Chrony Root Delays", "milliseconds", 'root', 'chrony.root', 'line'],
         'lines': [
-            ['rootdelay', None, 'absolute', 1, 1000]
-        ]},
-    'rootdispersion': {
-        'options': [None, "Root dispersion", "us", 'chrony', 'chrony.rootdispersion', 'line'],
-        'lines': [
-            ['rootdispersion', None, 'absolute', 1, 1000]
-        ]},
-    'skew': {
-        'options': [None, "Skew, error bound on frequency", "ppm", 'chrony', 'chrony.skew', 'line'],
-        'lines': [
-            ['skew', None, 'absolute', 1, 1000]
+            ['rootdelay',      'delay',      'absolute', 1, 1000000],
+            ['rootdispersion', 'dispersion', 'absolute', 1, 1000000]
         ]},
     'frequency': {
-        'options': [None, "Frequency", "ppm", 'chrony', 'chrony.frequency', 'line'],
+        'options': [None, "Chrony Frequency", "ppm", 'frequencies', 'chrony.frequency', 'area'],
         'lines': [
             ['frequency', None, 'absolute', 1, 1000]
         ]},
     'residualfreq': {
-        'options': [None, "Residual frequency", "ppm", 'chrony', 'chrony.residualfreq', 'line'],
+        'options': [None, "Chrony Residual frequency", "ppm", 'frequencies', 'chrony.residualfreq', 'area'],
         'lines': [
-            ['residualfreq', None, 'absolute', 1, 1000]
+            ['residualfreq', 'residual frequency', 'absolute', 1, 1000]
+        ]},
+    'skew': {
+        'options': [None, "Chrony Skew, error bound on frequency", "ppm", 'frequencies', 'chrony.skew', 'area'],
+        'lines': [
+            ['skew', None, 'absolute', 1, 1000]
         ]}
 }
 
@@ -68,6 +64,7 @@ CHRONY = [('Frequency', 'frequency', 1e3),
           ('Root delay', 'rootdelay', 1e9),
           ('Root dispersion', 'rootdispersion', 1e9),
           ('Skew', 'skew', 1e3),
+          ('Stratum', 'stratum', 1),
           ('System time', 'timediff', 1e9)]
 
 
