@@ -582,10 +582,15 @@ RRDSET *rrdset_create_custom(
 
     st->chart_type = rrdset_type_id(config_get(st->config_section, "chart type", rrdset_type_name(chart_type)));
     st->type       = config_get(st->config_section, "type", type);
+
     st->family     = config_get(st->config_section, "family", family?family:st->type);
+    json_fix_string(st->family);
+
     st->units      = config_get(st->config_section, "units", units?units:"");
+    json_fix_string(st->units);
 
     st->context    = config_get(st->config_section, "context", context?context:st->id);
+    json_fix_string(st->context);
     st->hash_context = simple_hash(st->context);
 
     st->priority = config_get_number(st->config_section, "priority", priority);
