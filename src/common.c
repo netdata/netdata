@@ -227,9 +227,18 @@ void json_escape_string(char *dst, const char *src, size_t size) {
 }
 
 void json_fix_string(char *s) {
-    for( ; *s ;s++) {
-        if(unlikely(*s == '\\')) *s = '/';
-        else if(unlikely(*s == '"')) *s = '\'';
+    unsigned char c;
+    while((c = (unsigned char)*s)) {
+        if(unlikely(c == '\\'))
+            *s++ = '/';
+        else if(unlikely(c == '"'))
+            *s++ = '\'';
+        else if(unlikely(isspace(c) || iscntrl(c)))
+            *s++ = ' ';
+        else if(unlikely(!isprint(c) || c > 127))
+            *s++ = '_';
+        else
+            s++;
     }
 }
 

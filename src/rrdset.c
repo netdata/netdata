@@ -586,6 +586,7 @@ RRDSET *rrdset_create_custom(
     st->units      = config_get(st->config_section, "units", units?units:"");
 
     st->context    = config_get(st->config_section, "context", context?context:st->id);
+    json_fix_string(st->context);
     st->hash_context = simple_hash(st->context);
 
     st->priority = config_get_number(st->config_section, "priority", priority);
