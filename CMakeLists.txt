@@ -152,7 +152,12 @@ set(NETDATA_SOURCE_FILES
         src/web_client.h
         src/web_server.c
         src/web_server.h
-        src/locks.h src/statsd.c src/statsd.h src/statistical.c src/statistical.h src/backend_prometheus.c src/backend_prometheus.h)
+        src/locks.h
+        src/statsd.c src/statsd.h
+        src/statistical.c src/statistical.h
+        src/backend_prometheus.c src/backend_prometheus.h
+        src/signals.c src/signals.h
+        )
 
 set(APPS_PLUGIN_SOURCE_FILES
         src/appconfig.c
