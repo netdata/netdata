@@ -4,6 +4,7 @@
 
 from base import SimpleService
 from subprocess import Popen, PIPE
+import re
 
 # default module values
 update_every = 10
@@ -102,6 +103,35 @@ class Service(SimpleService):
         self.ntpq = self.find_binary('ntpq')
         self.associd_list = list()
         self.peer_dict = dict()
+        self.rgx_sys = re.compile(
+                r'.*stratum=(?P<stratum>[0-9.-]+)'
+                r'.*precision=(?P<precision>[0-9.-]+)'
+                r'.*rootdelay=(?P<rootdelay>[0-9.-]+)'
+                r'.*rootdisp=(?P<rootdisp>[0-9.-]+)'
+                r'.*tc=(?P<tc>[0-9.-]+)'
+                r'.*mintc=(?P<mintc>[0-9.-]+)'
+                r'.*offset=(?P<offset>[0-9.-]+)'
+                r'.*frequency=(?P<frequency>[0-9.-]+)'
+                r'.*sys_jitter=(?P<sys_jitter>[0-9.-]+)'
+                r'.*clk_jitter=(?P<clk_jitter>[0-9.-]+)'
+                r'.*clk_wander=(?P<clk_wander>[0-9.-]+)')
+        self.rgx_peer = re.compile(
+                r'.*associd=(?P<associd>[0-9.-]+)'
+                r'.*srcadr=(?P<srcadr>[a-z0-9.-]+)'
+                r'.*stratum=(?P<stratum>[0-9.-]+)'
+                r'.*precision=(?P<precision>[0-9.-]+)'
+                r'.*rootdelay=(?P<rootdelay>[0-9.-]+)'
+                r'.*rootdisp=(?P<rootdisp>[0-9.-]+)'
+                r'.*hmode=(?P<hmode>[0-9.-]+)'
+                r'.*pmode=(?P<pmode>[0-9.-]+)'
+                r'.*hpoll=(?P<hpoll>[0-9.-]+)'
+                r'.*ppoll=(?P<ppoll>[0-9.-]+)'
+                r'.*headway=(?P<headway>[0-9.-]+)'
+                r'.*offset=(?P<offset>[0-9.-]+)'
+                r'.*delay=(?P<delay>[0-9.-]+)'
+                r'.*dispersion=(?P<dispersion>[0-9.-]+)'
+                r'.*jitter=(?P<jitter>[0-9.-]+)'
+                r'.*xleave=(?P<xleave>[0-9.-]+)')
 
     def check(self):
         # Cant start without 'ntpq' command
@@ -140,7 +170,7 @@ class Service(SimpleService):
             if len(peer) == 0:
                 self.error('Cant parse output...')
                 return False
-            self.peer_dict[associd] = peer[5][0].split('=')[1].replace('.','-')
+            self.peer_dict[associd] = '-'.join(peer['srcadr'].split('.'))
 
         # We are about to start!
         self.create_charts()
@@ -163,16 +193,6 @@ class Service(SimpleService):
 
         return outs.decode()
 
-    def parse_variables(self, raw):
-        data = []
-        lines = raw.split('\n')
-        for line in lines:
-            variables = line.replace('\n','').split(',')
-            for variable in variables:
-                if variable != '':
-                    data.append(' '.join(variable.split()).split(' '))
-        return data
-
     def get_variables(self, assoc_id):
         raw = self._get_raw_data('readlist %s' % assoc_id)
 
@@ -183,7 +203,15 @@ class Service(SimpleService):
                 self.error(''.join(['No data for peer: ', self.peer_dict[assoc_id], ', assoc_id: ', assoc_id]))
             return None
 
-        data = self.parse_variables(raw)
+        if assoc_id == 0:
+            match = self.rgx_sys.search(' '.join(raw.split('\n')))
+        else:
+            match = self.rgx_peer.search(' '.join(raw.split('\n')))
+
+        if match != None:
+            data = match.groupdict()
+        else:
+            return None
 
         return data
 
@@ -191,62 +219,38 @@ class Service(SimpleService):
         to_netdata = {}
 
         sys_vars = self.get_variables(0)
-        stratum = float(sys_vars[8][0].split('=')[1])
-        precision = float(sys_vars[9][0].split('=')[1])
-        rootdelay = float(sys_vars[10][0].split('=')[1])
-        rootdisp = float(sys_vars[11][0].split('=')[1])
-        tc = float(sys_vars[18][0].split('=')[1])
-        mintc = float(sys_vars[19][0].split('=')[1])
-        offset = float(sys_vars[20][0].split('=')[1])
-        frequency = float(sys_vars[21][0].split('=')[1])
-        sys_jitter = float(sys_vars[22][0].split('=')[1])
-        clk_jitter = float(sys_vars[23][0].split('=')[1])
-        clk_wander = float(sys_vars[24][0].split('=')[1])
-        to_netdata['frequency'] = frequency * 1000
-        to_netdata['offset'] = offset * 1000000
-        to_netdata['rootdelay'] = rootdelay * 1000
-        to_netdata['rootdisp'] = rootdisp * 1000
-        to_netdata['sys_jitter'] = sys_jitter * 1000000
-        to_netdata['clk_jitter'] = clk_jitter * 1000
-        to_netdata['clk_wander'] = clk_wander * 1000
-        to_netdata['precision'] = precision
-        to_netdata['stratum'] = stratum
-        to_netdata['tc'] = tc
-        to_netdata['mintc'] = mintc
+        if (sys_vars != None):
+            to_netdata['frequency'] = float(sys_vars['frequency']) * 1000
+            to_netdata['offset'] = float(sys_vars['offset']) * 1000000
+            to_netdata['rootdelay'] = float(sys_vars['rootdelay']) * 1000
+            to_netdata['rootdisp'] = float(sys_vars['rootdisp']) * 1000
+            to_netdata['sys_jitter'] = float(sys_vars['sys_jitter']) * 1000000
+            to_netdata['clk_jitter'] = float(sys_vars['clk_jitter']) * 1000
+            to_netdata['clk_wander'] = float(sys_vars['clk_wander']) * 1000
+            to_netdata['precision'] = float(sys_vars['precision'])
+            to_netdata['stratum'] = float(sys_vars['stratum'])
+            to_netdata['tc'] = float(sys_vars['tc'])
+            to_netdata['mintc'] = float(sys_vars['mintc'])
 
         if len(self.associd_list) != 0:
             for associd in self.associd_list:
                 peer = self.peer_dict[associd]
                 peer_vars = self.get_variables(associd)
                 if (peer_vars != None):
-                    peer_stratum = float(peer_vars[10][0].split('=')[1])
-                    peer_precision = float(peer_vars[11][0].split('=')[1])
-                    peer_rootdelay = float(peer_vars[12][0].split('=')[1])
-                    peer_rootdisp = float(peer_vars[13][0].split('=')[1])
-                    peer_hmode = float(peer_vars[21][0].split('=')[1])
-                    peer_pmode = float(peer_vars[22][0].split('=')[1])
-                    peer_hpoll = float(peer_vars[23][0].split('=')[1])
-                    peer_ppoll = float(peer_vars[24][0].split('=')[1])
-                    peer_headway = float(peer_vars[25][0].split('=')[1])
-                    peer_offset = float(peer_vars[28][0].split('=')[1])
-                    peer_delay = float(peer_vars[29][0].split('=')[1])
-                    peer_dispersion = float(peer_vars[30][0].split('=')[1])
-                    peer_jitter = float(peer_vars[31][0].split('=')[1])
-                    peer_xleave = float(peer_vars[32][0].split('=')[1])
-                    to_netdata[''.join([peer, '_stratum'])] = peer_stratum
-                    to_netdata[''.join([peer, '_precision'])] = peer_precision
-                    to_netdata[''.join([peer, '_rootdelay'])] = peer_rootdelay * 1000
-                    to_netdata[''.join([peer, '_rootdisp'])] = peer_rootdisp * 1000
-                    to_netdata[''.join([peer, '_hmode'])] = peer_hmode
-                    to_netdata[''.join([peer, '_pmode'])] = peer_pmode
-                    to_netdata[''.join([peer, '_hpoll'])] = peer_hpoll
-                    to_netdata[''.join([peer, '_ppoll'])] = peer_ppoll
-                    to_netdata[''.join([peer, '_headway'])] = peer_headway
-                    to_netdata[''.join([peer, '_offset'])] = peer_offset * 1000
-                    to_netdata[''.join([peer, '_delay'])] = peer_delay * 1000
-                    to_netdata[''.join([peer, '_dispersion'])] = peer_dispersion * 1000
-                    to_netdata[''.join([peer, '_jitter'])] = peer_jitter * 1000
-                    to_netdata[''.join([peer, '_xleave'])] = peer_xleave * 1000
+                    to_netdata[''.join([peer, '_stratum'])] = float(peer_vars['stratum'])
+                    to_netdata[''.join([peer, '_precision'])] = float(peer_vars['precision'])
+                    to_netdata[''.join([peer, '_rootdelay'])] = float(peer_vars['rootdelay']) * 1000
+                    to_netdata[''.join([peer, '_rootdisp'])] = float(peer_vars['rootdisp']) * 1000
+                    to_netdata[''.join([peer, '_hmode'])] = float(peer_vars['hmode'])
+                    to_netdata[''.join([peer, '_pmode'])] = float(peer_vars['pmode'])
+                    to_netdata[''.join([peer, '_hpoll'])] = float(peer_vars['hpoll'])
+                    to_netdata[''.join([peer, '_ppoll'])] = float(peer_vars['ppoll'])
+                    to_netdata[''.join([peer, '_headway'])] = float(peer_vars['headway'])
+                    to_netdata[''.join([peer, '_offset'])] = float(peer_vars['offset']) * 1000
+                    to_netdata[''.join([peer, '_delay'])] = float(peer_vars['delay']) * 1000
+                    to_netdata[''.join([peer, '_dispersion'])] = float(peer_vars['dispersion']) * 1000
+                    to_netdata[''.join([peer, '_jitter'])] = float(peer_vars['jitter']) * 1000
+                    to_netdata[''.join([peer, '_xleave'])] = float(peer_vars['xleave']) * 1000
 
         return to_netdata
 
