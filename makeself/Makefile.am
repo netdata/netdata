@@ -7,7 +7,7 @@ dist_noinst_SCRIPTS = \
 	build.sh \
 	makeself.sh \
 	makeself-license.txt \
-	setup-x86_64-static.sh \
+	install-alpine-packages.sh \
 	post-installer.sh \
 	jobs/10-prepare-destination.install.sh \
 	jobs/50-curl-7.53.1.install.sh \

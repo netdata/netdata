@@ -39,7 +39,10 @@ static void signal_handler(int signo) {
             if(signals_waiting[i].action == NETDATA_SIGNAL_FATAL) {
                 char buffer[200 + 1];
                 snprintfz(buffer, 200, "\nSIGNAL HANLDER: received: %s. Oops! This is bad!\n", signals_waiting[i].name);
-                write(STDERR_FILENO, buffer, strlen(buffer));
+                if(write(STDERR_FILENO, buffer, strlen(buffer)) == -1) {
+                    // nothing to do - we cannot write but there is no way to complaint about it
+                    ;
+                }
             }
 
             return;

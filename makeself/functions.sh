@@ -3,6 +3,7 @@
 # -----------------------------------------------------------------------------
 
 # allow running the jobs by hand
+[ -z "${NETDATA_BUILD_WITH_DEBUG}" ] && export NETDATA_BUILD_WITH_DEBUG=0
 [ -z "${NETDATA_INSTALL_PATH}" ] && export NETDATA_INSTALL_PATH="${1-/opt/netdata}"
 [ -z "${NETDATA_MAKESELF_PATH}" ] && export NETDATA_MAKESELF_PATH="$(dirname "${0}")/.."
 [ "${NETDATA_MAKESELF_PATH:0:1}" != "/" ] && export NETDATA_MAKESELF_PATH="$(pwd)/${NETDATA_MAKESELF_PATH}"
