@@ -216,6 +216,7 @@
 #include "web_client.h"
 #include "web_server.h"
 #include "registry.h"
+#include "signals.h"
 #include "daemon.h"
 #include "main.h"
 #include "unit_test.h"

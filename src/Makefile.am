@@ -121,6 +121,8 @@ netdata_SOURCES = \
 	rrdset.c \
 	rrdsetvar.c \
 	rrdvar.c \
+	signals.c \
+	signals.h \
 	simple_pattern.c \
 	simple_pattern.h \
 	socket.c \
