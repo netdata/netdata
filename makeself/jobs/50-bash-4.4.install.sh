@@ -44,4 +44,7 @@ EOF
 
 run make install
 
-run strip ${NETDATA_INSTALL_PATH}/bin/bash
+if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]
+then
+    run strip ${NETDATA_INSTALL_PATH}/bin/bash
+fi

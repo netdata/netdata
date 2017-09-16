@@ -1,6 +1,28 @@
 #!/usr/bin/env sh
 
-# First run setup-x86_64-static.sh under alpine linux to install
+# -----------------------------------------------------------------------------
+# parse command line arguments
+
+export NETDATA_BUILD_WITH_DEBUG=0
+
+while [ ! -z "${1}" ]
+do
+    case "${1}" in
+        debug)
+            export NETDATA_BUILD_WITH_DEBUG=1
+            ;;
+
+        *)
+            ;;
+    esac
+
+    shift
+done
+
+
+# -----------------------------------------------------------------------------
+
+# First run install-alpine-packages.sh under alpine linux to install
 # the required packages. build-x86_64-static.sh will do this for you
 # using docker.
 
