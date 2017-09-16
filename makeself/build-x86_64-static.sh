@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 . $(dirname "$0")/../installer/functions.sh || exit 1
 
