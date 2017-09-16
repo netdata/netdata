@@ -105,38 +105,8 @@ FILE *mypopen(const char *command, pid_t *pidptr)
 #endif
 
     // reset all signals
-    {
-        sigset_t sigset;
-        sigfillset(&sigset);
-
-        if(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1)
-            error("pre-execution of command '%s' on pid %d: could not unblock signals for threads.", command, getpid());
-        
-        // We only need to reset ignored signals.
-        // Signals with signal handlers are reset by default.
-        struct sigaction sa;
-        sigemptyset(&sa.sa_mask);
-        sa.sa_handler = SIG_DFL;
-        sa.sa_flags = 0;
-
-        if(sigaction(SIGINT, &sa, NULL) == -1)
-            error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGINT.", command, getpid());
-
-        if(sigaction(SIGTERM, &sa, NULL) == -1)
-            error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGTERM.", command, getpid());
-
-        if(sigaction(SIGPIPE, &sa, NULL) == -1)
-            error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGPIPE.", command, getpid());
-
-        if(sigaction(SIGHUP, &sa, NULL) == -1)
-            error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGHUP.", command, getpid());
-
-        if(sigaction(SIGUSR1, &sa, NULL) == -1)
-            error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGUSR1.", command, getpid());
-
-        if(sigaction(SIGUSR2, &sa, NULL) == -1)
-            error("pre-execution of command '%s' on pid %d: failed to set default signal handler for SIGUSR2.", command, getpid());
-    }
+    signals_unblock();
+    signals_reset();
 
     debug(D_CHILDS, "executing command: '%s' on pid %d.", command, getpid());
     execl("/bin/sh", "sh", "-c", command, NULL);
