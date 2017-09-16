@@ -1,4 +1,6 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
+
+. $(dirname "$0")/../installer/functions.sh || exit 1
 
 set -e
 
@@ -16,22 +18,22 @@ then
     #
     # This command maps the current directory to
     #   /usr/src/netdata.git
-    # inside the container and runs the script setup-x86_64-static.sh
+    # inside the container and runs the script install-alpine-packages.sh
     # (also inside the container)
     #
-    sudo docker run -v $(pwd):/usr/src/netdata.git:rw alpine:3.5 \
-        /bin/sh /usr/src/netdata.git/makeself/setup-x86_64-static.sh
+    run sudo docker run -v $(pwd):/usr/src/netdata.git:rw alpine:3.6 \
+        /bin/sh /usr/src/netdata.git/makeself/install-alpine-packages.sh
 
     # save the changes made permanently
     id=$(sudo docker ps -l -q)
-    sudo docker commit ${id} "${DOCKER_CONTAINER_NAME}"
+    run sudo docker commit ${id} "${DOCKER_CONTAINER_NAME}"
 fi
 
 # Run the build script inside the container
-sudo docker run -a stdin -a stdout -a stderr -i -t -v \
+run sudo docker run -a stdin -a stdout -a stderr -i -t -v \
     $(pwd):/usr/src/netdata.git:rw \
     "${DOCKER_CONTAINER_NAME}" \
-    /bin/sh /usr/src/netdata.git/makeself/build.sh
+    /bin/sh /usr/src/netdata.git/makeself/build.sh "${@}"
 
 if [ "${USER}" ]
     then
