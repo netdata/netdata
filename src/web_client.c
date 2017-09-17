@@ -138,13 +138,37 @@ void web_client_reset(struct web_client *w) {
 
 
         // --------------------------------------------------------------------
+
+        const char *mode;
+        switch(w->mode) {
+            case WEB_CLIENT_MODE_FILECOPY:
+                mode = "FILECOPY";
+                break;
+
+            case WEB_CLIENT_MODE_OPTIONS:
+                mode = "OPTIONS";
+                break;
+
+            case WEB_CLIENT_MODE_STREAM:
+                mode = "STREAM";
+                break;
+
+            case WEB_CLIENT_MODE_NORMAL:
+                mode = "DATA";
+                break;
+
+            default:
+                mode = "UNKNOWN";
+                break;
+        }
+
         // access log
         log_access("%llu: %d '[%s]:%s' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
                    w->id
                    , gettid()
                    , w->client_ip
                    , w->client_port
-                   , (w->mode == WEB_CLIENT_MODE_FILECOPY) ? "FILECOPY" : ((w->mode == WEB_CLIENT_MODE_OPTIONS) ? "OPTIONS" : "DATA")
+                   , mode
                    , sent
                    , size
                    , -((size > 0) ? ((size - sent) / (double) size * 100.0) : 0.0)
