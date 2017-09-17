@@ -207,6 +207,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_datadir}/%{name}/web
 
 %changelog
+* Mon Sep 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.8.0-1
+  This is mainly a bugfix release.
+  Please check full changelog at github.
 * Mon Jul 16 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.7.0-1
 - netdata is now a fully featured statsd server
 - new installation options
