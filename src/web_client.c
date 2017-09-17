@@ -8,6 +8,8 @@ int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int respect_web_browser_do_not_track_policy = 0;
 char *web_x_frame_options = NULL;
 
+SIMPLE_PATTERN *web_client_access_list = NULL;
+
 #ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 #endif /* NETDATA_WITH_ZLIB */
@@ -58,9 +60,12 @@ struct web_client *web_client_create(int listener) {
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
     {
-        w->ifd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port));
+        w->ifd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_client_access_list);
         if (w->ifd == -1) {
-            error("%llu: Cannot accept new incoming connection.", w->id);
+
+            if(errno != EPERM)
+                error("%llu: Failed to accept new incoming connection.", w->id);
+
             freez(w);
             return NULL;
         }
