@@ -142,6 +142,7 @@ struct web_client {
 };
 
 extern struct web_client *web_clients;
+extern SIMPLE_PATTERN *web_client_access_list;
 
 extern uid_t web_files_uid(void);
 extern uid_t web_files_gid(void);
