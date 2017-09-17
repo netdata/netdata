@@ -35,7 +35,7 @@ extern int sock_setreuse_port(int fd, int reuse);
 extern int sock_enlarge_in(int fd);
 extern int sock_enlarge_out(int fd);
 
-extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize);
+extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize, SIMPLE_PATTERN *access_list);
 
 #ifndef HAVE_ACCEPT4
 extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
@@ -56,6 +56,7 @@ extern void poll_events(LISTEN_SOCKETS *sockets
         , void  (*del_callback)(int fd, void *data)
         , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
         , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
+        , SIMPLE_PATTERN *access_list
         , void *data
 );
 

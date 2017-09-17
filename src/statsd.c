@@ -912,6 +912,7 @@ void *statsd_collector_thread(void *ptr) {
             , statsd_del_callback
             , statsd_rcv_callback
             , statsd_snd_callback
+            , NULL
             , (void *)d
     );
 
