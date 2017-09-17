@@ -999,4 +999,7 @@ int main(int argc, char **argv) {
     // Handle signals
 
     signals_handle();
+
+    // should never reach this point
+    return 1;
 }
