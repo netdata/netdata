@@ -106,6 +106,12 @@ netdataDashboard.menu = {
         info: 'Detailed information for each CPU of the system. A summary of the system for all CPUs can be found at the <a href="#menu_system">System Overview</a> section.'
     },
 
+    'gpu': {
+        title: 'GPUs',
+        icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
+        info: 'Detailed information for each NVIDIA GPU of the system'
+    },
+
     'mem': {
         title: 'Memory',
         icon: '<i class="fas fa-microchip"></i>',
