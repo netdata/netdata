@@ -146,6 +146,7 @@ extern SIMPLE_PATTERN *web_allow_connections_from;
 extern SIMPLE_PATTERN *web_allow_registry_from;
 extern SIMPLE_PATTERN *web_allow_badges_from;
 extern SIMPLE_PATTERN *web_allow_streaming_from;
+extern SIMPLE_PATTERN *web_allow_netdataconf_from;
 
 extern uid_t web_files_uid(void);
 extern uid_t web_files_gid(void);

@@ -87,6 +87,7 @@ void web_server_config_options(void) {
     web_allow_badges_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), SIMPLE_PATTERN_EXACT);
     web_allow_registry_from = simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), SIMPLE_PATTERN_EXACT);
     web_allow_streaming_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"), SIMPLE_PATTERN_EXACT);
+    web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from", "::1 fd* 127.* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*"), SIMPLE_PATTERN_EXACT);
 
 #ifdef NETDATA_WITH_ZLIB
     web_enable_gzip = config_get_boolean(CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);

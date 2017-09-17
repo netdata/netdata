@@ -12,6 +12,7 @@ SIMPLE_PATTERN *web_allow_connections_from = NULL;
 SIMPLE_PATTERN *web_allow_registry_from = NULL;
 SIMPLE_PATTERN *web_allow_badges_from = NULL;
 SIMPLE_PATTERN *web_allow_streaming_from = NULL;
+SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
 
 #ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
@@ -1158,6 +1159,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return check_host_and_call(host, w, url, web_client_api_old_all_json);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
+            if(unlikely(web_allow_netdataconf_from && !simple_pattern_matches(web_allow_netdataconf_from, w->client_ip)))
+                return web_client_permission_denied(w);
+
             debug(D_WEB_CLIENT_ACCESS, "%llu: generating netdata.conf ...", w->id);
             w->response.data->contenttype = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
