@@ -217,32 +217,46 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             st = NULL;
         }
         else if(likely(hash == CHART_HASH && !strcmp(s, PLUGINSD_KEYWORD_CHART))) {
-            int noname = 0;
             st = NULL;
 
-            if((words[1]) != NULL && (words[2]) != NULL && strcmp(words[1], words[2]) == 0)
-                noname = 1;
-
-            char *type = words[1];
-            char *id = NULL;
-            if(likely(type)) {
-                id = strchr(type, '.');
-                if(likely(id)) { *id = '\0'; id++; }
-            }
-            char *name = words[2];
-            char *title = words[3];
-            char *units = words[4];
-            char *family = words[5];
-            char *context = words[6];
-            char *chart = words[7];
-            char *priority_s = words[8];
+            char *type           = words[1];
+            char *name           = words[2];
+            char *title          = words[3];
+            char *units          = words[4];
+            char *family         = words[5];
+            char *context        = words[6];
+            char *chart          = words[7];
+            char *priority_s     = words[8];
             char *update_every_s = words[9];
-            char *options = words[10];
+            char *options        = words[10];
 
+            // parse the id from type
+            char *id = NULL;
+            if(likely(type && (id = strchr(type, '.')))) {
+                *id = '\0';
+                id++;
+            }
+
+            // make sure we have the required variables
             if(unlikely(!type || !*type || !id || !*id)) {
                 error("PLUGINSD: '%s' is requesting a CHART, without a type.id, on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
                 enabled = 0;
                 break;
+            }
+
+            // parse the name, and make sure it does not include 'type.'
+            if(unlikely(name && *name)) {
+                // when data are coming from slaves
+                // name will be type.name
+                // so we have to remove 'type.' from name too
+                size_t len = strlen(type);
+                if(strncmp(type, name, len) == 0 && name[len] == '.')
+                    name = &name[len + 1];
+
+                // if the name is the same with the id,
+                // or is just 'NULL', clear it.
+                if(unlikely(strcmp(name, id) == 0 || strcasecmp(name, "NULL") == 0 || strcasecmp(name, "(NULL)") == 0))
+                    name = NULL;
             }
 
             int priority = 1000;
@@ -255,9 +269,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             RRDSET_TYPE chart_type = RRDSET_TYPE_LINE;
             if(unlikely(chart)) chart_type = rrdset_type_id(chart);
 
-            if(unlikely(noname || !name || !*name || strcasecmp(name, "NULL") == 0 || strcasecmp(name, "(NULL)") == 0)) name = NULL;
-            if(unlikely(!family || !*family)) family = NULL;
-            if(unlikely(!context || !*context)) context = NULL;
+            if(unlikely(name && !*name)) name = NULL;
+            if(unlikely(family && !*family)) family = NULL;
+            if(unlikely(context && !*context)) context = NULL;
             if(unlikely(!title)) title = "";
             if(unlikely(!units)) units = "unknown";
 
