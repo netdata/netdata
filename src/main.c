@@ -239,7 +239,7 @@ struct option_def options[] = {
     { 'W', "See Advanced options below.",                 "options",     NULL},
 };
 
-void help(int exitcode) {
+int help(int exitcode) {
     FILE *stream;
     if(exitcode == 0)
         stream = stdout;
@@ -318,7 +318,7 @@ void help(int exitcode) {
     );
 
     fflush(stream);
-    exit(exitcode);
+    return exitcode;
 }
 
 // TODO: Remove this function with the nix major release.
@@ -595,7 +595,7 @@ int main(int argc, char **argv) {
                 case 'c':
                     if(config_load(optarg, 1) != 1) {
                         error("Cannot load configuration file %s.", optarg);
-                        exit(1);
+                        return 1;
                     }
                     else {
                         debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
@@ -606,7 +606,7 @@ int main(int argc, char **argv) {
                     dont_fork = 1;
                     break;
                 case 'h':
-                    help(0);
+                    return help(0);
                     break;
                 case 'i':
                     config_set(CONFIG_SECTION_WEB, "bind to", optarg);
@@ -637,8 +637,8 @@ int main(int argc, char **argv) {
                         char* debug_flags_string = "debug_flags=";
 
                         if(strcmp(optarg, "unittest") == 0) {
-                            if(unit_test_buffer()) exit(1);
-                            if(unit_test_str2ld()) exit(1);
+                            if(unit_test_buffer()) return 1;
+                            if(unit_test_str2ld()) return 1;
                             //default_rrd_update_every = 1;
                             //default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             //if(!config_loaded) config_load(NULL, 0);
@@ -648,10 +648,10 @@ int main(int argc, char **argv) {
                             default_health_enabled = 0;
                             rrd_init("unittest");
                             default_rrdpush_enabled = 0;
-                            if(run_all_mockup_tests()) exit(1);
-                            if(unit_test_storage()) exit(1);
+                            if(run_all_mockup_tests()) return 1;
+                            if(unit_test_storage()) return 1;
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
-                            exit(0);
+                            return 0;
                         }
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
@@ -675,7 +675,7 @@ int main(int argc, char **argv) {
                                         "   -W simple-pattern '!/path/*/*.ext /path/*.ext' '/path/test.ext'\n"
                                         "\n"
                                 );
-                                exit(1);
+                                return 1;
                             }
 
                             const char *heystack = argv[optind];
@@ -688,11 +688,11 @@ int main(int argc, char **argv) {
 
                             if(ret) {
                                 fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s'\n", heystack, needle);
-                                exit(0);
+                                return 0;
                             }
                             else {
                                 fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s'\n", heystack, needle);
-                                exit(1);
+                                return 1;
                             }
                         }
                         else if(strncmp(optarg, stacksize_string, strlen(stacksize_string)) == 0) {
@@ -718,7 +718,7 @@ int main(int argc, char **argv) {
                                         " parameters."
                                         "\n"
                                 );
-                                exit(1);
+                                return 1;
                             }
                             const char *section = argv[optind];
                             const char *key = argv[optind + 1];
@@ -743,7 +743,7 @@ int main(int argc, char **argv) {
                                         " -c netdata.conf has to be given before -W get.\n"
                                         "\n"
                                 );
-                                exit(1);
+                                return 1;
                             }
 
                             if(!config_loaded) {
@@ -759,18 +759,18 @@ int main(int argc, char **argv) {
                             const char *def = argv[optind + 2];
                             const char *value = config_get(section, key, def);
                             printf("%s\n", value);
-                            exit(0);
+                            return 0;
                         }
                         else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
-                            help(1);
+                            return help(1);
                         }
                     }
                     break;
+
                 default: /* ? */
                     fprintf(stderr, "Unknown parameter '%c'\n", opt);
-                    help(1);
-                    break;
+                    return help(1);
             }
         }
     }
@@ -999,4 +999,8 @@ int main(int argc, char **argv) {
     // Handle signals
 
     signals_handle();
+
+    // should never reach this point
+    // but we need it for rpmlint #2752
+    return 1;
 }
