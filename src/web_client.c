@@ -52,6 +52,10 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
     return 0;
 }
 
+static void log_connection(struct web_client *w, const char *msg) {
+    log_access("%llu: %d '[%s]:%s' '%s'", w->id, gettid(), w->client_ip, w->client_port, msg);
+}
+
 struct web_client *web_client_create(int listener) {
     struct web_client *w;
 
@@ -61,14 +65,24 @@ struct web_client *web_client_create(int listener) {
 
     {
         w->ifd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_client_access_list);
-        if (w->ifd == -1) {
 
-            if(errno != EPERM)
+        if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
+        if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
+
+        if (w->ifd == -1) {
+            if(errno == EPERM)
+                log_connection(w, "ACCESS DENIED");
+            else {
+                log_connection(w, "CONNECTION FAILED");
                 error("%llu: Failed to accept new incoming connection.", w->id);
+            }
 
             freez(w);
             return NULL;
         }
+        else
+            log_connection(w, "CONNECTED");
+
         w->ofd = w->ifd;
 
         int flag = 1;
@@ -125,17 +139,20 @@ void web_client_reset(struct web_client *w) {
 
         // --------------------------------------------------------------------
         // access log
-
-        log_access("%llu: (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %s: %d '%s'",
-                   w->id,
-                   sent, size, -((size > 0) ? ((size - sent) / (double) size * 100.0) : 0.0),
-                   dt_usec(&w->tv_ready, &w->tv_in) / 1000.0,
-                   dt_usec(&tv, &w->tv_ready) / 1000.0,
-                   dt_usec(&tv, &w->tv_in) / 1000.0,
-                   (w->mode == WEB_CLIENT_MODE_FILECOPY) ? "filecopy" : ((w->mode == WEB_CLIENT_MODE_OPTIONS)
-                                                                         ? "options" : "data"),
-                   w->response.code,
-                   w->last_url
+        log_access("%llu: %d '[%s]:%s' '%s' (sent/all = %zu/%zu bytes %0.0f%%, prep/sent/total = %0.2f/%0.2f/%0.2f ms) %d '%s'",
+                   w->id
+                   , gettid()
+                   , w->client_ip
+                   , w->client_port
+                   , (w->mode == WEB_CLIENT_MODE_FILECOPY) ? "FILECOPY" : ((w->mode == WEB_CLIENT_MODE_OPTIONS) ? "OPTIONS" : "DATA")
+                   , sent
+                   , size
+                   , -((size > 0) ? ((size - sent) / (double) size * 100.0) : 0.0)
+                   , dt_usec(&w->tv_ready, &w->tv_in) / 1000.0
+                   , dt_usec(&tv, &w->tv_ready) / 1000.0
+                   , dt_usec(&tv, &w->tv_in) / 1000.0
+                   , w->response.code
+                   , w->last_url
         );
     }
 
@@ -1612,8 +1629,6 @@ void *web_client_main(void *ptr)
     int retval, timeout;
     nfds_t fdmax = 0;
 
-    log_access("%llu: %s port %s connected on thread task id %d", w->id, w->client_ip, w->client_port, gettid());
-
     for(;;) {
         if(unlikely(netdata_exit)) break;
 
@@ -1723,7 +1738,7 @@ void *web_client_main(void *ptr)
 
     web_client_reset(w);
 
-    log_access("%llu: %s port %s disconnected from thread task id %d", w->id, w->client_ip, w->client_port, gettid());
+    log_connection(w, "DISCONNECTED");
     debug(D_WEB_CLIENT, "%llu: done...", w->id);
 
     // close the sockets/files now
