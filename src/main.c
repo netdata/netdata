@@ -83,7 +83,10 @@ void web_server_config_options(void) {
     web_x_frame_options = config_get(CONFIG_SECTION_WEB, "x-frame-options response header", "");
     if(!*web_x_frame_options) web_x_frame_options = NULL;
 
-    web_client_access_list = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "global API allow from", "127.* ::1 *"), SIMPLE_PATTERN_EXACT);
+    web_allow_connections_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "127.* ::1 *"), SIMPLE_PATTERN_EXACT);
+    web_allow_badges_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), SIMPLE_PATTERN_EXACT);
+    web_allow_registry_from = simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), SIMPLE_PATTERN_EXACT);
+    web_allow_streaming_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"), SIMPLE_PATTERN_EXACT);
 
 #ifdef NETDATA_WITH_ZLIB
     web_enable_gzip = config_get_boolean(CONFIG_SECTION_WEB, "enable gzip compression", web_enable_gzip);

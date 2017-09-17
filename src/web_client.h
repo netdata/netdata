@@ -142,10 +142,15 @@ struct web_client {
 };
 
 extern struct web_client *web_clients;
-extern SIMPLE_PATTERN *web_client_access_list;
+extern SIMPLE_PATTERN *web_allow_connections_from;
+extern SIMPLE_PATTERN *web_allow_registry_from;
+extern SIMPLE_PATTERN *web_allow_badges_from;
+extern SIMPLE_PATTERN *web_allow_streaming_from;
 
 extern uid_t web_files_uid(void);
 extern uid_t web_files_gid(void);
+
+extern int web_client_permission_denied(struct web_client *w);
 
 extern struct web_client *web_client_create(int listener);
 extern struct web_client *web_client_free(struct web_client *w);
