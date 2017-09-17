@@ -8,7 +8,10 @@ int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
 int respect_web_browser_do_not_track_policy = 0;
 char *web_x_frame_options = NULL;
 
-SIMPLE_PATTERN *web_client_access_list = NULL;
+SIMPLE_PATTERN *web_allow_connections_from = NULL;
+SIMPLE_PATTERN *web_allow_registry_from = NULL;
+SIMPLE_PATTERN *web_allow_badges_from = NULL;
+SIMPLE_PATTERN *web_allow_streaming_from = NULL;
 
 #ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
@@ -52,6 +55,14 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
     return 0;
 }
 
+inline int web_client_permission_denied(struct web_client *w) {
+    w->response.data->contenttype = CT_TEXT_PLAIN;
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "You do not allowed to access this resource.");
+    w->response.code = 403;
+    return 403;
+}
+
 static void log_connection(struct web_client *w, const char *msg) {
     log_access("%llu: %d '[%s]:%s' '%s'", w->id, gettid(), w->client_ip, w->client_port, msg);
 }
@@ -64,7 +75,7 @@ struct web_client *web_client_create(int listener) {
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
     {
-        w->ifd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_client_access_list);
+        w->ifd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_allow_connections_from);
 
         if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
         if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
@@ -1235,6 +1246,11 @@ void web_client_process_request(struct web_client *w) {
         case HTTP_VALIDATION_OK:
             switch(w->mode) {
                 case WEB_CLIENT_MODE_STREAM:
+                    if(unlikely(web_allow_streaming_from && !simple_pattern_matches(web_allow_streaming_from, w->client_ip))) {
+                        web_client_permission_denied(w);
+                        return;
+                    }
+
                     w->response.code = rrdpush_receiver_thread_spawn(localhost, w, w->decoded_url);
                     return;
 
