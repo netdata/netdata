@@ -50,6 +50,7 @@ dist_python_DATA = \
     nginx_plus.chart.py \
     nsd.chart.py \
     ntpd.chart.py \
+    nvidia_smi.chart.py \
     ovpn_status_log.chart.py \
     phpfpm.chart.py \
     portcheck.chart.py \
