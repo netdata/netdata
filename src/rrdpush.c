@@ -699,7 +699,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
 
     // call the plugins.d processor to receive the metrics
     info("STREAM %s [receive from [%s]:%s]: receiving metrics...", host->hostname, client_ip, client_port);
-    log_stream_connection(client_ip, client_port, key, host->hostname, "ACCESS GRANDED");
+    log_stream_connection(client_ip, client_port, key, host->hostname, "CONNECTED");
 
     size_t count = pluginsd_process(host, &cd, fp, 1);
 

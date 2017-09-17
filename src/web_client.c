@@ -1760,9 +1760,11 @@ void *web_client_main(void *ptr)
         }
     }
 
+    if(w->mode != WEB_CLIENT_MODE_STREAM)
+        log_connection(w, "DISCONNECTED");
+
     web_client_reset(w);
 
-    log_connection(w, "DISCONNECTED");
     debug(D_WEB_CLIENT, "%llu: done...", w->id);
 
     // close the sockets/files now
