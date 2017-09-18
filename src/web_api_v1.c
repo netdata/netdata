@@ -298,6 +298,9 @@ inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, 
 }
 
 int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
+    if(unlikely(web_allow_badges_from && !simple_pattern_matches(web_allow_badges_from, w->client_ip)))
+        return web_client_permission_denied(w);
+
     int ret = 400;
     buffer_flush(w->response.data);
 
@@ -816,55 +819,58 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
-    if(respect_web_browser_do_not_track_policy && web_client_has_donottrack(w)) {
+    if(unlikely(respect_web_browser_do_not_track_policy && web_client_has_donottrack(w))) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
         return 400;
     }
 
-    if(action == 'A' && (!machine_guid || !machine_url || !url_name)) {
-        error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')",
-                machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", url_name?url_name:"UNSET");
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Invalid registry Access request.");
-        return 400;
-    }
-    else if(action == 'D' && (!machine_guid || !machine_url || !delete_url)) {
-        error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')",
-                machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Invalid registry Delete request.");
-        return 400;
-    }
-    else if(action == 'S' && (!machine_guid || !machine_url || !search_machine_guid)) {
-        error("Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')",
-                machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Invalid registry Search request.");
-        return 400;
-    }
-    else if(action == 'W' && (!machine_guid || !machine_url || !to_person_guid)) {
-        error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')",
-                machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Invalid registry Switch request.");
-        return 400;
-    }
+    // for all calls except HELLO, we have to check the ACL
+    if(unlikely(action != 'H' && web_allow_registry_from && !simple_pattern_matches(web_allow_registry_from, w->client_ip)))
+        return web_client_permission_denied(w);
 
     switch(action) {
         case 'A':
+            if(unlikely(!machine_guid || !machine_url || !url_name)) {
+                error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')", machine_guid ? machine_guid : "UNSET", machine_url ? machine_url : "UNSET", url_name ? url_name : "UNSET");
+                buffer_flush(w->response.data);
+                buffer_strcat(w->response.data, "Invalid registry Access request.");
+                return 400;
+            }
+
             web_client_enable_tracking_required(w);
             return registry_request_access_json(host, w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
 
         case 'D':
+            if(unlikely(!machine_guid || !machine_url || !delete_url)) {
+                error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
+                buffer_flush(w->response.data);
+                buffer_strcat(w->response.data, "Invalid registry Delete request.");
+                return 400;
+            }
+
             web_client_enable_tracking_required(w);
             return registry_request_delete_json(host, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
+            if(unlikely(!machine_guid || !machine_url || !search_machine_guid)) {
+                error("Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
+                buffer_flush(w->response.data);
+                buffer_strcat(w->response.data, "Invalid registry Search request.");
+                return 400;
+            }
+
             web_client_enable_tracking_required(w);
             return registry_request_search_json(host, w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
 
         case 'W':
+            if(unlikely(!machine_guid || !machine_url || !to_person_guid)) {
+                error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
+                buffer_flush(w->response.data);
+                buffer_strcat(w->response.data, "Invalid registry Switch request.");
+                return 400;
+            }
+
             web_client_enable_tracking_required(w);
             return registry_request_switch_json(host, w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
 
