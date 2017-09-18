@@ -49,6 +49,7 @@ SUBDIRS = \
 	charts.d \
 	conf.d \
 	diagrams \
+	java.d \
 	makeself \
 	node.d \
 	plugins.d \

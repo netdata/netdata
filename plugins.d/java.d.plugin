@@ -17,4 +17,5 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # 
 
-exec java -Djava.util.logging.SimpleFormatter.format='%1$tF %1$TT: java.d: %4$s: %3$s: %5$s%6$s%n' -jar ../java.d/java-plugin.jar $@
+SCRIPTPATH=$(dirname $0)
+exec java -Djava.util.logging.SimpleFormatter.format='%1$tF %1$TT: java.d: %4$s: %3$s: %5$s%6$s%n' -jar ${SCRIPTPATH}/../java.d/java-plugin.jar $@

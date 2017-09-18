@@ -60,6 +60,12 @@ AC_ARG_ENABLE(
     [enable_plugin_freeipmi="detect"]
 )
 AC_ARG_ENABLE(
+    [plugin-java],
+    AS_HELP_STRING([--enable-plugin-java], [enable java plugin @<:@default autodetect@:>@])],
+    ,
+    [enable_plugin_java="detect"]
+)
+AC_ARG_ENABLE(
     [pedantic],
     [AS_HELP_STRING([--enable-pedantic], [enable pedantic compiler warnings @<:@default disabled@:>@])],
     ,
@@ -437,6 +443,20 @@ fi
 AC_MSG_RESULT([${enable_plugin_nfacct}])
 AM_CONDITIONAL([ENABLE_PLUGIN_NFACCT], [test "${enable_plugin_nfacct}" = "yes"])
 
+# -----------------------------------------------------------------------------
+# java.d.plugin - java
+
+AX_PROG_JAVAC
+m4_ifval([JAVAC], [have_javac=yes], [have_javac=no])
+
+AC_MSG_CHECKING([if java.d.plugin should be enabled])
+if test "${enable_plugin_java}" != "no" -a "${have_javac}" = "yes"; then
+    enable_plugin_java="yes"
+else
+    enable_plugin_java="no"
+fi
+AC_MSG_RESULT([${enable_plugin_java}])
+AM_CONDITIONAL([ENABLE_PLUGIN_JAVA], [test "${enable_plugin_java}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # check for setns() - cgroup-network
@@ -489,6 +509,7 @@ AC_SUBST([varlibdir], ["\$(localstatedir)/lib/netdata"])
 AC_SUBST([registrydir], ["\$(localstatedir)/lib/netdata/registry"])
 AC_SUBST([cachedir], ["\$(localstatedir)/cache/netdata"])
 AC_SUBST([chartsdir], ["\$(libexecdir)/netdata/charts.d"])
+AC_SUBST([javadir], ["\$(libexecdir)/netdata/java.d"])
 AC_SUBST([nodedir], ["\$(libexecdir)/netdata/node.d"])
 AC_SUBST([pythondir], ["\$(libexecdir)/netdata/python.d"])
 AC_SUBST([configdir], ["\$(sysconfdir)/netdata"])
@@ -524,6 +545,7 @@ AC_CONFIG_FILES([
     makeself/Makefile
     contrib/Makefile
     tests/Makefile
+    java.d/Makefile
 ])
 AC_OUTPUT
 
