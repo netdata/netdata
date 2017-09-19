@@ -560,8 +560,8 @@ cleanup:
 // ----------------------------------------------------------------------------
 // rrdpush receiver thread
 
-static void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *host, const char *msg) {
-    log_access("STREAM: %d '[%s]:%s' '%s' host '%s' api key '%s'", gettid(), client_ip, client_port, msg, host, api_key);
+static void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg) {
+    log_access("STREAM: %d '[%s]:%s' '%s' host '%s' api key '%s' machine guid '%s'", gettid(), client_ip, client_port, msg, host, api_key, machine_guid);
 }
 
 static int rrdpush_receive(int fd, const char *key, const char *hostname, const char *registry_hostname, const char *machine_guid, const char *os, const char *tags, int update_every, char *client_ip, char *client_port) {
@@ -622,7 +622,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
 
     if(!host) {
         close(fd);
-        log_stream_connection(client_ip, client_port, key, hostname, "FAILED - CANNOT ACQUIRE HOST");
+        log_stream_connection(client_ip, client_port, key, machine_guid, hostname, "FAILED - CANNOT ACQUIRE HOST");
         error("STREAM %s [receive from [%s]:%s]: failed to find/create host structure.", hostname, client_ip, client_port);
         return 1;
     }
@@ -661,7 +661,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
-        log_stream_connection(client_ip, client_port, key, host->hostname, "FAILED - CANNOT REPLY");
+        log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "FAILED - CANNOT REPLY");
         error("STREAM %s [receive from [%s]:%s]: cannot send ready command.", host->hostname, client_ip, client_port);
         close(fd);
         return 0;
@@ -674,7 +674,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
     // convert the socket to a FILE *
     FILE *fp = fdopen(fd, "r");
     if(!fp) {
-        log_stream_connection(client_ip, client_port, key, host->hostname, "FAILED - SOCKET ERROR");
+        log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "FAILED - SOCKET ERROR");
         error("STREAM %s [receive from [%s]:%s]: failed to get a FILE for FD %d.", host->hostname, client_ip, client_port, fd);
         close(fd);
         return 0;
@@ -699,11 +699,11 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
 
     // call the plugins.d processor to receive the metrics
     info("STREAM %s [receive from [%s]:%s]: receiving metrics...", host->hostname, client_ip, client_port);
-    log_stream_connection(client_ip, client_port, key, host->hostname, "CONNECTED");
+    log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "CONNECTED");
 
     size_t count = pluginsd_process(host, &cd, fp, 1);
 
-    log_stream_connection(client_ip, client_port, key, host->hostname, "DISCONNECTED");
+    log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "DISCONNECTED");
     error("STREAM %s [receive from [%s]:%s]: disconnected (completed updates %zu).", host->hostname, client_ip, client_port, count);
 
     rrdhost_wrlock(host);
@@ -825,37 +825,37 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     if(!key || !*key) {
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO KEY");
+        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO KEY");
         error("STREAM [receive from [%s]:%s]: request without an API key. Forbidding access.", w->client_ip, w->client_port);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!hostname || !*hostname) {
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO HOSTNAME");
+        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO HOSTNAME");
         error("STREAM [receive from [%s]:%s]: request without a hostname. Forbidding access.", w->client_ip, w->client_port);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!machine_guid || !*machine_guid) {
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO MACHINE GUID");
+        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO MACHINE GUID");
         error("STREAM [receive from [%s]:%s]: request without a machine GUID. Forbidding access.", w->client_ip, w->client_port);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(regenerate_guid(key, buf) == -1) {
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID KEY");
+        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID KEY");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not valid GUID (use the command uuidgen to generate one). Forbidding access.", w->client_ip, w->client_port, key);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(regenerate_guid(machine_guid, buf) == -1) {
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID MACHINE GUID");
+        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID MACHINE GUID");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not GUID. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!appconfig_get_boolean(&stream_config, key, "enabled", 0)) {
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - KEY NOT ENABLED");
+        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - KEY NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
         return rrdpush_receiver_permission_denied(w);
     }
@@ -865,7 +865,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         if(key_allow_from) {
             if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
                 simple_pattern_free(key_allow_from);
-                log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - KEY NOT ALLOWED FROM THIS IP");
+                log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - KEY NOT ALLOWED FROM THIS IP");
                 error("STREAM [receive from [%s]:%s]: API key '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, key);
                 return rrdpush_receiver_permission_denied(w);
             }
@@ -874,7 +874,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     if(!appconfig_get_boolean(&stream_config, machine_guid, "enabled", 1)) {
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - MACHINE GUID NOT ENABLED");
+        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - MACHINE GUID NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         return rrdpush_receiver_permission_denied(w);
     }
@@ -884,7 +884,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         if(machine_allow_from) {
             if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
                 simple_pattern_free(machine_allow_from);
-                log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - MACHINE GUID NOT ALLOWED FROM THIS IP");
+                log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - MACHINE GUID NOT ALLOWED FROM THIS IP");
                 error("STREAM [receive from [%s]:%s]: Machine GUID '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, machine_guid);
                 return rrdpush_receiver_permission_denied(w);
             }
