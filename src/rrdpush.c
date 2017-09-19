@@ -781,6 +781,14 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+int rrdpush_receiver_permission_denied(struct web_client *w) {
+    // we always respond with the same message and error code
+    // to prevent an attacker from gaining info about the error
+    buffer_flush(w->response.data);
+    buffer_sprintf(w->response.data, "You are not permitted to access this. Check the logs for more info.");
+    return 401;
+}
+
 int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url) {
     (void)host;
 
@@ -819,57 +827,69 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     if(!key || !*key) {
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO KEY");
         error("STREAM [receive from [%s]:%s]: request without an API key. Forbidding access.", w->client_ip, w->client_port);
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "You need an API key for this request.");
-        return 401;
+        return rrdpush_receiver_permission_denied(w);
     }
 
     if(!hostname || !*hostname) {
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO HOSTNAME");
         error("STREAM [receive from [%s]:%s]: request without a hostname. Forbidding access.", w->client_ip, w->client_port);
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "You need to send a hostname too.");
-        return 400;
+        return rrdpush_receiver_permission_denied(w);
     }
 
     if(!machine_guid || !*machine_guid) {
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO MACHINE GUID");
         error("STREAM [receive from [%s]:%s]: request without a machine GUID. Forbidding access.", w->client_ip, w->client_port);
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "You need to send a machine GUID too.");
-        return 400;
+        return rrdpush_receiver_permission_denied(w);
     }
 
     if(regenerate_guid(key, buf) == -1) {
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID KEY");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not valid GUID (use the command uuidgen to generate one). Forbidding access.", w->client_ip, w->client_port, key);
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Your API key is invalid.");
-        return 401;
+        return rrdpush_receiver_permission_denied(w);
     }
 
     if(regenerate_guid(machine_guid, buf) == -1) {
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID MACHINE GUID");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not GUID. Forbidding access.", w->client_ip, w->client_port, machine_guid);
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Your machine GUID is invalid.");
-        return 404;
+        return rrdpush_receiver_permission_denied(w);
     }
 
     if(!appconfig_get_boolean(&stream_config, key, "enabled", 0)) {
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - KEY NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Your API key is not permitted access.");
-        return 401;
+        return rrdpush_receiver_permission_denied(w);
+    }
+
+    {
+        SIMPLE_PATTERN *key_allow_from = simple_pattern_create(appconfig_get(&stream_config, key, "allow from", "*"), SIMPLE_PATTERN_EXACT);
+        if(key_allow_from) {
+            if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
+                simple_pattern_free(key_allow_from);
+                log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - KEY NOT ALLOWED FROM THIS IP");
+                error("STREAM [receive from [%s]:%s]: API key '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, key);
+                return rrdpush_receiver_permission_denied(w);
+            }
+            simple_pattern_free(key_allow_from);
+        }
     }
 
     if(!appconfig_get_boolean(&stream_config, machine_guid, "enabled", 1)) {
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - MACHINE GUID NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, machine_guid);
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Your machine guide is not permitted access.");
-        return 404;
+        return rrdpush_receiver_permission_denied(w);
+    }
+
+    {
+        SIMPLE_PATTERN *machine_allow_from = simple_pattern_create(appconfig_get(&stream_config, machine_guid, "allow from", "*"), SIMPLE_PATTERN_EXACT);
+        if(machine_allow_from) {
+            if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
+                simple_pattern_free(machine_allow_from);
+                log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - MACHINE GUID NOT ALLOWED FROM THIS IP");
+                error("STREAM [receive from [%s]:%s]: Machine GUID '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, machine_guid);
+                return rrdpush_receiver_permission_denied(w);
+            }
+            simple_pattern_free(machine_allow_from);
+        }
     }
 
     struct rrdpush_thread *rpt = mallocz(sizeof(struct rrdpush_thread));
