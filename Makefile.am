@@ -49,7 +49,6 @@ SUBDIRS = \
 	charts.d \
 	conf.d \
 	diagrams \
-	java.d \
 	makeself \
 	node.d \
 	plugins.d \
@@ -60,6 +59,10 @@ SUBDIRS = \
 	contrib \
 	tests \
 	$(NULL)
+
+if ENABLE_PLUGIN_JAVA
+SUBDIRS += java.d
+endif
 
 dist_noinst_DATA= \
 	cppcheck.sh \
