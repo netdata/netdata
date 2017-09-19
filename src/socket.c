@@ -873,6 +873,13 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         client_port[portsize - 1] = '\0';
 
         switch (((struct sockaddr *)&sadr)->sa_family) {
+            case AF_UNIX:
+                debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
+                // set the port - certain versions of libc return garbage on unix sockets
+                strncpy(client_port, "UNIX", portsize);
+                client_port[portsize - 1] = '\0';
+                break;
+
             case AF_INET:
                 debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
@@ -892,6 +899,11 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         }
 
         if(access_list) {
+            if(!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
+                strncpy(client_ip, "localhost", ipsize);
+                client_ip[ipsize - 1] = '\0';
+            }
+
             if(unlikely(!simple_pattern_matches(access_list, client_ip))) {
                 errno = 0;
                 debug(D_LISTENER, "Permission denied for client '%s', port '%s'", client_ip, client_port);
