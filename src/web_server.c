@@ -168,6 +168,11 @@ void *socket_listen_main_multi_threaded(void *ptr) {
                     continue;
                 }
 
+                if(api_sockets.fds_families[i] == AF_UNIX)
+                    web_client_set_unix(w);
+                else
+                    web_client_set_tcp(w);
+
                 if(pthread_create(&w->thread, NULL, web_client_main, w) != 0) {
                     error("%llu: failed to create new thread for web client.", w->id);
                     WEB_CLIENT_IS_OBSOLETE(w);

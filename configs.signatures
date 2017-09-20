@@ -355,6 +355,7 @@ declare -A configs_signatures=(
   ['b181dcca01a258d9792ad703583baed2']='statsd.d/example.conf'
   ['b185914d4f795e1732273dc4c7a35845']='health.d/memory.conf'
   ['b27f10a38a95edbbec20f44a4728b7c4']='python.d.conf'
+  ['b28c77dceeb398ca4ceec44c646f5431']='stream.conf'
   ['b32164929eda7449a9677044e11151bf']='python.d.conf'
   ['b3d48935ab7f44a57d40ad349df0033d']='python.d/postgres.conf'
   ['b3fc4749b132e55ac0d3a0f92859237e']='health.d/tcp_resets.conf'
