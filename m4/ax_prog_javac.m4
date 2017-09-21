@@ -73,7 +73,5 @@ AS_IF([test "x$JAVAPREFIX" = x],
       [test "x$JAVAC" = x && AC_CHECK_PROGS([JAVAC], [m4_ax_prog_javac_list])],
       [test "x$JAVAC" = x && AC_CHECK_PROGS([JAVAC], [m4_ax_prog_javac_list], [], [$JAVAPREFIX/bin])])
 m4_undefine([m4_ax_prog_javac_list])dnl
-test "x$JAVAC" = x && AC_MSG_ERROR([no acceptable Java compiler found in \$PATH])
-AX_PROG_JAVAC_WORKS
 AC_PROVIDE([$0])dnl
 ])
