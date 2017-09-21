@@ -39,6 +39,7 @@ hs_err_pid*
 java.d/.classpath
 java.d/.project
 java.d/.settings/
+java.d/.m2/
 target/
 
 # netdata makeself archives

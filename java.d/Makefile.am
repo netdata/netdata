@@ -19,7 +19,7 @@ dist_java_DATA = \
 java_src = $(shell find src/ -type f -print)
 
 ${java_jar}: pom.xml ${java_src}
-	./mvnw package
+	./mvnw -Dmaven.user.home=m2 -s .mvn/wrapper/settings.xml package
 
 clean-local:
-	./mvnw clean
+	./mvnw -Dmaven.user.home=m2 -s .mvn/wrapper/settings.xml clean
