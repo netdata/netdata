@@ -595,10 +595,10 @@ extern void rrdhost_free_all(void);
 extern void rrdhost_save_all(void);
 extern void rrdhost_cleanup_all(void);
 
-extern void rrdhost_cleanup_orphan_hosts(RRDHOST *protected);
+extern void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected);
 extern void rrdhost_free(RRDHOST *host);
-extern void rrdhost_save(RRDHOST *host);
-extern void rrdhost_delete(RRDHOST *host);
+extern void rrdhost_save_charts(RRDHOST *host);
+extern void rrdhost_delete_charts(RRDHOST *host);
 
 extern void rrdset_update_heterogeneous_flag(RRDSET *st);
 
