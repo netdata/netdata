@@ -1,17 +1,24 @@
 # Java Plugin
 
-[![Build Status](https://travis-ci.org/simonnagl/netdata-plugin-java-daemon.svg?branch=master)](https://travis-ci.org/simonnagl/netdata-plugin-java-daemon)
-[![Codacy Badge](https://api.codacy.com/project/badge/Coverage/c5196ea860ba4cb8a47f40c5264cc17f)](https://www.codacy.com/app/simonnagl/netdata-plugin-java-daemon?utm_source=github.com&utm_medium=referral&utm_content=simonnagl/netdata-plugin-java-daemon&utm_campaign=Badge_Coverage)
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/c5196ea860ba4cb8a47f40c5264cc17f)](https://www.codacy.com/app/simonnagl/netdata-plugin-java-daemon?utm_source=github.com&utm_medium=referral&utm_content=simonnagl/netdata-plugin-java-daemon&utm_campaign=badger)
-[![Dependency Status](https://www.versioneye.com/user/projects/59994481368b08135edcaabe/badge.svg?style=flat-square)](https://www.versioneye.com/user/projects/59994481368b08135edcaabe)
+## Requirements
+
+- JDK 8.x
+
 
 ## Modules
 
-- JMX Collector
+The following python.d modules are supported:
 
-## Required for compilation
+### JMX
 
-- JDK 8.x
+This module will monitor all local java processes by default. Java Monitoring Extension (JMX) is used to do so.
+
+It produces the following charts per process if the JVM supports them:
+
+- **CPU** usage in percent
+- **Load** of the last minute
+- **Uptime** of the process
+- **Threading**
 
 ## Configuration
 
