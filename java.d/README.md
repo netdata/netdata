@@ -13,13 +13,6 @@ The following python.d modules are supported:
 
 This module will monitor all local java processes by default. Java Monitoring Extension (JMX) is used to do so.
 
-It produces the following charts per process if the JVM supports them:
-
-- **CPU** usage in percent
-- **Load** of the last minute
-- **Uptime** of the process
-- **Threading**
-
 ## Configuration
 
 Configuration files contain JSON Objects.
