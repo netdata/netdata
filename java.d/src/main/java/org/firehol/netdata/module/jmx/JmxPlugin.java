@@ -87,33 +87,22 @@ public class JmxPlugin implements Module {
 
 	@Override
 	public Collection<Chart> initialize() throws InitializationException {
+		initConfiguration();
+		connectToServers();
 
-		// Read configuration
-		try {
-			configuration = configurationService.readPluginConfiguration("jmx", JmxPluginConfiguration.class);
-		} catch (ConfigurationSchemeInstantiationException e) {
-			throw new InitializationException("Could not read jmx plugin configuration", e);
+		List<Chart> charts = initCharts();
+		return charts;
+	}
+
+	private void connectToServers() {
+		connectToConfiguredServers();
+		connectToLocalProcess();
+		if (configuration.isAutoDetectLocalVirtualMachines()) {
+			connectToLocalServers();
 		}
+	}
 
-		// Propagate Common Charts to Server configurations.
-		for (JmxServerConfiguration serverConfiguartion : configuration.getJmxServers()) {
-			if (serverConfiguartion.getCharts() == null) {
-				serverConfiguartion.setCharts(configuration.getCommonCharts());
-				continue;
-			}
-
-			Map<String, JmxChartConfiguration> chartConfigById = chartConfigurationsById(
-					serverConfiguartion.getCharts());
-
-			for (JmxChartConfiguration chartConfig : configuration.getCommonCharts()) {
-				chartConfigById.putIfAbsent(chartConfig.getId(), chartConfig);
-			}
-
-			List<JmxChartConfiguration> chartConfigs = chartConfigById.values().stream().collect(Collectors.toList());
-			serverConfiguartion.setCharts(chartConfigs);
-		}
-
-		// Connect to MBeanServers of configuration.
+	private void connectToConfiguredServers() {
 		for (JmxServerConfiguration serverConfiguartion : configuration.getJmxServers()) {
 			MBeanServerCollector collector;
 			try {
@@ -125,68 +114,105 @@ public class JmxPlugin implements Module {
 
 			allMBeanCollector.add(collector);
 		}
+	}
 
-		// Connect to the local MBeanServer
+	private void connectToLocalProcess() {
 		JmxServerConfiguration localConfiguration = new JmxServerConfiguration();
 		localConfiguration.setCharts(configuration.getCommonCharts());
 		localConfiguration.setName("JavaPluginDaemon");
-
+	
 		MBeanServerCollector collector = new MBeanServerCollector(localConfiguration,
 				ManagementFactory.getPlatformMBeanServer());
 		allMBeanCollector.add(collector);
+	}
 
-		// Auto detect local VirtualMachines.
-		if (configuration.isAutoDetectLocalVirtualMachines()) {
-			// Before, find the names of all configured collectors.
-			Set<String> allRuntimeName = new HashSet<>();
-			for (MBeanServerCollector mBeanCollector : allMBeanCollector) {
-				try {
-					String runtimeName = mBeanCollector.getRuntimeName();
-					allRuntimeName.add(runtimeName);
-				} catch (JmxMBeanServerQueryException e) {
-					log.warning(LoggingUtils.getMessageSupplier("Could not find runtimeName", e));
-				}
+	private void connectToLocalServers() {
+		Set<String> allRuntimeName = getAllMBeanCollectorRuntimeName();
+	
+		// List running VirtualMachines
+		List<VirtualMachineDescriptor> virtualMachineDescriptors = VirtualMachine.list();
+		for (VirtualMachineDescriptor virtualMachineDescriptor : virtualMachineDescriptors) {
+			MBeanServerCollector collector;
+			// Build the MBeanServerCollector
+			try {
+				collector = buildMBeanServerCollector(virtualMachineDescriptor);
+			} catch (Exception e) {
+				log.warning(LoggingUtils.getMessageSupplier(
+						"Could not connect to JMX agent of process with PID " + virtualMachineDescriptor.id(), e));
+				continue;
 			}
-
-			// List running VirtualMachines
-			List<VirtualMachineDescriptor> virtualMachineDescriptors = VirtualMachine.list();
-			for (VirtualMachineDescriptor virtualMachineDescriptor : virtualMachineDescriptors) {
-				// Build the MBeanServerCollector
-				try {
-					collector = buildMBeanServerCollector(virtualMachineDescriptor);
-				} catch (Exception e) {
-					log.warning(LoggingUtils.getMessageSupplier(
-							"Could not connect to JMX agent of process with PID " + virtualMachineDescriptor.id(), e));
+			
+			// Check if we already have a connection to this server...
+			try {
+				String runtimeName = collector.getRuntimeName();
+				if (allRuntimeName.contains(runtimeName)) {
+					// ... and close the connection if true.
+					try {
+						collector.close();
+					} catch (IOException e) {
+						log.warning(LoggingUtils.getMessageSupplier(
+								"Could not close second connection to first configured and second auto detected JVM.",
+								e));
+					}
 					continue;
 				}
+			} catch (JmxMBeanServerQueryException e) {
+				log.warning(LoggingUtils.getMessageSupplier("Could not find runtimeName", e));
+			}
+	
+			allMBeanCollector.add(collector);
+		}
+	}
 
-				// Check if we already have a connection to this server...
-				try {
-					String runtimeName = collector.getRuntimeName();
-					if (allRuntimeName.contains(runtimeName)) {
-						// ... and close the connection if true.
-						try {
-							collector.close();
-						} catch (IOException e) {
-							log.warning(LoggingUtils.getMessageSupplier(
-									"Could not close second connection to first configured and second auto detected JVM.",
-									e));
-						}
-						continue;
-					}
-				} catch (JmxMBeanServerQueryException e) {
-					log.warning(LoggingUtils.getMessageSupplier("Could not find runtimeName", e));
-				}
-
-				allMBeanCollector.add(collector);
+	private Set<String> getAllMBeanCollectorRuntimeName() {
+		Set<String> allRuntimeName = new HashSet<>();
+		for (MBeanServerCollector mBeanCollector : allMBeanCollector) {
+			try {
+				String runtimeName = mBeanCollector.getRuntimeName();
+				allRuntimeName.add(runtimeName);
+			} catch (JmxMBeanServerQueryException e) {
+				log.warning(LoggingUtils.getMessageSupplier("Could not find runtimeName", e));
 			}
 		}
+		return allRuntimeName;
+	}
 
-		// Initialize charts
+	private void initConfiguration() throws InitializationException {
+		readConfiguration();
+		propagateCommonChartsToServerConfiguration();
+	}
 
+	private void readConfiguration() throws InitializationException {
+		try {
+			configuration = configurationService.readPluginConfiguration("jmx", JmxPluginConfiguration.class);
+		} catch (ConfigurationSchemeInstantiationException e) {
+			throw new InitializationException("Could not read jmx plugin configuration", e);
+		}
+	}
+
+	private void propagateCommonChartsToServerConfiguration() {
+		for (JmxServerConfiguration serverConfiguartion : configuration.getJmxServers()) {
+			if (serverConfiguartion.getCharts() == null) {
+				serverConfiguartion.setCharts(configuration.getCommonCharts());
+				continue;
+			}
+	
+			Map<String, JmxChartConfiguration> chartConfigById = chartConfigurationsById(
+					serverConfiguartion.getCharts());
+	
+			for (JmxChartConfiguration chartConfig : configuration.getCommonCharts()) {
+				chartConfigById.putIfAbsent(chartConfig.getId(), chartConfig);
+			}
+	
+			List<JmxChartConfiguration> chartConfigs = chartConfigById.values().stream().collect(Collectors.toList());
+			serverConfiguartion.setCharts(chartConfigs);
+		}
+	}
+
+	private List<Chart> initCharts() {
 		List<Chart> allChart = new LinkedList<>();
 		Iterator<MBeanServerCollector> mBeanCollectorIterator = allMBeanCollector.iterator();
-
+	
 		while (mBeanCollectorIterator.hasNext()) {
 			MBeanServerCollector mBeanCollector = mBeanCollectorIterator.next();
 			try {
@@ -197,7 +223,7 @@ public class JmxPlugin implements Module {
 				mBeanCollectorIterator.remove();
 			}
 		}
-
+		
 		return allChart;
 	}
 
