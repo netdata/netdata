@@ -425,11 +425,12 @@ struct rrdhost {
     // streaming of data to remote hosts - rrdpush
 
     int rrdpush_enabled:1;                          // 1 when this host sends metrics to another netdata
-    char *rrdpush_destination;                      // where to send metrics to
-    char *rrdpush_api_key;                          // the api key at the receiving netdata
     volatile int rrdpush_connected:1;               // 1 when the sender is ready to push metrics
     volatile int rrdpush_spawn:1;                   // 1 when the sender thread has been spawn
     volatile int rrdpush_error_shown:1;             // 1 when we have logged a communication error
+    volatile int rrdpush_sender_join:1;             // 1 when we have to join the sending thread
+    char *rrdpush_destination;                      // where to send metrics to
+    char *rrdpush_api_key;                          // the api key at the receiving netdata
     int rrdpush_socket;                             // the fd of the socket to the remote host, or -1
     pthread_t rrdpush_thread;                       // the sender thread
     netdata_mutex_t rrdpush_mutex;                  // exclusive access to rrdpush_buffer

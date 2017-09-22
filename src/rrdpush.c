@@ -170,7 +170,7 @@ void rrdset_done_push(RRDSET *st) {
     send_chart_metrics(st);
 
     // signal the sender there are more data
-    if(write(host->rrdpush_pipe[PIPE_WRITE], " ", 1) == -1)
+    if(host->rrdpush_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_pipe[PIPE_WRITE], " ", 1) == -1)
         error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
 
     rrdpush_unlock(host);
@@ -236,19 +236,55 @@ static void rrdpush_sender_thread_cleanup_locked_all(RRDHOST *host) {
     buffer_free(host->rrdpush_buffer);
     host->rrdpush_buffer = NULL;
 
+    if(!host->rrdpush_sender_join)
+        pthread_detach(pthread_self());
+
     host->rrdpush_spawn = 0;
+
+    pthread_exit(NULL);
 }
 
 void rrdpush_sender_thread_stop(RRDHOST *host) {
     rrdpush_lock(host);
     rrdhost_wrlock(host);
 
+    pthread_t thr = 0;
+
     if(host->rrdpush_spawn) {
         info("STREAM %s [send]: stopping sending thread...", host->hostname);
-        pthread_cancel(host->rrdpush_thread);
-        rrdpush_sender_thread_cleanup_locked_all(host);
+
+        // signal the thread that we want to join it
+        host->rrdpush_sender_join = 1;
+
+        // copy the thread id, so that we will be waiting for the right one
+        // even if a new one has been spawn
+        thr = host->rrdpush_thread;
+
+        // signal it to cancel
+        int ret = pthread_cancel(host->rrdpush_thread);
+        if(ret != 0)
+            error("STREAM %s [send]: pthread_cancel() returned error.", host->hostname);
     }
 
+    rrdhost_unlock(host);
+    rrdpush_unlock(host);
+
+    if(thr != 0) {
+        info("STREAM %s [send]: waiting for sending thread to stop...", host->hostname);
+        void *result;
+        int ret = pthread_join(thr, &result);
+        if(ret != 0)
+            error("STREAM %s [send]: pthread_join() returned error.", host->hostname);
+    }
+}
+
+static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
+    RRDHOST *host = (RRDHOST *)ptr;
+
+    rrdpush_lock(host);
+    rrdhost_wrlock(host);
+    info("STREAM %s [send]: sending thread self-exits.", host->hostname);
+    rrdpush_sender_thread_cleanup_locked_all(host);
     rrdhost_unlock(host);
     rrdpush_unlock(host);
 }
@@ -256,13 +292,19 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
 void *rrdpush_sender_thread(void *ptr) {
     RRDHOST *host = (RRDHOST *)ptr;
 
-    info("STREAM %s [send]: thread created (task id %d)", host->hostname, gettid());
+    if(!host->rrdpush_enabled || !host->rrdpush_destination || !*host->rrdpush_destination || !host->rrdpush_api_key || !*host->rrdpush_api_key) {
+        error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.", host->hostname, gettid());
+        pthread_exit(NULL);
+        return NULL;
+    }
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("STREAM %s [send]: cannot set pthread cancel type to DEFERRED.", host->hostname);
+    info("STREAM %s [send]: thread created (task id %d)", host->hostname, gettid());
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
+
+    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+        error("STREAM %s [send]: cannot set pthread cancel type to DEFERRED.", host->hostname);
 
     int timeout = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
     int default_port = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "default port", 19999);
@@ -270,9 +312,6 @@ void *rrdpush_sender_thread(void *ptr) {
     unsigned int reconnect_delay = (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "reconnect delay seconds", 5);
     remote_clock_resync_iterations = (unsigned int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "initial clock resync iterations", remote_clock_resync_iterations);
     char connected_to[CONNECTED_TO_SIZE + 1] = "";
-
-    if(!host->rrdpush_enabled || !host->rrdpush_destination || !*host->rrdpush_destination || !host->rrdpush_api_key || !*host->rrdpush_api_key)
-        goto cleanup;
 
     // initialize rrdpush globals
     host->rrdpush_buffer = buffer_create(1);
@@ -297,260 +336,252 @@ void *rrdpush_sender_thread(void *ptr) {
     ifd = &fds[0];
     ofd = &fds[1];
 
-    for(; host->rrdpush_enabled && !netdata_exit ;) {
-        debug(D_STREAM, "STREAM: Checking if we need to timeout the connection...");
-        if(host->rrdpush_socket != -1 && now_monotonic_sec() - last_sent_t > timeout) {
-            error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, timeout, sent_connection);
-            close(host->rrdpush_socket);
-            host->rrdpush_socket = -1;
-        }
+    pthread_cleanup_push(rrdpush_sender_thread_cleanup_callback, host);
 
-        if(unlikely(host->rrdpush_socket == -1)) {
-            debug(D_STREAM, "STREAM: Attempting to connect...");
+        for(; host->rrdpush_enabled && !netdata_exit ;) {
+            // check for outstanding cancellation requests
+            pthread_testcancel();
 
-            // stop appending data into rrdpush_buffer
-            // they will be lost, so there is no point to do it
-            host->rrdpush_connected = 0;
-
-            info("STREAM %s [send to %s]: connecting...", host->hostname, host->rrdpush_destination);
-            host->rrdpush_socket = connect_to_one_of(host->rrdpush_destination, default_port, &tv, &reconnects_counter, connected_to, CONNECTED_TO_SIZE);
+            debug(D_STREAM, "STREAM: Checking if we need to timeout the connection...");
+            if(host->rrdpush_socket != -1 && now_monotonic_sec() - last_sent_t > timeout) {
+                error("STREAM %s [send to %s]: could not send metrics for %d seconds - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, timeout, sent_connection);
+                close(host->rrdpush_socket);
+                host->rrdpush_socket = -1;
+            }
 
             if(unlikely(host->rrdpush_socket == -1)) {
-                error("STREAM %s [send to %s]: failed to connect", host->hostname, host->rrdpush_destination);
-                sleep(reconnect_delay);
-                continue;
+                debug(D_STREAM, "STREAM: Attempting to connect...");
+
+                // stop appending data into rrdpush_buffer
+                // they will be lost, so there is no point to do it
+                host->rrdpush_connected = 0;
+
+                info("STREAM %s [send to %s]: connecting...", host->hostname, host->rrdpush_destination);
+                host->rrdpush_socket = connect_to_one_of(host->rrdpush_destination, default_port, &tv, &reconnects_counter, connected_to, CONNECTED_TO_SIZE);
+
+                if(unlikely(host->rrdpush_socket == -1)) {
+                    error("STREAM %s [send to %s]: failed to connect", host->hostname, host->rrdpush_destination);
+                    sleep(reconnect_delay);
+                    continue;
+                }
+
+                info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
+
+                #define HTTP_HEADER_SIZE 8192
+                char http[HTTP_HEADER_SIZE + 1];
+                snprintfz(http, HTTP_HEADER_SIZE,
+                        "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&tags=%s HTTP/1.1\r\n"
+                        "User-Agent: netdata-push-service/%s\r\n"
+                        "Accept: */*\r\n\r\n"
+                          , host->rrdpush_api_key
+                          , host->hostname
+                          , host->registry_hostname
+                          , host->machine_guid
+                          , default_rrd_update_every
+                          , host->os
+                          , (host->tags)?host->tags:""
+                          , program_version
+                );
+
+                if(send_timeout(host->rrdpush_socket, http, strlen(http), 0, timeout) == -1) {
+                    close(host->rrdpush_socket);
+                    host->rrdpush_socket = -1;
+                    error("STREAM %s [send to %s]: failed to send http header to netdata", host->hostname, connected_to);
+                    sleep(reconnect_delay);
+                    continue;
+                }
+
+                info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
+
+                if(recv_timeout(host->rrdpush_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+                    close(host->rrdpush_socket);
+                    host->rrdpush_socket = -1;
+                    error("STREAM %s [send to %s]: failed to initialize communication", host->hostname, connected_to);
+                    sleep(reconnect_delay);
+                    continue;
+                }
+
+                if(strncmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT))) {
+                    close(host->rrdpush_socket);
+                    host->rrdpush_socket = -1;
+                    error("STREAM %s [send to %s]: server is not replying properly.", host->hostname, connected_to);
+                    sleep(reconnect_delay);
+                    continue;
+                }
+
+                info("STREAM %s [send to %s]: established communication - sending metrics...", host->hostname, connected_to);
+                last_sent_t = now_monotonic_sec();
+
+                if(sock_setnonblock(host->rrdpush_socket) < 0)
+                    error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, connected_to);
+
+                if(sock_enlarge_out(host->rrdpush_socket) < 0)
+                    error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", host->hostname, connected_to);
+
+                rrdpush_sender_thread_data_flush(host);
+                sent_connection = 0;
+
+                // allow appending data into rrdpush_buffer
+                host->rrdpush_connected = 1;
+
+                debug(D_STREAM, "STREAM: Connected on fd %d...", host->rrdpush_socket);
             }
 
-            info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
+            ifd->fd = host->rrdpush_pipe[PIPE_READ];
+            ifd->events = POLLIN;
+            ifd->revents = 0;
 
-            #define HTTP_HEADER_SIZE 8192
-            char http[HTTP_HEADER_SIZE + 1];
-            snprintfz(http, HTTP_HEADER_SIZE,
-                    "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&tags=%s HTTP/1.1\r\n"
-                    "User-Agent: netdata-push-service/%s\r\n"
-                    "Accept: */*\r\n\r\n"
-                      , host->rrdpush_api_key
-                      , host->hostname
-                      , host->registry_hostname
-                      , host->machine_guid
-                      , default_rrd_update_every
-                      , host->os
-                      , (host->tags)?host->tags:""
-                      , program_version
-            );
+            ofd->fd = host->rrdpush_socket;
+            ofd->revents = 0;
+            if(ofd->fd != -1 && begin < buffer_strlen(host->rrdpush_buffer)) {
+                debug(D_STREAM, "STREAM: Requesting data output on streaming socket %d...", ofd->fd);
+                ofd->events = POLLOUT;
+                fdmax = 2;
+            }
+            else {
+                debug(D_STREAM, "STREAM: Not requesting data output on streaming socket %d (nothing to send now)...", ofd->fd);
+                ofd->events = 0;
+                fdmax = 1;
+            }
 
-            if(send_timeout(host->rrdpush_socket, http, strlen(http), 0, timeout) == -1) {
+            debug(D_STREAM, "STREAM: Waiting for poll() events (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
+            if(netdata_exit) break;
+            int retval = poll(fds, fdmax, 1000);
+            if(netdata_exit) break;
+
+            if(unlikely(retval == -1)) {
+                debug(D_STREAM, "STREAM: poll() failed (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
+
+                if(errno == EAGAIN || errno == EINTR) {
+                    debug(D_STREAM, "STREAM: poll() failed with EAGAIN or EINTR...");
+                    continue;
+                }
+
+                error("STREAM %s [send to %s]: failed to poll().", host->hostname, connected_to);
                 close(host->rrdpush_socket);
                 host->rrdpush_socket = -1;
-                error("STREAM %s [send to %s]: failed to send http header to netdata", host->hostname, connected_to);
-                sleep(reconnect_delay);
-                continue;
+                break;
             }
+            else if(likely(retval)) {
+                if (ifd->revents & POLLIN || ifd->revents & POLLPRI) {
+                    debug(D_STREAM, "STREAM: Data added to send buffer (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
 
-            info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
+                    char buffer[1000 + 1];
+                    if (read(host->rrdpush_pipe[PIPE_READ], buffer, 1000) == -1)
+                        error("STREAM %s [send to %s]: cannot read from internal pipe.", host->hostname, connected_to);
+                }
 
-            if(recv_timeout(host->rrdpush_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
-                close(host->rrdpush_socket);
-                host->rrdpush_socket = -1;
-                error("STREAM %s [send to %s]: failed to initialize communication", host->hostname, connected_to);
-                sleep(reconnect_delay);
-                continue;
-            }
+                if (ofd->revents & POLLOUT) {
+                    if (begin < buffer_strlen(host->rrdpush_buffer)) {
+                        debug(D_STREAM, "STREAM: Sending data (current buffer length %zu bytes, begin = %zu)...", buffer_strlen(host->rrdpush_buffer), begin);
 
-            if(strncmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT))) {
-                close(host->rrdpush_socket);
-                host->rrdpush_socket = -1;
-                error("STREAM %s [send to %s]: server is not replying properly.", host->hostname, connected_to);
-                sleep(reconnect_delay);
-                continue;
-            }
+                        // BEGIN RRDPUSH LOCKED SESSION
 
-            info("STREAM %s [send to %s]: established communication - sending metrics...", host->hostname, connected_to);
-            last_sent_t = now_monotonic_sec();
+                        // during this session, data collectors
+                        // will not be able to append data to our buffer
+                        // but the socket is in non-blocking mode
+                        // so, we will not block at send()
 
-            if(sock_setnonblock(host->rrdpush_socket) < 0)
-                error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, connected_to);
+                        if (pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
+                            error("STREAM %s [send]: cannot set pthread cancel state to DISABLE.", host->hostname);
 
-            if(sock_enlarge_out(host->rrdpush_socket) < 0)
-                error("STREAM %s [send to %s]: cannot enlarge the socket buffer.", host->hostname, connected_to);
+                        debug(D_STREAM, "STREAM: Getting exclusive lock on host...");
+                        rrdpush_lock(host);
 
-            rrdpush_sender_thread_data_flush(host);
-            sent_connection = 0;
+                        debug(D_STREAM, "STREAM: Sending data, starting from %zu, size %zu...", begin, buffer_strlen(host->rrdpush_buffer));
+                        ssize_t ret = send(host->rrdpush_socket, &host->rrdpush_buffer->buffer[begin], buffer_strlen(host->rrdpush_buffer) - begin, MSG_DONTWAIT);
+                        if (unlikely(ret == -1)) {
+                            if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
+                                debug(D_STREAM, "STREAM: Send failed - closing socket...");
+                                error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                                close(host->rrdpush_socket);
+                                host->rrdpush_socket = -1;
+                            }
+                            else {
+                                debug(D_STREAM, "STREAM: Send failed - will retry...");
+                            }
+                        }
+                        else if (likely(ret > 0)) {
+                            // DEBUG - dump the scring to see it
+                            //char c = host->rrdpush_buffer->buffer[begin + ret];
+                            //host->rrdpush_buffer->buffer[begin + ret] = '\0';
+                            //debug(D_STREAM, "STREAM: sent from %zu to %zd:\n%s\n", begin, ret, &host->rrdpush_buffer->buffer[begin]);
+                            //host->rrdpush_buffer->buffer[begin + ret] = c;
 
-            // allow appending data into rrdpush_buffer
-            host->rrdpush_connected = 1;
+                            sent_connection += ret;
+                            sent_bytes += ret;
+                            begin += ret;
 
-            debug(D_STREAM, "STREAM: Connected on fd %d...", host->rrdpush_socket);
-        }
+                            if (begin == buffer_strlen(host->rrdpush_buffer)) {
+                                // we send it all
 
-        ifd->fd = host->rrdpush_pipe[PIPE_READ];
-        ifd->events = POLLIN;
-        ifd->revents = 0;
+                                debug(D_STREAM, "STREAM: Sent %zd bytes (the whole buffer)...", ret);
+                                buffer_flush(host->rrdpush_buffer);
+                                begin = 0;
+                            }
+                            else {
+                                debug(D_STREAM, "STREAM: Sent %zd bytes (part of the data buffer)...", ret);
+                            }
 
-        ofd->fd = host->rrdpush_socket;
-        ofd->revents = 0;
-        if(ofd->fd != -1 && begin < buffer_strlen(host->rrdpush_buffer)) {
-            debug(D_STREAM, "STREAM: Requesting data output on streaming socket %d...", ofd->fd);
-            ofd->events = POLLOUT;
-            fdmax = 2;
-        }
-        else {
-            debug(D_STREAM, "STREAM: Not requesting data output on streaming socket %d (nothing to send now)...", ofd->fd);
-            ofd->events = 0;
-            fdmax = 1;
-        }
-
-        debug(D_STREAM, "STREAM: Waiting for poll() events (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
-        if(netdata_exit) break;
-        int retval = poll(fds, fdmax, 1000);
-        if(netdata_exit) break;
-
-        if(unlikely(retval == -1)) {
-            debug(D_STREAM, "STREAM: poll() failed (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
-
-            if(errno == EAGAIN || errno == EINTR) {
-                debug(D_STREAM, "STREAM: poll() failed with EAGAIN or EINTR...");
-                continue;
-            }
-
-            error("STREAM %s [send to %s]: failed to poll().", host->hostname, connected_to);
-            close(host->rrdpush_socket);
-            host->rrdpush_socket = -1;
-            break;
-        }
-        else if(likely(retval)) {
-            if (ifd->revents & POLLIN || ifd->revents & POLLPRI) {
-                debug(D_STREAM, "STREAM: Data added to send buffer (current buffer length %zu bytes)...", buffer_strlen(host->rrdpush_buffer));
-
-                char buffer[1000 + 1];
-                if (read(host->rrdpush_pipe[PIPE_READ], buffer, 1000) == -1)
-                    error("STREAM %s [send to %s]: cannot read from internal pipe.", host->hostname, connected_to);
-            }
-
-            if (ofd->revents & POLLOUT) {
-                if (begin < buffer_strlen(host->rrdpush_buffer)) {
-                    debug(D_STREAM, "STREAM: Sending data (current buffer length %zu bytes, begin = %zu)...", buffer_strlen(host->rrdpush_buffer), begin);
-
-                    // BEGIN RRDPUSH LOCKED SESSION
-
-                    // during this session, data collectors
-                    // will not be able to append data to our buffer
-                    // but the socket is in non-blocking mode
-                    // so, we will not block at send()
-
-                    if (pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
-                        error("STREAM %s [send]: cannot set pthread cancel state to DISABLE.", host->hostname);
-
-                    debug(D_STREAM, "STREAM: Getting exclusive lock on host...");
-                    rrdpush_lock(host);
-
-                    debug(D_STREAM, "STREAM: Sending data, starting from %zu, size %zu...", begin, buffer_strlen(host->rrdpush_buffer));
-                    ssize_t ret = send(host->rrdpush_socket, &host->rrdpush_buffer->buffer[begin], buffer_strlen(host->rrdpush_buffer) - begin, MSG_DONTWAIT);
-                    if (unlikely(ret == -1)) {
-                        if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
-                            debug(D_STREAM, "STREAM: Send failed - closing socket...");
-                            error("STREAM %s [send to %s]: failed to send metrics - closing connection - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                            last_sent_t = now_monotonic_sec();
+                        }
+                        else {
+                            debug(D_STREAM, "STREAM: send() returned %zd - closing the socket...", ret);
+                            error("STREAM %s [send to %s]: failed to send metrics (send() returned %zd) - closing connection - we have sent %zu bytes on this connection.",
+                                  host->hostname, connected_to, ret, sent_connection);
                             close(host->rrdpush_socket);
                             host->rrdpush_socket = -1;
                         }
-                        else {
-                            debug(D_STREAM, "STREAM: Send failed - will retry...");
-                        }
-                    }
-                    else if (likely(ret > 0)) {
-                        // DEBUG - dump the scring to see it
-                        //char c = host->rrdpush_buffer->buffer[begin + ret];
-                        //host->rrdpush_buffer->buffer[begin + ret] = '\0';
-                        //debug(D_STREAM, "STREAM: sent from %zu to %zd:\n%s\n", begin, ret, &host->rrdpush_buffer->buffer[begin]);
-                        //host->rrdpush_buffer->buffer[begin + ret] = c;
 
-                        sent_connection += ret;
-                        sent_bytes += ret;
-                        begin += ret;
+                        debug(D_STREAM, "STREAM: Releasing exclusive lock on host...");
+                        rrdpush_unlock(host);
 
-                        if (begin == buffer_strlen(host->rrdpush_buffer)) {
-                            // we send it all
+                        if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+                            error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
 
-                            debug(D_STREAM, "STREAM: Sent %zd bytes (the whole buffer)...", ret);
-                            buffer_flush(host->rrdpush_buffer);
-                            begin = 0;
-                        }
-                        else {
-                            debug(D_STREAM, "STREAM: Sent %zd bytes (part of the data buffer)...", ret);
-                        }
-
-                        last_sent_t = now_monotonic_sec();
+                        // END RRDPUSH LOCKED SESSION
                     }
                     else {
-                        debug(D_STREAM, "STREAM: send() returned %zd - closing the socket...", ret);
-                        error("STREAM %s [send to %s]: failed to send metrics (send() returned %zd) - closing connection - we have sent %zu bytes on this connection.",
-                              host->hostname, connected_to, ret, sent_connection);
-                        close(host->rrdpush_socket);
-                        host->rrdpush_socket = -1;
+                        debug(D_STREAM, "STREAM: we have sent the entire buffer, but we received POLLOUT...");
                     }
-
-                    debug(D_STREAM, "STREAM: Releasing exclusive lock on host...");
-                    rrdpush_unlock(host);
-
-                    if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-                        error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
-
-                    // END RRDPUSH LOCKED SESSION
                 }
-                else {
-                    debug(D_STREAM, "STREAM: we have sent the entire buffer, but we received POLLOUT...");
+
+                if(unlikely(ofd->revents & POLLERR)) {
+                    debug(D_STREAM, "STREAM: Send failed (POLLERR) - closing socket...");
+                    error("STREAM %s [send to %s]: connection reports errors (POLLERR), closing it - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                    close(host->rrdpush_socket);
+                    host->rrdpush_socket = -1;
+                }
+                else if(unlikely(ofd->revents & POLLHUP)) {
+                    debug(D_STREAM, "STREAM: Send failed (POLLHUP) - closing socket...");
+                    error("STREAM %s [send to %s]: connection closed by remote end (POLLHUP) - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                    close(host->rrdpush_socket);
+                    host->rrdpush_socket = -1;
+                }
+                else if(unlikely(ofd->revents & POLLNVAL)) {
+                    debug(D_STREAM, "STREAM: Send failed (POLLNVAL) - closing socket...");
+                    error("STREAM %s [send to %s]: connection is invalid (POLLNVAL), closing it - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
+                    close(host->rrdpush_socket);
+                    host->rrdpush_socket = -1;
                 }
             }
+            else {
+                debug(D_STREAM, "STREAM: poll() timed out.");
+            }
 
-            if(unlikely(ofd->revents & POLLERR)) {
-                debug(D_STREAM, "STREAM: Send failed (POLLERR) - closing socket...");
-                error("STREAM %s [send to %s]: connection reports errors (POLLERR), closing it - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
-                close(host->rrdpush_socket);
-                host->rrdpush_socket = -1;
-            }
-            else if(unlikely(ofd->revents & POLLHUP)) {
-                debug(D_STREAM, "STREAM: Send failed (POLLHUP) - closing socket...");
-                error("STREAM %s [send to %s]: connection closed by remote end (POLLHUP) - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
-                close(host->rrdpush_socket);
-                host->rrdpush_socket = -1;
-            }
-            else if(unlikely(ofd->revents & POLLNVAL)) {
-                debug(D_STREAM, "STREAM: Send failed (POLLNVAL) - closing socket...");
-                error("STREAM %s [send to %s]: connection is invalid (POLLNVAL), closing it - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_connection);
-                close(host->rrdpush_socket);
-                host->rrdpush_socket = -1;
+            // protection from overflow
+            if(buffer_strlen(host->rrdpush_buffer) > max_size) {
+                debug(D_STREAM, "STREAM: Buffer is too big (%zu bytes), bigger than the max (%zu) - flushing it...", buffer_strlen(host->rrdpush_buffer), max_size);
+                errno = 0;
+                error("STREAM %s [send to %s]: too many data pending - buffer is %zu bytes long, %zu unsent - we have sent %zu bytes in total, %zu on this connection. Closing connection to flush the data.", host->hostname, connected_to, host->rrdpush_buffer->len, host->rrdpush_buffer->len - begin, sent_bytes, sent_connection);
+                if(host->rrdpush_socket != -1) {
+                    close(host->rrdpush_socket);
+                    host->rrdpush_socket = -1;
+                }
             }
         }
-        else {
-            debug(D_STREAM, "STREAM: poll() timed out.");
-        }
 
-        // protection from overflow
-        if(buffer_strlen(host->rrdpush_buffer) > max_size) {
-            debug(D_STREAM, "STREAM: Buffer is too big (%zu bytes), bigger than the max (%zu) - flushing it...", buffer_strlen(host->rrdpush_buffer), max_size);
-            errno = 0;
-            error("STREAM %s [send to %s]: too many data pending - buffer is %zu bytes long, %zu unsent - we have sent %zu bytes in total, %zu on this connection. Closing connection to flush the data.", host->hostname, connected_to, host->rrdpush_buffer->len, host->rrdpush_buffer->len - begin, sent_bytes, sent_connection);
-            if(host->rrdpush_socket != -1) {
-                close(host->rrdpush_socket);
-                host->rrdpush_socket = -1;
-            }
-        }
-    }
-
-cleanup:
-    debug(D_WEB_CLIENT, "STREAM %s [send]: sending thread exits.", host->hostname);
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
-        error("STREAM %s [send]: cannot set pthread cancel state to DISABLE.", host->hostname);
-
-    rrdpush_lock(host);
-    rrdhost_wrlock(host);
-    rrdpush_sender_thread_cleanup_locked_all(host);
-    rrdhost_unlock(host);
-    rrdpush_unlock(host);
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
+    pthread_cleanup_pop(1);
 
     pthread_exit(NULL);
     return NULL;
@@ -772,11 +803,8 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     if(!host->rrdpush_spawn) {
         if(pthread_create(&host->rrdpush_thread, NULL, rrdpush_sender_thread, (void *) host))
             error("STREAM %s [send]: failed to create new thread for client.", host->hostname);
-
-        else if(pthread_detach(host->rrdpush_thread))
-            error("STREAM %s [send]: cannot request detach newly created thread.", host->hostname);
-
-        host->rrdpush_spawn = 1;
+        else
+            host->rrdpush_spawn = 1;
     }
 
     rrdhost_unlock(host);
