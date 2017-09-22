@@ -6,6 +6,13 @@ Released under [GPL v3 or later](http://www.gnu.org/licenses/gpl-3.0.en.html).
 
 ---
 
+## Key netdata contributors
+
+- Costa Tsaousis
+- Simon Nagl
+
+---
+
 ## Re-distributed software
 
 Netdata re-distributes the following third party software.
