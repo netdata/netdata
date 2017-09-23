@@ -425,17 +425,25 @@ struct rrdhost {
     // streaming of data to remote hosts - rrdpush
 
     int rrdpush_send_enabled:1;                     // 1 when this host sends metrics to another netdata
-    volatile int rrdpush_send_connected:1;          // 1 when the sender is ready to push metrics
-    volatile int rrdpush_sender_spawn:1;            // 1 when the sender thread has been spawn
-    volatile int rrdpush_sender_error_shown:1;      // 1 when we have logged a communication error
-    volatile int rrdpush_sender_join:1;             // 1 when we have to join the sending thread
     char *rrdpush_send_destination;                 // where to send metrics to
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
-    int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
+
+    // the following are state information for the threading
+    // streaming metrics from this netdata to an upstream netdata
+    volatile int rrdpush_sender_spawn:1;            // 1 when the sender thread has been spawn
     pthread_t rrdpush_sender_thread;                // the sender thread
+
+    volatile int rrdpush_sender_connected:1;        // 1 when the sender is ready to push metrics
+    int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1
+
+    volatile int rrdpush_sender_error_shown:1;      // 1 when we have logged a communication error
+    volatile int rrdpush_sender_join:1;             // 1 when we have to join the sending thread
+
+    // metrics may be collected asynchronously
+    // these synchronize all the threads willing the write to our sending buffer
     netdata_mutex_t rrdpush_sender_buffer_mutex;    // exclusive access to rrdpush_sender_buffer
-    int rrdpush_sender_pipe[2];                     // collector to sender thread communication
-    BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends them
+    int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
+    BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
 
 
     // ------------------------------------------------------------------------
