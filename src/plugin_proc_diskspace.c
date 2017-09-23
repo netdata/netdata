@@ -227,6 +227,12 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     fsfilcnt_t freserved_root = favail_root - favail;
     fsfilcnt_t fused          = ftotal - favail_root;
 
+    if(m->do_inodes == CONFIG_BOOLEAN_AUTO && favail == (fsfilcnt_t)-1) {
+        // this file system does not support inodes reporting
+        // eg. cephfs
+        m->do_inodes = CONFIG_BOOLEAN_NO;
+    }
+
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
         error("DISKSPACE: disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
