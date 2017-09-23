@@ -284,7 +284,8 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     if(!host->rrdpush_sender_join) {
         info("STREAM %s [send]: sending thread detaches itself.", host->hostname);
-        pthread_detach(pthread_self());
+        if(pthread_detach(pthread_self()))
+            error("STREAM %s [send]: pthread_detach() failed.", host->hostname);
     }
 
     host->rrdpush_sender_spawn = 0;
