@@ -120,15 +120,15 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->rrd_memory_mode     = memory_mode;
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
-    host->rrdpush_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key);
-    host->rrdpush_destination = (host->rrdpush_enabled)?strdupz(rrdpush_destination):NULL;
-    host->rrdpush_api_key     = (host->rrdpush_enabled)?strdupz(rrdpush_api_key):NULL;
+    host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key);
+    host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
+    host->rrdpush_send_api_key     = (host->rrdpush_send_enabled)?strdupz(rrdpush_api_key):NULL;
 
-    host->rrdpush_pipe[0] = -1;
-    host->rrdpush_pipe[1] = -1;
-    host->rrdpush_socket  = -1;
+    host->rrdpush_sender_pipe[0] = -1;
+    host->rrdpush_sender_pipe[1] = -1;
+    host->rrdpush_sender_socket  = -1;
 
-    netdata_mutex_init(&host->rrdpush_mutex);
+    netdata_mutex_init(&host->rrdpush_sender_buffer_mutex);
     netdata_rwlock_init(&host->rrdhost_rwlock);
 
     rrdhost_init_hostname(host, hostname);
@@ -272,9 +272,9 @@ RRDHOST *rrdhost_create(const char *hostname,
              , host->rrd_update_every
              , rrd_memory_mode_name(host->rrd_memory_mode)
              , host->rrd_history_entries
-             , host->rrdpush_enabled?"enabled":"disabled"
-             , host->rrdpush_destination?host->rrdpush_destination:""
-             , host->rrdpush_api_key?host->rrdpush_api_key:""
+             , host->rrdpush_send_enabled?"enabled":"disabled"
+             , host->rrdpush_send_destination?host->rrdpush_send_destination:""
+             , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
              , host->health_enabled?"enabled":"disabled"
              , host->cache_dir
              , host->varlib_dir
@@ -508,8 +508,8 @@ void rrdhost_free(RRDHOST *host) {
     freez((void *)host->os);
     freez(host->cache_dir);
     freez(host->varlib_dir);
-    freez(host->rrdpush_api_key);
-    freez(host->rrdpush_destination);
+    freez(host->rrdpush_send_api_key);
+    freez(host->rrdpush_send_destination);
     freez(host->health_default_exec);
     freez(host->health_default_recipient);
     freez(host->health_log_filename);
