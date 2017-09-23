@@ -137,7 +137,8 @@ netdata_SOURCES = \
 	sys_devices_system_node.c \
 	unit_test.c \
 	unit_test.h \
-	url.c url.h \
+	url.c \
+	url.h \
 	web_api_old.c \
 	web_api_old.h \
 	web_api_v1.c \
@@ -176,7 +177,8 @@ netdata_SOURCES += \
 	$(NULL)
 else
 netdata_SOURCES += \
-	ipc.c ipc.h \
+	ipc.c \
+	ipc.h \
 	plugin_proc.c \
 	plugin_proc.h \
 	plugin_proc_diskspace.c \
