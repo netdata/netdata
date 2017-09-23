@@ -230,6 +230,7 @@ declare -A configs_signatures=(
   ['7454ed74511d7b9819dfe173f9020786']='python.d/redis.conf'
   ['749fe31362969d75f1ea66d15231d98d']='python.d/retroshare.conf'
   ['7502c931aa9acbb92f54c67978d75983']='stream.conf'
+  ['751f15371d0987018abc4d4ad60819f5']='apps_groups.conf'
   ['7596ae54d46ce199ac599429ef753caf']='health.d/cpu.conf'
   ['75a9c4b0b1c73956df55585eb0619f6c']='charts.d/ap.conf'
   ['769aa4cdcdc3d78d0328d1f9e4edcdf9']='python.d/mysql.conf'
