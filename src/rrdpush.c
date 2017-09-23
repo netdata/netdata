@@ -153,7 +153,7 @@ void rrdset_done_push(RRDSET *st) {
     if(unlikely(host->rrdpush_send_enabled && !host->rrdpush_sender_spawn))
         rrdpush_sender_thread_spawn(host);
 
-    if(unlikely(!host->rrdpush_sender_buffer || !host->rrdpush_send_connected)) {
+    if(unlikely(!host->rrdpush_sender_buffer || !host->rrdpush_sender_connected)) {
         if(unlikely(!host->rrdpush_sender_error_shown))
             error("STREAM %s [send]: not ready - discarding collected metrics.", host->hostname);
 
@@ -261,7 +261,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     rrdhost_wrlock(host);
 
     info("STREAM %s [send]: sending thread cleans up...", host->hostname);
-    host->rrdpush_send_connected = 0;
+    host->rrdpush_sender_connected = 0;
 
     if(host->rrdpush_sender_socket != -1) {
         close(host->rrdpush_sender_socket);
@@ -321,7 +321,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
     // initialize rrdpush globals
     host->rrdpush_sender_buffer = buffer_create(1);
-    host->rrdpush_send_connected = 0;
+    host->rrdpush_sender_connected = 0;
     if(pipe(host->rrdpush_sender_pipe) == -1) fatal("STREAM %s [send]: cannot create required pipe.", host->hostname);
 
     // initialize local variables
@@ -360,7 +360,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
                 // stop appending data into rrdpush_sender_buffer
                 // they will be lost, so there is no point to do it
-                host->rrdpush_send_connected = 0;
+                host->rrdpush_sender_connected = 0;
 
                 info("STREAM %s [send to %s]: connecting...", host->hostname, host->rrdpush_send_destination);
                 host->rrdpush_sender_socket = connect_to_one_of(host->rrdpush_send_destination, default_port, &tv, &reconnects_counter, connected_to, CONNECTED_TO_SIZE);
@@ -428,7 +428,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 sent_connection = 0;
 
                 // allow appending data into rrdpush_sender_buffer
-                host->rrdpush_send_connected = 1;
+                host->rrdpush_sender_connected = 1;
 
                 debug(D_STREAM, "STREAM: Connected on fd %d...", host->rrdpush_sender_socket);
             }
