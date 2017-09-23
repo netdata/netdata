@@ -548,19 +548,19 @@ class Web(Mixin):
         # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
         # 5. Bytes sent 6. Response length 7. Response process time
         default = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
-                             r' -.*?"(?P<request>[^"]+)"'
+                             r' -.*?"(?P<request>[^"]*)"'
                              r' (?P<code>[1-9]\d{2})'
                              r' (?P<bytes_sent>\d+|-)')
 
         apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
-                                       r' -.*?"(?P<request>[^"]+)"'
+                                       r' -.*?"(?P<request>[^"]*)"'
                                        r' (?P<code>[1-9]\d{2})'
                                        r' (?P<bytes_sent>\d+|-)'
                                        r' (?P<resp_length>\d+)'
                                        r' (?P<resp_time>\d+) ')
 
         apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
-                                       r' -.*?"(?P<request>[^"]+)"'
+                                       r' -.*?"(?P<request>[^"]*)"'
                                        r' (?P<code>[1-9]\d{2})'
                                        r' (?P<bytes_sent>\d+|-)'
                                        r' .*?'
@@ -569,14 +569,14 @@ class Web(Mixin):
                                        r'(?: |$)')
 
         nginx_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
-                                      r' -.*?"(?P<request>[^"]+)"'
+                                      r' -.*?"(?P<request>[^"]*)"'
                                       r' (?P<code>[1-9]\d{2})'
                                       r' (?P<bytes_sent>\d+)'
                                       r' (?P<resp_length>\d+)'
                                       r' (?P<resp_time>\d+\.\d+) ')
 
         nginx_ext2_insert = re.compile(r'(?P<address>[\da-f.:]+)'
-                                       r' -.*?"(?P<request>[^"]+)"'
+                                       r' -.*?"(?P<request>[^"]*)"'
                                        r' (?P<code>[1-9]\d{2})'
                                        r' (?P<bytes_sent>\d+)'
                                        r' (?P<resp_length>\d+)'
@@ -584,7 +584,7 @@ class Web(Mixin):
                                        r' (?P<resp_time_upstream>[\d.-]+) ')
 
         nginx_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
-                                      r' -.*?"(?P<request>[^"]+)"'
+                                      r' -.*?"(?P<request>[^"]*)"'
                                       r' (?P<code>[1-9]\d{2})'
                                       r' (?P<bytes_sent>\d+)'
                                       r' .*?'
