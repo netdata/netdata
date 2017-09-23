@@ -175,7 +175,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
 
         // the chart will not get more updates (data collection)
         // so, we have to push its definition now
-        if(unlikely(st->rrdhost->rrdpush_enabled))
+        if(unlikely(st->rrdhost->rrdpush_send_enabled))
             rrdset_push_chart_definition(st);
     }
 }
@@ -1029,7 +1029,7 @@ void rrdset_done(RRDSET *st) {
     if(unlikely(netdata_exit)) return;
 
     if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
-        if(unlikely(st->rrdhost->rrdpush_enabled))
+        if(unlikely(st->rrdhost->rrdpush_send_enabled))
             rrdset_done_push_exclusive(st);
 
         return;
@@ -1154,7 +1154,7 @@ void rrdset_done(RRDSET *st) {
     }
     st->counter_done++;
 
-    if(unlikely(st->rrdhost->rrdpush_enabled))
+    if(unlikely(st->rrdhost->rrdpush_send_enabled))
         rrdset_done_push(st);
 
     #ifdef NETDATA_INTERNAL_CHECKS
