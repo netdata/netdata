@@ -160,7 +160,7 @@ void rrdset_done_push(RRDSET *st) {
         return;
     }
     else if(unlikely(host->rrdpush_error_shown)) {
-        info("STREAM %s [send]: ready - sending metrics...", host->hostname);
+        info("STREAM %s [send]: sending metrics...", host->hostname);
         host->rrdpush_error_shown = 0;
     }
 
@@ -236,12 +236,14 @@ static void rrdpush_sender_thread_cleanup_locked_all(RRDHOST *host) {
     buffer_free(host->rrdpush_buffer);
     host->rrdpush_buffer = NULL;
 
-    if(!host->rrdpush_sender_join)
+    if(!host->rrdpush_sender_join) {
+        info("STREAM %s [send]: sending thread detaches itself.", host->hostname);
         pthread_detach(pthread_self());
+    }
 
     host->rrdpush_spawn = 0;
 
-    pthread_exit(NULL);
+    info("STREAM %s [send]: sending thread now exits.", host->hostname);
 }
 
 void rrdpush_sender_thread_stop(RRDHOST *host) {
@@ -251,7 +253,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
     pthread_t thr = 0;
 
     if(host->rrdpush_spawn) {
-        info("STREAM %s [send]: stopping sending thread...", host->hostname);
+        info("STREAM %s [send]: signaling sending thread to stop...", host->hostname);
 
         // signal the thread that we want to join it
         host->rrdpush_sender_join = 1;
@@ -270,11 +272,14 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
     rrdpush_unlock(host);
 
     if(thr != 0) {
-        info("STREAM %s [send]: waiting for sending thread to stop...", host->hostname);
+        info("STREAM %s [send]: waiting for the sending thread to stop...", host->hostname);
+
         void *result;
         int ret = pthread_join(thr, &result);
         if(ret != 0)
             error("STREAM %s [send]: pthread_join() returned error.", host->hostname);
+
+        info("STREAM %s [send]: sending thread has exited.", host->hostname);
     }
 }
 
@@ -283,7 +288,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     rrdpush_lock(host);
     rrdhost_wrlock(host);
-    info("STREAM %s [send]: sending thread self-exits.", host->hostname);
+    info("STREAM %s [send]: sending thread cleans up...", host->hostname);
     rrdpush_sender_thread_cleanup_locked_all(host);
     rrdhost_unlock(host);
     rrdpush_unlock(host);
@@ -409,7 +414,7 @@ void *rrdpush_sender_thread(void *ptr) {
                     continue;
                 }
 
-                info("STREAM %s [send to %s]: established communication - sending metrics...", host->hostname, connected_to);
+                info("STREAM %s [send to %s]: established communication - ready to send metrics...", host->hostname, connected_to);
                 last_sent_t = now_monotonic_sec();
 
                 if(sock_setnonblock(host->rrdpush_socket) < 0)
@@ -736,7 +741,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
     size_t count = pluginsd_process(host, &cd, fp, 1);
 
     log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "DISCONNECTED");
-    error("STREAM %s [receive from [%s]:%s]: disconnected (completed updates %zu).", host->hostname, client_ip, client_port, count);
+    error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).", host->hostname, client_ip, client_port, count);
 
     rrdhost_wrlock(host);
     host->senders_disconnected_time = now_realtime_sec();
@@ -748,7 +753,8 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
     }
     rrdhost_unlock(host);
 
-    rrdpush_sender_thread_stop(host);
+    if(host->connected_senders == 0)
+        rrdpush_sender_thread_stop(host);
 
     // cleanup
     fclose(fp);
