@@ -246,6 +246,8 @@ SQUID_CODES = dict(TCP='squid_transport_methods', UDP='squid_transport_methods',
                    DENIED='squid_cache_events', NOFETCH='squid_cache_events', TUNNEL='squid_cache_events',
                    ABORTED='squid_transport_errors', TIMEOUT='squid_transport_errors')
 
+REQUEST_REGEX = re.compile(r'(?P<method>[A-Z]+) (?P<url>[^ ]+) [A-Z]+/(?P<http_version>\d(?:.\d)?)')
+
 
 class Service(LogService):
     def __init__(self, configuration=None, name=None):
@@ -492,29 +494,13 @@ class Web(Mixin):
                     self.get_data_per_response_codes_detailed(code=match_dict['code'])
                 # response statuses
                 self.get_data_per_statuses(code=match_dict['code'])
-                # requests per url
-                if self.storage['url_pattern']:
-                    self.get_data_per_pattern(row=match_dict['url'],
-                                              other='url_pattern_other',
-                                              pattern=self.storage['url_pattern'])
                 # requests per user defined pattern
                 if self.storage['user_pattern'] and 'user_defined' in match_dict:
                     self.get_data_per_pattern(row=match_dict['user_defined'],
                                               other='user_pattern_other',
                                               pattern=self.storage['user_pattern'])
-                # requests per http method
-                if match_dict['method'] not in self.data:
-                    self.add_new_dimension(dimension_id=match_dict['method'],
-                                           chart_key='http_method')
-                self.data[match_dict['method']] += 1
-                # requests per http version
-                if 'http_version' in match_dict:
-                    dim_id = match_dict['http_version'].replace('.', '_')
-                    if dim_id not in self.data:
-                        self.add_new_dimension(dimension_id=dim_id,
-                                               chart_key='http_version',
-                                               dimension=match_dict['http_version'])
-                    self.data[dim_id] += 1
+                # method, url, http version
+                self.get_data_from_request_field(match_dict=match_dict)
                 # bandwidth sent
                 bytes_sent = match_dict['bytes_sent'] if '-' not in match_dict['bytes_sent'] else 0
                 self.data['bytes_sent'] += int(bytes_sent)
@@ -562,25 +548,19 @@ class Web(Mixin):
         # REGEX: 1.IPv4 address 2.HTTP method 3. URL 4. Response code
         # 5. Bytes sent 6. Response length 7. Response process time
         default = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
-                             r' -.*?"(?P<method>[A-Z]+)'
-                             r' (?P<url>[^ ]+)'
-                             r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                             r' -.*?"(?P<request>[^"]*)"'
                              r' (?P<code>[1-9]\d{2})'
                              r' (?P<bytes_sent>\d+|-)')
 
         apache_ext_insert = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
-                                       r' -.*?"(?P<method>[A-Z]+)'
-                                       r' (?P<url>[^ ]+)'
-                                       r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                       r' -.*?"(?P<request>[^"]*)"'
                                        r' (?P<code>[1-9]\d{2})'
                                        r' (?P<bytes_sent>\d+|-)'
                                        r' (?P<resp_length>\d+)'
                                        r' (?P<resp_time>\d+) ')
 
         apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
-                                       r' -.*?"(?P<method>[A-Z]+)'
-                                       r' (?P<url>[^ ]+)'
-                                       r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                       r' -.*?"(?P<request>[^"]*)"'
                                        r' (?P<code>[1-9]\d{2})'
                                        r' (?P<bytes_sent>\d+|-)'
                                        r' .*?'
@@ -589,18 +569,14 @@ class Web(Mixin):
                                        r'(?: |$)')
 
         nginx_ext_insert = re.compile(r'(?P<address>[\da-f.:]+)'
-                                      r' -.*?"(?P<method>[A-Z]+)'
-                                      r' (?P<url>[^ ]+)'
-                                      r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                      r' -.*?"(?P<request>[^"]*)"'
                                       r' (?P<code>[1-9]\d{2})'
                                       r' (?P<bytes_sent>\d+)'
                                       r' (?P<resp_length>\d+)'
                                       r' (?P<resp_time>\d+\.\d+) ')
 
         nginx_ext2_insert = re.compile(r'(?P<address>[\da-f.:]+)'
-                                       r' -.*?"(?P<method>[A-Z]+)'
-                                       r' (?P<url>[^ ]+)'
-                                       r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                       r' -.*?"(?P<request>[^"]*)"'
                                        r' (?P<code>[1-9]\d{2})'
                                        r' (?P<bytes_sent>\d+)'
                                        r' (?P<resp_length>\d+)'
@@ -608,9 +584,7 @@ class Web(Mixin):
                                        r' (?P<resp_time_upstream>[\d.-]+) ')
 
         nginx_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
-                                      r' -.*?"(?P<method>[A-Z]+)'
-                                      r' (?P<url>[^ ]+)'
-                                      r' [A-Z]+/(?P<http_version>\d\.\d)"'
+                                      r' -.*?"(?P<request>[^"]*)"'
                                       r' (?P<code>[1-9]\d{2})'
                                       r' (?P<bytes_sent>\d+)'
                                       r' .*?'
@@ -693,14 +667,14 @@ class Web(Mixin):
         if match_dict is None:
             return find_regex_return(msg='Custom log: search OK but contains no named subgroups'
                                          ' (you need to use ?P<subgroup_name>)')
-        mandatory_dict = {'address': r'[\da-f.:]+|localhost',
+        mandatory_dict = {'address': r'[\w.:-]+',
                           'code': r'[1-9]\d{2}',
-                          'method': r'[A-Z]+',
                           'bytes_sent': r'\d+|-'}
         optional_dict = {'resp_length': r'\d+',
                          'resp_time': r'[\d.]+',
                          'resp_time_upstream': r'[\d.-]+',
-                         'http_version': r'\d(\.\d)?'}
+                         'method': r'[A-Z]+',
+                         'http_version': r'\d(?:.\d)?'}
 
         mandatory_values = set(mandatory_dict) - set(match_dict)
         if mandatory_values:
@@ -725,6 +699,33 @@ class Web(Mixin):
 
         self.storage['regex'] = regex
         return find_regex_return(match_dict=match_dict)
+
+    def get_data_from_request_field(self, match_dict):
+        if match_dict.get('request'):
+            match_dict = REQUEST_REGEX.search(match_dict['request'])
+            if match_dict:
+                match_dict = match_dict.groupdict()
+            else:
+                return
+        # requests per url
+        if match_dict.get('url') and self.storage['url_pattern']:
+            self.get_data_per_pattern(row=match_dict['url'],
+                                      other='url_pattern_other',
+                                      pattern=self.storage['url_pattern'])
+        # requests per http method
+        if match_dict.get('method'):
+            if match_dict['method'] not in self.data:
+                self.add_new_dimension(dimension_id=match_dict['method'],
+                                       chart_key='http_method')
+            self.data[match_dict['method']] += 1
+        # requests per http version
+        if match_dict.get('http_version'):
+            dim_id = match_dict['http_version'].replace('.', '_')
+            if dim_id not in self.data:
+                self.add_new_dimension(dimension_id=dim_id,
+                                       chart_key='http_version',
+                                       dimension=match_dict['http_version'])
+            self.data[dim_id] += 1
 
     def get_data_per_response_codes_detailed(self, code):
         """
