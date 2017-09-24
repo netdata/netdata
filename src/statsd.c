@@ -685,8 +685,9 @@ struct statsd_udp {
 #endif
 
 // new TCP client connected
-static void *statsd_add_callback(int fd, short int *events) {
+static void *statsd_add_callback(int fd, int socktype, short int *events) {
     (void)fd;
+    (void)socktype;
     *events = POLLIN;
 
     struct statsd_tcp *data = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
@@ -697,8 +698,9 @@ static void *statsd_add_callback(int fd, short int *events) {
 }
 
 // TCP client disconnected
-static void statsd_del_callback(int fd, void *data) {
+static void statsd_del_callback(int fd, int socktype, void *data) {
     (void)fd;
+    (void)socktype;
 
     if(data) {
         struct statsd_tcp *t = data;

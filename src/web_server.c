@@ -377,3 +377,142 @@ void *socket_listen_main_single_threaded(void *ptr) {
     pthread_exit(NULL);
     return NULL;
 }
+
+
+#if 0
+// new TCP client connected
+static void *web_server_add_callback(int fd, int socktype, short int *events) {
+    (void)fd;
+    (void)socktype;
+
+    *events = POLLIN;
+
+    debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", fd);
+    struct web_client *w = web_client_create(fd);
+
+    if(unlikely(socktype == AF_UNIX))
+        web_client_set_unix(w);
+    else
+        web_client_set_tcp(w);
+
+    return (void *)w;
+}
+
+// TCP client disconnected
+static void web_server_del_callback(int fd, int socktype, void *data) {
+    (void)fd;
+    (void)socktype;
+
+    struct web_client *w = (struct web_client *)data;
+
+    if(w) {
+        if(w->ofd == -1 || fd == w->ofd) {
+            // we free the client, only if the closing fd
+            // is the client socket
+            web_client_free(w);
+        }
+    }
+
+    return;
+}
+
+// Receive data
+static int web_server_rcv_callback(int fd, int socktype, void *data, short int *events) {
+    (void)fd;
+    (void)socktype;
+
+    *events = 0;
+
+    struct web_client *w = (struct web_client *)data;
+
+    if(unlikely(!web_client_has_wait_receive(w)))
+        return -1;
+
+    if(unlikely(web_client_receive(w) < 0))
+        return -1;
+
+    if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
+        if(unlikely(w->ifd != -1 && w->ifd != fd)) {
+            // FIXME: we switched input fd
+            // add a new socket to poll_events, with the same
+        }
+        else if(unlikely(w->ifd == -1)) {
+            // FIXME: we closed input fd
+            // instruct poll_events() to close fd
+            return -1;
+        }
+    }
+    else {
+        debug(D_WEB_CLIENT, "%llu: Processing received data.", w->id);
+        web_client_process_request(w);
+    }
+
+    if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
+        *events |= POLLIN;
+
+    if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
+        *events |= POLLOUT;
+
+    if(unlikely(*events == 0))
+        return -1;
+
+    return 0;
+}
+
+static int web_server_snd_callback(int fd, int socktype, void *data, short int *events) {
+    (void)fd;
+    (void)socktype;
+
+    struct web_client *w = (struct web_client *)data;
+
+    if(unlikely(!web_client_has_wait_send(w)))
+        return -1;
+
+    if(unlikely(web_client_send(w) < 0))
+        return -1;
+
+    if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
+        *events |= POLLIN;
+
+    if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
+        *events |= POLLOUT;
+
+    if(unlikely(*events == 0))
+        return -1;
+
+    return 0;
+}
+
+void *socket_listen_main_single_threaded(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+
+    web_server_mode = WEB_SERVER_MODE_SINGLE_THREADED;
+
+    info("Single-threaded WEB SERVER thread created with task id %d", gettid());
+
+    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+        error("Cannot set pthread cancel type to DEFERRED.");
+
+    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+        error("Cannot set pthread cancel state to ENABLE.");
+
+    if(!api_sockets.opened)
+        fatal("LISTENER: no listen sockets available.");
+
+    poll_events(&api_sockets
+                , web_server_add_callback
+                , web_server_del_callback
+                , web_server_rcv_callback
+                , web_server_snd_callback
+                , web_allow_connections_from
+                , NULL
+    );
+
+    debug(D_WEB_CLIENT, "LISTENER: exit!");
+    listen_sockets_close(&api_sockets);
+
+    static_thread->enabled = 0;
+    pthread_exit(NULL);
+    return NULL;
+}
+#endif
