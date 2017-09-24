@@ -952,8 +952,8 @@ struct poll {
     struct pollinfo *inf;
     struct pollinfo *first_free;
 
-    void *(*add_callback)(int fd, short int *events);
-    void  (*del_callback)(int fd, void *data);
+    void *(*add_callback)(int fd, int socktype, short int *events);
+    void  (*del_callback)(int fd, int socktype, void *data);
     int   (*rcv_callback)(int fd, int socktype, void *data, short int *events);
     int   (*snd_callback)(int fd, int socktype, void *data, short int *events);
 };
@@ -1008,7 +1008,7 @@ static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype,
         p->max = pi->slot;
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
-        pi->data = p->add_callback(fd, &pf->events);
+        pi->data = p->add_callback(fd, pi->socktype, &pf->events);
     }
 
     if(pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
@@ -1027,7 +1027,7 @@ static inline void poll_close_fd(struct poll *p, struct pollinfo *pi) {
     if(unlikely(pf->fd == -1)) return;
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
-        p->del_callback(pf->fd, pi->data);
+        p->del_callback(pf->fd, pi->socktype, pi->data);
     }
 
     close(pf->fd);
@@ -1060,14 +1060,16 @@ static inline void poll_close_fd(struct poll *p, struct pollinfo *pi) {
     debug(D_POLLFD, "POLLFD: DEL: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 }
 
-static void *add_callback_default(int fd, short int *events) {
+static void *add_callback_default(int fd, int socktype, short int *events) {
     (void)fd;
+    (void)socktype;
     (void)events;
 
     return NULL;
 }
-static void del_callback_default(int fd, void *data) {
+static void del_callback_default(int fd, int socktype, void *data) {
     (void)fd;
+    (void)socktype;
     (void)data;
 
     if(data)
@@ -1124,8 +1126,8 @@ void poll_events_cleanup(void *data) {
 }
 
 void poll_events(LISTEN_SOCKETS *sockets
-        , void *(*add_callback)(int fd, short int *events)
-        , void  (*del_callback)(int fd, void *data)
+        , void *(*add_callback)(int fd, int socktype, short int *events)
+        , void  (*del_callback)(int fd, int socktype, void *data)
         , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
         , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
         , SIMPLE_PATTERN *access_list
