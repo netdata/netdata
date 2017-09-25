@@ -289,6 +289,7 @@ declare -A configs_signatures=(
   ['91cf3b3d42cac969b8b3fd4f531ecfb3']='python.d/squid.conf'
   ['91e1a9703debbdc64edf124419fdc14b']='python.d/elasticsearch.conf'
   ['9347bcce0b3574ac5193d43248d2e3cc']='python.d/chrony.conf'
+  ['94bb961f83ec724cf86239328f73a3db']='health.d/redis.conf'
   ['9542f80def48ba105190f6cdaa18248e']='health.d/mysql.conf'
   ['97eee7a30e6419df4537242e9d4a719d']='health.d/mysql.conf'
   ['97f337eb96213f3ede05e522e3743a6c']='python.d/memcached.conf'
