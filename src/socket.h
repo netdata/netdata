@@ -52,8 +52,8 @@ extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flag
 
 
 extern void poll_events(LISTEN_SOCKETS *sockets
-        , void *(*add_callback)(int fd, short int *events)
-        , void  (*del_callback)(int fd, void *data)
+        , void *(*add_callback)(int fd, int socktype, short int *events)
+        , void  (*del_callback)(int fd, int socktype, void *data)
         , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
         , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
         , SIMPLE_PATTERN *access_list
