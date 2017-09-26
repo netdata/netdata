@@ -225,6 +225,9 @@ This is a list of what it currently monitors:
 - **NSD name servers**<br/>
   queries, zones, protocols, query types, transfers, etc.
 
+- **PowerDNS**</br>
+  queries, answers, cache, latency, etc.
+
 - **Postfix email servers**<br/>
   message queue (entries, size)
 
@@ -269,6 +272,9 @@ This is a list of what it currently monitors:
 - **SNMP devices**<br/>
   can be monitored too (although you will need to configure these)
 
+- **chrony**</br>
+  frequencies, offsets, delays, etc.
+
 - **statsd**<br/>
   [netdata is a fully featured statsd server](https://github.com/firehol/netdata/wiki/statsd)
 
@@ -281,7 +287,7 @@ And you can extend it, by writing plugins that collect data from any source, usi
 This is a high level overview of netdata feature set and architecture.
 Click it to to interact with it (it has direct links to documentation).
 
-[![netdata-overview](https://cloud.githubusercontent.com/assets/2662304/26529478/104652ac-43c9-11e7-903f-edb9bb2ced24.png)](https://my-netdata.io/infographic.html)
+[![netdata-overview](https://user-images.githubusercontent.com/2662304/30880445-4ba55d24-a30b-11e7-979a-6598f069a590.png)](https://my-netdata.io/infographic.html)
 
 ---
 
