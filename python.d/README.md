@@ -1278,6 +1278,45 @@ When no configuration file is found, module tries to connect to TCP/IP socket: `
 
 ---
 
+# powerdns
+
+Module monitor powerdns performance and health metrics.
+
+Following charts are drawn:
+
+1. **Queries and Answers**
+ * udp-queries
+ * udp-answers
+ * tcp-queries
+ * tcp-answers
+
+2. **Cache Usage**
+ * query-cache-hit
+ * query-cache-miss
+ * packetcache-hit
+ * packetcache-miss
+
+3. **Cache Size**
+ * query-cache-size
+ * packetcache-size
+ * key-cache-size
+ * meta-cache-size
+
+4. **Latency**
+ * latency
+
+### configuration
+
+```yaml
+local:
+  name     : 'local'
+  url     : 'http://127.0.0.1:8081/api/v1/servers/localhost/statistics'
+  header   :
+    X-API-Key: 'change_me'
+```
+
+---
+
 # rabbitmq
 
 Module monitor rabbitmq performance and health metrics.
@@ -1321,10 +1360,10 @@ Following charts are drawn:
 ```yaml
 socket:
   name     : 'local'
-    host     : '127.0.0.1'
-    port     :  15672
-    user     : 'guest'
-    pass     : 'guest'
+  host     : '127.0.0.1'
+  port     :  15672
+  user     : 'guest'
+  pass     : 'guest'
 
 ```
 
