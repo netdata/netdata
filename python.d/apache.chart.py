@@ -42,10 +42,10 @@ CHARTS = {
             ["requests_sec"]
         ]},
     'bytespersec': {
-        'options': [None, 'apache Lifetime Avg. Bandwidth/s', 'kilobytes/s', 'statistics',
+        'options': [None, 'apache Lifetime Avg. Bandwidth/s', 'kilobits/s', 'statistics',
                     'apache.bytesperreq', 'area'],
         'lines': [
-            ["size_sec", None, 'absolute', 1, 1000]
+            ["size_sec", None, 'absolute', 8, 1000]
         ]},
     'requests': {
         'options': [None, 'apache Requests', 'requests/s', 'requests', 'apache.requests', 'line'],
@@ -53,9 +53,9 @@ CHARTS = {
             ["requests", None, 'incremental']
         ]},
     'net': {
-        'options': [None, 'apache Bandwidth', 'kilobytes/s', 'bandwidth', 'apache.net', 'area'],
+        'options': [None, 'apache Bandwidth', 'kilobits/s', 'bandwidth', 'apache.net', 'area'],
         'lines': [
-            ["sent", None, 'incremental']
+            ["sent", None, 'incremental', 8, 1]
         ]},
     'connections': {
         'options': [None, 'apache Connections', 'connections', 'connections', 'apache.connections', 'line'],
