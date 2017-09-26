@@ -437,7 +437,7 @@ install_non_systemd_init() {
             run update-rc.d netdata defaults && \
             run update-rc.d netdata enable && \
             return 0
-        elif [[ "${key}" =~ ^(amzn-201[567]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6).* ]]
+        elif [[ "${key}" =~ ^(amzn-201[567]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6.9).* ]]
             then
             echo >&2 "Installing init.d file..."
             run cp system/netdata-init-d /etc/init.d/netdata && \
