@@ -22,7 +22,28 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
     }
 }
 
-inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
+inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
+    if(unlikely(!rt)) return;
+
+    expression_free(rt->calculation);
+    expression_free(rt->warning);
+    expression_free(rt->critical);
+
+    freez(rt->family_match);
+    simple_pattern_free(rt->family_pattern);
+
+    freez(rt->name);
+    freez(rt->exec);
+    freez(rt->recipient);
+    freez(rt->context);
+    freez(rt->source);
+    freez(rt->units);
+    freez(rt->info);
+    freez(rt->dimensions);
+    freez(rt);
+}
+
+inline void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt)) return;
 
     debug(D_HEALTH, "Health removing template '%s' of host '%s'", rt->name, host->hostname);
@@ -41,22 +62,7 @@ inline void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
             error("Cannot find RRDCALCTEMPLATE '%s' linked in host '%s'", rt->name, host->hostname);
     }
 
-    expression_free(rt->calculation);
-    expression_free(rt->warning);
-    expression_free(rt->critical);
-
-    freez(rt->family_match);
-    simple_pattern_free(rt->family_pattern);
-
-    freez(rt->name);
-    freez(rt->exec);
-    freez(rt->recipient);
-    freez(rt->context);
-    freez(rt->source);
-    freez(rt->units);
-    freez(rt->info);
-    freez(rt->dimensions);
-    freez(rt);
+    rrdcalctemplate_free(rt);
 }
 
 

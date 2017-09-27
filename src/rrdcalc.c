@@ -375,8 +375,27 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
     return rc;
 }
 
-void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
-    if(!rc) return;
+void rrdcalc_free(RRDCALC *rc) {
+    if(unlikely(!rc)) return;
+
+    expression_free(rc->calculation);
+    expression_free(rc->warning);
+    expression_free(rc->critical);
+
+    freez(rc->name);
+    freez(rc->chart);
+    freez(rc->family);
+    freez(rc->dimensions);
+    freez(rc->exec);
+    freez(rc->recipient);
+    freez(rc->source);
+    freez(rc->units);
+    freez(rc->info);
+    freez(rc);
+}
+
+void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
+    if(unlikely(!rc)) return;
 
     debug(D_HEALTH, "Health removing alarm '%s.%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
 
@@ -398,18 +417,5 @@ void rrdcalc_free(RRDHOST *host, RRDCALC *rc) {
             error("Cannot unlink alarm '%s.%s' from host '%s': not found", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
     }
 
-    expression_free(rc->calculation);
-    expression_free(rc->warning);
-    expression_free(rc->critical);
-
-    freez(rc->name);
-    freez(rc->chart);
-    freez(rc->family);
-    freez(rc->dimensions);
-    freez(rc->exec);
-    freez(rc->recipient);
-    freez(rc->source);
-    freez(rc->units);
-    freez(rc->info);
-    freez(rc);
+    rrdcalc_free(rc);
 }

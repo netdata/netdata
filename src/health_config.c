@@ -505,11 +505,12 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if (rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
-                rrdcalc_free(host, rc);
+                rrdcalc_free(rc);
 
             if(rt) {
                 if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
-                    rrdcalctemplate_free(host, rt);
+                    rrdcalctemplate_free(rt);
+
                 rt = NULL;
             }
 
@@ -532,12 +533,13 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
                 if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc))
-                    rrdcalc_free(host, rc);
+                    rrdcalc_free(rc);
+
                 rc = NULL;
             }
 
             if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
-                rrdcalctemplate_free(host, rt);
+                rrdcalctemplate_free(rt);
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
             rt->name = strdupz(value);
@@ -833,10 +835,10 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
     }
 
     if(rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
-        rrdcalc_free(host, rc);
+        rrdcalc_free(rc);
 
     if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
-        rrdcalctemplate_free(host, rt);
+        rrdcalctemplate_free(rt);
 
     fclose(fp);
     return 1;
