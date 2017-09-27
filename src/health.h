@@ -403,8 +403,11 @@ extern char *health_config_dir(void);
 extern void health_reload_host(RRDHOST *host);
 extern void health_alarm_log_free(RRDHOST *host);
 
-extern void rrdcalc_free(RRDHOST *host, RRDCALC *rc);
-extern void rrdcalctemplate_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
+extern void rrdcalc_free(RRDCALC *rc);
+extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
+
+extern void rrdcalctemplate_free(RRDCALCTEMPLATE *rt);
+extern void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
 
 #ifdef NETDATA_HEALTH_INTERNALS
 #define RRDVAR_MAX_LENGTH 1024
