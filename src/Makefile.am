@@ -20,6 +20,7 @@ AM_CFLAGS = \
 	$(OPTIONAL_UUID_CFLAGS) \
 	$(OPTIONAL_LIBCAP_CFLAGS) \
 	$(OPTIONAL_IPMIMONITORING_CFLAGS)\
+	$(OPTIONAL_CUPS_CFLAGS)\
 	$(NULL)
 
 sbin_PROGRAMS = netdata
@@ -35,6 +36,10 @@ endif
 
 if ENABLE_PLUGIN_FREEIPMI
 plugins_PROGRAMS += freeipmi.plugin
+endif
+
+if ENABLE_PLUGIN_CUPS
+plugins_PROGRAMS += cups.plugin
 endif
 
 if ENABLE_PLUGIN_CGROUP_NETWORK
@@ -77,8 +82,6 @@ netdata_SOURCES = \
 	main.h \
 	plugin_checks.c \
 	plugin_checks.h \
-	plugin_cups.c \
-	plugin_cups.h \
 	plugin_idlejitter.c \
 	plugin_idlejitter.h \
 	plugin_nfacct.c \
@@ -249,6 +252,17 @@ freeipmi_plugin_SOURCES = \
 
 freeipmi_plugin_LDADD = \
 	$(OPTIONAL_IPMIMONITORING_LIBS) \
+	$(NULL)
+
+cups_plugin_SOURCES = \
+	cups_plugin.c \
+	clocks.c clocks.h \
+	common.c common.h \
+	log.c log.h \
+	$(NULL)
+
+cups_plugin_LDADD = \
+	$(OPTIONAL_CUPS_LIBS) \
 	$(NULL)
 
 cgroup_network_SOURCES = \

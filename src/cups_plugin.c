@@ -19,6 +19,7 @@ void *cups_main(void *ptr)
 
     // TODO: Check if cups is enabled
 
+    int rrd_update_every =  1;
     int update_every = (int)config_get_number("plugin:cups", "update every", rrd_update_every);
     if (update_every < rrd_update_every)
     {
@@ -183,13 +184,13 @@ void *cups_main(void *ptr)
 
         /// Todo add more charts
 
-        RRDSET *st = rrdset_find_byname("cups.jobs");
+        RRDSET *st = rrdset_find_byname_localhost("cups.jobs");
         if (unlikely(!st))
         {
-            st = rrdset_create("cups", "jobs", NULL, "jobs", NULL, "Total CUPS job number", "jobs",
+            st = rrdset_create_localhost("cups", "jobs", NULL, "jobs", NULL, "Total CUPS job number", "jobs",
                                3001, update_every, RRDSET_TYPE_LINE);
 
-            rrddim_add(st, "jobs", "jobs", 1, 1, RRDDIM_ABSOLUTE);
+            rrddim_add(st, "jobs", "jobs", 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         else
             rrdset_next(st);
@@ -206,4 +207,14 @@ void *cups_main(void *ptr)
     static_thread->enabled = 0;
     pthread_exit(NULL);
     return NULL;
+}
+
+void log_fatal(char *reason) {
+    fprintf(stderr, "cups.plugin FATAL %s\n", reason);
+    exit(1);
+}
+
+int main(int argc, char **argv) {
+    log_fatal("cups.plugin is not compiled");
+    return 0;
 }

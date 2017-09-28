@@ -26,6 +26,7 @@ stamp-h1
 netdata
 apps.plugin
 freeipmi.plugin
+cups.plugin
 netdata.spec
 
 *.tar.*

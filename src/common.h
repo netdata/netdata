@@ -188,7 +188,6 @@
 #include "plugin_checks.h"
 #include "plugin_idlejitter.h"
 #include "plugin_nfacct.h"
-#include "plugin_cups.h"
 
 #if defined(__FreeBSD__)
 #include <pthread_np.h>

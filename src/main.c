@@ -39,7 +39,6 @@ struct netdata_static_thread static_threads[] = {
 #endif
     {"tc",                  CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
     {"idlejitter",          CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
-    {"cups",                CONFIG_SECTION_PLUGINS,  "cups",       1, NULL, NULL, cups_main},
 #if defined(__FreeBSD__)
     {"freebsd",             CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
 #elif defined(__APPLE__)
