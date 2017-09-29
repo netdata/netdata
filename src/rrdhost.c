@@ -473,8 +473,12 @@ void rrdhost_free(RRDHOST *host) {
 
     while(host->rrdset_root) rrdset_free(host->rrdset_root);
 
-    while(host->alarms) rrdcalc_free(host, host->alarms);
-    while(host->templates) rrdcalctemplate_free(host, host->templates);
+    while(host->alarms)
+        rrdcalc_unlink_and_free(host, host->alarms);
+
+    while(host->templates)
+        rrdcalctemplate_unlink_and_free(host, host->templates);
+
     health_alarm_log_free(host);
 
 

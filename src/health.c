@@ -34,10 +34,10 @@ void health_reload_host(RRDHOST *host) {
     rrdhost_wrlock(host);
 
     while(host->templates)
-        rrdcalctemplate_free(host, host->templates);
+        rrdcalctemplate_unlink_and_free(host, host->templates);
 
     while(host->alarms)
-        rrdcalc_free(host, host->alarms);
+        rrdcalc_unlink_and_free(host, host->alarms);
 
     rrdhost_unlock(host);
 
