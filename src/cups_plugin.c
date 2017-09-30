@@ -1,9 +1,22 @@
-#include <cups/cups.h>
+
+
 #include "common.h"
+
+void netdata_cleanup_and_exit(int ret) {
+    exit(ret);
+}
+
+#ifdef HAVE_CUPS
+#include <cups/cups.h>
 
 // TODO: Validate if we can use ARL to scan printer options.
 // TODO: Define alarms for this plugin.
 // TODO: Add configuration options to disable per charts / per printer charts etc.
+
+int main(int argc, char **argv) {
+    fatal("cups.plugin is compiled");
+    return 0;
+}
 
 void *cups_main(void *ptr)
 {
@@ -209,12 +222,11 @@ void *cups_main(void *ptr)
     return NULL;
 }
 
-void log_fatal(char *reason) {
-    fprintf(stderr, "cups.plugin FATAL %s\n", reason);
-    exit(1);
-}
+#else // !HAVE_CUPS
 
 int main(int argc, char **argv) {
-    log_fatal("cups.plugin is not compiled");
+    fatal("cups.plugin is not compiled");
     return 0;
 }
+
+#endif // !HAVE_CUPS
