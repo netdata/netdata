@@ -30,6 +30,7 @@ dist_pythonconfig_DATA = \
     python.d/apache_cache.conf \
     python.d/bind_rndc.conf \
     python.d/chrony.conf \
+    python.d/couchdb.conf \
     python.d/cpufreq.conf \
     python.d/dns_query_time.conf \
     python.d/dovecot.conf \
@@ -73,6 +74,7 @@ dist_healthconfig_DATA = \
     health.d/backend.conf \
     health.d/bind_rndc.conf \
     health.d/cpu.conf \
+    health.d/couchdb.conf \
     health.d/disks.conf \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
