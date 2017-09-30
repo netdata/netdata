@@ -210,6 +210,9 @@ This is a list of what it currently monitors:
 - **Redis databases**<br/>
   multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves
 
+- **couchdb**<br/>
+  reads/writes, request methods, status codes, tasks, replication, per-db, etc
+
 - **mongodb**<br/>
   operations, clients, transactions, cursors, connections, asserts, locks, etc
 
