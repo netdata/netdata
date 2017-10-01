@@ -115,8 +115,12 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick)
     if(likely(*hb != 0ULL)) {
         usec_t dt = now - *hb;
         *hb = now;
-        if(unlikely(dt >= tick + tick / 2))
+
+        if(unlikely(dt >= tick + tick / 2)) {
+            errno = 0;
             error("heartbeat missed %llu microseconds", dt - tick);
+        }
+
         return dt;
     }
     else {
