@@ -588,20 +588,23 @@ void *rrdpush_sender_thread(void *ptr) {
                     }
                 }
 
-                if(unlikely(ofd->revents & POLLERR)) {
-                    debug(D_STREAM, "STREAM: Send failed (POLLERR) - closing socket...");
-                    error("STREAM %s [send to %s]: connection reports errors (POLLERR), closing it - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_bytes_on_this_connection);
-                    rrdpush_sender_thread_close_socket(host);
-                }
-                else if(unlikely(ofd->revents & POLLHUP)) {
-                    debug(D_STREAM, "STREAM: Send failed (POLLHUP) - closing socket...");
-                    error("STREAM %s [send to %s]: connection closed by remote end (POLLHUP) - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_bytes_on_this_connection);
-                    rrdpush_sender_thread_close_socket(host);
-                }
-                else if(unlikely(ofd->revents & POLLNVAL)) {
-                    debug(D_STREAM, "STREAM: Send failed (POLLNVAL) - closing socket...");
-                    error("STREAM %s [send to %s]: connection is invalid (POLLNVAL), closing it - we have sent %zu bytes on this connection.", host->hostname, connected_to, sent_bytes_on_this_connection);
-                    rrdpush_sender_thread_close_socket(host);
+                if(host->rrdpush_sender_socket != -1) {
+                    char *error = NULL;
+                    
+                    if (unlikely(ofd->revents & POLLERR))
+                        error = "socket reports errors (POLLERR)";
+                        
+                    else if (unlikely(ofd->revents & POLLHUP))
+                        error = "connection closed by remote end (POLLHUP)";
+                        
+                    else if (unlikely(ofd->revents & POLLNVAL))
+                        error = "connection is invalid (POLLNVAL)";
+                    
+                    if(unlikely(error)) {
+                        debug(D_STREAM, "STREAM: %s - closing socket...", error);
+                        error("STREAM %s [send to %s]: %s - reopening socket - we have sent %zu bytes on this connection.", host->hostname, connected_to, error, sent_bytes_on_this_connection);
+                        rrdpush_sender_thread_close_socket(host);
+                    }
                 }
             }
             else {
