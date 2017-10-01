@@ -1266,7 +1266,7 @@ case "${status}" in
     WARNING)
         image="${images_base_url}/images/alert-128-orange.png"
         status_message="needs attention"
-        color="#caca4b"
+        color="#ffc107"
 		;;
 
 	CLEAR)
