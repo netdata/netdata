@@ -9,35 +9,67 @@ void netdata_cleanup_and_exit(int ret) {
 #ifdef HAVE_CUPS
 #include <cups/cups.h>
 
+static int debug = 0;
+
 // TODO: Validate if we can use ARL to scan printer options.
 // TODO: Define alarms for this plugin.
 // TODO: Add configuration options to disable per charts / per printer charts etc.
 
 int main(int argc, char **argv) {
-    fatal("cups.plugin is compiled");
-    return 0;
-}
+    info("CUPS thread created with process id %d", getpid());
 
-void *cups_main(void *ptr)
-{
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    int i, freq = 0;
+    for(i = 1; i < argc ; i++) {
+        if(isdigit(*argv[i]) && !freq) {
+            int n = atoi(argv[i]);
+            if(n > 0 && freq < 86400) {
+                freq = n;
+                continue;
+            }
+        }
+        else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
+            printf("freeipmi.plugin %s\n", VERSION);
+            exit(0);
+        }
+        else if(strcmp("debug", argv[i]) == 0) {
+            debug = 1;
+            continue;
+        }
+        else if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
+            fprintf(stderr,
+                    "\n"
+                    " netdata cups.plugin %s\n"
+                    " Copyright (C) 2017 Simon Nagl <simonnagl@aim.com>\n"
+                    " Released under GNU General Public License v3 or later.\n"
+                    " All rights reserved.\n"
+                    "\n"
+                    " This program is a data collector plugin for netdata.\n"
+                    "\n"
+                    " Available command line options:\n"
+                    "\n"
+                    "  SECONDS                 data collection frequency\n"
+                    "\n"
+                    "  debug                   enable verbose output\n"
+                    "                          default: disabled\n"
+                    "\n"
+                    "  -v\n"
+                    "  -V\n"
+                    "  version                 print version and exit\n"
+                    "\n"
+                    , VERSION
+            );
+            exit(1);
+        }
 
-    info("CUPS thread created with task id %d", gettid());
+        error("freeipmi.plugin: ignoring parameter '%s'", argv[i]);
+    }
 
-    if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
-
-    if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+    int update_every = 1;
+    if(freq != 0) {
+        update_every = freq;
+    }
 
     // TODO: Check if cups is enabled
-
-    int rrd_update_every =  1;
-    int update_every = (int)config_get_number("plugin:cups", "update every", rrd_update_every);
-    if (update_every < rrd_update_every)
-    {
-        update_every = rrd_update_every;
-    }
 
     int num_dests; // Number of CUPS destiantions.
     int num_accepting_jobs;
@@ -99,7 +131,6 @@ void *cups_main(void *ptr)
             {
                 num_accepting_jobs++;
             }
-                error("Loop dest");
 
             const char *value2 = cupsGetOption("printer-is-shared", curr_dest->num_options, curr_dest->options);
             if (strcmp("true", value2))
@@ -197,29 +228,27 @@ void *cups_main(void *ptr)
 
         /// Todo add more charts
 
-        RRDSET *st = rrdset_find_byname_localhost("cups.jobs");
-        if (unlikely(!st))
-        {
-            st = rrdset_create_localhost("cups", "jobs", NULL, "jobs", NULL, "Total CUPS job number", "jobs",
-                               3001, update_every, RRDSET_TYPE_LINE);
+        static int cups_jobs_chart_created = 0;
 
-            rrddim_add(st, "jobs", "jobs", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        if (unlikely(!cups_jobs_chart_created)) {
+            cups_jobs_chart_created = 1;
+            printf("CHART cups.jobs '' TotalCUPSjobnumber jobs jobs cups line 3000 1\n");
+    
+            printf("DIMENSION jobs '' absolute 1 1\n");
         }
-        else
-            rrdset_next(st);
 
-        rrddim_set(st, "jobs", (collected_number) num_jobs_total);
-        rrdset_done(st);
+        printf(
+            "BEGIN cups.jobs\n"
+            "SET jobs = %zu\n"
+            "END\n"
+            , num_jobs_total
+        );
 
         if (unlikely(netdata_exit))
             break;
     }
 
-    info("CUPS thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
-    return NULL;
+    info("CUPS process exiting");
 }
 
 #else // !HAVE_CUPS

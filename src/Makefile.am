@@ -258,7 +258,13 @@ cups_plugin_SOURCES = \
 	cups_plugin.c \
 	clocks.c clocks.h \
 	common.c common.h \
+	appconfig.c appconfig.h \
+	avl.c avl.h \
 	log.c log.h \
+	$(NULL)
+
+cups_plugin_LDFLAGS = \
+	-lcups \
 	$(NULL)
 
 cups_plugin_LDADD = \
