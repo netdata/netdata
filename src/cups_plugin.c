@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
 
         if (unlikely(!cups_jobs_chart_created)) {
             cups_jobs_chart_created = 1;
-            printf("CHART cups.jobs '' TotalCUPSjobnumber jobs jobs cups line 3000 1\n");
+            printf("CHART cups.jobs '' 'Total CUPS job number' jobs jobs cups line 3000 1\n");
     
             printf("DIMENSION jobs '' absolute 1 1\n");
         }
@@ -243,6 +243,8 @@ int main(int argc, char **argv) {
             "END\n"
             , num_jobs_total
         );
+
+        fflush(stdout);        
 
         if (unlikely(netdata_exit))
             break;
