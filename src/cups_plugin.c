@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        error("freeipmi.plugin: ignoring parameter '%s'", argv[i]);
+        error("cups.plugin: ignoring parameter '%s'", argv[i]);
     }
 
     int update_every = 1;
