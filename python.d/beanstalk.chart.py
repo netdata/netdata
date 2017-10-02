@@ -27,7 +27,7 @@ class Service(SimpleService):
         self.chart("beanstalk.python_beanstalk", '', 'Beanstalk jobs', 'beanstalk',
                    '', 'random', 'line', self.priority, self.update_every)
 
-        beanstalk = beanstalkc.Connection(host=self.host, self.port)
+        beanstalk = beanstalkc.Connection(host=self.host, port = self.port)
 
         tubes = self.beanstalk.tubes()
         for tube in tubes:
@@ -40,7 +40,7 @@ class Service(SimpleService):
     def update(self, interval):
         self.begin("beanstalk.python_beanstalk", interval)
 
-        beanstalk = beanstalkc.Connection(host=self.host, self.port)
+        beanstalk = beanstalkc.Connection(host=self.host, port = self.port)
 
         tubes = self.beanstalk.tubes()
         for tube in tubes:
