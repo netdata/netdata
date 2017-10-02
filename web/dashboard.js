@@ -4088,7 +4088,7 @@ var NETDATA = window.NETDATA || {};
         }
 
         if(typeof seconds === 'string')
-            seconds = parseInt(seconds);
+            seconds = parseInt(seconds, 10);
 
         if(seconds === 0)
             return options.now;
