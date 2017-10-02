@@ -12,6 +12,9 @@ NAME = "beanstalk.chart.py"
 priority = 90000
 retries = 60
 
+host = 'localhost'
+port = 11300
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
