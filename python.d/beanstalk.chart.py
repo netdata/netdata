@@ -19,20 +19,21 @@ port = 11300
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         super(self.__class__,self).__init__(configuration=configuration, name=name)
-
+    
+    @classmethod
     def check(self):
         return True
-    
+
     def create(self):
         self.chart("beanstalk.python_beanstalk", '', 'Beanstalk jobs', 'beanstalk',
                    '', 'random', 'line', self.priority, self.update_every)
 
         beanstalk = beanstalkc.Connection(host=self.host, port = self.port)
 
-        tubes = self.beanstalk.tubes()
+        tubes = beanstalk.tubes()
         for tube in tubes:
-            stats = self.beanstalk.stats_tube(tube)
-            for stat, value in stats.iteritems():
+            stats = beanstalk.stats_tube(tube)
+            for stat in stats:
                 self.dimension(tube + "_" + stat)
         self.commit()
         return True
@@ -42,10 +43,10 @@ class Service(SimpleService):
 
         beanstalk = beanstalkc.Connection(host=self.host, port = self.port)
 
-        tubes = self.beanstalk.tubes()
+        tubes = beanstalk.tubes()
         for tube in tubes:
             print tube
-            stats = self.beanstalk.stats_tube(tube)
+            stats = beanstalk.stats_tube(tube)
             for stat, value in stats.iteritems():
                 self.set(tube + "_" + stat, value)
 
