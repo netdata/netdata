@@ -2869,6 +2869,18 @@ var NETDATA = window.NETDATA || {};
             return this.colors;
         };
 
+        this.legendResolutionTooltip = function () {
+            if(!this.chart) return '';
+
+            var collected = this.chart.update_every;
+            var viewed = (this.data)?this.data.view_update_every:collected;
+
+            if(collected === viewed)
+                return "resolution " + NETDATA.seconds4human(collected);
+
+            return "resolution " + NETDATA.seconds4human(viewed) + ", collected every " + NETDATA.seconds4human(collected);
+        };
+
         this.legendUpdateDOM = function() {
             var needed = false, dim, keys, len, i;
 
@@ -3189,6 +3201,11 @@ var NETDATA = window.NETDATA || {};
                     that.resizeHandler(e);
                 }, false);
 
+                if(this.chart) {
+                    this.element_legend_childs.title_date.title = this.chart.context.toString();
+                    this.element_legend_childs.title_time.title = this.legendResolutionTooltip();
+                }
+
                 this.element_legend_childs.title_date.className += " netdata-legend-title-date";
                 this.element_legend.appendChild(this.element_legend_childs.title_date);
                 this.tmp.__last_shown_legend_date = undefined;
@@ -3450,14 +3467,22 @@ var NETDATA = window.NETDATA || {};
             this.updates_since_last_creation++;
 
             var started = Date.now();
+            var view_update_every = data.view_update_every * 1000;
+
+
+            if(this.data_update_every !== view_update_every) {
+                if(this.element_legend_childs.title_time)
+                    this.element_legend_childs.title_time.title = this.legendResolutionTooltip();
+            }
 
             // if the result is JSON, find the latest update-every
-            this.data_update_every = data.view_update_every * 1000;
+            this.data_update_every = view_update_every;
             this.data_after = data.after * 1000;
             this.data_before = data.before * 1000;
             this.netdata_first = data.first_entry * 1000;
             this.netdata_last = data.last_entry * 1000;
             this.data_points = data.points;
+
             data.state = this;
 
             if(NETDATA.options.current.pan_and_zoom_data_padding === true && this.requested_padding !== null) {
@@ -4034,6 +4059,74 @@ var NETDATA = window.NETDATA || {};
         NETDATA.options.pauseCallback = null;
         NETDATA.options.updated_dom = true;
         NETDATA.options.pause = false;
+    };
+
+    NETDATA.seconds4human = function (seconds, options) {
+        var default_options = {
+            now: 'now',
+            space: ' ',
+            negative_suffix: 'ago',
+            day: 'day',
+            days: 'days',
+            hour: 'hour',
+            hours: 'hours',
+            minute: 'min',
+            minutes: 'mins',
+            second: 'sec',
+            seconds: 'secs',
+            and: 'and'
+        };
+
+        if(typeof options !== 'object')
+            options = default_options;
+        else {
+            var x;
+            for(x in default_options) {
+                if(typeof options[x] !== 'string')
+                    options[x] = default_options[x];
+            }
+        }
+
+        if(typeof seconds === 'string')
+            seconds = parseInt(seconds);
+
+        if(seconds === 0)
+            return options.now;
+
+        var suffix = '';
+        if(seconds < 0) {
+            seconds = -seconds;
+            if(options.negative_suffix !== '') suffix = options.space + options.negative_suffix;
+        }
+
+        var days = Math.floor(seconds / 86400);
+        seconds -= (days * 86400);
+
+        var hours = Math.floor(seconds / 3600);
+        seconds -= (hours * 3600);
+
+        var minutes = Math.floor(seconds / 60);
+        seconds -= (minutes * 60);
+
+        var strings = [];
+
+        if(days > 1) strings.push(days.toString() + options.space + options.days);
+        else if(days === 1) strings.push(days.toString() + options.space + options.day);
+
+        if(hours > 1) strings.push(hours.toString() + options.space + options.hours);
+        else if(hours === 1) strings.push(hours.toString() + options.space + options.hour);
+
+        if(minutes > 1) strings.push(minutes.toString() + options.space + options.minutes);
+        else if(minutes === 1) strings.push(minutes.toString() + options.space + options.minute);
+
+        if(seconds > 1) strings.push(Math.floor(seconds).toString() + options.space + options.seconds);
+        else if(seconds === 1) strings.push(Math.floor(seconds).toString() + options.space + options.second);
+
+        if(strings.length === 1)
+            return strings.pop() + suffix;
+
+        var last = strings.pop();
+        return strings.join(", ") + " " + options.and + " " + last + suffix;
     };
 
     // ----------------------------------------------------------------------------------------------------------------
