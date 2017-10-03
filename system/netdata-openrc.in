@@ -38,13 +38,13 @@ depend() {
 }
 
 start_post() {
-	if [[ ! -f @sysconfdir_POST@/netdata/netdata.conf ]]; then
+	if [ ! -f @sysconfdir_POST@/netdata/netdata.conf ]; then
 		ebegin "Downloading default configuration to @sysconfdir_POST@/netdata/netdata.conf"
 		sleep 2
 		curl -s -o @sysconfdir_POST@/netdata/netdata.conf.new "${NETDATA_CONFIG_URL}"
 		ret=$?
-		if [[ $ret -eq 0 && -s @sysconfdir_POST@/netdata/netdata.conf.new ]]; then
-			mv @sysconfdir_POST@/netdata/netdata.conf{.new,}
+		if [ $ret -eq 0 && -s @sysconfdir_POST@/netdata/netdata.conf.new ]; then
+			mv @sysconfdir_POST@/netdata/netdata.conf.new @sysconfdir_POST@/netdata/netdata.conf
 		else
 			ret=1
 			rm @sysconfdir_POST@/netdata/netdata.conf.new 2>/dev/null
@@ -57,20 +57,20 @@ stop_post() {
 	local result ret=0 count=0 sigkill=0
 
 	ebegin "Waiting for netdata to save its database"
-	while [[ -f "${pidfile}" ]]; do
-		if [[ $count -gt ${NETDATA_WAIT_EXIT_TIMEOUT} ]]; then
+	while [ -f "${pidfile}" ]; do
+		if [ $count -gt ${NETDATA_WAIT_EXIT_TIMEOUT} ]; then
 			sigkill=1
 			break
 		fi
 
-		count=$[count + 1]
+		count=$((count + 1))
 		kill -0 $(cat ${pidfile}) 2>/dev/null
 		ret=$?
 		test $ret -eq 0 && sleep 1
 	done
 	eend $sigkill
 
-	if [[ $sigkill -eq 1 && -f "${pidfile}" ]]; then
+	if [ $sigkill -eq 1 && -f "${pidfile}" ]; then
 		ebegin "Netdata is taking too long to exit, forcing it to quit"
 		kill -SIGKILL $(cat ${pidfile}) 2>/dev/null
 		eend $?
