@@ -274,7 +274,7 @@ declare -A role_recipients_messagebird=()
 # kavenegar configs
 KAVENEGAR_API_KEY=""
 KAVENEGAR_SENDER=""
-DEFAULT_RECIPIENT_KAVENEGAR=""
+DEFAULT_RECIPIENT_KAVENEGAR=()
 declare -A role_recipients_kavenegar=""
 
 # telegram configs
