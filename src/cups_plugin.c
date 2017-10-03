@@ -1,5 +1,4 @@
 
-
 #include "common.h"
 
 void netdata_cleanup_and_exit(int ret) {
@@ -15,53 +14,64 @@ static int debug = 0;
 // TODO: Define alarms for this plugin.
 // TODO: Add configuration options to disable per charts / per printer charts etc.
 
+void print_help() {
+    fprintf(stderr,
+        "\n"
+        "netdata cups.plugin %s\n"
+        "\n"
+        "Copyright (C) 2017 Simon Nagl <simonnagl@aim.com>\n"
+        "Released under GNU General Public License v3 or later.\n"
+        "All rights reserved.\n"
+        "\n"
+        "This program is a data collector plugin for netdata.\n"
+        "\n"
+        "SYNOPSIS: cups.plugin [-d][-h][-v] COLLECTION_FREQUENCY\n"
+        "\n"
+        "Options:"
+        "\n"
+        "  COLLECTION_FREQUENCY    data collection frequency in seconds\n"
+        "\n"
+        "  -d                      enable verbose output\n"
+        "                          default: disabled\n"
+        "\n"
+        "  -v                      print version and exit\n"
+        "\n"
+        "  -h                      print this message and exit\n"
+        "\n"
+        , VERSION
+    );
+}
+
 int main(int argc, char **argv) {
-    info("CUPS thread created with process id %d", getpid());
 
     int i, freq = 0;
     for(i = 1; i < argc ; i++) {
         if(isdigit(*argv[i]) && !freq) {
-            int n = atoi(argv[i]);
-            if(n > 0 && freq < 86400) {
-                freq = n;
-                continue;
+            if(freq) {
+                fprintf(stderr, "Invalid command line option '%s'\n", argv[i]);
+            } else {
+                int n = atoi(argv[i]);
+                if(n > 0 && freq < 86400) {
+                    freq = n;
+                    continue;
+                }
             }
         }
-        else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
-            printf("freeipmi.plugin %s\n", VERSION);
+        else if(strcmp("-v", argv[i]) == 0) {
+            printf("cups.plugin %s\n", VERSION);
             exit(0);
         }
-        else if(strcmp("debug", argv[i]) == 0) {
+        else if(strcmp("-d", argv[i]) == 0) {
             debug = 1;
             continue;
         }
-        else if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
-            fprintf(stderr,
-                    "\n"
-                    " netdata cups.plugin %s\n"
-                    " Copyright (C) 2017 Simon Nagl <simonnagl@aim.com>\n"
-                    " Released under GNU General Public License v3 or later.\n"
-                    " All rights reserved.\n"
-                    "\n"
-                    " This program is a data collector plugin for netdata.\n"
-                    "\n"
-                    " Available command line options:\n"
-                    "\n"
-                    "  SECONDS                 data collection frequency\n"
-                    "\n"
-                    "  debug                   enable verbose output\n"
-                    "                          default: disabled\n"
-                    "\n"
-                    "  -v\n"
-                    "  -V\n"
-                    "  version                 print version and exit\n"
-                    "\n"
-                    , VERSION
-            );
-            exit(1);
+        else if(strcmp("-h", argv[i]) == 0) {
+            print_help();
+            exit(0);
         }
 
-        error("cups.plugin: ignoring parameter '%s'", argv[i]);
+        print_help();
+        exit(1);
     }
 
     int update_every = 1;
