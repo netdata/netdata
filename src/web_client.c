@@ -347,6 +347,9 @@ gid_t web_files_gid(void) {
 int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
+    if(!web_client_can_access_dashboard(w))
+        return web_client_permission_denied(w);
+
     // skip leading slashes
     while (*filename == '/') filename++;
 

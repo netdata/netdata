@@ -897,8 +897,13 @@ static struct api_command {
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
         { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
         { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
-        { "registry",        0, WEB_CLIENT_ACL_NONE,      web_client_api_request_v1_registry        },
-        { "badge.svg",       0, WEB_CLIENT_ACL_BADGE,     web_client_api_request_v1_badge           },
+
+        // registry checks the ACL by itself, so we allow everything
+        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,   web_client_api_request_v1_registry        },
+
+        // badges can be fetched with both dashboard and badge permissions
+        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
+
         { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
@@ -927,7 +932,7 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
 
         for(i = 0; api_commands[i].command ;i++) {
             if(unlikely(hash == api_commands[i].hash && !strcmp(tok, api_commands[i].command))) {
-                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NONE) && !(w->acl & api_commands[i].acl))
+                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) && !(w->acl & api_commands[i].acl))
                     return web_client_permission_denied(w);
 
                 return api_commands[i].callback(host, w, url);

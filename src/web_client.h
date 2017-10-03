@@ -110,6 +110,7 @@ struct response {
 
 typedef enum web_client_acl {
     WEB_CLIENT_ACL_NONE      = 0,
+    WEB_CLIENT_ACL_NOCHECK   = 0,
     WEB_CLIENT_ACL_DASHBOARD = 1 << 0,
     WEB_CLIENT_ACL_REGISTRY  = 1 << 1,
     WEB_CLIENT_ACL_BADGE     = 1 << 2
