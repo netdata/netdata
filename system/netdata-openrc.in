@@ -23,7 +23,7 @@
 
 extra_started_commands="getconf"
 pidfile="/run/netdata.pid"
-command="${NETDATA_INSTALL_PATH}/usr/sbin/netdata"
+command="@sbindir_POST@/netdata"
 command_background="yes"
 command_args="-P ${pidfile} ${NETDATA_EXTRA_ARGS}"
 # start_stop_daemon_args="-u ${NETDATA_OWNER}"
