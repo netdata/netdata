@@ -126,7 +126,8 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb) {
     }
     rrdhost_unlock(host);
 
-    buffer_sprintf(wb, "\n\t}"
+    buffer_sprintf(wb
+                   , "\n\t}"
                     ",\n\t\"charts_count\": %zu"
                     ",\n\t\"dimensions_count\": %zu"
                     ",\n\t\"alarms_count\": %zu"
@@ -142,24 +143,31 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb) {
 
     if(unlikely(rrd_hosts_available > 1)) {
         rrd_rdlock();
+
+        size_t found = 0;
         RRDHOST *h;
         rrdhost_foreach_read(h) {
-            buffer_sprintf(wb,
-                   "%s\n\t\t{"
-                   "\n\t\t\t\"hostname\": \"%s\""
-                   "\n\t\t}"
-                   , (h != localhost) ? "," : ""
-                   , h->hostname
-            );
+            if(!rrdhost_should_be_removed(h, host, now)) {
+                buffer_sprintf(wb
+                               , "%s\n\t\t{"
+                                "\n\t\t\t\"hostname\": \"%s\""
+                                "\n\t\t}"
+                               , (found > 0) ? "," : ""
+                               , h->hostname
+                );
+
+                found++;
+            }
         }
+
         rrd_unlock();
     }
     else {
-        buffer_sprintf(wb,
-                "\n\t\t{"
-                "\n\t\t\t\"hostname\": \"%s\""
-                "\n\t\t}"
-                , host->hostname
+        buffer_sprintf(wb
+                       , "\n\t\t{"
+                        "\n\t\t\t\"hostname\": \"%s\""
+                        "\n\t\t}"
+                       , host->hostname
         );
     }
 
