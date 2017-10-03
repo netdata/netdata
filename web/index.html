@@ -1540,7 +1540,7 @@
 
             sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more charts</a></li>';
             sidebar += '<li class=""><a href="https://github.com/firehol/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more alarms</a></li>';
-            sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1)?'second':data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + seconds4human(data.update_every * data.history) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' +  data.version.toString() +'</small></li>';
+            sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1)?'second':data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, { space: '&nbsp;' }) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' +  data.version.toString() +'</small></li>';
             sidebar += '</ul>';
             div.innerHTML = html;
             document.getElementById('sidebar').innerHTML = sidebar;
@@ -1711,7 +1711,7 @@
 
                     return '<code>' + alarm.lookup_method + '</code> '
                         + dimensions + ', of chart <code>' + alarm.chart + '</code>'
-                        + ', starting <code>' + seconds4human(alarm.lookup_after + alarm.lookup_before) + '</code> and up to <code>' + seconds4human(alarm.lookup_before) + '</code>'
+                        + ', starting <code>' + NETDATA.seconds4human(alarm.lookup_after + alarm.lookup_before, { space: '&nbsp;' }) + '</code> and up to <code>' + NETDATA.seconds4human(alarm.lookup_before, { space: '&nbsp;' }) + '</code>'
                         + ((alarm.lookup_options)?(', with options <code>' + alarm.lookup_options.replace(' ', ',&nbsp;') + '</code>'):'')
                         + '.';
                 }
@@ -1747,25 +1747,25 @@
                     var delay = '';
                     if((alarm.delay_up_duration > 0 || alarm.delay_down_duration > 0) && alarm.delay_multiplier !== 0 && alarm.delay_max_duration > 0) {
                         if(alarm.delay_up_duration === alarm.delay_down_duration) {
-                            delay += '<small><br/>hysteresis ' + seconds4human(alarm.delay_up_duration, { negative_suffix: '' });
+                            delay += '<small><br/>hysteresis ' + NETDATA.seconds4human(alarm.delay_up_duration, { space: '&nbsp;', negative_suffix: '' });
                         }
                         else {
                             delay = '<small><br/>hysteresis ';
                             if(alarm.delay_up_duration > 0) {
-                                delay += 'on&nbsp;escalation&nbsp;<code>' + seconds4human(alarm.delay_up_duration, { negative_suffix: '' }) + '</code>, ';
+                                delay += 'on&nbsp;escalation&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_up_duration, { space: '&nbsp;', negative_suffix: '' }) + '</code>, ';
                             }
                             if(alarm.delay_down_duration > 0) {
-                                delay += 'on&nbsp;recovery&nbsp;<code>' + seconds4human(alarm.delay_down_duration, { negative_suffix: '' }) + '</code>, ';
+                                delay += 'on&nbsp;recovery&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_down_duration, { space: '&nbsp;', negative_suffix: '' }) + '</code>, ';
                             }
                         }
                         if(alarm.delay_multiplier !== 1.0) {
                             delay += 'multiplied&nbsp;by&nbsp;<code>' + alarm.delay_multiplier.toString() + '</code>';
-                            delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + seconds4human(alarm.delay_max_duration, { negative_suffix: '' }) + '</code>';
+                            delay += ',&nbsp;up&nbsp;to&nbsp;<code>' + NETDATA.seconds4human(alarm.delay_max_duration, { space: '&nbsp;', negative_suffix: '' }) + '</code>';
                         }
                         delay += '</small>';
                     }
 
-                    html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + seconds4human(alarm.update_every, { negative_suffix: '' }) + '</td></tr>'
+                    html += '<tr><td width="10%" style="text-align:right">check&nbsp;every</td><td>' + NETDATA.seconds4human(alarm.update_every, { space: '&nbsp;', negative_suffix: '' }) + '</td></tr>'
                         + ((has_alarm === true)?('<tr><td width="10%" style="text-align:right">execute</td><td><span style="font-family: monospace;">' + alarm.exec + '</span>' + delay + '</td></tr>'):'')
                         + '<tr><td width="10%" style="text-align:right">source</td><td><span style="font-family: monospace;">' + alarm.source + '</span></td></tr>'
                         + '</table></td></tr>';
@@ -2103,7 +2103,7 @@
                                 formatter: function(value, row, index) {
                                     void(row);
                                     void(index);
-                                    return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                                    return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
                                 },
                                 align: 'center',
                                 valign: 'middle',
@@ -2117,7 +2117,7 @@
                                 formatter: function(value, row, index) {
                                     void(row);
                                     void(index);
-                                    return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                                    return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
                                 },
                                 align: 'center',
                                 valign: 'middle',
@@ -2234,7 +2234,7 @@
                                     void(row);
                                     void(index);
 
-                                    return seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
+                                    return NETDATA.seconds4human(value, { negative_suffix: '', space: ' ', now: 'no time' });
                                 },
                                 align: 'center',
                                 valign: 'middle',
@@ -2274,70 +2274,6 @@
                     // console.log($('#alarms_log_table').bootstrapTable('getOptions'));
                 });
             });
-        }
-
-        function seconds4human(seconds, options) {
-            var default_options = {
-                now: 'now',
-                space: '&nbsp;',
-                negative_suffix: 'ago',
-                hour: 'hour',
-                hours: 'hours',
-                minute: 'minute',
-                minutes: 'minutes',
-                second: 'second',
-                seconds: 'seconds',
-                and: 'and'
-            };
-
-            if(typeof options !== 'object')
-                options = default_options;
-            else {
-                var x;
-                for(x in default_options) {
-                    if(typeof options[x] !== 'string')
-                        options[x] = default_options[x];
-                }
-            }
-
-            if(typeof seconds === 'string')
-                seconds = parseInt(seconds);
-
-            if(seconds === 0)
-                return options.now;
-
-            var suffix = '';
-            if(seconds < 0) {
-                seconds = -seconds;
-                if(options.negative_suffix !== '') suffix = options.space + options.negative_suffix;
-            }
-
-            var hours = Math.floor(seconds / 3600);
-            seconds -= (hours * 3600);
-
-            var minutes = Math.floor(seconds / 60);
-            seconds -= (minutes * 60);
-
-            var txt = '';
-
-            if(hours > 1) txt += hours.toString() + options.space + options.hours;
-            else if(hours === 1) txt += hours.toString() + options.space + options.hour;
-
-            if(hours > 0 && minutes > 0 && seconds === 0)
-                txt += options.space + options.and + options.space;
-            else if(hours > 0 && minutes > 0 && seconds > 0)
-                txt += ',' + options.space;
-
-            if(minutes > 1) txt += minutes.toString() + options.space + options.minutes;
-            else if(minutes === 1) txt += minutes.toString() + options.space + options.minute;
-
-            if((minutes > 0 || minutes > 0) && seconds > 0)
-                txt += options.space + options.and + options.space;
-
-            if(seconds > 1) txt += Math.floor(seconds).toString() + options.space + options.seconds;
-            else if(seconds === 1) txt += Math.floor(seconds).toString() + options.space + options.second;
-
-            return txt + suffix;
         }
 
         function alarmsCallback(data) {
@@ -3597,4 +3533,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20170815-14"></script>
+<script type="text/javascript" src="dashboard.js?v20171003-20"></script>
