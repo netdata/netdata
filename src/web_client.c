@@ -62,7 +62,7 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
 inline int web_client_permission_denied(struct web_client *w) {
     w->response.data->contenttype = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, "You do not allowed to access this resource.");
+    buffer_strcat(w->response.data, "You are not allowed to access this resource.");
     w->response.code = 403;
     return 403;
 }
