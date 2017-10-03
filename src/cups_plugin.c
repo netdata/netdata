@@ -10,9 +10,10 @@ void netdata_cleanup_and_exit(int ret) {
 
 static int debug = 0;
 
+static int update_every = 1;
+
 // TODO: Validate if we can use ARL to scan printer options.
 // TODO: Define alarms for this plugin.
-// TODO: Add configuration options to disable per charts / per printer charts etc.
 
 void print_help() {
     fprintf(stderr,
@@ -42,19 +43,15 @@ void print_help() {
     );
 }
 
-int main(int argc, char **argv) {
-
-    int i, freq = 0;
+void parse_command_line(int argc, char **argv) {
+    int i;
+    int update_every_found = 0;
     for(i = 1; i < argc ; i++) {
-        if(isdigit(*argv[i]) && !freq) {
-            if(freq) {
-                fprintf(stderr, "Invalid command line option '%s'\n", argv[i]);
-            } else {
-                int n = atoi(argv[i]);
-                if(n > 0 && freq < 86400) {
-                    freq = n;
-                    continue;
-                }
+        if(isdigit(*argv[i]) && !update_every_found) {
+            int n = atoi(argv[i]);
+            if(n > 0) {
+                update_every = n;
+                continue;
             }
         }
         else if(strcmp("-v", argv[i]) == 0) {
@@ -73,11 +70,10 @@ int main(int argc, char **argv) {
         print_help();
         exit(1);
     }
+}
 
-    int update_every = 1;
-    if(freq != 0) {
-        update_every = freq;
-    }
+int main(int argc, char **argv) {
+    parse_command_line(argc, argv);
 
     // TODO: Check if cups is enabled
 
@@ -126,8 +122,16 @@ int main(int argc, char **argv) {
         duration = heartbeat_dt_usec(&hb);
         /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
-        if (unlikely(netdata_exit))
+        if (unlikely(netdata_exit)) {
             break;
+        }
+
+        num_accepting_jobs = 0;
+        num_shared = 0;
+        num_idle = 0;
+        num_printing = 0;
+        num_stopped = 0;
+    
 
         cups_dest_t *dests;
         num_dests = cupsGetDests(&dests);
@@ -166,26 +170,25 @@ int main(int argc, char **argv) {
                 break;
             }
 
-            const char *value4 = cupsGetOption("printer-is-shared", curr_dest->num_options, curr_dest->options);
             // TODO implement collection
 
             // TODO Generate chart for printer.
 
-            unsigned long long size_total;
-            int num_pending;
-            unsigned long long size_pending;
-            int num_held;
-            unsigned long long size_held;
-            int num_processing;
-            unsigned long long size_processing;
-            int num_stopped;
-            unsigned long long size_stopped;
-            int num_canceled;
-            unsigned long long size_canceled;
-            int num_aborted;
-            unsigned long long size_aborted;
-            int num_completed;
-            unsigned long long size_completed;
+            unsigned long long size_total = 0;
+            int                num_pending = 0;
+            unsigned long long size_pending = 0;
+            int                num_held = 0;
+            unsigned long long size_held = 0;
+            int                num_processing = 0;
+            unsigned long long size_processing = 0;
+            int                num_stopped = 0;
+            unsigned long long size_stopped = 0;
+            int                num_canceled = 0;
+            unsigned long long size_canceled = 0;
+            int                num_aborted = 0;
+            unsigned long long size_aborted = 0;
+            int                num_completed = 0;
+            unsigned long long size_completed = 0;
 
             cups_job_t *jobs, *curr_job;
             int num_jobs = cupsGetJobs(&jobs, curr_dest->name, 0, CUPS_WHICHJOBS_ALL);
@@ -234,26 +237,91 @@ int main(int argc, char **argv) {
 
                 // TODO Add per printer charts
             }
+
+            static int cups_chart_created = 0;
+            
+                            if (unlikely(!cups_chart_created)) {
+                                cups_chart_created = 1;
+                                printf("CHART cups.%s '' 'Jobs of %s' printer printer cups line 2999 1\n", curr_dest->name, curr_dest->name);        
+            
+                                printf("DIMENSION pending '' absolute 1 1\n");
+                                printf("DIMENSION held '' absolute 1 1\n");
+                                printf("DIMENSION processing '' absolute 1 1\n");
+                                printf("DIMENSION stopped '' absolute 1 1\n");
+                                printf("DIMENSION canceled '' absolute 1 1\n");
+                                printf("DIMENSION aborted '' absolute 1 1\n");
+                                printf("DIMENSION completed '' absolute 1 1\n");
+                    
+                            }
+                        
+                            printf(
+                                "BEGIN cups.%s\n"
+                                "SET pending = %d\n"
+                                "SET held = %d\n"
+                                "SET processing = %d\n"
+                                "SET stopped = %d\n"
+                                "SET canceled = %d\n"
+                                "SET aborted = %d\n"
+                                "SET completed = %d\n"
+                                "END\n"
+                                , curr_dest->name
+                                , num_pending
+                                , num_held
+                                , num_processing
+                                , num_stopped
+                                , num_canceled
+                                , num_aborted
+                                , num_completed
+                            );
         }
 
         /// Todo add more charts
 
         static int cups_jobs_chart_created = 0;
+        static int cups_printer_by_option_created = 0;
+
+        if (unlikely(!cups_printer_by_option_created)) {
+            cups_printer_by_option_created = 1;
+            printf("CHART cups.printer_by_option '' 'CUPS Printers by option' printer printer cups line 3000 1\n");
+    
+            printf("DIMENSION accepting_jobs '' absolute 1 1\n");
+            printf("DIMENSION shared '' absolute 1 1\n");
+            printf("DIMENSION idle '' absolute 1 1\n");
+            printf("DIMENSION printing '' absolute 1 1\n");
+            printf("DIMENSION stopped '' absolute 1 1\n");
+
+        }
+
+        printf(
+            "BEGIN cups.printer_by_option\n"
+            "SET accepting_jobs = %d\n"
+            "SET shared = %d\n"
+            "SET idle = %d\n"
+            "SET printing = %d\n"
+            "SET stopped = %d\n"
+            "END\n"
+            , num_accepting_jobs
+            , num_shared
+            , num_idle
+            , num_printing
+            , num_stopped
+        );
+       
 
         if (unlikely(!cups_jobs_chart_created)) {
             cups_jobs_chart_created = 1;
-            printf("CHART cups.jobs '' 'Total CUPS job number' jobs jobs cups line 3000 1\n");
+            printf("CHART cups.jobs '' 'Total CUPS job number' jobs jobs cups line 3001 1\n");
     
             printf("DIMENSION jobs '' absolute 1 1\n");
         }
 
         printf(
             "BEGIN cups.jobs\n"
-            "SET jobs = %zu\n"
+            "SET jobs = %d\n"
             "END\n"
             , num_jobs_total
         );
-
+        
         fflush(stdout);        
 
         if (unlikely(netdata_exit))
