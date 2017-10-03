@@ -494,6 +494,7 @@ declare -A configs_signatures=(
   ['f96acba4b14b0c1b50d0187a04416151']='health_alarm_notify.conf'
   ['f9be549a849d023595d19d5d74263e0f']='health.d/tcp_resets.conf'
   ['fa4396513b358d6ec6a7f5bfb08439b8']='health.d/net.conf'
+  ['fb1c75159f855f4b4671835f5bca1ef6']='python.d.conf'
   ['fbdb6f5d3906d3d8ea4e28f6ba6965a6']='python.d/go_expvar.conf'
   ['fc40b83f173bc4676d686867a8369a62']='python.d/dns_query_time.conf'
   ['fd3164e6e8cb6726706267eae49aa082']='health_alarm_notify.conf'
