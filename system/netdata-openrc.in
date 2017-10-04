@@ -70,7 +70,7 @@ stop_post() {
 	done
 	eend $sigkill
 
-	if [ $sigkill -eq 1 && -f "${pidfile}" ]; then
+	if [ $sigkill -eq 1 -a -f "${pidfile}" ]; then
 		ebegin "Netdata is taking too long to exit, forcing it to quit"
 		kill -SIGKILL $(cat ${pidfile}) 2>/dev/null
 		eend $?
