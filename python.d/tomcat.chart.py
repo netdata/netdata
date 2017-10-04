@@ -112,15 +112,15 @@ class Service(UrlService):
 
             for pool in jvm.findall('memorypool'):
                 name = pool.get('name')
-                if name == 'Eden Space':
+                if 'Eden Space' in name:
                     data['eden_used'] = pool.get('usageUsed')
                     data['eden_commited'] = pool.get('usageCommitted')
                     data['eden_max'] = pool.get('usageMax')
-                elif name == 'Survivor Space':
+                elif 'Survivor Space' in name:
                     data['survivor_used'] = pool.get('usageUsed')
                     data['survivor_commited'] = pool.get('usageCommitted')
                     data['survivor_max'] = pool.get('usageMax')
-                elif name == 'Tenured Gen':
+                elif 'Tenured Gen' in name:
                     data['tenured_used'] = pool.get('usageUsed')
                     data['tenured_commited'] = pool.get('usageCommitted')
                     data['tenured_max'] = pool.get('usageMax')
