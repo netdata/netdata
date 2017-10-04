@@ -44,7 +44,7 @@ typedef enum web_client_flags {
 //#define web_client_flag_set(w, flag)   __atomic_or_fetch(&((w)->flags), flag, __ATOMIC_SEQ_CST)
 //#define web_client_flag_clear(w, flag) __atomic_and_fetch(&((w)->flags), ~flag, __ATOMIC_SEQ_CST)
 //#else
-#define web_client_flag_check(w, flag) ((w)->flags & flag)
+#define web_client_flag_check(w, flag) ((w)->flags & (flag))
 #define web_client_flag_set(w, flag)   (w)->flags |= flag
 #define web_client_flag_clear(w, flag) (w)->flags &= ~flag
 //#endif
@@ -108,11 +108,30 @@ struct response {
 
 };
 
+typedef enum web_client_acl {
+    WEB_CLIENT_ACL_NONE      = 0,
+    WEB_CLIENT_ACL_NOCHECK   = 0,
+    WEB_CLIENT_ACL_DASHBOARD = 1 << 0,
+    WEB_CLIENT_ACL_REGISTRY  = 1 << 1,
+    WEB_CLIENT_ACL_BADGE     = 1 << 2
+} WEB_CLIENT_ACL;
+
+#define web_client_can_access_dashboard(w) ((w)->acl & WEB_CLIENT_ACL_DASHBOARD)
+#define web_client_can_access_registry(w) ((w)->acl & WEB_CLIENT_ACL_REGISTRY)
+#define web_client_can_access_badges(w) ((w)->acl & WEB_CLIENT_ACL_BADGE)
+
+#define web_client_can_access_stream(w) \
+    (!web_allow_streaming_from || simple_pattern_matches(web_allow_streaming_from, (w)->client_ip))
+
+#define web_client_can_access_netdataconf(w) \
+    (!web_allow_netdataconf_from || simple_pattern_matches(web_allow_netdataconf_from, (w)->client_ip))
+
 struct web_client {
     unsigned long long id;
 
     WEB_CLIENT_FLAGS flags;             // status flags for the client
     WEB_CLIENT_MODE mode;               // the operational mode of the client
+    WEB_CLIENT_ACL acl;                 // the access list of the client
 
     int tcp_cork;                       // 1 = we have a cork on the socket
 
@@ -144,6 +163,7 @@ struct web_client {
 
 extern struct web_client *web_clients;
 extern SIMPLE_PATTERN *web_allow_connections_from;
+extern SIMPLE_PATTERN *web_allow_dashboard_from;
 extern SIMPLE_PATTERN *web_allow_registry_from;
 extern SIMPLE_PATTERN *web_allow_badges_from;
 extern SIMPLE_PATTERN *web_allow_streaming_from;

@@ -298,9 +298,6 @@ inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, 
 }
 
 int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
-    if(unlikely(web_allow_badges_from && !simple_pattern_matches(web_allow_badges_from, w->client_ip)))
-        return web_client_permission_denied(w);
-
     int ret = 400;
     buffer_flush(w->response.data);
 
@@ -825,9 +822,16 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
         return 400;
     }
 
-    // for all calls except HELLO, we have to check the ACL
-    if(unlikely(action != 'H' && web_allow_registry_from && !simple_pattern_matches(web_allow_registry_from, w->client_ip)))
-        return web_client_permission_denied(w);
+    if(unlikely(action == 'H')) {
+        // HELLO request, dashboard ACL
+        if(unlikely(!web_client_can_access_dashboard(w)))
+            return web_client_permission_denied(w);
+    }
+    else {
+        // everything else, registry ACL
+        if(unlikely(!web_client_can_access_registry(w)))
+            return web_client_permission_denied(w);
+    }
 
     switch(action) {
         case 'A':
@@ -884,19 +888,40 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 }
 
-inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
-    static uint32_t hash_data = 0, hash_chart = 0, hash_charts = 0, hash_registry = 0, hash_badge = 0, hash_alarms = 0, hash_alarm_log = 0, hash_alarm_variables = 0, hash_raw = 0;
+static struct api_command {
+    const char *command;
+    uint32_t hash;
+    WEB_CLIENT_ACL acl;
+    int (*callback)(RRDHOST *host, struct web_client *w, char *url);
+} api_commands[] = {
+        { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
+        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
+        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
 
-    if(unlikely(hash_data == 0)) {
-        hash_data = simple_hash("data");
-        hash_chart = simple_hash("chart");
-        hash_charts = simple_hash("charts");
-        hash_registry = simple_hash("registry");
-        hash_badge = simple_hash("badge.svg");
-        hash_alarms = simple_hash("alarms");
-        hash_alarm_log = simple_hash("alarm_log");
-        hash_alarm_variables = simple_hash("alarm_variables");
-        hash_raw = simple_hash("allmetrics");
+        // registry checks the ACL by itself, so we allow everything
+        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,   web_client_api_request_v1_registry        },
+
+        // badges can be fetched with both dashboard and badge permissions
+        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
+
+        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
+        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
+        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
+        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
+
+        // terminator
+        { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
+};
+
+inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
+    static int initialized = 0;
+    int i;
+
+    if(unlikely(initialized == 0)) {
+        initialized = 1;
+
+        for(i = 0; api_commands[i].command ; i++)
+            api_commands[i].hash = simple_hash(api_commands[i].command);
     }
 
     // get the command
@@ -905,39 +930,19 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
         debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
         uint32_t hash = simple_hash(tok);
 
-        if(hash == hash_data && !strcmp(tok, "data"))
-            return web_client_api_request_v1_data(host, w, url);
+        for(i = 0; api_commands[i].command ;i++) {
+            if(unlikely(hash == api_commands[i].hash && !strcmp(tok, api_commands[i].command))) {
+                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) && !(w->acl & api_commands[i].acl))
+                    return web_client_permission_denied(w);
 
-        else if(hash == hash_chart && !strcmp(tok, "chart"))
-            return web_client_api_request_v1_chart(host, w, url);
-
-        else if(hash == hash_charts && !strcmp(tok, "charts"))
-            return web_client_api_request_v1_charts(host, w, url);
-
-        else if(hash == hash_registry && !strcmp(tok, "registry"))
-            return web_client_api_request_v1_registry(host, w, url);
-
-        else if(hash == hash_badge && !strcmp(tok, "badge.svg"))
-            return web_client_api_request_v1_badge(host, w, url);
-
-        else if(hash == hash_alarms && !strcmp(tok, "alarms"))
-            return web_client_api_request_v1_alarms(host, w, url);
-
-        else if(hash == hash_alarm_log && !strcmp(tok, "alarm_log"))
-            return web_client_api_request_v1_alarm_log(host, w, url);
-
-        else if(hash == hash_alarm_variables && !strcmp(tok, "alarm_variables"))
-            return web_client_api_request_v1_alarm_variables(host, w, url);
-
-        else if(hash == hash_raw && !strcmp(tok, "allmetrics"))
-            return web_client_api_request_v1_allmetrics(host, w, url);
-
-        else {
-            buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "Unsupported v1 API command: ");
-            buffer_strcat_htmlescape(w->response.data, tok);
-            return 404;
+                return api_commands[i].callback(host, w, url);
+            }
         }
+
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Unsupported v1 API command: ");
+        buffer_strcat_htmlescape(w->response.data, tok);
+        return 404;
     }
     else {
         buffer_flush(w->response.data);
