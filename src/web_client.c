@@ -9,10 +9,13 @@ int respect_web_browser_do_not_track_policy = 0;
 char *web_x_frame_options = NULL;
 
 SIMPLE_PATTERN *web_allow_connections_from = NULL;
-SIMPLE_PATTERN *web_allow_registry_from = NULL;
-SIMPLE_PATTERN *web_allow_badges_from = NULL;
 SIMPLE_PATTERN *web_allow_streaming_from = NULL;
 SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
+
+// WEB_CLIENT_ACL
+SIMPLE_PATTERN *web_allow_dashboard_from = NULL;
+SIMPLE_PATTERN *web_allow_registry_from = NULL;
+SIMPLE_PATTERN *web_allow_badges_from = NULL;
 
 #ifdef NETDATA_WITH_ZLIB
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
@@ -59,13 +62,26 @@ static inline int web_client_uncrock_socket(struct web_client *w) {
 inline int web_client_permission_denied(struct web_client *w) {
     w->response.data->contenttype = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, "You do not allowed to access this resource.");
+    buffer_strcat(w->response.data, "You are not allowed to access this resource.");
     w->response.code = 403;
     return 403;
 }
 
 static void log_connection(struct web_client *w, const char *msg) {
     log_access("%llu: %d '[%s]:%s' '%s'", w->id, gettid(), w->client_ip, w->client_port, msg);
+}
+
+static void web_client_update_acl_matches(struct web_client *w) {
+    w->acl = WEB_CLIENT_ACL_NONE;
+
+    if(!web_allow_dashboard_from || simple_pattern_matches(web_allow_dashboard_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_DASHBOARD;
+
+    if(!web_allow_registry_from || simple_pattern_matches(web_allow_registry_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_REGISTRY;
+
+    if(!web_allow_badges_from || simple_pattern_matches(web_allow_badges_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_BADGE;
 }
 
 struct web_client *web_client_create(int listener) {
@@ -105,6 +121,8 @@ struct web_client *web_client_create(int listener) {
         if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
             error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
     }
+
+    web_client_update_acl_matches(w);
 
     w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
     w->response.header = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
@@ -328,6 +346,9 @@ gid_t web_files_gid(void) {
 
 int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
+
+    if(!web_client_can_access_dashboard(w))
+        return web_client_permission_denied(w);
 
     // skip leading slashes
     while (*filename == '/') filename++;
@@ -609,6 +630,13 @@ static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char 
     }
 
     return func(host, w, url);
+}
+
+static inline int check_host_and_dashboard_acl_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
+    if(!web_client_can_access_dashboard(w))
+        return web_client_permission_denied(w);
+
+    return check_host_and_call(host, w, url, func);
 }
 
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
@@ -1140,26 +1168,26 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
         else if(unlikely(hash == hash_data && strcmp(tok, WEB_PATH_DATA) == 0)) {             // old API "data"
             debug(D_WEB_CLIENT_ACCESS, "%llu: old API data request...", w->id);
-            return check_host_and_call(host, w, url, web_client_api_old_data_request_json);
+            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_data_request_json);
         }
         else if(unlikely(hash == hash_datasource && strcmp(tok, WEB_PATH_DATASOURCE) == 0)) { // old API "datasource"
             debug(D_WEB_CLIENT_ACCESS, "%llu: old API datasource request...", w->id);
-            return check_host_and_call(host, w, url, web_client_api_old_data_request_jsonp);
+            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_data_request_jsonp);
         }
         else if(unlikely(hash == hash_graph && strcmp(tok, WEB_PATH_GRAPH) == 0)) {           // old API "graph"
             debug(D_WEB_CLIENT_ACCESS, "%llu: old API graph request...", w->id);
-            return check_host_and_call(host, w, url, web_client_api_old_graph_request);
+            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_graph_request);
         }
         else if(unlikely(hash == hash_list && strcmp(tok, "list") == 0)) {                    // old API "list"
             debug(D_WEB_CLIENT_ACCESS, "%llu: old API list request...", w->id);
-            return check_host_and_call(host, w, url, web_client_api_old_list_request);
+            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_list_request);
         }
         else if(unlikely(hash == hash_all_json && strcmp(tok, "all.json") == 0)) {            // old API "all.json"
             debug(D_WEB_CLIENT_ACCESS, "%llu: old API all.json request...", w->id);
-            return check_host_and_call(host, w, url, web_client_api_old_all_json);
+            return check_host_and_dashboard_acl_and_call(host, w, url, web_client_api_old_all_json);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
-            if(unlikely(web_allow_netdataconf_from && !simple_pattern_matches(web_allow_netdataconf_from, w->client_ip)))
+            if(unlikely(!web_client_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
             debug(D_WEB_CLIENT_ACCESS, "%llu: generating netdata.conf ...", w->id);
@@ -1170,6 +1198,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
 #ifdef NETDATA_INTERNAL_CHECKS
         else if(unlikely(hash == hash_exit && strcmp(tok, "exit") == 0)) {
+            if(unlikely(!web_client_can_access_netdataconf(w)))
+                return web_client_permission_denied(w);
+
             w->response.data->contenttype = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
 
@@ -1183,6 +1214,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return 200;
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
+            if(unlikely(!web_client_can_access_netdataconf(w)))
+                return web_client_permission_denied(w);
+
             buffer_flush(w->response.data);
 
             // get the name of the data to show
@@ -1220,6 +1254,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return 400;
         }
         else if(unlikely(hash == hash_mirror && strcmp(tok, "mirror") == 0)) {
+            if(unlikely(!web_client_can_access_netdataconf(w)))
+                return web_client_permission_denied(w);
+
             debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
 
             // replace the zero bytes with spaces
@@ -1250,7 +1287,7 @@ void web_client_process_request(struct web_client *w) {
         case HTTP_VALIDATION_OK:
             switch(w->mode) {
                 case WEB_CLIENT_MODE_STREAM:
-                    if(unlikely(web_allow_streaming_from && !simple_pattern_matches(web_allow_streaming_from, w->client_ip))) {
+                    if(unlikely(!web_client_can_access_stream(w))) {
                         web_client_permission_denied(w);
                         return;
                     }
@@ -1259,6 +1296,11 @@ void web_client_process_request(struct web_client *w) {
                     return;
 
                 case WEB_CLIENT_MODE_OPTIONS:
+                    if(unlikely(!web_client_can_access_dashboard(w) && !web_client_can_access_registry(w) && !web_client_can_access_badges(w))) {
+                        web_client_permission_denied(w);
+                        return;
+                    }
+
                     w->response.data->contenttype = CT_TEXT_PLAIN;
                     buffer_flush(w->response.data);
                     buffer_strcat(w->response.data, "OK");
@@ -1267,6 +1309,11 @@ void web_client_process_request(struct web_client *w) {
 
                 case WEB_CLIENT_MODE_FILECOPY:
                 case WEB_CLIENT_MODE_NORMAL:
+                    if(unlikely(!web_client_can_access_dashboard(w) && !web_client_can_access_registry(w) && !web_client_can_access_badges(w))) {
+                        web_client_permission_denied(w);
+                        return;
+                    }
+
                     w->response.code = web_client_process_url(localhost, w, w->decoded_url);
                     break;
             }
