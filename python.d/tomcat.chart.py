@@ -120,7 +120,7 @@ class Service(UrlService):
                     data['survivor_used'] = pool.get('usageUsed')
                     data['survivor_commited'] = pool.get('usageCommitted')
                     data['survivor_max'] = pool.get('usageMax')
-                elif 'Tenured Gen' in name:
+                elif 'Tenured Gen' in name or 'Old Gen' in name:
                     data['tenured_used'] = pool.get('usageUsed')
                     data['tenured_commited'] = pool.get('usageCommitted')
                     data['tenured_max'] = pool.get('usageMax')
