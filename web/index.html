@@ -2718,6 +2718,11 @@
 
                     self.bootstrapToggle(netdataTheme === 'slate'?'on':'off');
                 };
+                var units_sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    self.bootstrapToggle(NETDATA.options.current.units === 'auto'?'on':'off');
+                };
 
                 sync_option('eliminate_zero_dimensions');
                 sync_option('destroy_on_hide');
@@ -2731,6 +2736,7 @@
                 sync_option('pan_and_zoom_data_padding');
                 sync_option('show_help');
                 theme_sync_option('netdata_theme_control');
+                units_sync_option('units_conversion');
 
                 if(NETDATA.getOption('parallel_refresher') === false) {
                     $('#concurrent_refreshes_row').hide();
@@ -2757,6 +2763,12 @@
             });
             $('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
             $('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
+
+            $('#units_conversion').change(function()                {
+                NETDATA.setOption('units', $(this).prop('checked')?'auto':'original');
+                netdataReload();
+            });
+
             $('#show_help').change(function()                       {
                 urlOptions.help = $(this).prop('checked');
                 urlOptions.hashUpdate();
@@ -3382,6 +3394,15 @@
                                         </td>
                                         </tr>
                                     <tr class="option-row">
+                                        <td class="option-control"><input id="units_conversion" type="checkbox" checked data-toggle="toggle"  data-on="Scale Units" data-off="Original" data-width="110px"></td>
+                                        <td class="option-info"><strong>Enable auto-conversion of units?</strong><br/>
+                                            <small>When set to <b>Scale Units</b> the values shown will be scaled to the maximum unit (ie. kilobits will be scaled to megabits or even gigabits). When set to <b>Original</b> all the values will be rendered using the original units maintained by the server.
+                                                <br/>
+                                                <b>Switching this will reload the dashboard</b>.
+                                            </small>
+                                        </td>
+                                        </tr>
+                                    <tr class="option-row">
                                         <td class="option-control"><input id="pan_and_zoom_data_padding" type="checkbox" checked data-toggle="toggle"  data-on="Pad" data-off="Don't Pad" data-width="110px"></td>
                                         <td class="option-info"><strong>Enable data padding when panning and zooming?</strong><br/>
                                             <small>When set to <b>Pad</b> the charts will be padded with more data, both before and after the visible area, thus giving the impression the whole database is loaded. This padding will happen only after the first pan or zoom operation on the chart (initially all charts have only the visible data). When set to <b>Don't Pad</b> only the visible data will be transfered from the netdata server, even after the first pan and zoom operation.</small>
@@ -3533,4 +3554,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20171003-20"></script>
+<script type="text/javascript" src="dashboard.js?v20171005-1"></script>

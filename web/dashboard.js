@@ -294,6 +294,8 @@ var NETDATA = window.NETDATA || {};
         // the current profile
         // we may have many...
         current: {
+            units: 'auto',              // can be 'auto' or 'original'
+
             pixels_per_point: isSlowDevice()?5:1, // the minimum pixels per point for all charts
                                         // increase this to speed javascript up
                                         // each chart library has its own limit too
@@ -1465,6 +1467,119 @@ var NETDATA = window.NETDATA || {};
 
 
     // ----------------------------------------------------------------------------------------------------------------
+    // units conversion
+
+    NETDATA.unitsConversion = {
+        units: {
+            'kilobits/s': {
+                'bits/s'    : 0.001,
+                'kilobits/s': 1,
+                'megabits/s': 1000,
+                'gigabits/s': 1000000
+            },
+            'kilobytes/s': {
+                'bytes/s'    : 0.001,
+                'kilobytes/s': 1,
+                'megabytes/s': 1000,
+                'gigabytes/s': 1000000
+            },
+            'MB': {
+                'B' : 0.000001,
+                'KB': 0.001,
+                'MB': 1,
+                'GB': 1000,
+                'TB': 1000000
+            },
+            'GB': {
+                'B' : 0.000000001,
+                'KB': 0.000001,
+                'MB': 0.001,
+                'GB': 1,
+                'TB': 1000
+            },
+            'seconds': {
+                'milliseconds': 0.001,
+                'seconds'     : 1,
+                'minutes'     : 60,
+                'hours'       : 3600,
+                'days'        : 86400
+            }
+        },
+
+        get: function(min, max, units, desired_units, switch_units_callback) {
+            if(typeof units === 'undefined')
+                units = 'undefined';
+
+            if(typeof desired_units === 'undefined' || desired_units === null)
+                desired_units = 'original';
+
+            if(desired_units !== 'original' && typeof NETDATA.unitsConversion.units[units] !== 'undefined') {
+                // console.log('NETDATA.unitsConversion(' + units.toString() + ', ' + desired_units.toString() + ', function()) decide divider with min = ' + min.toString() + ', max = ' + max.toString());
+
+                min = Math.abs(min);
+                max = Math.abs(max);
+                if (min > max) max = min;
+
+                var divider = 1;
+                var x;
+
+                if (desired_units === 'auto') {
+                    var tunits = null;
+                    var tdivider = 0;
+
+                    for (x in NETDATA.unitsConversion.units[units]) {
+                        if (!NETDATA.unitsConversion.units[units].hasOwnProperty(x)) continue;
+
+                        var m = NETDATA.unitsConversion.units[units][x];
+
+                        if (m <= max && m > tdivider) {
+                            tunits = x;
+                            tdivider = m;
+                        }
+                    }
+
+                    if (tunits !== null) {
+                        switch_units_callback(tunits);
+                        divider = tdivider;
+                    }
+                }
+                else {
+                    var found = 0;
+                    for (x in NETDATA.unitsConversion.units[units]) {
+                        if (!NETDATA.unitsConversion.units[units].hasOwnProperty(x)) continue;
+
+                        if (x === desired_units) {
+                            found = 1;
+                            switch_units_callback(x);
+                            divider = NETDATA.unitsConversion.units[units][x];
+                            break;
+                        }
+                    }
+
+                    if(!found)
+                        console.log('Units conversion from ' + units.toString() + ' to ' + desired_units.toString() + ' is not supported.');
+                }
+
+                if(divider <= 0 || divider === 1)
+                    return function (value) {
+                        return value;
+                    };
+
+                return function (value) {
+                    // console.log('NETDATA.unitsConversion(' + units.toString() + ', ' + desired_units.toString() + ', function()) decide divider with min = ' + min.toString() + ', max = ' + max.toString() + ', divider = ' + divider.toString() + ', value = ' + value.toString());
+                    return value / divider;
+                };
+            }
+            else {
+                return function (value) {
+                    // console.log('NETDATA.unitsConversion(' + units.toString() + ', ' + desired_units.toString() + ', function()) dummy divider');
+                    return value;
+                };
+            }
+        }
+    };
+
+    // ----------------------------------------------------------------------------------------------------------------
     // global selection sync
 
     NETDATA.globalSelectionSync = {
@@ -1677,6 +1792,9 @@ var NETDATA = window.NETDATA || {};
 
             that.title = NETDATA.dataAttribute(that.element, 'title', null);    // the title of the chart
             that.units = NETDATA.dataAttribute(that.element, 'units', null);    // the units of the chart dimensions
+            that.units_desired = NETDATA.dataAttribute(that.element, 'desired-units', NETDATA.options.current.units); // the units of the chart dimensions
+            that.units_current = that.units;
+
             that.append_options = NETDATA.dataAttribute(that.element, 'append-options', null); // additional options to pass to netdata
             that.override_options = NETDATA.dataAttribute(that.element, 'override-options', null);  // override options to pass to netdata
 
@@ -2525,6 +2643,30 @@ var NETDATA = window.NETDATA || {};
             return ret;
         };
 
+        var __unitsConversionLastUnits = undefined;
+        var __unitsConversionLastUnitsDesired = undefined;
+        var __unitsConversionLastMin = undefined;
+        var __unitsConversionLastMax = undefined;
+        var __unitsConversion = function(value) { return value; };
+        this.unitsConversionSetup = function(min, max) {
+            if(this.units !== __unitsConversionLastUnits
+                || this.units_desired !== __unitsConversionLastUnitsDesired
+                || min !== __unitsConversionLastMin
+                || max !== __unitsConversionLastMax) {
+
+                __unitsConversionLastUnits = this.units;
+                __unitsConversionLastUnitsDesired = this.units_desired;
+                __unitsConversionLastMin = min;
+                __unitsConversionLastMax = max;
+
+                __unitsConversion = NETDATA.unitsConversion.get(min, max, this.units, this.units_desired, function (units) {
+                    // console.log('switching units from ' + that.units.toString() + ' to ' + units.toString());
+                    that.units_current = units;
+                    that.legendSetUnitsString(that.units_current);
+                });
+            }
+        };
+
         var __legendFormatValueChartDecimalsLastMin = undefined;
         var __legendFormatValueChartDecimalsLastMax = undefined;
         var __legendFormatValueChartDecimals = -1;
@@ -2532,6 +2674,12 @@ var NETDATA = window.NETDATA || {};
         this.legendFormatValueDecimalsFromMinMax = function(min, max) {
             if(min === __legendFormatValueChartDecimalsLastMin && max === __legendFormatValueChartDecimalsLastMax)
                 return;
+
+            this.unitsConversionSetup(min, max);
+            if(__unitsConversion !== null) {
+                min = __unitsConversion(min);
+                max = __unitsConversion(max);
+            }
 
             __legendFormatValueChartDecimalsLastMin = min;
             __legendFormatValueChartDecimalsLastMax = max;
@@ -2578,6 +2726,8 @@ var NETDATA = window.NETDATA || {};
 
         this.legendFormatValue = function(value) {
             if(typeof value !== 'number') return '-';
+
+            value = __unitsConversion(value);
 
             if(__intlNumberFormat !== null)
                 return __intlNumberFormat.format(value);
@@ -2662,7 +2812,7 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
-        this.__legendSetUnitsString = function(units) {
+        this.legendSetUnitsString = function(units) {
             if(units !== this.tmp.__last_shown_legend_units) {
                 this.element_legend_childs.title_units.innerText = units;
                 this.tmp.__last_shown_legend_units = units;
@@ -2695,7 +2845,7 @@ var NETDATA = window.NETDATA || {};
                 this.__legendSetTimeString(this.legendSetDateLast.time);
 
             if(this.element_legend_childs.title_units !== null)
-                this.__legendSetUnitsString(this.units)
+                this.legendSetUnitsString(this.units_current)
         };
 
         this.legendShowUndefined = function() {
@@ -2706,7 +2856,7 @@ var NETDATA = window.NETDATA || {};
                 this.__legendSetTimeString(this.chart.name);
 
             if(this.element_legend_childs.title_units !== null)
-                this.__legendSetUnitsString(' ');
+                this.legendSetUnitsString(' ');
 
             if(this.data && this.element_legend_childs.series !== null) {
                 var labels = this.data.dimension_names;
@@ -3857,8 +4007,10 @@ var NETDATA = window.NETDATA || {};
             if(this.title === null)
                 this.title = chart.title;
 
-            if(this.units === null)
+            if(this.units === null) {
                 this.units = chart.units;
+                this.units_current = this.units;
+            }
         };
 
         // fetch the chart description from the netdata server
@@ -4469,7 +4621,7 @@ var NETDATA = window.NETDATA || {};
         var tooltipClassname = NETDATA.dataAttribute(state.element, 'sparkline-tooltipclassname', undefined);
         var tooltipFormat = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformat', undefined);
         var tooltipPrefix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipprefix', undefined);
-        var tooltipSuffix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipsuffix', ' ' + state.units);
+        var tooltipSuffix = NETDATA.dataAttribute(state.element, 'sparkline-tooltipsuffix', ' ' + state.units_current);
         var tooltipSkipNull = NETDATA.dataAttributeBoolean(state.element, 'sparkline-tooltipskipnull', true);
         var tooltipValueLookups = NETDATA.dataAttribute(state.element, 'sparkline-tooltipvaluelookups', undefined);
         var tooltipFormatFieldlist = NETDATA.dataAttribute(state.element, 'sparkline-tooltipformatfieldlist', undefined);
@@ -4538,6 +4690,7 @@ var NETDATA = window.NETDATA || {};
         };
 
         $(state.element_chart).sparkline(data.result, state.sparkline_options);
+
         return true;
     };
 
@@ -4756,7 +4909,7 @@ var NETDATA = window.NETDATA || {};
             xRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-xrangepad', 0),
             yRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-yrangepad', 1),
             valueRange:             NETDATA.dataAttribute(state.element, 'dygraph-valuerange', [ null, null ]),
-            ylabel:                 state.units,
+            ylabel:                 state.units_current,
             yLabelWidth:            NETDATA.dataAttribute(state.element, 'dygraph-ylabelwidth', 12),
 
                                     // the function to plot the chart
@@ -5590,7 +5743,7 @@ var NETDATA = window.NETDATA || {};
                 }
             },
             vAxis: {
-                title: state.units,
+                title: state.units_current,
                 viewWindowMode: 'pretty',
                 minValue: -0.1,
                 maxValue: 0.1,
@@ -5671,6 +5824,8 @@ var NETDATA = window.NETDATA || {};
 
         if(min > value) min = value;
         if(max < value) max = value;
+
+        state.legendFormatValueDecimalsFromMinMax(min, max);
 
         if(state.tmp.easyPieChartMin === null && min > 0) min = 0;
         if(state.tmp.easyPieChartMax === null && max < 0) max = 0;
@@ -5825,10 +5980,6 @@ var NETDATA = window.NETDATA || {};
         else
             state.tmp.easyPieChartMax = max;
 
-        var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
-
-        chart.data('data-percent', pcent);
-
         var size = state.chartWidth();
         var stroke = Math.floor(size / 22);
         if(stroke < 3) stroke = 2;
@@ -5856,7 +6007,7 @@ var NETDATA = window.NETDATA || {};
         var unittop = Math.round(valuetop + (valuefontsize + unitfontsize) + (size / 40));
         state.tmp.easyPieChartUnits = document.createElement('span');
         state.tmp.easyPieChartUnits.className = 'easyPieChartUnits';
-        state.tmp.easyPieChartUnits.innerText = state.units;
+        state.tmp.easyPieChartUnits.innerText = state.units_current;
         state.tmp.easyPieChartUnits.style.fontSize = unitfontsize + 'px';
         state.tmp.easyPieChartUnits.style.top = unittop.toString() + 'px';
         state.element_chart.appendChild(state.tmp.easyPieChartUnits);
@@ -5870,6 +6021,13 @@ var NETDATA = window.NETDATA || {};
             if(typeof tmp === 'function')
                 barColor = tmp;
         }
+
+        state.legendSetUnitsString = function(units) {
+            state.tmp.easyPieChartUnits.innerText = units;
+        };
+
+        var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
+        chart.data('data-percent', pcent);
 
         chart.easyPieChart({
             barColor: barColor,
@@ -5954,6 +6112,8 @@ var NETDATA = window.NETDATA || {};
         }
         else if(min === max)
             max = min + 1;
+
+        state.legendFormatValueDecimalsFromMinMax(min, max);
 
         // gauge.js has an issue if the needle
         // is smaller than min or larger than max
@@ -6216,7 +6376,7 @@ var NETDATA = window.NETDATA || {};
         var unitfontsize = Math.round(titlefontsize * 0.9);
         state.tmp.gaugeChartUnits = document.createElement('span');
         state.tmp.gaugeChartUnits.className = 'gaugeChartUnits';
-        state.tmp.gaugeChartUnits.innerText = state.units;
+        state.tmp.gaugeChartUnits.innerText = state.units_current;
         state.tmp.gaugeChartUnits.style.fontSize = unitfontsize + 'px';
         state.element_chart.appendChild(state.tmp.gaugeChartUnits);
 
@@ -6235,6 +6395,13 @@ var NETDATA = window.NETDATA || {};
         var animate = true;
         if(typeof state.tmp.gauge_instance !== 'undefined')
             animate = false;
+
+        state.legendSetUnitsString = function(units) {
+            state.tmp.gaugeChartUnits.innerText = units;
+            state.tmp.___gaugeOld__.valueLabel = null;
+            state.tmp.___gaugeOld__.minLabel = null;
+            state.tmp.___gaugeOld__.maxLabel = null;
+        };
 
         state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
 
