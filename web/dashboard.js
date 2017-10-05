@@ -6222,9 +6222,6 @@ var NETDATA = window.NETDATA || {};
         var value, min, max;
 
         if(NETDATA.globalPanAndZoom.isActive() === true || state.isAutoRefreshable() === false) {
-            value = 0;
-            min = 0;
-            max = 1;
             NETDATA.gaugeSetLabels(state, null, null, null);
             state.tmp.gauge_instance.set(0);
         }
