@@ -6226,6 +6226,7 @@ var NETDATA = window.NETDATA || {};
             min = 0;
             max = 1;
             NETDATA.gaugeSetLabels(state, null, null, null);
+            state.tmp.gauge_instance.set(0);
         }
         else {
             value = data.result[0];
@@ -6239,10 +6240,10 @@ var NETDATA = window.NETDATA || {};
             if(state.tmp.gaugeMin === null && min > 0) min = 0;
             if(state.tmp.gaugeMax === null && max < 0) max = 0;
 
+            NETDATA.gaugeSet(state, value, min, max);
             NETDATA.gaugeSetLabels(state, value, min, max);
         }
 
-        NETDATA.gaugeSet(state, value, min, max);
         return true;
     };
 
