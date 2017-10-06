@@ -1474,33 +1474,33 @@ var NETDATA = window.NETDATA || {};
         latest: {},
         units: {
             'kilobits/s': {
-                'bits/s'    : 0.001,
+                'bits/s'    : 1 / 1000,
                 'kilobits/s': 1,
                 'megabits/s': 1000,
                 'gigabits/s': 1000000
             },
             'kilobytes/s': {
-                'bytes/s'    : 0.001,
+                'bytes/s'    : 1 / 1024,
                 'kilobytes/s': 1,
-                'megabytes/s': 1000,
-                'gigabytes/s': 1000000
+                'megabytes/s': 1024,
+                'gigabytes/s': 1024 * 1024
             },
             'KB': {
-                'B' : 0.001,
+                'B' : 1 / 1024,
                 'KB': 1,
-                'MB': 1000,
-                'GB': 1000000
+                'MB': 1024,
+                'GB': 1024 * 1024
             },
             'MB': {
-                'KB': 0.001,
+                'KB': 1 / 1024,
                 'MB': 1,
-                'GB': 1000,
-                'TB': 1000000
+                'GB': 1024,
+                'TB': 1024 * 1024
             },
             'GB': {
-                'MB': 0.001,
+                'MB': 1 / 1024,
                 'GB': 1,
-                'TB': 1000
+                'TB': 1024
             },
             'seconds': {
                 'milliseconds': 0.001,
