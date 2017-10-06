@@ -1,4 +1,5 @@
 #include "common.h"
+#include <Availability.h>
 #include <sys/sysctl.h>
 // NEEDED BY: do_bandwidth
 #include <net/route.h>
@@ -112,9 +113,21 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     /*
      * Dirty workaround for /usr/include/netinet6/ip6_var.h absence.
      * Struct ip6stat was copied from bsd/netinet6/ip6_var.h from xnu sources.
+     * Do the same for previously missing scope6_var.h on OS X < 10.11.
      */
 #define	IP6S_SRCRULE_COUNT 16
+
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED < 101100)
+#ifndef _NETINET6_SCOPE6_VAR_H_
+#define _NETINET6_SCOPE6_VAR_H_
+#include <sys/appleapiopts.h>
+
+#define	SCOPE6_ID_MAX	16
+#endif
+#else
 #include <netinet6/scope6_var.h>
+#endif
+
     struct	ip6stat {
         u_quad_t ip6s_total;		/* total packets received */
         u_quad_t ip6s_tooshort;		/* packet too short */
@@ -455,6 +468,8 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
+
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
             if (do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO && (tcpstat.tcps_ecn_recv_ce || tcpstat.tcps_ecn_not_supported))) {
                 do_ecn = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv4.ecnpkts");
@@ -472,6 +487,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "InNoECTPkts", tcpstat.tcps_ecn_not_supported);
                 rrdset_done(st);
             }
+#endif
 
         }
     }
