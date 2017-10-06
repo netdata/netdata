@@ -383,7 +383,7 @@ var NETDATA = window.NETDATA || {};
             focus:              false,
             visibility:         false,
             chart_data_url:     false,
-            chart_errors:       false, // FIXME: remember to set it to false before merging
+            chart_errors:       true, // FIXME: remember to set it to false before merging
             chart_timing:       false,
             chart_calls:        false,
             libraries:          false,
@@ -1470,6 +1470,8 @@ var NETDATA = window.NETDATA || {};
     // units conversion
 
     NETDATA.unitsConversion = {
+        keys: {},
+        latest: {},
         units: {
             'kilobits/s': {
                 'bits/s'    : 0.001,
@@ -1483,16 +1485,19 @@ var NETDATA = window.NETDATA || {};
                 'megabytes/s': 1000,
                 'gigabytes/s': 1000000
             },
+            'KB': {
+                'B' : 0.001,
+                'KB': 1,
+                'MB': 1000,
+                'GB': 1000000
+            },
             'MB': {
-                'B' : 0.000001,
                 'KB': 0.001,
                 'MB': 1,
                 'GB': 1000,
                 'TB': 1000000
             },
             'GB': {
-                'B' : 0.000000001,
-                'KB': 0.000001,
                 'MB': 0.001,
                 'GB': 1,
                 'TB': 1000
@@ -1506,7 +1511,7 @@ var NETDATA = window.NETDATA || {};
             }
         },
 
-        get: function(min, max, units, desired_units, switch_units_callback) {
+        get: function(uuid, min, max, units, desired_units, common_units_name, switch_units_callback) {
             if(typeof units === 'undefined')
                 units = 'undefined';
 
@@ -1538,7 +1543,70 @@ var NETDATA = window.NETDATA || {};
                         }
                     }
 
-                    if (tunits !== null) {
+                    if(tunits !== null && typeof common_units_name === 'string' && typeof uuid === 'string') {
+                        // console.log(uuid + ' name: ' + common_units_name + ', divider: ' + tdivider.toString() + ', units: ' + tunits);
+
+                        var t = this.keys[common_units_name];
+                        if(typeof t === 'undefined') {
+                            // add our commonUnits
+                            this.keys[common_units_name] = {};
+                            t = this.keys[common_units_name];
+                        }
+
+                        // add our divider
+                        t[uuid] = tdivider;
+                        var td = tdivider;
+
+                        // find the max divider
+                        for(x in t)
+                            if(t.hasOwnProperty(x) && t[x] > tdivider)
+                                tdivider = t[x];
+
+                        // console.log(uuid + ' old divider ' + t[uuid].toString() + ', new divider ' + tdivider.toString());
+
+                        if(td !== tdivider) {
+                            // find the name for this divider
+                            tunits = null;
+                            for (x in NETDATA.unitsConversion.units[units]) {
+                                if (NETDATA.unitsConversion.units[units].hasOwnProperty(x) && NETDATA.unitsConversion.units[units][x] === tdivider) {
+                                    tunits = x;
+                                    break;
+                                }
+                            }
+
+                            // console.log(uuid + ' new units ' + tunits);
+                        }
+
+                        if (tunits !== null && tdivider > 0) {
+                            switch_units_callback(tunits);
+                            divider = tdivider;
+
+                            var latest = NETDATA.unitsConversion.latest[common_units_name];
+                            if(typeof latest === 'undefined') {
+                                NETDATA.unitsConversion.latest[common_units_name] = {
+                                    units: tunits,
+                                    divider: tdivider
+                                };
+                                latest = NETDATA.unitsConversion.latest[common_units_name];
+                            }
+                            else {
+                                latest.units = tunits;
+                                latest.divider = tdivider;
+                            }
+
+                            return function(value) {
+                                if(tdivider !== latest.divider) {
+                                    // console.log(uuid + ' new units detected, old divider ' + tdivider.toString() + ', new divider ' + latest.divider.toString() + ' new units ' + latest.units);
+                                    switch_units_callback(latest.units);
+                                    tdivider = latest.divider;
+                                }
+
+                                return value / tdivider;
+                            }
+                        }
+                    }
+
+                    if (tunits !== null && tdivider > 0) {
                         switch_units_callback(tunits);
                         divider = tdivider;
                     }
@@ -1794,6 +1862,7 @@ var NETDATA = window.NETDATA || {};
             that.units = NETDATA.dataAttribute(that.element, 'units', null);    // the units of the chart dimensions
             that.units_desired = NETDATA.dataAttribute(that.element, 'desired-units', NETDATA.options.current.units); // the units of the chart dimensions
             that.units_current = that.units;
+            that.units_common = NETDATA.dataAttribute(that.element, 'common-units', null);
 
             that.append_options = NETDATA.dataAttribute(that.element, 'append-options', null); // additional options to pass to netdata
             that.override_options = NETDATA.dataAttribute(that.element, 'override-options', null);  // override options to pass to netdata
@@ -2659,7 +2728,7 @@ var NETDATA = window.NETDATA || {};
                 __unitsConversionLastMin = min;
                 __unitsConversionLastMax = max;
 
-                __unitsConversion = NETDATA.unitsConversion.get(min, max, this.units, this.units_desired, function (units) {
+                __unitsConversion = NETDATA.unitsConversion.get(this.uuid, min, max, this.units, this.units_desired, this.units_common, function (units) {
                     // console.log('switching units from ' + that.units.toString() + ' to ' + units.toString());
                     that.units_current = units;
                     that.legendSetUnitsString(that.units_current);

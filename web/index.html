@@ -1333,6 +1333,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.io.mainhead"'
                 + ' role="application"></div>';
 
                 head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.io"'
@@ -1343,6 +1344,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.io.mainhead"'
                 + ' role="application"></div>';
             }
 
@@ -1367,6 +1369,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.ipv4.mainhead"'
                 + ' role="application"></div>';
 
                 head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ipv4"'
@@ -1377,6 +1380,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.ipv4.mainhead"'
                 + ' role="application"></div>';
             }
             else if(typeof charts['system.ipv6'] !== 'undefined') {
@@ -1389,6 +1393,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.ipv6.mainhead"'
                 + ' role="application"></div>';
 
                 head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ipv6"'
@@ -1400,6 +1405,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.ipv6.mainhead"'
                 + ' role="application"></div>';
             }
 
@@ -2721,7 +2727,9 @@
                 var units_sync_option = function(option) {
                     var self = $('#' + option);
 
-                    self.bootstrapToggle(NETDATA.options.current.units === 'auto'?'on':'off');
+                    if(self.prop('checked') !== (NETDATA.getOption('units') === 'auto')) {
+                        self.bootstrapToggle(NETDATA.getOption('units') === 'auto' ? 'on' : 'off');
+                    }
                 };
 
                 sync_option('eliminate_zero_dimensions');
@@ -3554,4 +3562,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20171005-1"></script>
+<script type="text/javascript" src="dashboard.js?v20171006-1"></script>
