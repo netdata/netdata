@@ -135,17 +135,22 @@ char *rrdset_strncpyz_name(char *to, const char *from, size_t length) {
     return to;
 }
 
-void rrdset_set_name(RRDSET *st, const char *name) {
+int rrdset_set_name(RRDSET *st, const char *name) {
     if(unlikely(st->name && !strcmp(st->name, name)))
-        return;
+        return 1;
 
-    debug(D_RRD_CALLS, "rrdset_set_name() old: %s, new: %s", st->name, name);
+    debug(D_RRD_CALLS, "rrdset_set_name() old: '%s', new: '%s'", st->name?st->name:"", name);
 
     char b[CONFIG_MAX_VALUE + 1];
     char n[RRD_ID_LENGTH_MAX + 1];
 
     snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
     rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
+
+    if(rrdset_index_find_name(st->rrdhost, b, 0)) {
+        error("RRDSET: chart name '%s' on host '%s' already exists.", b, st->rrdhost->hostname);
+        return 0;
+    }
 
     if(st->name) {
         rrdset_index_del_name(st->rrdhost, st);
@@ -166,6 +171,8 @@ void rrdset_set_name(RRDSET *st, const char *name) {
 
     if(unlikely(rrdset_index_add_name(st->rrdhost, st) != st))
         error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", st->name);
+
+    return 1;
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
@@ -628,8 +635,12 @@ RRDSET *rrdset_create_custom(
 
     netdata_rwlock_init(&st->rrdset_rwlock);
 
-    if(name && *name) rrdset_set_name(st, name);
-    else rrdset_set_name(st, id);
+    if(name && *name && rrdset_set_name(st, name))
+        // we did set the name
+        ;
+    else
+        // could not use the name, use the id
+        rrdset_set_name(st, id);
 
     st->title = config_get(st->config_section, "title", title);
     json_fix_string(st->title);
