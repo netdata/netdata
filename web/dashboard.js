@@ -1487,6 +1487,12 @@ var NETDATA = window.NETDATA || {};
                 'megabytes/s': 1024,
                 'gigabytes/s': 1024 * 1024
             },
+            'KB/s': {
+                'B/s': 1 / 1024,
+                'KB/s': 1,
+                'MB/s': 1024,
+                'GB/s': 1024 * 1024
+            },
             'KB': {
                 'B': 1 / 1024,
                 'KB': 1,
