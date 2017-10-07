@@ -2731,6 +2731,13 @@
                         self.bootstrapToggle(NETDATA.getOption('units') === 'auto' ? 'on' : 'off');
                     }
                 };
+                var temp_sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    if(self.prop('checked') !== (NETDATA.getOption('temperature') === 'celsius')) {
+                        self.bootstrapToggle(NETDATA.getOption('temperature') === 'celsius' ? 'on' : 'off');
+                    }
+                };
 
                 sync_option('eliminate_zero_dimensions');
                 sync_option('destroy_on_hide');
@@ -2745,6 +2752,7 @@
                 sync_option('show_help');
                 theme_sync_option('netdata_theme_control');
                 units_sync_option('units_conversion');
+                temp_sync_option('units_temp');
 
                 if(NETDATA.getOption('parallel_refresher') === false) {
                     $('#concurrent_refreshes_row').hide();
@@ -2774,7 +2782,9 @@
 
             $('#units_conversion').change(function()                {
                 NETDATA.setOption('units', $(this).prop('checked')?'auto':'original');
-                netdataReload();
+            });
+            $('#units_temp').change(function()                {
+                NETDATA.setOption('temperature', $(this).prop('checked')?'celsius':'fahrenheit');
             });
 
             $('#show_help').change(function()                       {
@@ -3309,6 +3319,7 @@
                         <li role="presentation" class="active"><a href="#settings_performance" aria-controls="settings_performance" role="tab" data-toggle="tab">Performance</a></li>
                         <li role="presentation"><a href="#settings_sync" aria-controls="settings_sync" role="tab" data-toggle="tab">Synchronization</a></li>
                         <li role="presentation"><a href="#settings_visual" aria-controls="settings_visual" role="tab" data-toggle="tab">Visual</a></li>
+                        <li role="presentation"><a href="#settings_locale" aria-controls="settings_locale" role="tab" data-toggle="tab">Locale</a></li>
                     </ul>
 
                     <!-- Tab panes -->
@@ -3402,15 +3413,6 @@
                                         </td>
                                         </tr>
                                     <tr class="option-row">
-                                        <td class="option-control"><input id="units_conversion" type="checkbox" checked data-toggle="toggle"  data-on="Scale Units" data-off="Original" data-width="110px"></td>
-                                        <td class="option-info"><strong>Enable auto-conversion of units?</strong><br/>
-                                            <small>When set to <b>Scale Units</b> the values shown will be scaled to the maximum unit (ie. kilobits will be scaled to megabits or even gigabits). When set to <b>Original</b> all the values will be rendered using the original units maintained by the server.
-                                                <br/>
-                                                <b>Switching this will reload the dashboard</b>.
-                                            </small>
-                                        </td>
-                                        </tr>
-                                    <tr class="option-row">
                                         <td class="option-control"><input id="pan_and_zoom_data_padding" type="checkbox" checked data-toggle="toggle"  data-on="Pad" data-off="Don't Pad" data-width="110px"></td>
                                         <td class="option-info"><strong>Enable data padding when panning and zooming?</strong><br/>
                                             <small>When set to <b>Pad</b> the charts will be padded with more data, both before and after the visible area, thus giving the impression the whole database is loaded. This padding will happen only after the first pan or zoom operation on the chart (initially all charts have only the visible data). When set to <b>Don't Pad</b> only the visible data will be transfered from the netdata server, even after the first pan and zoom operation.</small>
@@ -3423,6 +3425,33 @@
                                             <br/>
                                             Keep in mind <a href="http://dygraphs.com" target="_blank">dygraphs</a>, the main charting library in netdata dashboards, can only smooth line charts. It cannot smooth area or stacked charts. When set to <b>Rough</b>, this setting can lower the CPU resources consumed by your browser.</small>
                                         </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </form>
+                        </div>
+                        <div role="tabpanel" class="tab-pane" id="settings_locale">
+                            <form id="optionsForm4" method="get" class="form-horizontal">
+                                <div class="form-group">
+                                    <table>
+                                        <tr class="option-row">
+                                            <td class="option-control"><input id="units_conversion" type="checkbox" checked data-toggle="toggle"  data-on="Scale Units" data-off="Fixed Units" data-width="110px"></td>
+                                            <td class="option-info"><strong>Enable auto-scaling of select units?</strong><br/>
+                                                <small>When set to <b>Scale Units</b> the values shown will dynamically be scaled (e.g. 1000 kilobits will be shown as 1 megabit).
+                                                    When set to <b>Fixed Units</b> all the values will be rendered using the original units maintained by the netdata server.
+                                                    <br/>
+                                                    <b>This setting will be applied gradually as charts are updated. To force it, refresh the dashboard</b>.
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        <tr class="option-row">
+                                            <td class="option-control"><input id="units_temp" type="checkbox" checked data-toggle="toggle"  data-on="Celsius" data-off="Fahrenheit" data-width="110px"></td>
+                                            <td class="option-info"><strong>Which units to use for temperatures?</strong><br/>
+                                                <small>Set the temperature units of the dashboard.
+                                                    <br/>
+                                                    <b>This setting will be applied gradually as charts are updated. To force it, refresh the dashboard</b>.
+                                                </small>
+                                            </td>
                                         </tr>
                                     </table>
                                 </div>
