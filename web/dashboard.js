@@ -295,6 +295,7 @@ var NETDATA = window.NETDATA || {};
         // we may have many...
         current: {
             units: 'auto',              // can be 'auto' or 'original'
+            temperature: 'celsius',     // can be 'celsius' or 'fahrenheit'
 
             pixels_per_point: isSlowDevice()?5:1, // the minimum pixels per point for all charts
                                         // increase this to speed javascript up
@@ -1470,23 +1471,24 @@ var NETDATA = window.NETDATA || {};
     // units conversion
 
     NETDATA.unitsConversion = {
-        keys: {},
-        latest: {},
-        units: {
+        keys: {},       // keys for data-common-units
+        latest: {},     // latest selected units for data-common-units
+
+        scalableUnits: {
             'kilobits/s': {
-                'bits/s'    : 1 / 1000,
+                'bits/s': 1 / 1000,
                 'kilobits/s': 1,
                 'megabits/s': 1000,
                 'gigabits/s': 1000000
             },
             'kilobytes/s': {
-                'bytes/s'    : 1 / 1024,
+                'bytes/s': 1 / 1024,
                 'kilobytes/s': 1,
                 'megabytes/s': 1024,
                 'gigabytes/s': 1024 * 1024
             },
             'KB': {
-                'B' : 1 / 1024,
+                'B': 1 / 1024,
                 'KB': 1,
                 'MB': 1024,
                 'GB': 1024 * 1024
@@ -1504,38 +1506,76 @@ var NETDATA = window.NETDATA || {};
             },
             'seconds': {
                 'milliseconds': 0.001,
-                'seconds'     : 1,
-                'minutes'     : 60,
-                'hours'       : 3600,
-                'days'        : 86400
+                'seconds': 1,
+                'minutes': 60,
+                'hours': 3600,
+                'days': 86400
             }
         },
 
+        convertibleUnits: {
+            'Celsius': {
+                'Fahrenheit': {
+                    check: function() { return NETDATA.options.current.temperature === 'fahrenheit'; },
+                    convert: function(value) { return value * 9 / 5 + 32; }
+                }
+            },
+            'celsius': {
+                'fahrenheit': {
+                    check: function() { return NETDATA.options.current.temperature === 'fahrenheit'; },
+                    convert: function(value) { return value * 9 / 5 + 32; }
+                }
+            }
+        },
+
+        // get a function that converts the units
+        // + every time units are switched call the callback
         get: function(uuid, min, max, units, desired_units, common_units_name, switch_units_callback) {
+            // validate the parameters
             if(typeof units === 'undefined')
                 units = 'undefined';
 
-            if(typeof desired_units === 'undefined' || desired_units === null)
-                desired_units = 'original';
+            // check if we support units conversion
+            if(typeof NETDATA.unitsConversion.scalableUnits[units] === 'undefined' && typeof NETDATA.unitsConversion.convertibleUnits[units] === 'undefined') {
+                // we can't convert these units
+                //console.log('DEBUG: ' + uuid.toString() + ' can\'t convert units: ' + units.toString());
+                return function(value) { return value; };
+            }
 
-            if(desired_units !== 'original' && typeof NETDATA.unitsConversion.units[units] !== 'undefined') {
+            // check if the caller wants the original units
+            if(typeof desired_units === 'undefined' || desired_units === null || desired_units === 'original' || desired_units === units) {
+                //console.log('DEBUG: ' + uuid.toString() + ' original units wanted');
+                switch_units_callback(units);
+                return function(value) { return value; };
+            }
+
+            // now we know we can convert the units
+            // and the caller wants some kind of conversion
+
+            var tunits = null;
+            var tdivider = 0;
+            var x;
+
+            if(typeof NETDATA.unitsConversion.scalableUnits[units] !== 'undefined') {
+                // units that can be scaled
+                // we decide a divider
+
                 // console.log('NETDATA.unitsConversion(' + units.toString() + ', ' + desired_units.toString() + ', function()) decide divider with min = ' + min.toString() + ', max = ' + max.toString());
 
-                min = Math.abs(min);
-                max = Math.abs(max);
-                if (min > max) max = min;
-
-                var divider = 1;
-                var x;
-
                 if (desired_units === 'auto') {
-                    var tunits = null;
-                    var tdivider = 0;
+                    // the caller wants to auto-scale the units
 
-                    for (x in NETDATA.unitsConversion.units[units]) {
-                        if (!NETDATA.unitsConversion.units[units].hasOwnProperty(x)) continue;
+                    // find the absolute maximum value that is rendered on the chart
+                    // based on this we decide the scale
+                    min = Math.abs(min);
+                    max = Math.abs(max);
+                    if (min > max) max = min;
 
-                        var m = NETDATA.unitsConversion.units[units][x];
+                    // find the smallest scale that provides integers
+                    for (x in NETDATA.unitsConversion.scalableUnits[units]) {
+                        if (!NETDATA.unitsConversion.scalableUnits[units].hasOwnProperty(x)) continue;
+
+                        var m = NETDATA.unitsConversion.scalableUnits[units][x];
 
                         if (m <= max && m > tdivider) {
                             tunits = x;
@@ -1543,107 +1583,125 @@ var NETDATA = window.NETDATA || {};
                         }
                     }
 
-                    if(tunits !== null && typeof common_units_name === 'string' && typeof uuid === 'string') {
-                        // console.log(uuid + ' name: ' + common_units_name + ', divider: ' + tdivider.toString() + ', units: ' + tunits);
+                    if(tunits === null || tdivider <= 0) {
+                        // we couldn't find one
+                        //console.log('DEBUG: ' + uuid.toString() + ' cannot find an auto-scaling candidate for units: ' + units.toString() + ' (max: ' + max.toString() + ')');
+                        switch_units_callback(units);
+                        return function(value) { return value; };
+                    }
 
+                    if(typeof common_units_name === 'string' && typeof uuid === 'string') {
+                        // the caller wants several charts to have the same units
+                        // data-common-units
+
+                        // add our divider into the list of keys
                         var t = this.keys[common_units_name];
                         if(typeof t === 'undefined') {
-                            // add our commonUnits
                             this.keys[common_units_name] = {};
                             t = this.keys[common_units_name];
                         }
+                        t[uuid] = {
+                            units: tunits,
+                            divider: tdivider
+                        };
 
-                        // add our divider
-                        t[uuid] = tdivider;
-                        var td = tdivider;
-
-                        // find the max divider
-                        for(x in t)
-                            if(t.hasOwnProperty(x) && t[x] > tdivider)
-                                tdivider = t[x];
-
-                        // console.log(uuid + ' old divider ' + t[uuid].toString() + ', new divider ' + tdivider.toString());
-
-                        if(td !== tdivider) {
-                            // find the name for this divider
-                            tunits = null;
-                            for (x in NETDATA.unitsConversion.units[units]) {
-                                if (NETDATA.unitsConversion.units[units].hasOwnProperty(x) && NETDATA.unitsConversion.units[units][x] === tdivider) {
-                                    tunits = x;
-                                    break;
-                                }
-                            }
-
-                            // console.log(uuid + ' new units ' + tunits);
+                        // find the max divider of all charts
+                        var common_units = t[uuid];
+                        for(x in t) {
+                            if (t.hasOwnProperty(x) && t[x].divider > common_units.divider)
+                                common_units = t[x];
                         }
 
-                        if (tunits !== null && tdivider > 0) {
-                            switch_units_callback(tunits);
-                            divider = tdivider;
+                        // save our common_max to the latest keys
+                        var latest = NETDATA.unitsConversion.latest[common_units_name];
+                        if(typeof latest === 'undefined') {
+                            NETDATA.unitsConversion.latest[common_units_name] = {};
+                            latest = NETDATA.unitsConversion.latest[common_units_name];
+                        }
+                        latest.units = common_units.units;
+                        latest.divider = common_units.divider;
 
-                            var latest = NETDATA.unitsConversion.latest[common_units_name];
-                            if(typeof latest === 'undefined') {
-                                NETDATA.unitsConversion.latest[common_units_name] = {
-                                    units: tunits,
-                                    divider: tdivider
-                                };
-                                latest = NETDATA.unitsConversion.latest[common_units_name];
-                            }
-                            else {
-                                latest.units = tunits;
-                                latest.divider = tdivider;
+                        tunits = latest.units;
+                        tdivider = latest.divider;
+
+                        //console.log('DEBUG: ' + uuid.toString() + ' converted units: ' + units.toString() + ' to units: ' + tunits.toString() + ' with divider ' + tdivider.toString() + ', common-units=' + common_units_name.toString() + ((t[uuid].divider !== tdivider)?' USED COMMON, mine was ' + t[uuid].units:' set common').toString());
+
+                        // apply it to this chart
+                        switch_units_callback(tunits);
+                        return function(value) {
+                            if(tdivider !== latest.divider) {
+                                // another chart switched our common units
+                                // we should switch them too
+                                //console.log('DEBUG: ' + uuid + ' switching units due to a common-units change, from ' + tunits.toString() + ' to ' + latest.units.toString());
+                                tunits = latest.units;
+                                tdivider = latest.divider;
+                                switch_units_callback(tunits);
                             }
 
-                            return function(value) {
-                                if(tdivider !== latest.divider) {
-                                    // console.log(uuid + ' new units detected, old divider ' + tdivider.toString() + ', new divider ' + latest.divider.toString() + ' new units ' + latest.units);
-                                    switch_units_callback(latest.units);
-                                    tdivider = latest.divider;
-                                }
-
-                                return value / tdivider;
-                            }
+                            return value / tdivider;
                         }
                     }
+                    else {
+                        // the caller did not give data-common-units
+                        // this chart auto-scales independently of all others
+                        //console.log('DEBUG: ' + uuid.toString() + ' converted units: ' + units.toString() + ' to units: ' + tunits.toString() + ' with divider ' + tdivider.toString() + ', autonomously');
 
-                    if (tunits !== null && tdivider > 0) {
                         switch_units_callback(tunits);
-                        divider = tdivider;
+                        return function (value) { return value / tdivider; };
                     }
                 }
                 else {
-                    var found = 0;
-                    for (x in NETDATA.unitsConversion.units[units]) {
-                        if (!NETDATA.unitsConversion.units[units].hasOwnProperty(x)) continue;
+                    // the caller wants specific units
 
-                        if (x === desired_units) {
-                            found = 1;
-                            switch_units_callback(x);
-                            divider = NETDATA.unitsConversion.units[units][x];
-                            break;
+                    if(typeof NETDATA.unitsConversion.scalableUnits[units][desired_units] !== 'undefined') {
+                        // all good, set the new units
+                        tdivider = NETDATA.unitsConversion.scalableUnits[units][desired_units];
+                        // console.log('DEBUG: ' + uuid.toString() + ' converted units: ' + units.toString() + ' to units: ' + desired_units.toString() + ' with divider ' + tdivider.toString() + ', by reference');
+                        switch_units_callback(desired_units);
+                        return function (value) { return value / tdivider; };
+                    }
+                    else {
+                        // oops! switch back to original units
+                        console.log('Units conversion from ' + units.toString() + ' to ' + desired_units.toString() + ' is not supported.');
+                        switch_units_callback(units);
+                        return function (value) { return value; };
+                    }
+                }
+           }
+           else if(typeof NETDATA.unitsConversion.convertibleUnits[units] !== 'undefined') {
+                // units that can be converted
+                if(desired_units === 'auto') {
+                    for(x in NETDATA.unitsConversion.convertibleUnits[units]) {
+                        if (NETDATA.unitsConversion.convertibleUnits[units].hasOwnProperty(x)) {
+                            if (NETDATA.unitsConversion.convertibleUnits[units][x].check()) {
+                                //console.log('DEBUG: ' + uuid.toString() + ' converting ' + units.toString() + ' to: ' + x.toString());
+                                switch_units_callback(x);
+                                return NETDATA.unitsConversion.convertibleUnits[units][x].convert;
+                            }
                         }
                     }
 
-                    if(!found)
-                        console.log('Units conversion from ' + units.toString() + ' to ' + desired_units.toString() + ' is not supported.');
+                    // none checked ok
+                    //console.log('DEBUG: ' + uuid.toString() + ' no conversion available for ' + units.toString() + ' to: ' + desired_units.toString());
+                    switch_units_callback(units);
+                    return function (value) { return value; };
                 }
-
-                if(divider <= 0 || divider === 1)
-                    return function (value) {
-                        return value;
-                    };
-
-                return function (value) {
-                    // console.log('NETDATA.unitsConversion(' + units.toString() + ', ' + desired_units.toString() + ', function()) decide divider with min = ' + min.toString() + ', max = ' + max.toString() + ', divider = ' + divider.toString() + ', value = ' + value.toString());
-                    return value / divider;
-                };
-            }
-            else {
-                return function (value) {
-                    // console.log('NETDATA.unitsConversion(' + units.toString() + ', ' + desired_units.toString() + ', function()) dummy divider');
-                    return value;
-                };
-            }
+                else if(typeof NETDATA.unitsConversion.convertibleUnits[units][desired_units] !== 'undefined') {
+                    switch_units_callback(desired_units);
+                    return NETDATA.unitsConversion.convertibleUnits[units][desired_units].convert;
+                }
+                else {
+                    console.log('Units conversion from ' + units.toString() + ' to ' + desired_units.toString() + ' is not supported.');
+                    switch_units_callback(units);
+                    return function (value) { return value; };
+                }
+           }
+           else {
+                // hm... did we forget to implement the new type?
+                console.log('Unmatched unit conversion method for units ' + units.toString());
+                switch_units_callback(units);
+                return function (value) { return value; };
+           }
         }
     };
 
