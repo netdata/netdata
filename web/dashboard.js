@@ -847,6 +847,7 @@ var NETDATA = window.NETDATA || {};
             }
         },
 
+        // the fallback
         getFixed: function(min, max) {
             var key = max;
             if(min === max) {
@@ -882,7 +883,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         testIntlNumberFormat: function() {
-            var n = 1.12345;
+            var value = 1.12345;
             var e1 = "1.12", e2 = "1,12";
             var s = "";
 
@@ -893,7 +894,7 @@ var NETDATA = window.NETDATA || {};
                     maximumFractionDigits: 2
                 });
 
-                s = x.format(n);
+                s = x.format(value);
             }
             catch(e) {
                 s = "";
@@ -904,7 +905,7 @@ var NETDATA = window.NETDATA || {};
         },
 
         testLocaleString: function() {
-            var n = 1.12345;
+            var value = 1.12345;
             var e1 = "1.12", e2 = "1,12";
             var s = "";
 
