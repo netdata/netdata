@@ -2750,6 +2750,7 @@
                 sync_option('smooth_plot');
                 sync_option('pan_and_zoom_data_padding');
                 sync_option('show_help');
+                sync_option('seconds_as_time');
                 theme_sync_option('netdata_theme_control');
                 units_sync_option('units_conversion');
                 temp_sync_option('units_temp');
@@ -2779,6 +2780,7 @@
             });
             $('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
             $('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
+            $('#seconds_as_time').change(function()                 { NETDATA.setOption('seconds_as_time', $(this).prop('checked')); });
 
             $('#units_conversion').change(function()                {
                 NETDATA.setOption('units', $(this).prop('checked')?'auto':'original');
@@ -3435,12 +3437,19 @@
                                 <div class="form-group">
                                     <table>
                                         <tr class="option-row">
-                                            <td class="option-control"><input id="units_conversion" type="checkbox" checked data-toggle="toggle"  data-on="Scale Units" data-off="Fixed Units" data-width="110px"></td>
+                                            <td colspan="2" align="center">
+                                                <small>
+                                                    <b>These settings are applied gradually, as charts are updated. To force them, refresh the dashboard now</b>.
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        <tr class="option-row">
+                                            <td class="option-control"><input id="units_conversion" type="checkbox" checked data-toggle="toggle"  data-on="Scale Units" data-off="Fixed Units" data-onstyle="success" data-width="110px"></td>
                                             <td class="option-info"><strong>Enable auto-scaling of select units?</strong><br/>
                                                 <small>When set to <b>Scale Units</b> the values shown will dynamically be scaled (e.g. 1000 kilobits will be shown as 1 megabit).
+                                                    Netdata can auto-scale these original units: <code>kilobits/s</code>, <code>kilobytes/s</code>, <code>KB/s</code>,
+                                                    <code>KB</code>, <code>MB</code>, and <code>GB</code>.
                                                     When set to <b>Fixed Units</b> all the values will be rendered using the original units maintained by the netdata server.
-                                                    <br/>
-                                                    <b>This setting will be applied gradually as charts are updated. To force it, refresh the dashboard</b>.
                                                 </small>
                                             </td>
                                         </tr>
@@ -3448,8 +3457,14 @@
                                             <td class="option-control"><input id="units_temp" type="checkbox" checked data-toggle="toggle"  data-on="Celsius" data-off="Fahrenheit" data-width="110px"></td>
                                             <td class="option-info"><strong>Which units to use for temperatures?</strong><br/>
                                                 <small>Set the temperature units of the dashboard.
-                                                    <br/>
-                                                    <b>This setting will be applied gradually as charts are updated. To force it, refresh the dashboard</b>.
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        <tr class="option-row">
+                                            <td class="option-control"><input id="seconds_as_time" type="checkbox" checked data-toggle="toggle"  data-on="Time" data-off="Seconds" data-onstyle="success" data-width="110px"></td>
+                                            <td class="option-info"><strong>Convert seconds to time?</strong><br/>
+                                                <small>When set to <b>Time</b>, charts that present <code>seconds</code> will show <code>DDd:HH:MM:SS</code>.
+                                                    When set to <b>Seconds</b>, the raw number of seconds will be presented.
                                                 </small>
                                             </td>
                                         </tr>
@@ -3591,4 +3606,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20171006-1"></script>
+<script type="text/javascript" src="dashboard.js?v20171008-1"></script>

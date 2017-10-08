@@ -296,6 +296,7 @@ var NETDATA = window.NETDATA || {};
         current: {
             units: 'auto',              // can be 'auto' or 'original'
             temperature: 'celsius',     // can be 'celsius' or 'fahrenheit'
+            seconds_as_time: true,      // show seconds as DDd:HH:MM:SS ?
 
             pixels_per_point: isSlowDevice()?5:1, // the minimum pixels per point for all charts
                                         // increase this to speed javascript up
@@ -1536,7 +1537,7 @@ var NETDATA = window.NETDATA || {};
             },
             'seconds': {
                 'time': {
-                    check: function () { return NETDATA.options.current.units === 'auto'; },
+                    check: function () { return NETDATA.options.current.seconds_as_time; },
                     convert: function (seconds) {
                         seconds = Math.abs(seconds);
 
