@@ -1509,7 +1509,8 @@ var NETDATA = window.NETDATA || {};
                 'MB': 1 / 1024,
                 'GB': 1,
                 'TB': 1024
-            },
+            }
+            /*
             'seconds': {
                 'milliseconds': 0.001,
                 'seconds': 1,
@@ -1517,6 +1518,7 @@ var NETDATA = window.NETDATA || {};
                 'hours': 3600,
                 'days': 86400
             }
+            */
         },
 
         convertibleUnits: {
@@ -1531,6 +1533,47 @@ var NETDATA = window.NETDATA || {};
                     check: function() { return NETDATA.options.current.temperature === 'fahrenheit'; },
                     convert: function(value) { return value * 9 / 5 + 32; }
                 }
+            },
+            'seconds': {
+                'time': {
+                    check: function () { return NETDATA.options.current.units === 'auto'; },
+                    convert: function (seconds) {
+                        seconds = Math.abs(seconds);
+
+                        var days = Math.floor(seconds / 86400);
+                        seconds -= days * 86400;
+
+                        var hours = Math.floor(seconds / 3600);
+                        seconds -= hours * 3600;
+
+                        var minutes = Math.floor(seconds / 60);
+                        seconds -= minutes * 60;
+
+                        seconds = Math.round(seconds);
+
+                        var ms_txt = '';
+                        /*
+                        var ms = seconds - Math.floor(seconds);
+                        seconds -= ms;
+                        ms = Math.round(ms * 1000);
+
+                        if(ms > 1) {
+                            if(ms < 10)
+                                ms_txt = '.00' + ms.toString();
+                            else if(ms < 100)
+                                ms_txt = '.0' + ms.toString();
+                            else
+                                ms_txt = '.' + ms.toString();
+                        }
+                        */
+
+                        return ((days > 0)?days.toString() + 'd:':'').toString()
+                            + NETDATA.zeropad(hours) + ':'
+                            + NETDATA.zeropad(minutes) + ':'
+                            + NETDATA.zeropad(seconds)
+                            + ms_txt;
+                    }
+                }
             }
         },
 
@@ -1542,7 +1585,7 @@ var NETDATA = window.NETDATA || {};
                 units = 'undefined';
 
             // check if we support units conversion
-            if(typeof NETDATA.unitsConversion.scalableUnits[units] === 'undefined' && typeof NETDATA.unitsConversion.convertibleUnits[units] === 'undefined') {
+            if(typeof this.scalableUnits[units] === 'undefined' && typeof this.convertibleUnits[units] === 'undefined') {
                 // we can't convert these units
                 //console.log('DEBUG: ' + uuid.toString() + ' can\'t convert units: ' + units.toString());
                 return function(value) { return value; };
@@ -1562,11 +1605,11 @@ var NETDATA = window.NETDATA || {};
             var tdivider = 0;
             var x;
 
-            if(typeof NETDATA.unitsConversion.scalableUnits[units] !== 'undefined') {
+            if(typeof this.scalableUnits[units] !== 'undefined') {
                 // units that can be scaled
                 // we decide a divider
 
-                // console.log('NETDATA.unitsConversion(' + units.toString() + ', ' + desired_units.toString() + ', function()) decide divider with min = ' + min.toString() + ', max = ' + max.toString());
+                // console.log('NETDATA.unitsConversion.get(' + units.toString() + ', ' + desired_units.toString() + ', function()) decide divider with min = ' + min.toString() + ', max = ' + max.toString());
 
                 if (desired_units === 'auto') {
                     // the caller wants to auto-scale the units
@@ -1578,14 +1621,13 @@ var NETDATA = window.NETDATA || {};
                     if (min > max) max = min;
 
                     // find the smallest scale that provides integers
-                    for (x in NETDATA.unitsConversion.scalableUnits[units]) {
-                        if (!NETDATA.unitsConversion.scalableUnits[units].hasOwnProperty(x)) continue;
-
-                        var m = NETDATA.unitsConversion.scalableUnits[units][x];
-
-                        if (m <= max && m > tdivider) {
-                            tunits = x;
-                            tdivider = m;
+                    for (x in this.scalableUnits[units]) {
+                        if (this.scalableUnits[units].hasOwnProperty(x)) {
+                            var m = this.scalableUnits[units][x];
+                            if (m <= max && m > tdivider) {
+                                tunits = x;
+                                tdivider = m;
+                            }
                         }
                     }
 
@@ -1619,10 +1661,10 @@ var NETDATA = window.NETDATA || {};
                         }
 
                         // save our common_max to the latest keys
-                        var latest = NETDATA.unitsConversion.latest[common_units_name];
+                        var latest = this.latest[common_units_name];
                         if(typeof latest === 'undefined') {
-                            NETDATA.unitsConversion.latest[common_units_name] = {};
-                            latest = NETDATA.unitsConversion.latest[common_units_name];
+                            this.latest[common_units_name] = {};
+                            latest = this.latest[common_units_name];
                         }
                         latest.units = common_units.units;
                         latest.divider = common_units.divider;
@@ -1659,9 +1701,9 @@ var NETDATA = window.NETDATA || {};
                 else {
                     // the caller wants specific units
 
-                    if(typeof NETDATA.unitsConversion.scalableUnits[units][desired_units] !== 'undefined') {
+                    if(typeof this.scalableUnits[units][desired_units] !== 'undefined') {
                         // all good, set the new units
-                        tdivider = NETDATA.unitsConversion.scalableUnits[units][desired_units];
+                        tdivider = this.scalableUnits[units][desired_units];
                         // console.log('DEBUG: ' + uuid.toString() + ' converted units: ' + units.toString() + ' to units: ' + desired_units.toString() + ' with divider ' + tdivider.toString() + ', by reference');
                         switch_units_callback(desired_units);
                         return function (value) { return value / tdivider; };
@@ -1674,15 +1716,15 @@ var NETDATA = window.NETDATA || {};
                     }
                 }
            }
-           else if(typeof NETDATA.unitsConversion.convertibleUnits[units] !== 'undefined') {
+           else if(typeof this.convertibleUnits[units] !== 'undefined') {
                 // units that can be converted
                 if(desired_units === 'auto') {
-                    for(x in NETDATA.unitsConversion.convertibleUnits[units]) {
-                        if (NETDATA.unitsConversion.convertibleUnits[units].hasOwnProperty(x)) {
-                            if (NETDATA.unitsConversion.convertibleUnits[units][x].check()) {
+                    for(x in this.convertibleUnits[units]) {
+                        if (this.convertibleUnits[units].hasOwnProperty(x)) {
+                            if (this.convertibleUnits[units][x].check()) {
                                 //console.log('DEBUG: ' + uuid.toString() + ' converting ' + units.toString() + ' to: ' + x.toString());
                                 switch_units_callback(x);
-                                return NETDATA.unitsConversion.convertibleUnits[units][x].convert;
+                                return this.convertibleUnits[units][x].convert;
                             }
                         }
                     }
@@ -1692,9 +1734,9 @@ var NETDATA = window.NETDATA || {};
                     switch_units_callback(units);
                     return function (value) { return value; };
                 }
-                else if(typeof NETDATA.unitsConversion.convertibleUnits[units][desired_units] !== 'undefined') {
+                else if(typeof this.convertibleUnits[units][desired_units] !== 'undefined') {
                     switch_units_callback(desired_units);
-                    return NETDATA.unitsConversion.convertibleUnits[units][desired_units].convert;
+                    return this.convertibleUnits[units][desired_units].convert;
                 }
                 else {
                     console.log('Units conversion from ' + units.toString() + ' to ' + desired_units.toString() + ' is not supported.');
@@ -2812,6 +2854,9 @@ var NETDATA = window.NETDATA || {};
             if(__unitsConversion !== null) {
                 min = __unitsConversion(min);
                 max = __unitsConversion(max);
+
+                if(typeof min !== 'number' || typeof max !== 'number')
+                    return;
             }
 
             __legendFormatValueChartDecimalsLastMin = min;
@@ -2858,9 +2903,13 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.legendFormatValue = function(value) {
-            if(typeof value !== 'number') return '-';
+            if(typeof value !== 'number')
+                return '-';
 
             value = __unitsConversion(value);
+
+            if(typeof value !== 'number')
+                return value;
 
             if(__intlNumberFormat !== null)
                 return __intlNumberFormat.format(value);
