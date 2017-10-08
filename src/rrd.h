@@ -410,6 +410,7 @@ struct rrdhost {
 
     const char *os;                                 // the O/S type of the host
     const char *tags;                               // tags for this host
+    const char *timezone;                           // the timezone of the host
 
     uint32_t flags;                                 // flags about this RRDHOST
 
@@ -541,6 +542,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , const char *registry_hostname
         , const char *guid
         , const char *os
+        , const char *timezone
         , const char *tags
         , int update_every
         , long history
