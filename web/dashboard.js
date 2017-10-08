@@ -1642,11 +1642,13 @@ var NETDATA = window.NETDATA || {};
                         // the caller wants several charts to have the same units
                         // data-common-units
 
+                        var common_units_key = common_units_name + '-' + units;
+
                         // add our divider into the list of keys
-                        var t = this.keys[common_units_name];
+                        var t = this.keys[common_units_key];
                         if(typeof t === 'undefined') {
-                            this.keys[common_units_name] = {};
-                            t = this.keys[common_units_name];
+                            this.keys[common_units_key] = {};
+                            t = this.keys[common_units_key];
                         }
                         t[uuid] = {
                             units: tunits,
@@ -1661,10 +1663,10 @@ var NETDATA = window.NETDATA || {};
                         }
 
                         // save our common_max to the latest keys
-                        var latest = this.latest[common_units_name];
+                        var latest = this.latest[common_units_key];
                         if(typeof latest === 'undefined') {
-                            this.latest[common_units_name] = {};
-                            latest = this.latest[common_units_name];
+                            this.latest[common_units_key] = {};
+                            latest = this.latest[common_units_key];
                         }
                         latest.units = common_units.units;
                         latest.divider = common_units.divider;
