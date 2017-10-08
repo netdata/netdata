@@ -287,9 +287,12 @@ var NETDATA = window.NETDATA || {};
                                         // rendering the chart that is panned or zoomed).
                                         // Used with .current.global_pan_sync_time
 
-        last_page_resize: Date.now(),       // the timestamp of the last resize request
+        last_page_resize: Date.now(),   // the timestamp of the last resize request
 
         last_page_scroll: 0,            // the timestamp the last time the page was scrolled
+
+        browser_timezone: 'unknown',    // timezone detected by javascript
+        server_timezone: 'unknown',     // timezone reported by the server
 
         // the current profile
         // we may have many...
@@ -297,6 +300,8 @@ var NETDATA = window.NETDATA || {};
             units: 'auto',              // can be 'auto' or 'original'
             temperature: 'celsius',     // can be 'celsius' or 'fahrenheit'
             seconds_as_time: true,      // show seconds as DDd:HH:MM:SS ?
+            timezone: 'default',        // the timezone to use, or 'default'
+            user_set_server_timezone: 'default', // as set by the user on the dashboard
 
             pixels_per_point: isSlowDevice()?5:1, // the minimum pixels per point for all charts
                                         // increase this to speed javascript up
@@ -566,6 +571,8 @@ var NETDATA = window.NETDATA || {};
                 }
             }
         }
+
+        NETDATA.dateTime.init(NETDATA.options.current.timezone);
     };
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -1166,6 +1173,10 @@ var NETDATA = window.NETDATA || {};
                 if(data !== null) {
                     var h = NETDATA.chartRegistry.fixid(host);
                     self.charts[h] = data.charts;
+
+                    // update the server timezone in our options
+                    if(typeof data.timezone === 'string')
+                        NETDATA.options.server_timezone = data.timezone;
                 }
                 else NETDATA.error(406, host + '/api/v1/charts');
 
@@ -1466,6 +1477,126 @@ var NETDATA = window.NETDATA || {};
 
         return ret;
     };
+
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // date/time conversion
+
+    NETDATA.dateTime = {
+        using_timezone: false,
+
+        // these are the old netdata functions
+        // we fallback to these, if the new ones fail
+
+        localeDateStringNative: function(d) {
+            return d.toLocaleDateString();
+        },
+
+        localeTimeStringNative: function(d) {
+            return d.toLocaleTimeString();
+        },
+
+        xAxisTimeStringNative: function(d) {
+            return NETDATA.zeropad(d.getHours())  + ":"
+                + NETDATA.zeropad(d.getMinutes()) + ":"
+                + NETDATA.zeropad(d.getSeconds());
+        },
+
+        // initialize the new date/time conversion
+        // functions.
+        // if this fails, we fallback to the above
+        init: function(timezone) {
+
+            // detect browser timezone
+            try {
+                NETDATA.options.browser_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            }
+            catch(e) {
+                NETDATA.options.browser_timezone = 'cannot-detect-it';
+            }
+
+            var ret = false;
+
+            try {
+                var dateOptions ={
+                    localeMatcher: 'best fit',
+                    formatMatcher: 'best fit',
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: '2-digit'
+                };
+
+                var timeOptions = {
+                    localeMatcher: 'best fit',
+                    hour12: false,
+                    formatMatcher: 'best fit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                };
+
+                var xAxisOptions = {
+                    localeMatcher: 'best fit',
+                    hour12: false,
+                    formatMatcher: 'best fit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                };
+
+                if(typeof timezone === 'string' && timezone !== '' && timezone !== 'default') {
+                    dateOptions.timeZone  = timezone;
+                    timeOptions.timeZone  = timezone;
+                    timeOptions.timeZoneName = 'short';
+                    xAxisOptions.timeZone = timezone;
+                    this.using_timezone = true;
+                }
+                else {
+                    timezone = 'default';
+                    this.using_timezone = false;
+                }
+
+                this.dateFormat  = new Intl.DateTimeFormat(navigator.language, dateOptions);
+                this.timeFormat  = new Intl.DateTimeFormat(navigator.language, timeOptions);
+                this.xAxisFormat = new Intl.DateTimeFormat(navigator.language, xAxisOptions);
+
+                this.localeDateString = function(d) {
+                    return this.dateFormat.format(d);
+                };
+
+                this.localeTimeString = function(d) {
+                    return this.timeFormat.format(d);
+                };
+
+                this.xAxisTimeString = function(d) {
+                    return this.xAxisFormat.format(d);
+                };
+
+                var d = new Date();
+                var t = this.dateFormat.format(d) + ' ' + this.timeFormat.format(d) + ' ' + this.xAxisFormat.format(d);
+
+                ret = true;
+            }
+            catch(e) {
+                console.log('Cannot setup Date/Time formatting: ' + e.toString());
+
+                timezone = 'default';
+                this.localeDateString = this.localeDateStringNative;
+                this.localeTimeString = this.localeTimeStringNative;
+                this.xAxisTimeString  = this.xAxisTimeStringNative;
+                this.using_timezone = false;
+
+                ret = false;
+            }
+
+            // save it
+            NETDATA.setOption('timezone', timezone);
+
+            return ret;
+        }
+    };
+    NETDATA.dateTime.init(NETDATA.options.current.timezone);
 
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -3019,8 +3150,8 @@ var NETDATA = window.NETDATA || {};
             if(this.legendSetDateLast.ms !== ms) {
                 var d = new Date(ms);
                 this.legendSetDateLast.ms = ms;
-                this.legendSetDateLast.date = d.toLocaleDateString();
-                this.legendSetDateLast.time = d.toLocaleTimeString();
+                this.legendSetDateLast.date = NETDATA.dateTime.localeDateString(d);
+                this.legendSetDateLast.time = NETDATA.dateTime.localeTimeString(d);
             }
 
             if(this.element_legend_childs.title_date !== null)
@@ -5156,7 +5287,7 @@ var NETDATA = window.NETDATA || {};
                     ticker: Dygraph.dateTicker,
                     axisLabelFormatter: function (d, gran) {
                         void(gran);
-                        return NETDATA.zeropad(d.getHours()) + ":" + NETDATA.zeropad(d.getMinutes()) + ":" + NETDATA.zeropad(d.getSeconds());
+                        return NETDATA.dateTime.xAxisTimeString(d);
                     }
                 },
                 y: {
@@ -5788,7 +5919,7 @@ var NETDATA = window.NETDATA || {};
                     type: 'timeseries',
                     tick: {
                         format: function(x) {
-                            return NETDATA.zeropad(x.getHours()) + ":" + NETDATA.zeropad(x.getMinutes()) + ":" + NETDATA.zeropad(x.getSeconds());
+                            return NETDATA.dateTime.xAxisTimeString(x);
                         }
                     }
                 }
