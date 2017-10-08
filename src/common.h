@@ -238,6 +238,7 @@ extern char *netdata_configured_cache_dir;
 extern char *netdata_configured_varlib_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
+extern char *netdata_configured_timezone;
 
 extern void netdata_fix_chart_id(char *s);
 extern void netdata_fix_chart_name(char *s);

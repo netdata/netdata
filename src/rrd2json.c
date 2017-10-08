@@ -92,6 +92,7 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb) {
            "\t\"hostname\": \"%s\""
         ",\n\t\"version\": \"%s\""
         ",\n\t\"os\": \"%s\""
+        ",\n\t\"timezone\": \"%s\""
         ",\n\t\"update_every\": %d"
         ",\n\t\"history\": %ld"
         ",\n\t\"custom_info\": \"%s\""
@@ -99,6 +100,7 @@ void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb) {
         , host->hostname
         , program_version
         , host->os
+        , host->timezone
         , host->rrd_update_every
         , host->rrd_history_entries
         , custom_dashboard_info_js_filename

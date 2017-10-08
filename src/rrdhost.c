@@ -86,6 +86,15 @@ static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
     freez(old);
 }
 
+static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone) {
+    if(host->timezone && timezone && !strcmp(host->timezone, timezone))
+        return;
+
+    void *old = (void *)host->timezone;
+    host->timezone = strdupz((timezone && *timezone)?timezone:"unknown");
+    freez(old);
+}
+
 static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_guid) {
     strncpy(host->machine_guid, machine_guid, GUID_LEN);
     host->machine_guid[GUID_LEN] = '\0';
@@ -100,6 +109,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                         const char *registry_hostname,
                         const char *guid,
                         const char *os,
+                        const char *timezone,
                         const char *tags,
                         int update_every,
                         long entries,
@@ -134,6 +144,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
     rrdhost_init_os(host, os);
+    rrdhost_init_timezone(host, timezone);
     rrdhost_init_tags(host, tags);
     host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
@@ -251,7 +262,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     }
     else {
         info("Host '%s' (at registry as '%s') with guid '%s' initialized"
-                     ", os %s"
+                     ", os '%s'"
+                     ", timezone '%s'"
                      ", tags '%s'"
                      ", update every %d"
                      ", memory mode %s"
@@ -268,6 +280,7 @@ RRDHOST *rrdhost_create(const char *hostname,
              , host->registry_hostname
              , host->machine_guid
              , host->os
+             , host->timezone
              , (host->tags)?host->tags:""
              , host->rrd_update_every
              , rrd_memory_mode_name(host->rrd_memory_mode)
@@ -294,6 +307,7 @@ RRDHOST *rrdhost_find_or_create(
         , const char *registry_hostname
         , const char *guid
         , const char *os
+        , const char *timezone
         , const char *tags
         , int update_every
         , long history
@@ -313,6 +327,7 @@ RRDHOST *rrdhost_find_or_create(
                 , registry_hostname
                 , guid
                 , os
+                , timezone
                 , tags
                 , update_every
                 , history
@@ -404,6 +419,7 @@ void rrd_init(char *hostname) {
             , registry_get_this_machine_hostname()
             , registry_get_this_machine_guid()
             , os_type
+            , netdata_configured_timezone
             , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
             , default_rrd_update_every
             , default_rrd_history_entries
@@ -510,6 +526,7 @@ void rrdhost_free(RRDHOST *host) {
 
     freez((void *)host->tags);
     freez((void *)host->os);
+    freez((void *)host->timezone);
     freez(host->cache_dir);
     freez(host->varlib_dir);
     freez(host->rrdpush_send_api_key);
