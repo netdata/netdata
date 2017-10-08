@@ -526,8 +526,9 @@ static void get_system_timezone(void) {
         char *cmp = "/usr/share/zoneinfo/";
         size_t cmp_len = strlen(cmp);
 
-        if(!strncmp(buffer, cmp, cmp_len) && buffer[cmp_len]) {
-            timezone = &buffer[cmp_len];
+        char *s = strstr(buffer, cmp);
+        if(s && s[cmp_len]) {
+            timezone = &s[cmp_len];
             // info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
         }
     }
