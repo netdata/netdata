@@ -443,6 +443,49 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// dev.cpu.0.freq
+
+int do_dev_cpu_0_freq(int update_every, usec_t dt) {
+    (void)dt;
+    static int mib[4] = {0, 0, 0, 0};
+    int cpufreq;
+
+    if (unlikely(GETSYSCTL_SIMPLE("dev.cpu.0.freq", mib, cpufreq))) {
+        error("DISABLED: cpu.scaling_cur_freq chart");
+        error("DISABLED: dev.cpu.0.freq module");
+        return 1;
+    } else {
+
+        // --------------------------------------------------------------------
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost("cpu",
+                                         "scaling_cur_freq",
+                                         NULL,
+                                         "cpufreq",
+                                         NULL,
+                                         "Current CPU Scaling Frequency",
+                                         "MHz",
+                                         5003,
+                                         update_every,
+                                         RRDSET_TYPE_LINE
+            );
+
+            rd = rrddim_add(st, "frequency", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else rrdset_next(st);
+
+        rrddim_set_by_pointer(st, rd, cpufreq);
+        rrdset_done(st);
+    }
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // hw.intrcnt
 
 int do_hw_intcnt(int update_every, usec_t dt) {
