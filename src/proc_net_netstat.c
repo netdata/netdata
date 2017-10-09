@@ -122,7 +122,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         do_tcpext_ofo        = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP out-of-order queue", CONFIG_BOOLEAN_AUTO);
         do_tcpext_connaborts = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP connection aborts", CONFIG_BOOLEAN_AUTO);
         do_tcpext_memory     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP memory pressures", CONFIG_BOOLEAN_AUTO);
-        do_tcpext_listen     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP listen errors", CONFIG_BOOLEAN_AUTO);
+        do_tcpext_listen     = config_get_boolean_ondemand("plugin:proc:/proc/net/netstat", "TCP listen issues", CONFIG_BOOLEAN_AUTO);
 
         arl_ipext  = arl_create("netstat/ipext", NULL, 60);
         arl_tcpext = arl_create("netstat/tcpext", NULL, 60);
