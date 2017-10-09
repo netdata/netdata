@@ -102,6 +102,7 @@ dist_healthconfig_DATA = \
     health.d/softnet.conf \
     health.d/squid.conf \
     health.d/swap.conf \
+    health.d/tcp_listen.conf \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
     health.d/varnish.conf \
