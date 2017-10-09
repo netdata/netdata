@@ -1,5 +1,6 @@
 declare -A configs_signatures=(
   ['0056936ce99788ed9ae1c611c87aa6d8']='apps_groups.conf'
+  ['007fc019fb32e952b509d455c016a002']='health.d/tcp_resets.conf'
   ['0102351817595a85d01ebd54a5f2f36b']='python.d/ovpn_status_log.conf'
   ['01302e01162d465614276de43fad7546']='python.d.conf'
   ['01c54057e0ca55b5bb49df1662d6b8c3']='python.d/web_log.conf'
@@ -485,6 +486,7 @@ declare -A configs_signatures=(
   ['f4c5d88c34d3fb853498124177cc77f1']='python.d.conf'
   ['f5736e0b2945182cb659cb0713eff923']='apps_groups.conf'
   ['f66e5236ba1245bb2e5fd99191f114c6']='charts.d/hddtemp.conf'
+  ['f68ac0fca6b4ffc96097779344cabac6']='health.d/tcp_listen.conf'
   ['f6c6656f900ff52d159dca12d624016a']='python.d/postgres.conf'
   ['f7401a6e7c7d4fe2e0e2be7f7f523275']='health.d/web_log.conf'
   ['f7a99e94231beda85c6254912d8d31c1']='python.d/tomcat.conf'
