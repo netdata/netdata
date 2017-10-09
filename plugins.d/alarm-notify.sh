@@ -224,6 +224,7 @@ SEND_PUSHOVER="YES"
 SEND_TWILIO="YES"
 SEND_HIPCHAT="YES"
 SEND_MESSAGEBIRD="YES"
+SEND_KAVENEGAR="YES"
 SEND_TELEGRAM="YES"
 SEND_EMAIL="YES"
 SEND_PUSHBULLET="YES"
@@ -269,6 +270,12 @@ MESSAGEBIRD_ACCESS_KEY=
 MESSAGEBIRD_NUMBER=
 DEFAULT_RECIPIENT_MESSAGEBIRD=
 declare -A role_recipients_messagebird=()
+
+# kavenegar configs
+KAVENEGAR_API_KEY=""
+KAVENEGAR_SENDER=""
+DEFAULT_RECIPIENT_KAVENEGAR=()
+declare -A role_recipients_kavenegar=""
 
 # telegram configs
 TELEGRAM_BOT_TOKEN=
@@ -382,6 +389,7 @@ declare -A arr_pd=()
 declare -A arr_email=()
 declare -A arr_custom=()
 declare -A arr_messagebird=()
+declare -A arr_kavenegar=()
 
 # netdata may call us with multiple roles, and roles may have multiple but
 # overlapping recipients - so, here we find the unique recipients.
@@ -437,6 +445,14 @@ do
     for r in ${a//,/ }
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality messagebird "${r}" && arr_messagebird[${r/|*/}]="1"
+    done
+
+    # kavenegar
+    a="${role_recipients_kavenegar[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_KAVENEGAR}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality kavenegar "${r}" && arr_kavenegar[${r/|*/}]="1"
     done
 
     # telegram
@@ -509,6 +525,10 @@ to_hipchat="${!arr_hipchat[*]}"
 to_messagebird="${!arr_messagebird[*]}"
 [ -z "${to_messagebird}" ] && SEND_MESSAGEBIRD="NO"
 
+# build the list of kavenegar recipients (phone numbers)
+to_kavenegar="${!arr_kavenegar[*]}"
+[ -z "${to_kavenegar}" ] && SEND_KAVENEGAR="NO"
+
 # check array of telegram recipients (chat ids)
 to_telegram="${!arr_telegram[*]}"
 [ -z "${to_telegram}" ] && SEND_TELEGRAM="NO"
@@ -555,6 +575,9 @@ done
 # check messagebird
 [ -z "${MESSAGEBIRD_ACCESS_KEY}" -o -z "${MESSAGEBIRD_NUMBER}" ] && SEND_MESSAGEBIRD="NO"
 
+# check kavenegar
+[ -z "${KAVENEGAR_API_KEY}" -o -z "${KAVENEGAR_SENDER}" ] && SEND_KAVENEGAR="NO"
+
 # check telegram
 [ -z "${TELEGRAM_BOT_TOKEN}" ] && SEND_TELEGRAM="NO"
 
@@ -582,6 +605,7 @@ if [ \( \
         -o "${SEND_HIPCHAT}"     = "YES" \
         -o "${SEND_TWILIO}"      = "YES" \
         -o "${SEND_MESSAGEBIRD}" = "YES" \
+        -o "${SEND_KAVENEGAR}"   = "YES" \
         -o "${SEND_TELEGRAM}"    = "YES" \
         -o "${SEND_PUSHBULLET}"  = "YES" \
         -o "${SEND_KAFKA}"       = "YES" \
@@ -599,6 +623,7 @@ if [ \( \
         SEND_TWILIO="NO"
         SEND_HIPCHAT="NO"
         SEND_MESSAGEBIRD="NO"
+        SEND_KAVENEGAR="NO"
         SEND_KAFKA="NO"
     fi
 fi
@@ -623,6 +648,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_TWILIO}"         != "YES" \
     -a "${SEND_HIPCHAT}"        != "YES" \
     -a "${SEND_MESSAGEBIRD}"    != "YES" \
+    -a "${SEND_KAVENEGAR}"      != "YES" \
     -a "${SEND_PUSHBULLET}"     != "YES" \
     -a "${SEND_KAFKA}"          != "YES" \
     -a "${SEND_PD}"             != "YES" \
@@ -1054,6 +1080,36 @@ send_messagebird() {
 }
 
 # -----------------------------------------------------------------------------
+# kavenegar sender
+
+send_kavenegar() {
+    local API_KEY="${1}" kavenegarsender="${2}" recipients="${3}"  title="${4}" message="${5}" httpcode sent=0 user
+    if [ "${SEND_KAVENEGAR}" = "YES" -a ! -z "${API_KEY}" -a ! -z "${kavenegarsender}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
+        then
+        # http://api.kavenegar.com/v1/{API-KEY}/sms/send.json
+        for user in ${recipients}
+        do
+            httpcode=$(docurl -X POST http://api.kavenegar.com/v1/${API_KEY}/sms/send.json \
+                --data-urlencode "sender=${kavenegarsender}" \
+                --data-urlencode "receptor=${user}" \
+                --data-urlencode "message=${title} ${message}")
+
+            if [ "${httpcode}" == "201" ]
+            then
+                info "sent Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+                sent=$((sent + 1))
+            else
+                error "failed to send Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with HTTP error code ${httpcode}."
+            fi
+        done
+
+        [ ${sent} -gt 0 ] && return 0
+    fi
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # telegram sender
 
 send_telegram() {
@@ -1384,6 +1440,18 @@ SENT_MESSAGEBIRD=$?
 
 
 # -----------------------------------------------------------------------------
+# send the kavenegar SMS
+
+send_kavenegar "${KAVENEGAR_API_KEY}" "${KAVENEGAR_SENDER}" "${to_kavenegar}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm} 
+Severity: ${severity}
+Chart: ${chart}
+Family: ${family}
+${info}"
+
+SENT_KAVENEGAR=$?
+
+
+# -----------------------------------------------------------------------------
 # send the telegram.org message
 
 # https://core.telegram.org/bots/api#formatting-options
@@ -1574,6 +1642,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_TWILIO}       -eq 0 \
     -o ${SENT_HIPCHAT}      -eq 0 \
     -o ${SENT_MESSAGEBIRD}  -eq 0 \
+    -o ${SENT_KAVENEGAR}    -eq 0 \
     -o ${SENT_PUSHBULLET}   -eq 0 \
     -o ${SENT_KAFKA}        -eq 0 \
     -o ${SENT_PD}           -eq 0 \

@@ -580,7 +580,7 @@ extern void __rrd_check_wrlock(const char *file, const char *function, const uns
 // ----------------------------------------------------------------------------
 // RRDSET functions
 
-extern void rrdset_set_name(RRDSET *st, const char *name);
+extern int rrdset_set_name(RRDSET *st, const char *name);
 
 extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , const char *type
