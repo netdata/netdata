@@ -18,6 +18,7 @@ extern int do_vm_vmtotal(int update_every, usec_t dt);
 extern int do_kern_cp_time(int update_every, usec_t dt);
 extern int do_kern_cp_times(int update_every, usec_t dt);
 extern int do_dev_cpu_temperature(int update_every, usec_t dt);
+extern int do_dev_cpu_0_freq(int update_every, usec_t dt);
 extern int do_hw_intcnt(int update_every, usec_t dt);
 extern int do_vm_stats_sys_v_intr(int update_every, usec_t dt);
 extern int do_vm_stats_sys_v_soft(int update_every, usec_t dt);
