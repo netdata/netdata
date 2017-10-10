@@ -2748,7 +2748,7 @@
 
                     document.getElementById('browser_timezone').innerText = NETDATA.options.browser_timezone;
                     document.getElementById('server_timezone').innerText = NETDATA.options.server_timezone;
-                    document.getElementById('current_timezone').innerText = NETDATA.options.current.timezone;
+                    document.getElementById('current_timezone').innerText = (NETDATA.options.current.timezone === 'default')?'unset, using browser default':NETDATA.options.current.timezone;
 
                     if(self.prop('checked') === NETDATA.dateTime.using_timezone) {
                         self.bootstrapToggle(NETDATA.dateTime.using_timezone ? 'off' : 'on');
@@ -3021,7 +3021,7 @@
                 }
             }
 
-            document.getElementById('current_timezone').innerText = NETDATA.options.current.timezone;
+            document.getElementById('current_timezone').innerText = (NETDATA.options.current.timezone === 'default')?'unset, using browser default':NETDATA.options.current.timezone;
             return false;
         }
 
