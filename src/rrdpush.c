@@ -294,7 +294,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&tags=%s HTTP/1.1\r\n"
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s HTTP/1.1\r\n"
                     "User-Agent: netdata-push-service/%s\r\n"
                     "Accept: */*\r\n\r\n"
               , host->rrdpush_send_api_key
@@ -303,6 +303,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , host->machine_guid
               , default_rrd_update_every
               , host->os
+              , host->timezone
               , (host->tags)?host->tags:""
               , program_version
     );
@@ -634,7 +635,7 @@ static void log_stream_connection(const char *client_ip, const char *client_port
     log_access("STREAM: %d '[%s]:%s' '%s' host '%s' api key '%s' machine guid '%s'", gettid(), client_ip, client_port, msg, host, api_key, machine_guid);
 }
 
-static int rrdpush_receive(int fd, const char *key, const char *hostname, const char *registry_hostname, const char *machine_guid, const char *os, const char *tags, int update_every, char *client_ip, char *client_port) {
+static int rrdpush_receive(int fd, const char *key, const char *hostname, const char *registry_hostname, const char *machine_guid, const char *os, const char *timezone, const char *tags, int update_every, char *client_ip, char *client_port) {
     RRDHOST *host;
     int history = default_rrd_history_entries;
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
@@ -680,6 +681,7 @@ static int rrdpush_receive(int fd, const char *key, const char *hostname, const 
                 , registry_hostname
                 , machine_guid
                 , os
+                , timezone
                 , tags
                 , update_every
                 , history
@@ -803,6 +805,7 @@ struct rrdpush_thread {
     char *registry_hostname;
     char *machine_guid;
     char *os;
+    char *timezone;
     char *tags;
     char *client_ip;
     char *client_port;
@@ -820,7 +823,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
 
 
     info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
-    rrdpush_receive(rpt->fd, rpt->key, rpt->hostname, rpt->registry_hostname, rpt->machine_guid, rpt->os, rpt->tags, rpt->update_every, rpt->client_ip, rpt->client_port);
+    rrdpush_receive(rpt->fd, rpt->key, rpt->hostname, rpt->registry_hostname, rpt->machine_guid, rpt->os, rpt->timezone, rpt->tags, rpt->update_every, rpt->client_ip, rpt->client_port);
     info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
     freez(rpt->key);
@@ -828,6 +831,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
     freez(rpt->registry_hostname);
     freez(rpt->machine_guid);
     freez(rpt->os);
+    freez(rpt->timezone);
     freez(rpt->tags);
     freez(rpt->client_ip);
     freez(rpt->client_port);
@@ -863,7 +867,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
     info("STREAM [receive from [%s]:%s]: new client connection.", w->client_ip, w->client_port);
 
-    char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *tags = NULL;
+    char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
     int update_every = default_rrd_update_every;
     char buf[GUID_LEN + 1];
 
@@ -887,6 +891,8 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
             update_every = (int)strtoul(value, NULL, 0);
         else if(!strcmp(name, "os"))
             os = value;
+        else if(!strcmp(name, "timezone"))
+            timezone = value;
         else if(!strcmp(name, "tags"))
             tags = value;
         else
@@ -968,6 +974,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
     rpt->machine_guid      = strdupz(machine_guid);
     rpt->os                = strdupz(os);
+    rpt->timezone          = strdupz(timezone);
     rpt->tags              = (tags)?strdupz(tags):NULL;
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);

@@ -17,6 +17,7 @@ char *netdata_configured_cache_dir   = NULL;
 char *netdata_configured_varlib_dir  = NULL;
 char *netdata_configured_home_dir    = NULL;
 char *netdata_configured_host_prefix = NULL;
+char *netdata_configured_timezone    = NULL;
 
 int enable_ksm = 1;
 
