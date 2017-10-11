@@ -496,6 +496,88 @@ static void get_netdata_configured_variables() {
     get_system_pid_max();
 }
 
+static void get_system_timezone(void) {
+    // avoid flood calls to stat(/etc/localtime)
+    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
+    const char *tz = getenv("TZ");
+    if(!tz || !*tz)
+        setenv("TZ", config_get(CONFIG_SECTION_GLOBAL, "TZ environment variable", ":/etc/localtime"), 0);
+
+    char buffer[FILENAME_MAX + 1];
+    const char *timezone = NULL;
+    ssize_t ret;
+
+    // use the TZ variable
+    if(tz && *tz && *tz != ':') {
+        timezone = tz;
+        // info("TIMEZONE: using TZ variable '%s'", timezone);
+    }
+
+    // use the contents of /etc/timezone
+    if(!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
+        timezone = buffer;
+        // info("TIMEZONE: using the contents of /etc/timezone: '%s'", timezone);
+    }
+
+    // read the link /etc/localtime
+    if(!timezone && (ret = readlink("/etc/localtime", buffer, FILENAME_MAX)) > 0) {
+        buffer[ret] = '\0';
+
+        char *cmp = "/usr/share/zoneinfo/";
+        size_t cmp_len = strlen(cmp);
+
+        char *s = strstr(buffer, cmp);
+        if(s && s[cmp_len]) {
+            timezone = &s[cmp_len];
+            // info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
+        }
+    }
+
+    // find the timezone from strftime()
+    if(!timezone) {
+        time_t t;
+        struct tm *tmp, tmbuf;
+
+        t = now_realtime_sec();
+        tmp = localtime_r(&t, &tmbuf);
+
+        if (tmp != NULL) {
+            if(strftime(buffer, FILENAME_MAX, "%Z", tmp) == 0)
+                buffer[0] = '\0';
+            else {
+                buffer[FILENAME_MAX] = '\0';
+                timezone = buffer;
+                // info("TIMEZONE: using strftime(): '%s'", timezone);
+            }
+        }
+    }
+
+    if(timezone && *timezone) {
+        // make sure it does not have illegal characters
+        // info("TIMEZONE: fixing '%s'", timezone);
+
+        char tmp[strlen(timezone) + 1];
+        char *d = tmp;
+        *d = '\0';
+
+        while(*timezone) {
+            if(isalnum(*timezone) || *timezone == '_' || *timezone == '/')
+                *d++ = *timezone++;
+            else
+                timezone++;
+        }
+        *d = '\0';
+        strcpy(buffer, tmp);
+        timezone = buffer;
+        // info("TIMEZONE: fixed as '%s'", timezone);
+    }
+
+    if(!timezone || !*timezone)
+        timezone = "unknown";
+
+    netdata_configured_timezone = config_get(CONFIG_SECTION_GLOBAL, "timezone", timezone);
+}
+
 void set_global_environment() {
     {
         char b[16];
@@ -513,11 +595,7 @@ void set_global_environment() {
     setenv("HOME"               , verify_required_directory(netdata_configured_home_dir),    1);
     setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
-    // avoid flood calls to stat(/etc/localtime)
-    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-    const char *tz = getenv("TZ");
-    if(!tz || !*tz)
-        setenv("TZ", config_get(CONFIG_SECTION_GLOBAL, "TZ environment variable", ":/etc/localtime"), 0);
+    get_system_timezone();
 
     // set the path we need
     char path[1024 + 1], *p = getenv("PATH");

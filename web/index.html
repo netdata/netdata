@@ -265,6 +265,11 @@
         max-height: 80vh;
         overflow-x: hidden;
     }
+    .scrollable-menu-50 {
+        height: auto;
+        max-height: 50vh;
+        overflow-x: hidden;
+    }
 
     /* Back to top (hidden on mobile) */
     .back-to-top,
@@ -1333,6 +1338,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.io.mainhead"'
                 + ' role="application"></div>';
 
                 head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.io"'
@@ -1343,6 +1349,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.io.mainhead"'
                 + ' role="application"></div>';
             }
 
@@ -1367,6 +1374,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.ipv4.mainhead"'
                 + ' role="application"></div>';
 
                 head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ipv4"'
@@ -1377,6 +1385,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.ipv4.mainhead"'
                 + ' role="application"></div>';
             }
             else if(typeof charts['system.ipv6'] !== 'undefined') {
@@ -1389,6 +1398,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.ipv6.mainhead"'
                 + ' role="application"></div>';
 
                 head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.ipv6"'
@@ -1400,6 +1410,7 @@
                 + ' data-before="0"'
                 + ' data-after="-' + duration.toString() + '"'
                 + ' data-points="' + duration.toString() + '"'
+                + ' data-common-units="system.ipv6.mainhead"'
                 + ' role="application"></div>';
             }
 
@@ -2718,6 +2729,31 @@
 
                     self.bootstrapToggle(netdataTheme === 'slate'?'on':'off');
                 };
+                var units_sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    if(self.prop('checked') !== (NETDATA.getOption('units') === 'auto')) {
+                        self.bootstrapToggle(NETDATA.getOption('units') === 'auto' ? 'on' : 'off');
+                    }
+                };
+                var temp_sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    if(self.prop('checked') !== (NETDATA.getOption('temperature') === 'celsius')) {
+                        self.bootstrapToggle(NETDATA.getOption('temperature') === 'celsius' ? 'on' : 'off');
+                    }
+                };
+                var timezone_sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    document.getElementById('browser_timezone').innerText = NETDATA.options.browser_timezone;
+                    document.getElementById('server_timezone').innerText = NETDATA.options.server_timezone;
+                    document.getElementById('current_timezone').innerText = (NETDATA.options.current.timezone === 'default')?'unset, using browser default':NETDATA.options.current.timezone;
+
+                    if(self.prop('checked') === NETDATA.dateTime.using_timezone) {
+                        self.bootstrapToggle(NETDATA.dateTime.using_timezone ? 'off' : 'on');
+                    }
+                };
 
                 sync_option('eliminate_zero_dimensions');
                 sync_option('destroy_on_hide');
@@ -2730,7 +2766,11 @@
                 sync_option('smooth_plot');
                 sync_option('pan_and_zoom_data_padding');
                 sync_option('show_help');
+                sync_option('seconds_as_time');
                 theme_sync_option('netdata_theme_control');
+                units_sync_option('units_conversion');
+                temp_sync_option('units_temp');
+                timezone_sync_option('local_timezone');
 
                 if(NETDATA.getOption('parallel_refresher') === false) {
                     $('#concurrent_refreshes_row').hide();
@@ -2757,6 +2797,22 @@
             });
             $('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
             $('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
+            $('#seconds_as_time').change(function()                 { NETDATA.setOption('seconds_as_time', $(this).prop('checked')); });
+            $('#local_timezone').change(function() {
+                if($(this).prop('checked'))
+                    selected_server_timezone('default', true);
+                else
+                    selected_server_timezone('default', false);
+            });
+
+
+            $('#units_conversion').change(function()                {
+                NETDATA.setOption('units', $(this).prop('checked')?'auto':'original');
+            });
+            $('#units_temp').change(function()                {
+                NETDATA.setOption('temperature', $(this).prop('checked')?'celsius':'fahrenheit');
+            });
+
             $('#show_help').change(function()                       {
                 urlOptions.help = $(this).prop('checked');
                 urlOptions.hashUpdate();
@@ -2919,9 +2975,60 @@
             }
         };
 
+        var selected_server_timezone = function(timezone, status) {
+            // console.log(timezone + " " + ((typeof status === 'undefined')?'undefined':status).toString());
+
+            // clear the error
+            document.getElementById('timezone_error_message').innerHTML = '';
+
+            if (typeof status === 'undefined') {
+                // the user selected a timezone from the menu
+
+                if (NETDATA.dateTime.init(timezone) === false) {
+                    NETDATA.dateTime.init();
+
+                    if(!$('#local_timezone').prop('checked'))
+                        $('#local_timezone').bootstrapToggle('on');
+
+                    document.getElementById('timezone_error_message').innerHTML = 'Ooops! That timezone was not accepted by your browser. Please open a github issue to help us fix it.';
+                    NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
+                }
+                else {
+                    NETDATA.setOption('user_set_server_timezone', timezone);
+
+                    if($('#local_timezone').prop('checked'))
+                        $('#local_timezone').bootstrapToggle('off');
+                }
+            }
+            else {
+                if (status === true) {
+                    NETDATA.dateTime.init();
+                }
+                else {
+                    if (NETDATA.options.current.user_set_server_timezone === 'default')
+                        NETDATA.options.current.user_set_server_timezone = NETDATA.options.server_timezone;
+
+                    timezone = NETDATA.options.current.user_set_server_timezone;
+                    if (NETDATA.dateTime.init(timezone) === false) {
+                        NETDATA.dateTime.init();
+
+                        if(!$('#local_timezone').prop('checked'))
+                            $('#local_timezone').bootstrapToggle('on');
+
+                        document.getElementById('timezone_error_message').innerHTML = 'Sorry. The timezone "' + timezone.toString() + '" is not accepted by your browser. Please select one from the list.';
+                        NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
+                    }
+                }
+            }
+
+            document.getElementById('current_timezone').innerText = (NETDATA.options.current.timezone === 'default')?'unset, using browser default':NETDATA.options.current.timezone;
+            return false;
+        }
+
         // our entry point
         // var netdataStarted = performance.now();
         var netdataCallback = initializeDynamicDashboard;
+
     </script>
 </head>
 
@@ -3289,6 +3396,7 @@
                         <li role="presentation" class="active"><a href="#settings_performance" aria-controls="settings_performance" role="tab" data-toggle="tab">Performance</a></li>
                         <li role="presentation"><a href="#settings_sync" aria-controls="settings_sync" role="tab" data-toggle="tab">Synchronization</a></li>
                         <li role="presentation"><a href="#settings_visual" aria-controls="settings_visual" role="tab" data-toggle="tab">Visual</a></li>
+                        <li role="presentation"><a href="#settings_locale" aria-controls="settings_locale" role="tab" data-toggle="tab">Locale</a></li>
                     </ul>
 
                     <!-- Tab panes -->
@@ -3394,6 +3502,416 @@
                                             <br/>
                                             Keep in mind <a href="http://dygraphs.com" target="_blank">dygraphs</a>, the main charting library in netdata dashboards, can only smooth line charts. It cannot smooth area or stacked charts. When set to <b>Rough</b>, this setting can lower the CPU resources consumed by your browser.</small>
                                         </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </form>
+                        </div>
+                        <div role="tabpanel" class="tab-pane" id="settings_locale">
+                            <form id="optionsForm4" method="get" class="form-horizontal">
+                                <div class="form-group">
+                                    <table>
+                                        <tr class="option-row">
+                                            <td colspan="2" align="center">
+                                                <small>
+                                                    <b>These settings are applied gradually, as charts are updated. To force them, refresh the dashboard now</b>.
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        <tr class="option-row">
+                                            <td class="option-control"><input id="units_conversion" type="checkbox" checked data-toggle="toggle"  data-on="Scale Units" data-off="Fixed Units" data-onstyle="success" data-width="110px"></td>
+                                            <td class="option-info"><strong>Enable auto-scaling of select units?</strong><br/>
+                                                <small>When set to <b>Scale Units</b> the values shown will dynamically be scaled (e.g. 1000 kilobits will be shown as 1 megabit).
+                                                    Netdata can auto-scale these original units: <code>kilobits/s</code>, <code>kilobytes/s</code>, <code>KB/s</code>,
+                                                    <code>KB</code>, <code>MB</code>, and <code>GB</code>.
+                                                    When set to <b>Fixed Units</b> all the values will be rendered using the original units maintained by the netdata server.
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        <tr class="option-row">
+                                            <td class="option-control"><input id="units_temp" type="checkbox" checked data-toggle="toggle"  data-on="Celsius" data-off="Fahrenheit" data-width="110px"></td>
+                                            <td class="option-info"><strong>Which units to use for temperatures?</strong><br/>
+                                                <small>Set the temperature units of the dashboard.
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        <tr class="option-row">
+                                            <td class="option-control"><input id="seconds_as_time" type="checkbox" checked data-toggle="toggle"  data-on="Time" data-off="Seconds" data-onstyle="success" data-width="110px"></td>
+                                            <td class="option-info"><strong>Convert seconds to time?</strong><br/>
+                                                <small>When set to <b>Time</b>, charts that present <code>seconds</code> will show <code>DDd:HH:MM:SS</code>.
+                                                    When set to <b>Seconds</b>, the raw number of seconds will be presented.
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        <tr class="option-row">
+                                            <td class="option-control"><input id="local_timezone" type="checkbox" checked data-toggle="toggle"  data-on="Your Time" data-off="Server Time" data-onstyle="success" data-offstyle="danger" data-width="110px"></td>
+                                            <td class="option-info"><strong>Show browser local time or server time?</strong><br/>
+                                                <small>When set to <b>Your Time</b>, the charts will use your browser local time. When set to <b>Server Time</b> the charts will use the server time.
+                                                    <br/>
+                                                    Set it to <b>Your Time</b> to have a common time-reference, no matter where the server is and which time zone it uses (all your dashboards will report your local time).
+                                                    Set it to <b>Server Time</b> when you need to compare netdata charts with server log files.
+                                                    <br/>
+                                                    Your browser time zone is: <b><span id="browser_timezone">-</span></b>.</br>
+                                                    The server reported timezone is: <b><span id="server_timezone">-</span></b> (you can set this in netdata.conf <code>[global].timezone</code>).<br/>
+                                                    The current time zone on the dashboard is: <b><span id="current_timezone">-</span></b>.
+                                                    <br/>
+                                                    <div class="dropup">
+                                                        <button class="btn btn-default dropdown-toggle" type="button" id="dropdownTimeZone" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                                            Select Server Time Zone
+                                                            <span class="caret"></span>
+                                                        </button>
+                                                        <ul class="dropdown-menu scrollable-menu-50" aria-labelledby="dropdownTimeZone">
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Abidjan');">Africa/Abidjan</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Accra');">Africa/Accra</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Algiers');">Africa/Algiers</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Bissau');">Africa/Bissau</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Cairo');">Africa/Cairo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Casablanca');">Africa/Casablanca</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Ceuta');">Africa/Ceuta</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/El_Aaiun');">Africa/El_Aaiun</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Johannesburg');">Africa/Johannesburg</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Khartoum');">Africa/Khartoum</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Lagos');">Africa/Lagos</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Maputo');">Africa/Maputo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Monrovia');">Africa/Monrovia</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Nairobi');">Africa/Nairobi</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Ndjamena');">Africa/Ndjamena</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Tripoli');">Africa/Tripoli</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Tunis');">Africa/Tunis</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Africa/Windhoek');">Africa/Windhoek</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Adak');">America/Adak</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Anchorage');">America/Anchorage</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Araguaina');">America/Araguaina</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/Buenos_Aires');">America/Argentina/Buenos_Aires</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/Catamarca');">America/Argentina/Catamarca</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/Cordoba');">America/Argentina/Cordoba</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/Jujuy');">America/Argentina/Jujuy</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/La_Rioja');">America/Argentina/La_Rioja</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/Mendoza');">America/Argentina/Mendoza</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/Rio_Gallegos');">America/Argentina/Rio_Gallegos</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/Salta');">America/Argentina/Salta</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/San_Juan');">America/Argentina/San_Juan</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/San_Luis');">America/Argentina/San_Luis</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/Tucuman');">America/Argentina/Tucuman</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Argentina/Ushuaia');">America/Argentina/Ushuaia</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Asuncion');">America/Asuncion</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Atikokan');">America/Atikokan</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Bahia');">America/Bahia</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Bahia_Banderas');">America/Bahia_Banderas</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Barbados');">America/Barbados</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Belem');">America/Belem</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Belize');">America/Belize</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Blanc-Sablon');">America/Blanc-Sablon</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Boa_Vista');">America/Boa_Vista</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Bogota');">America/Bogota</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Boise');">America/Boise</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Cambridge_Bay');">America/Cambridge_Bay</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Campo_Grande');">America/Campo_Grande</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Cancun');">America/Cancun</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Caracas');">America/Caracas</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Cayenne');">America/Cayenne</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Chicago');">America/Chicago</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Chihuahua');">America/Chihuahua</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Costa_Rica');">America/Costa_Rica</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Creston');">America/Creston</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Cuiaba');">America/Cuiaba</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Curacao');">America/Curacao</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Danmarkshavn');">America/Danmarkshavn</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Dawson');">America/Dawson</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Dawson_Creek');">America/Dawson_Creek</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Denver');">America/Denver</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Detroit');">America/Detroit</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Edmonton');">America/Edmonton</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Eirunepe');">America/Eirunepe</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/El_Salvador');">America/El_Salvador</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Fortaleza');">America/Fortaleza</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Fort_Nelson');">America/Fort_Nelson</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Glace_Bay');">America/Glace_Bay</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Godthab');">America/Godthab</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Goose_Bay');">America/Goose_Bay</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Grand_Turk');">America/Grand_Turk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Guatemala');">America/Guatemala</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Guayaquil');">America/Guayaquil</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Guyana');">America/Guyana</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Halifax');">America/Halifax</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Havana');">America/Havana</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Hermosillo');">America/Hermosillo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Indiana/Indianapolis');">America/Indiana/Indianapolis</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Indiana/Knox');">America/Indiana/Knox</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Indiana/Marengo');">America/Indiana/Marengo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Indiana/Petersburg');">America/Indiana/Petersburg</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Indiana/Tell_City');">America/Indiana/Tell_City</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Indiana/Vevay');">America/Indiana/Vevay</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Indiana/Vincennes');">America/Indiana/Vincennes</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Indiana/Winamac');">America/Indiana/Winamac</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Inuvik');">America/Inuvik</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Iqaluit');">America/Iqaluit</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Jamaica');">America/Jamaica</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Juneau');">America/Juneau</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Kentucky/Louisville');">America/Kentucky/Louisville</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Kentucky/Monticello');">America/Kentucky/Monticello</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/La_Paz');">America/La_Paz</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Lima');">America/Lima</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Los_Angeles');">America/Los_Angeles</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Maceio');">America/Maceio</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Managua');">America/Managua</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Manaus');">America/Manaus</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Martinique');">America/Martinique</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Matamoros');">America/Matamoros</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Mazatlan');">America/Mazatlan</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Menominee');">America/Menominee</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Merida');">America/Merida</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Metlakatla');">America/Metlakatla</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Mexico_City');">America/Mexico_City</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Miquelon');">America/Miquelon</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Moncton');">America/Moncton</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Monterrey');">America/Monterrey</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Montevideo');">America/Montevideo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Nassau');">America/Nassau</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/New_York');">America/New_York</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Nipigon');">America/Nipigon</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Nome');">America/Nome</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Noronha');">America/Noronha</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/North_Dakota/Beulah');">America/North_Dakota/Beulah</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/North_Dakota/Center');">America/North_Dakota/Center</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/North_Dakota/New_Salem');">America/North_Dakota/New_Salem</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Ojinaga');">America/Ojinaga</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Panama');">America/Panama</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Pangnirtung');">America/Pangnirtung</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Paramaribo');">America/Paramaribo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Phoenix');">America/Phoenix</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Port-au-Prince');">America/Port-au-Prince</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Port_of_Spain');">America/Port_of_Spain</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Porto_Velho');">America/Porto_Velho</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Puerto_Rico');">America/Puerto_Rico</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Punta_Arenas');">America/Punta_Arenas</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Rainy_River');">America/Rainy_River</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Rankin_Inlet');">America/Rankin_Inlet</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Recife');">America/Recife</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Regina');">America/Regina</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Resolute');">America/Resolute</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Rio_Branco');">America/Rio_Branco</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Santarem');">America/Santarem</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Santiago');">America/Santiago</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Santo_Domingo');">America/Santo_Domingo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Sao_Paulo');">America/Sao_Paulo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Scoresbysund');">America/Scoresbysund</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Sitka');">America/Sitka</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/St_Johns');">America/St_Johns</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Swift_Current');">America/Swift_Current</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Tegucigalpa');">America/Tegucigalpa</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Thule');">America/Thule</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Thunder_Bay');">America/Thunder_Bay</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Tijuana');">America/Tijuana</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Toronto');">America/Toronto</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Vancouver');">America/Vancouver</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Whitehorse');">America/Whitehorse</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Winnipeg');">America/Winnipeg</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Yakutat');">America/Yakutat</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('America/Yellowknife');">America/Yellowknife</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/Casey');">Antarctica/Casey</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/Davis');">Antarctica/Davis</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/DumontDUrville');">Antarctica/DumontDUrville</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/Macquarie');">Antarctica/Macquarie</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/Mawson');">Antarctica/Mawson</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/Palmer');">Antarctica/Palmer</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/Rothera');">Antarctica/Rothera</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/Syowa');">Antarctica/Syowa</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/Troll');">Antarctica/Troll</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Antarctica/Vostok');">Antarctica/Vostok</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Almaty');">Asia/Almaty</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Amman');">Asia/Amman</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Anadyr');">Asia/Anadyr</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Aqtau');">Asia/Aqtau</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Aqtobe');">Asia/Aqtobe</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Ashgabat');">Asia/Ashgabat</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Atyrau');">Asia/Atyrau</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Baghdad');">Asia/Baghdad</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Baku');">Asia/Baku</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Bangkok');">Asia/Bangkok</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Barnaul');">Asia/Barnaul</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Beirut');">Asia/Beirut</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Bishkek');">Asia/Bishkek</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Brunei');">Asia/Brunei</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Chita');">Asia/Chita</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Choibalsan');">Asia/Choibalsan</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Colombo');">Asia/Colombo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Damascus');">Asia/Damascus</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Dhaka');">Asia/Dhaka</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Dili');">Asia/Dili</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Dubai');">Asia/Dubai</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Dushanbe');">Asia/Dushanbe</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Famagusta');">Asia/Famagusta</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Gaza');">Asia/Gaza</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Hebron');">Asia/Hebron</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Ho_Chi_Minh');">Asia/Ho_Chi_Minh</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Hong_Kong');">Asia/Hong_Kong</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Hovd');">Asia/Hovd</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Irkutsk');">Asia/Irkutsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Jakarta');">Asia/Jakarta</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Jayapura');">Asia/Jayapura</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Jerusalem');">Asia/Jerusalem</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Kabul');">Asia/Kabul</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Kamchatka');">Asia/Kamchatka</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Karachi');">Asia/Karachi</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Kathmandu');">Asia/Kathmandu</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Khandyga');">Asia/Khandyga</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Kolkata');">Asia/Kolkata</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Krasnoyarsk');">Asia/Krasnoyarsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Kuala_Lumpur');">Asia/Kuala_Lumpur</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Kuching');">Asia/Kuching</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Macau');">Asia/Macau</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Magadan');">Asia/Magadan</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Makassar');">Asia/Makassar</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Manila');">Asia/Manila</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Nicosia');">Asia/Nicosia</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Novokuznetsk');">Asia/Novokuznetsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Novosibirsk');">Asia/Novosibirsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Omsk');">Asia/Omsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Oral');">Asia/Oral</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Pontianak');">Asia/Pontianak</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Pyongyang');">Asia/Pyongyang</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Qatar');">Asia/Qatar</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Qyzylorda');">Asia/Qyzylorda</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Riyadh');">Asia/Riyadh</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Sakhalin');">Asia/Sakhalin</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Samarkand');">Asia/Samarkand</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Seoul');">Asia/Seoul</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Shanghai');">Asia/Shanghai</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Singapore');">Asia/Singapore</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Srednekolymsk');">Asia/Srednekolymsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Taipei');">Asia/Taipei</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Tashkent');">Asia/Tashkent</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Tbilisi');">Asia/Tbilisi</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Tehran');">Asia/Tehran</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Thimphu');">Asia/Thimphu</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Tokyo');">Asia/Tokyo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Tomsk');">Asia/Tomsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Ulaanbaatar');">Asia/Ulaanbaatar</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Urumqi');">Asia/Urumqi</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Ust-Nera');">Asia/Ust-Nera</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Vladivostok');">Asia/Vladivostok</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Yakutsk');">Asia/Yakutsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Yangon');">Asia/Yangon</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Yekaterinburg');">Asia/Yekaterinburg</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Asia/Yerevan');">Asia/Yerevan</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Atlantic/Azores');">Atlantic/Azores</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Atlantic/Bermuda');">Atlantic/Bermuda</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Atlantic/Canary');">Atlantic/Canary</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Atlantic/Cape_Verde');">Atlantic/Cape_Verde</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Atlantic/Faroe');">Atlantic/Faroe</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Atlantic/Madeira');">Atlantic/Madeira</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Atlantic/Reykjavik');">Atlantic/Reykjavik</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Atlantic/South_Georgia');">Atlantic/South_Georgia</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Atlantic/Stanley');">Atlantic/Stanley</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Adelaide');">Australia/Adelaide</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Brisbane');">Australia/Brisbane</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Broken_Hill');">Australia/Broken_Hill</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Currie');">Australia/Currie</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Darwin');">Australia/Darwin</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Eucla');">Australia/Eucla</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Hobart');">Australia/Hobart</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Lindeman');">Australia/Lindeman</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Lord_Howe');">Australia/Lord_Howe</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Melbourne');">Australia/Melbourne</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Perth');">Australia/Perth</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Australia/Sydney');">Australia/Sydney</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Amsterdam');">Europe/Amsterdam</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Andorra');">Europe/Andorra</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Astrakhan');">Europe/Astrakhan</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Athens');">Europe/Athens</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Belgrade');">Europe/Belgrade</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Berlin');">Europe/Berlin</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Brussels');">Europe/Brussels</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Bucharest');">Europe/Bucharest</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Budapest');">Europe/Budapest</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Chisinau');">Europe/Chisinau</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Copenhagen');">Europe/Copenhagen</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Dublin');">Europe/Dublin</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Gibraltar');">Europe/Gibraltar</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Helsinki');">Europe/Helsinki</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Istanbul');">Europe/Istanbul</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Kaliningrad');">Europe/Kaliningrad</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Kiev');">Europe/Kiev</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Kirov');">Europe/Kirov</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Lisbon');">Europe/Lisbon</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/London');">Europe/London</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Luxembourg');">Europe/Luxembourg</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Madrid');">Europe/Madrid</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Malta');">Europe/Malta</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Minsk');">Europe/Minsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Monaco');">Europe/Monaco</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Moscow');">Europe/Moscow</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Oslo');">Europe/Oslo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Paris');">Europe/Paris</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Prague');">Europe/Prague</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Riga');">Europe/Riga</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Rome');">Europe/Rome</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Samara');">Europe/Samara</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Saratov');">Europe/Saratov</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Simferopol');">Europe/Simferopol</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Sofia');">Europe/Sofia</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Stockholm');">Europe/Stockholm</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Tallinn');">Europe/Tallinn</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Tirane');">Europe/Tirane</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Ulyanovsk');">Europe/Ulyanovsk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Uzhgorod');">Europe/Uzhgorod</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Vienna');">Europe/Vienna</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Vilnius');">Europe/Vilnius</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Volgograd');">Europe/Volgograd</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Warsaw');">Europe/Warsaw</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Zaporozhye');">Europe/Zaporozhye</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Europe/Zurich');">Europe/Zurich</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Indian/Chagos');">Indian/Chagos</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Indian/Christmas');">Indian/Christmas</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Indian/Cocos');">Indian/Cocos</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Indian/Kerguelen');">Indian/Kerguelen</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Indian/Mahe');">Indian/Mahe</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Indian/Maldives');">Indian/Maldives</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Indian/Mauritius');">Indian/Mauritius</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Indian/Reunion');">Indian/Reunion</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Apia');">Pacific/Apia</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Auckland');">Pacific/Auckland</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Bougainville');">Pacific/Bougainville</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Chatham');">Pacific/Chatham</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Chuuk');">Pacific/Chuuk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Easter');">Pacific/Easter</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Efate');">Pacific/Efate</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Enderbury');">Pacific/Enderbury</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Fakaofo');">Pacific/Fakaofo</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Fiji');">Pacific/Fiji</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Funafuti');">Pacific/Funafuti</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Galapagos');">Pacific/Galapagos</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Gambier');">Pacific/Gambier</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Guadalcanal');">Pacific/Guadalcanal</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Guam');">Pacific/Guam</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Honolulu');">Pacific/Honolulu</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Kiritimati');">Pacific/Kiritimati</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Kosrae');">Pacific/Kosrae</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Kwajalein');">Pacific/Kwajalein</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Majuro');">Pacific/Majuro</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Marquesas');">Pacific/Marquesas</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Nauru');">Pacific/Nauru</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Niue');">Pacific/Niue</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Norfolk');">Pacific/Norfolk</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Noumea');">Pacific/Noumea</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Pago_Pago');">Pacific/Pago_Pago</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Palau');">Pacific/Palau</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Pitcairn');">Pacific/Pitcairn</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Pohnpei');">Pacific/Pohnpei</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Port_Moresby');">Pacific/Port_Moresby</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Rarotonga');">Pacific/Rarotonga</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Tahiti');">Pacific/Tahiti</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Tarawa');">Pacific/Tarawa</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Tongatapu');">Pacific/Tongatapu</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Wake');">Pacific/Wake</a></li>
+                                                            <li><a href=# onclick="return selected_server_timezone('Pacific/Wallis');">Pacific/Wallis</a></li>
+                                                        </ul>
+                                                    </div>
+                                                    <b><span id="timezone_error_message"></span></b>
+
+                                                </small>
+                                            </td>
                                         </tr>
                                     </table>
                                 </div>
@@ -3533,4 +4051,4 @@
     </div>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20171003-20"></script>
+<script type="text/javascript" src="dashboard.js?v20171008-1"></script>
