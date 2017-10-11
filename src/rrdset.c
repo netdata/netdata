@@ -1010,28 +1010,35 @@ static inline void rrdset_done_fill_the_gap(RRDSET *st) {
     usec_t update_every_ut = st->update_every * USEC_PER_SEC;
     usec_t now_collect_ut  = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
 
-    long c = 0, entries = st->entries;
+    usec_t next_store_ut = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
+    long fill_entries = (long)((now_collect_ut - next_store_ut) / update_every_ut + 1) - st->gap_when_lost_iterations_above * 2;
+    if(unlikely(fill_entries <= 0)) return;
+
+    long valid_fill_entries = (fill_entries > st->entries)? st->entries : fill_entries;
+
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        usec_t next_store_ut = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
-        long current_entry = st->current_entry;
-
-        for(c = 0; c < entries && next_store_ut <= now_collect_ut ; next_store_ut += update_every_ut, c++) {
-            rd->values[current_entry] = SN_EMPTY_SLOT;
-            current_entry = ((current_entry + 1) >= entries) ? 0 : current_entry + 1;
-
+        if(st->current_entry + valid_fill_entries > st->entries) {
             #ifdef NETDATA_INTERNAL_CHECKS
-            rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING (FILLED THE GAP)", rd->name, current_entry);
+            rrdset_debug(st, "fill_entries split");
             #endif
+            memset(&rd->values[st->current_entry], SN_EMPTY_SLOT, (st->entries - st->current_entry) * sizeof(storage_number));
+            memset(&rd->values[0], SN_EMPTY_SLOT, (valid_fill_entries - (st->entries - st->current_entry)) * sizeof(storage_number));
+        }
+        else {
+            #ifdef NETDATA_INTERNAL_CHECKS
+            rrdset_debug(st, "fill_entries contiguous");
+            #endif
+            memset(&rd->values[st->current_entry], SN_EMPTY_SLOT, valid_fill_entries * sizeof(storage_number));
         }
     }
 
-    if(c > 0) {
-        c--;
-        st->last_updated.tv_sec += c * st->update_every;
+    if(fill_entries > 0) {
+        fill_entries--;
+        st->last_updated.tv_sec += fill_entries * st->update_every;
 
-        st->current_entry += c;
-        if(st->current_entry >= st->entries)
+        st->current_entry += fill_entries;
+        while(st->current_entry >= st->entries)
             st->current_entry -= st->entries;
     }
 }
@@ -1129,6 +1136,14 @@ void rrdset_done(RRDSET *st) {
         first_entry = 1;
     }
 
+    // check if the should be a gap on the chart
+    if(st->last_updated.tv_sec + st->gap_when_lost_iterations_above * 2 * st->update_every < st->last_collected_time.tv_sec) {
+        #ifdef NETDATA_INTERNAL_CHECKS
+        rrdset_debug(st, "Filling the gap...");
+        #endif
+        rrdset_done_fill_the_gap(st);
+    }
+
     // these are the 3 variables that will help us in interpolation
     // last_stored_ut = the last time we added a value to the storage
     // now_collect_ut = the time the current value has been collected
@@ -1138,14 +1153,7 @@ void rrdset_done(RRDSET *st) {
     next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
     if(unlikely(!st->counter_done)) {
-        // if we have not collected metrics this session (st->counter_done == 0)
-        // and we have collected metrics for this chart in the past (st->counter != 0)
-        // fill the gap (the chart has been just loaded from disk)
-        if(unlikely(st->counter)) {
-            rrdset_done_fill_the_gap(st);
-            last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
-            next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
-        }
+        // we have not collected metrics this session (st->counter_done == 0)
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))) {
             store_this_entry = 1;
