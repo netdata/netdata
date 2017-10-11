@@ -1627,6 +1627,7 @@ Content-Transfer-Encoding: 8bit
 </table>
 </body>
 </html>
+--multipart-boundary--
 EOF
 
 SENT_EMAIL=$?
@@ -1655,4 +1656,3 @@ fi
 
 # we did not send anything
 exit 1
-
