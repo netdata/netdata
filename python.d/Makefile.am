@@ -59,8 +59,6 @@ pythonmodulesdir=$(pythondir)/python_modules
 dist_pythonmodules_DATA = \
     python_modules/__init__.py \
     python_modules/base.py \
-    python_modules/msg.py \
-    python_modules/lm_sensors.py \
     $(NULL)
 
 basesdir=$(pythonmodulesdir)/bases
@@ -87,6 +85,7 @@ third_partydir=$(pythonmodulesdir)/third_party
 dist_third_party_DATA = \
     python_modules/third_party/__init__.py \
     python_modules/third_party/ordereddict.py \
+    python_modules/third_party/lm_sensors.py \
     $(NULL)
 
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2
