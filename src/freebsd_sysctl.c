@@ -27,6 +27,62 @@
 
 int system_pagesize = PAGE_SIZE;
 int number_of_cpus = 1;
+#if __FreeBSD_version >= 1200029
+struct __vmmeter {
+	uint64_t v_swtch;
+	uint64_t v_trap;
+	uint64_t v_syscall;
+	uint64_t v_intr;
+	uint64_t v_soft;
+	uint64_t v_vm_faults;
+	uint64_t v_io_faults;
+	uint64_t v_cow_faults;
+	uint64_t v_cow_optim;
+	uint64_t v_zfod;
+	uint64_t v_ozfod;
+	uint64_t v_swapin;
+	uint64_t v_swapout;
+	uint64_t v_swappgsin;
+	uint64_t v_swappgsout;
+	uint64_t v_vnodein;
+	uint64_t v_vnodeout;
+	uint64_t v_vnodepgsin;
+	uint64_t v_vnodepgsout;
+	uint64_t v_intrans;
+	uint64_t v_reactivated;
+	uint64_t v_pdwakeups;
+	uint64_t v_pdpages;
+	uint64_t v_pdshortfalls;
+	uint64_t v_dfree;
+	uint64_t v_pfree;
+	uint64_t v_tfree;
+	uint64_t v_forks;
+	uint64_t v_vforks;
+	uint64_t v_rforks;
+	uint64_t v_kthreads;
+	uint64_t v_forkpages;
+	uint64_t v_vforkpages;
+	uint64_t v_rforkpages;
+	uint64_t v_kthreadpages;
+	u_int v_page_size;
+	u_int v_page_count;
+	u_int v_free_reserved;
+	u_int v_free_target;
+	u_int v_free_min;
+	u_int v_free_count;
+	u_int v_wire_count;
+	u_int v_active_count;
+	u_int v_inactive_target;
+	u_int v_inactive_count;
+	u_int v_laundry_count;
+	u_int v_pageout_free_min;
+	u_int v_interrupt_free_min;
+	u_int v_free_severe;
+};
+typedef struct __vmmeter vmmeter_t;
+#else
+typedef struct vmmeter vmmeter_t;
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // FreeBSD plugin initialization
@@ -856,7 +912,7 @@ int do_system_ram(int update_every, usec_t dt) {
     (void)dt;
     static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
                mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
-    struct vmmeter vmmeter_data;
+    vmmeter_t vmmeter_data;
     int vfs_bufspace_count;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_active_count",   mib_active_count,   vmmeter_data.v_active_count) ||
@@ -923,7 +979,7 @@ int do_system_ram(int update_every, usec_t dt) {
 int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
     (void)dt;
     static int mib_swappgsin[4] = {0, 0, 0, 0}, mib_swappgsout[4] = {0, 0, 0, 0};
-    struct vmmeter vmmeter_data;
+    vmmeter_t vmmeter_data;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsin", mib_swappgsin, vmmeter_data.v_swappgsin) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsout", mib_swappgsout, vmmeter_data.v_swappgsout))) {
@@ -970,7 +1026,7 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
     (void)dt;
     static int mib_vm_faults[4] = {0, 0, 0, 0}, mib_io_faults[4] = {0, 0, 0, 0}, mib_cow_faults[4] = {0, 0, 0, 0},
                mib_cow_optim[4] = {0, 0, 0, 0}, mib_intrans[4] = {0, 0, 0, 0};
-    struct vmmeter vmmeter_data;
+    vmmeter_t vmmeter_data;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_vm_faults",  mib_vm_faults,  vmmeter_data.v_vm_faults) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_io_faults",  mib_io_faults,  vmmeter_data.v_io_faults) ||

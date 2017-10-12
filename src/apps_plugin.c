@@ -1572,14 +1572,22 @@ static inline int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
                             break;
                         default:
                             /* print protocol number and socket address */
+#if __FreeBSD_version < 1200031
                             sprintf(fdsname, "socket: other: %d %s %s", fds->kf_sock_protocol, fds->kf_sa_local.__ss_pad1, fds->kf_sa_local.__ss_pad2);
+#else
+                            sprintf(fdsname, "socket: other: %d %s %s", fds->kf_sock_protocol, fds->kf_un.kf_sock.kf_sa_local.__ss_pad1, fds->kf_un.kf_sock.kf_sa_local.__ss_pad2);
+#endif
                     }
                     break;
                 case KF_TYPE_PIPE:
                     sprintf(fdsname, "pipe: %lu %lu", fds->kf_un.kf_pipe.kf_pipe_addr, fds->kf_un.kf_pipe.kf_pipe_peer);
                     break;
                 case KF_TYPE_PTS:
+#if __FreeBSD_version < 1200031
                     sprintf(fdsname, "other: pts: %u", fds->kf_un.kf_pts.kf_pts_dev);
+#else
+                    sprintf(fdsname, "other: pts: %lu", fds->kf_un.kf_pts.kf_pts_dev);
+#endif
                     break;
                 case KF_TYPE_SHM:
                     sprintf(fdsname, "other: shm: %s size: %lu", fds->kf_path, fds->kf_un.kf_file.kf_file_size);
