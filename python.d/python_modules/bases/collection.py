@@ -34,13 +34,11 @@ def on_try_except_finally(on_except=(None, ), on_finally=(None, )):
             try:
                 func(*args, **kwargs)
             except Exception:
-                if not except_func:
-                    return
-                except_func(*on_except[1:])
+                if except_func:
+                    except_func(*on_except[1:])
             finally:
-                if not finally_func:
-                    return
-                finally_func(*on_finally[1:])
+                if finally_func:
+                    finally_func(*on_finally[1:])
         return wrapper
     return decorator
 
