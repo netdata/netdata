@@ -172,9 +172,9 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 job.PREV_UPDATE = current_time
                 job.ELAPSED = int((current_time - job.START_RUN) * 1e3)
                 job.RETRIES = 0
-                self.safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
-                                                            since_last=job.SINCE_UPDATE,
-                                                            elapsed=job.ELAPSED))
+                safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
+                                                       since_last=job.SINCE_UPDATE,
+                                                       elapsed=job.ELAPSED))
             self.debug(UPDATE_MSG.format(status='OK' if updated else 'FAILED',
                                          elapsed=job.ELAPSED if updated else '-',
                                          retries=job.RETRIES_MAX - job.RETRIES))
