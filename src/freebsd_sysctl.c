@@ -79,6 +79,9 @@ struct __vmmeter {
 	u_int v_interrupt_free_min;
 	u_int v_free_severe;
 };
+typedef struct __vmmeter vmmeter_t;
+#else
+typedef struct vmmeter vmmeter_t;
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -909,11 +912,7 @@ int do_system_ram(int update_every, usec_t dt) {
     (void)dt;
     static int mib_active_count[4] = {0, 0, 0, 0}, mib_inactive_count[4] = {0, 0, 0, 0}, mib_wire_count[4] = {0, 0, 0, 0},
                mib_cache_count[4] = {0, 0, 0, 0}, mib_vfs_bufspace[2] = {0, 0}, mib_free_count[4] = {0, 0, 0, 0};
-#if __FreeBSD_version < 1200029
-    struct vmmeter vmmeter_data;
-#else
-    struct __vmmeter vmmeter_data;
-#endif
+    vmmeter_t vmmeter_data;
     int vfs_bufspace_count;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_active_count",   mib_active_count,   vmmeter_data.v_active_count) ||
@@ -980,11 +979,7 @@ int do_system_ram(int update_every, usec_t dt) {
 int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
     (void)dt;
     static int mib_swappgsin[4] = {0, 0, 0, 0}, mib_swappgsout[4] = {0, 0, 0, 0};
-#if __FreeBSD_version < 1200029
-    struct vmmeter vmmeter_data;
-#else
-    struct __vmmeter vmmeter_data;
-#endif
+    vmmeter_t vmmeter_data;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsin", mib_swappgsin, vmmeter_data.v_swappgsin) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsout", mib_swappgsout, vmmeter_data.v_swappgsout))) {
@@ -1031,11 +1026,7 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
     (void)dt;
     static int mib_vm_faults[4] = {0, 0, 0, 0}, mib_io_faults[4] = {0, 0, 0, 0}, mib_cow_faults[4] = {0, 0, 0, 0},
                mib_cow_optim[4] = {0, 0, 0, 0}, mib_intrans[4] = {0, 0, 0, 0};
-#if __FreeBSD_version < 1200029
-    struct vmmeter vmmeter_data;
-#else
-    struct __vmmeter vmmeter_data;
-#endif
+    vmmeter_t vmmeter_data;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_vm_faults",  mib_vm_faults,  vmmeter_data.v_vm_faults) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_io_faults",  mib_io_faults,  vmmeter_data.v_io_faults) ||
