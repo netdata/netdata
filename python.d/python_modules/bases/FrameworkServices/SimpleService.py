@@ -232,4 +232,4 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         return self._get_data()
 
     def _get_data(self):
-        raise NotImplemented
+        raise NotImplementedError
