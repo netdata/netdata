@@ -63,6 +63,32 @@ dist_pythonmodules_DATA = \
     python_modules/lm_sensors.py \
     $(NULL)
 
+basesdir=$(pythonmodulesdir)/bases
+dist_bases_DATA = \
+    python_modules/bases/__init__.py \
+    python_modules/bases/charts.py \
+    python_modules/bases/collection.py \
+    python_modules/bases/loaders.py \
+    python_modules/bases/loggers.py \
+    $(NULL)
+
+bases_framework_servicesdir=$(basesdir)/FrameworkServices
+dist_bases_framework_services_DATA = \
+    python_modules/bases/FrameworkServices/__init__.py \
+    python_modules/bases/FrameworkServices/ExecutableService.py \
+    python_modules/bases/FrameworkServices/LogService.py \
+    python_modules/bases/FrameworkServices/MySQLService.py \
+    python_modules/bases/FrameworkServices/SimpleService.py \
+    python_modules/bases/FrameworkServices/SocketService.py \
+    python_modules/bases/FrameworkServices/UrlService.py \
+    $(NULL)
+
+third_partydir=$(pythonmodulesdir)/third_party
+dist_third_party_DATA = \
+    python_modules/third_party/__init__.py \
+    python_modules/third_party/ordereddict.py \
+    $(NULL)
+
 pythonyaml2dir=$(pythonmodulesdir)/pyyaml2
 dist_pythonyaml2_DATA = \
     python_modules/pyyaml2/__init__.py \
