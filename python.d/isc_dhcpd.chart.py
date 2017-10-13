@@ -7,14 +7,15 @@ from os import stat, access, R_OK
 from os.path import isfile
 try:
     from ipaddress import ip_network, ip_address
-    have_ipaddress = True
+    HAVE_IPADDRESS = True
 except ImportError:
-    have_ipaddress = False
+    HAVE_IPADDRESS = False
 try:
     from itertools import filterfalse
 except ImportError:
     from itertools import ifilterfalse as filterfalse
-from base import SimpleService
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 60000
 retries = 60
@@ -59,7 +60,7 @@ class Service(SimpleService):
         # Also only ipv4 supported
 
     def check(self):
-        if not have_ipaddress:
+        if not HAVE_IPADDRESS:
             self.error('\'python-ipaddress\' module is needed')
             return False
         if not (isfile(self.leases_path) and access(self.leases_path, R_OK)):
@@ -155,4 +156,3 @@ def find_lease(value):
 
 def find_ends(value):
     return value[2:6] != 'ends'
-
