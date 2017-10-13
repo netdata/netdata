@@ -43,46 +43,6 @@ class ReAddingError(Exception):
     pass
 
 
-class Checks:
-    @staticmethod
-    def chart_params(params, chart_name):
-        """
-        :param params: <list>
-        :param chart_name: <str>
-        :return:
-        """
-        for param in CHART_PARAMS:
-            try:
-                params[param]
-            except KeyError:
-                raise KeyError('{param} is missing ({chart})'.format(param=param, chart=chart_name))
-            value = params[param]
-            if any([param == 'id', param == 'units', param == 'context', param == 'chart_type']):
-                if not value:
-                    raise ValueError('Wrong chart value ({chart}). {param} must not be empty'.format(chart=chart_name,
-                                                                                                     param=param))
-            if param == 'chart_type':
-                if value not in CHART_TYPES:
-                    raise ValueError('Wrong chart type ({chart}). Must be on of {types}'.format(chart=chart_name,
-                                                                                                types=CHART_TYPES))
-
-    @staticmethod
-    def dimension_params(params, chart_name):
-        """
-        :param params: <list>
-        :param chart_name: <str>
-        :return:
-        """
-        if not params.get('id'):
-            raise ValueError('Wrong dimension id ({chart}). Must not be empty'.format(chart=chart_name))
-        if params['algorithm'] not in DIMENSION_ALGORITHMS:
-            raise ValueError('Wrong dimension algorithm ({chart}). '
-                             'Must be one of {algorithms}'.format(chart=chart_name,
-                                                                  algorithms=DIMENSION_ALGORITHMS))
-        if not (str(params['multiplier']).isdigit() and str(params['divisor']).isdigit()):
-            raise ValueError('Wrong multiplier or divisor ({chart}). Must be a digit'.format(chart=chart_name))
-
-
 class Charts:
     def __init__(self, job_name, priority, update_every):
         """
@@ -146,9 +106,14 @@ class Chart:
         """
         :param params: <list>
         """
+        if not params or not isinstance(params, list):
+            raise ValueError('Chart params must be a not empty list')
+
         self.params = dict(zip(CHART_PARAMS, (p or str() for p in params)))
         self.name = '.'.join([self.params['type'], self.params['id']])
-        Checks.chart_params(self.params, self.name)
+        if self.params.get('chart_type') not in CHART_TYPES:
+            self.params['chart_type'] = 'absolute'
+
         self.dimensions = list()
         self.penalty = 0
 
@@ -169,20 +134,20 @@ class Chart:
         :param dimension: <list>
         :return:
         """
-        if dimension[0] in self.dimensions:
+        if dimension[0] in [repr(d) for d in self.dimensions]:
             raise ReAddingError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
                                                                                    chart=self.name))
-        self.dimensions.append(Dimension(dimension, self.name))
+        self.dimensions.append(Dimension(dimension))
 
     def add_dimension_and_push_chart(self, dimension):
         """
         :param dimension: <list>
         :return:
         """
-        if dimension[0] in self.dimensions:
+        if dimension[0] in [repr(d) for d in self.dimensions]:
             raise ReAddingError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
                                                                                    chart=self.name))
-        dimension = Dimension(dimension, self.name)
+        dimension = Dimension(dimension)
         self.dimensions.append(dimension)
         safe_print(self.create(dimension))
 
@@ -212,18 +177,22 @@ class Chart:
 
 
 class Dimension:
-    def __init__(self, params, chart_name):
+    def __init__(self, params):
         """
         :param params: <list>
-        :param chart_name: <str>
         """
+        if not params or not isinstance(params, list):
+            raise ValueError('Dimension params must be a not empty list')
+
         self.params = dict(zip(DIMENSION_PARAMS, (p or str() for p in params)))
         self.params['name'] = self.params.get('name') or self.params.get('id')
-        self.params.setdefault('algorithm', 'absolute')
-        self.params.setdefault('multiplier', 1)
-        self.params.setdefault('divisor', 1)
+        if self.params.get('algorithm') not in DIMENSION_ALGORITHMS:
+            self.params['algorithm'] = 'absolute'
+        if not str(self.params.get('multiplier')).isdigit():
+            self.params['multiplier'] = 1
+        if not str(self.params.get('divisor')).isdigit():
+            self.params['divisor'] = 1
         self.params.setdefault('hidden', '')
-        Checks.dimension_params(self.params, chart_name)
 
     def __repr__(self):
         return self.params['id']
