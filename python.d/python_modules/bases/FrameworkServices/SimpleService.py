@@ -68,7 +68,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         self._runtime_counters = RuntimeCounters(configuration=configuration)
         self.charts = Charts(job_name=self.actual_name,
                              priority=configuration.pop('priority', 60000),
-                             update_every=self._runtime_counters.FREQ)
+                             update_every=self.update_every)
         self.functions = UsefulFuncs()
 
     def __repr__(self):
@@ -81,7 +81,6 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             return '_'.join([self.module_name, self.override_name or self.job_name])
         return self.module_name
 
-    @property
     def actual_name(self):
         return self.fake_name or self.name
 
