@@ -1120,10 +1120,14 @@ pid_t gettid(void) {
 #ifdef __FreeBSD__
     return (pid_t)pthread_getthreadid_np();
 #elif defined(__APPLE__)
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     uint64_t curthreadid;
     pthread_threadid_np(NULL, &curthreadid);
     return (pid_t)curthreadid;
-#else
+#else /* __MAC_OS_X_VERSION_MIN_REQUIRED */
+    return (pid_t)pthread_self;
+#endif /* __MAC_OS_X_VERSION_MIN_REQUIRED */
+#else /* __APPLE__*/
     return (pid_t)syscall(SYS_gettid);
 #endif /* __FreeBSD__, __APPLE__*/
 }

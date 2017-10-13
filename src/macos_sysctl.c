@@ -531,15 +531,21 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "NoPorts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                     rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+#endif
                 } else
                     rrdset_next(st);
 
                 rrddim_set(st, "InErrors", udpstat.udps_hdrops + udpstat.udps_badlen);
                 rrddim_set(st, "NoPorts", udpstat.udps_noport);
                 rrddim_set(st, "RcvbufErrors", udpstat.udps_fullsock);
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                 rrddim_set(st, "InCsumErrors", udpstat.udps_badsum + udpstat.udps_nosum);
                 rrddim_set(st, "IgnoredMulti", udpstat.udps_filtermcast);
+#else
+                rrddim_set(st, "InCsumErrors", udpstat.udps_badsum);
+#endif
                 rrdset_done(st);
             }
         }
