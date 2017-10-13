@@ -4,8 +4,8 @@
 
 import glob
 import os
-import time
-from base import SimpleService
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
