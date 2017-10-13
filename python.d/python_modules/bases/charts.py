@@ -86,7 +86,7 @@ class Checks:
 class Charts:
     def __init__(self, job_name, priority, update_every):
         """
-        :param job_name: <str>
+        :param job_name: <bound method>
         :param priority: <int>
         :param update_every: <int>
         """
@@ -128,7 +128,7 @@ class Charts:
         :param params: <list>
         :return:
         """
-        params = [self.job_name] + params
+        params = [self.job_name()] + params
         chart_id = params[1]
         if chart_id in self.charts:
             raise ReAddingError('{chart} already in charts'.format(chart=chart_id))
