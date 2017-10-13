@@ -2,11 +2,12 @@
 # Description: bind rndc netdata python.d module
 # Author: l2isbad
 
+from collections import defaultdict
 from os.path import getsize
 from os import access, R_OK
 from subprocess import Popen
-from collections import defaultdict
-from base import SimpleService
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 60000
 retries = 60
@@ -94,7 +95,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.named_stats_path = self.configuration.get('named_stats_path', '/var/log/bind/named.stats')
-        self.rndc = self.find_binary('rndc')
+        self.rndc = self.functions.find_binary('rndc')
         self.data = dict(nms_requests=0, nms_responses=0, nms_failure=0, nms_auth=0,
                          nms_non_auth=0, nms_nxrrset=0, nms_success=0, nms_nxdomain=0,
                          nms_recursion=0, nms_duplicate=0, nms_rejected_queries=0,
@@ -102,10 +103,10 @@ class Service(SimpleService):
 
     def check(self):
         if not self.rndc:
-            self.error('Can\'t locate \'rndc\' binary or binary is not executable by netdata')
+            self.error('Can\'t locate "rndc" binary or binary is not executable by netdata')
             return False
 
-        if not access(self.named_stats_path, R_OK):
+        if not self.functions.is_file_readable(self.named_stats_path):
             self.error('Cannot access file %s' % self.named_stats_path)
             return False
 
@@ -159,12 +160,12 @@ class Service(SimpleService):
             parsed_key, chart_name = elem[0], elem[1]
             for dimension_id, value in queries_mapper(data=parsed[parsed_key],
                                                       add=chart_name[:9]).items():
+
                 if dimension_id not in self.data:
                     dimension = dimension_id.replace(chart_name[:9], '')
-                    self._add_new_dimension(dimension_id=dimension_id,
-                                            dimension=dimension,
-                                            chart_name=chart_name,
-                                            priority=self.priority + self.order.index(chart_name))
+                    if dimension_id not in self.charts[chart_name]:
+                        self.charts[chart_name].add_dimension_and_push_chart([dimension_id, dimension, 'incremental'])
+
                 self.data[dimension_id] = value
 
         self.data['stats_size'] = raw_data['size']
