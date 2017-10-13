@@ -158,6 +158,12 @@ class Chart:
     def __str__(self):
         return self.params['id']
 
+    def __iter__(self):
+        return iter(self.dimensions)
+
+    def __contains__(self, item):
+        return item in [repr(d) for d in self.dimensions]
+
     def add_dimension(self, dimension):
         """
         :param dimension: <list>
@@ -213,7 +219,7 @@ class Dimension:
         """
         self.params = dict(zip(DIMENSION_PARAMS, (p or str() for p in params)))
         self.params['name'] = self.params.get('name') or self.params.get('id')
-        self.params.setdefault('algorithm', 'incremental')
+        self.params.setdefault('algorithm', 'absolute')
         self.params.setdefault('multiplier', 1)
         self.params.setdefault('divisor', 1)
         self.params.setdefault('hidden', '')
