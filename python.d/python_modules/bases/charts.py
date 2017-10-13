@@ -106,7 +106,7 @@ class Chart:
         """
         :param params: <list>
         """
-        if not params or not isinstance(params, list):
+        if not (params and isinstance(params, list)):
             raise ValueError('Chart params must be a not empty list')
 
         self.params = dict(zip(CHART_PARAMS, (p or str() for p in params)))
@@ -181,7 +181,7 @@ class Dimension:
         """
         :param params: <list>
         """
-        if not params or not isinstance(params, list):
+        if not (params and isinstance(params, list)):
             raise ValueError('Dimension params must be a not empty list')
 
         self.params = dict(zip(DIMENSION_PARAMS, (p or str() for p in params)))

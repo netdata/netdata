@@ -2,10 +2,7 @@
 # Description: example netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-import os
 import random
-
-from collections import defaultdict
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
