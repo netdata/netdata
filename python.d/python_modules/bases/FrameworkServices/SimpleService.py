@@ -20,6 +20,7 @@ START_MSG = 'STARTED. Update frequency: {freq}, retries: {retries}.'
 UPDATE_MSG = 'UPDATE {status}. Elapsed time: {elapsed}, retries left: {retries}.'
 STOP_MSG = 'STOPPED after {retries_max} data collection failures in a row.'
 SLEEP_MSG = 'SLEEPING for {sleep_time} to reach frequency of {freq} sec.'
+UNHANDLED_EXCEPTION = 'Unhandled exception in {method_name}(). Error: {error}.'
 
 RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
                        'SET run_time = {elapsed}\n' \
@@ -160,7 +161,8 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             try:
                 updated = self.update(interval=job.SINCE_UPDATE)
             except Exception as error:
-                print(error)
+                self.debug(UNHANDLED_EXCEPTION.format(method_name='update',
+                                                      error=error))
                 updated = False
 
             if not updated:
