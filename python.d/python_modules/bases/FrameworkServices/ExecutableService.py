@@ -72,8 +72,8 @@ class ExecutableService(SimpleService):
         try:
             data = self._get_data()
         except Exception as error:
-            self.error('_get_data() failed. Command: {command}. Error: error'.format(command=self.command,
-                                                                                     error=error))
+            self.error('_get_data() failed. Command: {command}. Error: {error}'.format(command=self.command,
+                                                                                       error=error))
             return False
 
         if isinstance(data, dict) and data:
