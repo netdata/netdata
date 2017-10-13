@@ -25,7 +25,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
     natural_t cp_time[CPU_STATE_MAX];
 
     // NEEDED BY: do_ram, do_swapio, do_pgfaults
-#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED > 1050)
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     vm_statistics64_data_t vm_statistics;
 #else
     vm_statistics_data_t vm_statistics;
@@ -77,7 +77,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
     
     if (likely(do_ram || do_swapio || do_pgfaults)) {
-#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED > 1050)
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         count = sizeof(vm_statistics64_data_t);
         kr = host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&vm_statistics, &count);
 #else
@@ -101,7 +101,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
                     rrddim_add(st, "active",    NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "wired",     NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
-#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED > 1080)
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                     rrddim_add(st, "throttled", NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "compressor", NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
 #endif
@@ -114,7 +114,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
                 rrddim_set(st, "active",    vm_statistics.active_count);
                 rrddim_set(st, "wired",     vm_statistics.wire_count);
-#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED > 1080)
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                 rrddim_set(st, "throttled", vm_statistics.throttled_count);
                 rrddim_set(st, "compressor", vm_statistics.compressor_page_count);
 #endif
@@ -125,7 +125,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
-#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED > 1080)
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
             // --------------------------------------------------------------------
 
             if (likely(do_swapio)) {
@@ -158,7 +158,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                     rrddim_add(st, "cow",       NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "pagein",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "pageout",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED > 1080)
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                     rrddim_add(st, "compress",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "decompress", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 #endif
@@ -172,7 +172,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 rrddim_set(st, "cow", vm_statistics.cow_faults);
                 rrddim_set(st, "pagein", vm_statistics.pageins);
                 rrddim_set(st, "pageout", vm_statistics.pageouts);
-#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED > 1080)
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                 rrddim_set(st, "compress", vm_statistics.compressions);
                 rrddim_set(st, "decompress", vm_statistics.decompressions);
 #endif
