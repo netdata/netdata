@@ -25,7 +25,11 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
     natural_t cp_time[CPU_STATE_MAX];
 
     // NEEDED BY: do_ram, do_swapio, do_pgfaults
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
     vm_statistics64_data_t vm_statistics;
+#else
+    vm_statistics_data_t vm_statistics;
+#endif
 
     host = mach_host_self();
     kr = host_page_size(host, &system_pagesize);
@@ -73,8 +77,13 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
     
     if (likely(do_ram || do_swapio || do_pgfaults)) {
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         count = sizeof(vm_statistics64_data_t);
         kr = host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&vm_statistics, &count);
+#else
+        count = sizeof(vm_statistics_data_t);
+        kr = host_statistics(host, HOST_VM_INFO, (host_info_t)&vm_statistics, &count);
+#endif
         if (unlikely(kr != KERN_SUCCESS)) {
             error("MACOS: host_statistics64() failed: %s", mach_error_string(kr));
             do_ram = 0;
@@ -92,8 +101,10 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
                     rrddim_add(st, "active",    NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "wired",     NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                     rrddim_add(st, "throttled", NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "compressor", NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
+#endif
                     rrddim_add(st, "inactive",  NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "purgeable", NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "speculative", NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
@@ -103,8 +114,10 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
                 rrddim_set(st, "active",    vm_statistics.active_count);
                 rrddim_set(st, "wired",     vm_statistics.wire_count);
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                 rrddim_set(st, "throttled", vm_statistics.throttled_count);
                 rrddim_set(st, "compressor", vm_statistics.compressor_page_count);
+#endif
                 rrddim_set(st, "inactive",  vm_statistics.inactive_count);
                 rrddim_set(st, "purgeable", vm_statistics.purgeable_count);
                 rrddim_set(st, "speculative", vm_statistics.speculative_count);
@@ -112,6 +125,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
 
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
             // --------------------------------------------------------------------
 
             if (likely(do_swapio)) {
@@ -129,6 +143,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 rrddim_set(st, "out", vm_statistics.swapouts);
                 rrdset_done(st);
             }
+#endif
 
             // --------------------------------------------------------------------
 
@@ -143,8 +158,10 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                     rrddim_add(st, "cow",       NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "pagein",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "pageout",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                     rrddim_add(st, "compress",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "decompress", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+#endif
                     rrddim_add(st, "zero_fill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "reactivate", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "purge",     NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -155,8 +172,10 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 rrddim_set(st, "cow", vm_statistics.cow_faults);
                 rrddim_set(st, "pagein", vm_statistics.pageins);
                 rrddim_set(st, "pageout", vm_statistics.pageouts);
+#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                 rrddim_set(st, "compress", vm_statistics.compressions);
                 rrddim_set(st, "decompress", vm_statistics.decompressions);
+#endif
                 rrddim_set(st, "zero_fill", vm_statistics.zero_fill_count);
                 rrddim_set(st, "reactivate", vm_statistics.reactivations);
                 rrddim_set(st, "purge", vm_statistics.purges);
