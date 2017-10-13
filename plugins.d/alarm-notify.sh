@@ -609,6 +609,7 @@ if [ \( \
         -o "${SEND_TELEGRAM}"    = "YES" \
         -o "${SEND_PUSHBULLET}"  = "YES" \
         -o "${SEND_KAFKA}"       = "YES" \
+        -o "${SEND_CUSTOM}"      = "YES" \
     \) -a -z "${curl}" ]
     then
     curl="$(which curl 2>/dev/null || command -v curl 2>/dev/null)"
@@ -625,6 +626,7 @@ if [ \( \
         SEND_MESSAGEBIRD="NO"
         SEND_KAVENEGAR="NO"
         SEND_KAFKA="NO"
+        SEND_CUSTOM="NO"
     fi
 fi
 
@@ -828,7 +830,7 @@ send_pushover() {
                 --form-string "priority=${priority}" \
                 https://api.pushover.net/1/messages.json)
 
-            if [ "${httpcode}" == "200" ]
+            if [ "${httpcode}" = "200" ]
             then
                 info "sent pushover notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
@@ -864,7 +866,7 @@ send_pushbullet() {
 EOF
                ) "https://api.pushbullet.com/v2/pushes" -X POST)
 
-            if [ "${httpcode}" == "200" ]
+            if [ "${httpcode}" = "200" ]
             then
                 info "sent pushbullet notification for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
@@ -890,7 +892,7 @@ send_kafka() {
                 --data "{host_ip:\"${KAFKA_SENDER_IP}\",when:${when},name:\"${name}\",chart:\"${chart}\",family:\"${family}\",status:\"${status}\",old_status:\"${old_status}\",value:${value},old_value:${old_value},duration:${duration},non_clear_duration:${non_clear_duration},units:\"${units}\",info:\"${info}\"}" \
                 "${KAFKA_URL}")
 
-            if [ "${httpcode}" == "204" ]
+            if [ "${httpcode}" = "204" ]
             then
                 info "sent kafka data for: ${host} ${chart}.${name} is ${status} and ip '${KAFKA_SENDER_IP}'"
                 sent=$((sent + 1))
@@ -977,7 +979,7 @@ send_twilio() {
                 -u "${accountsid}:${accounttoken}" \
                 "https://api.twilio.com/2010-04-01/Accounts/${accountsid}/Messages.json")
 
-            if [ "${httpcode}" == "201" ]
+            if [ "${httpcode}" = "201" ]
             then
                 info "sent Twilio SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
@@ -1030,7 +1032,7 @@ send_hipchat() {
                     -d "{\"color\": \"${color}\", \"from\": \"${host}\", \"message_format\": \"${msg_format}\", \"message\": \"${message}\", \"notify\": \"${notify}\"}" \
                     "https://${HIPCHAT_SERVER}/v2/room/${room}/notification")
  
-            if [ "${httpcode}" == "204" ]
+            if [ "${httpcode}" = "204" ]
             then
                 info "sent HipChat notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
                 sent=$((sent + 1))
@@ -1064,7 +1066,7 @@ send_messagebird() {
                 -H "Authorization: AccessKey ${accesskey}" \
                 "https://rest.messagebird.com/messages")
 
-            if [ "${httpcode}" == "201" ]
+            if [ "${httpcode}" = "201" ]
             then
                 info "sent Messagebird SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
@@ -1094,7 +1096,7 @@ send_kavenegar() {
                 --data-urlencode "receptor=${user}" \
                 --data-urlencode "message=${title} ${message}")
 
-            if [ "${httpcode}" == "201" ]
+            if [ "${httpcode}" = "201" ]
             then
                 info "sent Kavenegar SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
                 sent=$((sent + 1))
@@ -1135,11 +1137,11 @@ send_telegram() {
                 --data-urlencode "text=${emoji} ${message}" \
                 "https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatid}")
 
-            if [ "${httpcode}" == "200" ]
+            if [ "${httpcode}" = "200" ]
             then
                 info "sent telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}'"
                 sent=$((sent + 1))
-            elif [ "${httpcode}" == "401" ]
+            elif [ "${httpcode}" = "401" ]
             then
                 error "failed to send telegram notification for: ${host} ${chart}.${name} is ${status} to '${chatid}': Wrong bot token."
             else
@@ -1203,7 +1205,7 @@ EOF
         )"
 
         httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
-        if [ "${httpcode}" == "200" ]
+        if [ "${httpcode}" = "200" ]
         then
             info "sent slack notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
             sent=$((sent + 1))
@@ -1266,7 +1268,7 @@ EOF
         )"
 
         httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
-        if [ "${httpcode}" == "200" ]
+        if [ "${httpcode}" = "200" ]
         then
             info "sent discord notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
             sent=$((sent + 1))
