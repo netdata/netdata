@@ -272,13 +272,11 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                 procfile_lineword(ff, l, 1)))) break;
     }
 
-    RRDSET *st;
-
     // --------------------------------------------------------------------
 
     if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO && (Ip6InOctets || Ip6OutOctets))) {
         do_bandwidth = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost("system.ipv6");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     "system"
@@ -309,7 +307,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_ip_packets == CONFIG_BOOLEAN_YES || (do_ip_packets == CONFIG_BOOLEAN_AUTO && (Ip6InReceives || Ip6OutRequests || Ip6InDelivers || Ip6OutForwDatagrams))) {
         do_ip_packets = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".packets");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -344,7 +342,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_ip_fragsout == CONFIG_BOOLEAN_YES || (do_ip_fragsout == CONFIG_BOOLEAN_AUTO && (Ip6FragOKs || Ip6FragFails || Ip6FragCreates))) {
         do_ip_fragsout = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".fragsout");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -384,7 +382,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Ip6ReasmReqds
             ))) {
         do_ip_fragsin = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".fragsin");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -429,7 +427,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Ip6InNoRoutes
         ))) {
         do_ip_errors = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".errors");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -479,7 +477,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_udp_packets == CONFIG_BOOLEAN_YES || (do_udp_packets == CONFIG_BOOLEAN_AUTO && (Udp6InDatagrams || Udp6OutDatagrams))) {
         do_udp_packets = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udppackets");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -518,7 +516,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Udp6IgnoredMulti
         ))) {
         do_udp_errors = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udperrors");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -558,7 +556,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_udplite_packets == CONFIG_BOOLEAN_YES || (do_udplite_packets == CONFIG_BOOLEAN_AUTO && (UdpLite6InDatagrams || UdpLite6OutDatagrams))) {
         do_udplite_packets = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udplitepackets");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -597,7 +595,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || UdpLite6InCsumErrors
         ))) {
         do_udplite_errors = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udpliteerrors");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -635,7 +633,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO && (Ip6OutMcastOctets || Ip6InMcastOctets))) {
         do_mcast = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".mcast");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -667,7 +665,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO && (Ip6OutBcastOctets || Ip6InBcastOctets))) {
         do_bcast = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".bcast");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -699,7 +697,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO && (Ip6OutMcastPkts || Ip6InMcastPkts))) {
         do_mcast_p = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".mcastpkts");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -731,7 +729,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_icmp == CONFIG_BOOLEAN_YES || (do_icmp == CONFIG_BOOLEAN_AUTO && (Icmp6InMsgs || Icmp6OutMsgs))) {
         do_icmp = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmp");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -762,7 +760,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_icmp_redir == CONFIG_BOOLEAN_YES || (do_icmp_redir == CONFIG_BOOLEAN_AUTO && (Icmp6InRedirects || Icmp6OutRedirects))) {
         do_icmp_redir = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpredir");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -806,7 +804,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutParmProblems
         ))) {
         do_icmp_errors = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmperrors");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -862,7 +860,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutEchoReplies
         ))) {
         do_icmp_echos = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpechos");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -905,7 +903,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutGroupMembReductions
         ))) {
         do_icmp_groupmemb = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".groupmemb");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -949,7 +947,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutRouterAdvertisements
         ))) {
         do_icmp_router = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmprouter");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -990,7 +988,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutNeighborAdvertisements
         ))) {
         do_icmp_neighbor = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpneighbor");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -1025,7 +1023,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_icmp_mldv2 == CONFIG_BOOLEAN_YES || (do_icmp_mldv2 == CONFIG_BOOLEAN_AUTO && (Icmp6InMLDv2Reports || Icmp6OutMLDv2Reports))) {
         do_icmp_mldv2 = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpmldv2");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -1068,7 +1066,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutType143
         ))) {
         do_icmp_types = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmptypes");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6
@@ -1121,7 +1119,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Ip6InCEPkts
         ))) {
         do_ect = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".ect");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_SNMP6

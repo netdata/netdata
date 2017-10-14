@@ -323,8 +323,7 @@ void registry_statistics(void) {
 
     static RRDSET *sts = NULL, *stc = NULL, *stm = NULL;
 
-    if(!sts) sts = rrdset_find_localhost("netdata.registry_sessions");
-    if(!sts) {
+    if(unlikely(!sts)) {
         sts = rrdset_create_localhost(
                 "netdata"
                 , "registry_sessions"
@@ -349,8 +348,7 @@ void registry_statistics(void) {
 
     // ------------------------------------------------------------------------
 
-    if(!stc) stc = rrdset_find_localhost("netdata.registry_entries");
-    if(!stc) {
+    if(unlikely(!stc)) {
         stc = rrdset_create_localhost(
                 "netdata"
                 , "registry_entries"
@@ -383,8 +381,7 @@ void registry_statistics(void) {
 
     // ------------------------------------------------------------------------
 
-    if(!stm) stm = rrdset_find_localhost("netdata.registry_mem");
-    if(!stm) {
+    if(unlikely(!stm)) {
         stm = rrdset_create_localhost(
                 "netdata"
                 , "registry_mem"

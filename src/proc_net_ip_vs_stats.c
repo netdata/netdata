@@ -35,13 +35,13 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     InBytes     = strtoull(procfile_lineword(ff, 2, 3), NULL, 16);
     OutBytes    = strtoull(procfile_lineword(ff, 2, 4), NULL, 16);
 
-    RRDSET *st;
 
     // --------------------------------------------------------------------
 
     if(do_sockets) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_IPVS ".sockets");
-        if(!st) {
+        static RRDSET *st = NULL;
+
+        if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_IPVS
                     , "sockets"
@@ -68,8 +68,8 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_packets) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_IPVS ".packets");
-        if(!st) {
+        static RRDSET *st = NULL;
+        if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_IPVS
                     , "packets"
@@ -98,8 +98,8 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_bandwidth) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_IPVS ".net");
-        if(!st) {
+        static RRDSET *st = NULL;
+        if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_IPVS
                     , "net"

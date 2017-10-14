@@ -655,7 +655,7 @@ static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
         d->name = NULL;
     }
 
-    if(likely(name && *name && strcmp(d->id, name))) {
+    if(likely(name && *name && strcmp(d->id, name) == 0)) {
         debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", d->id, name);
         d->name = strdupz(name);
         d->name_updated = 1;
@@ -826,7 +826,6 @@ void *tc_main(void *ptr) {
         error("Cannot set pthread cancel state to ENABLE.");
 
     struct rusage thread;
-    RRDSET *stcpu = NULL, *sttime = NULL;
 
     char buffer[TC_LINE_MAX+1] = "";
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -1039,7 +1038,9 @@ void *tc_main(void *ptr) {
                 // debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
                 getrusage(RUSAGE_THREAD, &thread);
 
-                if(unlikely(!stcpu)) stcpu = rrdset_find_localhost("netdata.plugin_tc_cpu");
+                RRDSET *stcpu = NULL;
+                static RRDDIM *rd_user = NULL, *rd_system = NULL;
+
                 if(unlikely(!stcpu)) {
                     stcpu = rrdset_create_localhost(
                             "netdata"
@@ -1055,16 +1056,18 @@ void *tc_main(void *ptr) {
                             , localhost->rrd_update_every
                             , RRDSET_TYPE_STACKED
                     );
-                    rrddim_add(stcpu, "user",  NULL,  1, 1000, RRD_ALGORITHM_INCREMENTAL);
-                    rrddim_add(stcpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+                    rd_user   = rrddim_add(stcpu, "user",  NULL,  1, 1000, RRD_ALGORITHM_INCREMENTAL);
+                    rd_system = rrddim_add(stcpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(stcpu);
 
-                rrddim_set(stcpu, "user"  , thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-                rrddim_set(stcpu, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+                rrddim_set_by_pointer(stcpu, rd_user  , thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+                rrddim_set_by_pointer(stcpu, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
                 rrdset_done(stcpu);
 
-                if(unlikely(!sttime)) sttime = rrdset_find_localhost("netdata.plugin_tc_time");
+                RRDSET *sttime = NULL;
+                static RRDDIM *rd_run_time = NULL;
+
                 if(unlikely(!sttime)) {
                     sttime = rrdset_create_localhost(
                             "netdata"
@@ -1080,11 +1083,11 @@ void *tc_main(void *ptr) {
                             , localhost->rrd_update_every
                             , RRDSET_TYPE_AREA
                     );
-                    rrddim_add(sttime, "run_time",  "run time",  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rd_run_time = rrddim_add(sttime, "run_time",  "run time",  1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(sttime);
 
-                rrddim_set(sttime, "run_time", atoll(words[1]));
+                rrddim_set_by_pointer(sttime, rd_run_time, str2ll(words[1], NULL));
                 rrdset_done(sttime);
 
             }

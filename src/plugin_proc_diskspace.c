@@ -395,22 +395,20 @@ void *proc_diskspace_main(void *ptr) {
             getrusage(RUSAGE_THREAD, &thread);
 
             if(!stcpu_thread) {
-                stcpu_thread = rrdset_find_localhost("netdata.plugin_diskspace");
-                if(!stcpu_thread)
-                    stcpu_thread = rrdset_create_localhost(
-                            "netdata"
-                            , "plugin_diskspace"
-                            , NULL
-                            , "diskspace"
-                            , NULL
-                            , "NetData Disk Space Plugin CPU usage"
-                            , "milliseconds/s"
-                            , "diskspace"
-                            , NULL
-                            , 132020
-                            , update_every
-                            , RRDSET_TYPE_STACKED
-                    );
+                stcpu_thread = rrdset_create_localhost(
+                        "netdata"
+                        , "plugin_diskspace"
+                        , NULL
+                        , "diskspace"
+                        , NULL
+                        , "NetData Disk Space Plugin CPU usage"
+                        , "milliseconds/s"
+                        , "diskspace"
+                        , NULL
+                        , 132020
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
 
                 rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
                 rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
@@ -425,22 +423,20 @@ void *proc_diskspace_main(void *ptr) {
             // ----------------------------------------------------------------
 
             if(!st_duration) {
-                st_duration = rrdset_find_localhost("netdata.plugin_diskspace_dt");
-                if(!st_duration)
-                    st_duration = rrdset_create_localhost(
-                            "netdata"
-                            , "plugin_diskspace_dt"
-                            , NULL
-                            , "diskspace"
-                            , NULL
-                            , "NetData Disk Space Plugin Duration"
-                            , "milliseconds/run"
-                            , "diskspace"
-                            , NULL
-                            , 132021
-                            , update_every
-                            , RRDSET_TYPE_AREA
-                    );
+                st_duration = rrdset_create_localhost(
+                        "netdata"
+                        , "plugin_diskspace_dt"
+                        , NULL
+                        , "diskspace"
+                        , NULL
+                        , "NetData Disk Space Plugin Duration"
+                        , "milliseconds/run"
+                        , "diskspace"
+                        , NULL
+                        , 132021
+                        , update_every
+                        , RRDSET_TYPE_AREA
+                );
 
                 rd_duration = rrddim_add(st_duration, "duration", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             }
