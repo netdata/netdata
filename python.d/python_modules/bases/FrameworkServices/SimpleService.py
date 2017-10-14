@@ -11,7 +11,7 @@ except ImportError:
     from time import sleep, time
 
 from bases.charts import Charts, create_runtime_chart
-from bases.collection import OldVersionCompatibility, UsefulFuncs, safe_print
+from bases.collection import OldVersionCompatibility, safe_print
 from bases.loggers import PythonDLimitedLogger
 
 CHART_OBSOLETE_PENALTY = 10
