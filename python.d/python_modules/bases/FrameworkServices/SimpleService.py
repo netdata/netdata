@@ -70,7 +70,6 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         self.charts = Charts(job_name=self.actual_name,
                              priority=configuration.pop('priority', 60000),
                              update_every=self.update_every)
-        self.functions = UsefulFuncs()
 
     def __repr__(self):
         return '<{cls_bases}: {name}>'.format(cls_bases=', '.join(c.__name__ for c in self.__class__.__bases__),

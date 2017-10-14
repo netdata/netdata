@@ -3,9 +3,12 @@
 # Author: Pawel Krupa (paulfantom)
 # Author: Ilya Mashchenko (l2isbad)
 
+import os
+
 from subprocess import Popen, PIPE
 
 from bases.FrameworkServices.SimpleService import SimpleService
+from bases.collection import find_binary
 
 
 class ExecutableService(SimpleService):
@@ -57,14 +60,14 @@ class ExecutableService(SimpleService):
 
         # Find absolute path ('echo' => '/bin/echo')
         if '/' not in command:
-            command = self.functions.find_binary(command)
+            command = find_binary(command)
             if not command:
                 self.error('Can\'t locate "{command}" binary'.format(command=self.command))
                 return False
         # Check if binary exist and executable
         else:
-            if not (self.functions.is_file_executable(command)):
-                self.error('"{binary}" is not a file or not executable'.format(binary=command))
+            if not os.access(command, os.X_OK):
+                self.error('"{binary}" is not executable'.format(binary=command))
                 return False
 
         self.command = [command] + opts if opts else [command]

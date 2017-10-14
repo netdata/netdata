@@ -60,6 +60,18 @@ def safe_print(msg):
     print(msg)
 
 
+def find_binary(binary):
+    """
+    :param binary: <str>
+    :return:
+    """
+    for directory in PATH:
+        binary_name = '/'.join([directory, binary])
+        if os.path.isfile(binary_name) and os.access(binary_name, os.X_OK):
+            return binary_name
+    return None
+
+
 class OldVersionCompatibility:
 
     def __init__(self):
@@ -119,49 +131,3 @@ class OldVersionCompatibility:
     def commit(self):
         print(self._data_stream)
         self._data_stream = str()
-
-
-class UsefulFuncs:
-    @staticmethod
-    def find_binary(binary):
-        """
-        :param binary: <str>
-        :return:
-        """
-        for directory in PATH:
-            binary_name = '/'.join([directory, binary])
-            if os.path.isfile(binary_name) and os.access(binary_name, os.X_OK):
-                return binary_name
-        return None
-
-    @staticmethod
-    def is_file_readable(f):
-        """
-        :param f: <str>
-        :return:
-        """
-        return os.path.isfile(f) and os.access(f, os.R_OK)
-
-    @staticmethod
-    def is_file_executable(f):
-        """
-        :param f: <str>
-        :return:
-        """
-        return os.path.isfile(f) and os.access(f, os.X_OK)
-
-    @staticmethod
-    def get_file_size(f):
-        """
-        :param f: <str>
-        :return:
-        """
-        return os.path.getsize(f)
-
-    @staticmethod
-    def is_directory(d):
-        """
-        :param d: <str>
-        :return:
-        """
-        return os.path.isdir(d)
