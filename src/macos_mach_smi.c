@@ -155,8 +155,20 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             if (likely(do_swapio)) {
                 st = rrdset_find_localhost("system.swapio");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250
-                                                 , update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost(
+                            "system"
+                            , "swapio"
+                            , NULL
+                            , "swap"
+                            , NULL
+                            , "Swap I/O"
+                            , "kilobytes/s"
+                            , "macos"
+                            , "mach_smi"
+                            , 250
+                            , update_every
+                            , RRDSET_TYPE_AREA
+                    );
 
                     rrddim_add(st, "in",  NULL, system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "out", NULL, -system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
