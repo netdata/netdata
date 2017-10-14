@@ -2,9 +2,9 @@
 # Description: NSD `nsd-control stats_noreset` netdata python.d module
 # Author: <383c57 at gmail.com>
 
-
-from base import ExecutableService
 import re
+
+from bases.FrameworkServices.ExecutableService import ExecutableService
 
 # default module values (can be overridden per job in `config`)
 priority = 60000
