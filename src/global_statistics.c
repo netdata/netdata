@@ -122,14 +122,6 @@ void global_statistics_charts(void) {
     static collected_number compression_ratio = -1,
                             average_response_time = -1;
 
-    static RRDSET *stcpu = NULL,
-                  *stcpu_thread = NULL,
-                  *stclients = NULL,
-                  *streqs = NULL,
-                  *stbytes = NULL,
-                  *stduration = NULL,
-                  *stcompression = NULL;
-
     struct global_statistics gs;
     struct rusage me, thread;
 
@@ -137,241 +129,280 @@ void global_statistics_charts(void) {
     getrusage(RUSAGE_THREAD, &thread);
     getrusage(RUSAGE_SELF, &me);
 
+    {
+        static RRDSET *st_cpu_thread = NULL;
+        static RRDDIM *rd_cpu_thread_user = NULL,
+                      *rd_cpu_thread_system = NULL;
+
 #ifdef __FreeBSD__
-    if (unlikely(!stcpu_thread)) {
-        stcpu_thread = rrdset_create_localhost(
-                "netdata"
-                , "plugin_freebsd_cpu"
-                , NULL
-                , "freebsd"
-                , NULL
-                , "NetData FreeBSD Plugin CPU usage"
-                , "milliseconds/s"
-                , "netdata"
-                , "stats"
-                , 132000
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_STACKED
-        );
+        if (unlikely(!st_cpu_thread)) {
+            st_cpu_thread = rrdset_create_localhost(
+                    "netdata"
+                    , "plugin_freebsd_cpu"
+                    , NULL
+                    , "freebsd"
+                    , NULL
+                    , "NetData FreeBSD Plugin CPU usage"
+                    , "milliseconds/s"
+                    , "netdata"
+                    , "stats"
+                    , 132000
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_STACKED
+            );
 #else
-    if (unlikely(!stcpu_thread)) {
-        stcpu_thread = rrdset_create_localhost(
-                "netdata"
-                , "plugin_proc_cpu"
-                , NULL
-                , "proc"
-                , NULL
-                , "NetData Proc Plugin CPU usage"
-                , "milliseconds/s"
-                , "netdata"
-                , "stats"
-                , 132000
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_STACKED
-        );
+        if (unlikely(!st_cpu_thread)) {
+            st_cpu_thread = rrdset_create_localhost(
+                    "netdata"
+                    , "plugin_proc_cpu"
+                    , NULL
+                    , "proc"
+                    , NULL
+                    , "NetData Proc Plugin CPU usage"
+                    , "milliseconds/s"
+                    , "netdata"
+                    , "stats"
+                    , 132000
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_STACKED
+            );
 #endif
 
-        rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-    }
-    else
-        rrdset_next(stcpu_thread);
+            rd_cpu_thread_user   = rrddim_add(st_cpu_thread, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            rd_cpu_thread_system = rrddim_add(st_cpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_cpu_thread);
 
-    rrddim_set(stcpu_thread, "user", thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
-    rrddim_set(stcpu_thread, "system", thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
-    rrdset_done(stcpu_thread);
+        rrddim_set_by_pointer(st_cpu_thread, rd_cpu_thread_user,   thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+        rrddim_set_by_pointer(st_cpu_thread, rd_cpu_thread_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+        rrdset_done(st_cpu_thread);
+    }
 
     // ----------------------------------------------------------------
 
-    if (unlikely(!stcpu)) {
-        stcpu = rrdset_create_localhost(
-                "netdata"
-                , "server_cpu"
-                , NULL
-                , "netdata"
-                , NULL
-                , "NetData CPU usage"
-                , "milliseconds/s"
-                , "netdata"
-                , "stats"
-                , 130000
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_STACKED
-        );
+    {
+        static RRDSET *st_cpu = NULL;
+        static RRDDIM *rd_cpu_user   = NULL,
+                      *rd_cpu_system = NULL;
 
-        rrddim_add(stcpu, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        rrddim_add(stcpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        if (unlikely(!st_cpu)) {
+            st_cpu = rrdset_create_localhost(
+                    "netdata"
+                    , "server_cpu"
+                    , NULL
+                    , "netdata"
+                    , NULL
+                    , "NetData CPU usage"
+                    , "milliseconds/s"
+                    , "netdata"
+                    , "stats"
+                    , 130000
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_cpu_user   = rrddim_add(st_cpu, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            rd_cpu_system = rrddim_add(st_cpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_cpu);
+
+        rrddim_set_by_pointer(st_cpu, rd_cpu_user,   me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec);
+        rrddim_set_by_pointer(st_cpu, rd_cpu_system, me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec);
+        rrdset_done(st_cpu);
     }
-    else
-        rrdset_next(stcpu);
-
-    rrddim_set(stcpu, "user", me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec);
-    rrddim_set(stcpu, "system", me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec);
-    rrdset_done(stcpu);
 
     // ----------------------------------------------------------------
 
-    if (unlikely(!stclients)) {
-        stclients = rrdset_create_localhost(
-                "netdata"
-                , "clients"
-                , NULL
-                , "netdata"
-                , NULL
-                , "NetData Web Clients"
-                , "connected clients"
-                , "netdata"
-                , "stats"
-                , 130200
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_LINE
-        );
+    {
+        static RRDSET *st_clients = NULL;
+        static RRDDIM *rd_clients = NULL;
 
-        rrddim_add(stclients, "clients", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        if (unlikely(!st_clients)) {
+            st_clients = rrdset_create_localhost(
+                    "netdata"
+                    , "clients"
+                    , NULL
+                    , "netdata"
+                    , NULL
+                    , "NetData Web Clients"
+                    , "connected clients"
+                    , "netdata"
+                    , "stats"
+                    , 130200
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_clients = rrddim_add(st_clients, "clients", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(st_clients);
+
+        rrddim_set_by_pointer(st_clients, rd_clients, gs.connected_clients);
+        rrdset_done(st_clients);
     }
-    else
-        rrdset_next(stclients);
-
-    rrddim_set(stclients, "clients", gs.connected_clients);
-    rrdset_done(stclients);
 
     // ----------------------------------------------------------------
 
-    if (unlikely(!streqs)) {
-        streqs = rrdset_create_localhost(
-                "netdata"
-                , "requests"
-                , NULL
-                , "netdata"
-                , NULL
-                , "NetData Web Requests"
-                , "requests/s"
-                , "netdata"
-                , "stats"
-                , 130300
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_LINE
-        );
+    {
+        static RRDSET *st_reqs = NULL;
+        static RRDDIM *rd_requests = NULL;
 
-        rrddim_add(streqs, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if (unlikely(!st_reqs)) {
+            st_reqs = rrdset_create_localhost(
+                    "netdata"
+                    , "requests"
+                    , NULL
+                    , "netdata"
+                    , NULL
+                    , "NetData Web Requests"
+                    , "requests/s"
+                    , "netdata"
+                    , "stats"
+                    , 130300
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_requests = rrddim_add(st_reqs, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_reqs);
+
+        rrddim_set_by_pointer(st_reqs, rd_requests, (collected_number) gs.web_requests);
+        rrdset_done(st_reqs);
     }
-    else
-        rrdset_next(streqs);
-
-    rrddim_set(streqs, "requests", (collected_number) gs.web_requests);
-    rrdset_done(streqs);
 
     // ----------------------------------------------------------------
 
-    if (unlikely(!stbytes)) {
-        stbytes = rrdset_create_localhost(
-                "netdata"
-                , "net"
-                , NULL
-                , "netdata"
-                , NULL
-                , "NetData Network Traffic"
-                , "kilobits/s"
-                , "netdata"
-                , "stats"
-                , 130000
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_AREA
-        );
+    {
+        static RRDSET *st_bytes = NULL;
+        static RRDDIM *rd_in = NULL,
+                      *rd_out = NULL;
 
-        rrddim_add(stbytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-        rrddim_add(stbytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        if (unlikely(!st_bytes)) {
+            st_bytes = rrdset_create_localhost(
+                    "netdata"
+                    , "net"
+                    , NULL
+                    , "netdata"
+                    , NULL
+                    , "NetData Network Traffic"
+                    , "kilobits/s"
+                    , "netdata"
+                    , "stats"
+                    , 130000
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_in  = rrddim_add(st_bytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_bytes);
+
+        rrddim_set_by_pointer(st_bytes, rd_in, (collected_number) gs.bytes_received);
+        rrddim_set_by_pointer(st_bytes, rd_out, (collected_number) gs.bytes_sent);
+        rrdset_done(st_bytes);
     }
-    else
-        rrdset_next(stbytes);
-
-    rrddim_set(stbytes, "in", (collected_number) gs.bytes_received);
-    rrddim_set(stbytes, "out", (collected_number) gs.bytes_sent);
-    rrdset_done(stbytes);
 
     // ----------------------------------------------------------------
 
-    if (unlikely(!stduration)) {
-        stduration = rrdset_create_localhost(
-                "netdata"
-                , "response_time"
-                , NULL
-                , "netdata"
-                , NULL
-                , "NetData API Response Time"
-                , "ms/request"
-                , "netdata"
-                , "stats"
-                , 130400
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_LINE
-        );
+    {
+        static RRDSET *st_duration = NULL;
+        static RRDDIM *rd_average = NULL,
+                      *rd_max     = NULL;
 
-        rrddim_add(stduration, "average", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-        rrddim_add(stduration, "max", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        if (unlikely(!st_duration)) {
+            st_duration = rrdset_create_localhost(
+                    "netdata"
+                    , "response_time"
+                    , NULL
+                    , "netdata"
+                    , NULL
+                    , "NetData API Response Time"
+                    , "ms/request"
+                    , "netdata"
+                    , "stats"
+                    , 130400
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_average = rrddim_add(st_duration, "average", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rd_max = rrddim_add(st_duration, "max", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(st_duration);
+
+        uint64_t gweb_usec = gs.web_usec;
+        uint64_t gweb_requests = gs.web_requests;
+
+        uint64_t web_usec = (gweb_usec >= old_web_usec) ? gweb_usec - old_web_usec : 0;
+        uint64_t web_requests = (gweb_requests >= old_web_requests) ? gweb_requests - old_web_requests : 0;
+
+        old_web_usec = gweb_usec;
+        old_web_requests = gweb_requests;
+
+        if (web_requests)
+            average_response_time = (collected_number) (web_usec / web_requests);
+
+        if (unlikely(average_response_time != -1))
+            rrddim_set_by_pointer(st_duration, rd_average, average_response_time);
+        else
+            rrddim_set_by_pointer(st_duration, rd_average, 0);
+
+        rrddim_set_by_pointer(st_duration, rd_max, ((gs.web_usec_max)?(collected_number)gs.web_usec_max:average_response_time));
+        rrdset_done(st_duration);
     }
-    else
-        rrdset_next(stduration);
-
-    uint64_t gweb_usec = gs.web_usec;
-    uint64_t gweb_requests = gs.web_requests;
-
-    uint64_t web_usec = (gweb_usec >= old_web_usec) ? gweb_usec - old_web_usec : 0;
-    uint64_t web_requests = (gweb_requests >= old_web_requests) ? gweb_requests - old_web_requests : 0;
-
-    old_web_usec = gweb_usec;
-    old_web_requests = gweb_requests;
-
-    if (web_requests)
-        average_response_time = (collected_number) (web_usec / web_requests);
-
-    if (unlikely(average_response_time != -1))
-        rrddim_set(stduration, "average", average_response_time);
-    else
-        rrddim_set(stduration, "average", 0);
-
-    rrddim_set(stduration, "max", ((gs.web_usec_max)?(collected_number)gs.web_usec_max:average_response_time));
-    rrdset_done(stduration);
 
     // ----------------------------------------------------------------
 
-    if (unlikely(!stcompression)) {
-        stcompression = rrdset_create_localhost(
-                "netdata"
-                , "compression_ratio"
-                , NULL
-                , "netdata"
-                , NULL
-                , "NetData API Responses Compression Savings Ratio"
-                , "percentage"
-                , "netdata"
-                , "stats"
-                , 130500
-                , localhost->rrd_update_every
-                , RRDSET_TYPE_LINE
-        );
+    {
+        static RRDSET *st_compression = NULL;
+        static RRDDIM *rd_savings = NULL;
 
-        rrddim_add(stcompression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        if (unlikely(!st_compression)) {
+            st_compression = rrdset_create_localhost(
+                    "netdata"
+                    , "compression_ratio"
+                    , NULL
+                    , "netdata"
+                    , NULL
+                    , "NetData API Responses Compression Savings Ratio"
+                    , "percentage"
+                    , "netdata"
+                    , "stats"
+                    , 130500
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(st_compression);
+
+        // since we don't lock here to read the global statistics
+        // read the smaller value first
+        unsigned long long gcompressed_content_size = gs.compressed_content_size;
+        unsigned long long gcontent_size = gs.content_size;
+
+        unsigned long long compressed_content_size = gcompressed_content_size - old_compressed_content_size;
+        unsigned long long content_size = gcontent_size - old_content_size;
+
+        old_compressed_content_size = gcompressed_content_size;
+        old_content_size = gcontent_size;
+
+        if (content_size && content_size >= compressed_content_size)
+            compression_ratio = ((content_size - compressed_content_size) * 100 * 1000) / content_size;
+
+        if (compression_ratio != -1)
+            rrddim_set_by_pointer(st_compression, rd_savings, compression_ratio);
+
+        rrdset_done(st_compression);
     }
-    else
-        rrdset_next(stcompression);
-
-    // since we don't lock here to read the global statistics
-    // read the smaller value first
-    unsigned long long gcompressed_content_size = gs.compressed_content_size;
-    unsigned long long gcontent_size = gs.content_size;
-
-    unsigned long long compressed_content_size = gcompressed_content_size - old_compressed_content_size;
-    unsigned long long content_size = gcontent_size - old_content_size;
-
-    old_compressed_content_size = gcompressed_content_size;
-    old_content_size = gcontent_size;
-
-    if (content_size && content_size >= compressed_content_size)
-        compression_ratio = ((content_size - compressed_content_size) * 100 * 1000) / content_size;
-
-    if (compression_ratio != -1)
-        rrddim_set(stcompression, "savings", compression_ratio);
-
-    rrdset_done(stcompression);
 }
