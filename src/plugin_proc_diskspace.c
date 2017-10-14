@@ -394,7 +394,7 @@ void *proc_diskspace_main(void *ptr) {
 
             getrusage(RUSAGE_THREAD, &thread);
 
-            if(!stcpu_thread) {
+            if(unlikely(!stcpu_thread)) {
                 stcpu_thread = rrdset_create_localhost(
                         "netdata"
                         , "plugin_diskspace"
@@ -422,7 +422,7 @@ void *proc_diskspace_main(void *ptr) {
 
             // ----------------------------------------------------------------
 
-            if(!st_duration) {
+            if(unlikely(!st_duration)) {
                 st_duration = rrdset_create_localhost(
                         "netdata"
                         , "plugin_diskspace_dt"
