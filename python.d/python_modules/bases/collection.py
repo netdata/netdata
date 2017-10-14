@@ -72,6 +72,17 @@ def find_binary(binary):
     return None
 
 
+def read_last_line(f):
+    with open(f, 'rb') as opened:
+        opened.seek(-2, 2)
+        while opened.read(1) != b'\n':
+            opened.seek(-2, 1)
+            if opened.tell() == 0:
+                break
+        result = opened.readline()
+    return result.decode()
+
+
 class OldVersionCompatibility:
 
     def __init__(self):
