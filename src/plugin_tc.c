@@ -655,7 +655,7 @@ static inline void tc_device_set_device_name(struct tc_device *d, char *name) {
         d->name = NULL;
     }
 
-    if(likely(name && *name && strcmp(d->id, name) == 0)) {
+    if(likely(name && *name && strcmp(d->id, name) != 0)) {
         debug(D_TC_LOOP, "TC: Setting device '%s' name to '%s'", d->id, name);
         d->name = strdupz(name);
         d->name_updated = 1;
