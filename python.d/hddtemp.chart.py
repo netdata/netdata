@@ -41,7 +41,6 @@ class Service(SocketService):
         self.request = ""
         self.host = "127.0.0.1"
         self.port = 7634
-        self.fahrenheit = self.configuration.get('fahrenheit')
         self.disks = list()
 
     def get_disks(self):
@@ -84,7 +83,7 @@ class Service(SocketService):
             if not raw[i*5+1] in self.disks:
                 continue
             try:
-                val = self.calc_temperature(int(raw[i*5+3]))
+                val = int(raw[i*5+3])
             except ValueError:
                 val = 0
             data[raw[i*5+1].replace("/dev/", "")] = val
@@ -106,14 +105,6 @@ class Service(SocketService):
         if data is None:
             return False
 
-        if self.fahrenheit:
-            self.definitions['temperatures']['options'][2] = 'Fahrenheit'
-
         for name in data:
             self.definitions['temperatures']['lines'].append([name])
         return True
-
-    def calc_temperature(self, value):
-        if not self.fahrenheit:
-            return value
-        return value * 9 / 5 + 32
