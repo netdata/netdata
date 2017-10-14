@@ -140,6 +140,8 @@ int do_vm_loadavg(int update_every, usec_t dt){
                                              NULL,
                                              "System Load Average",
                                              "load",
+                                             "freebsd",
+                                             "vm.loadavg",
                                              100,
                                              (update_every < MIN_LOADAVG_UPDATE_EVERY) ?
                                              MIN_LOADAVG_UPDATE_EVERY : update_every, RRDSET_TYPE_LINE
@@ -206,6 +208,8 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                                                  NULL,
                                                  "System Active Processes",
                                                  "processes",
+                                                 "freebsd",
+                                                 "vm.vmtotal",
                                                  750,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -232,6 +236,8 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                                                  NULL,
                                                  "System Processes",
                                                  "processes",
+                                                 "freebsd",
+                                                 "vm.vmtotal",
                                                  600,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -261,6 +267,8 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
                                                  NULL,
                                                  "Committed (Allocated) Memory",
                                                  "MB",
+                                                 "freebsd",
+                                                 "vm.vmtotal",
                                                  5000,
                                                  update_every,
                                                  RRDSET_TYPE_AREA
@@ -317,6 +325,8 @@ int do_kern_cp_time(int update_every, usec_t dt) {
                                              "system.cpu",
                                              "Total CPU utilization",
                                              "percentage",
+                                             "freebsd",
+                                             "kern.cp_time",
                                              100, update_every,
                                              RRDSET_TYPE_STACKED
                 );
@@ -395,6 +405,8 @@ int do_kern_cp_times(int update_every, usec_t dt) {
                                                                    "cpu.cpu",
                                                                    "Core utilization",
                                                                    "percentage",
+                                                                   "freebsd",
+                                                                   "kern.cp_times",
                                                                    1000,
                                                                    update_every,
                                                                    RRDSET_TYPE_STACKED
@@ -475,12 +487,15 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
                                      "temperature",
                                      "cpu.temperatute",
                                      "Core temperature",
-                                     "degree",
+                                     "Celsius",
+                                     "freebsd",
+                                     "dev.cpu.temperature",
                                      1050,
                                      update_every,
                                      RRDSET_TYPE_LINE
         );
-    } else rrdset_next(st);
+    }
+    else rrdset_next(st);
 
     for (i = 0; i < number_of_cpus; i++) {
         if (unlikely(!rd_pcpu_temperature[i])) {
@@ -525,6 +540,8 @@ int do_dev_cpu_0_freq(int update_every, usec_t dt) {
                                          NULL,
                                          "Current CPU Scaling Frequency",
                                          "MHz",
+                                         "freebsd",
+                                         "dev.cpu.0.freq",
                                          5003,
                                          update_every,
                                          RRDSET_TYPE_LINE
@@ -586,6 +603,8 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                                                   NULL,
                                                   "Total Hardware Interrupts",
                                                   "interrupts/s",
+                                                  "freebsd",
+                                                  "hw.intrcnt",
                                                   900,
                                                   update_every,
                                                   RRDSET_TYPE_LINE
@@ -629,6 +648,8 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                                                             NULL,
                                                             "System interrupts",
                                                             "interrupts/s",
+                                                            "freebsd",
+                                                            "hw.intrcnt",
                                                             1000,
                                                             update_every,
                                                             RRDSET_TYPE_STACKED
@@ -682,6 +703,8 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
                                          NULL,
                                          "Device Interrupts",
                                          "interrupts/s",
+                                         "freebsd",
+                                         "vm.stats.sys.v_intr",
                                          1000,
                                          update_every,
                                          RRDSET_TYPE_LINE
@@ -725,6 +748,8 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
                                          NULL,
                                          "Software Interrupts",
                                          "interrupts/s",
+                                         "freebsd",
+                                         "vm.stats.sys.v_soft",
                                          1100,
                                          update_every,
                                          RRDSET_TYPE_LINE
@@ -768,6 +793,8 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
                                          NULL,
                                          "CPU Context Switches",
                                          "context switches/s",
+                                         "freebsd",
+                                         "vm.stats.sys.v_swtch",
                                          800,
                                          update_every,
                                          RRDSET_TYPE_LINE
@@ -811,6 +838,8 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
                                          NULL,
                                          "Started Processes",
                                          "processes/s",
+                                         "freebsd",
+                                         "vm.stats.sys.v_swtch",
                                          700,
                                          update_every,
                                          RRDSET_TYPE_LINE
@@ -885,6 +914,8 @@ int do_vm_swap_info(int update_every, usec_t dt) {
                                          NULL,
                                          "System Swap",
                                          "MB",
+                                         "freebsd",
+                                         "vm.swap_info",
                                          201,
                                          update_every,
                                          RRDSET_TYPE_STACKED
@@ -943,6 +974,8 @@ int do_system_ram(int update_every, usec_t dt) {
                                          NULL,
                                          "System RAM",
                                          "MB",
+                                         "freebsd",
+                                         "System.ram",
                                          200,
                                          update_every,
                                          RRDSET_TYPE_STACKED
@@ -1001,6 +1034,8 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
                                          NULL,
                                          "Swap I/O",
                                          "kilobytes/s",
+                                         "freebsd",
+                                         "vm.stats.vm.v_swappgs",
                                          250,
                                          update_every,
                                          RRDSET_TYPE_AREA
@@ -1052,6 +1087,8 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
                                          NULL,
                                          "Memory Page Faults",
                                          "page faults/s",
+                                         "freebsd",
+                                         "vm.stats.vm.v_pgfaults",
                                          500,
                                          update_every,
                                          RRDSET_TYPE_LINE
@@ -1131,6 +1168,8 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
                                                         NULL,
                                                         "IPC Semaphores",
                                                         "semaphores",
+                                                        "freebsd",
+                                                        "kern.ipc.sem",
                                                         1000,
                                                         update_every,
                                                         RRDSET_TYPE_AREA
@@ -1153,6 +1192,8 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
                                                               NULL,
                                                               "IPC Semaphore Arrays",
                                                               "arrays",
+                                                              "freebsd",
+                                                              "kern.ipc.sem",
                                                               1000,
                                                               update_every,
                                                               RRDSET_TYPE_AREA
@@ -1224,6 +1265,8 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
                                              NULL,
                                              "IPC Shared Memory Segments",
                                              "segments",
+                                             "freebsd",
+                                             "kern.ipc.shm",
                                              1000,
                                              update_every,
                                              RRDSET_TYPE_AREA
@@ -1246,6 +1289,8 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
                                              NULL,
                                              "IPC Shared Memory Segments Size",
                                              "kilobytes",
+                                             "freebsd",
+                                             "kern.ipc.shm",
                                              1000,
                                              update_every,
                                              RRDSET_TYPE_AREA
@@ -1323,6 +1368,8 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                                                     NULL,
                                                     "Number of IPC Message Queues",
                                                     "queues",
+                                                    "freebsd",
+                                                    "kern.ipc.msq",
                                                     990,
                                                     update_every,
                                                     RRDSET_TYPE_AREA
@@ -1345,6 +1392,8 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                                                       NULL,
                                                       "Number of Messages in IPC Message Queues",
                                                       "messages",
+                                                      "freebsd",
+                                                      "kern.ipc.msq",
                                                       1000,
                                                       update_every,
                                                       RRDSET_TYPE_AREA
@@ -1367,6 +1416,8 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
                                              NULL,
                                              "Size of IPC Message Queues",
                                              "bytes",
+                                             "freebsd",
+                                             "kern.ipc.msq",
                                              1100,
                                              update_every,
                                              RRDSET_TYPE_LINE
@@ -1408,6 +1459,8 @@ int do_uptime(int update_every, usec_t dt) {
                                      NULL,
                                      "System Uptime",
                                      "seconds",
+                                     "freebsd",
+                                     "uptime",
                                      1000,
                                      update_every,
                                      RRDSET_TYPE_LINE
@@ -1533,6 +1586,8 @@ int do_net_isr(int update_every, usec_t dt) {
                                          NULL,
                                          "System softnet_stat",
                                          "events/s",
+                                         "freebsd",
+                                         "net.isr",
                                          955,
                                          update_every,
                                          RRDSET_TYPE_LINE
@@ -1583,6 +1638,8 @@ int do_net_isr(int update_every, usec_t dt) {
                                                                    NULL,
                                                                    "Per CPU netisr statistics",
                                                                    "events/s",
+                                                                   "freebsd",
+                                                                   "net.isr",
                                                                    1101 + i,
                                                                    update_every,
                                                                    RRDSET_TYPE_LINE
@@ -1642,6 +1699,8 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
                                          NULL,
                                          "IPv4 TCP Connections",
                                          "active connections",
+                                         "freebsd",
+                                         "net.inet.tcp.states",
                                          2500,
                                          update_every,
                                          RRDSET_TYPE_LINE
@@ -1717,6 +1776,8 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 TCP Packets",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.tcp.stats",
                                                  2600,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -1746,6 +1807,8 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 TCP Errors",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.tcp.stats",
                                                  2700,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -1785,6 +1848,8 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 TCP Handshake Issues",
                                                  "events/s",
+                                                 "freebsd",
+                                                 "net.inet.tcp.stats",
                                                  2900,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -1823,6 +1888,8 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "TCP Connection Aborts",
                                                  "connections/s",
+                                                 "freebsd",
+                                                 "net.inet.tcp.stats",
                                                  3010,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -1860,6 +1927,8 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "TCP Out-Of-Order Queue",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.tcp.stats",
                                                  3050,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -1889,6 +1958,8 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "TCP SYN Cookies",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.tcp.stats",
                                                  3100,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -1922,6 +1993,8 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 ECN Statistics",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.tcp.stats",
                                                  8700,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -1993,6 +2066,8 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 UDP Packets",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.udp.stats",
                                                  2601,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2023,6 +2098,8 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 UDP Errors",
                                                  "events/s",
+                                                 "freebsd",
+                                                 "net.inet.udp.stats",
                                                  2701,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2099,16 +2176,19 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4",
-                                                 "icmp",
-                                                 NULL,
-                                                 "icmp",
-                                                 NULL,
-                                                 "IPv4 ICMP Packets",
-                                                 "packets/s",
-                                                 2602,
-                                                 update_every,
-                                                 RRDSET_TYPE_LINE
+                    st = rrdset_create_localhost(
+                            "ipv4"
+                            , "icmp"
+                            , NULL
+                            , "icmp"
+                            , NULL
+                            , "IPv4 ICMP Packets"
+                            , "packets/s"
+                            , "freebsd"
+                            , "net.inet.icmp.stats"
+                            , 2602
+                            , update_every
+                            , RRDSET_TYPE_LINE
                     );
 
                     rd_in  = rrddim_add(st, "InMsgs",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2129,9 +2209,20 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                 static RRDDIM *rd_in = NULL, *rd_out = NULL, *rd_in_csum = NULL;
 
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "icmp_errors", NULL, "icmp", NULL, "IPv4 ICMP Errors",
-                                                 "packets/s",
-                                                 2603, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost(
+                            "ipv4"
+                            , "icmp_errors"
+                            , NULL
+                            , "icmp"
+                            , NULL
+                            , "IPv4 ICMP Errors"
+                            , "packets/s"
+                            , "freebsd"
+                            , "net.inet.icmp.stats"
+                            , 2603
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
 
                     rd_in      = rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out     = rrddim_add(st, "OutErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2154,8 +2245,20 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
                 static RRDDIM *rd_in_reps = NULL, *rd_out_reps = NULL, *rd_in = NULL, *rd_out = NULL;
 
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "icmpmsg", NULL, "icmp", NULL, "IPv4 ICMP Messages",
-                                                 "packets/s", 2604, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost(
+                            "ipv4"
+                            , "icmpmsg"
+                            , NULL
+                            , "icmp"
+                            , NULL
+                            , "IPv4 ICMP Messages"
+                            , "packets/s"
+                            , "freebsd"
+                            , "net.inet.icmp.stats"
+                            , 2604
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
 
                     rd_in_reps  = rrddim_add(st, "InEchoReps",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_out_reps = rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2227,6 +2330,8 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 Packets",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.ip.stats",
                                                  3000,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2260,6 +2365,8 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 Fragments Sent",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.ip.stats",
                                                  3010,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2293,6 +2400,8 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 Fragments Reassembly",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.ip.stats",
                                                  3011,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2328,6 +2437,8 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv4 Errors",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet.ip.stats",
                                                  3002,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2416,6 +2527,8 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 Packets",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet6.ip6.stats",
                                                  3000,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2453,6 +2566,8 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 Fragments Sent",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet6.ip6.stats",
                                                  3010,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2490,6 +2605,8 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 Fragments Reassembly",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet6.ip6.stats",
                                                  3011,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2538,6 +2655,8 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 Errors",
                                                  "packets/s",
+                                                 "freebsd",
+                                                 "net.inet6.ip6.stats",
                                                  3002,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2649,6 +2768,8 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 ICMP Messages",
                                                  "messages/s",
+                                                 "freebsd",
+                                                 "net.inet6.icmp6.stats",
                                                  10000,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2681,6 +2802,8 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 ICMP Redirects",
                                                  "redirects/s",
+                                                 "freebsd",
+                                                 "net.inet6.icmp6.stats",
                                                  10050,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2725,6 +2848,8 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 ICMP Errors",
                                                  "errors/s",
+                                                 "freebsd",
+                                                 "net.inet6.icmp6.stats",
                                                  10100,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2777,6 +2902,8 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 ICMP Echo",
                                                  "messages/s",
+                                                 "freebsd",
+                                                 "net.inet6.icmp6.stats",
                                                  10200,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2817,6 +2944,8 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 Router Messages",
                                                  "messages/s",
+                                                 "freebsd",
+                                                 "net.inet6.icmp6.stats",
                                                  10400,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2857,6 +2986,8 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 Neighbor Messages",
                                                  "messages/s",
+                                                 "freebsd",
+                                                 "net.inet6.icmp6.stats",
                                                  10500,
                                                  update_every,
                                                  RRDSET_TYPE_LINE
@@ -2904,6 +3035,8 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
                                                  NULL,
                                                  "IPv6 ICMP Types",
                                                  "messages/s",
+                                                 "freebsd",
+                                                 "net.inet6.icmp6.stats",
                                                  10700,
                                                  update_every,
                                                  RRDSET_TYPE_LINE

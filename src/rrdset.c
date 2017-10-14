@@ -341,6 +341,8 @@ void rrdset_free(RRDSET *st) {
 
     // free directly allocated members
     freez(st->config_section);
+    freez(st->plugin_name);
+    freez(st->module_name);
 
     switch(st->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
@@ -423,6 +425,8 @@ RRDSET *rrdset_create_custom(
         , const char *context
         , const char *title
         , const char *units
+        , const char *plugin
+        , const char *module
         , long priority
         , int update_every
         , RRDSET_TYPE chart_type
@@ -514,6 +518,8 @@ RRDSET *rrdset_create_custom(
             st->units = NULL;
             st->context = NULL;
             st->cache_dir = NULL;
+            st->plugin_name = NULL;
+            st->module_name = NULL;
             st->dimensions = NULL;
             st->rrdfamily = NULL;
             st->rrdhost = NULL;
@@ -570,6 +576,9 @@ RRDSET *rrdset_create_custom(
         st = callocz(1, size);
         st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
+
+    st->plugin_name = plugin?strdup(plugin):NULL;
+    st->module_name = module?strdup(module):NULL;
 
     st->config_section = strdup(config_section);
     st->rrdhost = host;

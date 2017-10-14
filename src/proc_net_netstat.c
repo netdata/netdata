@@ -260,6 +260,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Bandwidth"
                             , "kilobits/s"
+                            , "proc"
+                            , "net/netstat"
                             , 500
                             , update_every
                             , RRDSET_TYPE_AREA
@@ -293,6 +295,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Input Errors"
                             , "packets/s"
+                            , "proc"
+                            , "net/netstat"
                             , 4000
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -330,6 +334,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Multicast Bandwidth"
                             , "kilobits/s"
+                            , "proc"
+                            , "net/netstat"
                             , 9000
                             , update_every
                             , RRDSET_TYPE_AREA
@@ -366,6 +372,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Broadcast Bandwidth"
                             , "kilobits/s"
+                            , "proc"
+                            , "net/netstat"
                             , 8000
                             , update_every
                             , RRDSET_TYPE_AREA
@@ -402,6 +410,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Multicast Packets"
                             , "packets/s"
+                            , "proc"
+                            , "net/netstat"
                             , 8600
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -437,6 +447,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 Broadcast Packets"
                             , "packets/s"
+                            , "proc"
+                            , "net/netstat"
                             , 8500
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -473,6 +485,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "IPv4 ECN Statistics"
                             , "packets/s"
+                            , "proc"
+                            , "net/netstat"
                             , 8700
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -523,6 +537,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Memory Pressures"
                             , "events/s"
+                            , "proc"
+                            , "net/netstat"
                             , 3000
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -555,6 +571,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Connection Aborts"
                             , "connections/s"
+                            , "proc"
+                            , "net/netstat"
                             , 3010
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -597,6 +615,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Reordered Packets by Detection Method"
                             , "packets/s"
+                            , "proc"
+                            , "net/netstat"
                             , 3020
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -636,6 +656,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Out-Of-Order Queue"
                             , "packets/s"
+                            , "proc"
+                            , "net/netstat"
                             , 3050
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -675,6 +697,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP SYN Cookies"
                             , "packets/s"
+                            , "proc"
+                            , "net/netstat"
                             , 3100
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -712,6 +736,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , NULL
                             , "TCP Listen Socket Issues"
                             , "packets/s"
+                            , "proc"
+                            , "net/netstat"
                             , 3015
                             , update_every
                             , RRDSET_TYPE_LINE

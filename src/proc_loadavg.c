@@ -60,6 +60,8 @@ int do_proc_loadavg(int update_every, usec_t dt) {
                         , NULL
                         , "System Load Average"
                         , "load"
+                        , "proc"
+                        , "loadavg"
                         , 100
                         , (update_every < MIN_LOADAVG_UPDATE_EVERY) ? MIN_LOADAVG_UPDATE_EVERY : update_every
                         , RRDSET_TYPE_LINE
@@ -98,6 +100,8 @@ int do_proc_loadavg(int update_every, usec_t dt) {
                     , NULL
                     , "System Active Processes"
                     , "processes"
+                    , "proc"
+                    , "loadavg"
                     , 750
                     , update_every
                     , RRDSET_TYPE_LINE

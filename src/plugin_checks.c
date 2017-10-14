@@ -16,18 +16,55 @@ void *checks_main(void *ptr) {
 
     RRDSET *check1, *check2, *check3, *apps_cpu = NULL;
 
-    check1 = rrdset_create_localhost("netdata", "check1", NULL, "netdata", NULL, "Caller gives microseconds"
-                                     , "a million !", 99999, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+    check1 = rrdset_create_localhost(
+            "netdata"
+            , "check1"
+            , NULL
+            , "netdata"
+            , NULL
+            , "Caller gives microseconds"
+            , "a million !"
+            , "netdata"
+            , "checks"
+            , 99999
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_LINE
+    );
+
     rrddim_add(check1, "absolute", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(check1, "incremental", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-    check2 = rrdset_create_localhost("netdata", "check2", NULL, "netdata", NULL, "Netdata calcs microseconds"
-                                     , "a million !", 99999, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+    check2 = rrdset_create_localhost(
+            "netdata"
+            , "check2"
+            , NULL
+            , "netdata"
+            , NULL
+            , "Netdata calcs microseconds"
+            , "a million !"
+            , "netdata"
+            , "checks"
+            , 99999
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_LINE
+    );
     rrddim_add(check2, "absolute", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(check2, "incremental", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-    check3 = rrdset_create_localhost("netdata", "checkdt", NULL, "netdata", NULL, "Clock difference"
-                                     , "microseconds diff", 99999, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+    check3 = rrdset_create_localhost(
+            "netdata"
+            , "checkdt"
+            , NULL
+            , "netdata"
+            , NULL
+            , "Clock difference"
+            , "microseconds diff"
+            , "netdata"
+            , "checks"
+            , 99999
+            , localhost->rrd_update_every
+            , RRDSET_TYPE_LINE
+    );
     rrddim_add(check3, "caller", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(check3, "netdata", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     rrddim_add(check3, "apps.plugin", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);

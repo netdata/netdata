@@ -257,6 +257,8 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                         , "disk.space"
                         , title
                         , "GB"
+                        , "diskspace"
+                        , NULL
                         , 2023
                         , update_every
                         , RRDSET_TYPE_STACKED
@@ -295,6 +297,8 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                         , "disk.inodes"
                         , title
                         , "Inodes"
+                        , "diskspace"
+                        , NULL
                         , 2024
                         , update_every
                         , RRDSET_TYPE_STACKED
@@ -401,6 +405,8 @@ void *proc_diskspace_main(void *ptr) {
                             , NULL
                             , "NetData Disk Space Plugin CPU usage"
                             , "milliseconds/s"
+                            , "diskspace"
+                            , NULL
                             , 132020
                             , update_every
                             , RRDSET_TYPE_STACKED
@@ -429,6 +435,8 @@ void *proc_diskspace_main(void *ptr) {
                             , NULL
                             , "NetData Disk Space Plugin Duration"
                             , "milliseconds/run"
+                            , "diskspace"
+                            , NULL
                             , 132021
                             , update_every
                             , RRDSET_TYPE_AREA

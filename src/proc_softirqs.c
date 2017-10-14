@@ -136,6 +136,8 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 , NULL
                 , "System softirqs"
                 , "softirqs/s"
+                , "proc"
+                , "softirqs"
                 , 950
                 , update_every
                 , RRDSET_TYPE_STACKED
@@ -212,6 +214,8 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                         , "cpu.softirqs"
                         , title
                         , "softirqs/s"
+                        , "proc"
+                        , "softirqs"
                         , 3000 + c
                         , update_every
                         , RRDSET_TYPE_STACKED

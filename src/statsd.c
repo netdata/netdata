@@ -1251,19 +1251,21 @@ static inline RRDSET *statsd_private_rrdset_create(
 
     statsd.private_charts++;
     RRDSET *st = rrdset_create_custom(
-            localhost
-            , type
-            , id
-            , name
-            , family
-            , context
-            , title
-            , units
-            , priority
-            , update_every
-            , chart_type
-            , memory_mode
-            , history
+            localhost         // host
+            , type            // type
+            , id              // id
+            , name            // name
+            , family          // family
+            , context         // context
+            , title           // title
+            , units           // units
+            , "statsd"        // plugin
+            , NULL            // module
+            , priority        // priority
+            , update_every    // update every
+            , chart_type      // chart type
+            , memory_mode     // memory mode
+            , history         // history
     );
     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
     // rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
@@ -1647,19 +1649,21 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
 
     if(!chart->st) {
         chart->st = rrdset_create_custom(
-                localhost
-                , app->name
-                , chart->id
-                , chart->name
-                , chart->family
-                , chart->context
-                , chart->title
-                , chart->units
-                , chart->priority
-                , statsd.update_every
-                , chart->chart_type
-                , app->rrd_memory_mode
-                , app->rrd_history_entries
+                localhost                   // host
+                , app->name                 // type
+                , chart->id                 // id
+                , chart->name               // name
+                , chart->family             // family
+                , chart->context            // context
+                , chart->title              // title
+                , chart->units              // units
+                , "statsd"                  // plugin
+                , NULL                      // module
+                , chart->priority           // priority
+                , statsd.update_every       // update every
+                , chart->chart_type         // chart type
+                , app->rrd_memory_mode      // memory mode
+                , app->rrd_history_entries  // history
         );
 
         rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);
@@ -1874,6 +1878,8 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Metrics in the netdata statsd database"
             , "metrics"
+            , "netdata"
+            , "stats"
             , 132000
             , statsd.update_every
             , RRDSET_TYPE_STACKED
@@ -1893,6 +1899,8 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Events processed by the netdata statsd server"
             , "events/s"
+            , "netdata"
+            , "stats"
             , 132001
             , statsd.update_every
             , RRDSET_TYPE_STACKED
@@ -1914,6 +1922,8 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Read operations made by the netdata statsd server"
             , "reads/s"
+            , "netdata"
+            , "stats"
             , 132002
             , statsd.update_every
             , RRDSET_TYPE_STACKED
@@ -1929,6 +1939,8 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Bytes read by the netdata statsd server"
             , "kilobits/s"
+            , "netdata"
+            , "stats"
             , 132003
             , statsd.update_every
             , RRDSET_TYPE_STACKED
@@ -1944,6 +1956,8 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Network packets processed by the netdata statsd server"
             , "packets/s"
+            , "netdata"
+            , "stats"
             , 132004
             , statsd.update_every
             , RRDSET_TYPE_STACKED
@@ -1959,6 +1973,8 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Private metric charts created by the netdata statsd server"
             , "charts"
+            , "netdata"
+            , "stats"
             , 132010
             , statsd.update_every
             , RRDSET_TYPE_AREA

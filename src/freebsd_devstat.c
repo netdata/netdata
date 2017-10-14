@@ -327,6 +327,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                     "disk.io",
                                                                     "Disk I/O Bandwidth",
                                                                     "kilobytes/s",
+                                                                    "freebsd",
+                                                                    "devstat",
                                                                     2000,
                                                                     update_every,
                                                                     RRDSET_TYPE_AREA
@@ -356,6 +358,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                      "disk.ops",
                                                                      "Disk Completed I/O Operations",
                                                                      "operations/s",
+                                                                    "freebsd",
+                                                                    "devstat",
                                                                      2001,
                                                                      update_every,
                                                                      RRDSET_TYPE_LINE
@@ -386,6 +390,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                       "disk.qops",
                                                                       "Disk Current I/O Operations",
                                                                       "operations",
+                                                                      "freebsd",
+                                                                      "devstat",
                                                                       2002,
                                                                       update_every,
                                                                       RRDSET_TYPE_LINE
@@ -413,6 +419,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                       "disk.util",
                                                                       "Disk Utilization Time",
                                                                       "% of time working",
+                                                                      "freebsd",
+                                                                      "devstat",
                                                                       2004,
                                                                       update_every,
                                                                       RRDSET_TYPE_AREA
@@ -441,6 +449,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                         "disk.iotime",
                                                                         "Disk Total I/O Time",
                                                                         "milliseconds/s",
+                                                                        "freebsd",
+                                                                        "devstat",
                                                                         2022,
                                                                         update_every,
                                                                         RRDSET_TYPE_LINE
@@ -478,6 +488,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                            "disk.await",
                                                                            "Average Completed I/O Operation Time",
                                                                            "ms per operation",
+                                                                           "freebsd",
+                                                                           "devstat",
                                                                            2005,
                                                                            update_every,
                                                                            RRDSET_TYPE_LINE
@@ -521,6 +533,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                             "disk.avgsz",
                                                                             "Average Completed I/O Operation Bandwidth",
                                                                             "kilobytes per operation",
+                                                                            "freebsd",
+                                                                            "devstat",
                                                                             2006,
                                                                             update_every,
                                                                             RRDSET_TYPE_AREA
@@ -564,6 +578,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                            "disk.svctm",
                                                                            "Average Service Time",
                                                                            "ms per operation",
+                                                                           "freebsd",
+                                                                           "devstat",
                                                                            2007,
                                                                            update_every,
                                                                            RRDSET_TYPE_LINE
@@ -613,6 +629,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                      NULL,
                                                      "Disk I/O",
                                                      "kilobytes/s",
+                                                     "freebsd",
+                                                     "devstat",
                                                      150,
                                                      update_every,
                                                      RRDSET_TYPE_AREA

@@ -551,6 +551,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.net"
                         , "Bandwidth"
                         , "kilobits/s"
+                        , "proc"
+                        , "net/dev"
                         , d->priority
                         , update_every
                         , RRDSET_TYPE_AREA
@@ -590,6 +592,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.packets"
                         , "Packets"
                         , "packets/s"
+                        , "proc"
+                        , "net/dev"
                         , d->priority + 1
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -633,6 +637,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.errors"
                         , "Interface Errors"
                         , "errors/s"
+                        , "proc"
+                        , "net/dev"
                         , d->priority + 2
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -674,6 +680,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.drops"
                         , "Interface Drops"
                         , "drops/s"
+                        , "proc"
+                        , "net/dev"
                         , d->priority + 3
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -715,6 +723,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.fifo"
                         , "Interface FIFO Buffer Errors"
                         , "errors"
+                        , "proc"
+                        , "net/dev"
                         , d->priority + 4
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -756,6 +766,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.compressed"
                         , "Compressed Packets"
                         , "packets/s"
+                        , "proc"
+                        , "net/dev"
                         , d->priority + 5
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -797,6 +809,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                         , "net.events"
                         , "Network Interface Events"
                         , "events/s"
+                        , "proc"
+                        , "net/dev"
                         , d->priority + 6
                         , update_every
                         , RRDSET_TYPE_LINE
