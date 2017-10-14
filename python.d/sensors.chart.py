@@ -77,7 +77,6 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
-        self.fahrenheit = self.configuration.get('fahrenheit')
         self.chips = list()
 
     def get_data(self):
@@ -95,9 +94,6 @@ class Service(SimpleService):
                         limit = LIMITS[type_name]
                         if val < limit[0] or val > limit[1]:
                             continue
-                    if 'temp' in str(feature.name.decode()):
-                        data[prefix + "_" + str(feature.name.decode())] = int(self.calc_temperature(val) * 1000)
-                    else:
                         data[prefix + "_" + str(feature.name.decode())] = int(val * 1000)
         except Exception as error:
             self.error(error)
@@ -123,8 +119,6 @@ class Service(SimpleService):
                             self.order.append(name)
                             chart_def = list(CHARTS[sensor]['options'])
                             chart_def[1] = chip_name + chart_def[1]
-                            if chart_def[2] == 'Celsius' and self.fahrenheit:
-                                chart_def[2] = 'Fahrenheit'
                             self.definitions[name] = {'options': chart_def}
                             self.definitions[name]['lines'] = []
                         line = list(CHARTS[sensor]['lines'][0])
@@ -143,7 +137,3 @@ class Service(SimpleService):
 
         return True
 
-    def calc_temperature(self, v):
-        if not self.fahrenheit:
-            return v
-        return v * 9 / 5 + 32
