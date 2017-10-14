@@ -581,8 +581,20 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 do_ecn = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv4.ecnpkts");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("ipv4", "ecnpkts", NULL, "ecn", NULL, "IPv4 ECN Statistics"
-                                                 , "packets/s", 8700, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost(
+                            "ipv4"
+                            , "ecnpkts"
+                            , NULL
+                            , "ecn"
+                            , NULL
+                            , "IPv4 ECN Statistics"
+                            , "packets/s"
+                            , "macos"
+                            , "sysctl"
+                            , 8700
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRD_ALGORITHM_INCREMENTAL);
