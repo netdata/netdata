@@ -5,6 +5,7 @@
 from re import findall
 from subprocess import Popen, PIPE
 
+from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
@@ -78,8 +79,8 @@ class Service(SimpleService):
         self.proxy_acct = self.configuration.get('proxy_acct', False)
         chart_choice = [True, bool(self.acct), bool(self.proxy_auth), bool(self.proxy_acct)]
         self.order = [chart for chart, choice in zip(ORDER, chart_choice) if choice]
-        self.echo = self.functions.find_binary('echo')
-        self.radclient = self.functions.find_binary('radclient')
+        self.echo = find_binary('echo')
+        self.radclient = find_binary('radclient')
         self.sub_echo = [self.echo, RADIUS_MSG]
         self.sub_radclient = [self.radclient, '-r', '1', '-t', '1',
                               ':'.join([self.host, self.port]), 'status', self.secret]

@@ -3,6 +3,7 @@
 # Author: Pawel Krupa (paulfantom)
 
 from glob import glob
+import os
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -24,7 +25,7 @@ class LogService(SimpleService):
         try:
             if self.__re_find['current'] == self.__re_find['run']:
                 self._find_recent_log_file()
-            size = self.functions.get_file_size(self.log_path)
+            size = os.path.getsize(self.log_path)
             if size == self._last_position:
                 self.__re_find['current'] += 1
                 return list()  # return empty list if nothing has changed
@@ -65,13 +66,13 @@ class LogService(SimpleService):
             self.error('No path to log specified')
             return None
 
-        if self._find_recent_log_file() and self.functions.is_file_readable(self.log_path):
+        if self._find_recent_log_file() and os.access(self.log_path, os.R_OK) and os.path.isfile(self.log_path):
             return True
         self.error('Cannot access {0}'.format(self.log_path))
         return False
 
     def create(self):
         # set cursor at last byte of log file
-        self._last_position = self.functions.get_file_size(self.log_path)
+        self._last_position = os.path.getsize(self.log_path)
         status = SimpleService.create(self)
         return status

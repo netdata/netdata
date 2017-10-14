@@ -2,11 +2,12 @@
 # Description: bind rndc netdata python.d module
 # Author: l2isbad
 
+import os
+
 from collections import defaultdict
-from os.path import getsize
-from os import access, R_OK
 from subprocess import Popen
 
+from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 60000
@@ -95,7 +96,7 @@ class Service(SimpleService):
         self.order = ORDER
         self.definitions = CHARTS
         self.named_stats_path = self.configuration.get('named_stats_path', '/var/log/bind/named.stats')
-        self.rndc = self.functions.find_binary('rndc')
+        self.rndc = find_binary('rndc')
         self.data = dict(nms_requests=0, nms_responses=0, nms_failure=0, nms_auth=0,
                          nms_non_auth=0, nms_nxrrset=0, nms_success=0, nms_nxdomain=0,
                          nms_recursion=0, nms_duplicate=0, nms_rejected_queries=0,
@@ -106,7 +107,7 @@ class Service(SimpleService):
             self.error('Can\'t locate "rndc" binary or binary is not executable by netdata')
             return False
 
-        if not self.functions.is_file_readable(self.named_stats_path):
+        if not (os.path.isfile(self.named_stats_path) and os.access(self.named_stats_path, os.R_OK)):
             self.error('Cannot access file %s' % self.named_stats_path)
             return False
 
@@ -125,7 +126,7 @@ class Service(SimpleService):
         """
         result = dict()
         try:
-            current_size = getsize(self.named_stats_path)
+            current_size = os.path.getsize(self.named_stats_path)
             run_rndc = Popen([self.rndc, 'stats'], shell=False)
             run_rndc.wait()
 
