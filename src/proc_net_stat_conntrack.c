@@ -125,12 +125,10 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             rrdvar_custom_host_variable_set(rrdvar_max, max);
     }
 
-    RRDSET *st;
-
     // --------------------------------------------------------------------
 
     if(do_sockets) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_sockets");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -158,7 +156,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_new) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_new");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -190,7 +188,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_changes) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_changes");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -223,7 +221,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_expect) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_expect");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -256,7 +254,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_search) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_search");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -289,7 +287,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_errors) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_CONNTRACK "_errors");
+        static RRDSET *st = NULL;
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER

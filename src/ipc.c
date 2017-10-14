@@ -191,8 +191,7 @@ int do_ipc(int update_every, usec_t dt) {
         if(semaphores_max) rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
 
         // create the charts
-        semaphores = rrdset_find_localhost("system.ipc_semaphores");
-        if(!semaphores) {
+        if(unlikely(!semaphores)) {
             semaphores = rrdset_create_localhost(
                     "system"
                     , "ipc_semaphores"
@@ -210,8 +209,7 @@ int do_ipc(int update_every, usec_t dt) {
             rrddim_add(semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        arrays = rrdset_find_localhost("system.ipc_semaphore_arrays");
-        if(!arrays) {
+        if(unlikely(!arrays)) {
             arrays = rrdset_create_localhost(
                     "system"
                     , "ipc_semaphore_arrays"
