@@ -154,6 +154,8 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                 , NULL
                 , "System interrupts"
                 , "interrupts/s"
+                , "proc"
+                , "interrupts"
                 , 1000
                 , update_every
                 , RRDSET_TYPE_STACKED
@@ -217,6 +219,8 @@ int do_proc_interrupts(int update_every, usec_t dt) {
                         , "cpu.interrupts"
                         , title
                         , "interrupts/s"
+                        , "proc"
+                        , "interrupts"
                         , 1100 + c
                         , update_every
                         , RRDSET_TYPE_STACKED

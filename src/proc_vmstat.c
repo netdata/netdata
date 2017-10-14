@@ -102,6 +102,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , NULL
                     , "Swap I/O"
                     , "kilobytes/s"
+                    , "proc"
+                    , "vmstat"
                     , 250
                     , update_every
                     , RRDSET_TYPE_AREA
@@ -132,6 +134,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , NULL
                     , "Disk I/O"
                     , "kilobytes/s"
+                    , "proc"
+                    , "vmstat"
                     , 150
                     , update_every
                     , RRDSET_TYPE_AREA
@@ -162,6 +166,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , NULL
                     , "Memory Page Faults"
                     , "page faults/s"
+                    , "proc"
+                    , "vmstat"
                     , 500
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -205,6 +211,8 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , NULL
                     , "NUMA events"
                     , "events/s"
+                    , "proc"
+                    , "vmstat"
                     , 800
                     , update_every
                     , RRDSET_TYPE_LINE

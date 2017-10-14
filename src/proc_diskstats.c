@@ -518,6 +518,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.io"
                         , "Disk I/O Bandwidth"
                         , "kilobytes/s"
+                        , "proc"
+                        , "diskstats"
                         , 2000
                         , update_every
                         , RRDSET_TYPE_AREA
@@ -547,6 +549,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.ops"
                         , "Disk Completed I/O Operations"
                         , "operations/s"
+                        , "proc"
+                        , "diskstats"
                         , 2001
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -578,6 +582,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.qops"
                         , "Disk Current I/O Operations"
                         , "operations"
+                        , "proc"
+                        , "diskstats"
                         , 2002
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -607,6 +613,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.backlog"
                         , "Disk Backlog"
                         , "backlog (ms)"
+                        , "proc"
+                        , "diskstats"
                         , 2003
                         , update_every
                         , RRDSET_TYPE_AREA
@@ -636,6 +644,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.util"
                         , "Disk Utilization Time"
                         , "% of time working"
+                        , "proc"
+                        , "diskstats"
                         , 2004
                         , update_every
                         , RRDSET_TYPE_AREA
@@ -665,6 +675,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.mops"
                         , "Disk Merged Operations"
                         , "merged operations/s"
+                        , "proc"
+                        , "diskstats"
                         , 2021
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -696,6 +708,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.iotime"
                         , "Disk Total I/O Time"
                         , "milliseconds/s"
+                        , "proc"
+                        , "diskstats"
                         , 2022
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -730,6 +744,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.await"
                             , "Average Completed I/O Operation Time"
                             , "ms per operation"
+                            , "proc"
+                            , "diskstats"
                             , 2005
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -759,6 +775,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.avgsz"
                             , "Average Completed I/O Operation Bandwidth"
                             , "kilobytes per operation"
+                            , "proc"
+                            , "diskstats"
                             , 2006
                             , update_every
                             , RRDSET_TYPE_AREA
@@ -788,6 +806,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.svctm"
                             , "Average Service Time"
                             , "ms per operation"
+                            , "proc"
+                            , "diskstats"
                             , 2007
                             , update_every
                             , RRDSET_TYPE_LINE

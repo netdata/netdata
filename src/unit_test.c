@@ -973,7 +973,7 @@ int run_test(struct test *test)
     snprintfz(name, 100, "unittest-%s", test->name);
 
     // create the chart
-    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1
+    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1
                                          , test->update_every, RRDSET_TYPE_LINE);
     RRDDIM *rd = rrddim_add(st, "dim1", NULL, test->multiplier, test->divisor, test->algorithm);
     
@@ -1062,7 +1062,7 @@ int run_test(struct test *test)
 
 static int test_variable_renames(void) {
     fprintf(stderr, "Creating chart\n");
-    RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
+    RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
     fprintf(stderr, "Created chart with id '%s', name '%s'\n", st->id, st->name);
 
     fprintf(stderr, "Creating dimension DIM1\n");
@@ -1182,7 +1182,7 @@ int unit_test(long delay, long shift)
     int do_abst = 0;
     int do_absi = 0;
 
-    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1
+    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1, 1
                                          , RRDSET_TYPE_LINE);
     rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
 

@@ -79,8 +79,20 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
 
     st = rrdset_find_bytype_localhost("system", "softnet_stat");
     if(unlikely(!st)) {
-        st = rrdset_create_localhost("system", "softnet_stat", NULL, "softnet_stat", "system.softnet_stat", "System softnet_stat"
-                                     , "events/s", 955, update_every, RRDSET_TYPE_LINE);
+        st = rrdset_create_localhost(
+                "system"
+                , "softnet_stat"
+                , NULL
+                , "softnet_stat"
+                , "system.softnet_stat"
+                , "System softnet_stat"
+                , "events/s"
+                , "proc"
+                , "net/softnet_stat"
+                , 955
+                , update_every
+                , RRDSET_TYPE_LINE
+        );
         for(w = 0; w < allocated_columns ;w++)
             if(unlikely(softnet_column_name(w)))
                 rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -103,8 +115,20 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
                 char title[100+1];
                 snprintfz(title, 100, "CPU%zu softnet_stat", l);
 
-                st = rrdset_create_localhost("cpu", id, NULL, "softnet_stat", "cpu.softnet_stat", title, "events/s", 4101 + l
-                                             , update_every, RRDSET_TYPE_LINE);
+                st = rrdset_create_localhost(
+                        "cpu"
+                        , id
+                        , NULL
+                        , "softnet_stat"
+                        , "cpu.softnet_stat"
+                        , title
+                        , "events/s"
+                        , "proc"
+                        , "net/softnet_stat"
+                        , 4101 + l
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
                 for(w = 0; w < allocated_columns ;w++)
                     if(unlikely(softnet_column_name(w)))
                         rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

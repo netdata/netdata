@@ -150,6 +150,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "System RAM"
                     , "MB"
+                    , "proc"
+                    , "meminfo"
                     , 200
                     , update_every
                     , RRDSET_TYPE_STACKED
@@ -189,6 +191,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "System Swap"
                     , "MB"
+                    , "proc"
+                    , "meminfo"
                     , 201
                     , update_every
                     , RRDSET_TYPE_STACKED
@@ -224,6 +228,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Corrupted Memory, detected by ECC"
                     , "MB"
+                    , "proc"
+                    , "meminfo"
                     , 9000
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -255,6 +261,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Committed (Allocated) Memory"
                     , "MB"
+                    , "proc"
+                    , "meminfo"
                     , 5000
                     , update_every
                     , RRDSET_TYPE_AREA
@@ -286,6 +294,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Writeback Memory"
                     , "MB"
+                    , "proc"
+                    , "meminfo"
                     , 4000
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -324,6 +334,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Memory Used by Kernel"
                     , "MB"
+                    , "proc"
+                    , "meminfo"
                     , 6000
                     , update_every
                     , RRDSET_TYPE_STACKED
@@ -361,6 +373,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , NULL
                     , "Reclaimable Kernel Memory"
                     , "MB"
+                    , "proc"
+                    , "meminfo"
                     , 6500
                     , update_every
                     , RRDSET_TYPE_STACKED

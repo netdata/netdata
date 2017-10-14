@@ -229,6 +229,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *priority_s     = words[8];
             char *update_every_s = words[9];
             char *options        = words[10];
+            char *plugin         = words[11];
+            char *module         = words[12];
 
             // parse the id from type
             char *id = NULL;
@@ -287,7 +289,21 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                       , update_every
                 );
 
-                st = rrdset_create(host, type, id, name, family, context, title, units, priority, update_every, chart_type);
+                st = rrdset_create(
+                        host
+                        , type
+                        , id
+                        , name
+                        , family
+                        , context
+                        , title
+                        , units
+                        , (plugin && *plugin)?plugin:cd->filename
+                        , module
+                        , priority
+                        , update_every
+                        , chart_type
+                );
                 cd->update_every = update_every;
             }
             else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);

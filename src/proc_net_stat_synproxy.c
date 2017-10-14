@@ -62,9 +62,20 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
         st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_entries");
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_entries", NULL
-                                         , RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Entries Used", "entries", 3304
-                                         , update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_STAT_NETFILTER
+                    , RRD_TYPE_NET_STAT_SYNPROXY "_entries"
+                    , NULL
+                    , RRD_TYPE_NET_STAT_SYNPROXY
+                    , NULL
+                    , "SYNPROXY Entries Used"
+                    , "entries"
+                    , "proc"
+                    , "net/stat/synproxy"
+                    , 3304
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
 
             rrddim_add(st, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -81,9 +92,20 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
         st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_syn_received");
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_syn_received", NULL
-                                         , RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY SYN Packets received", "SYN/s"
-                                         , 3301, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_STAT_NETFILTER
+                    , RRD_TYPE_NET_STAT_SYNPROXY "_syn_received"
+                    , NULL
+                    , RRD_TYPE_NET_STAT_SYNPROXY
+                    , NULL
+                    , "SYNPROXY SYN Packets received"
+                    , "SYN/s"
+                    , "proc"
+                    , "net/stat/synproxy"
+                    , 3301
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
 
             rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
@@ -100,9 +122,20 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
         st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened");
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened", NULL
-                                         , RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY Connections Reopened"
-                                         , "connections/s", 3303, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_STAT_NETFILTER
+                    , RRD_TYPE_NET_STAT_SYNPROXY "_conn_reopened"
+                    , NULL
+                    , RRD_TYPE_NET_STAT_SYNPROXY
+                    , NULL
+                    , "SYNPROXY Connections Reopened"
+                    , "connections/s"
+                    , "proc"
+                    , "net/stat/synproxy"
+                    , 3303
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
 
             rrddim_add(st, "reopened", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
@@ -119,9 +152,20 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
 
         st = rrdset_find_localhost(RRD_TYPE_NET_STAT_NETFILTER "." RRD_TYPE_NET_STAT_SYNPROXY "_cookies");
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_STAT_NETFILTER, RRD_TYPE_NET_STAT_SYNPROXY "_cookies", NULL
-                                         , RRD_TYPE_NET_STAT_SYNPROXY, NULL, "SYNPROXY TCP Cookies", "cookies/s", 3302
-                                         , update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_STAT_NETFILTER
+                    , RRD_TYPE_NET_STAT_SYNPROXY "_cookies"
+                    , NULL
+                    , RRD_TYPE_NET_STAT_SYNPROXY
+                    , NULL
+                    , "SYNPROXY TCP Cookies"
+                    , "cookies/s"
+                    , "proc"
+                    , "net/stat/synproxy"
+                    , 3302
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
 
             rrddim_add(st, "valid", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "invalid", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);

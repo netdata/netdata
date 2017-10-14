@@ -140,6 +140,8 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , NULL
                     , "ECC Memory Correctable Errors"
                     , "errors"
+                    , "proc"
+                    , "/sys/devices/system/edac/mc"
                     , 6600
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -176,6 +178,8 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , NULL
                     , "ECC Memory Uncorrectable Errors"
                     , "errors"
+                    , "proc"
+                    , "/sys/devices/system/edac/mc"
                     , 6610
                     , update_every
                     , RRDSET_TYPE_LINE

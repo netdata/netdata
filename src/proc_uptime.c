@@ -50,6 +50,8 @@ int do_proc_uptime(int update_every, usec_t dt) {
                 , NULL
                 , "System Uptime"
                 , "seconds"
+                , "proc"
+                , "uptime"
                 , 1000
                 , update_every
                 , RRDSET_TYPE_LINE

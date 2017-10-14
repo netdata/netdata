@@ -105,6 +105,8 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
                             , NULL
                             , "NUMA events"
                             , "events/s"
+                            , "proc"
+                            , "/sys/devices/system/node"
                             , 1000
                             , update_every
                             , RRDSET_TYPE_LINE
