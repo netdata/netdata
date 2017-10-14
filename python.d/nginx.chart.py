@@ -2,7 +2,7 @@
 # Description: nginx netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import UrlService
+from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -22,7 +22,8 @@ ORDER = ['connections', 'requests', 'connection_status', 'connect_rate']
 
 CHARTS = {
     'connections': {
-        'options': [None, 'nginx Active Connections', 'connections', 'active connections', 'nginx.connections', 'line'],
+        'options': [None, 'nginx Active Connections', 'connections', 'active connections',
+                    'nginx.connections', 'line'],
         'lines': [
             ["active"]
         ]},
@@ -32,14 +33,16 @@ CHARTS = {
             ["requests", None, 'incremental']
         ]},
     'connection_status': {
-        'options': [None, 'nginx Active Connections by Status', 'connections', 'status', 'nginx.connection_status', 'line'],
+        'options': [None, 'nginx Active Connections by Status', 'connections', 'status',
+                    'nginx.connection_status', 'line'],
         'lines': [
             ["reading"],
             ["writing"],
             ["waiting", "idle"]
         ]},
     'connect_rate': {
-        'options': [None, 'nginx Connections Rate', 'connections/s', 'connections rate', 'nginx.connect_rate', 'line'],
+        'options': [None, 'nginx Connections Rate', 'connections/s', 'connections rate',
+                    'nginx.connect_rate', 'line'],
         'lines': [
             ["accepts", "accepted", "incremental"],
             ["handled", None, "incremental"]
@@ -50,8 +53,7 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        if len(self.url) == 0:
-            self.url = "http://localhost/stub_status"
+        self.url = self.configuration.get('url', 'http://localhost/stub_status')
         self.order = ORDER
         self.definitions = CHARTS
 
