@@ -129,6 +129,8 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
 
     if(do_sockets) {
         static RRDSET *st = NULL;
+        static RRDDIM *rd_connections = NULL;
+
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -145,11 +147,11 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rrddim_add(st, "connections", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_connections = rrddim_add(st, "connections", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "connections", aentries);
+        rrddim_set_by_pointer(st, rd_connections, aentries);
         rrdset_done(st);
     }
 
@@ -157,6 +159,11 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
 
     if(do_new) {
         static RRDSET *st = NULL;
+        static RRDDIM
+                *rd_new     = NULL,
+                *rd_ignore  = NULL,
+                *rd_invalid = NULL;
+
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -173,15 +180,15 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rrddim_add(st, "new", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "ignore", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "invalid", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_new     = rrddim_add(st, "new",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ignore  = rrddim_add(st, "ignore",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_invalid = rrddim_add(st, "invalid", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "new", anew);
-        rrddim_set(st, "ignore", aignore);
-        rrddim_set(st, "invalid", ainvalid);
+        rrddim_set_by_pointer(st, rd_new,     anew);
+        rrddim_set_by_pointer(st, rd_ignore,  aignore);
+        rrddim_set_by_pointer(st, rd_invalid, ainvalid);
         rrdset_done(st);
     }
 
@@ -189,6 +196,11 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
 
     if(do_changes) {
         static RRDSET *st = NULL;
+        static RRDDIM
+                *rd_inserted    = NULL,
+                *rd_deleted     = NULL,
+                *rd_delete_list = NULL;
+
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -206,15 +218,15 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "inserted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "deleted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "delete_list", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_inserted = rrddim_add(st, "inserted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_deleted = rrddim_add(st, "deleted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_delete_list = rrddim_add(st, "delete_list", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "inserted", ainsert);
-        rrddim_set(st, "deleted", adelete);
-        rrddim_set(st, "delete_list", adelete_list);
+        rrddim_set_by_pointer(st, rd_inserted, ainsert);
+        rrddim_set_by_pointer(st, rd_deleted, adelete);
+        rrddim_set_by_pointer(st, rd_delete_list, adelete_list);
         rrdset_done(st);
     }
 
@@ -222,6 +234,10 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
 
     if(do_expect) {
         static RRDSET *st = NULL;
+        static RRDDIM *rd_created = NULL,
+                      *rd_deleted = NULL,
+                      *rd_new     = NULL;
+
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -239,15 +255,15 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "created", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "deleted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "new", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_created = rrddim_add(st, "created", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_deleted = rrddim_add(st, "deleted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_new     = rrddim_add(st, "new",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "created", aexpect_create);
-        rrddim_set(st, "deleted", aexpect_delete);
-        rrddim_set(st, "new", aexpect_new);
+        rrddim_set_by_pointer(st, rd_created, aexpect_create);
+        rrddim_set_by_pointer(st, rd_deleted, aexpect_delete);
+        rrddim_set_by_pointer(st, rd_new,     aexpect_new);
         rrdset_done(st);
     }
 
@@ -255,6 +271,10 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
 
     if(do_search) {
         static RRDSET *st = NULL;
+        static RRDDIM *rd_searched  = NULL,
+                      *rd_restarted = NULL,
+                      *rd_found     = NULL;
+
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -272,15 +292,15 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "searched", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "restarted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "found", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_searched  = rrddim_add(st, "searched",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_restarted = rrddim_add(st, "restarted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_found     = rrddim_add(st, "found",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "searched", asearched);
-        rrddim_set(st, "restarted", asearch_restart);
-        rrddim_set(st, "found", afound);
+        rrddim_set_by_pointer(st, rd_searched,  asearched);
+        rrddim_set_by_pointer(st, rd_restarted, asearch_restart);
+        rrddim_set_by_pointer(st, rd_found,     afound);
         rrdset_done(st);
     }
 
@@ -288,6 +308,11 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
 
     if(do_errors) {
         static RRDSET *st = NULL;
+        static RRDDIM *rd_icmp_error    = NULL,
+                      *rd_insert_failed = NULL,
+                      *rd_drop          = NULL,
+                      *rd_early_drop    = NULL;
+
         if(unlikely(!st)) {
             st = rrdset_create_localhost(
                     RRD_TYPE_NET_STAT_NETFILTER
@@ -305,17 +330,17 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "icmp_error", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "insert_failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "drop", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "early_drop", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_icmp_error    = rrddim_add(st, "icmp_error",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_insert_failed = rrddim_add(st, "insert_failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_drop          = rrddim_add(st, "drop",          NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_early_drop    = rrddim_add(st, "early_drop",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "icmp_error", aicmp_error);
-        rrddim_set(st, "insert_failed", ainsert_failed);
-        rrddim_set(st, "drop", adrop);
-        rrddim_set(st, "early_drop", aearly_drop);
+        rrddim_set_by_pointer(st, rd_icmp_error,    aicmp_error);
+        rrddim_set_by_pointer(st, rd_insert_failed, ainsert_failed);
+        rrddim_set_by_pointer(st, rd_drop,          adrop);
+        rrddim_set_by_pointer(st, rd_early_drop,    aearly_drop);
         rrdset_done(st);
     }
 
