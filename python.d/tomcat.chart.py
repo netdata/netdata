@@ -2,8 +2,9 @@
 # Description: tomcat netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import UrlService
 import xml.etree.ElementTree as ET
+
+from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -71,6 +72,7 @@ CHARTS = {
         ]},
 }
 
+
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
@@ -87,7 +89,6 @@ class Service(UrlService):
         data = None
         raw_data = self._get_raw_data()
         if raw_data:
-            xml = None
             try:
                 xml = ET.fromstring(raw_data)
             except ET.ParseError:
@@ -107,7 +108,7 @@ class Service(UrlService):
                 connector = xml.find('connector')
 
             memory = jvm.find('memory')
-            data['free']  = memory.get('free')
+            data['free'] = memory.get('free')
             data['total'] = memory.get('total')
 
             for pool in jvm.findall('memorypool'):
