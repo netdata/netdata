@@ -2,7 +2,7 @@
 # Description: memcached netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import SocketService
+from bases.FrameworkServices.SocketService import SocketService
 
 # default module values (can be overridden per job in `config`)
 #update_every = 2
@@ -151,7 +151,7 @@ class Service(SocketService):
                     self.debug("invalid line received: " + str(line))
                     pass
 
-        if len(data) == 0:
+        if not data:
             self.error("received data doesn't have any records")
             return None
 
@@ -159,7 +159,7 @@ class Service(SocketService):
         try:
             data['avail'] = int(data['limit_maxbytes']) - int(data['bytes'])
             data['used'] = int(data['bytes'])
-        except:
+        except (KeyError, ValueError, TypeError):
             pass
 
         return data
@@ -178,11 +178,7 @@ class Service(SocketService):
         :return: boolean
         """
         self._parse_config()
-        if self.name == "":
-            self.name = "local"
-        self.chart_name += "_" + self.name
         data = self._get_data()
         if data is None:
             return False
-
         return True
