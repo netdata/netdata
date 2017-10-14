@@ -2,8 +2,9 @@
 # Description: IPFS netdata python.d module
 # Authors: Pawel Krupa (paulfantom), davidak
 
-from base import UrlService
 import json
+
+from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -49,75 +50,75 @@ CHARTS = {
 }
 
 SI_zeroes = {'k': 3, 'm': 6, 'g': 9, 't': 12,
-             'p': 15, 'e': 18, 'z': 21, 'y': 24 }
+             'p': 15, 'e': 18, 'z': 21, 'y': 24}
 
 
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        try:
-            self.baseurl = str(self.configuration['url'])
-        except (KeyError, TypeError):
-            self.baseurl = "http://localhost:5001"
+        self.baseurl = self.configuration.get('url', 'http://localhost:5001')
         self.order = ORDER
         self.definitions = CHARTS
-        self.__storagemax = None
+        self.__storage_max = None
 
-    def _get_json(self, suburl):
+    def _get_json(self, sub_url):
         """
         :return: json decoding of the specified url
         """
-        self.url = self.baseurl + suburl
+        self.url = self.baseurl + sub_url
         try:
             return json.loads(self._get_raw_data())
-        except:
-            return {}
+        except (TypeError, ValueError):
+            return dict()
 
-    def _recursive_pins(self, keys):
+    @staticmethod
+    def _recursive_pins(keys):
         return len([k for k in keys if keys[k]["Type"] == b"recursive"])
 
-    def _dehumanize(self, storemax):
+    @staticmethod
+    def _dehumanize(store_max):
         # convert from '10Gb' to 10000000000
-        if type(storemax) != int:
-            storemax = storemax.lower()
-            if storemax.endswith('b'):
-                val, units = storemax[:-2], storemax[-2]
+        if not isinstance(store_max, int):
+            store_max = store_max.lower()
+            if store_max.endswith('b'):
+                val, units = store_max[:-2], store_max[-2]
                 if units in SI_zeroes:
                     val += '0'*SI_zeroes[units]
-                storemax = val
+                store_max = val
             try:
-                storemax = int(storemax)
-            except:
-                storemax = None
-        return storemax
+                store_max = int(store_max)
+            except (TypeError, ValueError):
+                store_max = None
+        return store_max
 
-    def _storagemax(self, storecfg):
-        if self.__storagemax is None:
-            self.__storagemax = self._dehumanize(storecfg['StorageMax'])
-        return self.__storagemax
+    def _storagemax(self, store_cfg):
+        if self.__storage_max is None:
+            self.__storage_max = self._dehumanize(store_cfg['StorageMax'])
+        return self.__storage_max
 
     def _get_data(self):
         """
         Get data from API
         :return: dict
         """
-        cfg = { # suburl : List of (result-key, original-key, transform-func)
-               '/api/v0/stats/bw'   :[('in', 'RateIn', int ),
-                                      ('out', 'RateOut', int )],
-               '/api/v0/swarm/peers':[('peers', 'Strings', len )],
-               '/api/v0/stats/repo' :[('size', 'RepoSize', int),
-                                      ('objects', 'NumObjects', int)],
-               '/api/v0/pin/ls': [('pinned', 'Keys', len),
-                                  ('recursive_pins', 'Keys', self._recursive_pins)],
-               '/api/v0/config/show': [('avail', 'Datastore', self._storagemax)]
+        # suburl : List of (result-key, original-key, transform-func)
+        cfg = {
+            '/api/v0/stats/bw':
+                [('in', 'RateIn', int), ('out', 'RateOut', int)],
+            '/api/v0/swarm/peers':
+                [('peers', 'Strings', len)],
+            '/api/v0/stats/repo':
+                [('size', 'RepoSize', int), ('objects', 'NumObjects', int)],
+            '/api/v0/pin/ls':
+                [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)],
+            '/api/v0/config/show': [('avail', 'Datastore', self._storagemax)]
         }
-        r = {}
+        r = dict()
         for suburl in cfg:
-            json = self._get_json(suburl)
-            for newkey, origkey, xmute in cfg[suburl]:
+            in_json = self._get_json(suburl)
+            for new_key, orig_key, xmute in cfg[suburl]:
                 try:
-                    r[newkey] = xmute(json[origkey])
-                except: pass
+                    r[new_key] = xmute(in_json[orig_key])
+                except Exception:
+                    continue
         return r or None
-
-
