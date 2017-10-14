@@ -2,10 +2,9 @@
 # Description: redis netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import SocketService
+from bases.FrameworkServices.SocketService import SocketService
 
 # default module values (can be overridden per job in `config`)
-#update_every = 2
 priority = 60000
 retries = 60
 
@@ -192,9 +191,6 @@ class Service(SocketService):
         Parse configuration, check if redis is available, and dynamically create chart lines data
         :return: boolean
         """
-        if self.name == "":
-            self.name = "local"
-            self.chart_name += "_" + self.name
         data = self._get_data()
         if data is None:
             return False
