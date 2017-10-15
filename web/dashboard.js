@@ -5122,7 +5122,8 @@ var NETDATA = window.NETDATA || {};
                 colors: state.chartColors(),
                 labels: data.result.labels,
                 labelsDivWidth: state.chartWidth() - 70,
-                visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
+                visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
+                ylabel: (state.dimensions_visibility.unselected_count !== 0)?"":state.units_current
         };
 
         if(state.tmp.dygraph_force_zoom === true) {
