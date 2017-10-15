@@ -134,6 +134,8 @@ RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
 }
 
 void rrdvar_free_remaining_variables(RRDHOST *host) {
+    // FIXME: this is not bullet proof - avl should support some means to destroy it
+    // with a callback for each item already in the index
     while(host->variables_root_index.avl_tree.root) {
         RRDVAR *rv = (RRDVAR *)host->variables_root_index.avl_tree.root;
         rrdvar_free(host, &host->variables_root_index, rv);
