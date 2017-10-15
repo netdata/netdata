@@ -63,7 +63,7 @@ inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {
     freez(rv);
 }
 
-inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, int type, void *value) {
+inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, RRDVAR_TYPE type, void *value) {
     char *variable = strdupz(name);
     rrdvar_fix_name(variable);
     uint32_t hash = simple_hash(variable);
@@ -191,7 +191,7 @@ static calculated_number rrdvar2number(RRDVAR *rv) {
         }
 
         default:
-            error("I don't know how to convert RRDVAR type %d to calculated_number", rv->type);
+            error("I don't know how to convert RRDVAR type %u to calculated_number", rv->type);
             return NAN;
     }
 }
