@@ -81,34 +81,46 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
 static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     rrdset_flag_set(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 
-    buffer_sprintf(st->rrdhost->rrdpush_sender_buffer, "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s\"\n"
-                , st->id
-                , st->name
-                , st->title
-                , st->units
-                , st->family
-                , st->context
-                , rrdset_type_name(st->chart_type)
-                , st->priority
-                , st->update_every
-                , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
-                , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
-                , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
+    buffer_sprintf(
+            st->rrdhost->rrdpush_sender_buffer
+            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s\" \"%s\" \"%s\"\n"
+            , st->id
+            , st->name
+            , st->title
+            , st->units
+            , st->family
+            , st->context
+            , rrdset_type_name(st->chart_type)
+            , st->priority
+            , st->update_every
+            , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
+            , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
+            , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
+            , (st->plugin_name)?st->plugin_name:""
+            , (st->module_name)?st->module_name:""
     );
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        buffer_sprintf(st->rrdhost->rrdpush_sender_buffer, "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s\"\n"
-                       , rd->id
-                       , rd->name
-                       , rrd_algorithm_name(rd->algorithm)
-                       , rd->multiplier
-                       , rd->divisor
-                       , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
-                       , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
+        buffer_sprintf(
+                st->rrdhost->rrdpush_sender_buffer
+                , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s\"\n"
+                , rd->id
+                , rd->name
+                , rrd_algorithm_name(rd->algorithm)
+                , rd->multiplier
+                , rd->divisor
+                , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
+                , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
         rd->exposed = 1;
     }
+    /*
+    RRDSETVAR *rs;
+    for(rs = st->variables; rs ;rs = rs->next) {
+        if(unlikely(rs->type == ))
+    }
+    */
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
 }
