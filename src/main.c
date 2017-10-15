@@ -503,7 +503,7 @@ static void get_system_timezone(void) {
     if(!tz || !*tz)
         setenv("TZ", config_get(CONFIG_SECTION_GLOBAL, "TZ environment variable", ":/etc/localtime"), 0);
 
-    char buffer[FILENAME_MAX + 1];
+    char buffer[FILENAME_MAX + 1] = "";
     const char *timezone = NULL;
     ssize_t ret;
 
@@ -520,17 +520,23 @@ static void get_system_timezone(void) {
     }
 
     // read the link /etc/localtime
-    if(!timezone && (ret = readlink("/etc/localtime", buffer, FILENAME_MAX)) > 0) {
-        buffer[ret] = '\0';
+    if(!timezone) {
+        ret = readlink("/etc/localtime", buffer, FILENAME_MAX);
 
-        char *cmp = "/usr/share/zoneinfo/";
-        size_t cmp_len = strlen(cmp);
+        if(ret > 0) {
+            buffer[ret] = '\0';
 
-        char *s = strstr(buffer, cmp);
-        if(s && s[cmp_len]) {
-            timezone = &s[cmp_len];
-            // info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
+            char   *cmp    = "/usr/share/zoneinfo/";
+            size_t cmp_len = strlen(cmp);
+
+            char *s = strstr(buffer, cmp);
+            if (s && s[cmp_len]) {
+                timezone = &s[cmp_len];
+                // info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
+            }
         }
+        else
+            buffer[0] = '\0';
     }
 
     // find the timezone from strftime()
@@ -556,7 +562,8 @@ static void get_system_timezone(void) {
         // make sure it does not have illegal characters
         // info("TIMEZONE: fixing '%s'", timezone);
 
-        char tmp[strlen(timezone) + 1];
+        size_t len = strlen(timezone);
+        char tmp[len + 1];
         char *d = tmp;
         *d = '\0';
 
@@ -567,7 +574,7 @@ static void get_system_timezone(void) {
                 timezone++;
         }
         *d = '\0';
-        strcpy(buffer, tmp);
+        strncpyz(buffer, tmp, len);
         timezone = buffer;
         // info("TIMEZONE: fixed as '%s'", timezone);
     }
