@@ -157,12 +157,15 @@ void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name) {
     freez(rv);
 }
 
-void rrdvar_custom_host_variable_set(RRDVAR *rv, calculated_number value) {
+void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_number value) {
     if(rv->type != RRDVAR_TYPE_CALCULATED_ALLOCATED)
         error("requested to set variable '%s' to value " CALCULATED_NUMBER_FORMAT " but the variable is not a custom one.", rv->name, value);
     else {
         calculated_number *v = rv->value;
         *v = value;
+
+        // if the host is streaming, send this variable upstream immediately
+        rrdpush_sender_send_this_variable_now(host, rv);
     }
 }
 

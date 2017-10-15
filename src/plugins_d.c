@@ -388,7 +388,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 calculated_number v = (calculated_number)str2ld(value, NULL);
                 RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
                 if(rv)
-                    rrdvar_custom_host_variable_set(rv, v);
+                    rrdvar_custom_host_variable_set(host, rv, v);
                 else
                     error("PLUGINSD: '%s': cannot find/create VARIABLE '%s' on host '%s'", cd->fullfilename, name, host->hostname);
             }
