@@ -1038,7 +1038,7 @@ void *tc_main(void *ptr) {
                 // debug(D_TC_LOOP, "WORKTIME line '%s' '%s'", words[1], words[2]);
                 getrusage(RUSAGE_THREAD, &thread);
 
-                RRDSET *stcpu = NULL;
+                static RRDSET *stcpu = NULL;
                 static RRDDIM *rd_user = NULL, *rd_system = NULL;
 
                 if(unlikely(!stcpu)) {
@@ -1065,7 +1065,7 @@ void *tc_main(void *ptr) {
                 rrddim_set_by_pointer(stcpu, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
                 rrdset_done(stcpu);
 
-                RRDSET *sttime = NULL;
+                static RRDSET *sttime = NULL;
                 static RRDDIM *rd_run_time = NULL;
 
                 if(unlikely(!sttime)) {
