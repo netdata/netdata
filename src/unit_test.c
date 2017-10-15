@@ -3,6 +3,13 @@
 static int check_rrdcalc_comparisons(void) {
     RRDCALC_STATUS a, b;
 
+    // make sure calloc() sets the status to UNINITIALIZED
+    memset(&a, 0, sizeof(RRDCALC_STATUS));
+    if(a != RRDCALC_STATUS_UNINITIALIZED) {
+        fprintf(stderr, "%s is not zero.\n", rrdcalc_status2string(RRDCALC_STATUS_UNINITIALIZED));
+        return 1;
+    }
+
     a = RRDCALC_STATUS_REMOVED;
     b = RRDCALC_STATUS_UNDEFINED;
     if(!(a < b)) {
