@@ -162,6 +162,8 @@ int do_ipfw(int update_every, usec_t dt) {
                                                  NULL,
                                                  "Memory allocated by rules",
                                                  "bytes",
+                                                 "freebsd",
+                                                 "ipfw",
                                                  3005,
                                                  update_every,
                                                  RRDSET_TYPE_STACKED
@@ -193,6 +195,8 @@ int do_ipfw(int update_every, usec_t dt) {
                                                          NULL,
                                                          "Packets",
                                                          "packets/s",
+                                                         "freebsd",
+                                                         "ipfw",
                                                          3001,
                                                          update_every,
                                                          RRDSET_TYPE_STACKED
@@ -208,6 +212,8 @@ int do_ipfw(int update_every, usec_t dt) {
                                                        NULL,
                                                        "Bytes",
                                                        "bytes/s",
+                                                       "freebsd",
+                                                       "ipfw",
                                                        3002,
                                                        update_every,
                                                        RRDSET_TYPE_STACKED
@@ -310,6 +316,8 @@ int do_ipfw(int update_every, usec_t dt) {
                                                     NULL,
                                                     "Active rules",
                                                     "rules",
+                                                    "freebsd",
+                                                    "ipfw",
                                                     3003,
                                                     update_every,
                                                     RRDSET_TYPE_STACKED
@@ -325,6 +333,8 @@ int do_ipfw(int update_every, usec_t dt) {
                                                      NULL,
                                                      "Expired rules",
                                                      "rules",
+                                                     "freebsd",
+                                                     "ipfw",
                                                      3004,
                                                      update_every,
                                                      RRDSET_TYPE_STACKED
