@@ -228,7 +228,7 @@ void kill_childs()
     info("All threads/childs stopped.");
 }
 
-struct option_def options[] = {
+struct option_def option_definitions[] = {
     // opt description                                    arg name       default value
     { 'c', "Configuration file to load.",                 "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
     { 'D', "Do not fork. Run in the foreground.",         NULL,          "run in the background"},
@@ -251,14 +251,14 @@ int help(int exitcode) {
     else
         stream = stderr;
 
-    int num_opts = sizeof(options) / sizeof(struct option_def);
+    int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
     int i;
     int max_len_arg = 0;
 
     // Compute maximum argument length
     for( i = 0; i < num_opts; i++ ) {
-        if(options[i].arg_name) {
-            int len_arg = (int)strlen(options[i].arg_name);
+        if(option_definitions[i].arg_name) {
+            int len_arg = (int)strlen(option_definitions[i].arg_name);
             if(len_arg > max_len_arg) max_len_arg = len_arg;
         }
     }
@@ -296,9 +296,9 @@ int help(int exitcode) {
 
     // Output options description.
     for( i = 0; i < num_opts; i++ ) {
-        fprintf(stream, "  -%c %-*s  %s", options[i].val, max_len_arg, options[i].arg_name ? options[i].arg_name : "", options[i].description);
-        if(options[i].default_value) {
-            fprintf(stream, "\n   %c %-*s  Default: %s\n", ' ', max_len_arg, "", options[i].default_value);
+        fprintf(stream, "  -%c %-*s  %s", option_definitions[i].val, max_len_arg, option_definitions[i].arg_name ? option_definitions[i].arg_name : "", option_definitions[i].description);
+        if(option_definitions[i].default_value) {
+            fprintf(stream, "\n   %c %-*s  Default: %s\n", ' ', max_len_arg, "", option_definitions[i].default_value);
         } else {
             fprintf(stream, "\n");
         }
@@ -656,14 +656,14 @@ int main(int argc, char **argv) {
 
     // parse options
     {
-        int num_opts = sizeof(options) / sizeof(struct option_def);
+        int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
         char optstring[(num_opts * 2) + 1];
 
         int string_i = 0;
         for( i = 0; i < num_opts; i++ ) {
-            optstring[string_i] = options[i].val;
+            optstring[string_i] = option_definitions[i].val;
             string_i++;
-            if(options[i].arg_name) {
+            if(option_definitions[i].arg_name) {
                 optstring[string_i] = ':';
                 string_i++;
             }

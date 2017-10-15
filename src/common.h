@@ -203,10 +203,21 @@
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
 
-#include "statistical.h"
-#include "socket.h"
+typedef enum rrdcalc_status {
+    RRDCALC_STATUS_REMOVED       = -2,
+    RRDCALC_STATUS_UNDEFINED     = -1,
+    RRDCALC_STATUS_UNINITIALIZED =  0,
+    RRDCALC_STATUS_CLEAR         =  1,
+    RRDCALC_STATUS_RAISED        =  2,
+    RRDCALC_STATUS_WARNING       =  3,
+    RRDCALC_STATUS_CRITICAL      =  4
+} RRDCALC_STATUS;
+
 #include "eval.h"
 #include "health.h"
+
+#include "statistical.h"
+#include "socket.h"
 #include "rrd.h"
 #include "plugin_tc.h"
 #include "plugins_d.h"

@@ -1,5 +1,55 @@
 #include "common.h"
 
+static int check_rrdcalc_comparisons(void) {
+    RRDCALC_STATUS a, b;
+
+    a = RRDCALC_STATUS_REMOVED;
+    b = RRDCALC_STATUS_UNDEFINED;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_UNDEFINED;
+    b = RRDCALC_STATUS_UNINITIALIZED;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_UNINITIALIZED;
+    b = RRDCALC_STATUS_CLEAR;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_CLEAR;
+    b = RRDCALC_STATUS_RAISED;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_RAISED;
+    b = RRDCALC_STATUS_WARNING;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_WARNING;
+    b = RRDCALC_STATUS_CRITICAL;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    fprintf(stderr, "RRDCALC_STATUSes are sortable.\n");
+
+    return 0;
+}
+
 int check_storage_number(calculated_number n, int debug) {
     char buffer[100];
     uint32_t flags = SN_EXISTS;
@@ -1106,6 +1156,9 @@ static int test_variable_renames(void) {
 
 int run_all_mockup_tests(void)
 {
+    if(check_rrdcalc_comparisons())
+        return 1;
+
     if(!test_variable_renames())
         return 1;
 

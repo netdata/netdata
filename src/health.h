@@ -5,13 +5,14 @@ extern int default_health_enabled;
 
 extern int rrdvar_compare(void *a, void *b);
 
-#define RRDVAR_TYPE_CALCULATED              1
-#define RRDVAR_TYPE_TIME_T                  2
-#define RRDVAR_TYPE_COLLECTED               3
-#define RRDVAR_TYPE_TOTAL                   4
-#define RRDVAR_TYPE_INT                     5
-#define RRDVAR_TYPE_CALCULATED_ALLOCATED    6
-
+typedef enum rrdvar_type {
+    RRDVAR_TYPE_CALCULATED              = 1,
+    RRDVAR_TYPE_TIME_T                  = 2,
+    RRDVAR_TYPE_COLLECTED               = 3,
+    RRDVAR_TYPE_TOTAL                   = 4,
+    RRDVAR_TYPE_INT                     = 5,
+    RRDVAR_TYPE_CALCULATED_ALLOCATED    = 6
+} RRDVAR_TYPE;
 
 // the variables as stored in the variables indexes
 // there are 3 indexes:
@@ -24,7 +25,7 @@ typedef struct rrdvar {
     char *name;
     uint32_t hash;
 
-    int type;
+    RRDVAR_TYPE type;
     void *value;
 
     time_t last_updated;
@@ -35,15 +36,21 @@ typedef struct rrdvar {
 // calculated / processed by the normal data collection process
 // This means, there will be no speed penalty for using
 // these variables
+
+typedef enum rrdvar_options {
+    RRDVAR_OPTION_DEFAULT    = (0 << 0)
+    // future use
+} RRDVAR_OPTIONS;
+
 typedef struct rrdsetvar {
     char *key_fullid;               // chart type.chart id.variable
     char *key_fullname;             // chart type.chart name.variable
-    char *variable;             // variable
+    char *variable;                 // variable
 
-    int type;
+    RRDVAR_TYPE type;
     void *value;
 
-    uint32_t options;
+    RRDVAR_OPTIONS options;
 
     RRDVAR *var_local;
     RRDVAR *var_family;
@@ -75,10 +82,10 @@ typedef struct rrddimvar {
     char *key_fullnameid;           // chart type.chart name + dimension id
     char *key_fullnamename;         // chart type.chart name + dimension name
 
-    int type;
+    RRDVAR_TYPE type;
     void *value;
 
-    uint32_t options;
+    RRDVAR_OPTIONS options;
 
     RRDVAR *var_local_id;
     RRDVAR *var_local_name;
@@ -101,7 +108,7 @@ typedef struct rrddimvar {
 // calculated variables (defined in health configuration)
 // These aggregate time-series data at fixed intervals
 // (defined in their update_every member below)
-// These increase the overhead of netdata.
+// They increase the overhead of netdata.
 //
 // These calculations are allocated and linked (->next)
 // under RRDHOST.
@@ -110,14 +117,6 @@ typedef struct rrddimvar {
 // This double-linked list is maintained sorted at all times
 // having as RRDSET.calculations the RRDCALC to be processed
 // next.
-
-#define RRDCALC_STATUS_REMOVED       -2
-#define RRDCALC_STATUS_UNDEFINED     -1
-#define RRDCALC_STATUS_UNINITIALIZED  0
-#define RRDCALC_STATUS_CLEAR          1
-#define RRDCALC_STATUS_RAISED         2
-#define RRDCALC_STATUS_WARNING        3
-#define RRDCALC_STATUS_CRITICAL       4
 
 #define RRDCALC_FLAG_DB_ERROR              0x00000001
 #define RRDCALC_FLAG_DB_NAN                0x00000002
@@ -179,7 +178,7 @@ typedef struct rrdcalc {
     // ------------------------------------------------------------------------
     // runtime information
 
-    int status;                     // the current status of the alarm
+    RRDCALC_STATUS status;          // the current status of the alarm
 
     calculated_number value;        // the current value of the alarm
     calculated_number old_value;    // the previous value of the alarm
@@ -314,8 +313,8 @@ typedef struct alarm_entry {
     char *old_value_string;
     char *new_value_string;
 
-    int old_status;
-    int new_status;
+    RRDCALC_STATUS old_status;
+    RRDCALC_STATUS new_status;
 
     uint32_t flags;
 
@@ -340,11 +339,11 @@ typedef struct alarm_log {
 #include "rrd.h"
 
 extern void rrdsetvar_rename_all(RRDSET *st);
-extern RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options);
+extern RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options);
 extern void rrdsetvar_free(RRDSETVAR *rs);
 
 extern void rrddimvar_rename_all(RRDDIM *rd);
-extern RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char *suffix, void *value, uint32_t options);
+extern RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_OPTIONS options);
 extern void rrddimvar_free(RRDDIMVAR *rs);
 
 extern void rrdsetcalc_link_matching(RRDSET *st);
@@ -367,7 +366,7 @@ extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *nam
 extern void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name);
 extern void rrdvar_custom_host_variable_set(RRDVAR *rv, calculated_number value);
 
-extern const char *rrdcalc_status2string(int status);
+extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
 
 extern int health_alarm_log_open(RRDHOST *host);
@@ -389,8 +388,8 @@ extern void health_alarm_log(
         time_t duration,
         calculated_number old_value,
         calculated_number new_value,
-        int old_status,
-        int new_status,
+        RRDCALC_STATUS old_status,
+        RRDCALC_STATUS new_status,
         const char *source,
         const char *units,
         const char *info,
@@ -419,7 +418,7 @@ extern int rrdvar_fix_name(char *variable);
 extern RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
 extern void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc);
 
-extern RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, int type, void *value);
+extern RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, RRDVAR_TYPE type, void *value);
 extern void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv);
 
 extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);

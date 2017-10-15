@@ -4,7 +4,7 @@
 // ----------------------------------------------------------------------------
 // RRDCALC management
 
-inline const char *rrdcalc_status2string(int status) {
+inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
             return "REMOVED";

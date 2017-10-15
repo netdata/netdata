@@ -17,6 +17,9 @@ typedef long double collected_number;
 #define calculated_number_llrint(x) llrintl(x)
 #define calculated_number_round(x) roundl(x)
 #define calculated_number_fabs(x) fabsl(x)
+#define calculated_number_epsilon (calculated_number)0.0000001
+
+#define calculated_number_equal(a, b) (calculated_number_fabs((a) - (b)) < calculated_number_epsilon)
 
 typedef uint32_t storage_number;
 #define STORAGE_NUMBER_FORMAT "%u"
