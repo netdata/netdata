@@ -497,6 +497,9 @@ struct rrdhost {
 
     netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
 
+    // ------------------------------------------------------------------------
+    // indexes
+
     avl_tree_lock rrdset_root_index;                // the host's charts index (by id)
     avl_tree_lock rrdset_root_index_name;           // the host's charts index (by name)
 

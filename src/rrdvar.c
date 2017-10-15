@@ -115,6 +115,7 @@ inline int rrdvar_callback_for_all_variables(RRDHOST *host, int (*callback)(void
 RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
     calculated_number *v = callocz(1, sizeof(calculated_number));
     *v = NAN;
+
     RRDVAR *rv = rrdvar_create_and_index("host", &host->variables_root_index, name, RRDVAR_TYPE_CALCULATED_ALLOCATED, v);
     if(unlikely(!rv)) {
         free(v);
@@ -130,6 +131,13 @@ RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
     }
 
     return rv;
+}
+
+void rrdvar_free_remaining_variables(RRDHOST *host) {
+    while(host->variables_root_index.avl_tree.root) {
+        RRDVAR *rv = (RRDVAR *)host->variables_root_index.avl_tree.root;
+        rrdvar_free(host, &host->variables_root_index, rv);
+    }
 }
 
 void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name) {
