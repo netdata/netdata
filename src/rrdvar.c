@@ -59,6 +59,9 @@ inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {
             error("Attempted to delete variable '%s' from host '%s', but it is not found.", rv->name, host->hostname);
     }
 
+    if(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)
+        freez(rv->value);
+
     freez(rv->name);
     freez(rv);
 }
@@ -104,13 +107,17 @@ inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, c
 // ----------------------------------------------------------------------------
 // CUSTOM VARIABLES
 
+inline int rrdvar_callback_for_all_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data) {
+    return avl_traverse_lock(&host->variables_root_index, callback, data);
+}
+
 RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
     calculated_number *v = callocz(1, sizeof(calculated_number));
     *v = NAN;
     RRDVAR *rv = rrdvar_create_and_index("host", &host->variables_root_index, name, RRDVAR_TYPE_CALCULATED_ALLOCATED, v);
     if(unlikely(!rv)) {
         free(v);
-        error("Requested variable '%s' already exists - possibly 2 plugins will be updating it at the same time", name);
+        error("Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", name);
 
         char *variable = strdupz(name);
         rrdvar_fix_name(variable);
