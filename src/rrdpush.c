@@ -197,6 +197,8 @@ static inline void rrdpush_sender_add_variable_to_buffer_nolock(RRDHOST *host, R
             , rv->name
             , *value
     );
+
+    debug(D_STREAM, "RRDVAR pushed VARIABLE %s = " CALCULATED_NUMBER_FORMAT, rv->name, *value);
 }
 
 void rrdpush_sender_send_this_variable_now(RRDHOST *host, RRDVAR *rv) {
@@ -224,7 +226,7 @@ static int rrdpush_sender_thread_custom_variables_callback(void *rrdvar_ptr, voi
 
 static void rrdpush_sender_thread_send_custom_variables(RRDHOST *host) {
     int ret = rrdvar_callback_for_all_variables(host, rrdpush_sender_thread_custom_variables_callback, host);
-    info("RRDVAR printed %d VARIABLES", ret);
+    debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
 }
 
 // resets all the chart, so that their definitions
