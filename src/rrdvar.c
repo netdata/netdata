@@ -84,7 +84,8 @@ inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, c
         RRDVAR *ret = rrdvar_index_add(tree, rv);
         if(unlikely(ret != rv)) {
             debug(D_VARIABLES, "Variable '%s' in scope '%s' already exists", variable, scope);
-            rrdvar_free(NULL, NULL, rv);
+            freez(rv);
+            freez(variable);
             rv = NULL;
         }
         else
@@ -124,6 +125,8 @@ RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
         uint32_t hash = simple_hash(variable);
 
         rv = rrdvar_index_find(&host->variables_root_index, variable, hash);
+
+        freez(variable);
     }
 
     return rv;
