@@ -646,7 +646,6 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------
 
                 static RRDSET *st_interrupts = NULL;
-                RRDDIM *rd_interrupts = NULL;
                 void *p;
 
                 if (unlikely(!st_interrupts))
@@ -670,9 +669,11 @@ int do_hw_intcnt(int update_every, usec_t dt) {
                 for (i = 0; i < nintr; i++) {
                     p = intrnames + i * (MAXCOMLEN + 1);
                     if (unlikely((intrcnt[i] != 0) && (*(char *) p != 0))) {
-                        rd_interrupts = rrddim_find(st_interrupts, p);
+                        RRDDIM *rd_interrupts = rrddim_find(st_interrupts, p);
+
                         if (unlikely(!rd_interrupts))
                             rd_interrupts = rrddim_add(st_interrupts, p, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
                         rrddim_set_by_pointer(st_interrupts, rd_interrupts, intrcnt[i]);
                     }
                 }
