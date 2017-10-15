@@ -117,7 +117,7 @@ RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
     RRDVAR *rv = rrdvar_create_and_index("host", &host->variables_root_index, name, RRDVAR_TYPE_CALCULATED_ALLOCATED, v);
     if(unlikely(!rv)) {
         free(v);
-        error("Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", name);
+        debug(D_VARIABLES, "Requested variable '%s' already exists - possibly 2 plugins are updating it at the same time.", name);
 
         char *variable = strdupz(name);
         rrdvar_fix_name(variable);
