@@ -1,5 +1,7 @@
 #include "common.h"
 
+#ifdef NETDATA_INTERNAL_CHECKS
+
 void *checks_main(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
@@ -124,3 +126,4 @@ void *checks_main(void *ptr) {
     return NULL;
 }
 
+#endif // NETDATA_INTERNAL_CHECKS
