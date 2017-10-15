@@ -122,7 +122,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
 
         unsigned long long max;
         if(likely(!read_single_number_file(nf_conntrack_max_filename, &max)))
-            rrdvar_custom_host_variable_set(rrdvar_max, max);
+            rrdvar_custom_host_variable_set(localhost, rrdvar_max, max);
     }
 
     // --------------------------------------------------------------------

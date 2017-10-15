@@ -188,8 +188,8 @@ int do_ipc(int update_every, usec_t dt) {
         arrays_max     = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.arrays.max");
         semaphores_max = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.max");
 
-        if(arrays_max)     rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
-        if(semaphores_max) rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
+        if(arrays_max)     rrdvar_custom_host_variable_set(localhost, arrays_max, limits.semmni);
+        if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
 
         // create the charts
         if(unlikely(!st_semaphores)) {
@@ -234,8 +234,8 @@ int do_ipc(int update_every, usec_t dt) {
             error("Unable to fetch semaphore limits.");
         }
         else {
-            if(arrays_max)     rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
-            if(semaphores_max) rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
+            if(arrays_max)     rrdvar_custom_host_variable_set(localhost, arrays_max, limits.semmni);
+            if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
 
             st_arrays->red = limits.semmni;
             st_semaphores->red = limits.semmns;

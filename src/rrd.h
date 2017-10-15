@@ -697,7 +697,6 @@ extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number 
 
 extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
-
 // ----------------------------------------------------------------------------
 // RRD internal functions
 

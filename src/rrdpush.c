@@ -188,20 +188,33 @@ void rrdset_done_push(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
+static inline void rrdpush_sender_add_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
+    calculated_number *value = (calculated_number *)rv->value;
+
+    buffer_sprintf(
+            host->rrdpush_sender_buffer
+            , "VARIABLE %s = " CALCULATED_NUMBER_FORMAT "\n"
+            , rv->name
+            , *value
+    );
+}
+
+void rrdpush_sender_send_this_variable_now(RRDHOST *host, RRDVAR *rv) {
+    if(host->rrdpush_send_enabled && host->rrdpush_sender_spawn && host->rrdpush_sender_connected) {
+        rrdpush_buffer_lock(host);
+        rrdpush_sender_add_variable_to_buffer_nolock(host, rv);
+        rrdpush_buffer_unlock(host);
+    }
+}
+
 static int rrdpush_sender_thread_custom_variables_callback(void *rrdvar_ptr, void *host_ptr) {
     RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
     if(unlikely(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)) {
-        calculated_number *value = (calculated_number *)rv->value;
+        rrdpush_sender_add_variable_to_buffer_nolock(host, rv);
 
-        buffer_sprintf(
-                host->rrdpush_sender_buffer
-                , "VARIABLE %s = " CALCULATED_NUMBER_FORMAT "\n"
-                , rv->name
-                , *value
-        );
-
+        // return 1, so that the traversal will return the number of variables sent
         return 1;
     }
 
