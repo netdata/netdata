@@ -11,7 +11,7 @@ typedef enum rrdvar_type {
     RRDVAR_TYPE_COLLECTED               = 3,
     RRDVAR_TYPE_TOTAL                   = 4,
     RRDVAR_TYPE_INT                     = 5,
-    RRDVAR_TYPE_CALCULATED_ALLOCATED    = 6
+    RRDVAR_TYPE_CALCULATED_ALLOCATED    = 6  // a custom variable, allocate on purpose (ie. not inherited from charts)
 } RRDVAR_TYPE;
 
 // the variables as stored in the variables indexes
@@ -407,6 +407,8 @@ extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 
 extern void rrdcalctemplate_free(RRDCALCTEMPLATE *rt);
 extern void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
+
+extern int  rrdvar_callback_for_all_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data);
 
 #ifdef NETDATA_HEALTH_INTERNALS
 #define RRDVAR_MAX_LENGTH 1024

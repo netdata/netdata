@@ -115,12 +115,6 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
         );
         rd->exposed = 1;
     }
-    /*
-    RRDSETVAR *rs;
-    for(rs = st->variables; rs ;rs = rs->next) {
-        if(unlikely(rs->type == ))
-    }
-    */
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
 }
@@ -194,6 +188,32 @@ void rrdset_done_push(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
+static int rrdpush_sender_thread_custom_variables_callback(void *rrdvar_ptr, void *host_ptr) {
+    RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
+    RRDHOST *host = (RRDHOST *)host_ptr;
+
+    if(unlikely(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)) {
+        calculated_number *value = (calculated_number *)rv->value;
+
+        buffer_sprintf(
+                host->rrdpush_sender_buffer
+                , "VARIABLE %s = " CALCULATED_NUMBER_FORMAT "\n"
+                , rv->name
+                , *value
+        );
+
+        return 1;
+    }
+
+    // returning a negative number will break the traversal
+    return 0;
+}
+
+static void rrdpush_sender_thread_send_custom_variables(RRDHOST *host) {
+    int ret = rrdvar_callback_for_all_variables(host, rrdpush_sender_thread_custom_variables_callback, host);
+    info("RRDVAR printed %d VARIABLES", ret);
+}
+
 // resets all the chart, so that their definitions
 // will be resent to the central netdata
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
@@ -225,6 +245,7 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     buffer_flush(host->rrdpush_sender_buffer);
 
     rrdpush_sender_thread_reset_all_charts(host);
+    rrdpush_sender_thread_send_custom_variables(host);
 
     rrdpush_buffer_unlock(host);
 }

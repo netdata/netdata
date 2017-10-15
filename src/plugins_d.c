@@ -101,6 +101,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     uint32_t CHART_HASH = simple_hash(PLUGINSD_KEYWORD_CHART);
     uint32_t DIMENSION_HASH = simple_hash(PLUGINSD_KEYWORD_DIMENSION);
     uint32_t DISABLE_HASH = simple_hash(PLUGINSD_KEYWORD_DISABLE);
+    uint32_t VARIABLE_HASH = simple_hash(PLUGINSD_KEYWORD_VARIABLE);
 
     RRDSET *st = NULL;
     uint32_t hash;
@@ -211,10 +212,6 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             st = NULL;
 
             count++;
-        }
-        else if(likely(hash == FLUSH_HASH && !strcmp(s, PLUGINSD_KEYWORD_FLUSH))) {
-            debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
-            st = NULL;
         }
         else if(likely(hash == CHART_HASH && !strcmp(s, PLUGINSD_KEYWORD_CHART))) {
             st = NULL;
@@ -374,6 +371,31 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
                 if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
             }
+        }
+        else if(likely(hash == VARIABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_VARIABLE))) {
+            char *name = words[1];
+            char *value = words[2];
+
+            if(unlikely(!name || !*name)) {
+                error("PLUGINSD: '%s' is requesting a VARIABLE on host '%s', without a variable name. Disabling it.", cd->fullfilename, host->hostname);
+                enabled = 0;
+                break;
+            }
+
+            if(unlikely(!value || !*value)) value = NULL;
+
+            if(value) {
+                calculated_number v = (calculated_number)str2ld(value, NULL);
+                RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
+                if(rv)
+                    rrdvar_custom_host_variable_set(rv, v);
+                else
+                    error("PLUGINSD: '%s': cannot find/create VARIABLE '%s' on host '%s'", cd->fullfilename, name, host->hostname);
+            }
+        }
+        else if(likely(hash == FLUSH_HASH && !strcmp(s, PLUGINSD_KEYWORD_FLUSH))) {
+            debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
+            st = NULL;
         }
         else if(unlikely(hash == DISABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_DISABLE))) {
             info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
