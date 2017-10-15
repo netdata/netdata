@@ -5146,7 +5146,7 @@ var NETDATA = window.NETDATA || {};
                 colors: state.chartColors(),
                 labels: data.result.labels,
                 labelsDivWidth: state.chartWidth() - 70,
-                visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names);
+                visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
         }
 
         if(!NETDATA.chartLibraries.dygraph.isSparkline(state)) {
