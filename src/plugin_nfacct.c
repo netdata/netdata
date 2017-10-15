@@ -302,6 +302,8 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker New Connections"
                     , "connections/s"
+                    , "nfacct"
+                    , NULL
                     , 3001
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
@@ -336,6 +338,8 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker Changes"
                     , "changes/s"
+                    , "nfacct"
+                    , NULL
                     , 3002
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
@@ -371,6 +375,8 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker Searches"
                     , "searches/s"
+                    , "nfacct"
+                    , NULL
                     , 3010
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
@@ -406,6 +412,8 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker Errors"
                     , "events/s"
+                    , "nfacct"
+                    , NULL
                     , 3005
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
@@ -443,6 +451,8 @@ static void nfstat_send_metrics() {
                     , NULL
                     , "Connection Tracker Expectations"
                     , "expectations/s"
+                    , "nfacct"
+                    , NULL
                     , 3003
                     , nfstat_root.update_every
                     , RRDSET_TYPE_LINE
@@ -661,6 +671,8 @@ static void nfacct_send_metrics() {
                 , NULL
                 , "Netfilter Accounting Packets"
                 , "packets/s"
+                , "nfacct"
+                , NULL
                 , 3206
                 , nfacct_root.update_every
                 , RRDSET_TYPE_STACKED
@@ -702,6 +714,8 @@ static void nfacct_send_metrics() {
                 , NULL
                 , "Netfilter Accounting Bandwidth"
                 , "kilobytes/s"
+                , "nfacct"
+                , NULL
                 , 3207
                 , nfacct_root.update_every
                 , RRDSET_TYPE_STACKED
