@@ -54,8 +54,20 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
                 st = rrdset_find_bytype_localhost("system", "cpu");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "cpu", NULL, "cpu", "system.cpu", "Total CPU utilization"
-                                                 , "percentage", 100, update_every, RRDSET_TYPE_STACKED);
+                    st = rrdset_create_localhost(
+                            "system"
+                            , "cpu"
+                            , NULL
+                            , "cpu"
+                            , "system.cpu"
+                            , "Total CPU utilization"
+                            , "percentage"
+                            , "macos"
+                            , "mach_smi"
+                            , 100
+                            , update_every
+                            , RRDSET_TYPE_STACKED
+                    );
 
                     rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_add(st, "nice", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
@@ -96,8 +108,20 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             if (likely(do_ram)) {
                 st = rrdset_find_localhost("system.ram");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "ram", NULL, "ram", NULL, "System RAM", "MB", 200
-                                                 , update_every, RRDSET_TYPE_STACKED);
+                    st = rrdset_create_localhost(
+                            "system"
+                            , "ram"
+                            , NULL
+                            , "ram"
+                            , NULL
+                            , "System RAM"
+                            , "MB"
+                            , "macos"
+                            , "mach_smi"
+                            , 200
+                            , update_every
+                            , RRDSET_TYPE_STACKED
+                    );
 
                     rrddim_add(st, "active",    NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "wired",     NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
@@ -131,8 +155,20 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             if (likely(do_swapio)) {
                 st = rrdset_find_localhost("system.swapio");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("system", "swapio", NULL, "swap", NULL, "Swap I/O", "kilobytes/s", 250
-                                                 , update_every, RRDSET_TYPE_AREA);
+                    st = rrdset_create_localhost(
+                            "system"
+                            , "swapio"
+                            , NULL
+                            , "swap"
+                            , NULL
+                            , "Swap I/O"
+                            , "kilobytes/s"
+                            , "macos"
+                            , "mach_smi"
+                            , 250
+                            , update_every
+                            , RRDSET_TYPE_AREA
+                    );
 
                     rrddim_add(st, "in",  NULL, system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "out", NULL, -system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
@@ -150,8 +186,20 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             if (likely(do_pgfaults)) {
                 st = rrdset_find_localhost("mem.pgfaults");
                 if (unlikely(!st)) {
-                    st = rrdset_create_localhost("mem", "pgfaults", NULL, "system", NULL, "Memory Page Faults"
-                                                 , "page faults/s", 500, update_every, RRDSET_TYPE_LINE);
+                    st = rrdset_create_localhost(
+                            "mem"
+                            , "pgfaults"
+                            , NULL
+                            , "system"
+                            , NULL
+                            , "Memory Page Faults"
+                            , "page faults/s"
+                            , "macos"
+                            , "mach_smi"
+                            , 500
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
                     rrddim_add(st, "memory",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

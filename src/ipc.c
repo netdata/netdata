@@ -167,7 +167,8 @@ int do_ipc(int update_every, usec_t dt) {
     static struct ipc_limits limits;
     static struct ipc_status status;
     static RRDVAR *arrays_max = NULL, *semaphores_max = NULL;
-    static RRDSET *semaphores = NULL, *arrays = NULL;
+    static RRDSET *st_semaphores = NULL, *st_arrays = NULL;
+    static RRDDIM *rd_semaphores = NULL, *rd_arrays = NULL;
 
     if(unlikely(!initialized)) {
         initialized = 1;
@@ -187,24 +188,44 @@ int do_ipc(int update_every, usec_t dt) {
         arrays_max     = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.arrays.max");
         semaphores_max = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.max");
 
-        if(arrays_max)     rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
-        if(semaphores_max) rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
+        if(arrays_max)     rrdvar_custom_host_variable_set(localhost, arrays_max, limits.semmni);
+        if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
 
         // create the charts
-        semaphores = rrdset_find_localhost("system.ipc_semaphores");
-        if(!semaphores) {
-            semaphores = rrdset_create_localhost("system", "ipc_semaphores", NULL, "ipc semaphores", NULL
-                                                 , "IPC Semaphores", "semaphores", 1000, localhost->rrd_update_every
-                                                 , RRDSET_TYPE_AREA);
-            rrddim_add(semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        if(unlikely(!st_semaphores)) {
+            st_semaphores = rrdset_create_localhost(
+                    "system"
+                    , "ipc_semaphores"
+                    , NULL
+                    , "ipc semaphores"
+                    , NULL
+                    , "IPC Semaphores"
+                    , "semaphores"
+                    , "linux"
+                    , "ipc"
+                    , 1000
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_AREA
+            );
+            rd_semaphores = rrddim_add(st_semaphores, "semaphores", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        arrays = rrdset_find_localhost("system.ipc_semaphore_arrays");
-        if(!arrays) {
-            arrays = rrdset_create_localhost("system", "ipc_semaphore_arrays", NULL, "ipc semaphores", NULL
-                                             , "IPC Semaphore Arrays", "arrays", 1000, localhost->rrd_update_every
-                                             , RRDSET_TYPE_AREA);
-            rrddim_add(arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        if(unlikely(!st_arrays)) {
+            st_arrays = rrdset_create_localhost(
+                    "system"
+                    , "ipc_semaphore_arrays"
+                    , NULL
+                    , "ipc semaphores"
+                    , NULL
+                    , "IPC Semaphore Arrays"
+                    , "arrays"
+                    , "linux"
+                    , "ipc"
+                    , 1000
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_AREA
+            );
+            rd_arrays = rrddim_add(st_arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
     }
 
@@ -213,11 +234,11 @@ int do_ipc(int update_every, usec_t dt) {
             error("Unable to fetch semaphore limits.");
         }
         else {
-            if(arrays_max)     rrdvar_custom_host_variable_set(arrays_max, limits.semmni);
-            if(semaphores_max) rrdvar_custom_host_variable_set(semaphores_max, limits.semmns);
+            if(arrays_max)     rrdvar_custom_host_variable_set(localhost, arrays_max, limits.semmni);
+            if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
 
-            arrays->red = limits.semmni;
-            semaphores->red = limits.semmns;
+            st_arrays->red = limits.semmni;
+            st_semaphores->red = limits.semmns;
 
             read_limits_next = 60 / update_every;
         }
@@ -230,13 +251,13 @@ int do_ipc(int update_every, usec_t dt) {
         return 0;
     }
 
-    if(semaphores->counter_done) rrdset_next(semaphores);
-    rrddim_set(semaphores, "semaphores", status.semaem);
-    rrdset_done(semaphores);
+    if(st_semaphores->counter_done) rrdset_next(st_semaphores);
+    rrddim_set_by_pointer(st_semaphores, rd_semaphores, status.semaem);
+    rrdset_done(st_semaphores);
 
-    if(arrays->counter_done) rrdset_next(arrays);
-    rrddim_set(arrays, "arrays", status.semusz);
-    rrdset_done(arrays);
+    if(st_arrays->counter_done) rrdset_next(st_arrays);
+    rrddim_set_by_pointer(st_arrays, rd_arrays, status.semusz);
+    rrdset_done(st_arrays);
 
     return 0;
 }

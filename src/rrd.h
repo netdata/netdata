@@ -300,7 +300,11 @@ struct rrdset {
 
     time_t last_accessed_time;                      // the last time this RRDSET has been accessed
     time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
-    size_t unused[8];
+
+    char *plugin_name;                              // the name of the plugin that generated this
+    char *module_name;                              // the name of the plugin module that generated this
+
+    size_t unused[6];
 
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons
@@ -493,6 +497,9 @@ struct rrdhost {
 
     netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
 
+    // ------------------------------------------------------------------------
+    // indexes
+
     avl_tree_lock rrdset_root_index;                // the host's charts index (by id)
     avl_tree_lock rrdset_root_index_name;           // the host's charts index (by name)
 
@@ -590,17 +597,19 @@ extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , const char *context
                              , const char *title
                              , const char *units
+                             , const char *plugin
+                             , const char *module
                              , long priority
                              , int update_every
                              , RRDSET_TYPE chart_type
                              , RRD_MEMORY_MODE memory_mode
                              , long history_entries);
 
-#define rrdset_create(host, type, id, name, family, context, title, units, priority, update_every, chart_type) \
-    rrdset_create_custom(host, type, id, name, family, context, title, units, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries)
+#define rrdset_create(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
+    rrdset_create_custom(host, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type, (host)->rrd_memory_mode, (host)->rrd_history_entries)
 
-#define rrdset_create_localhost(type, id, name, family, context, title, units, priority, update_every, chart_type) \
-    rrdset_create(localhost, type, id, name, family, context, title, units, priority, update_every, chart_type)
+#define rrdset_create_localhost(type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type) \
+    rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
 
 extern void rrdhost_free_all(void);
 extern void rrdhost_save_all(void);
@@ -690,7 +699,6 @@ extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 
 extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
-
 
 // ----------------------------------------------------------------------------
 // RRD internal functions

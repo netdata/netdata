@@ -39,7 +39,9 @@ storage_number pack_storage_number(calculated_number value, uint32_t flags)
         r += (1 << 30) + (m << 27); // the multiplier m
 
         if(n > (calculated_number)0x00ffffff) {
+            #ifdef NETDATA_INTERNAL_CHECKS
             error("Number " CALCULATED_NUMBER_FORMAT " is too big.", value);
+            #endif
             r += 0x00ffffff;
             return r;
         }

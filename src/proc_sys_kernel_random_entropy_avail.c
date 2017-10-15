@@ -29,6 +29,8 @@ int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt) {
                 , NULL
                 , "Available Entropy"
                 , "entropy"
+                , "proc"
+                , "sys/kernel/random/entropy_avail"
                 , 1000
                 , update_every
                 , RRDSET_TYPE_LINE

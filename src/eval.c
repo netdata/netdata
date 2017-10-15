@@ -232,7 +232,7 @@ calculated_number eval_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     if(isinf(n1) && isinf(n2)) return 1;
     if(isnan(n1) || isnan(n2)) return 0;
     if(isinf(n1) || isinf(n2)) return 0;
-    return n1 == n2;
+    return calculated_number_equal(n1, n2);
 }
 calculated_number eval_not_equal(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return !eval_equal(exp, op, error);

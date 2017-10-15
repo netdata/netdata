@@ -287,6 +287,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , context
                             , title
                             , "percentage"
+                            , "proc"
+                            , "stat"
                             , priority
                             , update_every
                             , RRDSET_TYPE_STACKED
@@ -337,6 +339,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , NULL
                             , "CPU Interrupts"
                             , "interrupts/s"
+                            , "proc"
+                            , "stat"
                             , 900
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -367,6 +371,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , NULL
                             , "CPU Context Switches"
                             , "context switches/s"
+                            , "proc"
+                            , "stat"
                             , 800
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -406,6 +412,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                     , NULL
                     , "Started Processes"
                     , "processes/s"
+                    , "proc"
+                    , "stat"
                     , 700
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -436,6 +444,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                     , NULL
                     , "System Processes"
                     , "processes"
+                    , "proc"
+                    , "stat"
                     , 600
                     , update_every
                     , RRDSET_TYPE_LINE
@@ -468,6 +478,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , "cpu.core_throttling"
                             , "Core Thermal Throttling Events"
                             , "events/s"
+                            , "proc"
+                            , "stat"
                             , 5001
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -496,6 +508,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , "cpu.package_throttling"
                             , "Package Thermal Throttling Events"
                             , "events/s"
+                            , "proc"
+                            , "stat"
                             , 5002
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -524,6 +538,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                             , "cpu.scaling_cur_freq"
                             , "Per CPU Core, Current CPU Scaling Frequency"
                             , "MHz"
+                            , "proc"
+                            , "stat"
                             , 5003
                             , update_every
                             , RRDSET_TYPE_LINE

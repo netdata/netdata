@@ -32,24 +32,34 @@ void netdata_cleanup_and_exit(int ret) {
 }
 
 struct netdata_static_thread static_threads[] = {
+
 #ifdef INTERNAL_PLUGIN_NFACCT
-// nfacct requires root access
+    // nfacct requires root access
     // so, we build it as an external plugin with setuid to root
     {"nfacct",              CONFIG_SECTION_PLUGINS,  "nfacct",     1, NULL, NULL, nfacct_main},
 #endif
 
-    {"tc",                  CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
-    {"idlejitter",          CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
+#ifdef NETDATA_INTERNAL_CHECKS
+    // debugging plugin
+    {"check",               CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
+#endif
+
 #if defined(__FreeBSD__)
+    // FreeBSD internal plugins
     {"freebsd",             CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
 #elif defined(__APPLE__)
+    // macOS internal plugins
     {"macos",               CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
 #else
+    // linux internal plugins
     {"proc",                CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
     {"diskspace",           CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
     {"cgroups",             CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
+    {"tc",                  CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
 #endif /* __FreeBSD__, __APPLE__*/
-    {"check",               CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
+
+    // common plugins for all systems
+    {"idlejitter",          CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
     {"backends",            NULL,                    NULL,         1, NULL, NULL, backends_main},
     {"health",              NULL,                    NULL,         1, NULL, NULL, health_main},
     {"plugins.d",           NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
@@ -57,6 +67,7 @@ struct netdata_static_thread static_threads[] = {
     {"web-single-threaded", NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
     {"push-metrics",        NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
     {"statsd",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
+
     {NULL,                  NULL,                    NULL,         0, NULL, NULL, NULL}
 };
 
@@ -228,7 +239,7 @@ void kill_childs()
     info("All threads/childs stopped.");
 }
 
-struct option_def options[] = {
+struct option_def option_definitions[] = {
     // opt description                                    arg name       default value
     { 'c', "Configuration file to load.",                 "filename",    CONFIG_DIR "/" CONFIG_FILENAME},
     { 'D', "Do not fork. Run in the foreground.",         NULL,          "run in the background"},
@@ -251,14 +262,14 @@ int help(int exitcode) {
     else
         stream = stderr;
 
-    int num_opts = sizeof(options) / sizeof(struct option_def);
+    int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
     int i;
     int max_len_arg = 0;
 
     // Compute maximum argument length
     for( i = 0; i < num_opts; i++ ) {
-        if(options[i].arg_name) {
-            int len_arg = (int)strlen(options[i].arg_name);
+        if(option_definitions[i].arg_name) {
+            int len_arg = (int)strlen(option_definitions[i].arg_name);
             if(len_arg > max_len_arg) max_len_arg = len_arg;
         }
     }
@@ -296,9 +307,9 @@ int help(int exitcode) {
 
     // Output options description.
     for( i = 0; i < num_opts; i++ ) {
-        fprintf(stream, "  -%c %-*s  %s", options[i].val, max_len_arg, options[i].arg_name ? options[i].arg_name : "", options[i].description);
-        if(options[i].default_value) {
-            fprintf(stream, "\n   %c %-*s  Default: %s\n", ' ', max_len_arg, "", options[i].default_value);
+        fprintf(stream, "  -%c %-*s  %s", option_definitions[i].val, max_len_arg, option_definitions[i].arg_name ? option_definitions[i].arg_name : "", option_definitions[i].description);
+        if(option_definitions[i].default_value) {
+            fprintf(stream, "\n   %c %-*s  Default: %s\n", ' ', max_len_arg, "", option_definitions[i].default_value);
         } else {
             fprintf(stream, "\n");
         }
@@ -503,7 +514,7 @@ static void get_system_timezone(void) {
     if(!tz || !*tz)
         setenv("TZ", config_get(CONFIG_SECTION_GLOBAL, "TZ environment variable", ":/etc/localtime"), 0);
 
-    char buffer[FILENAME_MAX + 1];
+    char buffer[FILENAME_MAX + 1] = "";
     const char *timezone = NULL;
     ssize_t ret;
 
@@ -520,17 +531,23 @@ static void get_system_timezone(void) {
     }
 
     // read the link /etc/localtime
-    if(!timezone && (ret = readlink("/etc/localtime", buffer, FILENAME_MAX)) > 0) {
-        buffer[ret] = '\0';
+    if(!timezone) {
+        ret = readlink("/etc/localtime", buffer, FILENAME_MAX);
 
-        char *cmp = "/usr/share/zoneinfo/";
-        size_t cmp_len = strlen(cmp);
+        if(ret > 0) {
+            buffer[ret] = '\0';
 
-        char *s = strstr(buffer, cmp);
-        if(s && s[cmp_len]) {
-            timezone = &s[cmp_len];
-            // info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
+            char   *cmp    = "/usr/share/zoneinfo/";
+            size_t cmp_len = strlen(cmp);
+
+            char *s = strstr(buffer, cmp);
+            if (s && s[cmp_len]) {
+                timezone = &s[cmp_len];
+                // info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
+            }
         }
+        else
+            buffer[0] = '\0';
     }
 
     // find the timezone from strftime()
@@ -556,7 +573,8 @@ static void get_system_timezone(void) {
         // make sure it does not have illegal characters
         // info("TIMEZONE: fixing '%s'", timezone);
 
-        char tmp[strlen(timezone) + 1];
+        size_t len = strlen(timezone);
+        char tmp[len + 1];
         char *d = tmp;
         *d = '\0';
 
@@ -567,7 +585,7 @@ static void get_system_timezone(void) {
                 timezone++;
         }
         *d = '\0';
-        strcpy(buffer, tmp);
+        strncpyz(buffer, tmp, len);
         timezone = buffer;
         // info("TIMEZONE: fixed as '%s'", timezone);
     }
@@ -656,14 +674,14 @@ int main(int argc, char **argv) {
 
     // parse options
     {
-        int num_opts = sizeof(options) / sizeof(struct option_def);
+        int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
         char optstring[(num_opts * 2) + 1];
 
         int string_i = 0;
         for( i = 0; i < num_opts; i++ ) {
-            optstring[string_i] = options[i].val;
+            optstring[string_i] = option_definitions[i].val;
             string_i++;
-            if(options[i].arg_name) {
+            if(option_definitions[i].arg_name) {
                 optstring[string_i] = ':';
                 string_i++;
             }

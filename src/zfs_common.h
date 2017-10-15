@@ -103,7 +103,7 @@ struct arcstats {
 
 int l2exist;
 
-void generate_charts_arcstats(int update_every);
-void generate_charts_arc_summary(int update_every);
+void generate_charts_arcstats(const char *plugin, int update_every);
+void generate_charts_arc_summary(const char *plugin, int update_every);
 
 #endif //NETDATA_ZFS_COMMON_H

@@ -68,7 +68,7 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
 
 }
 
-RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, int type, void *value, uint32_t options) {
+RRDSETVAR *rrdsetvar_create(RRDSET *st, const char *variable, RRDVAR_TYPE type, void *value, RRDVAR_OPTIONS options) {
     debug(D_VARIABLES, "RRDVARSET create for chart id '%s' name '%s' with variable name '%s'", st->id, st->name, variable);
     RRDSETVAR *rs = (RRDSETVAR *)callocz(1, sizeof(RRDSETVAR));
 

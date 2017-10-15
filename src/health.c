@@ -84,7 +84,7 @@ void health_reload(void) {
 // ----------------------------------------------------------------------------
 // health main thread and friends
 
-static inline int rrdcalc_value2status(calculated_number n) {
+static inline RRDCALC_STATUS rrdcalc_value2status(calculated_number n) {
     if(isnan(n) || isinf(n)) return RRDCALC_STATUS_UNDEFINED;
     if(n) return RRDCALC_STATUS_RAISED;
     return RRDCALC_STATUS_CLEAR;
@@ -189,7 +189,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
 done:
     health_alarm_log_save(host, ae);
-    return;
 }
 
 static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
@@ -537,8 +536,8 @@ void *health_main(void *ptr) {
                     if(unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUNNABLE)))
                         continue;
 
-                    int warning_status  = RRDCALC_STATUS_UNDEFINED;
-                    int critical_status = RRDCALC_STATUS_UNDEFINED;
+                    RRDCALC_STATUS warning_status  = RRDCALC_STATUS_UNDEFINED;
+                    RRDCALC_STATUS critical_status = RRDCALC_STATUS_UNDEFINED;
 
                     // --------------------------------------------------------
                     // check the warning expression
@@ -605,7 +604,7 @@ void *health_main(void *ptr) {
                     // --------------------------------------------------------
                     // decide the final alarm status
 
-                    int status = RRDCALC_STATUS_UNDEFINED;
+                    RRDCALC_STATUS status = RRDCALC_STATUS_UNDEFINED;
 
                     switch(warning_status) {
                         case RRDCALC_STATUS_CLEAR:

@@ -208,8 +208,8 @@ static inline int single_threaded_link_client(struct web_client *w, fd_set *ifds
     if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
         return 1;
 
-    if(unlikely(w->ifd < 0 || w->ifd >= FD_SETSIZE || w->ofd < 0 || w->ofd >= FD_SETSIZE)) {
-        error("%llu: invalid file descriptor, ifd = %d, ofd = %d (required 0 <= fd < FD_SETSIZE (%d)", w->id, w->ifd, w->ofd, FD_SETSIZE);
+    if(unlikely(w->ifd < 0 || w->ifd >= (int)FD_SETSIZE || w->ofd < 0 || w->ofd >= (int)FD_SETSIZE)) {
+        error("%llu: invalid file descriptor, ifd = %d, ofd = %d (required 0 <= fd < FD_SETSIZE (%d)", w->id, w->ifd, w->ofd, (int)FD_SETSIZE);
         return 1;
     }
 
@@ -266,7 +266,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
         fatal("LISTENER: no listen sockets available.");
 
     size_t i;
-    for(i = 0; i < FD_SETSIZE ; i++)
+    for(i = 0; i < (size_t)FD_SETSIZE ; i++)
         single_threaded_clients[i] = NULL;
 
     fd_set ifds, ofds, efds, rifds, rofds, refds;
@@ -276,7 +276,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
     int fdmax = 0;
 
     for(i = 0; i < api_sockets.opened ; i++) {
-        if (api_sockets.fds[i] < 0 || api_sockets.fds[i] >= FD_SETSIZE)
+        if (api_sockets.fds[i] < 0 || api_sockets.fds[i] >= (int)FD_SETSIZE)
             fatal("LISTENER: Listen socket %d is not ready, or invalid.", api_sockets.fds[i]);
 
         info("Listening on '%s'", (api_sockets.fds_names[i])?api_sockets.fds_names[i]:"UNKNOWN");
