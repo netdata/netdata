@@ -101,6 +101,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     uint32_t CHART_HASH = simple_hash(PLUGINSD_KEYWORD_CHART);
     uint32_t DIMENSION_HASH = simple_hash(PLUGINSD_KEYWORD_DIMENSION);
     uint32_t DISABLE_HASH = simple_hash(PLUGINSD_KEYWORD_DISABLE);
+    uint32_t VARIABLE_HASH = simple_hash(PLUGINSD_KEYWORD_VARIABLE);
 
     RRDSET *st = NULL;
     uint32_t hash;
@@ -212,10 +213,6 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
             count++;
         }
-        else if(likely(hash == FLUSH_HASH && !strcmp(s, PLUGINSD_KEYWORD_FLUSH))) {
-            debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
-            st = NULL;
-        }
         else if(likely(hash == CHART_HASH && !strcmp(s, PLUGINSD_KEYWORD_CHART))) {
             st = NULL;
 
@@ -229,6 +226,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *priority_s     = words[8];
             char *update_every_s = words[9];
             char *options        = words[10];
+            char *plugin         = words[11];
+            char *module         = words[12];
 
             // parse the id from type
             char *id = NULL;
@@ -287,7 +286,21 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                       , update_every
                 );
 
-                st = rrdset_create(host, type, id, name, family, context, title, units, priority, update_every, chart_type);
+                st = rrdset_create(
+                        host
+                        , type
+                        , id
+                        , name
+                        , family
+                        , context
+                        , title
+                        , units
+                        , (plugin && *plugin)?plugin:cd->filename
+                        , module
+                        , priority
+                        , update_every
+                        , chart_type
+                );
                 cd->update_every = update_every;
             }
             else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
@@ -358,6 +371,31 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 if(strstr(options, "noreset") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
                 if(strstr(options, "nooverflow") != NULL) rrddim_flag_set(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
             }
+        }
+        else if(likely(hash == VARIABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_VARIABLE))) {
+            char *name = words[1];
+            char *value = words[2];
+
+            if(unlikely(!name || !*name)) {
+                error("PLUGINSD: '%s' is requesting a VARIABLE on host '%s', without a variable name. Disabling it.", cd->fullfilename, host->hostname);
+                enabled = 0;
+                break;
+            }
+
+            if(unlikely(!value || !*value)) value = NULL;
+
+            if(value) {
+                calculated_number v = (calculated_number)str2ld(value, NULL);
+                RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
+                if(rv)
+                    rrdvar_custom_host_variable_set(host, rv, v);
+                else
+                    error("PLUGINSD: '%s': cannot find/create VARIABLE '%s' on host '%s'", cd->fullfilename, name, host->hostname);
+            }
+        }
+        else if(likely(hash == FLUSH_HASH && !strcmp(s, PLUGINSD_KEYWORD_FLUSH))) {
+            debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
+            st = NULL;
         }
         else if(unlikely(hash == DISABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_DISABLE))) {
             info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);

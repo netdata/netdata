@@ -4,127 +4,133 @@ struct nfs_procs {
     char name[30];
     unsigned long long value;
     int present;
+    RRDDIM *rd;
 };
 
 struct nfs_procs nfs_proc2_values[] = {
-    { "null", 0ULL, 0 },
-    { "getattr", 0ULL, 0 },
-    { "setattr", 0ULL, 0 },
-    { "root", 0ULL, 0 },
-    { "lookup", 0ULL, 0 },
-    { "readlink", 0ULL, 0 },
-    { "read", 0ULL, 0 },
-    { "wrcache", 0ULL, 0 },
-    { "write", 0ULL, 0 },
-    { "create", 0ULL, 0 },
-    { "remove", 0ULL, 0 },
-    { "rename", 0ULL, 0 },
-    { "link", 0ULL, 0 },
-    { "symlink", 0ULL, 0 },
-    { "mkdir", 0ULL, 0 },
-    { "rmdir", 0ULL, 0 },
-    { "readdir", 0ULL, 0 },
-    { "fsstat", 0ULL, 0 },
-    
-    /* termination */
-    { "", 0ULL, 0 }
+        {  "null"    , 0ULL, 0, NULL}
+        , {"getattr" , 0ULL, 0, NULL}
+        , {"setattr" , 0ULL, 0, NULL}
+        , {"root"    , 0ULL, 0, NULL}
+        , {"lookup"  , 0ULL, 0, NULL}
+        , {"readlink", 0ULL, 0, NULL}
+        , {"read"    , 0ULL, 0, NULL}
+        , {"wrcache" , 0ULL, 0, NULL}
+        , {"write"   , 0ULL, 0, NULL}
+        , {"create"  , 0ULL, 0, NULL}
+        , {"remove"  , 0ULL, 0, NULL}
+        , {"rename"  , 0ULL, 0, NULL}
+        , {"link"    , 0ULL, 0, NULL}
+        , {"symlink" , 0ULL, 0, NULL}
+        , {"mkdir"   , 0ULL, 0, NULL}
+        , {"rmdir"   , 0ULL, 0, NULL}
+        , {"readdir" , 0ULL, 0, NULL}
+        , {"fsstat"  , 0ULL, 0, NULL}
+        ,
+
+        /* termination */
+        {  ""        , 0ULL, 0, NULL}
 };
 
 struct nfs_procs nfs_proc3_values[] = {
-    { "null", 0ULL, 0 },
-    { "getattr", 0ULL, 0 },
-    { "setattr", 0ULL, 0 },
-    { "lookup", 0ULL, 0 },
-    { "access", 0ULL, 0 },
-    { "readlink", 0ULL, 0 },
-    { "read", 0ULL, 0 },
-    { "write", 0ULL, 0 },
-    { "create", 0ULL, 0 },
-    { "mkdir", 0ULL, 0 },
-    { "symlink", 0ULL, 0 },
-    { "mknod", 0ULL, 0 },
-    { "remove", 0ULL, 0 },
-    { "rmdir", 0ULL, 0 },
-    { "rename", 0ULL, 0 },
-    { "link", 0ULL, 0 },
-    { "readdir", 0ULL, 0 },
-    { "readdirplus", 0ULL, 0 },
-    { "fsstat", 0ULL, 0 },
-    { "fsinfo", 0ULL, 0 },
-    { "pathconf", 0ULL, 0 },
-    { "commit", 0ULL, 0 },
+        {  "null"       , 0ULL, 0, NULL}
+        , {"getattr"    , 0ULL, 0, NULL}
+        , {"setattr"    , 0ULL, 0, NULL}
+        , {"lookup"     , 0ULL, 0, NULL}
+        , {"access"     , 0ULL, 0, NULL}
+        , {"readlink"   , 0ULL, 0, NULL}
+        , {"read"       , 0ULL, 0, NULL}
+        , {"write"      , 0ULL, 0, NULL}
+        , {"create"     , 0ULL, 0, NULL}
+        , {"mkdir"      , 0ULL, 0, NULL}
+        , {"symlink"    , 0ULL, 0, NULL}
+        , {"mknod"      , 0ULL, 0, NULL}
+        , {"remove"     , 0ULL, 0, NULL}
+        , {"rmdir"      , 0ULL, 0, NULL}
+        , {"rename"     , 0ULL, 0, NULL}
+        , {"link"       , 0ULL, 0, NULL}
+        , {"readdir"    , 0ULL, 0, NULL}
+        , {"readdirplus", 0ULL, 0, NULL}
+        , {"fsstat"     , 0ULL, 0, NULL}
+        , {"fsinfo"     , 0ULL, 0, NULL}
+        , {"pathconf"   , 0ULL, 0, NULL}
+        , {"commit"     , 0ULL, 0, NULL}
+        ,
 
-    /* termination */
-    { "", 0ULL, 0 }
+        /* termination */
+        {  ""           , 0ULL, 0, NULL}
 };
 
 struct nfs_procs nfs_proc4_values[] = {
-    { "null", 0ULL, 0 },
-    { "read", 0ULL, 0 },
-    { "write", 0ULL, 0 },
-    { "commit", 0ULL, 0 },
-    { "open", 0ULL, 0 },
-    { "open_conf", 0ULL, 0 },
-    { "open_noat", 0ULL, 0 },
-    { "open_dgrd", 0ULL, 0 },
-    { "close", 0ULL, 0 },
-    { "setattr", 0ULL, 0 },
-    { "fsinfo", 0ULL, 0 },
-    { "renew", 0ULL, 0 },
-    { "setclntid", 0ULL, 0 },
-    { "confirm", 0ULL, 0 },
-    { "lock", 0ULL, 0 },
-    { "lockt", 0ULL, 0 },
-    { "locku", 0ULL, 0 },
-    { "access", 0ULL, 0 },
-    { "getattr", 0ULL, 0 },
-    { "lookup", 0ULL, 0 },
-    { "lookup_root", 0ULL, 0 },
-    { "remove", 0ULL, 0 },
-    { "rename", 0ULL, 0 },
-    { "link", 0ULL, 0 },
-    { "symlink", 0ULL, 0 },
-    { "create", 0ULL, 0 },
-    { "pathconf", 0ULL, 0 },
-    { "statfs", 0ULL, 0 },
-    { "readlink", 0ULL, 0 },
-    { "readdir", 0ULL, 0 },
-    { "server_caps", 0ULL, 0 },
-    { "delegreturn", 0ULL, 0 },
-    { "getacl", 0ULL, 0 },
-    { "setacl", 0ULL, 0 },
-    { "fs_locations", 0ULL, 0 },
-    { "rel_lkowner", 0ULL, 0 },
-    { "secinfo", 0ULL, 0 },
-    { "fsid_present", 0ULL, 0 },
+        {  "null"            , 0ULL, 0, NULL}
+        , {"read"            , 0ULL, 0, NULL}
+        , {"write"           , 0ULL, 0, NULL}
+        , {"commit"          , 0ULL, 0, NULL}
+        , {"open"            , 0ULL, 0, NULL}
+        , {"open_conf"       , 0ULL, 0, NULL}
+        , {"open_noat"       , 0ULL, 0, NULL}
+        , {"open_dgrd"       , 0ULL, 0, NULL}
+        , {"close"           , 0ULL, 0, NULL}
+        , {"setattr"         , 0ULL, 0, NULL}
+        , {"fsinfo"          , 0ULL, 0, NULL}
+        , {"renew"           , 0ULL, 0, NULL}
+        , {"setclntid"       , 0ULL, 0, NULL}
+        , {"confirm"         , 0ULL, 0, NULL}
+        , {"lock"            , 0ULL, 0, NULL}
+        , {"lockt"           , 0ULL, 0, NULL}
+        , {"locku"           , 0ULL, 0, NULL}
+        , {"access"          , 0ULL, 0, NULL}
+        , {"getattr"         , 0ULL, 0, NULL}
+        , {"lookup"          , 0ULL, 0, NULL}
+        , {"lookup_root"     , 0ULL, 0, NULL}
+        , {"remove"          , 0ULL, 0, NULL}
+        , {"rename"          , 0ULL, 0, NULL}
+        , {"link"            , 0ULL, 0, NULL}
+        , {"symlink"         , 0ULL, 0, NULL}
+        , {"create"          , 0ULL, 0, NULL}
+        , {"pathconf"        , 0ULL, 0, NULL}
+        , {"statfs"          , 0ULL, 0, NULL}
+        , {"readlink"        , 0ULL, 0, NULL}
+        , {"readdir"         , 0ULL, 0, NULL}
+        , {"server_caps"     , 0ULL, 0, NULL}
+        , {"delegreturn"     , 0ULL, 0, NULL}
+        , {"getacl"          , 0ULL, 0, NULL}
+        , {"setacl"          , 0ULL, 0, NULL}
+        , {"fs_locations"    , 0ULL, 0, NULL}
+        , {"rel_lkowner"     , 0ULL, 0, NULL}
+        , {"secinfo"         , 0ULL, 0, NULL}
+        , {"fsid_present"    , 0ULL, 0, NULL}
+        ,
 
-    /* nfsv4.1 client ops */
-    { "exchange_id", 0ULL, 0 },
-    { "create_session", 0ULL, 0 },
-    { "destroy_session", 0ULL, 0 },
-    { "sequence", 0ULL, 0 },
-    { "get_lease_time", 0ULL, 0 },
-    { "reclaim_comp", 0ULL, 0 },
-    { "layoutget", 0ULL, 0 },
-    { "getdevinfo", 0ULL, 0 },
-    { "layoutcommit", 0ULL, 0 },
-    { "layoutreturn", 0ULL, 0 },
-    { "secinfo_no", 0ULL, 0 },
-    { "test_stateid", 0ULL, 0 },
-    { "free_stateid", 0ULL, 0 },
-    { "getdevicelist", 0ULL, 0 },
-    { "bind_conn_to_ses", 0ULL, 0 },
-    { "destroy_clientid", 0ULL, 0 },
+        /* nfsv4.1 client ops */
+        {  "exchange_id"     , 0ULL, 0, NULL}
+        , {"create_session"  , 0ULL, 0, NULL}
+        , {"destroy_session" , 0ULL, 0, NULL}
+        , {"sequence"        , 0ULL, 0, NULL}
+        , {"get_lease_time"  , 0ULL, 0, NULL}
+        , {"reclaim_comp"    , 0ULL, 0, NULL}
+        , {"layoutget"       , 0ULL, 0, NULL}
+        , {"getdevinfo"      , 0ULL, 0, NULL}
+        , {"layoutcommit"    , 0ULL, 0, NULL}
+        , {"layoutreturn"    , 0ULL, 0, NULL}
+        , {"secinfo_no"      , 0ULL, 0, NULL}
+        , {"test_stateid"    , 0ULL, 0, NULL}
+        , {"free_stateid"    , 0ULL, 0, NULL}
+        , {"getdevicelist"   , 0ULL, 0, NULL}
+        , {"bind_conn_to_ses", 0ULL, 0, NULL}
+        , {"destroy_clientid", 0ULL, 0, NULL}
+        ,
 
-    /* nfsv4.2 client ops */
-    { "seek", 0ULL, 0 },
-    { "allocate", 0ULL, 0 },
-    { "deallocate", 0ULL, 0 },
-    { "layoutstats", 0ULL, 0 },
-    { "clone", 0ULL, 0 },
+        /* nfsv4.2 client ops */
+        {  "seek"            , 0ULL, 0, NULL}
+        , {"allocate"        , 0ULL, 0, NULL}
+        , {"deallocate"      , 0ULL, 0, NULL}
+        , {"layoutstats"     , 0ULL, 0, NULL}
+        , {"clone"           , 0ULL, 0, NULL}
+        ,
 
-    /* termination */
-    { "", 0ULL, 0 }
+        /* termination */
+        {  ""                , 0ULL, 0, NULL}
 };
 
 int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
@@ -264,68 +270,111 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
         }
     }
 
-    RRDSET *st;
-
     // --------------------------------------------------------------------
 
     if(do_net == 2) {
-        st = rrdset_find_bytype_localhost("nfs", "net");
-        if(!st) {
-            st = rrdset_create_localhost("nfs", "net", NULL, "network", NULL, "NFS Client Network", "operations/s", 5007
-                                         , update_every, RRDSET_TYPE_STACKED);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_udp = NULL,
+                      *rd_tcp = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "nfs"
+                    , "net"
+                    , NULL
+                    , "network"
+                    , NULL
+                    , "NFS Client Network"
+                    , "operations/s"
+                    , "proc"
+                    , "net/rpc/nfs"
+                    , 5007
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_udp = rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_tcp = rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
         // ignore net_count, net_tcp_connections
-        if(net_count) {};
-        if(net_tcp_connections) {};
+        (void)net_count;
+        (void)net_tcp_connections;
 
-        rrddim_set(st, "udp", net_udp_count);
-        rrddim_set(st, "tcp", net_tcp_count);
+        rrddim_set_by_pointer(st, rd_udp, net_udp_count);
+        rrddim_set_by_pointer(st, rd_tcp, net_tcp_count);
         rrdset_done(st);
     }
 
     // --------------------------------------------------------------------
 
     if(do_rpc == 2) {
-        st = rrdset_find_bytype_localhost("nfs", "rpc");
-        if(!st) {
-            st = rrdset_create_localhost("nfs", "rpc", NULL, "rpc", NULL, "NFS Client Remote Procedure Calls Statistics"
-                                         , "calls/s", 5008, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_calls        = NULL,
+                      *rd_retransmits  = NULL,
+                      *rd_auth_refresh = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "nfs"
+                    , "rpc"
+                    , NULL
+                    , "rpc"
+                    , NULL
+                    , "NFS Client Remote Procedure Calls Statistics"
+                    , "calls/s"
+                    , "proc"
+                    , "net/rpc/nfs"
+                    , 5008
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "calls", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "retransmits", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "auth_refresh", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_calls        = rrddim_add(st, "calls",        NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_retransmits  = rrddim_add(st, "retransmits",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_auth_refresh = rrddim_add(st, "auth_refresh", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "calls", rpc_calls);
-        rrddim_set(st, "retransmits", rpc_retransmits);
-        rrddim_set(st, "auth_refresh", rpc_auth_refresh);
+        rrddim_set_by_pointer(st, rd_calls,        rpc_calls);
+        rrddim_set_by_pointer(st, rd_retransmits,  rpc_retransmits);
+        rrddim_set_by_pointer(st, rd_auth_refresh, rpc_auth_refresh);
         rrdset_done(st);
     }
 
     // --------------------------------------------------------------------
 
     if(do_proc2 == 2) {
-        unsigned int i;
-        st = rrdset_find_bytype_localhost("nfs", "proc2");
-        if(!st) {
-            st = rrdset_create_localhost("nfs", "proc2", NULL, "nfsv2rpc", NULL, "NFS v2 Client Remote Procedure Calls"
-                                         , "calls/s", 5009, update_every, RRDSET_TYPE_STACKED);
-
-            for(i = 0; nfs_proc2_values[i].present ; i++)
-                rrddim_add(st, nfs_proc2_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        static RRDSET *st = NULL;
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "nfs"
+                    , "proc2"
+                    , NULL
+                    , "nfsv2rpc"
+                    , NULL
+                    , "NFS v2 Client Remote Procedure Calls"
+                    , "calls/s"
+                    , "proc"
+                    , "net/rpc/nfs"
+                    , 5009
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
         }
         else rrdset_next(st);
 
-        for(i = 0; nfs_proc2_values[i].present ; i++)
-            rrddim_set(st, nfs_proc2_values[i].name, nfs_proc2_values[i].value);
+        size_t i;
+        for(i = 0; nfs_proc2_values[i].present ; i++) {
+            if(unlikely(!nfs_proc2_values[i].rd))
+                nfs_proc2_values[i].rd = rrddim_add(st, nfs_proc2_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st, nfs_proc2_values[i].rd, nfs_proc2_values[i].value);
+        }
 
         rrdset_done(st);
     }
@@ -333,19 +382,32 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_proc3 == 2) {
-        unsigned int i;
-        st = rrdset_find_bytype_localhost("nfs", "proc3");
-        if(!st) {
-            st = rrdset_create_localhost("nfs", "proc3", NULL, "nfsv3rpc", NULL, "NFS v3 Client Remote Procedure Calls"
-                                         , "calls/s", 5010, update_every, RRDSET_TYPE_STACKED);
-
-            for(i = 0; nfs_proc3_values[i].present ; i++)
-                rrddim_add(st, nfs_proc3_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        static RRDSET *st = NULL;
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "nfs"
+                    , "proc3"
+                    , NULL
+                    , "nfsv3rpc"
+                    , NULL
+                    , "NFS v3 Client Remote Procedure Calls"
+                    , "calls/s"
+                    , "proc"
+                    , "net/rpc/nfs"
+                    , 5010
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
         }
         else rrdset_next(st);
 
-        for(i = 0; nfs_proc3_values[i].present ; i++)
-            rrddim_set(st, nfs_proc3_values[i].name, nfs_proc3_values[i].value);
+        size_t i;
+        for(i = 0; nfs_proc3_values[i].present ; i++) {
+            if(unlikely(!nfs_proc3_values[i].rd))
+                nfs_proc3_values[i].rd = rrddim_add(st, nfs_proc3_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st, nfs_proc3_values[i].rd, nfs_proc3_values[i].value);
+        }
 
         rrdset_done(st);
     }
@@ -353,19 +415,32 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_proc4 == 2) {
-        unsigned int i;
-        st = rrdset_find_bytype_localhost("nfs", "proc4");
-        if(!st) {
-            st = rrdset_create_localhost("nfs", "proc4", NULL, "nfsv4rpc", NULL, "NFS v4 Client Remote Procedure Calls"
-                                         , "calls/s", 5011, update_every, RRDSET_TYPE_STACKED);
-
-            for(i = 0; nfs_proc4_values[i].present ; i++)
-                rrddim_add(st, nfs_proc4_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        static RRDSET *st = NULL;
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "nfs"
+                    , "proc4"
+                    , NULL
+                    , "nfsv4rpc"
+                    , NULL
+                    , "NFS v4 Client Remote Procedure Calls"
+                    , "calls/s"
+                    , "proc"
+                    , "net/rpc/nfs"
+                    , 5011
+                    , update_every
+                    , RRDSET_TYPE_STACKED
+            );
         }
         else rrdset_next(st);
 
-        for(i = 0; nfs_proc4_values[i].present ; i++)
-            rrddim_set(st, nfs_proc4_values[i].name, nfs_proc4_values[i].value);
+        size_t i;
+        for(i = 0; nfs_proc4_values[i].present ; i++) {
+            if(unlikely(!nfs_proc4_values[i].rd))
+                nfs_proc4_values[i].rd = rrddim_add(st, nfs_proc4_values[i].name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            rrddim_set_by_pointer(st, nfs_proc4_values[i].rd, nfs_proc4_values[i].value);
+        }
 
         rrdset_done(st);
     }

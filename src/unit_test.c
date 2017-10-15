@@ -1,5 +1,62 @@
 #include "common.h"
 
+static int check_rrdcalc_comparisons(void) {
+    RRDCALC_STATUS a, b;
+
+    // make sure calloc() sets the status to UNINITIALIZED
+    memset(&a, 0, sizeof(RRDCALC_STATUS));
+    if(a != RRDCALC_STATUS_UNINITIALIZED) {
+        fprintf(stderr, "%s is not zero.\n", rrdcalc_status2string(RRDCALC_STATUS_UNINITIALIZED));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_REMOVED;
+    b = RRDCALC_STATUS_UNDEFINED;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_UNDEFINED;
+    b = RRDCALC_STATUS_UNINITIALIZED;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_UNINITIALIZED;
+    b = RRDCALC_STATUS_CLEAR;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_CLEAR;
+    b = RRDCALC_STATUS_RAISED;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_RAISED;
+    b = RRDCALC_STATUS_WARNING;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    a = RRDCALC_STATUS_WARNING;
+    b = RRDCALC_STATUS_CRITICAL;
+    if(!(a < b)) {
+        fprintf(stderr, "%s is not less than %s\n", rrdcalc_status2string(a), rrdcalc_status2string(b));
+        return 1;
+    }
+
+    fprintf(stderr, "RRDCALC_STATUSes are sortable.\n");
+
+    return 0;
+}
+
 int check_storage_number(calculated_number n, int debug) {
     char buffer[100];
     uint32_t flags = SN_EXISTS;
@@ -973,7 +1030,7 @@ int run_test(struct test *test)
     snprintfz(name, 100, "unittest-%s", test->name);
 
     // create the chart
-    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1
+    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1
                                          , test->update_every, RRDSET_TYPE_LINE);
     RRDDIM *rd = rrddim_add(st, "dim1", NULL, test->multiplier, test->divisor, test->algorithm);
     
@@ -1062,7 +1119,7 @@ int run_test(struct test *test)
 
 static int test_variable_renames(void) {
     fprintf(stderr, "Creating chart\n");
-    RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", 1, 1, RRDSET_TYPE_LINE);
+    RRDSET *st = rrdset_create_localhost("chart", "ID", NULL, "family", "context", "Unit Testing", "a value", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
     fprintf(stderr, "Created chart with id '%s', name '%s'\n", st->id, st->name);
 
     fprintf(stderr, "Creating dimension DIM1\n");
@@ -1106,6 +1163,9 @@ static int test_variable_renames(void) {
 
 int run_all_mockup_tests(void)
 {
+    if(check_rrdcalc_comparisons())
+        return 1;
+
     if(!test_variable_renames())
         return 1;
 
@@ -1182,7 +1242,7 @@ int unit_test(long delay, long shift)
     int do_abst = 0;
     int do_absi = 0;
 
-    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", 1, 1
+    RRDSET *st = rrdset_create_localhost("netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest", NULL, 1, 1
                                          , RRDSET_TYPE_LINE);
     rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
 

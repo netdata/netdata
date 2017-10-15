@@ -102,6 +102,8 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , NULL
                     , "Kernel Same Page Merging"
                     , "MB"
+                    , "proc"
+                    , "/sys/kernel/mm/ksm"
                     , 5000
                     , update_every
                     , RRDSET_TYPE_AREA
@@ -140,6 +142,8 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , NULL
                     , "Kernel Same Page Merging Savings"
                     , "MB"
+                    , "proc"
+                    , "/sys/kernel/mm/ksm"
                     , 5001
                     , update_every
                     , RRDSET_TYPE_AREA
@@ -172,6 +176,8 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , NULL
                     , "Kernel Same Page Merging Effectiveness"
                     , "percentage"
+                    , "proc"
+                    , "/sys/kernel/mm/ksm"
                     , 5002
                     , update_every
                     , RRDSET_TYPE_LINE

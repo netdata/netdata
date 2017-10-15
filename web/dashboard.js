@@ -3166,10 +3166,10 @@ var NETDATA = window.NETDATA || {};
 
         this.legendShowUndefined = function() {
             if(this.element_legend_childs.title_date !== null)
-                this.__legendSetDateString(' ');
+                this.__legendSetDateString(this.legendPluginModuleString(false));
 
             if(this.element_legend_childs.title_time !== null)
-                this.__legendSetTimeString(this.chart.name);
+                this.__legendSetTimeString(this.chart.context.toString());
 
             if(this.element_legend_childs.title_units !== null)
                 this.legendSetUnitsString(' ');
@@ -3334,6 +3334,30 @@ var NETDATA = window.NETDATA || {};
             }
 
             return this.colors;
+        };
+
+        this.legendPluginModuleString = function(withContext) {
+            var str = ' ';
+            var context = '';
+
+            if(typeof this.chart !== 'undefined') {
+                if(withContext && typeof this.chart.context === 'string')
+                    context = this.chart.context;
+
+                if (typeof this.chart.plugin === 'string' && this.chart.plugin !== '') {
+                    str = this.chart.plugin;
+                    if (typeof this.chart.module === 'string' && this.chart.module !== '') {
+                        str += '/' + this.chart.module;
+                    }
+
+                    if (withContext && context !== '')
+                        str += ', ' + context;
+                }
+                else if (withContext && context !== '')
+                    str = context;
+            }
+
+            return str;
         };
 
         this.legendResolutionTooltip = function () {
@@ -3669,7 +3693,7 @@ var NETDATA = window.NETDATA || {};
                 }, false);
 
                 if(this.chart) {
-                    this.element_legend_childs.title_date.title = this.chart.context.toString();
+                    this.element_legend_childs.title_date.title = this.legendPluginModuleString(true);
                     this.element_legend_childs.title_time.title = this.legendResolutionTooltip();
                 }
 
@@ -5122,7 +5146,8 @@ var NETDATA = window.NETDATA || {};
                 colors: state.chartColors(),
                 labels: data.result.labels,
                 labelsDivWidth: state.chartWidth() - 70,
-                visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
+                visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
+                ylabel: (state.dimensions_visibility.unselected_count !== 0)?"":state.units_current
         };
 
         if(state.tmp.dygraph_force_zoom === true) {

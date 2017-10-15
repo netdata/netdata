@@ -272,24 +272,37 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                 procfile_lineword(ff, l, 1)))) break;
     }
 
-    RRDSET *st;
-
     // --------------------------------------------------------------------
 
     if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO && (Ip6InOctets || Ip6OutOctets))) {
         do_bandwidth = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost("system.ipv6");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost("system", "ipv6", NULL, "network", NULL, "IPv6 Bandwidth", "kilobits/s", 500
-                                         , update_every, RRDSET_TYPE_AREA);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_received = NULL,
+                      *rd_sent = NULL;
 
-            rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "system"
+                    , "ipv6"
+                    , NULL
+                    , "network"
+                    , NULL
+                    , "IPv6 Bandwidth"
+                    , "kilobits/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 500
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_received = rrddim_add(st, "InOctets",  "received",  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent     = rrddim_add(st, "OutOctets", "sent",     -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "sent", Ip6OutOctets);
-        rrddim_set(st, "received", Ip6InOctets);
+        rrddim_set_by_pointer(st, rd_received, Ip6InOctets);
+        rrddim_set_by_pointer(st, rd_sent,     Ip6OutOctets);
         rrdset_done(st);
     }
 
@@ -297,22 +310,39 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_ip_packets == CONFIG_BOOLEAN_YES || (do_ip_packets == CONFIG_BOOLEAN_AUTO && (Ip6InReceives || Ip6OutRequests || Ip6InDelivers || Ip6OutForwDatagrams))) {
         do_ip_packets = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".packets");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "packets", NULL, "packets", NULL, "IPv6 Packets"
-                                         , "packets/s", 3000, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_received = NULL,
+                      *rd_sent = NULL,
+                      *rd_forwarded = NULL,
+                      *rd_delivers = NULL;
 
-            rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "forwarded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "delivers", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "packets"
+                    , NULL
+                    , "packets"
+                    , NULL
+                    , "IPv6 Packets"
+                    , "packets/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 3000
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_received  = rrddim_add(st, "InReceives",       "received",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent      = rrddim_add(st, "OutRequests",      "sent",      -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_forwarded = rrddim_add(st, "OutForwDatagrams", "forwarded", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_delivers  = rrddim_add(st, "InDelivers",       "delivers",   1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "sent", Ip6OutRequests);
-        rrddim_set(st, "received", Ip6InReceives);
-        rrddim_set(st, "forwarded", Ip6OutForwDatagrams);
-        rrddim_set(st, "delivers", Ip6InDelivers);
+        rrddim_set_by_pointer(st, rd_received,  Ip6InReceives);
+        rrddim_set_by_pointer(st, rd_sent,      Ip6OutRequests);
+        rrddim_set_by_pointer(st, rd_forwarded, Ip6OutForwDatagrams);
+        rrddim_set_by_pointer(st, rd_delivers,  Ip6InDelivers);
         rrdset_done(st);
     }
 
@@ -320,21 +350,37 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_ip_fragsout == CONFIG_BOOLEAN_YES || (do_ip_fragsout == CONFIG_BOOLEAN_AUTO && (Ip6FragOKs || Ip6FragFails || Ip6FragCreates))) {
         do_ip_fragsout = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".fragsout");
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_ok = NULL,
+                      *rd_failed = NULL,
+                      *rd_all = NULL;
+
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "fragsout", NULL, "fragments", NULL, "IPv6 Fragments Sent"
-                                         , "packets/s", 3010, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "fragsout"
+                    , NULL
+                    , "fragments"
+                    , NULL
+                    , "IPv6 Fragments Sent"
+                    , "packets/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 3010
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "all", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ok     = rrddim_add(st, "FragOKs",     "ok",      1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed = rrddim_add(st, "FragFails",   "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_all    = rrddim_add(st, "FragCreates", "all",     1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "ok", Ip6FragOKs);
-        rrddim_set(st, "failed", Ip6FragFails);
-        rrddim_set(st, "all", Ip6FragCreates);
+        rrddim_set_by_pointer(st, rd_ok,     Ip6FragOKs);
+        rrddim_set_by_pointer(st, rd_failed, Ip6FragFails);
+        rrddim_set_by_pointer(st, rd_all,    Ip6FragCreates);
         rrdset_done(st);
     }
 
@@ -348,24 +394,40 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Ip6ReasmReqds
             ))) {
         do_ip_fragsin = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".fragsin");
+
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_ok = NULL,
+                      *rd_failed = NULL,
+                      *rd_timeout = NULL,
+                      *rd_all = NULL;
+
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "fragsin", NULL, "fragments", NULL
-                                         , "IPv6 Fragments Reassembly", "packets/s", 3011, update_every
-                                         , RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "fragsin"
+                    , NULL
+                    , "fragments"
+                    , NULL
+                    , "IPv6 Fragments Reassembly"
+                    , "packets/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 3011
+                    , update_every
+                    , RRDSET_TYPE_LINE);
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "timeout", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "all", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ok      = rrddim_add(st, "ReasmOKs",     "ok",       1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed  = rrddim_add(st, "ReasmFails",   "failed",  -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_timeout = rrddim_add(st, "ReasmTimeout", "timeout", -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_all     = rrddim_add(st, "ReasmReqds",   "all",      1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "ok", Ip6ReasmOKs);
-        rrddim_set(st, "failed", Ip6ReasmFails);
-        rrddim_set(st, "timeout", Ip6ReasmTimeout);
-        rrddim_set(st, "all", Ip6ReasmReqds);
+        rrddim_set_by_pointer(st, rd_ok,      Ip6ReasmOKs);
+        rrddim_set_by_pointer(st, rd_failed,  Ip6ReasmFails);
+        rrddim_set_by_pointer(st, rd_timeout, Ip6ReasmTimeout);
+        rrddim_set_by_pointer(st, rd_all,     Ip6ReasmReqds);
         rrdset_done(st);
     }
 
@@ -383,37 +445,55 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Ip6InNoRoutes
         ))) {
         do_ip_errors = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".errors");
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InDiscards      = NULL,
+                      *rd_OutDiscards     = NULL,
+                      *rd_InHdrErrors     = NULL,
+                      *rd_InAddrErrors    = NULL,
+                      *rd_InUnknownProtos = NULL,
+                      *rd_InTooBigErrors  = NULL,
+                      *rd_InTruncatedPkts = NULL,
+                      *rd_InNoRoutes      = NULL,
+                      *rd_OutNoRoutes     = NULL;
+
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "errors", NULL, "errors", NULL, "IPv6 Errors", "packets/s"
-                                         , 3002, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "errors"
+                    , NULL
+                    , "errors"
+                    , NULL
+                    , "IPv6 Errors"
+                    , "packets/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 3002
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "InDiscards", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutDiscards", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrddim_add(st, "InHdrErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InUnknownProtos", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InTooBigErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InTruncatedPkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InNoRoutes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InDiscards      = rrddim_add(st, "InDiscards",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutDiscards     = rrddim_add(st, "OutDiscards",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InHdrErrors     = rrddim_add(st, "InHdrErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InAddrErrors    = rrddim_add(st, "InAddrErrors",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InUnknownProtos = rrddim_add(st, "InUnknownProtos", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InTooBigErrors  = rrddim_add(st, "InTooBigErrors",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InTruncatedPkts = rrddim_add(st, "InTruncatedPkts", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InNoRoutes      = rrddim_add(st, "InNoRoutes",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutNoRoutes     = rrddim_add(st, "OutNoRoutes",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InDiscards", Ip6InDiscards);
-        rrddim_set(st, "OutDiscards", Ip6OutDiscards);
-
-        rrddim_set(st, "InHdrErrors", Ip6InHdrErrors);
-        rrddim_set(st, "InAddrErrors", Ip6InAddrErrors);
-        rrddim_set(st, "InUnknownProtos", Ip6InUnknownProtos);
-        rrddim_set(st, "InTooBigErrors", Ip6InTooBigErrors);
-        rrddim_set(st, "InTruncatedPkts", Ip6InTruncatedPkts);
-        rrddim_set(st, "InNoRoutes", Ip6InNoRoutes);
-
-        rrddim_set(st, "OutNoRoutes", Ip6OutNoRoutes);
+        rrddim_set_by_pointer(st, rd_InDiscards,      Ip6InDiscards);
+        rrddim_set_by_pointer(st, rd_OutDiscards,     Ip6OutDiscards);
+        rrddim_set_by_pointer(st, rd_InHdrErrors,     Ip6InHdrErrors);
+        rrddim_set_by_pointer(st, rd_InAddrErrors,    Ip6InAddrErrors);
+        rrddim_set_by_pointer(st, rd_InUnknownProtos, Ip6InUnknownProtos);
+        rrddim_set_by_pointer(st, rd_InTooBigErrors,  Ip6InTooBigErrors);
+        rrddim_set_by_pointer(st, rd_InTruncatedPkts, Ip6InTruncatedPkts);
+        rrddim_set_by_pointer(st, rd_InNoRoutes,      Ip6InNoRoutes);
+        rrddim_set_by_pointer(st, rd_OutNoRoutes,     Ip6OutNoRoutes);
         rrdset_done(st);
     }
 
@@ -421,18 +501,33 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_udp_packets == CONFIG_BOOLEAN_YES || (do_udp_packets == CONFIG_BOOLEAN_AUTO && (Udp6InDatagrams || Udp6OutDatagrams))) {
         do_udp_packets = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udppackets");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udppackets", NULL, "udp", NULL, "IPv6 UDP Packets"
-                                         , "packets/s", 3601, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_received = NULL,
+                      *rd_sent     = NULL;
 
-            rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "udppackets"
+                    , NULL
+                    , "udp"
+                    , NULL
+                    , "IPv6 UDP Packets"
+                    , "packets/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 3601
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_received = rrddim_add(st, "InDatagrams",  "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent     = rrddim_add(st, "OutDatagrams", "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "received", Udp6InDatagrams);
-        rrddim_set(st, "sent", Udp6OutDatagrams);
+        rrddim_set_by_pointer(st, rd_received, Udp6InDatagrams);
+        rrddim_set_by_pointer(st, rd_sent,     Udp6OutDatagrams);
         rrdset_done(st);
     }
 
@@ -448,27 +543,46 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Udp6IgnoredMulti
         ))) {
         do_udp_errors = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udperrors");
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_RcvbufErrors = NULL,
+                      *rd_SndbufErrors = NULL,
+                      *rd_InErrors     = NULL,
+                      *rd_NoPorts      = NULL,
+                      *rd_InCsumErrors = NULL,
+                      *rd_IgnoredMulti = NULL;
+
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udperrors", NULL, "udp", NULL, "IPv6 UDP Errors"
-                                         , "events/s", 3701, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "udperrors"
+                    , NULL
+                    , "udp"
+                    , NULL
+                    , "IPv6 UDP Errors"
+                    , "events/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 3701
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "NoPorts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InErrors     = rrddim_add(st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_NoPorts      = rrddim_add(st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_IgnoredMulti = rrddim_add(st, "IgnoredMulti", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InErrors", Udp6InErrors);
-        rrddim_set(st, "NoPorts", Udp6NoPorts);
-        rrddim_set(st, "RcvbufErrors", Udp6RcvbufErrors);
-        rrddim_set(st, "SndbufErrors", Udp6SndbufErrors);
-        rrddim_set(st, "InCsumErrors", Udp6InCsumErrors);
-        rrddim_set(st, "IgnoredMulti", Udp6IgnoredMulti);
+        rrddim_set_by_pointer(st, rd_RcvbufErrors, Udp6RcvbufErrors);
+        rrddim_set_by_pointer(st, rd_SndbufErrors, Udp6SndbufErrors);
+        rrddim_set_by_pointer(st, rd_InErrors,     Udp6InErrors);
+        rrddim_set_by_pointer(st, rd_NoPorts,      Udp6NoPorts);
+        rrddim_set_by_pointer(st, rd_InCsumErrors, Udp6InCsumErrors);
+        rrddim_set_by_pointer(st, rd_IgnoredMulti, Udp6IgnoredMulti);
         rrdset_done(st);
     }
 
@@ -476,18 +590,33 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_udplite_packets == CONFIG_BOOLEAN_YES || (do_udplite_packets == CONFIG_BOOLEAN_AUTO && (UdpLite6InDatagrams || UdpLite6OutDatagrams))) {
         do_udplite_packets = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udplitepackets");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udplitepackets", NULL, "udplite", NULL
-                                         , "IPv6 UDPlite Packets", "packets/s", 3601, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_received = NULL,
+                      *rd_sent     = NULL;
 
-            rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "udplitepackets"
+                    , NULL
+                    , "udplite"
+                    , NULL
+                    , "IPv6 UDPlite Packets"
+                    , "packets/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 3601
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_received = rrddim_add(st, "InDatagrams",  "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent     = rrddim_add(st, "OutDatagrams", "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "received", UdpLite6InDatagrams);
-        rrddim_set(st, "sent", UdpLite6OutDatagrams);
+        rrddim_set_by_pointer(st, rd_received, UdpLite6InDatagrams);
+        rrddim_set_by_pointer(st, rd_sent,     UdpLite6OutDatagrams);
         rrdset_done(st);
     }
 
@@ -503,25 +632,43 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || UdpLite6InCsumErrors
         ))) {
         do_udplite_errors = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".udpliteerrors");
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_RcvbufErrors = NULL,
+                      *rd_SndbufErrors = NULL,
+                      *rd_InErrors     = NULL,
+                      *rd_NoPorts      = NULL,
+                      *rd_InCsumErrors = NULL;
+
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "udpliteerrors", NULL, "udplite", NULL
-                                         , "IPv6 UDP Lite Errors", "events/s", 3701, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "udpliteerrors"
+                    , NULL
+                    , "udplite"
+                    , NULL
+                    , "IPv6 UDP Lite Errors"
+                    , "events/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 3701
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "RcvbufErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "NoPorts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_RcvbufErrors = rrddim_add(st, "RcvbufErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_SndbufErrors = rrddim_add(st, "SndbufErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InErrors     = rrddim_add(st, "InErrors",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_NoPorts      = rrddim_add(st, "NoPorts",      NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InCsumErrors = rrddim_add(st, "InCsumErrors", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InErrors", UdpLite6InErrors);
-        rrddim_set(st, "NoPorts", UdpLite6NoPorts);
-        rrddim_set(st, "RcvbufErrors", UdpLite6RcvbufErrors);
-        rrddim_set(st, "SndbufErrors", UdpLite6SndbufErrors);
-        rrddim_set(st, "InCsumErrors", UdpLite6InCsumErrors);
+        rrddim_set_by_pointer(st, rd_InErrors,     UdpLite6InErrors);
+        rrddim_set_by_pointer(st, rd_NoPorts,      UdpLite6NoPorts);
+        rrddim_set_by_pointer(st, rd_RcvbufErrors, UdpLite6RcvbufErrors);
+        rrddim_set_by_pointer(st, rd_SndbufErrors, UdpLite6SndbufErrors);
+        rrddim_set_by_pointer(st, rd_InCsumErrors, UdpLite6InCsumErrors);
         rrdset_done(st);
     }
 
@@ -529,20 +676,34 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO && (Ip6OutMcastOctets || Ip6InMcastOctets))) {
         do_mcast = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".mcast");
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_Ip6InMcastOctets  = NULL,
+                      *rd_Ip6OutMcastOctets = NULL;
+
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "mcast", NULL, "multicast", NULL
-                                         , "IPv6 Multicast Bandwidth", "kilobits/s", 9000, update_every
-                                         , RRDSET_TYPE_AREA);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "mcast"
+                    , NULL
+                    , "multicast"
+                    , NULL
+                    , "IPv6 Multicast Bandwidth"
+                    , "kilobits/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 9000
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6InMcastOctets  = rrddim_add(st, "InMcastOctets",  "received",  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6OutMcastOctets = rrddim_add(st, "OutMcastOctets", "sent",     -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "sent", Ip6OutMcastOctets);
-        rrddim_set(st, "received", Ip6InMcastOctets);
+        rrddim_set_by_pointer(st, rd_Ip6InMcastOctets,  Ip6InMcastOctets);
+        rrddim_set_by_pointer(st, rd_Ip6OutMcastOctets, Ip6OutMcastOctets);
         rrdset_done(st);
     }
 
@@ -550,20 +711,34 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO && (Ip6OutBcastOctets || Ip6InBcastOctets))) {
         do_bcast = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".bcast");
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_Ip6InBcastOctets  = NULL,
+                      *rd_Ip6OutBcastOctets = NULL;
+
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "bcast", NULL, "broadcast", NULL
-                                         , "IPv6 Broadcast Bandwidth", "kilobits/s", 8000, update_every
-                                         , RRDSET_TYPE_AREA);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "bcast"
+                    , NULL
+                    , "broadcast"
+                    , NULL
+                    , "IPv6 Broadcast Bandwidth"
+                    , "kilobits/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 8000
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6InBcastOctets  = rrddim_add(st, "InBcastOctets",  "received",  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6OutBcastOctets = rrddim_add(st, "OutBcastOctets", "sent",     -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "sent", Ip6OutBcastOctets);
-        rrddim_set(st, "received", Ip6InBcastOctets);
+        rrddim_set_by_pointer(st, rd_Ip6InBcastOctets,  Ip6InBcastOctets);
+        rrddim_set_by_pointer(st, rd_Ip6OutBcastOctets, Ip6OutBcastOctets);
         rrdset_done(st);
     }
 
@@ -571,19 +746,34 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO && (Ip6OutMcastPkts || Ip6InMcastPkts))) {
         do_mcast_p = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".mcastpkts");
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_Ip6InMcastPkts  = NULL,
+                      *rd_Ip6OutMcastPkts = NULL;
+
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "mcastpkts", NULL, "multicast", NULL
-                                         , "IPv6 Multicast Packets", "packets/s", 9500, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "mcastpkts"
+                    , NULL
+                    , "multicast"
+                    , NULL
+                    , "IPv6 Multicast Packets"
+                    , "packets/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 9500
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6InMcastPkts  = rrddim_add(st, "InMcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6OutMcastPkts = rrddim_add(st, "OutMcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "sent", Ip6OutMcastPkts);
-        rrddim_set(st, "received", Ip6InMcastPkts);
+        rrddim_set_by_pointer(st, rd_Ip6InMcastPkts,  Ip6InMcastPkts);
+        rrddim_set_by_pointer(st, rd_Ip6OutMcastPkts, Ip6OutMcastPkts);
         rrdset_done(st);
     }
 
@@ -591,18 +781,33 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_icmp == CONFIG_BOOLEAN_YES || (do_icmp == CONFIG_BOOLEAN_AUTO && (Icmp6InMsgs || Icmp6OutMsgs))) {
         do_icmp = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmp");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmp", NULL, "icmp", NULL, "IPv6 ICMP Messages"
-                                         , "messages/s", 10000, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_Icmp6InMsgs  = NULL,
+                      *rd_Icmp6OutMsgs = NULL;
 
-            rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "icmp"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv6 ICMP Messages"
+                    , "messages/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10000
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_Icmp6InMsgs  = rrddim_add(st, "InMsgs",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Icmp6OutMsgs = rrddim_add(st, "OutMsgs", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "sent", Icmp6InMsgs);
-        rrddim_set(st, "received", Icmp6OutMsgs);
+        rrddim_set_by_pointer(st, rd_Icmp6InMsgs,  Icmp6InMsgs);
+        rrddim_set_by_pointer(st, rd_Icmp6OutMsgs, Icmp6OutMsgs);
         rrdset_done(st);
     }
 
@@ -610,18 +815,33 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_icmp_redir == CONFIG_BOOLEAN_YES || (do_icmp_redir == CONFIG_BOOLEAN_AUTO && (Icmp6InRedirects || Icmp6OutRedirects))) {
         do_icmp_redir = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpredir");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmpredir", NULL, "icmp", NULL, "IPv6 ICMP Redirects"
-                                         , "redirects/s", 10050, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_Icmp6InRedirects  = NULL,
+                      *rd_Icmp6OutRedirects = NULL;
 
-            rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "icmpredir"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv6 ICMP Redirects"
+                    , "redirects/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10050
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_Icmp6InRedirects  = rrddim_add(st, "InRedirects",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Icmp6OutRedirects = rrddim_add(st, "OutRedirects", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "sent", Icmp6InRedirects);
-        rrddim_set(st, "received", Icmp6OutRedirects);
+        rrddim_set_by_pointer(st, rd_Icmp6InRedirects,  Icmp6InRedirects);
+        rrddim_set_by_pointer(st, rd_Icmp6OutRedirects, Icmp6OutRedirects);
         rrdset_done(st);
     }
 
@@ -642,37 +862,60 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutParmProblems
         ))) {
         do_icmp_errors = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmperrors");
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InErrors        = NULL,
+                      *rd_OutErrors       = NULL,
+                      *rd_InCsumErrors    = NULL,
+                      *rd_InDestUnreachs  = NULL,
+                      *rd_InPktTooBigs    = NULL,
+                      *rd_InTimeExcds     = NULL,
+                      *rd_InParmProblems  = NULL,
+                      *rd_OutDestUnreachs = NULL,
+                      *rd_OutPktTooBigs   = NULL,
+                      *rd_OutTimeExcds    = NULL,
+                      *rd_OutParmProblems = NULL;
+
         if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmperrors", NULL, "icmp", NULL, "IPv6 ICMP Errors"
-                                         , "errors/s", 10100, update_every, RRDSET_TYPE_LINE);
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "icmperrors"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv6 ICMP Errors"
+                    , "errors/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10100
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
 
-            rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InDestUnreachs", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InPktTooBigs", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InTimeExcds", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InParmProblems", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutPktTooBigs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutTimeExcds", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InErrors        = rrddim_add(st, "InErrors",        NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutErrors       = rrddim_add(st, "OutErrors",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InCsumErrors    = rrddim_add(st, "InCsumErrors",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InDestUnreachs  = rrddim_add(st, "InDestUnreachs",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InPktTooBigs    = rrddim_add(st, "InPktTooBigs",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InTimeExcds     = rrddim_add(st, "InTimeExcds",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InParmProblems  = rrddim_add(st, "InParmProblems",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutDestUnreachs = rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutPktTooBigs   = rrddim_add(st, "OutPktTooBigs",   NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutTimeExcds    = rrddim_add(st, "OutTimeExcds",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutParmProblems = rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InErrors", Icmp6InErrors);
-        rrddim_set(st, "OutErrors", Icmp6OutErrors);
-        rrddim_set(st, "InCsumErrors", Icmp6InCsumErrors);
-        rrddim_set(st, "InDestUnreachs", Icmp6InDestUnreachs);
-        rrddim_set(st, "InPktTooBigs", Icmp6InPktTooBigs);
-        rrddim_set(st, "InTimeExcds", Icmp6InTimeExcds);
-        rrddim_set(st, "InParmProblems", Icmp6InParmProblems);
-        rrddim_set(st, "OutDestUnreachs", Icmp6OutDestUnreachs);
-        rrddim_set(st, "OutPktTooBigs", Icmp6OutPktTooBigs);
-        rrddim_set(st, "OutTimeExcds", Icmp6OutTimeExcds);
-        rrddim_set(st, "OutParmProblems", Icmp6OutParmProblems);
+        rrddim_set_by_pointer(st, rd_InErrors,        Icmp6InErrors);
+        rrddim_set_by_pointer(st, rd_OutErrors,       Icmp6OutErrors);
+        rrddim_set_by_pointer(st, rd_InCsumErrors,    Icmp6InCsumErrors);
+        rrddim_set_by_pointer(st, rd_InDestUnreachs,  Icmp6InDestUnreachs);
+        rrddim_set_by_pointer(st, rd_InPktTooBigs,    Icmp6InPktTooBigs);
+        rrddim_set_by_pointer(st, rd_InTimeExcds,     Icmp6InTimeExcds);
+        rrddim_set_by_pointer(st, rd_InParmProblems,  Icmp6InParmProblems);
+        rrddim_set_by_pointer(st, rd_OutDestUnreachs, Icmp6OutDestUnreachs);
+        rrddim_set_by_pointer(st, rd_OutPktTooBigs,   Icmp6OutPktTooBigs);
+        rrddim_set_by_pointer(st, rd_OutTimeExcds,    Icmp6OutTimeExcds);
+        rrddim_set_by_pointer(st, rd_OutParmProblems, Icmp6OutParmProblems);
         rrdset_done(st);
     }
 
@@ -686,22 +929,39 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutEchoReplies
         ))) {
         do_icmp_echos = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpechos");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmpechos", NULL, "icmp", NULL, "IPv6 ICMP Echo"
-                                         , "messages/s", 10200, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InEchos        = NULL,
+                      *rd_OutEchos       = NULL,
+                      *rd_InEchoReplies  = NULL,
+                      *rd_OutEchoReplies = NULL;
 
-            rrddim_add(st, "InEchos", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutEchos", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InEchoReplies", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutEchoReplies", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "icmpechos"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv6 ICMP Echo"
+                    , "messages/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10200
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InEchos        = rrddim_add(st, "InEchos",        NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutEchos       = rrddim_add(st, "OutEchos",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InEchoReplies  = rrddim_add(st, "InEchoReplies",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutEchoReplies = rrddim_add(st, "OutEchoReplies", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InEchos", Icmp6InEchos);
-        rrddim_set(st, "OutEchos", Icmp6OutEchos);
-        rrddim_set(st, "InEchoReplies", Icmp6InEchoReplies);
-        rrddim_set(st, "OutEchoReplies", Icmp6OutEchoReplies);
+        rrddim_set_by_pointer(st, rd_InEchos,        Icmp6InEchos);
+        rrddim_set_by_pointer(st, rd_OutEchos,       Icmp6OutEchos);
+        rrddim_set_by_pointer(st, rd_InEchoReplies,  Icmp6InEchoReplies);
+        rrddim_set_by_pointer(st, rd_OutEchoReplies, Icmp6OutEchoReplies);
         rrdset_done(st);
     }
 
@@ -717,27 +977,44 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutGroupMembReductions
         ))) {
         do_icmp_groupmemb = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".groupmemb");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "groupmemb", NULL, "icmp", NULL
-                                         , "IPv6 ICMP Group Membership", "messages/s", 10300, update_every
-                                         , RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InQueries     = NULL,
+                      *rd_OutQueries    = NULL,
+                      *rd_InResponses   = NULL,
+                      *rd_OutResponses  = NULL,
+                      *rd_InReductions  = NULL,
+                      *rd_OutReductions = NULL;
 
-            rrddim_add(st, "InQueries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutQueries", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InResponses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutResponses", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InReductions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutReductions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "groupmemb"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv6 ICMP Group Membership"
+                    , "messages/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10300
+                    , update_every
+                    , RRDSET_TYPE_LINE);
+
+            rd_InQueries     = rrddim_add(st, "InQueries",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutQueries    = rrddim_add(st, "OutQueries",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InResponses   = rrddim_add(st, "InResponses",   NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutResponses  = rrddim_add(st, "OutResponses",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InReductions  = rrddim_add(st, "InReductions",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutReductions = rrddim_add(st, "OutReductions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InQueries", Icmp6InGroupMembQueries);
-        rrddim_set(st, "OutQueries", Icmp6OutGroupMembQueries);
-        rrddim_set(st, "InResponses", Icmp6InGroupMembResponses);
-        rrddim_set(st, "OutResponses", Icmp6OutGroupMembResponses);
-        rrddim_set(st, "InReductions", Icmp6InGroupMembReductions);
-        rrddim_set(st, "OutReductions", Icmp6OutGroupMembReductions);
+        rrddim_set_by_pointer(st, rd_InQueries,     Icmp6InGroupMembQueries);
+        rrddim_set_by_pointer(st, rd_OutQueries,    Icmp6OutGroupMembQueries);
+        rrddim_set_by_pointer(st, rd_InResponses,   Icmp6InGroupMembResponses);
+        rrddim_set_by_pointer(st, rd_OutResponses,  Icmp6OutGroupMembResponses);
+        rrddim_set_by_pointer(st, rd_InReductions,  Icmp6InGroupMembReductions);
+        rrddim_set_by_pointer(st, rd_OutReductions, Icmp6OutGroupMembReductions);
         rrdset_done(st);
     }
 
@@ -751,22 +1028,39 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutRouterAdvertisements
         ))) {
         do_icmp_router = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmprouter");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmprouter", NULL, "icmp", NULL, "IPv6 Router Messages"
-                                         , "messages/s", 10400, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InSolicits        = NULL,
+                      *rd_OutSolicits       = NULL,
+                      *rd_InAdvertisements  = NULL,
+                      *rd_OutAdvertisements = NULL;
 
-            rrddim_add(st, "InSolicits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutSolicits", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "icmprouter"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv6 Router Messages"
+                    , "messages/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10400
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InSolicits        = rrddim_add(st, "InSolicits",        NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutSolicits       = rrddim_add(st, "OutSolicits",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InAdvertisements  = rrddim_add(st, "InAdvertisements",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutAdvertisements = rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InSolicits", Icmp6InRouterSolicits);
-        rrddim_set(st, "OutSolicits", Icmp6OutRouterSolicits);
-        rrddim_set(st, "InAdvertisements", Icmp6InRouterAdvertisements);
-        rrddim_set(st, "OutAdvertisements", Icmp6OutRouterAdvertisements);
+        rrddim_set_by_pointer(st, rd_InSolicits,        Icmp6InRouterSolicits);
+        rrddim_set_by_pointer(st, rd_OutSolicits,       Icmp6OutRouterSolicits);
+        rrddim_set_by_pointer(st, rd_InAdvertisements,  Icmp6InRouterAdvertisements);
+        rrddim_set_by_pointer(st, rd_OutAdvertisements, Icmp6OutRouterAdvertisements);
         rrdset_done(st);
     }
 
@@ -780,23 +1074,39 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutNeighborAdvertisements
         ))) {
         do_icmp_neighbor = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpneighbor");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmpneighbor", NULL, "icmp", NULL
-                                         , "IPv6 Neighbor Messages", "messages/s", 10500, update_every
-                                         , RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InSolicits        = NULL,
+                      *rd_OutSolicits       = NULL,
+                      *rd_InAdvertisements  = NULL,
+                      *rd_OutAdvertisements = NULL;
 
-            rrddim_add(st, "InSolicits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutSolicits", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "icmpneighbor"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv6 Neighbor Messages"
+                    , "messages/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10500
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InSolicits        = rrddim_add(st, "InSolicits",        NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutSolicits       = rrddim_add(st, "OutSolicits",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InAdvertisements  = rrddim_add(st, "InAdvertisements",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutAdvertisements = rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InSolicits", Icmp6InNeighborSolicits);
-        rrddim_set(st, "OutSolicits", Icmp6OutNeighborSolicits);
-        rrddim_set(st, "InAdvertisements", Icmp6InNeighborAdvertisements);
-        rrddim_set(st, "OutAdvertisements", Icmp6OutNeighborAdvertisements);
+        rrddim_set_by_pointer(st, rd_InSolicits,        Icmp6InNeighborSolicits);
+        rrddim_set_by_pointer(st, rd_OutSolicits,       Icmp6OutNeighborSolicits);
+        rrddim_set_by_pointer(st, rd_InAdvertisements,  Icmp6InNeighborAdvertisements);
+        rrddim_set_by_pointer(st, rd_OutAdvertisements, Icmp6OutNeighborAdvertisements);
         rrdset_done(st);
     }
 
@@ -804,18 +1114,33 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     if(do_icmp_mldv2 == CONFIG_BOOLEAN_YES || (do_icmp_mldv2 == CONFIG_BOOLEAN_AUTO && (Icmp6InMLDv2Reports || Icmp6OutMLDv2Reports))) {
         do_icmp_mldv2 = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmpmldv2");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmpmldv2", NULL, "icmp", NULL, "IPv6 ICMP MLDv2 Reports"
-                                         , "reports/s", 10600, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InMLDv2Reports  = NULL,
+                      *rd_OutMLDv2Reports = NULL;
 
-            rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "icmpmldv2"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv6 ICMP MLDv2 Reports"
+                    , "reports/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10600
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InMLDv2Reports  = rrddim_add(st, "InMLDv2Reports",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutMLDv2Reports = rrddim_add(st, "OutMLDv2Reports", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "sent", Icmp6InMLDv2Reports);
-        rrddim_set(st, "received", Icmp6OutMLDv2Reports);
+        rrddim_set_by_pointer(st, rd_InMLDv2Reports,  Icmp6InMLDv2Reports);
+        rrddim_set_by_pointer(st, rd_OutMLDv2Reports, Icmp6OutMLDv2Reports);
         rrdset_done(st);
     }
 
@@ -835,34 +1160,57 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Icmp6OutType143
         ))) {
         do_icmp_types = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".icmptypes");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "icmptypes", NULL, "icmp", NULL, "IPv6 ICMP Types"
-                                         , "messages/s", 10700, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InType1    = NULL,
+                      *rd_InType128  = NULL,
+                      *rd_InType129  = NULL,
+                      *rd_InType136  = NULL,
+                      *rd_OutType1   = NULL,
+                      *rd_OutType128 = NULL,
+                      *rd_OutType129 = NULL,
+                      *rd_OutType133 = NULL,
+                      *rd_OutType135 = NULL,
+                      *rd_OutType143 = NULL;
 
-            rrddim_add(st, "InType1", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InType128", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InType129", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InType136", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutType1", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutType128", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutType129", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutType133", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutType135", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "OutType143", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "icmptypes"
+                    , NULL
+                    , "icmp"
+                    , NULL
+                    , "IPv6 ICMP Types"
+                    , "messages/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10700
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InType1    = rrddim_add(st, "InType1",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InType128  = rrddim_add(st, "InType128",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InType129  = rrddim_add(st, "InType129",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InType136  = rrddim_add(st, "InType136",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutType1   = rrddim_add(st, "OutType1",   NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutType128 = rrddim_add(st, "OutType128", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutType129 = rrddim_add(st, "OutType129", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutType133 = rrddim_add(st, "OutType133", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutType135 = rrddim_add(st, "OutType135", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutType143 = rrddim_add(st, "OutType143", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InType1", Icmp6InType1);
-        rrddim_set(st, "InType128", Icmp6InType128);
-        rrddim_set(st, "InType129", Icmp6InType129);
-        rrddim_set(st, "InType136", Icmp6InType136);
-        rrddim_set(st, "OutType1", Icmp6OutType1);
-        rrddim_set(st, "OutType128", Icmp6OutType128);
-        rrddim_set(st, "OutType129", Icmp6OutType129);
-        rrddim_set(st, "OutType133", Icmp6OutType133);
-        rrddim_set(st, "OutType135", Icmp6OutType135);
-        rrddim_set(st, "OutType143", Icmp6OutType143);
+        rrddim_set_by_pointer(st, rd_InType1,    Icmp6InType1);
+        rrddim_set_by_pointer(st, rd_InType128,  Icmp6InType128);
+        rrddim_set_by_pointer(st, rd_InType129,  Icmp6InType129);
+        rrddim_set_by_pointer(st, rd_InType136,  Icmp6InType136);
+        rrddim_set_by_pointer(st, rd_OutType1,   Icmp6OutType1);
+        rrddim_set_by_pointer(st, rd_OutType128, Icmp6OutType128);
+        rrddim_set_by_pointer(st, rd_OutType129, Icmp6OutType129);
+        rrddim_set_by_pointer(st, rd_OutType133, Icmp6OutType133);
+        rrddim_set_by_pointer(st, rd_OutType135, Icmp6OutType135);
+        rrddim_set_by_pointer(st, rd_OutType143, Icmp6OutType143);
         rrdset_done(st);
     }
 
@@ -876,22 +1224,39 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
             || Ip6InCEPkts
         ))) {
         do_ect = CONFIG_BOOLEAN_YES;
-        st = rrdset_find_localhost(RRD_TYPE_NET_SNMP6 ".ect");
-        if(unlikely(!st)) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_SNMP6, "ect", NULL, "packets", NULL, "IPv6 ECT Packets"
-                                         , "packets/s", 10800, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        static RRDDIM *rd_InNoECTPkts = NULL,
+                      *rd_InECT1Pkts  = NULL,
+                      *rd_InECT0Pkts  = NULL,
+                      *rd_InCEPkts    = NULL;
 
-            rrddim_add(st, "InNoECTPkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InECT1Pkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InECT0Pkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rrddim_add(st, "InCEPkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_SNMP6
+                    , "ect"
+                    , NULL
+                    , "packets"
+                    , NULL
+                    , "IPv6 ECT Packets"
+                    , "packets/s"
+                    , "proc"
+                    , "net/snmp6"
+                    , 10800
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_InNoECTPkts = rrddim_add(st, "InNoECTPkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InECT1Pkts  = rrddim_add(st, "InECT1Pkts",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InECT0Pkts  = rrddim_add(st, "InECT0Pkts",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InCEPkts    = rrddim_add(st, "InCEPkts",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else rrdset_next(st);
 
-        rrddim_set(st, "InNoECTPkts", Ip6InNoECTPkts);
-        rrddim_set(st, "InECT1Pkts", Ip6InECT1Pkts);
-        rrddim_set(st, "InECT0Pkts", Ip6InECT0Pkts);
-        rrddim_set(st, "InCEPkts", Ip6InCEPkts);
+        rrddim_set_by_pointer(st, rd_InNoECTPkts, Ip6InNoECTPkts);
+        rrddim_set_by_pointer(st, rd_InECT1Pkts,  Ip6InECT1Pkts);
+        rrddim_set_by_pointer(st, rd_InECT0Pkts,  Ip6InECT0Pkts);
+        rrddim_set_by_pointer(st, rd_InCEPkts,    Ip6InCEPkts);
         rrdset_done(st);
     }
 

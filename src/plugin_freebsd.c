@@ -128,9 +128,20 @@ void *freebsd_main(void *ptr) {
                 st = rrdset_find_bytype_localhost("netdata", "plugin_freebsd_modules");
 
                 if(!st) {
-                    st = rrdset_create_localhost("netdata", "plugin_freebsd_modules", NULL, "freebsd", NULL
-                    , "NetData FreeBSD Plugin Modules Durations", "milliseconds/run", 132001
-                    , localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+                    st = rrdset_create_localhost(
+                            "netdata"
+                            , "plugin_freebsd_modules"
+                            , NULL
+                            , "freebsd"
+                            , NULL
+                            , "NetData FreeBSD Plugin Modules Durations"
+                            , "milliseconds/run"
+                            , "netdata"
+                            , "stats"
+                            , 132001
+                            , localhost->rrd_update_every
+                            , RRDSET_TYPE_STACKED
+                    );
 
                     for(i = 0 ; freebsd_modules[i].name ;i++) {
                         struct freebsd_module *pm = &freebsd_modules[i];

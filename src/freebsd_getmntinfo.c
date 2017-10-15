@@ -223,6 +223,8 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                               "disk.space",
                                                               title,
                                                               "GB",
+                                                              "freebsd",
+                                                              "getmntinfo",
                                                               2023,
                                                               update_every,
                                                               RRDSET_TYPE_STACKED
@@ -260,6 +262,8 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                                "disk.inodes",
                                                                title,
                                                                "Inodes",
+                                                               "freebsd",
+                                                               "getmntinfo",
                                                                2024,
                                                                update_every,
                                                                RRDSET_TYPE_STACKED

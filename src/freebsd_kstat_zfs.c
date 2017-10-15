@@ -205,8 +205,8 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_need_free", mibs.arc_need_free, arcstats.arc_need_free);
     // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_sys_free", mibs.arc_sys_free, arcstats.arc_sys_free);
 
-    generate_charts_arcstats(update_every);
-    generate_charts_arc_summary(update_every);
+    generate_charts_arcstats("freebsd", update_every);
+    generate_charts_arc_summary("freebsd", update_every);
 
     return 0;
 }

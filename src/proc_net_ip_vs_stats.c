@@ -35,16 +35,27 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     InBytes     = strtoull(procfile_lineword(ff, 2, 3), NULL, 16);
     OutBytes    = strtoull(procfile_lineword(ff, 2, 4), NULL, 16);
 
-    RRDSET *st;
 
     // --------------------------------------------------------------------
 
     if(do_sockets) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_IPVS ".sockets");
-        if(!st) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_IPVS, "sockets", NULL, RRD_TYPE_NET_IPVS, NULL
-                                         , "IPVS New Connections", "connections/s", 3101, update_every
-                                         , RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_IPVS
+                    , "sockets"
+                    , NULL
+                    , RRD_TYPE_NET_IPVS
+                    , NULL
+                    , "IPVS New Connections"
+                    , "connections/s"
+                    , "proc"
+                    , "net/ip_vs_stats"
+                    , 3101
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
 
             rrddim_add(st, "connections", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
@@ -57,10 +68,22 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_packets) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_IPVS ".packets");
-        if(!st) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_IPVS, "packets", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS Packets"
-                                         , "packets/s", 3102, update_every, RRDSET_TYPE_LINE);
+        static RRDSET *st = NULL;
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_IPVS
+                    , "packets"
+                    , NULL
+                    , RRD_TYPE_NET_IPVS
+                    , NULL
+                    , "IPVS Packets"
+                    , "packets/s"
+                    , "proc"
+                    , "net/ip_vs_stats"
+                    , 3102
+                    , update_every
+                    , RRDSET_TYPE_LINE
+            );
 
             rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -75,10 +98,22 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_bandwidth) {
-        st = rrdset_find_localhost(RRD_TYPE_NET_IPVS ".net");
-        if(!st) {
-            st = rrdset_create_localhost(RRD_TYPE_NET_IPVS, "net", NULL, RRD_TYPE_NET_IPVS, NULL, "IPVS Bandwidth"
-                                         , "kilobits/s", 3100, update_every, RRDSET_TYPE_AREA);
+        static RRDSET *st = NULL;
+        if(unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    RRD_TYPE_NET_IPVS
+                    , "net"
+                    , NULL
+                    , RRD_TYPE_NET_IPVS
+                    , NULL
+                    , "IPVS Bandwidth"
+                    , "kilobits/s"
+                    , "proc"
+                    , "net/ip_vs_stats"
+                    , 3100
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
 
             rrddim_add(st, "received", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "sent", NULL,    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);

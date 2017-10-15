@@ -147,7 +147,7 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     rs->var_host_chartnamename  = rrdvar_create_and_index("host", &st->rrdhost->variables_root_index, rs->key_fullnamename, rs->type, rs->value);
 }
 
-RRDDIMVAR *rrddimvar_create(RRDDIM *rd, int type, const char *prefix, const char *suffix, void *value, uint32_t options) {
+RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_OPTIONS options) {
     RRDSET *st = rd->rrdset;
 
     debug(D_VARIABLES, "RRDDIMSET create for chart id '%s' name '%s', dimension id '%s', name '%s%s%s'", st->id, st->name, rd->id, (prefix)?prefix:"", rd->name, (suffix)?suffix:"");

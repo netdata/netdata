@@ -16,12 +16,6 @@ struct option_def {
     const char *default_value;
 };
 
-/**
- * List of command line options.
- * This can be used to compute manpage, help messages, ect.
- */
-extern struct option_def options[];
-
 struct netdata_static_thread {
     char *name;
 

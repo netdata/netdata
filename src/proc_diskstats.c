@@ -31,16 +31,41 @@ static struct disk {
 
     int updated;
 
-    RRDSET *st_avgsz;
-    RRDSET *st_await;
-    RRDSET *st_backlog;
     RRDSET *st_io;
-    RRDSET *st_iotime;
-    RRDSET *st_mops;
+    RRDDIM *rd_io_reads;
+    RRDDIM *rd_io_writes;
+
     RRDSET *st_ops;
+    RRDDIM *rd_ops_reads;
+    RRDDIM *rd_ops_writes;
+
     RRDSET *st_qops;
-    RRDSET *st_svctm;
+    RRDDIM *rd_qops_operations;
+
+    RRDSET *st_backlog;
+    RRDDIM *rd_backlog_backlog;
+
     RRDSET *st_util;
+    RRDDIM *rd_util_utilization;
+
+    RRDSET *st_mops;
+    RRDDIM *rd_mops_reads;
+    RRDDIM *rd_mops_writes;
+
+    RRDSET *st_iotime;
+    RRDDIM *rd_iotime_reads;
+    RRDDIM *rd_iotime_writes;
+
+    RRDSET *st_await;
+    RRDDIM *rd_await_reads;
+    RRDDIM *rd_await_writes;
+
+    RRDSET *st_avgsz;
+    RRDDIM *rd_avgsz_reads;
+    RRDDIM *rd_avgsz_writes;
+
+    RRDSET *st_svctm;
+    RRDDIM *rd_svctm_svctm;
 
     struct disk *next;
 } *disk_root = NULL;
@@ -518,18 +543,20 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.io"
                         , "Disk I/O Bandwidth"
                         , "kilobytes/s"
+                        , "proc"
+                        , "diskstats"
                         , 2000
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
 
-                rrddim_add(d->st_io, "reads", NULL, d->sector_size, 1024, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(d->st_io, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_io_reads  = rrddim_add(d->st_io, "reads",  NULL, d->sector_size, 1024,      RRD_ALGORITHM_INCREMENTAL);
+                d->rd_io_writes = rrddim_add(d->st_io, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(d->st_io);
 
-            last_readsectors  = rrddim_set(d->st_io, "reads", readsectors);
-            last_writesectors = rrddim_set(d->st_io, "writes", writesectors);
+            last_readsectors  = rrddim_set_by_pointer(d->st_io, d->rd_io_reads, readsectors);
+            last_writesectors = rrddim_set_by_pointer(d->st_io, d->rd_io_writes, writesectors);
             rrdset_done(d->st_io);
         }
 
@@ -547,6 +574,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.ops"
                         , "Disk Completed I/O Operations"
                         , "operations/s"
+                        , "proc"
+                        , "diskstats"
                         , 2001
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -554,13 +583,13 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_ops, RRDSET_FLAG_DETAIL);
 
-                rrddim_add(d->st_ops, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(d->st_ops, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_ops_reads  = rrddim_add(d->st_ops, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_ops_writes = rrddim_add(d->st_ops, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(d->st_ops);
 
-            last_reads  = rrddim_set(d->st_ops, "reads", reads);
-            last_writes = rrddim_set(d->st_ops, "writes", writes);
+            last_reads  = rrddim_set_by_pointer(d->st_ops, d->rd_ops_reads, reads);
+            last_writes = rrddim_set_by_pointer(d->st_ops, d->rd_ops_writes, writes);
             rrdset_done(d->st_ops);
         }
 
@@ -578,6 +607,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.qops"
                         , "Disk Current I/O Operations"
                         , "operations"
+                        , "proc"
+                        , "diskstats"
                         , 2002
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -585,11 +616,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_qops, RRDSET_FLAG_DETAIL);
 
-                rrddim_add(d->st_qops, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->rd_qops_operations = rrddim_add(d->st_qops, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(d->st_qops);
 
-            rrddim_set(d->st_qops, "operations", queued_ios);
+            rrddim_set_by_pointer(d->st_qops, d->rd_qops_operations, queued_ios);
             rrdset_done(d->st_qops);
         }
 
@@ -607,6 +638,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.backlog"
                         , "Disk Backlog"
                         , "backlog (ms)"
+                        , "proc"
+                        , "diskstats"
                         , 2003
                         , update_every
                         , RRDSET_TYPE_AREA
@@ -614,11 +647,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_backlog, RRDSET_FLAG_DETAIL);
 
-                rrddim_add(d->st_backlog, "backlog", NULL, 1, 10, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_backlog_backlog = rrddim_add(d->st_backlog, "backlog", NULL, 1, 10, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(d->st_backlog);
 
-            rrddim_set(d->st_backlog, "backlog", backlog_ms);
+            rrddim_set_by_pointer(d->st_backlog, d->rd_backlog_backlog, backlog_ms);
             rrdset_done(d->st_backlog);
         }
 
@@ -636,6 +669,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.util"
                         , "Disk Utilization Time"
                         , "% of time working"
+                        , "proc"
+                        , "diskstats"
                         , 2004
                         , update_every
                         , RRDSET_TYPE_AREA
@@ -643,11 +678,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_util, RRDSET_FLAG_DETAIL);
 
-                rrddim_add(d->st_util, "utilization", NULL, 1, 10, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_util_utilization = rrddim_add(d->st_util, "utilization", NULL, 1, 10, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(d->st_util);
 
-            last_busy_ms = rrddim_set(d->st_util, "utilization", busy_ms);
+            last_busy_ms = rrddim_set_by_pointer(d->st_util, d->rd_util_utilization, busy_ms);
             rrdset_done(d->st_util);
         }
 
@@ -665,6 +700,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.mops"
                         , "Disk Merged Operations"
                         , "merged operations/s"
+                        , "proc"
+                        , "diskstats"
                         , 2021
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -672,13 +709,13 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_mops, RRDSET_FLAG_DETAIL);
 
-                rrddim_add(d->st_mops, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(d->st_mops, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_mops_reads  = rrddim_add(d->st_mops, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_mops_writes = rrddim_add(d->st_mops, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(d->st_mops);
 
-            rrddim_set(d->st_mops, "reads", mreads);
-            rrddim_set(d->st_mops, "writes", mwrites);
+            rrddim_set_by_pointer(d->st_mops, d->rd_mops_reads,  mreads);
+            rrddim_set_by_pointer(d->st_mops, d->rd_mops_writes, mwrites);
             rrdset_done(d->st_mops);
         }
 
@@ -696,6 +733,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , "disk.iotime"
                         , "Disk Total I/O Time"
                         , "milliseconds/s"
+                        , "proc"
+                        , "diskstats"
                         , 2022
                         , update_every
                         , RRDSET_TYPE_LINE
@@ -703,13 +742,13 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrdset_flag_set(d->st_iotime, RRDSET_FLAG_DETAIL);
 
-                rrddim_add(d->st_iotime, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rrddim_add(d->st_iotime, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_iotime_reads  = rrddim_add(d->st_iotime, "reads",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_iotime_writes = rrddim_add(d->st_iotime, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else rrdset_next(d->st_iotime);
 
-            last_readms  = rrddim_set(d->st_iotime, "reads", readms);
-            last_writems = rrddim_set(d->st_iotime, "writes", writems);
+            last_readms  = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_reads, readms);
+            last_writems = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_writes, writems);
             rrdset_done(d->st_iotime);
         }
 
@@ -730,6 +769,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.await"
                             , "Average Completed I/O Operation Time"
                             , "ms per operation"
+                            , "proc"
+                            , "diskstats"
                             , 2005
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -737,13 +778,13 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(d->st_await, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(d->st_await, "reads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    rrddim_add(d->st_await, "writes", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_await_reads  = rrddim_add(d->st_await, "reads",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_await_writes = rrddim_add(d->st_await, "writes", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(d->st_await);
 
-                rrddim_set(d->st_await, "reads", (reads - last_reads) ? (readms - last_readms) / (reads - last_reads) : 0);
-                rrddim_set(d->st_await, "writes", (writes - last_writes) ? (writems - last_writems) / (writes - last_writes) : 0);
+                rrddim_set_by_pointer(d->st_await, d->rd_await_reads,  (reads  - last_reads)  ? (readms  - last_readms)  / (reads  - last_reads)  : 0);
+                rrddim_set_by_pointer(d->st_await, d->rd_await_writes, (writes - last_writes) ? (writems - last_writems) / (writes - last_writes) : 0);
                 rrdset_done(d->st_await);
             }
 
@@ -759,6 +800,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.avgsz"
                             , "Average Completed I/O Operation Bandwidth"
                             , "kilobytes per operation"
+                            , "proc"
+                            , "diskstats"
                             , 2006
                             , update_every
                             , RRDSET_TYPE_AREA
@@ -766,13 +809,13 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(d->st_avgsz, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(d->st_avgsz, "reads", NULL, d->sector_size, 1024, RRD_ALGORITHM_ABSOLUTE);
-                    rrddim_add(d->st_avgsz, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_avgsz_reads  = rrddim_add(d->st_avgsz, "reads",  NULL, d->sector_size, 1024,      RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_avgsz_writes = rrddim_add(d->st_avgsz, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(d->st_avgsz);
 
-                rrddim_set(d->st_avgsz, "reads", (reads - last_reads) ? (readsectors - last_readsectors) / (reads - last_reads) : 0);
-                rrddim_set(d->st_avgsz, "writes", (writes - last_writes) ? (writesectors - last_writesectors) / (writes - last_writes) : 0);
+                rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_reads,  (reads  - last_reads)  ? (readsectors  - last_readsectors)  / (reads  - last_reads)  : 0);
+                rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_writes, (writes - last_writes) ? (writesectors - last_writesectors) / (writes - last_writes) : 0);
                 rrdset_done(d->st_avgsz);
             }
 
@@ -788,6 +831,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , "disk.svctm"
                             , "Average Service Time"
                             , "ms per operation"
+                            , "proc"
+                            , "diskstats"
                             , 2007
                             , update_every
                             , RRDSET_TYPE_LINE
@@ -795,11 +840,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(d->st_svctm, RRDSET_FLAG_DETAIL);
 
-                    rrddim_add(d->st_svctm, "svctm", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_svctm_svctm = rrddim_add(d->st_svctm, "svctm", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
                 else rrdset_next(d->st_svctm);
 
-                rrddim_set(d->st_svctm, "svctm", ((reads - last_reads) + (writes - last_writes)) ? (busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) : 0);
+                rrddim_set_by_pointer(d->st_svctm, d->rd_svctm_svctm, ((reads - last_reads) + (writes - last_writes)) ? (busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) : 0);
                 rrdset_done(d->st_svctm);
             }
         }
