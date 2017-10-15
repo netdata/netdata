@@ -32,24 +32,34 @@ void netdata_cleanup_and_exit(int ret) {
 }
 
 struct netdata_static_thread static_threads[] = {
+
 #ifdef INTERNAL_PLUGIN_NFACCT
-// nfacct requires root access
+    // nfacct requires root access
     // so, we build it as an external plugin with setuid to root
     {"nfacct",              CONFIG_SECTION_PLUGINS,  "nfacct",     1, NULL, NULL, nfacct_main},
 #endif
 
-    {"tc",                  CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
-    {"idlejitter",          CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
+#ifdef NETDATA_INTERNAL_CHECKS
+    // debugging plugin
+    {"check",               CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
+#endif
+
 #if defined(__FreeBSD__)
+    // FreeBSD internal plugins
     {"freebsd",             CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
 #elif defined(__APPLE__)
+    // macOS internal plugins
     {"macos",               CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
 #else
+    // linux internal plugins
     {"proc",                CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
     {"diskspace",           CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
     {"cgroups",             CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
+    {"tc",                  CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
 #endif /* __FreeBSD__, __APPLE__*/
-    {"check",               CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
+
+    // common plugins for all systems
+    {"idlejitter",          CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
     {"backends",            NULL,                    NULL,         1, NULL, NULL, backends_main},
     {"health",              NULL,                    NULL,         1, NULL, NULL, health_main},
     {"plugins.d",           NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
@@ -57,6 +67,7 @@ struct netdata_static_thread static_threads[] = {
     {"web-single-threaded", NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
     {"push-metrics",        NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
     {"statsd",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
+
     {NULL,                  NULL,                    NULL,         0, NULL, NULL, NULL}
 };
 
