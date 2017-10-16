@@ -16,9 +16,9 @@ typedef enum rrdvar_type {
 
 // the variables as stored in the variables indexes
 // there are 3 indexes:
-// 1. at each chart   (RRDSET.variables_root_index)
-// 2. at each context (RRDFAMILY.variables_root_index)
-// 3. at each host    (RRDHOST.variables_root_index)
+// 1. at each chart   (RRDSET.rrdvar_root_index)
+// 2. at each context (RRDFAMILY.rrdvar_root_index)
+// 3. at each host    (RRDHOST.rrdvar_root_index)
 typedef struct rrdvar {
     avl avl;
 
@@ -363,9 +363,12 @@ extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 
 extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name);
-extern void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name);
 extern void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_number value);
-extern void rrdvar_free_remaining_variables(RRDHOST *host);
+
+extern RRDVAR *rrdvar_custom_chart_variable_create(RRDSET *st, const char *name);
+extern void rrdvar_custom_chart_variable_set(RRDSET *st, RRDVAR *rv, calculated_number value);
+
+extern void rrdvar_free_remaining_variables(RRDHOST *host, avl_tree_lock *tree_lock);
 
 extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
 

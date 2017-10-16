@@ -30,7 +30,7 @@ RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {
         rc->hash_family = simple_hash(rc->family);
 
         // initialize the variables index
-        avl_init_lock(&rc->variables_root_index, rrdvar_compare);
+        avl_init_lock(&rc->rrdvar_root_index, rrdvar_compare);
 
         RRDFAMILY *ret = rrdfamily_index_add(host, rc);
         if(ret != rc)
@@ -48,7 +48,7 @@ void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc) {
         if(ret != rc)
             fatal("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", rc->family, (ret)?ret->family:"NONE");
 
-        if(rc->variables_root_index.avl_tree.root != NULL)
+        if(rc->rrdvar_root_index.avl_tree.root != NULL)
             fatal("RRDFAMILY: INTERNAL ERROR: Variables index of RRDFAMILY '%s' that is freed, is not empty.", rc->family);
 
         freez((void *)rc->family);

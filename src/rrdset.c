@@ -316,6 +316,8 @@ void rrdset_free(RRDSET *st) {
 
     rrdfamily_free(st->rrdhost, st->rrdfamily);
 
+    rrdvar_free_remaining_variables(st->rrdhost, &st->rrdvar_root_index);
+
     // ------------------------------------------------------------------------
     // unlink it from the host
 
@@ -506,7 +508,7 @@ RRDSET *rrdset_create_custom(
         if(st) {
             memset(&st->avl, 0, sizeof(avl));
             memset(&st->avlname, 0, sizeof(avl));
-            memset(&st->variables_root_index, 0, sizeof(avl_tree_lock));
+            memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
             memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
             memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
 
@@ -640,7 +642,7 @@ RRDSET *rrdset_create_custom(
     st->upstream_resync_time = 0;
 
     avl_init_lock(&st->dimensions_index, rrddim_compare);
-    avl_init_lock(&st->variables_root_index, rrdvar_compare);
+    avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
 
     netdata_rwlock_init(&st->rrdset_rwlock);
 
