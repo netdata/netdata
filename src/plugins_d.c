@@ -377,21 +377,23 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *value = words[2];
             int global = (st)?0:1;
 
+            if(name && *name) {
+                if((strcmp(name, "GLOBAL") == 0 || strcmp(name, "HOST") == 0)) {
+                    global = 1;
+                    name = words[2];
+                    value  = words[3];
+                }
+                else if((strcmp(name, "LOCAL") == 0 || strcmp(name, "CHART") == 0)) {
+                    global = 0;
+                    name = words[2];
+                    value  = words[3];
+                }
+            }
+
             if(unlikely(!name || !*name)) {
                 error("PLUGINSD: '%s' is requesting a VARIABLE on host '%s', without a variable name. Disabling it.", cd->fullfilename, host->hostname);
                 enabled = 0;
                 break;
-            }
-
-            if(value && *value) {
-                if((strcmp(value, "GLOBAL") == 0 || strcmp(value, "HOST") == 0)) {
-                    global = 1;
-                    value  = words[3];
-                }
-                else if((strcmp(value, "LOCAL") == 0 || strcmp(value, "CHART") == 0)) {
-                    global = 0;
-                    value  = words[3];
-                }
             }
 
             if(unlikely(!value || !*value))
