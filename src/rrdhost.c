@@ -151,7 +151,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
     avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
     avl_init_lock(&(host->rrdfamily_root_index),   rrdfamily_compare);
-    avl_init_lock(&(host->variables_root_index),   rrdvar_compare);
+    avl_init_lock(&(host->rrdvar_root_index),   rrdvar_compare);
 
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete obsolete charts files", 1))
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
@@ -496,7 +496,7 @@ void rrdhost_free(RRDHOST *host) {
     while(host->templates)
         rrdcalctemplate_unlink_and_free(host, host->templates);
 
-    rrdvar_free_remaining_variables(host);
+    rrdvar_free_remaining_variables(host, &host->rrdvar_root_index);
 
     health_alarm_log_free(host);
 

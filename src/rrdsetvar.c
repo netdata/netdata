@@ -10,23 +10,23 @@ static inline void rrdsetvar_free_variables(RRDSETVAR *rs) {
 
     // CHART
 
-    rrdvar_free(st->rrdhost, &st->variables_root_index, rs->var_local);
+    rrdvar_free(st->rrdhost, &st->rrdvar_root_index, rs->var_local);
     rs->var_local = NULL;
 
     // FAMILY
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family);
+    rrdvar_free(st->rrdhost, &st->rrdfamily->rrdvar_root_index, rs->var_family);
     rs->var_family = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host);
+    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rs->var_host);
     rs->var_host = NULL;
 
     // HOST
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->variables_root_index, rs->var_family_name);
+    rrdvar_free(st->rrdhost, &st->rrdfamily->rrdvar_root_index, rs->var_family_name);
     rs->var_family_name = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->variables_root_index, rs->var_host_name);
+    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rs->var_host_name);
     rs->var_host_name = NULL;
 
     // KEYS
@@ -54,17 +54,17 @@ static inline void rrdsetvar_create_variables(RRDSETVAR *rs) {
 
     // CHART
 
-    rs->var_local       = rrdvar_create_and_index("local",  &st->variables_root_index,               rs->variable, rs->type, rs->value);
+    rs->var_local       = rrdvar_create_and_index("local",  &st->rrdvar_root_index,               rs->variable, rs->type, rs->value);
 
     // FAMILY
 
-    rs->var_family      = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index,    rs->key_fullid,   rs->type, rs->value);
-    rs->var_family_name = rrdvar_create_and_index("family", &st->rrdfamily->variables_root_index,    rs->key_fullname, rs->type, rs->value);
+    rs->var_family      = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index,    rs->key_fullid,   rs->type, rs->value);
+    rs->var_family_name = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index,    rs->key_fullname, rs->type, rs->value);
 
     // HOST
 
-    rs->var_host        = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index,      rs->key_fullid,   rs->type, rs->value);
-    rs->var_host_name   = rrdvar_create_and_index("host",   &st->rrdhost->variables_root_index,      rs->key_fullname, rs->type, rs->value);
+    rs->var_host        = rrdvar_create_and_index("host",   &st->rrdhost->rrdvar_root_index,      rs->key_fullid,   rs->type, rs->value);
+    rs->var_host_name   = rrdvar_create_and_index("host",   &st->rrdhost->rrdvar_root_index,      rs->key_fullname, rs->type, rs->value);
 
 }
 

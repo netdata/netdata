@@ -375,6 +375,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         else if(likely(hash == VARIABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_VARIABLE))) {
             char *name = words[1];
             char *value = words[2];
+            int global = (st)?0:1;
 
             if(unlikely(!name || !*name)) {
                 error("PLUGINSD: '%s' is requesting a VARIABLE on host '%s', without a variable name. Disabling it.", cd->fullfilename, host->hostname);
@@ -382,16 +383,38 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 break;
             }
 
-            if(unlikely(!value || !*value)) value = NULL;
+            if(value && *value) {
+                if((strcmp(value, "GLOBAL") == 0 || strcmp(value, "HOST") == 0)) {
+                    global = 1;
+                    value  = words[3];
+                }
+                else if((strcmp(value, "LOCAL") == 0 || strcmp(value, "CHART") == 0)) {
+                    global = 0;
+                    value  = words[3];
+                }
+            }
+
+            if(unlikely(!value || !*value))
+                value = NULL;
 
             if(value) {
                 calculated_number v = (calculated_number)str2ld(value, NULL);
-                RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
-                if(rv)
-                    rrdvar_custom_host_variable_set(host, rv, v);
+
+                if(global) {
+                    RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
+                    if (rv) rrdvar_custom_host_variable_set(host, rv, v);
+                    else error("PLUGINSD: '%s': cannot find/create HOST VARIABLE '%s' on host '%s'", cd->fullfilename, name, host->hostname);
+                }
+                else if(st) {
+                    RRDVAR *rv = rrdvar_custom_chart_variable_create(st, name);
+                    if (rv) rrdvar_custom_chart_variable_set(st, rv, v);
+                    else error("PLUGINSD: '%s': cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", cd->fullfilename, name, host->hostname, st->id);
+                }
                 else
-                    error("PLUGINSD: '%s': cannot find/create VARIABLE '%s' on host '%s'", cd->fullfilename, name, host->hostname);
+                    error("PLUGINSD: '%s': cannot find/create CHART VARIABLE '%s' on host '%s' without a chart", cd->fullfilename, name, host->hostname);
             }
+            else
+                error("PLUGINSD: '%s': cannot set %s VARIABLE '%s' on host '%s' to an empty value", cd->fullfilename, (global)?"HOST":"CHART", name, host->hostname);
         }
         else if(likely(hash == FLUSH_HASH && !strcmp(s, PLUGINSD_KEYWORD_FLUSH))) {
             debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
