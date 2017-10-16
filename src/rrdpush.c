@@ -77,6 +77,29 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
     return 0;
 }
 
+static int rrdpush_sender_add_chart_variable_to_buffer_nolock(void *rrdvar_ptr, void *rrdset_ptr) {
+    RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
+
+    if(unlikely(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)) {
+        RRDSET *st = (RRDSET *)rrdset_ptr;
+
+        calculated_number *value = (calculated_number *) rv->value;
+
+        buffer_sprintf(
+                st->rrdhost->rrdpush_sender_buffer
+                , "VARIABLE CHART %s = " CALCULATED_NUMBER_FORMAT "\n"
+                , rv->name
+                , *value
+        );
+
+        debug(D_STREAM, "RRDVAR pushed CHART VARIABLE %s = " CALCULATED_NUMBER_FORMAT, rv->name, *value);
+
+        return 1;
+    }
+
+    return 0;
+}
+
 // sends the current chart definition
 static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     rrdset_flag_set(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
@@ -117,6 +140,10 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
+
+    int ret = rrdvar_callback_for_all_chart_variables(st, rrdpush_sender_add_chart_variable_to_buffer_nolock, st);
+    debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
+
 }
 
 // sends the current chart dimensions
@@ -188,33 +215,33 @@ void rrdset_done_push(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
-static inline void rrdpush_sender_add_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
+static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
     calculated_number *value = (calculated_number *)rv->value;
 
     buffer_sprintf(
             host->rrdpush_sender_buffer
-            , "VARIABLE %s = " CALCULATED_NUMBER_FORMAT "\n"
+            , "VARIABLE HOST %s = " CALCULATED_NUMBER_FORMAT "\n"
             , rv->name
             , *value
     );
 
-    debug(D_STREAM, "RRDVAR pushed VARIABLE %s = " CALCULATED_NUMBER_FORMAT, rv->name, *value);
+    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " CALCULATED_NUMBER_FORMAT, rv->name, *value);
 }
 
-void rrdpush_sender_send_this_variable_now(RRDHOST *host, RRDVAR *rv) {
+void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {
     if(host->rrdpush_send_enabled && host->rrdpush_sender_spawn && host->rrdpush_sender_connected) {
         rrdpush_buffer_lock(host);
-        rrdpush_sender_add_variable_to_buffer_nolock(host, rv);
+        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
         rrdpush_buffer_unlock(host);
     }
 }
 
-static int rrdpush_sender_thread_custom_variables_callback(void *rrdvar_ptr, void *host_ptr) {
+static int rrdpush_sender_thread_custom_host_variables_callback(void *rrdvar_ptr, void *host_ptr) {
     RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
     RRDHOST *host = (RRDHOST *)host_ptr;
 
     if(unlikely(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)) {
-        rrdpush_sender_add_variable_to_buffer_nolock(host, rv);
+        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
 
         // return 1, so that the traversal will return the number of variables sent
         return 1;
@@ -224,8 +251,8 @@ static int rrdpush_sender_thread_custom_variables_callback(void *rrdvar_ptr, voi
     return 0;
 }
 
-static void rrdpush_sender_thread_send_custom_variables(RRDHOST *host) {
-    int ret = rrdvar_callback_for_all_variables(host, rrdpush_sender_thread_custom_variables_callback, host);
+static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
+    int ret = rrdvar_callback_for_all_host_variables(host, rrdpush_sender_thread_custom_host_variables_callback, host);
     debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
 }
 
@@ -236,6 +263,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
     RRDSET *st;
     rrdset_foreach_read(st, host) {
+        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 
         st->upstream_resync_time = 0;
 
@@ -260,7 +288,7 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     buffer_flush(host->rrdpush_sender_buffer);
 
     rrdpush_sender_thread_reset_all_charts(host);
-    rrdpush_sender_thread_send_custom_variables(host);
+    rrdpush_sender_thread_send_custom_host_variables(host);
 
     rrdpush_buffer_unlock(host);
 }

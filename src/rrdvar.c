@@ -117,8 +117,12 @@ void rrdvar_free_remaining_variables(RRDHOST *host, avl_tree_lock *tree_lock) {
 // ----------------------------------------------------------------------------
 // CUSTOM VARIABLES
 
-inline int rrdvar_callback_for_all_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data) {
+inline int rrdvar_callback_for_all_host_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data) {
     return avl_traverse_lock(&host->rrdvar_root_index, callback, data);
+}
+
+inline int rrdvar_callback_for_all_chart_variables(RRDSET *st, int (*callback)(void *rrdvar, void *data), void *data) {
+    return avl_traverse_lock(&st->rrdhost->rrdvar_root_index, callback, data);
 }
 
 static RRDVAR *rrdvar_custom_variable_create(const char *scope, avl_tree_lock *tree_lock, const char *name) {
@@ -159,7 +163,7 @@ void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_numbe
             *v = value;
 
             // if the host is streaming, send this variable upstream immediately
-            rrdpush_sender_send_this_variable_now(host, rv);
+            rrdpush_sender_send_this_host_variable_now(host, rv);
         }
     }
 }

@@ -14,6 +14,6 @@ extern void *rrdpush_sender_thread(void *ptr);
 extern int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url);
 extern void rrdpush_sender_thread_stop(RRDHOST *host);
 
-extern void rrdpush_sender_send_this_variable_now(RRDHOST *host, RRDVAR *rv);
+extern void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv);
 
 #endif //NETDATA_RRDPUSH_H

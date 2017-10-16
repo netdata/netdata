@@ -412,7 +412,8 @@ extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 extern void rrdcalctemplate_free(RRDCALCTEMPLATE *rt);
 extern void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
 
-extern int  rrdvar_callback_for_all_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data);
+extern int  rrdvar_callback_for_all_host_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data);
+extern int rrdvar_callback_for_all_chart_variables(RRDSET *st, int (*callback)(void *rrdvar, void *data), void *data);
 
 #ifdef NETDATA_HEALTH_INTERNALS
 #define RRDVAR_MAX_LENGTH 1024
