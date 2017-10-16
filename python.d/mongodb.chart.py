@@ -2,7 +2,6 @@
 # Description: mongodb netdata python.d module
 # Author: l2isbad
 
-from base import SimpleService
 from copy import deepcopy
 from datetime import datetime
 from sys import exc_info
@@ -13,6 +12,8 @@ try:
     PYMONGO = True
 except ImportError:
     PYMONGO = False
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -35,6 +36,7 @@ REPL_SET_STATES = [
 
 def multiply_by_100(value):
     return value * 100
+
 
 DEFAULT_METRICS = [
     ('opcounters.delete', None, None),
