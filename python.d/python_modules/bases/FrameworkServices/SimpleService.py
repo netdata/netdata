@@ -16,12 +16,6 @@ from bases.loggers import PythonDLimitedLogger
 
 CHART_OBSOLETE_PENALTY = 10
 
-START_MSG = 'STARTED. Update frequency: {freq}, retries: {retries}.'
-UPDATE_MSG = 'UPDATE {status}. Elapsed time: {elapsed}, retries left: {retries}.'
-STOP_MSG = 'STOPPED after {retries_max} data collection failures in a row.'
-SLEEP_MSG = 'SLEEPING for {sleep_time} to reach frequency of {freq} sec.'
-UNHANDLED_EXCEPTION = 'Unhandled exception in {method_name}(). Error: {error}.'
-
 RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
                        'SET run_time = {elapsed}\n' \
                        'END\n'
@@ -32,14 +26,14 @@ class RuntimeCounters:
         """
         :param configuration: <dict>
         """
-        self.FREQ = int(configuration.pop('update_every', 1))
+        self.FREQ = int(configuration.pop('update_every'))
         self.START_RUN = 0
         self.NEXT_RUN = 0
         self.PREV_UPDATE = 0
         self.SINCE_UPDATE = 0
         self.ELAPSED = 0
         self.RETRIES = 0
-        self.RETRIES_MAX = configuration.pop('retries', 10)
+        self.RETRIES_MAX = configuration.pop('retries')
 
     def is_sleep_time(self):
         return self.START_RUN < self.NEXT_RUN
@@ -60,15 +54,17 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         PythonDLimitedLogger.__init__(self)
         OldVersionCompatibility.__init__(self)
         self.configuration = configuration
-        self.module_name = configuration.pop('module_name')
+        self.order = list()
+        self.definitions = dict()
+
+        self.module_name = self.__module__
         self.job_name = configuration.pop('job_name')
         self.override_name = configuration.pop('override_name')
         self.fake_name = None
-        self.order = list()
-        self.definitions = dict()
+
         self._runtime_counters = RuntimeCounters(configuration=configuration)
         self.charts = Charts(job_name=self.actual_name,
-                             priority=configuration.pop('priority', 60000),
+                             priority=configuration.pop('priority'),
                              update_every=self.update_every)
 
     def __repr__(self):
@@ -101,29 +97,24 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         check() prototype
         :return: boolean
         """
-        try:
-            data = self._get_data()
-        except Exception as error:
-            self.debug('CHECK {{error: {error}}}'.format(error=error))
-        else:
-            if data and isinstance(data, dict):
-                return True
-            self.debug('CHECK returned no data')
-            return False
+        self.debug("job doesn't implement check() method. Using default which simply invokes get_data().")
+        data = self.get_data()
+        if data and isinstance(data, dict):
+            return True
+        self.debug('returned value is wrong: {0}'.format(data))
+        return False
 
     @create_runtime_chart
     def create(self):
         for chart_name in self.order:
             chart_config = self.definitions.get(chart_name)
             if not chart_config:
-                self.debug('{chart_name} not in definitions'.format(chart_name=chart_name))
+                self.debug("create() chart '{chart_name}' not in definitions. "
+                           "Skipping it.".format(chart_name=chart_name))
                 continue
 
-            chart_params = ([chart_name] + chart_config['options'])
-            ok = self.charts.add_chart(params=chart_params)
-            if not ok:
-                self.debug('"{chart}" chart no added'.format(chart=chart_name))
-                continue
+            chart_params = [chart_name] + chart_config['options']
+            self.charts.add_chart(params=chart_params)
 
             for line in chart_config['lines']:
                 self.charts[chart_name].add_dimension(line)
@@ -131,12 +122,10 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         del self.order
         del self.definitions
 
-        if self.charts.empty():
-            return None
-
         for chart in self.charts:
             safe_print(chart.create())
-        return True
+
+        return bool(self.charts)
 
     def run(self):
         """
@@ -145,7 +134,8 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         :return: None
         """
         job = self._runtime_counters
-        self.debug(START_MSG.format(freq=job.FREQ, retries=job.RETRIES_MAX - job.RETRIES))
+        self.debug('started, update frequency: {freq}, '
+                   'retries: {retries}'.format(freq=job.FREQ, retries=job.RETRIES_MAX - job.RETRIES))
 
         while True:
             job.START_RUN = time()
@@ -160,8 +150,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             try:
                 updated = self.update(interval=job.SINCE_UPDATE)
             except Exception as error:
-                self.debug(UNHANDLED_EXCEPTION.format(method_name='update',
-                                                      error=error))
+                self.debug('update() unhandled exception: {error}'.format(error=error))
                 updated = False
 
             if not updated:
@@ -175,9 +164,10 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
                                                        since_last=job.SINCE_UPDATE,
                                                        elapsed=job.ELAPSED))
-            self.debug(UPDATE_MSG.format(status='OK' if updated else 'FAILED',
-                                         elapsed=job.ELAPSED if updated else '-',
-                                         retries=job.RETRIES_MAX - job.RETRIES))
+            self.debug('update => [{status}] (elapsed time: {elapsed}, '
+                       'retries left: {retries})'.format(status='OK' if updated else 'FAILED',
+                                                         elapsed=job.ELAPSED if updated else '-',
+                                                         retries=job.RETRIES_MAX - job.RETRIES))
 
     def update(self, interval):
         """
@@ -186,16 +176,22 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         """
         data = self.get_data()
         if not data:
-            return None
+            self.debug('get_data() returns no data')
+            return False
+        elif not isinstance(data, dict):
+            self.debug('get_data() returns incorrect type data')
+            return False
+
         charts_updated = False
 
         for chart in self.charts.penalty_exceeded(penalty_max=CHART_OBSOLETE_PENALTY):
             safe_print(chart.obsolete())
             del self.charts[chart.params['id']]
+            self.error('chart "{0}" was removed due to non updating'.format(chart.name))
 
         for chart in self.charts:
             dimension_updated = str()
-            for dimension in chart.dimensions:
+            for dimension in chart:
                 try:
                     value = int(data[dimension.params['id']])
                 except (KeyError, TypeError):
@@ -208,12 +204,17 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                                     dimension_updated, 'END\n']))
             else:
                 chart.penalty += 1
+
+        if not charts_updated:
+            self.debug('none of the charts have been updated')
+
         return charts_updated
 
     def manage_retries(self):
         self._runtime_counters.RETRIES += 1
         if self._runtime_counters.RETRIES >= self._runtime_counters.RETRIES_MAX:
-            self.error(STOP_MSG.format(retries_max=self._runtime_counters.RETRIES_MAX))
+            self.error('stopped after {retries_max} data '
+                       'collection failures in a row'.format(retries_max=self._runtime_counters.RETRIES_MAX))
             return False
         return True
 
@@ -223,8 +224,8 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         # sleep() is interruptable
         while job.is_sleep_time():
             sleep_time = job.NEXT_RUN - job.START_RUN
-            self.debug(SLEEP_MSG.format(sleep_time=sleep_time,
-                                        freq=job.FREQ))
+            self.debug('sleeping for {sleep_time} to reach frequency of {freq} sec'.format(sleep_time=sleep_time,
+                                                                                           freq=job.FREQ))
             sleep(sleep_time)
             job.START_RUN = time()
 

@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 '''':; exec "$(command -v python || command -v python3 || command -v python2 ||
 echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
@@ -39,7 +38,7 @@ from bases.loggers import PythonDLogger
 from bases.collection import setdefault_values, run_and_exit
 
 BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
-               'retries': 10,
+               'retries': 20,
                'priority': 60000,
                'autodetection_retry': 0,
                'name': str()}
@@ -47,11 +46,6 @@ BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
 
 MODULE_EXTENSION = '.chart.py'
 OBSOLETE_MODULES = ['apache_cache', 'gunicorn_log', 'nginx_log']
-
-JOB_INITIALIZE_MSG = 'Job initialization {status}. Module: "{module_name}", job: "{job_name}"{error}.'
-JOB_CREATE_CHARTS_MSG = 'CREATE {status}. Number of charts: {number_of_charts}.'
-MODULE_LOAD_MSG = 'Module load {status}. Module: "{module_name}", initialized jobs: {jobs_number}.'
-UNHANDLED_EXCEPTION = 'Unhandled exception in {method_name}(). Error: {error}.'
 
 
 def module_ok(m):
@@ -73,18 +67,17 @@ def multi_job_check(config):
 
 
 class Job(object):
-    def __init__(self, initialized_job, module_name, internal_name):
+    def __init__(self, initialized_job, job_id):
         """
-        :param initialized_job: <Class Service>
-        :param module_name: <str>
-        :param internal_name: <str>
+        :param initialized_job: instance of <Class Service>
+        :param job_id: <str>
         """
         self.job = initialized_job
-        self.internal_name = internal_name  # key in Modules.jobs
-        self.module_name = module_name  # needed in Plugin.delete_job
+        self.id = job_id  # key in Modules.jobs()
+        self.module_name = self.job.__module__  # used in Plugin.delete_job()
         self.recheck_every = self.job.configuration.pop('autodetection_retry')
-        self.checked = False  # needed in Plugin.check_job
-        self.created = False  # needed in Plugin.create_job_charts
+        self.checked = False  # used in Plugin.check_job()
+        self.created = False  # used in Plugin.create_job_charts()
         if OVERRIDE_UPDATE_EVERY:
             self.job.update_every = int(OVERRIDE_UPDATE_EVERY)
 
@@ -112,13 +105,14 @@ class Module(object):
         """
         self.service = service
         self.name = service.__name__
-        self.config = self.build_jobs_configurations(config)
+        self.config = self.jobs_configurations_builder(config)
         self.jobs = OrderedDict()
+        self.counter = 1
 
         self.initialize_jobs()
 
     def __repr__(self):
-        return '<Class Module "{name}">'.format(name=self.name)
+        return "<Class Module '{name}'>".format(name=self.name)
 
     def __iter__(self):
         return iter(OrderedDict(self.jobs).values())
@@ -133,58 +127,64 @@ class Module(object):
         return len(self.jobs)
 
     def __bool__(self):
-        return bool(len(self.jobs))
+        return bool(self.jobs)
 
     def __nonzero__(self):
         return self.__bool__()
 
-    def build_jobs_configurations(self, config):
+    @staticmethod
+    def jobs_configurations_builder(config):
         """
         :param config: <dict>
         :return:
         """
-        if not config:
-            return {self.name: dict(BASE_CONFIG)}
-        if not multi_job_check(config):
-            return {self.name: setdefault_values(config, BASE_CONFIG)}
-        else:
-            jobs, jobs_base_config = OrderedDict(), dict()
-            for attr in BASE_CONFIG:
-                jobs_base_config[attr] = config.pop(attr, BASE_CONFIG[attr])
-            for job_name in config:
-                if not isinstance(config[job_name], dict):
-                    continue
+        counter = 0
+        job_base_config = dict()
 
-                defaulted = setdefault_values(config[job_name], base_dict=jobs_base_config)
-                config[job_name]['name'] = sub(r'\s+', '_', config[job_name]['name'])
-                job_name = sub(r'\s+', '_', job_name)
-                job_internal_name = '_'.join([self.name, job_name])
-                jobs[job_internal_name] = defaulted
-            return jobs
+        for attr in BASE_CONFIG:
+            job_base_config[attr] = config.pop(attr, BASE_CONFIG[attr])
+
+        if not config:
+            config = {str(): dict()}
+        elif not multi_job_check(config):
+            config = {str(): config}
+
+        for job_name in config:
+            if not isinstance(config[job_name], dict):
+                continue
+
+            job_config = setdefault_values(config[job_name], base_dict=job_base_config)
+            job_name = sub(r'\s+', '_', job_name)
+            config[job_name]['name'] = sub(r'\s+', '_', config[job_name]['name'])
+            counter += 1
+            job_id = 'job' + str(counter).zfill(3)
+
+            yield job_id, job_name, job_config
 
     def initialize_jobs(self):
-        for job_internal_name in self.config:
-            job_name = job_internal_name[len(self.name) + 1:]
-            job_override_name = self.config[job_internal_name].pop('name')
-            self.config[job_internal_name]['module_name'] = self.name
-            self.config[job_internal_name]['job_name'] = job_name
-            self.config[job_internal_name]['override_name'] = job_override_name
+        """
+        :return:
+        """
+        for job_id, job_name, job_config in self.config:
+            job_config['job_name'] = job_name
+            job_config['override_name'] = job_config.pop('name')
+
             try:
-                initialized_job = self.service.Service(configuration=self.config[job_internal_name])
+                initialized_job = self.service.Service(configuration=job_config)
             except Exception as error:
-                Logger.error(JOB_INITIALIZE_MSG.format(status='FAILED',
-                                                       module_name=self.name,
-                                                       job_name=job_name,
-                                                       error=', error: {0}'.format(error)))
+                Logger.error("job initialization: '{module_name} {job_name}' "
+                             "=> [{status}] ({error})".format(status='FAILED',
+                                                              module_name=self.name,
+                                                              job_name=job_name,
+                                                              error=error))
                 continue
             else:
-                Logger.debug(JOB_INITIALIZE_MSG.format(status='SUCCESS',
-                                                       module_name=self.name,
-                                                       job_name=job_name,
-                                                       error=''))
-                self.jobs[job_internal_name] = Job(initialized_job=initialized_job,
-                                                   module_name=self.name,
-                                                   internal_name=job_internal_name)
+                Logger.debug("job initialization: '{module_name} {job_name}' "
+                             "=> [{status}]".format(status='OK',
+                                                    module_name=self.name,
+                                                    job_name=job_name or self.name))
+                self.jobs[job_id] = Job(initialized_job=initialized_job,
+                                        job_id=job_id)
         del self.config
         del self.service
 
@@ -194,7 +194,7 @@ class Plugin(object):
         self.loader = ModuleAndConfigLoader()
         self.modules = OrderedDict()
         self.sleep_time = 1
-        self.number_of_runs = 0
+        self.runs_counter = 0
         self.config, error = self.loader.load_config_from_file(PLUGIN_CONFIG_DIR + 'python.d.conf')
         if error:
             run_and_exit(Logger.error)(error)
@@ -207,7 +207,7 @@ class Plugin(object):
             run_and_exit(Logger.info)('No modules to run. Exit...')
 
     def __iter__(self):
-        return iter(dict(self.modules).values())
+        return iter(OrderedDict(self.modules).values())
 
     @property
     def jobs(self):
@@ -240,19 +240,31 @@ class Plugin(object):
 
     def load_and_initialize_modules(self):
         for mod, mod_name, mod_path, conf_path in self.enabled_modules():
+
+            # Load module from file ------------------------------------------------------------
             loaded_module, error = self.loader.load_module_from_file(mod_name, mod_path)
+            log = Logger.error if error else Logger.debug
+            log("module load source: '{module_name}' => [{status}]".format(status='FAILED' if error else 'OK',
+                                                                           module_name=mod_name))
             if error:
-                Logger.error('Module load failed. Module: {name}, error: {error}.'.format(name=mod,
-                                                                                          error=error))
+                Logger.error("load source error : {0}".format(error))
                 continue
+
+            # Load module config from file ------------------------------------------------------
             loaded_config, error = self.loader.load_config_from_file(conf_path)
+            log = Logger.error if error else Logger.debug
+            log("module load config: '{module_name}' => [{status}]".format(status='FAILED' if error else 'OK',
+                                                                           module_name=mod_name))
             if error:
-                Logger.error('Config load failed. Module {module}, error: {error}.'.format(module=mod_name,
-                                                                                           error=error))
+                Logger.error('load config error : {0}'.format(error))
+
+            # Service instance initialization ---------------------------------------------------
             initialized_module = Module(service=loaded_module, config=loaded_config)
-            Logger.debug(MODULE_LOAD_MSG.format(status='OK' if initialized_module else 'FAILED',
-                                                module_name=initialized_module.name,
-                                                jobs_number=len(initialized_module)))
+            Logger.debug("module status: '{module_name}' => [{status}] "
+                         "(jobs: {jobs_number})".format(status='OK' if initialized_module else 'FAILED',
+                                                        module_name=initialized_module.name,
+                                                        jobs_number=len(initialized_module)))
+
             if initialized_module:
                 self.modules[initialized_module.name] = initialized_module
 
@@ -263,17 +275,11 @@ class Plugin(object):
         :return:
         """
         try:
-            check_ok = job.check()
+            check_ok = bool(job.check())
         except Exception as error:
-            job.error(UNHANDLED_EXCEPTION.format(method_name='check',
-                                                 error=error))
-            return False
+            job.error('check() unhandled exception: {error}'.format(error=error))
+            return None
         else:
-            log = job.info if check_ok else job.error
-            log('CHECK {status}'.format(status='OK' if check_ok else 'FAILED'))
-            if job.is_autodetect():
-                if not check_ok:
-                    job.error('Next CHECK in {0} seconds.'.format(job.recheck_every))
             return check_ok
 
     @staticmethod
@@ -285,12 +291,9 @@ class Plugin(object):
         try:
             create_ok = job.create()
         except Exception as error:
-            job.error(UNHANDLED_EXCEPTION.format(method_name='create',
-                                                 error=error))
+            job.error('create() unhandled exception: {error}'.format(error=error))
             return False
         else:
-            job.debug(JOB_CREATE_CHARTS_MSG.format(status='OK' if create_ok else 'FAILED',
-                                                   number_of_charts=len(job.charts)))
             return create_ok
 
     def delete_job(self, job):
@@ -298,31 +301,38 @@ class Plugin(object):
         :param job: <Job>
         :return:
         """
-        del self.modules[job.module_name][job.internal_name]
+        del self.modules[job.module_name][job.id]
 
     def run_check(self):
         checked = list()
         for job in self.jobs:
             if job.name in checked:
-                Logger.info('DROPPED: {job_name}. Already served by another job.'.format(job_name=job.internal_name))
+                job.info('check() => [DROPPED] (already served by another job)')
                 self.delete_job(job)
                 continue
             ok = self.check_job(job)
             if ok:
+                job.info('check() => [OK]')
                 checked.append(job.name)
                 job.checked = True
                 continue
-            if not job.is_autodetect():
+            if not job.is_autodetect() or ok is None:
+                job.error('check() => [FAILED]')
                 self.delete_job(job)
+            else:
+                job.error('check() => [RECHECK] (autodetection_retry: {0})'.format(job.recheck_every))
 
     def run_create(self):
         for job in self.jobs:
             if not job.checked:
+                #  skip autodetection_retry jobs
                 continue
             ok = self.create_job_charts(job)
             if ok:
+                job.debug('create() => [OK] (charts: {0})'.format(len(job.charts)))
                 job.created = True
                 continue
+            job.error('create() => [FAILED] (charts: {0})'.format(len(job.charts)))
             self.delete_job(job)
 
     def start(self):
@@ -348,9 +358,9 @@ class Plugin(object):
                 del self.modules[mod.name]
 
     def autodetect_retry(self):
-        self.number_of_runs += self.sleep_time
+        self.runs_counter += self.sleep_time
         for job in self.autodetect_jobs:
-            if self.number_of_runs % job.recheck_every == 0:
+            if self.runs_counter % job.recheck_every == 0:
                 checked = self.check_job(job)
                 if checked:
                     created = self.create_job_charts(job)
