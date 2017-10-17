@@ -400,7 +400,15 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 value = NULL;
 
             if(value) {
-                calculated_number v = (calculated_number)str2ld(value, NULL);
+                char *endptr = NULL;
+                calculated_number v = (calculated_number)str2ld(value, &endptr);
+
+                if(unlikely(endptr && *endptr)) {
+                    if(endptr == value)
+                        error("PLUGINSD: '%s': the value '%s' of VARIABLE '%s' on host '%s' cannot be parsed as a number", cd->fullfilename, value, name, host->hostname);
+                    else
+                        error("PLUGINSD: '%s': the value '%s' of VARIABLE '%s' on host '%s' has leftovers: '%s'", cd->fullfilename, value, name, host->hostname, endptr);
+                }
 
                 if(global) {
                     RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
@@ -408,8 +416,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                     else error("PLUGINSD: '%s': cannot find/create HOST VARIABLE '%s' on host '%s'", cd->fullfilename, name, host->hostname);
                 }
                 else if(st) {
-                    RRDVAR *rv = rrdvar_custom_chart_variable_create(st, name);
-                    if (rv) rrdvar_custom_chart_variable_set(st, rv, v);
+                    RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(st, name);
+                    if (rs) rrdsetvar_custom_chart_variable_set(rs, v);
                     else error("PLUGINSD: '%s': cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", cd->fullfilename, name, host->hostname, st->id);
                 }
                 else

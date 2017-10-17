@@ -108,21 +108,23 @@ inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, c
 void rrdvar_free_remaining_variables(RRDHOST *host, avl_tree_lock *tree_lock) {
     // FIXME: this is not bullet proof - avl should support some means to destroy it
     // with a callback for each item already in the index
-    while(host->rrdvar_root_index.avl_tree.root) {
-        RRDVAR *rv = (RRDVAR *)tree_lock->avl_tree.root;
+
+    RRDVAR *rv, *last = NULL;
+    while((rv = (RRDVAR *)tree_lock->avl_tree.root)) {
+        if(unlikely(rv == last)) {
+            error("RRDVAR: INTERNAL ERROR: Cannot cleanup tree of RRDVARs");
+            break;
+        }
+        last = rv;
         rrdvar_free(host, tree_lock, rv);
     }
 }
 
 // ----------------------------------------------------------------------------
-// CUSTOM VARIABLES
+// CUSTOM HOST VARIABLES
 
 inline int rrdvar_callback_for_all_host_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data) {
     return avl_traverse_lock(&host->rrdvar_root_index, callback, data);
-}
-
-inline int rrdvar_callback_for_all_chart_variables(RRDSET *st, int (*callback)(void *rrdvar, void *data), void *data) {
-    return avl_traverse_lock(&st->rrdhost->rrdvar_root_index, callback, data);
 }
 
 static RRDVAR *rrdvar_custom_variable_create(const char *scope, avl_tree_lock *tree_lock, const char *name) {
@@ -150,10 +152,6 @@ RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name) {
     return rrdvar_custom_variable_create("host", &host->rrdvar_root_index, name);
 }
 
-RRDVAR *rrdvar_custom_chart_variable_create(RRDSET *st, const char *name) {
-    return rrdvar_custom_variable_create("local", &st->rrdvar_root_index, name);
-}
-
 void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_number value) {
     if(rv->type != RRDVAR_TYPE_CALCULATED_ALLOCATED)
         error("requested to set variable '%s' to value " CALCULATED_NUMBER_FORMAT " but the variable is not a custom one.", rv->name, value);
@@ -164,20 +162,6 @@ void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_numbe
 
             // if the host is streaming, send this variable upstream immediately
             rrdpush_sender_send_this_host_variable_now(host, rv);
-        }
-    }
-}
-
-void rrdvar_custom_chart_variable_set(RRDSET *st, RRDVAR *rv, calculated_number value) {
-    if(rv->type != RRDVAR_TYPE_CALCULATED_ALLOCATED)
-        error("requested to set variable '%s' to value " CALCULATED_NUMBER_FORMAT " but the variable is not a custom one.", rv->name, value);
-    else {
-        calculated_number *v = rv->value;
-        if(*v != value) {
-            *v = value;
-
-            // mark the chart to be sent upstream
-            rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
         }
     }
 }

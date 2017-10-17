@@ -316,6 +316,7 @@ void rrdset_free(RRDSET *st) {
 
     rrdfamily_free(st->rrdhost, st->rrdfamily);
 
+    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", st->rrdhost->hostname, st->id);
     rrdvar_free_remaining_variables(st->rrdhost, &st->rrdvar_root_index);
 
     // ------------------------------------------------------------------------
@@ -662,11 +663,11 @@ RRDSET *rrdset_create_custom(
     host->rrdset_root = st;
 
     if(host->health_enabled) {
-        rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_OPTION_DEFAULT);
-        rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "red",                 RRDVAR_TYPE_CALCULATED, &st->red,                        RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
     }
 
     if(unlikely(rrdset_index_add(host, st) != st))

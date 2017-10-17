@@ -496,6 +496,7 @@ void rrdhost_free(RRDHOST *host) {
     while(host->templates)
         rrdcalctemplate_unlink_and_free(host, host->templates);
 
+    debug(D_RRD_CALLS, "RRDHOST: Cleaning up remaining host variables for host '%s'", host->hostname);
     rrdvar_free_remaining_variables(host, &host->rrdvar_root_index);
 
     health_alarm_log_free(host);
