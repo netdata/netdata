@@ -77,35 +77,15 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
     return 0;
 }
 
-static int rrdpush_sender_add_chart_variable_to_buffer_nolock(void *rrdvar_ptr, void *rrdset_ptr) {
-    RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
-
-    if(unlikely(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)) {
-        RRDSET *st = (RRDSET *)rrdset_ptr;
-
-        calculated_number *value = (calculated_number *) rv->value;
-
-        buffer_sprintf(
-                st->rrdhost->rrdpush_sender_buffer
-                , "VARIABLE CHART %s = " CALCULATED_NUMBER_FORMAT "\n"
-                , rv->name
-                , *value
-        );
-
-        debug(D_STREAM, "RRDVAR pushed CHART VARIABLE %s = " CALCULATED_NUMBER_FORMAT, rv->name, *value);
-
-        return 1;
-    }
-
-    return 0;
-}
-
 // sends the current chart definition
 static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+
     rrdset_flag_set(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 
+    // send the chart
     buffer_sprintf(
-            st->rrdhost->rrdpush_sender_buffer
+            host->rrdpush_sender_buffer
             , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s\" \"%s\" \"%s\"\n"
             , st->id
             , st->name
@@ -123,10 +103,11 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
             , (st->module_name)?st->module_name:""
     );
 
+    // send the dimensions
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         buffer_sprintf(
-                st->rrdhost->rrdpush_sender_buffer
+                host->rrdpush_sender_buffer
                 , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s\"\n"
                 , rd->id
                 , rd->name
@@ -139,11 +120,22 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
         rd->exposed = 1;
     }
 
+    // send the chart local custom variables
+    RRDSETVAR *rs;
+    for(rs = st->variables; rs ;rs = rs->next) {
+        if(unlikely(rs->options && RRDVAR_OPTION_ALLOCATED)) {
+            calculated_number *value = (calculated_number *) rs->value;
+
+            buffer_sprintf(
+                    host->rrdpush_sender_buffer
+                    , "VARIABLE CHART %s = " CALCULATED_NUMBER_FORMAT "\n"
+                    , rs->variable
+                    , *value
+            );
+        }
+    }
+
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
-
-    int ret = rrdvar_callback_for_all_chart_variables(st, rrdpush_sender_add_chart_variable_to_buffer_nolock, st);
-    debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
-
 }
 
 // sends the current chart dimensions
