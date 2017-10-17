@@ -163,10 +163,10 @@ static inline int ipc_sem_get_status(struct ipc_status *st) {
 int do_ipc(int update_every, usec_t dt) {
     (void)dt;
 
-    static int initialized = 0, read_limits_next = 0;
+    static int initialized = 0, read_limits_next = -1;
     static struct ipc_limits limits;
     static struct ipc_status status;
-    static RRDVAR *arrays_max = NULL, *semaphores_max = NULL;
+    static RRDSETVAR *arrays_max = NULL, *semaphores_max = NULL;
     static RRDSET *st_semaphores = NULL, *st_arrays = NULL;
     static RRDDIM *rd_semaphores = NULL, *rd_arrays = NULL;
 
@@ -184,12 +184,6 @@ int do_ipc(int update_every, usec_t dt) {
             error("unable to fetch semaphore statistics");
             return 1;
         }
-
-        arrays_max     = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.arrays.max");
-        semaphores_max = rrdvar_custom_host_variable_create(localhost, "ipc.semaphores.max");
-
-        if(arrays_max)     rrdvar_custom_host_variable_set(localhost, arrays_max, limits.semmni);
-        if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
 
         // create the charts
         if(unlikely(!st_semaphores)) {
@@ -227,6 +221,10 @@ int do_ipc(int update_every, usec_t dt) {
             );
             rd_arrays = rrddim_add(st_arrays, "arrays", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
+
+        // variables
+        semaphores_max = rrdsetvar_custom_chart_variable_create(st_semaphores, "ipc.semaphores.max");
+        arrays_max     = rrdsetvar_custom_chart_variable_create(st_arrays, "ipc.semaphores.arrays.max");
     }
 
     if(unlikely(read_limits_next < 0)) {
@@ -234,8 +232,8 @@ int do_ipc(int update_every, usec_t dt) {
             error("Unable to fetch semaphore limits.");
         }
         else {
-            if(arrays_max)     rrdvar_custom_host_variable_set(localhost, arrays_max, limits.semmni);
-            if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
+            if(semaphores_max) rrdsetvar_custom_chart_variable_set(semaphores_max, limits.semmns);
+            if(arrays_max)     rrdsetvar_custom_chart_variable_set(arrays_max,     limits.semmni);
 
             st_arrays->red = limits.semmni;
             st_semaphores->red = limits.semmns;

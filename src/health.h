@@ -11,14 +11,15 @@ typedef enum rrdvar_type {
     RRDVAR_TYPE_COLLECTED               = 3,
     RRDVAR_TYPE_TOTAL                   = 4,
     RRDVAR_TYPE_INT                     = 5,
-    RRDVAR_TYPE_CALCULATED_ALLOCATED    = 6  // a custom variable, allocate on purpose (ie. not inherited from charts)
+    RRDVAR_TYPE_CALCULATED_ALLOCATED    = 6  // a custom variable, allocated on purpose (ie. not inherited from charts)
+                                             // used only for custom host global variables
 } RRDVAR_TYPE;
 
 // the variables as stored in the variables indexes
 // there are 3 indexes:
-// 1. at each chart   (RRDSET.variables_root_index)
-// 2. at each context (RRDFAMILY.variables_root_index)
-// 3. at each host    (RRDHOST.variables_root_index)
+// 1. at each chart   (RRDSET.rrdvar_root_index)
+// 2. at each context (RRDFAMILY.rrdvar_root_index)
+// 3. at each host    (RRDHOST.rrdvar_root_index)
 typedef struct rrdvar {
     avl avl;
 
@@ -38,14 +39,17 @@ typedef struct rrdvar {
 // these variables
 
 typedef enum rrdvar_options {
-    RRDVAR_OPTION_DEFAULT    = (0 << 0)
+    RRDVAR_OPTION_DEFAULT    = (0 << 0),
+    RRDVAR_OPTION_ALLOCATED  = (1 << 0) // the value ptr is allocated (not a reference)
     // future use
 } RRDVAR_OPTIONS;
 
 typedef struct rrdsetvar {
+    char *variable;                 // variable name
+    uint32_t hash;                  // variable name hash
+
     char *key_fullid;               // chart type.chart id.variable
     char *key_fullname;             // chart type.chart name.variable
-    char *variable;                 // variable
 
     RRDVAR_TYPE type;
     void *value;
@@ -363,9 +367,12 @@ extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 
 extern RRDVAR *rrdvar_custom_host_variable_create(RRDHOST *host, const char *name);
-extern void rrdvar_custom_host_variable_destroy(RRDHOST *host, const char *name);
 extern void rrdvar_custom_host_variable_set(RRDHOST *host, RRDVAR *rv, calculated_number value);
-extern void rrdvar_free_remaining_variables(RRDHOST *host);
+
+extern RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name);
+extern void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rv, calculated_number value);
+
+extern void rrdvar_free_remaining_variables(RRDHOST *host, avl_tree_lock *tree_lock);
 
 extern const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
@@ -409,7 +416,7 @@ extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 extern void rrdcalctemplate_free(RRDCALCTEMPLATE *rt);
 extern void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
 
-extern int  rrdvar_callback_for_all_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data);
+extern int  rrdvar_callback_for_all_host_variables(RRDHOST *host, int (*callback)(void *rrdvar, void *data), void *data);
 
 #ifdef NETDATA_HEALTH_INTERNALS
 #define RRDVAR_MAX_LENGTH 1024
