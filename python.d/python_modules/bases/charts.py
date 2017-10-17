@@ -39,7 +39,7 @@ def create_runtime_chart(func):
     return wrapper
 
 
-class ReAddingError(Exception):
+class DuplicateError(Exception):
     pass
 
 
@@ -73,8 +73,11 @@ class Charts:
     def __delitem__(self, key):
         del self.charts[key]
 
-    def empty(self):
-        return not bool(self.charts)
+    def __bool__(self):
+        return bool(self.charts)
+
+    def __nonzero__(self):
+        return self.__bool__()
 
     def penalty_exceeded(self, penalty_max):
         """
@@ -91,7 +94,7 @@ class Charts:
         params = [self.job_name()] + params
         chart_id = params[1]
         if chart_id in self.charts:
-            raise ReAddingError('{chart} already in charts'.format(chart=chart_id))
+            raise DuplicateError('{chart} already in charts'.format(chart=chart_id))
         else:
             new_chart = Chart(params)
             new_chart.params['update_every'] = self.update_every
@@ -106,11 +109,12 @@ class Chart:
         """
         :param params: <list>
         """
-        if not (params and isinstance(params, list)):
-            raise ValueError('Chart params must be a not empty list')
+        if not (params and isinstance(params, list) and len(params) >= 8):
+            raise ValueError('Chart params must be a list with 7 items')
 
         self.params = dict(zip(CHART_PARAMS, (p or str() for p in params)))
-        self.name = '.'.join([self.params['type'], self.params['id']])
+        self.name = '{type}.{id}'.format(type=self.params['type'],
+                                         id=self.params['id'])
         if self.params.get('chart_type') not in CHART_TYPES:
             self.params['chart_type'] = 'absolute'
 
@@ -135,8 +139,8 @@ class Chart:
         :return:
         """
         if dimension[0] in [repr(d) for d in self.dimensions]:
-            raise ReAddingError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
-                                                                                   chart=self.name))
+            raise DuplicateError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
+                                                                                    chart=self.name))
         self.dimensions.append(Dimension(dimension))
 
     def add_dimension_and_push_chart(self, dimension):
@@ -145,8 +149,8 @@ class Chart:
         :return:
         """
         if dimension[0] in [repr(d) for d in self.dimensions]:
-            raise ReAddingError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
-                                                                                   chart=self.name))
+            raise DuplicateError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
+                                                                                    chart=self.name))
         dimension = Dimension(dimension)
         self.dimensions.append(dimension)
         safe_print(self.create(dimension))
@@ -185,7 +189,8 @@ class Dimension:
             raise ValueError('Dimension params must be a not empty list')
 
         self.params = dict(zip(DIMENSION_PARAMS, (p or str() for p in params)))
-        self.params['name'] = self.params.get('name') or self.params.get('id')
+        self.params['name'] = self.params.get('name') or self.params['id']
+
         if self.params.get('algorithm') not in DIMENSION_ALGORITHMS:
             self.params['algorithm'] = 'absolute'
         if not str(self.params.get('multiplier')).isdigit():
