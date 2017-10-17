@@ -87,7 +87,7 @@ struct rrdfamily {
 
     size_t use_count;
 
-    avl_tree_lock variables_root_index;
+    avl_tree_lock rrdvar_root_index;
 };
 typedef struct rrdfamily RRDFAMILY;
 
@@ -266,9 +266,9 @@ struct rrdset {
     char *units;                                    // units of measurement
 
     char *context;                                  // the template of this data set
-    uint32_t hash_context;
+    uint32_t hash_context;                          // the hash of the chart's context
 
-    RRDSET_TYPE chart_type;
+    RRDSET_TYPE chart_type;                         // line, area, stacked
 
     int update_every;                               // every how many seconds is this updated?
 
@@ -282,7 +282,7 @@ struct rrdset {
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
 
-    long priority;
+    long priority;                                  // the sorting priority of this chart
 
 
     // ------------------------------------------------------------------------
@@ -319,20 +319,20 @@ struct rrdset {
     total_number collected_total;                   // used internally to calculate percentages
     total_number last_collected_total;              // used internally to calculate percentages
 
-    RRDFAMILY *rrdfamily;
-    struct rrdhost *rrdhost;
+    RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
+    struct rrdhost *rrdhost;                        // pointer to RRDHOST this chart belongs to
 
     struct rrdset *next;                            // linking of rrdsets
 
     // ------------------------------------------------------------------------
     // local variables
 
-    calculated_number green;
-    calculated_number red;
+    calculated_number green;                        // green threshold for this chart
+    calculated_number red;                          // red threshold for this chart
 
-    avl_tree_lock variables_root_index;
-    RRDSETVAR *variables;
-    RRDCALC *alarms;
+    avl_tree_lock rrdvar_root_index;                // RRDVAR index for this chart
+    RRDSETVAR *variables;                           // RRDSETVAR linked list for this chart (one RRDSETVAR, many RRDVARs)
+    RRDCALC *alarms;                                // RRDCALC linked list for this chart
 
     // ------------------------------------------------------------------------
     // members for checking the data when loading from disk
@@ -504,7 +504,7 @@ struct rrdhost {
     avl_tree_lock rrdset_root_index_name;           // the host's charts index (by name)
 
     avl_tree_lock rrdfamily_root_index;             // the host's chart families index
-    avl_tree_lock variables_root_index;             // the host's chart variables index
+    avl_tree_lock rrdvar_root_index;                // the host's chart variables index
 
     struct rrdhost *next;
 };

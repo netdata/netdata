@@ -30,11 +30,11 @@ RRDFAMILY *rrdfamily_create(RRDHOST *host, const char *id) {
         rc->hash_family = simple_hash(rc->family);
 
         // initialize the variables index
-        avl_init_lock(&rc->variables_root_index, rrdvar_compare);
+        avl_init_lock(&rc->rrdvar_root_index, rrdvar_compare);
 
         RRDFAMILY *ret = rrdfamily_index_add(host, rc);
         if(ret != rc)
-            fatal("RRDFAMILY: INTERNAL ERROR: Expected to INSERT RRDFAMILY '%s' into index, but inserted '%s'.", rc->family, (ret)?ret->family:"NONE");
+            error("RRDFAMILY: INTERNAL ERROR: Expected to INSERT RRDFAMILY '%s' into index, but inserted '%s'.", rc->family, (ret)?ret->family:"NONE");
     }
 
     rc->use_count++;
@@ -46,13 +46,14 @@ void rrdfamily_free(RRDHOST *host, RRDFAMILY *rc) {
     if(!rc->use_count) {
         RRDFAMILY *ret = rrdfamily_index_del(host, rc);
         if(ret != rc)
-            fatal("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", rc->family, (ret)?ret->family:"NONE");
+            error("RRDFAMILY: INTERNAL ERROR: Expected to DELETE RRDFAMILY '%s' from index, but deleted '%s'.", rc->family, (ret)?ret->family:"NONE");
+        else {
+            debug(D_RRD_CALLS, "RRDFAMILY: Cleaning up remaining family variables for host '%s', family '%s'", host->hostname, rc->family);
+            rrdvar_free_remaining_variables(host, &rc->rrdvar_root_index);
 
-        if(rc->variables_root_index.avl_tree.root != NULL)
-            fatal("RRDFAMILY: INTERNAL ERROR: Variables index of RRDFAMILY '%s' that is freed, is not empty.", rc->family);
-
-        freez((void *)rc->family);
-        freez(rc);
+            freez((void *) rc->family);
+            freez(rc);
+        }
     }
 }
 
