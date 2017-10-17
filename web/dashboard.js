@@ -3555,7 +3555,7 @@ var NETDATA = window.NETDATA || {};
                         placement: 'bottom',
                         delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
                         title: 'Pan Left',
-                        content: 'Pan the chart to the left. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Pan the chart to the left. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help can be disabled from the settings.</small>'
                     });
 
 
@@ -3575,7 +3575,7 @@ var NETDATA = window.NETDATA || {};
                         placement: 'bottom',
                         delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
                         title: 'Chart Reset',
-                        content: 'Reset all the charts to their default auto-refreshing state. You can also <b>double click</b> the chart contents with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Reset all the charts to their default auto-refreshing state. You can also <b>double click</b> the chart contents with your mouse or your finger (on touch devices).<br/><small>Help can be disabled from the settings.</small>'
                     });
 
                     this.element_legend_childs.toolbox_right.className += ' netdata-legend-toolbox-button';
