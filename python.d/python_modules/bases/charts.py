@@ -6,6 +6,8 @@ from bases.collection import safe_print
 
 CHART_PARAMS = ['type', 'id', 'name', 'title', 'units', 'family', 'context', 'chart_type']
 DIMENSION_PARAMS = ['id', 'name', 'algorithm', 'multiplier', 'divisor']
+VARIABLE_PARAMS = ['id', 'value']
+
 CHART_TYPES = ['line', 'area', 'stacked']
 DIMENSION_ALGORITHMS = ['absolute', 'incremental', 'percentage-of-absolute-row', 'percentage-of-incremental-row']
 
@@ -18,6 +20,8 @@ CHART_OBSOLETE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{co
 
 DIMENSION_CREATE = "DIMENSION '{id}' '{name}' {algorithm} {multiplier} {divisor} '{hidden}'\n"
 DIMENSION_SET = "SET '{id}' = {value}\n"
+
+CHART_VARIABLE_SET = "VARIABLE CHART '{id}' = {value}\n"
 
 RUNTIME_CHART_CREATE = "CHART netdata.runtime_{job_name} '' 'Execution time for {job_name}' 'ms' 'python.d' " \
                        "netdata.pythond_runtime line 145000 {update_every}\n" \
@@ -119,6 +123,7 @@ class Chart:
             self.params['chart_type'] = 'absolute'
 
         self.dimensions = list()
+        self.variables = set()
         self.penalty = 0
 
     def __repr__(self):
@@ -132,6 +137,13 @@ class Chart:
 
     def __contains__(self, item):
         return item in [repr(d) for d in self.dimensions]
+
+    def add_variable(self, variable):
+        """
+        :param variable: <list>
+        :return:
+        """
+        self.variables.add(ChartVariable(variable))
 
     def add_dimension(self, dimension):
         """
@@ -163,9 +175,11 @@ class Chart:
         chart = CHART_CREATE.format(**self.params)
         if not dimension:
             dimensions = ''.join([dimension.create() for dimension in self.dimensions])
+            variables = ''.join([var.set(var.params['value']) for var in self.variables if var])
+            return chart + dimensions + variables
         else:
             dimensions = dimension.create()
-        return chart + dimensions
+            return chart + dimensions
 
     def begin(self, since_last):
         """
@@ -212,3 +226,36 @@ class Dimension:
         """
         return DIMENSION_SET.format(id=self.params['id'],
                                     value=value)
+
+
+class ChartVariable:
+    def __init__(self, params):
+        """
+        :param params: <list>
+        """
+        if not (params and isinstance(params, list)):
+            raise ValueError('Variable params must be a not empty list')
+
+        self.params = dict(zip(VARIABLE_PARAMS, params))
+        self.params.setdefault('value', None)
+
+    def __bool__(self):
+        return self.params['value'] is not None
+
+    def __nonzero__(self):
+        return self.__bool__()
+
+    def __repr__(self):
+        return 'ChartVariable({0})'.format(self.params['id'])
+
+    def __eq__(self, other):
+        if isinstance(other, ChartVariable):
+            return self.params['id'] == other.params['id']
+        return False
+
+    def __hash__(self):
+        return hash(repr(self))
+
+    def set(self, value):
+        return CHART_VARIABLE_SET.format(id=self.params['id'],
+                                         value=value)
