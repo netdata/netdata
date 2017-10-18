@@ -10,7 +10,7 @@ try:
 except ImportError:
     from time import sleep, time
 
-from bases.charts import Charts, create_runtime_chart
+from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import OldVersionCompatibility, safe_print
 from bases.loggers import PythonDLimitedLogger
 
@@ -110,22 +110,37 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             chart_config = self.definitions.get(chart_name)
 
             if not chart_config:
-                self.debug("create() chart '{chart_name}' not in definitions. "
+                self.debug("create() => [NOT ADDED] chart '{chart_name}' not in definitions. "
                            "Skipping it.".format(chart_name=chart_name))
                 continue
 
             #  create chart
             chart_params = [chart_name] + chart_config['options']
-            self.charts.add_chart(params=chart_params)
+            try:
+                self.charts.add_chart(params=chart_params)
+            except ChartError as error:
+                self.error("create() => [NOT ADDED] (chart '{chart}': {error})".format(chart=chart_name,
+                                                                                       error=error))
+                continue
 
             # add dimensions to chart
             for dimension in chart_config['lines']:
-                self.charts[chart_name].add_dimension(dimension)
+                try:
+                    self.charts[chart_name].add_dimension(dimension)
+                except ChartError as error:
+                    self.error("create() => [NOT ADDED] (dimension '{dimension}': {error})".format(dimension=dimension,
+                                                                                                   error=error))
+                    continue
 
             # add variables to chart
             if 'variables' in chart_config:
                 for variable in chart_config['variables']:
-                    self.charts[chart_name].add_variable(variable)
+                    try:
+                        self.charts[chart_name].add_variable(variable)
+                    except ChartError as error:
+                        self.error("create() => [NOT ADDED] (variable '{var}': {error})".format(var=variable,
+                                                                                                error=error))
+                        continue
 
         del self.order
         del self.definitions
@@ -197,7 +212,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         for chart in self.charts.penalty_exceeded(penalty_max=CHART_OBSOLETE_PENALTY):
             safe_print(chart.obsolete())
             del self.charts[chart.params['id']]
-            self.error('chart "{0}" was removed due to non updating'.format(chart.name))
+            self.error("chart '{0}' was removed due to non updating".format(chart.name))
 
         for chart in self.charts:
             dimension_updated, variables_updated = str(), str()
