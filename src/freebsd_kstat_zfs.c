@@ -3,7 +3,9 @@
 
 struct arcstats arcstats = { 0 };
 
+// --------------------------------------------------------------------------------------------------------------------
 // kstat.zfs.misc.arcstats
+
 int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     (void)dt;
 
@@ -207,6 +209,90 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
 
     generate_charts_arcstats("freebsd", update_every);
     generate_charts_arc_summary("freebsd", update_every);
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// kstat.zfs.misc.zio_trim
+
+int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
+    (void)dt;
+    static int mib_bytes[5] = {0, 0, 0, 0, 0}, mib_success[5] = {0, 0, 0, 0, 0},
+               mib_failed[5] = {0, 0, 0, 0, 0}, mib_unsupported[5] = {0, 0, 0, 0, 0};
+    uint64_t bytes, success, failed, unsupported;
+
+    if (unlikely(GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.bytes", mib_bytes, bytes) ||
+                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.success", mib_success, success) ||
+                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.failed", mib_failed, failed) ||
+                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.unsupported", mib_unsupported, unsupported))) {
+        error("DISABLED: zfs.trim_bytes chart");
+        error("DISABLED: zfs.trim_success chart");
+        error("DISABLED: kstat.zfs.misc.zio_trim module");
+        return 1;
+     } else {
+
+     // --------------------------------------------------------------------
+
+        static RRDSET *st_bytes = NULL;
+        static RRDDIM *rd_bytes = NULL;
+
+        if (unlikely(!st_bytes)) {
+            st_bytes = rrdset_create_localhost(
+                    "zfs",
+                    "trim_bytes",
+                    NULL,
+                    "trim",
+                    NULL,
+                    "Successfully TRIMmed bytes",
+                    "bytes",
+                    "freebsd",
+                    "zfs",
+                    2320,
+                    update_every,
+                    RRDSET_TYPE_LINE
+            );
+
+            rd_bytes = rrddim_add(st_bytes, "TRIMmed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st_bytes);
+
+        rrddim_set_by_pointer(st_bytes, rd_bytes, bytes);
+        rrdset_done(st_bytes);
+        
+        // --------------------------------------------------------------------
+
+        static RRDSET *st_requests = NULL;
+        static RRDDIM *rd_successful = NULL, *rd_failed = NULL, *rd_unsupported = NULL;
+
+        if (unlikely(!st_requests)) {
+            st_requests = rrdset_create_localhost(
+                    "zfs",
+                    "trim_requests",
+                    NULL,
+                    "trim",
+                    NULL,
+                    "TRIM requests",
+                    "requests",
+                    "freebsd",
+                    "zfs",
+                    2321,
+                    update_every,
+                    RRDSET_TYPE_STACKED
+            );
+
+            rd_successful  = rrddim_add(st_requests, "successful",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed      = rrddim_add(st_requests, "failed",      NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_unsupported = rrddim_add(st_requests, "unsupported", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st_requests);
+
+        rrddim_set_by_pointer(st_requests, rd_successful,  success);
+        rrddim_set_by_pointer(st_requests, rd_failed,      failed);
+        rrddim_set_by_pointer(st_requests, rd_unsupported, unsupported);
+        rrdset_done(st_requests);
+        
+     }
 
     return 0;
 }
