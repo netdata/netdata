@@ -1751,7 +1751,8 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
 
 int do_net_inet_tcp_stats(int update_every, usec_t dt) {
     (void)dt;
-    static int do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_tcpext_connaborts = -1, do_tcpext_ofo = -1, do_tcpext_syncookies = -1, do_ecn = -1;
+    static int do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_tcpext_connaborts = -1, do_tcpext_ofo = -1,
+               do_tcpext_syncookies = -1, do_tcpext_listen = -1, do_ecn = -1;
 
     if (unlikely(do_tcp_packets == -1)) {
         do_tcp_packets       = config_get_boolean("plugin:freebsd:net.inet.tcp.stats", "ipv4 TCP packets",          1);
@@ -1763,12 +1764,15 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                                                            CONFIG_BOOLEAN_AUTO);
         do_tcpext_syncookies = config_get_boolean_ondemand("plugin:freebsd:net.inet.tcp.stats", "TCP SYN cookies",
                                                            CONFIG_BOOLEAN_AUTO);
+        do_tcpext_listen     = config_get_boolean_ondemand("plugin:freebsd:net.inet.tcp.stats", "TCP listen issues",
+                                                           CONFIG_BOOLEAN_AUTO);
         do_ecn               = config_get_boolean_ondemand("plugin:freebsd:net.inet.tcp.stats", "ECN packets",
                                                            CONFIG_BOOLEAN_AUTO);
     }
 
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
-    if (likely(do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo || do_tcpext_syncookies || do_ecn)) {
+    if (likely(do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo ||
+               do_tcpext_syncookies || do_tcpext_listen || do_ecn)) {
         static int mib[4] = {0, 0, 0, 0};
         struct tcpstat tcpstat;
 
@@ -1785,6 +1789,8 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
             error("DISABLED: ipv4.tcpofo chart");
             do_tcpext_syncookies = 0;
             error("DISABLED: ipv4.tcpsyncookies chart");
+            do_tcpext_listen = 0;
+            error("DISABLED: ipv4.tcplistenissues chart");
             do_ecn = 0;
             error("DISABLED: ipv4.ecnpkts chart");
             error("DISABLED: net.inet.tcp.stats module");
@@ -2010,6 +2016,41 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_send,   tcpstat.tcps_sc_sendcookie);
                 rrddim_set_by_pointer(st, rd_failed, tcpstat.tcps_sc_zonefail);
                 rrdset_done(st);
+            }
+            
+            // --------------------------------------------------------------------
+
+            if(do_tcpext_listen == CONFIG_BOOLEAN_YES || (do_tcpext_listen == CONFIG_BOOLEAN_AUTO && tcpstat.tcps_listendrop)) {
+                do_tcpext_listen = CONFIG_BOOLEAN_YES;
+
+                static RRDSET *st_listen = NULL;
+                static RRDDIM *rd_overflows = NULL;
+
+                if(unlikely(!st_listen)) {
+
+                    st_listen = rrdset_create_localhost(
+                            "ipv4",
+                            "tcplistenissues",
+                            NULL,
+                            "tcp",
+                            NULL,
+                            "TCP Listen Socket Issues",
+                            "packets/s",
+                            "freebsd",
+                            "net.inet.tcp.stats",
+                            3015,
+                            update_every,
+                            RRDSET_TYPE_LINE
+                    );
+
+                    rd_overflows = rrddim_add(st_listen, "ListenOverflows", "overflows",  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                }
+                else
+                    rrdset_next(st_listen);
+
+                rrddim_set_by_pointer(st_listen, rd_overflows, tcpstat.tcps_listendrop);
+
+                rrdset_done(st_listen);
             }
 
             // --------------------------------------------------------------------
