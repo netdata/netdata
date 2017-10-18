@@ -30,6 +30,12 @@ RUNTIME_CHART_CREATE = "CHART netdata.runtime_{job_name} '' 'Execution time for 
 
 def create_runtime_chart(func):
     """
+    Calls a wrapped function, then prints runtime chart to stdout.
+
+    Used as a decorator for SimpleService.create() method.
+    The whole point of making 'create runtime chart' functionality as a decorator was
+    to help users who re-implements create() in theirs classes.
+
     :param func: class method
     :return:
     """
@@ -43,11 +49,24 @@ def create_runtime_chart(func):
     return wrapper
 
 
-class DuplicateError(Exception):
-    pass
+class ChartError(Exception):
+    """Base-class for all exceptions raised by this module"""
+
+
+class DuplicateChartError(ChartError):
+    """Raised when user re-adds a chart that has already been added"""
+
+
+class DuplicateDimensionError(ChartError):
+    """Raised when user re-adds a dimension that has already been added"""
 
 
 class Charts:
+    """Represent a collection of charts
+
+    All charts stored in a dict.
+    Chart is a instance of Chart class.
+    Charts adding must be done using Charts.add_chart() method only"""
     def __init__(self, job_name, priority, update_every):
         """
         :param job_name: <bound method>
@@ -92,13 +111,16 @@ class Charts:
 
     def add_chart(self, params):
         """
+        Create Chart instance and add it to the dict
+
+        Manually adds job name, priority and update_every to params.
         :param params: <list>
         :return:
         """
         params = [self.job_name()] + params
         chart_id = params[1]
         if chart_id in self.charts:
-            raise DuplicateError('{chart} already in charts'.format(chart=chart_id))
+            raise DuplicateChartError('{chart} already in charts'.format(chart=chart_id))
         else:
             new_chart = Chart(params)
             new_chart.params['update_every'] = self.update_every
@@ -109,12 +131,15 @@ class Charts:
 
 
 class Chart:
+    """Represent a chart"""
     def __init__(self, params):
         """
         :param params: <list>
         """
-        if not (params and isinstance(params, list) and len(params) >= 8):
-            raise ValueError('Chart params must be a list with 7 items')
+        if not isinstance(params, list):
+            raise TypeError("'chart' must be a list type")
+        if not len(params) >= 8:
+            raise ValueError('invalid value for "chart", must be {0}'.format(CHART_PARAMS))
 
         self.params = dict(zip(CHART_PARAMS, (p or str() for p in params)))
         self.name = '{type}.{id}'.format(type=self.params['type'],
@@ -151,8 +176,8 @@ class Chart:
         :return:
         """
         if dimension[0] in [repr(d) for d in self.dimensions]:
-            raise DuplicateError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
-                                                                                    chart=self.name))
+            raise DuplicateDimensionError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
+                                                                                             chart=self.name))
         self.dimensions.append(Dimension(dimension))
 
     def add_dimension_and_push_chart(self, dimension):
@@ -161,8 +186,8 @@ class Chart:
         :return:
         """
         if dimension[0] in [repr(d) for d in self.dimensions]:
-            raise DuplicateError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
-                                                                                    chart=self.name))
+            raise DuplicateDimensionError('{dimension} already in {chart} dimensions'.format(dimension=dimension[0],
+                                                                                             chart=self.name))
         dimension = Dimension(dimension)
         self.dimensions.append(dimension)
         safe_print(self.create(dimension))
@@ -195,12 +220,15 @@ class Chart:
 
 
 class Dimension:
+    """Represent a dimension"""
     def __init__(self, params):
         """
         :param params: <list>
         """
-        if not (params and isinstance(params, list)):
-            raise ValueError('Dimension params must be a not empty list')
+        if not isinstance(params, list):
+            raise TypeError("'dimension' must be a list type")
+        if not params:
+            raise ValueError('invalid value for "dimension", must be {0}'.format(DIMENSION_PARAMS))
 
         self.params = dict(zip(DIMENSION_PARAMS, (p or str() for p in params)))
         self.params['name'] = self.params.get('name') or self.params['id']
@@ -229,12 +257,15 @@ class Dimension:
 
 
 class ChartVariable:
+    """Represent a chart variable"""
     def __init__(self, params):
         """
         :param params: <list>
         """
-        if not (params and isinstance(params, list)):
-            raise ValueError('Variable params must be a not empty list')
+        if not isinstance(params, list):
+            raise TypeError("'variable' must be a list type")
+        if not params:
+            raise ValueError('invalid value for "variable", must be: {0}'.format(VARIABLE_PARAMS))
 
         self.params = dict(zip(VARIABLE_PARAMS, params))
         self.params.setdefault('value', None)
