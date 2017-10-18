@@ -101,12 +101,18 @@ class Service(SimpleService):
         self.log_path = self.configuration.get('log_path', '/var/log/smartd')
         self.raw_values = self.configuration.get('raw_values')
         self.attr = self.configuration.get('smart_attributes', [])
+        self.exclude_disks = self.configuration.get('exclude_disks', str()).split()
         self.order = list()
         self.definitions = dict()
         self.disks = list()
 
         for path_to_disk in find_disks_in_log_path(self.log_path):
-            self.disks.append(Disk(name=os.path.basename(path_to_disk), path=path_to_disk))
+            disk_name = os.path.basename(path_to_disk).split('.')[-3]
+            for pattern in self.exclude_disks:
+                if pattern in disk_name:
+                    break
+            else:
+                self.disks.append(Disk(name=disk_name, path=path_to_disk))
 
     def check(self):
         if not self.disks:
@@ -141,8 +147,7 @@ class Service(SimpleService):
         def create_lines(attr_id):
             result = list()
             for disk in self.disks:
-                name = disk.name
-                result.append(['_'.join([name, attr_id]), name[:name.index('.')], 'absolute'])
+                result.append(['_'.join([disk.name, attr_id]), disk.name, 'absolute'])
             return result
 
         try:
