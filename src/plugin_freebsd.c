@@ -57,6 +57,7 @@ static struct freebsd_module {
 
         // ZFS metrics
         { .name = "kstat.zfs.misc.arcstats", .dim = "arcstats",   .enabled = 1, .func = do_kstat_zfs_misc_arcstats },
+        { .name = "kstat.zfs.misc.zio_trim", .dim = "trim",       .enabled = 1, .func = do_kstat_zfs_misc_zio_trim },
 
         // ipfw metrics
         { .name = "ipfw",                  .dim = "ipfw",         .enabled = 1, .func = do_ipfw },
