@@ -108,23 +108,33 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
     def create(self):
         for chart_name in self.order:
             chart_config = self.definitions.get(chart_name)
+
             if not chart_config:
                 self.debug("create() chart '{chart_name}' not in definitions. "
                            "Skipping it.".format(chart_name=chart_name))
                 continue
 
+            #  create chart
             chart_params = [chart_name] + chart_config['options']
             self.charts.add_chart(params=chart_params)
 
-            for line in chart_config['lines']:
-                self.charts[chart_name].add_dimension(line)
+            # add dimensions to chart
+            for dimension in chart_config['lines']:
+                self.charts[chart_name].add_dimension(dimension)
+
+            # add variables to chart
+            if 'variables' in chart_config:
+                for variable in chart_config['variables']:
+                    self.charts[chart_name].add_variable(variable)
 
         del self.order
         del self.definitions
 
+        # push charts to netdata
         for chart in self.charts:
             safe_print(chart.create())
 
+        # True if job has at least 1 chart else False
         return bool(self.charts)
 
     def run(self):
@@ -190,18 +200,30 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             self.error('chart "{0}" was removed due to non updating'.format(chart.name))
 
         for chart in self.charts:
-            dimension_updated = str()
+            dimension_updated, variables_updated = str(), str()
+
             for dimension in chart:
                 try:
                     value = int(data[dimension.params['id']])
                 except (KeyError, TypeError):
                     continue
-                dimension_updated += dimension.set(value)
+                else:
+                    dimension_updated += dimension.set(value)
+
+            for var in chart.variables:
+                try:
+                    value = int(data[var.params['id']])
+                except (KeyError, TypeError):
+                    continue
+                else:
+                    variables_updated += var.set(value)
 
             if dimension_updated:
                 charts_updated = True
                 safe_print(''.join([chart.begin(since_last=interval),
-                                    dimension_updated, 'END\n']))
+                                    dimension_updated,
+                                    variables_updated,
+                                    'END\n']))
             else:
                 chart.penalty += 1
 
