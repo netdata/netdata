@@ -3114,22 +3114,22 @@ var NETDATA = window.NETDATA || {};
             if(series.user !== null) series.user.innerText = s;
         };
 
-        this.__legendSetDateString = function(date) {
-            if(date !== this.tmp.__last_shown_legend_date) {
+        this.legendSetDateString = function(date) {
+            if(this.element_legend_childs.title_date !== null && date !== this.tmp.__last_shown_legend_date) {
                 this.element_legend_childs.title_date.innerText = date;
                 this.tmp.__last_shown_legend_date = date;
             }
         };
 
-        this.__legendSetTimeString = function(time) {
-            if(time !== this.tmp.__last_shown_legend_time) {
+        this.legendSetTimeString = function(time) {
+            if(this.element_legend_childs.title_time !== null && time !== this.tmp.__last_shown_legend_time) {
                 this.element_legend_childs.title_time.innerText = time;
                 this.tmp.__last_shown_legend_time = time;
             }
         };
 
         this.legendSetUnitsString = function(units) {
-            if(units !== this.tmp.__last_shown_legend_units) {
+            if(this.element_legend_childs.title_units !== null && units !== this.tmp.__last_shown_legend_units) {
                 this.element_legend_childs.title_units.innerText = units;
                 this.tmp.__last_shown_legend_units = units;
             }
@@ -3154,25 +3154,15 @@ var NETDATA = window.NETDATA || {};
                 this.legendSetDateLast.time = NETDATA.dateTime.localeTimeString(d);
             }
 
-            if(this.element_legend_childs.title_date !== null)
-                this.__legendSetDateString(this.legendSetDateLast.date);
-
-            if(this.element_legend_childs.title_time !== null)
-                this.__legendSetTimeString(this.legendSetDateLast.time);
-
-            if(this.element_legend_childs.title_units !== null)
-                this.legendSetUnitsString(this.units_current)
+            this.legendSetDateString(this.legendSetDateLast.date);
+            this.legendSetTimeString(this.legendSetDateLast.time);
+            this.legendSetUnitsString(this.units_current)
         };
 
         this.legendShowUndefined = function() {
-            if(this.element_legend_childs.title_date !== null)
-                this.__legendSetDateString(this.legendPluginModuleString(false));
-
-            if(this.element_legend_childs.title_time !== null)
-                this.__legendSetTimeString(this.chart.context.toString());
-
-            if(this.element_legend_childs.title_units !== null)
-                this.legendSetUnitsString(' ');
+            this.legendSetDateString(this.legendPluginModuleString(false));
+            this.legendSetTimeString(this.chart.context.toString());
+            this.legendSetUnitsString(' ');
 
             if(this.data && this.element_legend_childs.series !== null) {
                 var labels = this.data.dimension_names;
@@ -6369,6 +6359,7 @@ var NETDATA = window.NETDATA || {};
         state.legendSetUnitsString = function(units) {
             state.tmp.easyPieChartUnits.innerText = units;
         };
+        state.legendShowUndefined = function() {};
 
         var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
         chart.data('data-percent', pcent);
@@ -6744,6 +6735,7 @@ var NETDATA = window.NETDATA || {};
             state.tmp.___gaugeOld__.minLabel = null;
             state.tmp.___gaugeOld__.maxLabel = null;
         };
+        state.legendShowUndefined = function() {};
 
         state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
 
