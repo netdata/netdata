@@ -6357,7 +6357,8 @@ var NETDATA = window.NETDATA || {};
         }
 
         state.legendSetUnitsString = function(units) {
-            state.tmp.easyPieChartUnits.innerText = units;
+            if(typeof state.tmp.easyPieChartUnits !== 'undefined')
+                state.tmp.easyPieChartUnits.innerText = units;
         };
         state.legendShowUndefined = function() {};
 
@@ -6730,7 +6731,9 @@ var NETDATA = window.NETDATA || {};
             animate = false;
 
         state.legendSetUnitsString = function(units) {
-            state.tmp.gaugeChartUnits.innerText = units;
+            if(typeof state.tmp.gaugeChartUnits !== 'undefined')
+                state.tmp.gaugeChartUnits.innerText = units;
+
             state.tmp.___gaugeOld__.valueLabel = null;
             state.tmp.___gaugeOld__.minLabel = null;
             state.tmp.___gaugeOld__.maxLabel = null;
