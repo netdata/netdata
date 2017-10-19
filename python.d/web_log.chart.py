@@ -506,7 +506,8 @@ class Web(Mixin):
                 self.data['bytes_sent'] += int(bytes_sent)
                 # request processing time and bandwidth received
                 if 'resp_length' in match_dict:
-                    self.data['resp_length'] += int(match_dict['resp_length'])
+                    resp_length = match_dict['resp_length'] if '-' not in match_dict['resp_length'] else 0
+                    self.data['resp_length'] += int(resp_length)
                 if 'resp_time' in match_dict:
                     get_timings(timings=timings['resp_time'],
                                 time=self.storage['func_resp_time'](float(match_dict['resp_time'])))
@@ -556,7 +557,7 @@ class Web(Mixin):
                                        r' -.*?"(?P<request>[^"]*)"'
                                        r' (?P<code>[1-9]\d{2})'
                                        r' (?P<bytes_sent>\d+|-)'
-                                       r' (?P<resp_length>\d+)'
+                                       r' (?P<resp_length>\d+|-)'
                                        r' (?P<resp_time>\d+) ')
 
         apache_ext_append = re.compile(r'(?P<address>[\da-f.:]+|localhost)'
@@ -564,7 +565,7 @@ class Web(Mixin):
                                        r' (?P<code>[1-9]\d{2})'
                                        r' (?P<bytes_sent>\d+|-)'
                                        r' .*?'
-                                       r' (?P<resp_length>\d+)'
+                                       r' (?P<resp_length>\d+|-)'
                                        r' (?P<resp_time>\d+)'
                                        r'(?: |$)')
 
@@ -670,7 +671,7 @@ class Web(Mixin):
         mandatory_dict = {'address': r'[\w.:-]+',
                           'code': r'[1-9]\d{2}',
                           'bytes_sent': r'\d+|-'}
-        optional_dict = {'resp_length': r'\d+',
+        optional_dict = {'resp_length': r'\d+|-',
                          'resp_time': r'[\d.]+',
                          'resp_time_upstream': r'[\d.-]+',
                          'method': r'[A-Z]+',
