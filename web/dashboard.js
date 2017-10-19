@@ -6359,6 +6359,7 @@ var NETDATA = window.NETDATA || {};
         state.legendSetUnitsString = function(units) {
             state.tmp.easyPieChartUnits.innerText = units;
         };
+        state.legendShowUndefined = function() {};
 
         var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
         chart.data('data-percent', pcent);
@@ -6734,6 +6735,7 @@ var NETDATA = window.NETDATA || {};
             state.tmp.___gaugeOld__.minLabel = null;
             state.tmp.___gaugeOld__.maxLabel = null;
         };
+        state.legendShowUndefined = function() {};
 
         state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
 
