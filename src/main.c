@@ -213,23 +213,8 @@ void kill_childs()
         tc_child_pid = 0;
     }
 
-    struct plugind *cd;
-    for(cd = pluginsd_root ; cd ; cd = cd->next) {
-        if(cd->enabled && !cd->obsolete) {
-            info("Stopping %s plugin thread", cd->id);
-            pthread_cancel(cd->thread);
-
-            if(cd->pid) {
-                info("killing %s plugin child process pid %d", cd->id, cd->pid);
-                if(killpid(cd->pid, SIGTERM) != -1)
-                    waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
-
-                cd->pid = 0;
-            }
-
-            cd->obsolete = 1;
-        }
-    }
+    // stop all running plugins
+    pluginsd_stop_all_external_plugins();
 
     // if, for any reason there is any child exited
     // catch it here
@@ -472,16 +457,22 @@ static void get_netdata_configured_variables() {
     }
 
     // ------------------------------------------------------------------------
-    // let the plugins know the min update_every
-
     // get system paths
+
     netdata_configured_config_dir  = config_get(CONFIG_SECTION_GLOBAL, "config directory",    CONFIG_DIR);
     netdata_configured_log_dir     = config_get(CONFIG_SECTION_GLOBAL, "log directory",       LOG_DIR);
-    netdata_configured_plugins_dir = config_get(CONFIG_SECTION_GLOBAL, "plugins directory",   PLUGINS_DIR);
     netdata_configured_web_dir     = config_get(CONFIG_SECTION_GLOBAL, "web files directory", WEB_DIR);
     netdata_configured_cache_dir   = config_get(CONFIG_SECTION_GLOBAL, "cache directory",     CACHE_DIR);
     netdata_configured_varlib_dir  = config_get(CONFIG_SECTION_GLOBAL, "lib directory",       VARLIB_DIR);
     netdata_configured_home_dir    = config_get(CONFIG_SECTION_GLOBAL, "home directory",      CACHE_DIR);
+
+    {
+        char plugins_dirs[(FILENAME_MAX * 2) + 1];
+        snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
+        netdata_configured_plugins_dir_base = strdupz(config_get(CONFIG_SECTION_GLOBAL, "plugins directory",  plugins_dirs));
+        quoted_strings_splitter(netdata_configured_plugins_dir_base, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
+        netdata_configured_plugins_dir = plugin_directories[0];
+    }
 
     // ------------------------------------------------------------------------
     // get default memory mode for the database
@@ -708,7 +699,6 @@ int main(int argc, char **argv) {
                     break;
                 case 'h':
                     return help(0);
-                    break;
                 case 'i':
                     config_set(CONFIG_SECTION_WEB, "bind to", optarg);
                     break;
