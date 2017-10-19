@@ -243,6 +243,7 @@ typedef enum rrdcalc_status {
 extern char *netdata_configured_hostname;
 extern char *netdata_configured_config_dir;
 extern char *netdata_configured_log_dir;
+extern char *netdata_configured_plugins_dir_base;
 extern char *netdata_configured_plugins_dir;
 extern char *netdata_configured_web_dir;
 extern char *netdata_configured_cache_dir;
