@@ -184,7 +184,7 @@ class Chart:
         if dim.params['id'] in self:
             raise DuplicateItemError("'{dimension}' already in '{chart}' dimensions".format(dimension=dim.params['id'],
                                                                                             chart=self.name))
-        self.dimensions.append(Dimension(dimension))
+        self.dimensions.append(dim)
         return dim
 
     def add_dimension_and_push_chart(self, dimension):
