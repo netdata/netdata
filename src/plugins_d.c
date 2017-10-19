@@ -1,5 +1,8 @@
 #include "common.h"
 
+char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { NULL };
+char *netdata_configured_plugins_dir_base;
+
 struct plugind *pluginsd_root = NULL;
 
 static inline int pluginsd_space(char c) {
@@ -16,13 +19,27 @@ static inline int pluginsd_space(char c) {
     }
 }
 
+inline int config_isspace(char c) {
+    switch(c) {
+        case ' ':
+        case '\t':
+        case '\r':
+        case '\n':
+        case ',':
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
 // split a text into words, respecting quotes
-inline int pluginsd_split_words(char *str, char **words, int max_words) {
+inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char)) {
     char *s = str, quote = 0;
     int i = 0, j;
 
     // skip all white space
-    while(unlikely(pluginsd_space(*s))) s++;
+    while(unlikely(custom_isspace(*s))) s++;
 
     // check for quote
     if(unlikely(*s == '\'' || *s == '"')) {
@@ -49,13 +66,13 @@ inline int pluginsd_split_words(char *str, char **words, int max_words) {
         }
 
         // if it is a space
-        else if(unlikely(quote == 0 && pluginsd_space(*s))) {
+        else if(unlikely(quote == 0 && custom_isspace(*s))) {
 
             // terminate the word
             *s++ = '\0';
 
             // skip all white space
-            while(likely(pluginsd_space(*s))) s++;
+            while(likely(custom_isspace(*s))) s++;
 
             // check for quote
             if(unlikely(*s == '\'' || *s == '"')) {
@@ -80,6 +97,10 @@ inline int pluginsd_split_words(char *str, char **words, int max_words) {
     while(likely(j < max_words)) words[j++] = NULL;
 
     return i;
+}
+
+inline int pluginsd_split_words(char *str, char **words, int max_words) {
+    return quoted_strings_splitter(str, words, max_words, pluginsd_space);
 }
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations) {
@@ -547,99 +568,131 @@ void *pluginsd_main(void *ptr) {
 
     int automatic_run = config_get_boolean(CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
     int scan_frequency = (int) config_get_number(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
-    DIR *dir = NULL;
-    struct dirent *file = NULL;
-    struct plugind *cd;
-
-    // enable the apps plugin by default
-    // config_get_boolean(CONFIG_SECTION_PLUGINS, "apps", 1);
-
     if(scan_frequency < 1) scan_frequency = 1;
+
+    // store the errno for each plugins directory
+    // so that we don't log broken directories on each loop
+    int directory_errors[PLUGINSD_MAX_DIRECTORIES] =  { 0 };
 
     for(;;) {
         if(unlikely(netdata_exit)) break;
 
-        dir = opendir(netdata_configured_plugins_dir);
-        if(unlikely(!dir)) {
-            error("Cannot open directory '%s'.", netdata_configured_plugins_dir);
-            goto cleanup;
-        }
+        int idx;
+        const char *directory_name;
 
-        while(likely((file = readdir(dir)))) {
+        for( idx = 0; idx < PLUGINSD_MAX_DIRECTORIES && (directory_name = plugin_directories[idx]) ; idx++ ) {
             if(unlikely(netdata_exit)) break;
 
-            debug(D_PLUGINSD, "PLUGINSD: Examining file '%s'", file->d_name);
-
-            if(unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0)) continue;
-
-            int len = (int) strlen(file->d_name);
-            if(unlikely(len <= (int)PLUGINSD_FILE_SUFFIX_LEN)) continue;
-            if(unlikely(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0)) {
-                debug(D_PLUGINSD, "PLUGINSD: File '%s' does not end in '%s'.", file->d_name, PLUGINSD_FILE_SUFFIX);
+            errno = 0;
+            DIR *dir = opendir(directory_name);
+            if(unlikely(!dir)) {
+                if(directory_errors[idx] != errno) {
+                    directory_errors[idx] = errno;
+                    error("PLUGINSD: Cannot open plugins directory '%s'.", directory_name);
+                }
                 continue;
             }
 
-            char pluginname[CONFIG_MAX_NAME + 1];
-            snprintfz(pluginname, CONFIG_MAX_NAME, "%.*s", (int)(len - PLUGINSD_FILE_SUFFIX_LEN), file->d_name);
-            int enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
+            struct dirent *file = NULL;
+            while(likely((file = readdir(dir)))) {
+                if(unlikely(netdata_exit)) break;
 
-            if(unlikely(!enabled)) {
-                debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is not enabled", file->d_name);
-                continue;
-            }
+                debug(D_PLUGINSD, "PLUGINSD: Examining file '%s'", file->d_name);
 
-            // check if it runs already
-            for(cd = pluginsd_root ; cd ; cd = cd->next)
-                if(unlikely(strcmp(cd->filename, file->d_name) == 0)) break;
+                if(unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0)) continue;
 
-            if(likely(cd && !cd->obsolete)) {
-                debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is already running", cd->filename);
-                continue;
-            }
+                int len = (int) strlen(file->d_name);
+                if(unlikely(len <= (int)PLUGINSD_FILE_SUFFIX_LEN)) continue;
+                if(unlikely(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0)) {
+                    debug(D_PLUGINSD, "PLUGINSD: File '%s' does not end in '%s'.", file->d_name, PLUGINSD_FILE_SUFFIX);
+                    continue;
+                }
 
-            // it is not running
-            // allocate a new one, or use the obsolete one
-            if(unlikely(!cd)) {
-                cd = callocz(sizeof(struct plugind), 1);
+                char pluginname[CONFIG_MAX_NAME + 1];
+                snprintfz(pluginname, CONFIG_MAX_NAME, "%.*s", (int)(len - PLUGINSD_FILE_SUFFIX_LEN), file->d_name);
+                int enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
 
-                snprintfz(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
+                if(unlikely(!enabled)) {
+                    debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is not enabled", file->d_name);
+                    continue;
+                }
 
-                strncpyz(cd->filename, file->d_name, FILENAME_MAX);
-                snprintfz(cd->fullfilename, FILENAME_MAX, "%s/%s", netdata_configured_plugins_dir, cd->filename);
+                // check if it runs already
+                struct plugind *cd;
+                for(cd = pluginsd_root ; cd ; cd = cd->next)
+                    if(unlikely(strcmp(cd->filename, file->d_name) == 0)) break;
 
-                cd->enabled = enabled;
-                cd->update_every = (int) config_get_number(cd->id, "update every", localhost->rrd_update_every);
-                cd->started_t = now_realtime_sec();
+                if(likely(cd && !cd->obsolete)) {
+                    debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is already running", cd->filename);
+                    continue;
+                }
 
-                char *def = "";
-                snprintfz(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
+                // it is not running
+                // allocate a new one, or use the obsolete one
+                if(unlikely(!cd)) {
+                    cd = callocz(sizeof(struct plugind), 1);
 
-                // link it
-                if(likely(pluginsd_root)) cd->next = pluginsd_root;
-                pluginsd_root = cd;
+                    snprintfz(cd->id, CONFIG_MAX_NAME, "plugin:%s", pluginname);
 
-                // it is not currently running
-                cd->obsolete = 1;
+                    strncpyz(cd->filename, file->d_name, FILENAME_MAX);
+                    snprintfz(cd->fullfilename, FILENAME_MAX, "%s/%s", directory_name, cd->filename);
 
-                if(cd->enabled) {
-                    // spawn a new thread for it
-                    if(unlikely(pthread_create(&cd->thread, NULL, pluginsd_worker_thread, cd) != 0))
-                        error("PLUGINSD: failed to create new thread for plugin '%s'.", cd->filename);
+                    cd->enabled = enabled;
+                    cd->update_every = (int) config_get_number(cd->id, "update every", localhost->rrd_update_every);
+                    cd->started_t = now_realtime_sec();
 
-                    else if(unlikely(pthread_detach(cd->thread) != 0))
-                        error("PLUGINSD: Cannot request detach of newly created thread for plugin '%s'.", cd->filename);
+                    char *def = "";
+                    snprintfz(cd->cmd, PLUGINSD_CMD_MAX, "exec %s %d %s", cd->fullfilename, cd->update_every, config_get(cd->id, "command options", def));
+
+                    // link it
+                    if(likely(pluginsd_root)) cd->next = pluginsd_root;
+                    pluginsd_root = cd;
+
+                    // it is not currently running
+                    cd->obsolete = 1;
+
+                    if(cd->enabled) {
+                        // spawn a new thread for it
+                        if(unlikely(pthread_create(&cd->thread, NULL, pluginsd_worker_thread, cd) != 0))
+                            error("PLUGINSD: failed to create new thread for plugin '%s'.", cd->filename);
+
+                        else if(unlikely(pthread_detach(cd->thread) != 0))
+                            error("PLUGINSD: Cannot request detach of newly created thread for plugin '%s'.", cd->filename);
+                    }
                 }
             }
+
+            closedir(dir);
         }
 
-        closedir(dir);
         sleep((unsigned int) scan_frequency);
     }
 
-cleanup:
     info("PLUGINS.D thread exiting");
 
     static_thread->enabled = 0;
     pthread_exit(NULL);
     return NULL;
+}
+
+
+void pluginsd_stop_all_external_plugins() {
+    siginfo_t info;
+    struct plugind *cd;
+    for(cd = pluginsd_root ; cd ; cd = cd->next) {
+        if(cd->enabled && !cd->obsolete) {
+            info("Stopping %s plugin thread", cd->id);
+            pthread_cancel(cd->thread);
+
+            if(cd->pid) {
+                info("killing %s plugin child process pid %d", cd->id, cd->pid);
+                if(killpid(cd->pid, SIGTERM) != -1)
+                    waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
+
+                cd->pid = 0;
+            }
+
+            cd->obsolete = 1;
+        }
+    }
 }
