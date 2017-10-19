@@ -6356,12 +6356,6 @@ var NETDATA = window.NETDATA || {};
                 barColor = tmp;
         }
 
-        state.legendSetUnitsString = function(units) {
-            if(typeof state.tmp.easyPieChartUnits !== 'undefined')
-                state.tmp.easyPieChartUnits.innerText = units;
-        };
-        state.legendShowUndefined = function() {};
-
         var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
         chart.data('data-percent', pcent);
 
@@ -6389,6 +6383,13 @@ var NETDATA = window.NETDATA || {};
         if(animate === false) state.tmp.easyPieChart_instance.disableAnimation();
         state.tmp.easyPieChart_instance.update(pcent);
         if(animate === false) state.tmp.easyPieChart_instance.enableAnimation();
+
+        state.legendSetUnitsString = function(units) {
+            if(typeof state.tmp.easyPieChartUnits !== 'undefined')
+                state.tmp.easyPieChartUnits.innerText = units;
+        };
+        state.legendShowUndefined = function() {};
+
         return true;
     };
 
@@ -6730,16 +6731,6 @@ var NETDATA = window.NETDATA || {};
         if(typeof state.tmp.gauge_instance !== 'undefined')
             animate = false;
 
-        state.legendSetUnitsString = function(units) {
-            if(typeof state.tmp.gaugeChartUnits !== 'undefined')
-                state.tmp.gaugeChartUnits.innerText = units;
-
-            state.tmp.___gaugeOld__.valueLabel = null;
-            state.tmp.___gaugeOld__.minLabel = null;
-            state.tmp.___gaugeOld__.maxLabel = null;
-        };
-        state.legendShowUndefined = function() {};
-
         state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
 
         state.tmp.___gaugeOld__ = {
@@ -6759,6 +6750,17 @@ var NETDATA = window.NETDATA || {};
         NETDATA.gaugeSet(state, value, min, max);
         NETDATA.gaugeSetLabels(state, value, min, max);
         NETDATA.gaugeAnimation(state, true);
+
+        state.legendSetUnitsString = function(units) {
+            if(typeof state.tmp.gaugeChartUnits !== 'undefined') {
+                state.tmp.gaugeChartUnits.innerText = units;
+                state.tmp.___gaugeOld__.valueLabel = null;
+                state.tmp.___gaugeOld__.minLabel = null;
+                state.tmp.___gaugeOld__.maxLabel = null;
+            }
+        };
+        state.legendShowUndefined = function() {};
+
         return true;
     };
 
