@@ -16,6 +16,9 @@
 #define PLUGINSD_LINE_MAX 1024
 #define PLUGINSD_MAX_WORDS 20
 
+#define PLUGINSD_MAX_DIRECTORIES 20
+extern char *plugin_directories[PLUGINSD_MAX_DIRECTORIES];
+
 struct plugind {
     char id[CONFIG_MAX_NAME+1];         // config node id
 
@@ -44,7 +47,12 @@ struct plugind {
 extern struct plugind *pluginsd_root;
 
 extern void *pluginsd_main(void *ptr);
+extern void pluginsd_stop_all_external_plugins(void);
+
 extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
 extern int pluginsd_split_words(char *str, char **words, int max_words);
+
+extern int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char));
+extern int config_isspace(char c);
 
 #endif /* NETDATA_PLUGINS_D_H */
