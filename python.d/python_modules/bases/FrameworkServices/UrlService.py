@@ -23,6 +23,7 @@ class UrlService(SimpleService):
         self.proxy_password = self.configuration.get('proxy_pass')
         self.proxy_url = self.configuration.get('proxy_url')
         self.header = self.configuration.get('header')
+        self.request_timeout = self.configuration.get('timeout', 1)
         self._manager = None
 
     def __make_headers(self, **header_kw):
@@ -73,10 +74,9 @@ class UrlService(SimpleService):
         try:
             url = url or self.url
             manager = manager or self._manager
-            # TODO: timeout, retries and method hardcoded..
             response = manager.request(method='GET',
                                        url=url,
-                                       timeout=1,
+                                       timeout=self.request_timeout,
                                        retries=1,
                                        headers=manager.headers)
         except (urllib3.exceptions.HTTPError, TypeError, AttributeError) as error:
