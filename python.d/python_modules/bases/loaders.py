@@ -38,7 +38,7 @@ class YamlOrderedLoader:
             opened = True
             loader = YamlSafeLoader(stream)
             loaded = True
-            parsed = loader.get_single_data()
+            parsed = loader.get_single_data() or dict()
         except Exception as error:
             return dict(), error
         else:
