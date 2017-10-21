@@ -71,15 +71,15 @@ class Charts:
     All charts stored in a dict.
     Chart is a instance of Chart class.
     Charts adding must be done using Charts.add_chart() method only"""
-    def __init__(self, job_name, priority, update_every):
+    def __init__(self, job_name, priority, get_update_every):
         """
         :param job_name: <bound method>
         :param priority: <int>
-        :param update_every: <int>
+        :param get_update_every: <bound method>
         """
         self.job_name = job_name
         self.priority = priority
-        self.update_every = update_every
+        self.get_update_every = get_update_every
         self.charts = dict()
 
     def __len__(self):
@@ -127,7 +127,7 @@ class Charts:
             raise DuplicateItemError("'{chart}' already in charts".format(chart=chart_id))
         else:
             new_chart = Chart(params)
-            new_chart.params['update_every'] = self.update_every
+            new_chart.params['update_every'] = self.get_update_every()
             new_chart.params['priority'] = self.priority
             self.priority += 1
             self.charts[new_chart.params['id']] = new_chart

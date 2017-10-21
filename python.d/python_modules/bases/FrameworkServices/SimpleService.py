@@ -65,7 +65,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         self._runtime_counters = RuntimeCounters(configuration=configuration)
         self.charts = Charts(job_name=self.actual_name,
                              priority=configuration.pop('priority'),
-                             update_every=self.update_every)
+                             get_update_every=self.get_update_every)
 
     def __repr__(self):
         return '<{cls_bases}: {name}>'.format(cls_bases=', '.join(c.__name__ for c in self.__class__.__bases__),
@@ -91,6 +91,9 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         :return:
         """
         self._runtime_counters.FREQ = value
+
+    def get_update_every(self):
+        return self.update_every
 
     def check(self):
         """
