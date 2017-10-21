@@ -224,7 +224,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
             for dimension in chart:
                 try:
-                    value = int(data[dimension.params['id']])
+                    value = int(data[dimension.id])
                 except (KeyError, TypeError):
                     continue
                 else:
@@ -232,7 +232,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
             for var in chart.variables:
                 try:
-                    value = int(data[var.params['id']])
+                    value = int(data[var.id])
                 except (KeyError, TypeError):
                     continue
                 else:

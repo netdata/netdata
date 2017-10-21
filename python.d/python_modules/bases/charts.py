@@ -89,6 +89,9 @@ class Charts:
         return iter(self.charts.values())
 
     def __repr__(self):
+        return 'Charts({0})'.format(self)
+
+    def __str__(self):
         return str([chart for chart in self.charts])
 
     def __contains__(self, item):
@@ -130,7 +133,7 @@ class Charts:
             new_chart.params['update_every'] = self.get_update_every()
             new_chart.params['priority'] = self.priority
             self.priority += 1
-            self.charts[new_chart.params['id']] = new_chart
+            self.charts[new_chart.id] = new_chart
             return new_chart
 
 
@@ -156,17 +159,24 @@ class Chart:
         self.alive = True
         self.penalty = 0
 
+    def __getattr__(self, item):
+        try:
+            return self.params[item]
+        except KeyError:
+            raise AttributeError("'{instance}' has no attribute '{attr}'".format(instance=repr(self),
+                                                                                 attr=item))
+
     def __repr__(self):
-        return str(self.params)
+        return 'Chart({0})'.format(self.id)
 
     def __str__(self):
-        return self.params['id']
+        return self.id
 
     def __iter__(self):
         return iter(self.dimensions)
 
     def __contains__(self, item):
-        return item in [repr(d) for d in self.dimensions]
+        return item in [dimension.id for dimension in self.dimensions]
 
     def suppress(self):
         self.alive = False
@@ -189,8 +199,8 @@ class Chart:
         """
         dim = Dimension(dimension)
 
-        if dim.params['id'] in self:
-            raise DuplicateItemError("'{dimension}' already in '{chart}' dimensions".format(dimension=dim.params['id'],
+        if dim.id in self:
+            raise DuplicateItemError("'{dimension}' already in '{chart}' dimensions".format(dimension=dim.id,
                                                                                             chart=self.name))
         self.dimensions.append(dim)
         return dim
@@ -212,7 +222,7 @@ class Chart:
         chart = CHART_CREATE.format(**self.params)
         if not dimension:
             dimensions = ''.join([dimension.create() for dimension in self.dimensions])
-            variables = ''.join([var.set(var.params['value']) for var in self.variables if var])
+            variables = ''.join([var.set(var.value) for var in self.variables if var])
             return chart + dimensions + variables
         else:
             dimensions = dimension.create()
@@ -223,8 +233,8 @@ class Chart:
         :param since_last: <int>: microseconds
         :return:
         """
-        return CHART_BEGIN.format(type=self.params['type'],
-                                  id=self.params['id'],
+        return CHART_BEGIN.format(type=self.type,
+                                  id=self.id,
                                   since_last=since_last)
 
     def obsolete(self):
@@ -253,8 +263,18 @@ class Dimension:
             self.params['divisor'] = 1
         self.params.setdefault('hidden', '')
 
+    def __getattr__(self, item):
+        try:
+            return self.params[item]
+        except KeyError:
+            raise AttributeError("'{instance}' has no attribute '{attr}'".format(instance=repr(self),
+                                                                                 attr=item))
+
     def __repr__(self):
-        return self.params['id']
+        return 'Dimension({0})'.format(self.id)
+
+    def __str__(self):
+        return self.id
 
     def create(self):
         return DIMENSION_CREATE.format(**self.params)
@@ -264,7 +284,7 @@ class Dimension:
         :param value: <str>: must be a digit
         :return:
         """
-        return DIMENSION_SET.format(id=self.params['id'],
+        return DIMENSION_SET.format(id=self.id,
                                     value=value)
 
 
@@ -282,23 +302,33 @@ class ChartVariable:
         self.params = dict(zip(VARIABLE_PARAMS, params))
         self.params.setdefault('value', None)
 
+    def __getattr__(self, item):
+        try:
+            return self.params[item]
+        except KeyError:
+            raise AttributeError("'{instance}' has no attribute '{attr}'".format(instance=repr(self),
+                                                                                 attr=item))
+
     def __bool__(self):
-        return self.params['value'] is not None
+        return self.value is not None
 
     def __nonzero__(self):
         return self.__bool__()
 
     def __repr__(self):
-        return 'ChartVariable({0})'.format(self.params['id'])
+        return 'ChartVariable({0})'.format(self.id)
+
+    def __str__(self):
+        return self.id
 
     def __eq__(self, other):
         if isinstance(other, ChartVariable):
-            return self.params['id'] == other.params['id']
+            return self.id == other.id
         return False
 
     def __hash__(self):
         return hash(repr(self))
 
     def set(self, value):
-        return CHART_VARIABLE_SET.format(id=self.params['id'],
+        return CHART_VARIABLE_SET.format(id=self.id,
                                          value=value)
