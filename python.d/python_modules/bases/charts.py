@@ -111,7 +111,7 @@ class Charts:
         :param penalty_max: <int>
         :return:
         """
-        return (chart for chart in self if chart.penalty > penalty_max)
+        return (chart for chart in self if chart.penalty > penalty_max and chart.alive)
 
     def add_chart(self, params):
         """
@@ -153,6 +153,7 @@ class Chart:
 
         self.dimensions = list()
         self.variables = set()
+        self.alive = True
         self.penalty = 0
 
     def __repr__(self):
@@ -166,6 +167,13 @@ class Chart:
 
     def __contains__(self, item):
         return item in [repr(d) for d in self.dimensions]
+
+    def suppress(self):
+        self.alive = False
+
+    def unsuppress(self):
+        self.penalty = 0
+        self.alive = True
 
     def add_variable(self, variable):
         """
@@ -193,6 +201,7 @@ class Chart:
         :return:
         """
         dim = self.add_dimension(dimension)
+        self.unsuppress()
         safe_print(self.create(dim))
 
     def create(self, dimension=None):

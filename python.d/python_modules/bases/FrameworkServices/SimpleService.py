@@ -211,10 +211,12 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
         for chart in self.charts.penalty_exceeded(penalty_max=CHART_OBSOLETE_PENALTY):
             safe_print(chart.obsolete())
-            del self.charts[chart.params['id']]
+            chart.suppress()
             self.error("chart '{0}' was removed due to non updating".format(chart.name))
 
         for chart in self.charts:
+            if not chart.alive:
+                continue
             dimension_updated, variables_updated = str(), str()
 
             for dimension in chart:
