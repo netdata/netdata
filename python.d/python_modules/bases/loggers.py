@@ -30,18 +30,16 @@ def limiter(log_max_count=30, allowed_in_seconds=60):
     def on_decorator(func):
 
         def on_call(*args, **kwargs):
-            self = args[0]
+            current_time = args[0]._runtime_counters.START_RUN
+            lc = args[0]._logger_counters
 
-            if self._logger_counters.allowed > log_max_count:
-                current_time = time()
-                if current_time - self._logger_counters.time_to_compare <= allowed_in_seconds:
-                    self._logger_counters.dropped += 1
+            if lc.logged and lc.logged % log_max_count == 0:
+                if current_time - lc.time_to_compare <= allowed_in_seconds:
+                    lc.dropped += 1
                     return
-                self._logger_counters.allowed = 0
-                self._logger_counters.time_to_compare = current_time
+                lc.time_to_compare = current_time
 
-            self._logger_counters.allowed += 1
-            self._logger_counters.logged += 1
+            lc.logged += 1
             func(*args, **kwargs)
 
         return on_call
@@ -52,12 +50,11 @@ class LoggerCounters:
     def __init__(self):
         self.logged = 0
         self.dropped = 0
-        self.allowed = 0
         self.time_to_compare = time()
 
     def __repr__(self):
-        return '<LoggerCounter: {{logged: {logged}, dropped: {dropped}}}>'.format(logged=self.logged,
-                                                                                  dropped=self.dropped)
+        return 'LoggerCounter(logged: {logged}, dropped: {dropped})'.format(logged=self.logged,
+                                                                            dropped=self.dropped)
 
 
 class BaseLogger(object):
