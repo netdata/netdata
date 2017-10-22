@@ -57,9 +57,10 @@ ALL_MODULES = [m for m in sorted(os.listdir(CHARTS_PY_DIR)) if module_ok(m)]
 
 def parse_cmd():
     debug = 'debug' in argv[1:]
+    trace = 'trace' in argv[1:]
     override_update_every = next((arg for arg in argv[1:] if arg.isdigit() and int(arg) > 1), False)
     modules = [''.join([m, MODULE_EXTENSION]) for m in argv[1:] if ''.join([m, MODULE_EXTENSION]) in ALL_MODULES]
-    return debug, override_update_every, modules or ALL_MODULES
+    return debug, trace, override_update_every, modules or ALL_MODULES
 
 
 def multi_job_check(config):
@@ -371,10 +372,12 @@ class Plugin(object):
 
 
 if __name__ == '__main__':
-    DEBUG, OVERRIDE_UPDATE_EVERY, MODULES_TO_RUN = parse_cmd()
+    DEBUG, TRACE, OVERRIDE_UPDATE_EVERY, MODULES_TO_RUN = parse_cmd()
     Logger = PythonDLogger()
     if DEBUG:
         Logger.logger.severity = 'DEBUG'
+    if TRACE:
+        Logger.log_traceback = True
     Logger.info('Using python {version}'.format(version=PY_VERSION[0]))
 
     plugin = Plugin()

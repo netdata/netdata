@@ -3,6 +3,9 @@
 # Author: Ilya Mashchenko (l2isbad)
 
 import logging
+import traceback
+
+from sys import exc_info
 
 try:
     from time import monotonic as time
@@ -29,7 +32,7 @@ PYTHON_D_LOG_NAME = 'python.d'
 def limiter(log_max_count=30, allowed_in_seconds=60):
     def on_decorator(func):
 
-        def on_call(*args, **kwargs):
+        def on_call(*args):
             current_time = args[0]._runtime_counters.START_RUN
             lc = args[0]._logger_counters
 
@@ -40,10 +43,26 @@ def limiter(log_max_count=30, allowed_in_seconds=60):
                 lc.time_to_compare = current_time
 
             lc.logged += 1
-            func(*args, **kwargs)
+            func(*args)
 
         return on_call
     return on_decorator
+
+
+def add_traceback(func):
+    def on_call(*args):
+        self = args[0]
+
+        if not self.log_traceback:
+            func(*args)
+        else:
+            if exc_info()[0]:
+                func(*args)
+                func(self, traceback.format_exc())
+            else:
+                func(*args)
+
+    return on_call
 
 
 class LoggerCounters:
@@ -120,7 +139,7 @@ class BaseLogger(object):
         self.logger.critical(' '.join(map(str, msg)), **kwargs)
 
 
-class PythonDLogger:
+class PythonDLogger(object):
     def __init__(self, logger_name=PYTHON_D_LOG_NAME, log_fmt=PYTHON_D_LOG_LINE_FORMAT):
         """
         :param logger_name: <str>
@@ -130,6 +149,16 @@ class PythonDLogger:
         self.module_name = 'plugin'
         self.job_name = 'main'
         self._logger_counters = LoggerCounters()
+
+    _LOG_TRACEBACK = False
+
+    @property
+    def log_traceback(self):
+        return PythonDLogger._LOG_TRACEBACK
+
+    @log_traceback.setter
+    def log_traceback(self, value):
+        PythonDLogger._LOG_TRACEBACK = value
 
     def debug(self, *msg):
         self.logger.debug(*msg, extra={'module_name': self.module_name,
@@ -143,10 +172,12 @@ class PythonDLogger:
         self.logger.warning(*msg, extra={'module_name': self.module_name,
                                          'job_name': self.job_name or self.module_name})
 
+    @add_traceback
     def error(self, *msg):
         self.logger.error(*msg, extra={'module_name': self.module_name,
                                        'job_name': self.job_name or self.module_name})
 
+    @add_traceback
     def alert(self, *msg):
         self.logger.alert(*msg, extra={'module_name': self.module_name,
                                        'job_name': self.job_name or self.module_name})
@@ -168,3 +199,7 @@ class PythonDLimitedLogger(PythonDLogger):
     @limiter()
     def error(self, *msg):
         PythonDLogger.error(self, *msg)
+
+    @limiter()
+    def alert(self, *msg):
+        PythonDLogger.alert(self, *msg)
