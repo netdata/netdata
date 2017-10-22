@@ -176,7 +176,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             try:
                 updated = self.update()
             except Exception as error:
-                self.debug('update() unhandled exception: {error}'.format(error=error))
+                self.error('update() unhandled exception: {error}'.format(error=error))
                 updated = False
 
             if not updated:
