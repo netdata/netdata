@@ -38,7 +38,7 @@ from bases.loggers import PythonDLogger
 from bases.collection import setdefault_values, run_and_exit
 
 BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
-               'retries': 20,
+               'retries': 60,
                'priority': 60000,
                'autodetection_retry': 0,
                'name': str()}

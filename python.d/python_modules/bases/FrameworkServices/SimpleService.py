@@ -34,6 +34,7 @@ class RuntimeCounters:
         self.ELAPSED = 0
         self.RETRIES = 0
         self.RETRIES_MAX = configuration.pop('retries')
+        self.PENALTY = 0
 
     def is_sleep_time(self):
         return self.START_RUN < self.NEXT_RUN
@@ -168,7 +169,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         while True:
             job.START_RUN = time()
 
-            job.NEXT_RUN = job.START_RUN - (job.START_RUN % job.FREQ) + job.FREQ
+            job.NEXT_RUN = job.START_RUN - (job.START_RUN % job.FREQ) + job.FREQ + job.PENALTY
 
             self.sleep_until_next_run()
 
@@ -185,7 +186,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 current_time = time()
                 job.PREV_UPDATE = current_time
                 job.ELAPSED = int((current_time - job.START_RUN) * 1e3)
-                job.RETRIES = 0
+                job.RETRIES, job.PENALTY = 0, 0
                 safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
                                                        since_last=job.SINCE_UPDATE,
                                                        elapsed=job.ELAPSED))
@@ -200,10 +201,10 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         """
         data = self.get_data()
         if not data:
-            self.debug('get_data() returns no data')
+            self.debug('get_data() returned no data')
             return False
         elif not isinstance(data, dict):
-            self.debug('get_data() returns incorrect type data')
+            self.debug('get_data() returned incorrect type data')
             return False
 
         job = self._runtime_counters
@@ -254,6 +255,8 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
     def manage_retries(self):
         self._runtime_counters.RETRIES += 1
+        if self._runtime_counters.RETRIES % 5 == 0:
+            self._runtime_counters.PENALTY = int(self._runtime_counters.RETRIES * self.update_every / 2)
         if self._runtime_counters.RETRIES >= self._runtime_counters.RETRIES_MAX:
             self.error('stopped after {retries_max} data '
                        'collection failures in a row'.format(retries_max=self._runtime_counters.RETRIES_MAX))
@@ -267,7 +270,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         while job.is_sleep_time():
             sleep_time = job.NEXT_RUN - job.START_RUN
             self.debug('sleeping for {sleep_time} to reach frequency of {freq} sec'.format(sleep_time=sleep_time,
-                                                                                           freq=job.FREQ))
+                                                                                           freq=job.FREQ + job.PENALTY))
             sleep(sleep_time)
             job.START_RUN = time()
 
