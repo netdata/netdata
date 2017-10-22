@@ -133,8 +133,7 @@ class Module(object):
     def __nonzero__(self):
         return self.__bool__()
 
-    @staticmethod
-    def jobs_configurations_builder(config):
+    def jobs_configurations_builder(self, config):
         """
         :param config: <dict>
         :return:
@@ -143,7 +142,7 @@ class Module(object):
         job_base_config = dict()
 
         for attr in BASE_CONFIG:
-            job_base_config[attr] = config.pop(attr, BASE_CONFIG[attr])
+            job_base_config[attr] = config.pop(attr, getattr(self.service, attr, BASE_CONFIG[attr]))
 
         if not config:
             config = {str(): dict()}
