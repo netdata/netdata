@@ -567,6 +567,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
             else pri = 2;
 
             if(i == pri) {
+                int loaded = 0;
                 int used = 0;
                 int changed = 0;
                 int count = 0;
@@ -574,13 +575,14 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                 config_section_wrlock(co);
                 for(cv = co->values; cv ; cv = cv->next) {
                     used += (cv->flags & CONFIG_VALUE_USED)?1:0;
+                    loaded += (cv->flags & CONFIG_VALUE_LOADED)?1:0;
                     changed += (cv->flags & CONFIG_VALUE_CHANGED)?1:0;
                     count++;
                 }
                 config_section_unlock(co);
 
                 if(!count) continue;
-                if(only_changed && !changed) continue;
+                if(only_changed && !changed && !loaded) continue;
 
                 if(!used) {
                     buffer_sprintf(wb, "\n# section '%s' is not used.", co->name);
@@ -594,7 +596,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                     if(used && !(cv->flags & CONFIG_VALUE_USED)) {
                         buffer_sprintf(wb, "\n\t# option '%s' is not used.\n", cv->name);
                     }
-                    buffer_sprintf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
+                    buffer_sprintf(wb, "\t%s%s = %s\n", ((!(cv->flags & CONFIG_VALUE_LOADED)) && (!(cv->flags & CONFIG_VALUE_CHANGED)) && (cv->flags & CONFIG_VALUE_USED))?"# ":"", cv->name, cv->value);
                 }
                 config_section_unlock(co);
             }
