@@ -306,7 +306,10 @@ int avl_walker(avl *node, int (*callback)(void *entry, void *data), void *data) 
 }
 
 int avl_traverse(avl_tree *t, int (*callback)(void *entry, void *data), void *data) {
-    return avl_walker(t->root, callback, data);
+    if(t->root)
+        return avl_walker(t->root, callback, data);
+    else
+        return 0;
 }
 
 // ---------------------------
