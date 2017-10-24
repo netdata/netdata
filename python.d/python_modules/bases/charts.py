@@ -257,9 +257,9 @@ class Dimension:
 
         if self.params.get('algorithm') not in DIMENSION_ALGORITHMS:
             self.params['algorithm'] = 'absolute'
-        if not str(self.params.get('multiplier')).isdigit():
+        if not isinstance(self.params.get('multiplier'), int):
             self.params['multiplier'] = 1
-        if not str(self.params.get('divisor')).isdigit():
+        if not isinstance(self.params.get('divisor'), int):
             self.params['divisor'] = 1
         self.params.setdefault('hidden', '')
 
