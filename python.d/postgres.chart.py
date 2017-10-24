@@ -62,7 +62,7 @@ SELECT
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.ready$$r$ as INT)), 0) AS INT) AS ready_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.done$$r$ AS INT)), 0) AS INT) AS done_count
 FROM
-    pg_catalog.pg_ls_dir('{}/archive_status') AS archive_files (archive_file);
+    pg_catalog.pg_ls_dir('{0}/archive_status') AS archive_files (archive_file);
 """,
     BACKENDS="""
 SELECT
