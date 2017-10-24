@@ -62,7 +62,7 @@ SELECT
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.ready$$r$ as INT)), 0) AS INT) AS ready_count,
     CAST(COALESCE(SUM(CAST(archive_file ~ $r$\.done$$r$ AS INT)), 0) AS INT) AS done_count
 FROM
-    pg_catalog.pg_ls_dir('pg_xlog/archive_status') AS archive_files (archive_file);
+    pg_catalog.pg_ls_dir('{0}/archive_status') AS archive_files (archive_file);
 """,
     BACKENDS="""
 SELECT
@@ -125,7 +125,11 @@ AND NOT datname ~* '^template\d+';
 """,
     IF_SUPERUSER="""
 SELECT current_setting('is_superuser') = 'on' AS is_superuser;
-    """)
+    """,
+    DETECT_SERVER_VERSION="""
+SHOW server_version_num;
+    """
+)
 
 
 QUERY_STATS = {
@@ -229,6 +233,7 @@ class Service(SimpleService):
         self.database_poll = configuration.pop('database_poll', None)
         self.configuration = configuration
         self.connection = False
+        self.server_version = None
         self.data = dict()
         self.locks_zeroed = dict()
         self.databases = list()
@@ -264,6 +269,7 @@ class Service(SimpleService):
             cursor = self.connection.cursor()
             self.databases = discover_databases_(cursor, QUERIES['FIND_DATABASES'])
             is_superuser = check_if_superuser_(cursor, QUERIES['IF_SUPERUSER'])
+            self.server_version = detect_server_version(cursor, QUERIES['DETECT_SERVER_VERSION'])
             cursor.close()
 
             if (self.database_poll and isinstance(self.database_poll, str)):
@@ -284,7 +290,11 @@ class Service(SimpleService):
             self.queries[QUERIES['TABLE_STATS']] = METRICS['TABLE_STATS']
         if is_superuser:
             self.queries[QUERIES['BGWRITER']] = METRICS['BGWRITER']
-            self.queries[QUERIES['ARCHIVE']] = METRICS['ARCHIVE']
+            if self.server_version >= 100000:
+                wal_dir_name = 'pg_wal'
+            else:
+                wal_dir_name = 'pg_xlog'
+            self.queries[QUERIES['ARCHIVE'].format(wal_dir_name)] = METRICS['ARCHIVE']
 
     def create_dynamic_charts_(self):
 
@@ -340,6 +350,9 @@ def check_if_superuser_(cursor, query):
     cursor.execute(query)
     return cursor.fetchone()[0]
 
+def detect_server_version(cursor, query):
+    cursor.execute(query)
+    return int(cursor.fetchone()[0])
 
 def populate_lock_types(databases):
     result = dict()
