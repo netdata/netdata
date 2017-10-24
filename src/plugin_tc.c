@@ -81,6 +81,7 @@ struct tc_device {
     avl_tree classes_index;
 
     struct tc_class *classes;
+    struct tc_class *last_class;
 
     struct tc_device *next;
     struct tc_device *prev;
@@ -139,11 +140,19 @@ static inline struct tc_class *tc_class_index_find(struct tc_device *st, const c
 
 static inline void tc_class_free(struct tc_device *n, struct tc_class *c) {
     if(c == n->classes) {
-        if(c->next)
+        if(likely(c->next))
             n->classes = c->next;
         else
             n->classes = c->prev;
     }
+
+    if(c == n->last_class) {
+        if(unlikely(c->next))
+            n->last_class = c->next;
+        else
+            n->last_class = c->prev;
+    }
+
     if(c->next) c->next->prev = c->prev;
     if(c->prev) c->prev->next = c->next;
 
@@ -713,9 +722,15 @@ static inline struct tc_class *tc_class_add(struct tc_device *n, char *id, char 
 
         c = callocz(1, sizeof(struct tc_class));
 
-        if(n->classes) n->classes->prev = c;
-        c->next = n->classes;
-        n->classes = c;
+        if(unlikely(!n->classes))
+            n->classes = c;
+
+        else if(likely(n->last_class)) {
+            n->last_class->next = c;
+            c->prev = n->last_class;
+        }
+
+        n->last_class = c;
 
         c->id = strdupz(id);
         c->hash = simple_hash(c->id);
