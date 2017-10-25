@@ -31,9 +31,7 @@ CHARTS = {
         'options': [None, 'apache Workers', 'workers', 'workers', 'apache.workers', 'stacked'],
         'lines': [
             ["idle"],
-            ["idle_servers", 'idle'],
             ["busy"],
-            ["busy_servers", 'busy']
         ]},
     'reqpersec': {
         'options': [None, 'apache Lifetime Avg. Requests/s', 'requests/s', 'statistics',
@@ -102,6 +100,10 @@ class Service(UrlService):
         if 'idle_servers' in data:
             self.module_name = 'lighttpd'
             for chart in self.definitions:
+                if chart == 'workers':
+                    lines = self.definitions[chart]['lines']
+                    lines[0] = ["idle_servers", 'idle']
+                    lines[1] = ["busy_servers", 'busy']
                 opts = self.definitions[chart]['options']
                 opts[1] = opts[1].replace('apache', 'lighttpd')
                 opts[4] = opts[4].replace('apache', 'lighttpd')
