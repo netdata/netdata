@@ -128,15 +128,15 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         if(unlikely(!st_io)) {
             st_io = rrdset_create_localhost(
                     "system"
-                    , "io"
+                    , "pgpgio"
                     , NULL
                     , "disk"
                     , NULL
-                    , "Disk I/O"
+                    , "Memory Paged from/to disk"
                     , "kilobytes/s"
                     , "proc"
                     , "vmstat"
-                    , 150
+                    , 151
                     , update_every
                     , RRDSET_TYPE_AREA
             );
