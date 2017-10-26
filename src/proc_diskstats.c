@@ -2,9 +2,10 @@
 
 #define RRD_TYPE_DISK "disk"
 
+#define DISK_TYPE_UNKNOWN   0
 #define DISK_TYPE_PHYSICAL  1
 #define DISK_TYPE_PARTITION 2
-#define DISK_TYPE_CONTAINER 3
+#define DISK_TYPE_VIRTUAL   3
 
 #define CONFIG_SECTION_DISKSTATS "plugin:proc:/proc/diskstats"
 #define DELAULT_EXLUDED_DISKS "loop* ram*"
@@ -74,7 +75,9 @@ static struct disk {
 
 static char *path_to_get_hw_sector_size = NULL;
 static char *path_to_get_hw_sector_size_partitions = NULL;
-static char *path_to_find_block_device = NULL;
+static char *path_to_sys_dev_block_major_minor_string = NULL;
+static char *path_to_sys_block_device = NULL;
+static char *path_to_sys_devices_virtual_block_device = NULL;
 static char *path_to_device_mapper = NULL;
 
 static inline char *get_disk_name(unsigned long major, unsigned long minor, char *disk) {
@@ -159,7 +162,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     d->device = strdupz(disk);
     d->major = major;
     d->minor = minor;
-    d->type = DISK_TYPE_PHYSICAL; // Default type. Changed later if not correct.
+    d->type = DISK_TYPE_UNKNOWN; // Default type. Changed later if not correct.
     d->configured = 0;
     d->sector_size = 512; // the default, will be changed below
     d->next = NULL;
@@ -173,33 +176,50 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         last->next = d;
     }
 
+    char buffer[FILENAME_MAX + 1];
+
+    // find if it is a physical disk
+    // by checking if /sys/block/DISK is readable.
+    snprintfz(buffer, FILENAME_MAX, path_to_sys_block_device, disk);
+    if(likely(access(buffer, R_OK) == 0)) {
+        // assign it here, but it will be overwritten if it is not a physical disk
+        d->type = DISK_TYPE_PHYSICAL;
+    }
+
     // find if it is a partition
     // by checking if /sys/dev/block/MAJOR:MINOR/partition is readable.
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, path_to_find_block_device, major, minor, "partition");
+    snprintfz(buffer, FILENAME_MAX, path_to_sys_dev_block_major_minor_string, major, minor, "partition");
     if(likely(access(buffer, R_OK) == 0)) {
         d->type = DISK_TYPE_PARTITION;
     }
     else {
-        // find if it is a container
-        // by checking if /sys/dev/block/MAJOR:MINOR/slaves has entries
-        snprintfz(buffer, FILENAME_MAX, path_to_find_block_device, major, minor, "slaves/");
-        DIR *dirp = opendir(buffer);
-        if(likely(dirp != NULL)) {
-            struct dirent *dp;
-            while( (dp = readdir(dirp)) ) {
-                // . and .. are also files in empty folders.
-                if(unlikely(strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)) {
-                    continue;
+        // find if it is a virtual disk
+        // by checking if /sys/devices/virtual/block/DISK is readable.
+        snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_block_device, disk);
+        if(likely(access(buffer, R_OK) == 0)) {
+            d->type = DISK_TYPE_VIRTUAL;
+        }
+        else {
+            // find if it is a virtual device
+            // by checking if /sys/dev/block/MAJOR:MINOR/slaves has entries
+            snprintfz(buffer, FILENAME_MAX, path_to_sys_dev_block_major_minor_string, major, minor, "slaves/");
+            DIR *dirp = opendir(buffer);
+            if (likely(dirp != NULL)) {
+                struct dirent *dp;
+                while ((dp = readdir(dirp))) {
+                    // . and .. are also files in empty folders.
+                    if (unlikely(strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)) {
+                        continue;
+                    }
+
+                    d->type = DISK_TYPE_VIRTUAL;
+
+                    // Stop the loop after we found one file.
+                    break;
                 }
-
-                d->type = DISK_TYPE_CONTAINER;
-
-                // Stop the loop after we found one file.
-                break;
+                if (unlikely(closedir(dirp) == -1))
+                    error("Unable to close dir %s", buffer);
             }
-            if(unlikely(closedir(dirp) == -1))
-                error("Unable to close dir %s", buffer);
         }
     }
 
@@ -321,8 +341,14 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         
         char buffer[FILENAME_MAX + 1];
 
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s");
+        path_to_sys_block_device = config_get(CONFIG_SECTION_DISKSTATS, "path to get block device", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/block/%s");
+        path_to_sys_devices_virtual_block_device = config_get(CONFIG_SECTION_DISKSTATS, "path to get virtual block device", buffer);
+
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
-        path_to_find_block_device = config_get(CONFIG_SECTION_DISKSTATS, "path to get block device infos", buffer);
+        path_to_sys_dev_block_major_minor_string = config_get(CONFIG_SECTION_DISKSTATS, "path to get block device infos", buffer);
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/queue/hw_sector_size");
         path_to_get_hw_sector_size = config_get(CONFIG_SECTION_DISKSTATS, "path to get h/w sector size", buffer);
@@ -481,6 +507,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 // based on the type of disk
 
                 switch(d->type) {
+                    default:
+                    case DISK_TYPE_UNKNOWN:
+                        break;
+
                     case DISK_TYPE_PHYSICAL:
                         def_performance = global_enable_performance_for_physical_disks;
                         break;
@@ -489,7 +519,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         def_performance = global_enable_performance_for_partitions;
                         break;
 
-                    case DISK_TYPE_CONTAINER:
+                    case DISK_TYPE_VIRTUAL:
                         def_performance = global_enable_performance_for_virtual_disks;
                         break;
                 }
