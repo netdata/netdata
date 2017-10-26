@@ -497,7 +497,18 @@ netdataDashboard.context = {
     },
 
     'system.io': {
-        info: 'Total Disk I/O, for all disks. You can get detailed information about each disk at the <a href="#menu_disk">Disks</a> section and per application Disk usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
+        info: function(os) {
+            var s = 'Total Disk I/O, for all physical disks. You can get detailed information about each disk at the <a href="#menu_disk">Disks</a> section and per application Disk usage at the <a href="#menu_apps">Applications Monitoring</a> section.';
+
+            if(os === 'linux')
+                return s + ' Physical are all the disks that are listed in <code>/sys/block</code>, but do not exist in <code>/sys/devices/virtual/block</code>.';
+            else
+                return s;
+        }
+    },
+
+    'system.pgpgio': {
+        info: 'Memory paged from/to disk. This is usually the total disk I/O of the system.'
     },
 
     'system.swapio': {
@@ -552,7 +563,7 @@ netdataDashboard.context = {
             var s = 'Total bandwidth of all physical network interfaces. This does not include <code>lo</code>, VPNs, network bridges, IFB devices, bond interfaces, etc. Only the bandwidth of physical network interfaces is aggregated.';
 
             if(os === 'linux')
-                return s + ' Physical are all the network interfaces that are listed in <code>/proc/net/dev</code>, but do not exist in <code>/sys/devices/virtual/net</code>.'
+                return s + ' Physical are all the network interfaces that are listed in <code>/proc/net/dev</code>, but do not exist in <code>/sys/devices/virtual/net</code>.';
             else
                 return s;
         }
