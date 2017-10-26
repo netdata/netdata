@@ -166,7 +166,7 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
     }
 
     if(exp->rrdcalc && health_variable_lookup(v->name, v->hash, exp->rrdcalc, &n)) {
-        buffer_sprintf(exp->error_msg, "[ $%s = ", v->name);
+        buffer_sprintf(exp->error_msg, "[ ${%s} = ", v->name);
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
         return n;
@@ -355,7 +355,7 @@ static inline calculated_number eval_node(EVAL_EXPRESSION *exp, EVAL_NODE *op, i
 
 static inline void print_parsed_as_variable(BUFFER *out, EVAL_VARIABLE *v, int *error) {
     (void)error;
-    buffer_sprintf(out, "$%s", v->name);
+    buffer_sprintf(out, "${%s}", v->name);
 }
 
 static inline void print_parsed_as_constant(BUFFER *out, calculated_number n) {
@@ -703,17 +703,31 @@ static inline int parse_variable(const char **string, char *buffer, size_t len) 
     const char *s = *string;
 
     // $
-    if(s[0] == '$') {
+    if(*s == '$') {
         size_t i = 0;
         s++;
 
-        while(*s && !isvariableterm(*s) && i < len)
-            buffer[i++] = *s++;
+        if(*s == '{') {
+            // ${variable_name}
+
+            s++;
+            while (*s && *s != '}' && i < len)
+                buffer[i++] = *s++;
+
+            if(*s == '}')
+                s++;
+        }
+        else {
+            // $variable_name
+
+            while (*s && !isvariableterm(*s) && i < len)
+                buffer[i++] = *s++;
+        }
 
         buffer[i] = '\0';
 
-        if(buffer[0]) {
-            *string = &s[0];
+        if (buffer[0]) {
+            *string = s;
             return 1;
         }
     }

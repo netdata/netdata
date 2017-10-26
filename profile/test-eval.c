@@ -3,11 +3,12 @@
  * 1. build netdata (as normally)
  * 2. cd profile/
  * 3. compile with:
- *    gcc -O1 -ggdb -Wall -Wextra -I ../src/ -I ../ -o test-eval test-eval.c ../src/log.o ../src/eval.o ../src/common.o ../src/web_buffer.o ../src/storage_number.o -pthread -lm
- *
+ *    gcc -O1 -ggdb -Wall -Wextra -I ../src/ -I ../ -o test-eval test-eval.c ../src/log.o ../src/eval.o ../src/common.o ../src/clocks.o ../src/web_buffer.o ../src/storage_number.o -pthread -lm
  */
 
+#include "config.h"
 #include "common.h"
+#include "clocks.h"
 
 void netdata_cleanup_and_exit(int ret) { exit(ret); }
 
