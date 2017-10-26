@@ -183,9 +183,6 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 if not self.manage_retries():
                     return
             else:
-                current_time = time()
-                job.PREV_UPDATE = current_time
-                job.ELAPSED = int((current_time - job.START_RUN) * 1e3)
                 job.RETRIES, job.PENALTY = 0, 0
                 safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
                                                        since_last=job.SINCE_UPDATE,
@@ -208,8 +205,14 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             return False
 
         job = self._runtime_counters
+        current_time = time()
+
         if job.PREV_UPDATE:
-            job.SINCE_UPDATE = int((time() - job.PREV_UPDATE) * 1e6)
+            job.SINCE_UPDATE = int((current_time - job.PREV_UPDATE) * 1e6)
+            job.PREV_UPDATE = current_time
+        else:
+            job.PREV_UPDATE = current_time
+        job.ELAPSED = int((current_time - job.START_RUN) * 1e3)
 
         charts_updated = False
 
