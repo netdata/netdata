@@ -547,6 +547,17 @@ netdataDashboard.context = {
         info: 'Idle jitter is calculated by netdata. A thread is spawned that requests to sleep for a few microseconds. When the system wakes it up, it measures how many microseconds have passed. The difference between the requested and the actual duration of the sleep, is the <b>idle jitter</b>. This number is useful in real-time environments, where CPU jitter can affect the quality of the service (like VoIP media gateways).'
     },
 
+    'system.net': {
+        info: function(os) {
+            var s = 'Total bandwidth of all physical network interfaces. This does not include <code>lo</code>, VPNs, network bridges, IFB devices, bond interfaces, etc. Only the bandwidth of physical network interfaces is aggregated.';
+
+            if(os === 'linux')
+                return s + ' Physical are all the network interfaces that are listed in <code>/proc/net/dev</code>, but do not exist in <code>/sys/devices/virtual/net</code>.'
+            else
+                return s;
+        }
+    },
+
     'system.ipv4': {
         info: 'Total IPv4 Traffic.'
     },
