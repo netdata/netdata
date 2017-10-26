@@ -348,6 +348,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
     size_t lines = procfile_lines(ff), l;
 
+    collected_number system_read_kb = 0, system_write_kb = 0;
+
     for(l = 0; l < lines ;l++) {
         // --------------------------------------------------------------------------
         // Read parameters
@@ -422,6 +424,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         struct disk *d = get_disk(major, minor, disk);
         d->updated = 1;
+
+        if(unlikely(d->type == DISK_TYPE_PHYSICAL)) {
+            system_read_kb  += readsectors * d->sector_size / 1024;
+            system_write_kb += writesectors * d->sector_size / 1024;
+        }
 
         // --------------------------------------------------------------------------
         // Set its family based on mount point
@@ -850,6 +857,42 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         }
     }
 
+
+    // ------------------------------------------------------------------------
+    // update the system total I/O
+
+    if(global_do_io == CONFIG_BOOLEAN_YES || (global_do_io == CONFIG_BOOLEAN_AUTO && (system_read_kb || system_write_kb))) {
+        static RRDSET *st_io = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if(unlikely(!st_io)) {
+            st_io = rrdset_create_localhost(
+                    "system"
+                    , "io"
+                    , NULL
+                    , "disk"
+                    , NULL
+                    , "Disk I/O"
+                    , "kilobytes/s"
+                    , "proc"
+                    , "diskstats"
+                    , 150
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_in  = rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else rrdset_next(st_io);
+
+        rrddim_set_by_pointer(st_io, rd_in, system_read_kb);
+        rrddim_set_by_pointer(st_io, rd_out, system_write_kb);
+        rrdset_done(st_io);
+    }
+
+
+    // ------------------------------------------------------------------------
     // cleanup removed disks
 
     struct disk *d = disk_root, *last = NULL;
