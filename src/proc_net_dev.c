@@ -867,7 +867,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     , NULL
                     , "network"
                     , NULL
-                    , "Network Interfaces Aggregated Bandwidth"
+                    , "Physical Network Interfaces Aggregated Bandwidth"
                     , "kilobits/s"
                     , "proc"
                     , "net/dev"
