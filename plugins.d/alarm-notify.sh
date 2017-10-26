@@ -850,7 +850,7 @@ send_pushover() {
 # pushbullet sender
 
 send_pushbullet() {
-    local userapikey="${1}" source_device="${2}" recipients="${3}" url="{4}" title="${5}" message="{6}" httpcode sent=0 user
+    local userapikey="${1}" source_device="${2}" recipients="${3}" url="${4}" title="${5}" message="${6}" httpcode sent=0 user
     if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikey}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
         then
         #https://docs.pushbullet.com/#create-push
