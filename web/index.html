@@ -1388,8 +1388,8 @@
                     + ' data-colors="' + NETDATA.colors[12] + '"'
                     + ' role="application"></div>';
 
-            if(typeof charts['system.bandwidth'] !== 'undefined') {
-                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.bandwidth"'
+            if(typeof charts['system.net'] !== 'undefined') {
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.net"'
                     + ' data-dimensions="received"'
                     + ' data-chart-library="easypiechart"'
                     + ' data-title="Net Inbound"'
@@ -1397,10 +1397,10 @@
                     + ' data-before="0"'
                     + ' data-after="-' + duration.toString() + '"'
                     + ' data-points="' + duration.toString() + '"'
-                    + ' data-common-units="system.bandwidth.mainhead"'
+                    + ' data-common-units="system.net.mainhead"'
                     + ' role="application"></div>';
 
-                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.bandwidth"'
+                head += '<div class="netdata-container" style="margin-right: 10px;" data-netdata="system.net"'
                     + ' data-dimensions="sent"'
                     + ' data-chart-library="easypiechart"'
                     + ' data-title="Net Outbound"'
@@ -1408,7 +1408,7 @@
                     + ' data-before="0"'
                     + ' data-after="-' + duration.toString() + '"'
                     + ' data-points="' + duration.toString() + '"'
-                    + ' data-common-units="system.bandwidth.mainhead"'
+                    + ' data-common-units="system.net.mainhead"'
                     + ' role="application"></div>';
             }
             else if(typeof charts['system.ipv4'] !== 'undefined') {
