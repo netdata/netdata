@@ -249,6 +249,7 @@ declare -A role_recipients_pushover=()
 
 # pushbullet configs
 PUSHBULLET_ACCESS_TOKEN=
+PUSHBULLET_SOURCE_DEVICE=
 DEFAULT_RECIPIENT_PUSHBULLET=
 declare -A role_recipients_pushbullet=()
 
@@ -849,7 +850,7 @@ send_pushover() {
 # pushbullet sender
 
 send_pushbullet() {
-    local userapikey="${1}" recipients="${2}"  title="${3}" message="${4}" httpcode sent=0 user
+    local userapikey="${1}" source_device="${2}" recipients="${3}" url="{4}" title="${5}" message="{6}" httpcode sent=0 user
     if [ "${SEND_PUSHBULLET}" = "YES" -a ! -z "${userapikey}" -a ! -z "${recipients}" -a ! -z "${message}" -a ! -z "${title}" ]
         then
         #https://docs.pushbullet.com/#create-push
@@ -860,9 +861,11 @@ send_pushbullet() {
               --header 'Content-Type: application/json' \
               --data-binary  @<(cat <<EOF
                               {"title": "${title}",
-                              "type": "note",
+                              "type": "link",
                               "email": "${user}",
-                              "body": "$( echo -n ${message})"}
+                              "body": "$( echo -n ${message})",
+                              "url": "${url}",
+                              "source_device_iden": "${source_device}"}
 EOF
                ) "https://api.pushbullet.com/v2/pushes" -X POST)
 
@@ -1409,11 +1412,11 @@ SENT_PUSHOVER=$?
 # -----------------------------------------------------------------------------
 # send the pushbullet notification
 
-send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${to_pushbullet}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\n
+send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to_pushbullet}" "${goto_url}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\n
 Severity: ${severity}\n
 Chart: ${chart}\n
 Family: ${family}\n
-To View Netdata go to: ${goto_url}\n
+$(date -d @${when})\n
 The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?
