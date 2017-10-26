@@ -459,6 +459,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
     netdev_found = 0;
 
+    kernel_uint_t system_rbytes = 0;
+    kernel_uint_t system_tbytes = 0;
+
     size_t lines = procfile_lines(ff), l;
     for(l = 2; l < lines ;l++) {
         // require 17 words on each line
@@ -501,6 +504,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if(likely(d->do_bandwidth != CONFIG_BOOLEAN_NO)) {
             d->rbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 1));
             d->tbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 9));
+
+            system_rbytes += d->rbytes;
+            system_tbytes += d->tbytes;
         }
 
         if(likely(d->do_packets != CONFIG_BOOLEAN_NO)) {
@@ -829,6 +835,39 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrddim_set_by_pointer(d->st_events, d->rd_tcarrier,    (collected_number)d->tcarrier);
             rrdset_done(d->st_events);
         }
+    }
+
+    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO && (system_rbytes || system_tbytes))) {
+        do_bandwidth = CONFIG_BOOLEAN_YES;
+        static RRDSET *st_system_bandwidth = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if(unlikely(!st_system_bandwidth)) {
+            st_system_bandwidth = rrdset_create_localhost(
+                    "system"
+                    , "bandwidth"
+                    , NULL
+                    , "network"
+                    , NULL
+                    , "Network Interfaces Aggregated Bandwidth"
+                    , "kilobits/s"
+                    , "proc"
+                    , "net/dev"
+                    , 500
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_in  = rrddim_add(st_system_bandwidth, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_system_bandwidth, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_system_bandwidth);
+
+        rrddim_set_by_pointer(st_system_bandwidth, rd_in,  (collected_number)system_rbytes);
+        rrddim_set_by_pointer(st_system_bandwidth, rd_out, (collected_number)system_tbytes);
+
+        rrdset_done(st_system_bandwidth);
     }
 
     netdev_cleanup();
