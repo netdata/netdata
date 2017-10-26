@@ -262,7 +262,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                             , "kilobits/s"
                             , "proc"
                             , "net/netstat"
-                            , 500
+                            , 501
                             , update_every
                             , RRDSET_TYPE_AREA
                     );

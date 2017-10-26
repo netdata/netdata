@@ -291,7 +291,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     , "kilobits/s"
                     , "proc"
                     , "net/snmp6"
-                    , 500
+                    , 502
                     , update_every
                     , RRDSET_TYPE_AREA
             );
