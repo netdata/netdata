@@ -9,6 +9,7 @@ static struct netdev {
     size_t len;
 
     // flags
+    int virtual;
     int configured;
     int enabled;
     int updated;
@@ -428,8 +429,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1, do_events = -1;
+    static char *path_to_sys_devices_virtual_net = NULL;
 
     if(unlikely(enable_new_interfaces == -1)) {
+        char filename[FILENAME_MAX + 1];
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/net/%s");
+        path_to_sys_devices_virtual_net = config_get("plugin:proc:/proc/net/dev", "path to get virtual interfaces", filename);
+
         enable_new_interfaces = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
 
         do_bandwidth    = config_get_boolean_ondemand("plugin:proc:/proc/net/dev", "bandwidth for all interfaces", CONFIG_BOOLEAN_AUTO);
@@ -459,6 +466,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
     netdev_found = 0;
 
+    kernel_uint_t system_rbytes = 0;
+    kernel_uint_t system_tbytes = 0;
+
     size_t lines = procfile_lines(ff), l;
     for(l = 2; l < lines ;l++) {
         // require 17 words on each line
@@ -479,28 +489,42 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(d->enabled)
                 d->enabled = !simple_pattern_matches(disabled_list, d->name);
 
-            char var_name[512 + 1];
-            snprintfz(var_name, 512, "plugin:proc:/proc/net/dev:%s", d->name);
-            d->enabled = config_get_boolean_ondemand(var_name, "enabled", d->enabled);
+            char buffer[FILENAME_MAX + 1];
+
+            snprintfz(buffer, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
+            if(likely(access(buffer, R_OK) == 0)) {
+                d->virtual = 1;
+            }
+            else
+                d->virtual = 0;
+
+            snprintfz(buffer, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
+            d->enabled = config_get_boolean_ondemand(buffer, "enabled", d->enabled);
+            d->virtual = config_get_boolean(buffer, "virtual", d->virtual);
 
             if(d->enabled == CONFIG_BOOLEAN_NO)
                 continue;
 
-            d->do_bandwidth  = config_get_boolean_ondemand(var_name, "bandwidth",  do_bandwidth);
-            d->do_packets    = config_get_boolean_ondemand(var_name, "packets",    do_packets);
-            d->do_errors     = config_get_boolean_ondemand(var_name, "errors",     do_errors);
-            d->do_drops      = config_get_boolean_ondemand(var_name, "drops",      do_drops);
-            d->do_fifo       = config_get_boolean_ondemand(var_name, "fifo",       do_fifo);
-            d->do_compressed = config_get_boolean_ondemand(var_name, "compressed", do_compressed);
-            d->do_events     = config_get_boolean_ondemand(var_name, "events",     do_events);
+            d->do_bandwidth  = config_get_boolean_ondemand(buffer, "bandwidth",  do_bandwidth);
+            d->do_packets    = config_get_boolean_ondemand(buffer, "packets",    do_packets);
+            d->do_errors     = config_get_boolean_ondemand(buffer, "errors",     do_errors);
+            d->do_drops      = config_get_boolean_ondemand(buffer, "drops",      do_drops);
+            d->do_fifo       = config_get_boolean_ondemand(buffer, "fifo",       do_fifo);
+            d->do_compressed = config_get_boolean_ondemand(buffer, "compressed", do_compressed);
+            d->do_events     = config_get_boolean_ondemand(buffer, "events",     do_events);
         }
 
         if(unlikely(!d->enabled))
             continue;
 
-        if(likely(d->do_bandwidth != CONFIG_BOOLEAN_NO)) {
+        if(likely(d->do_bandwidth != CONFIG_BOOLEAN_NO || !d->virtual)) {
             d->rbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 1));
             d->tbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 9));
+
+            if(likely(!d->virtual)) {
+                system_rbytes += d->rbytes;
+                system_tbytes += d->tbytes;
+            }
         }
 
         if(likely(d->do_packets != CONFIG_BOOLEAN_NO)) {
@@ -829,6 +853,39 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrddim_set_by_pointer(d->st_events, d->rd_tcarrier,    (collected_number)d->tcarrier);
             rrdset_done(d->st_events);
         }
+    }
+
+    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO && (system_rbytes || system_tbytes))) {
+        do_bandwidth = CONFIG_BOOLEAN_YES;
+        static RRDSET *st_system_net = NULL;
+        static RRDDIM *rd_in = NULL, *rd_out = NULL;
+
+        if(unlikely(!st_system_net)) {
+            st_system_net = rrdset_create_localhost(
+                    "system"
+                    , "net"
+                    , NULL
+                    , "network"
+                    , NULL
+                    , "Physical Network Interfaces Aggregated Bandwidth"
+                    , "kilobits/s"
+                    , "proc"
+                    , "net/dev"
+                    , 500
+                    , update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_in  = rrddim_add(st_system_net, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_system_net, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_system_net);
+
+        rrddim_set_by_pointer(st_system_net, rd_in,  (collected_number)system_rbytes);
+        rrddim_set_by_pointer(st_system_net, rd_out, (collected_number)system_tbytes);
+
+        rrdset_done(st_system_net);
     }
 
     netdev_cleanup();
