@@ -1417,7 +1417,6 @@ Severity: ${severity}\n
 Chart: ${chart}\n
 Family: ${family}\n
 $(date -d @${when})\n
-To View Netdata go to: ${goto_url}\n
 The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?
