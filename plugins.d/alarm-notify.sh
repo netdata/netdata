@@ -1413,10 +1413,10 @@ SENT_PUSHOVER=$?
 # send the pushbullet notification
 
 send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to_pushbullet}" "${goto_url}" "${host} ${status_message} - ${name//_/ } - ${chart}" "${alarm}\n
-$(date -d @${when})\n
 Severity: ${severity}\n
 Chart: ${chart}\n
 Family: ${family}\n
+$(date -d @${when})\n
 To View Netdata go to: ${goto_url}\n
 The source of this alarm is line ${src}"
 
