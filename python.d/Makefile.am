@@ -14,7 +14,6 @@ dist_python_SCRIPTS = \
 dist_python_DATA = \
     README.md \
     apache.chart.py \
-    apache_cache.chart.py \
     bind_rndc.chart.py \
     chrony.chart.py \
     couchdb.chart.py \
