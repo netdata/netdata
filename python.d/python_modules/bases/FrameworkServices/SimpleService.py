@@ -173,8 +173,11 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
             self.sleep_until_next_run()
 
+            if job.PREV_UPDATE:
+                job.SINCE_UPDATE = int((job.START_RUN - job.PREV_UPDATE) * 1e6)
+
             try:
-                updated = self.update()
+                updated = self.update(interval=job.SINCE_UPDATE)
             except Exception as error:
                 self.error('update() unhandled exception: {error}'.format(error=error))
                 updated = False
@@ -183,6 +186,8 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 if not self.manage_retries():
                     return
             else:
+                job.ELAPSED = int((time() - job.START_RUN) * 1e3)
+                job.PREV_UPDATE = job.START_RUN
                 job.RETRIES, job.PENALTY = 0, 0
                 safe_print(RUNTIME_CHART_UPDATE.format(job_name=self.name,
                                                        since_last=job.SINCE_UPDATE,
@@ -192,7 +197,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                                                          elapsed=job.ELAPSED if updated else '-',
                                                          retries=job.RETRIES_MAX - job.RETRIES))
 
-    def update(self):
+    def update(self, interval):
         """
         :return:
         """
@@ -203,16 +208,6 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         elif not isinstance(data, dict):
             self.debug('get_data() returned incorrect type data')
             return False
-
-        job = self._runtime_counters
-        current_time = time()
-
-        if job.PREV_UPDATE:
-            job.SINCE_UPDATE = int((current_time - job.PREV_UPDATE) * 1e6)
-            job.PREV_UPDATE = current_time
-        else:
-            job.PREV_UPDATE = current_time
-        job.ELAPSED = int((current_time - job.START_RUN) * 1e3)
 
         charts_updated = False
 
@@ -244,7 +239,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
             if dimension_updated:
                 charts_updated = True
-                safe_print(''.join([chart.begin(since_last=job.SINCE_UPDATE),
+                safe_print(''.join([chart.begin(since_last=interval),
                                     dimension_updated,
                                     variables_updated,
                                     'END\n']))
