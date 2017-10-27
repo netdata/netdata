@@ -15,12 +15,12 @@ except ImportError:
 from bases.collection import on_try_except_finally
 
 
-LOGGING_LEVELS = {50: 'CRITICAL',
-                  40: 'ERROR',
-                  30: 'WARNING',
-                  20: 'INFO',
-                  10: 'DEBUG',
-                  0: 'NOTSET'}
+LOGGING_LEVELS = {'CRITICAL': 50,
+                  'ERROR': 40,
+                  'WARNING': 30,
+                  'INFO': 20,
+                  'DEBUG': 10,
+                  'NOTSET': 0}
 
 DEFAULT_LOG_LINE_FORMAT = '%(asctime)s: %(name)s %(levelname)s : %(message)s'
 DEFAULT_LOG_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -116,8 +116,8 @@ class BaseLogger(object):
         :param level: <str> or <int>
         :return:
         """
-        if level in [lvl for item in LOGGING_LEVELS.items() for lvl in item]:
-            self.logger.setLevel(level)
+        if level in LOGGING_LEVELS:
+            self.logger.setLevel(LOGGING_LEVELS[level])
 
     def debug(self, *msg, **kwargs):
         self.logger.debug(' '.join(map(str, msg)), **kwargs)
