@@ -16,11 +16,6 @@ from sys import version_info, argv
 from time import sleep
 
 try:
-    from collections import OrderedDict
-except ImportError:
-    from third_party.ordereddict import OrderedDict
-
-try:
     from time import monotonic as time
 except ImportError:
     from time import time
@@ -36,6 +31,11 @@ sys.path.append(PYTHON_MODULES_DIR)
 from bases.loaders import ModuleAndConfigLoader
 from bases.loggers import PythonDLogger
 from bases.collection import setdefault_values, run_and_exit
+
+try:
+    from collections import OrderedDict
+except ImportError:
+    from third_party.ordereddict import OrderedDict
 
 BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
                'retries': 60,
