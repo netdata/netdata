@@ -364,8 +364,6 @@ var NETDATA = window.NETDATA || {};
 
             smooth_plot: (isSlowDevice() === false), // enable smooth plot, where possible
 
-            charts_selection_animation_delay: 50, // delay to animate charts when syncing selection
-
             color_fill_opacity_line: 1.0,
             color_fill_opacity_area: 0.2,
             color_fill_opacity_stacked: 0.8,
@@ -1986,7 +1984,7 @@ var NETDATA = window.NETDATA || {};
                 if (this.timeout_id !== null)
                     clearTimeout(this.timeout_id);
 
-                this.timeout_id = setTimeout(this.__syncSlaves, 5);
+                this.timeout_id = setTimeout(this.__syncSlaves, 0);
             }
         }
     };
@@ -6227,7 +6225,7 @@ var NETDATA = window.NETDATA || {};
             state.tmp.easyPieChartEvent.timer = setTimeout(function() {
                 state.tmp.easyPieChartEvent.timer = undefined;
                 state.tmp.easyPieChart_instance.update(state.tmp.easyPieChartEvent.pcent);
-            }, NETDATA.options.current.charts_selection_animation_delay);
+            }, 0);
         }
 
         return true;
@@ -6508,7 +6506,7 @@ var NETDATA = window.NETDATA || {};
             state.tmp.gaugeEvent.timer = setTimeout(function() {
                 state.tmp.gaugeEvent.timer = undefined;
                 NETDATA.gaugeSet(state, state.tmp.gaugeEvent.value, state.tmp.gaugeEvent.min, state.tmp.gaugeEvent.max);
-            }, NETDATA.options.current.charts_selection_animation_delay);
+            }, 0);
         }
 
         return true;
