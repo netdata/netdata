@@ -114,8 +114,11 @@ GLOBAL_STATS = [
  'Connection_errors_max_connections',
  'Connection_errors_peer_address',
  'Connection_errors_select',
- 'Connection_errors_tcpwrap']
-
+ 'Connection_errors_tcpwrap',
+ 'wsrep_local_recv_queue',
+ 'wsrep_local_send_queue',
+ 'wsrep_received',
+ 'wsrep_replicated']
 
 def slave_seconds(value):
     try:
@@ -148,7 +151,8 @@ ORDER = ['net',
          'innodb_buffer_pool_read_ahead', 'innodb_buffer_pool_reqs', 'innodb_buffer_pool_ops',
          'qcache_ops', 'qcache', 'qcache_freemem', 'qcache_memblocks',
          'key_blocks', 'key_requests', 'key_disk_ops',
-         'files', 'files_rate', 'slave_behind', 'slave_status']
+         'files', 'files_rate', 'slave_behind', 'slave_status',
+         'galera_writesets', 'galera_queue']
 
 CHARTS = {
     'net': {
@@ -411,6 +415,18 @@ CHARTS = {
         'lines': [
             ['Slave_SQL_Running', 'sql_running', 'absolute'],
             ['Slave_IO_Running', 'io_running', 'absolute']
+        ]},
+    'galera_writesets': {
+        'options': [None, 'Galera writesets', 'writesets/s', 'galera', 'mysql.galera_writesets', 'line'],
+        'lines': [
+            ['wsrep_received', 'rx', 'incremental'],
+            ['wsrep_replicated', 'tx', 'incremental', -1, 1],
+        ]},
+    'galera_queue': {
+        'options': [None, 'Galera queue', 'writesets', 'galera', 'mysql.galera_queue', 'area'],
+        'lines': [
+            ['wsrep_local_recv_queue', 'rx', 'incremental'],
+            ['wsrep_local_send_queue', 'tx', 'incremental', -1, 1],
         ]}
 }
 
