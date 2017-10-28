@@ -364,8 +364,6 @@ var NETDATA = window.NETDATA || {};
 
             smooth_plot: (isSlowDevice() === false), // enable smooth plot, where possible
 
-            charts_selection_animation_delay: 50, // delay to animate charts when syncing selection
-
             color_fill_opacity_line: 1.0,
             color_fill_opacity_area: 0.2,
             color_fill_opacity_stacked: 0.8,
@@ -1895,15 +1893,98 @@ var NETDATA = window.NETDATA || {};
         dont_sync_before: 0,
         last_t: 0,
         slaves: [],
+        timeout_id: null,
 
-        stop: function() {
-            if(this.state !== null)
-                this.state.globalSelectionSyncStop();
+        // return true if global selection sync can be enabled now
+        enabled: function() {
+            // console.log('enabled()');
+            // can we globally apply selection sync?
+            if(NETDATA.options.current.sync_selection === false)
+                return false;
+
+            return (this.dont_sync_before <= Date.now());
         },
 
-        delay: function() {
+        // set the global selection sync master
+        setMaster: function(state) {
+            // console.log('setMaster()');
+            if(NETDATA.options.current.sync_selection === false || this.state === state)
+                return;
+
+            if(this.state !== null)
+                this.stop();
+
+            state.selected = true;
+            this.state = state;
+            this.last_t = 0;
+
+            // find all slaves
+            this.slaves = [];
+            var len = NETDATA.options.targets.length;
+            while(len--) {
+                var st = NETDATA.options.targets[len];
+                if (this.state !== st && st.globalSelectionSyncIsEligible() === true)
+                    this.slaves.push(st);
+            }
+
+            // this.delay(100);
+        },
+
+        // stop global selection sync
+        stop: function() {
+            // console.log('stop()');
             if(this.state !== null) {
-                this.state.globalSelectionSyncDelay();
+                var len = this.slaves.length;
+                while (len--)
+                    this.slaves[len].clearSelection();
+
+                this.state.clearSelection();
+
+                this.last_t = 0;
+                this.slaves = [];
+                this.state = null;
+            }
+        },
+
+        // delay global selection sync for some time
+        delay: function(ms) {
+            // console.log('delay()');
+
+            if(this.state !== null && NETDATA.options.current.sync_selection === true) {
+                if(typeof ms === 'number')
+                    this.dont_sync_before = Date.now() + ms;
+                else
+                    this.dont_sync_before = Date.now() + NETDATA.options.current.sync_selection_delay;
+            }
+        },
+
+        __syncSlaves: function() {
+            var t = NETDATA.globalSelectionSync.last_t;
+            var len = NETDATA.globalSelectionSync.slaves.length;
+            while(len--)
+                NETDATA.globalSelectionSync.slaves[len].setSelection(t);
+
+            this.timeout_id = null;
+        },
+
+        // sync all the visible charts to the given time
+        // this is to be called from the chart libraries
+        sync: function(state, t) {
+            // console.log('sync()');
+
+            if(NETDATA.options.current.sync_selection === true) {
+                if(this.state !== state)
+                    this.setMaster(state);
+
+                if(t === this.last_t)
+                    return;
+
+                this.last_t = t;
+
+                if (this.timeout_id !== null)
+                    clearTimeout(this.timeout_id);
+
+                this.timeout_id = setTimeout(this.__syncSlaves, 0);
             }
         }
     };
@@ -2644,74 +2725,6 @@ var NETDATA = window.NETDATA || {};
         // ----------------------------------------------------------------------------------------------------------------
         // global selection sync
 
-        // prevent to global selection sync for some time
-        this.globalSelectionSyncDelay = function(ms) {
-            if(NETDATA.options.current.sync_selection === false)
-                return;
-
-            if(typeof ms === 'number')
-                NETDATA.globalSelectionSync.dont_sync_before = Date.now() + ms;
-            else
-                NETDATA.globalSelectionSync.dont_sync_before = Date.now() + NETDATA.options.current.sync_selection_delay;
-        };
-
-        // can we globally apply selection sync?
-        this.globalSelectionSyncAbility = function() {
-            if(NETDATA.options.current.sync_selection === false)
-                return false;
-
-            return (NETDATA.globalSelectionSync.dont_sync_before <= Date.now());
-        };
-
-        this.globalSelectionSyncIsMaster = function() {
-            return (NETDATA.globalSelectionSync.state === this);
-        };
-
-        // this chart is the master of the global selection sync
-        this.globalSelectionSyncBeMaster = function() {
-            // am I the master?
-            if(this.globalSelectionSyncIsMaster()) {
-                if(this.debug === true)
-                    this.log('sync: I am the master already.');
-
-                return;
-            }
-
-            if(NETDATA.globalSelectionSync.state) {
-                if(this.debug === true)
-                    this.log('sync: I am not the sync master. Resetting global sync.');
-
-                this.globalSelectionSyncStop();
-            }
-
-            // become the master
-            if(this.debug === true)
-                this.log('sync: becoming sync master.');
-
-            this.selected = true;
-            NETDATA.globalSelectionSync.state = this;
-
-            // find the all slaves
-            var targets = NETDATA.options.targets;
-            var len = targets.length;
-            while(len--) {
-                var st = targets[len];
-
-                if(st === this) {
-                    if(this.debug === true)
-                        st.log('sync: not adding me to sync');
-                }
-                else if(st.globalSelectionSyncIsEligible()) {
-                    if(this.debug === true)
-                        st.log('sync: adding to sync as slave');
-
-                    st.globalSelectionSyncBeSlave();
-                }
-            }
-
-            // this.globalSelectionSyncDelay(100);
-        };
-
         // can the chart participate to the global selection sync as a slave?
         this.globalSelectionSyncIsEligible = function() {
             return (this.enabled === true
@@ -2719,61 +2732,6 @@ var NETDATA = window.NETDATA || {};
                 && typeof this.library.setSelection === 'function'
                 && this.isVisible() === true
                 && this.chart_created === true);
-        };
-
-        // this chart becomes a slave of the global selection sync
-        this.globalSelectionSyncBeSlave = function() {
-            if(NETDATA.globalSelectionSync.state !== this)
-                NETDATA.globalSelectionSync.slaves.push(this);
-        };
-
-        // sync all the visible charts to the given time
-        // this is to be called from the chart libraries
-        this.globalSelectionSync = function(t) {
-            if(this.globalSelectionSyncAbility() === false)
-                return;
-
-            if(this.globalSelectionSyncIsMaster() === false) {
-                if(this.debug === true)
-                    this.log('sync: trying to be sync master.');
-
-                this.globalSelectionSyncBeMaster();
-
-                if(this.globalSelectionSyncAbility() === false)
-                    return;
-            }
-
-            NETDATA.globalSelectionSync.last_t = t;
-            $.each(NETDATA.globalSelectionSync.slaves, function(i, st) {
-                st.setSelection(t);
-            });
-        };
-
-        // stop syncing all charts to the given time
-        this.globalSelectionSyncStop = function() {
-            if(NETDATA.globalSelectionSync.slaves.length) {
-                if(this.debug === true)
-                    this.log('sync: cleaning up...');
-
-                $.each(NETDATA.globalSelectionSync.slaves, function(i, st) {
-                    if(st === that) {
-                        if(that.debug === true)
-                            st.log('sync: not adding me to sync stop');
-                    }
-                    else {
-                        if(that.debug === true)
-                            st.log('sync: removed slave from sync');
-
-                        st.clearSelection();
-                    }
-                });
-
-                NETDATA.globalSelectionSync.last_t = 0;
-                NETDATA.globalSelectionSync.slaves = [];
-                NETDATA.globalSelectionSync.state = null;
-            }
-
-            this.clearSelection();
         };
 
         this.setSelection = function(t) {
@@ -2803,6 +2761,8 @@ var NETDATA = window.NETDATA || {};
 
             return this.selected;
         };
+
+        // ----------------------------------------------------------------------------------------------------------------
 
         // find if a timestamp (ms) is shown in the current chart
         this.timeIsVisible = function(t) {
@@ -4390,7 +4350,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.resetAllCharts = function(state) {
         // first clear the global selection sync
         // to make sure no chart is in selected state
-        state.globalSelectionSyncStop();
+        NETDATA.globalSelectionSync.stop();
 
         // there are 2 possibilities here
         // a. state is the global Pan and Zoom master
@@ -5039,8 +4999,8 @@ var NETDATA = window.NETDATA || {};
             before = state.netdata_last;
 
         state.setMode('zoom');
-        state.globalSelectionSyncStop();
-        state.globalSelectionSyncDelay();
+        NETDATA.globalSelectionSync.stop();
+        NETDATA.globalSelectionSync.delay();
         state.tmp.dygraph_user_action = true;
         state.tmp.dygraph_force_zoom = true;
         state.updateChartPanOrZoom(after, before);
@@ -5364,8 +5324,8 @@ var NETDATA = window.NETDATA || {};
                 if(NETDATA.options.debug.dygraph === true)
                     state.log('dygraphZoomCallback()');
 
-                state.globalSelectionSyncStop();
-                state.globalSelectionSyncDelay();
+                NETDATA.globalSelectionSync.stop();
+                NETDATA.globalSelectionSync.delay();
                 state.setMode('zoom');
 
                 // refresh it to the greatest possible zoom level
@@ -5376,9 +5336,6 @@ var NETDATA = window.NETDATA || {};
             highlightCallback: function(event, x, points, row, seriesName) {
                 void(seriesName);
 
-                if(NETDATA.options.debug.dygraph === true || state.debug === true)
-                    state.log('dygraphHighlightCallback()');
-
                 state.pauseChart();
 
                 // there is a bug in dygraph when the chart is zoomed enough
@@ -5388,7 +5345,7 @@ var NETDATA = window.NETDATA || {};
                 // var t = state.data_after + row * state.data_update_every;
                 // console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':(Math.abs(x-t)<=state.data_update_every)?'SIMILAR':'DIFFERENT') + ', rows in db: ' + state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' + state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' + state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before + ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' + state.data_update_every);
 
-                state.globalSelectionSync(x);
+                NETDATA.globalSelectionSync.sync(state, x);
 
                 // fix legend zIndex using the internal structures of dygraph legend module
                 // this works, but it is a hack!
@@ -5401,7 +5358,7 @@ var NETDATA = window.NETDATA || {};
                     state.log('dygraphUnhighlightCallback()');
 
                 state.unpauseChart();
-                state.globalSelectionSyncStop();
+                NETDATA.globalSelectionSync.stop();
             },
             interactionModel : {
                 mousedown: function(event, dygraph, context) {
@@ -5409,7 +5366,7 @@ var NETDATA = window.NETDATA || {};
                         state.log('interactionModel.mousedown()');
 
                     state.tmp.dygraph_user_action = true;
-                    state.globalSelectionSyncStop();
+                    NETDATA.globalSelectionSync.stop();
 
                     if(NETDATA.options.debug.dygraph === true)
                         state.log('dygraphMouseDown()');
@@ -5422,24 +5379,24 @@ var NETDATA = window.NETDATA || {};
                     if(event.button && event.button === 1) {
                         if (event.altKey || event.shiftKey) {
                             state.setMode('pan');
-                            state.globalSelectionSyncDelay();
+                            NETDATA.globalSelectionSync.delay();
                             Dygraph.startPan(event, dygraph, context);
                         }
                         else {
                             state.setMode('zoom');
-                            state.globalSelectionSyncDelay();
+                            NETDATA.globalSelectionSync.delay();
                             Dygraph.startZoom(event, dygraph, context);
                         }
                     }
                     else {
                         if (event.altKey || event.shiftKey) {
                             state.setMode('zoom');
-                            state.globalSelectionSyncDelay();
+                            NETDATA.globalSelectionSync.delay();
                             Dygraph.startZoom(event, dygraph, context);
                         }
                         else {
                             state.setMode('pan');
-                            state.globalSelectionSyncDelay();
+                            NETDATA.globalSelectionSync.delay();
                             Dygraph.startPan(event, dygraph, context);
                         }
                     }
@@ -5450,16 +5407,16 @@ var NETDATA = window.NETDATA || {};
 
                     if(context.isPanning) {
                         state.tmp.dygraph_user_action = true;
-                        state.globalSelectionSyncStop();
-                        state.globalSelectionSyncDelay();
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.globalSelectionSync.delay();
                         state.setMode('pan');
                         context.is2DPan = false;
                         Dygraph.movePan(event, dygraph, context);
                     }
                     else if(context.isZooming) {
                         state.tmp.dygraph_user_action = true;
-                        state.globalSelectionSyncStop();
-                        state.globalSelectionSyncDelay();
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.globalSelectionSync.delay();
                         state.setMode('zoom');
                         Dygraph.moveZoom(event, dygraph, context);
                     }
@@ -5470,12 +5427,12 @@ var NETDATA = window.NETDATA || {};
 
                     if (context.isPanning) {
                         state.tmp.dygraph_user_action = true;
-                        state.globalSelectionSyncDelay();
+                        NETDATA.globalSelectionSync.delay();
                         Dygraph.endPan(event, dygraph, context);
                     }
                     else if (context.isZooming) {
                         state.tmp.dygraph_user_action = true;
-                        state.globalSelectionSyncDelay();
+                        NETDATA.globalSelectionSync.delay();
                         Dygraph.endZoom(event, dygraph, context);
                     }
                 },
@@ -5565,8 +5522,8 @@ var NETDATA = window.NETDATA || {};
                     if(event.altKey || event.shiftKey) {
                         state.tmp.dygraph_user_action = true;
 
-                        state.globalSelectionSyncStop();
-                        state.globalSelectionSyncDelay();
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.globalSelectionSync.delay();
 
                         // http://dygraphs.com/gallery/interaction-api.js
                         var normal_def;
@@ -5655,7 +5612,7 @@ var NETDATA = window.NETDATA || {};
                         var pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
                         var t = Math.round(state.data_after + (state.data_before - state.data_after) * pct);
                         if(NETDATA.dygraphSetSelection(state, t) === true)
-                            state.globalSelectionSync(t);
+                            NETDATA.globalSelectionSync.sync(state, t);
                     }
 
                     // if it was double tap within double click time, reset the charts
@@ -6268,7 +6225,7 @@ var NETDATA = window.NETDATA || {};
             state.tmp.easyPieChartEvent.timer = setTimeout(function() {
                 state.tmp.easyPieChartEvent.timer = undefined;
                 state.tmp.easyPieChart_instance.update(state.tmp.easyPieChartEvent.pcent);
-            }, NETDATA.options.current.charts_selection_animation_delay);
+            }, 0);
         }
 
         return true;
@@ -6549,7 +6506,7 @@ var NETDATA = window.NETDATA || {};
             state.tmp.gaugeEvent.timer = setTimeout(function() {
                 state.tmp.gaugeEvent.timer = undefined;
                 NETDATA.gaugeSet(state, state.tmp.gaugeEvent.value, state.tmp.gaugeEvent.min, state.tmp.gaugeEvent.max);
-            }, NETDATA.options.current.charts_selection_animation_delay);
+            }, 0);
         }
 
         return true;
