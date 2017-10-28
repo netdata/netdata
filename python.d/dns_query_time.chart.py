@@ -2,6 +2,10 @@
 # Description: dns_query_time netdata python.d module
 # Author: l2isbad
 
+from random import choice
+from threading import Thread
+from socket import gethostbyname, gaierror
+
 try:
     from time import monotonic as time
 except ImportError:
@@ -15,10 +19,8 @@ try:
     from queue import Queue
 except ImportError:
     from Queue import Queue
-from random import choice
-from threading import Thread
-from socket import gethostbyname, gaierror
-from base import SimpleService
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 
 # default module values (can be overridden per job in `config`)
@@ -43,7 +45,6 @@ class Service(SimpleService):
             return False
 
         self.timeout = self.timeout if isinstance(self.timeout, int) else 4
-        self.update_every = self.timeout + 1 if self.update_every <= self.timeout else self.update_every
 
         if not all([self.domains, self.server_list,
                     isinstance(self.server_list, str), isinstance(self.domains, str)]):
@@ -69,9 +70,7 @@ class Service(SimpleService):
             if not self.server_list:
                 return False
 
-        self._data_from_check = data
         self.order, self.definitions = create_charts(aggregate=self.aggregate, server_list=self.server_list)
-        self.info(str({'domains': len(self.domains), 'servers': self.server_list}))
         return True
 
     def _get_data(self, timeout=None):

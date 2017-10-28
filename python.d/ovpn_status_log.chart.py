@@ -3,8 +3,8 @@
 # Author: l2isbad
 
 from re import compile as r_compile
-from collections import defaultdict
-from base import SimpleService
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 60000
 retries = 60
@@ -34,24 +34,30 @@ class Service(SimpleService):
         self.log_path = self.configuration.get('log_path')
         self.regex = dict(tls=r_compile(r'\d{1,3}(?:\.\d{1,3}){3}(?::\d+)? (?P<bytes_in>\d+) (?P<bytes_out>\d+)'),
                           static_key=r_compile(r'TCP/[A-Z]+ (?P<direction>(?:read|write)) bytes,(?P<bytes>\d+)'))
-        self.to_netdata = dict(bytes_in=0, bytes_out=0)
 
     def check(self):
         if not (self.log_path and isinstance(self.log_path, str)):
-            self.error('\'log_path\' is not defined')
+            self.error("'log_path' is not defined")
             return False
 
-        data = False
-        for method in (self._get_data_tls, self._get_data_static_key):
-            data = method()
-            if data:
-                self._get_data = method
-                self._data_from_check = data
-                break
+        data = self._get_raw_data()
+        if not data:
+            self.error('Make sure that the openvpn status log file exists and netdata has permission to read it')
+            return None
 
-        if data:
+        found = None
+        for row in data:
+            if 'ROUTING' in row:
+                self.get_data = self.get_data_tls
+                found = True
+                break
+            elif 'STATISTICS' in row:
+                self.get_data = self.get_data_static_key
+                found = True
+                break
+        if found:
             return True
-        self.error('Make sure that the openvpn status log file exists and netdata has permission to read it')
+        self.error("Failed to parse ovpenvpn log file")
         return False
 
     def _get_raw_data(self):
@@ -68,7 +74,7 @@ class Service(SimpleService):
         else:
             return raw_data
 
-    def _get_data_static_key(self):
+    def get_data_static_key(self):
         """
         Parse openvpn-status log file.
         """
@@ -77,7 +83,7 @@ class Service(SimpleService):
         if not raw_data:
             return None
 
-        data = defaultdict(lambda: 0)
+        data = dict(bytes_in=0, bytes_out=0)
 
         for row in raw_data:
             match = self.regex['static_key'].search(row)
@@ -90,7 +96,7 @@ class Service(SimpleService):
 
         return data or None
 
-    def _get_data_tls(self):
+    def get_data_tls(self):
         """
         Parse openvpn-status log file.
         """
@@ -99,7 +105,7 @@ class Service(SimpleService):
         if not raw_data:
             return None
 
-        data = defaultdict(lambda: 0)
+        data = dict(users=0, bytes_in=0, bytes_out=0)
         for row in raw_data:
             row = ' '.join(row.split(',')) if ',' in row else ' '.join(row.split())
             match = self.regex['tls'].search(row)
@@ -110,4 +116,3 @@ class Service(SimpleService):
                 data['bytes_out'] += int(match['bytes_out'])
 
         return data or None
-

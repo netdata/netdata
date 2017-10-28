@@ -2,8 +2,9 @@
 # Description: powerdns netdata python.d module
 # Author: l2isbad
 
-from base import UrlService
 from json import loads
+
+from bases.FrameworkServices.UrlService import UrlService
 
 priority = 60000
 retries = 60
@@ -54,5 +55,4 @@ class Service(UrlService):
         data = self._get_raw_data()
         if not data:
             return None
-        return dict([(d['name'], d['value']) for d in loads(data)])
-
+        return dict((d['name'], d['value']) for d in loads(data))

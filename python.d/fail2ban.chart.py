@@ -2,12 +2,15 @@
 # Description: fail2ban log netdata python.d module
 # Author: l2isbad
 
+import bisect
+
+from glob import glob
 from re import compile as r_compile
 from os import access as is_accessible, R_OK
 from os.path import isdir, getsize
-from glob import glob
-import bisect
-from base import LogService
+
+
+from bases.FrameworkServices.LogService import LogService
 
 priority = 60000
 retries = 60
@@ -180,8 +183,8 @@ def find_jails_in_files(list_of_files, print_error):
     jails_list = list()
     for conf in list_of_files:
         if is_accessible(conf, R_OK):
-            with open(conf, 'rt') as conf:
-                raw_data = conf.readlines()
+            with open(conf, 'rt') as f:
+                raw_data = f.readlines()
             data = ' '.join(line for line in raw_data if line.startswith(('[', 'enabled')))
             jails_list.extend(REGEX_JAILS.findall(data))
         else:

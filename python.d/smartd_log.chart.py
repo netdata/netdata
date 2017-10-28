@@ -2,20 +2,11 @@
 # Description: smart netdata python.d module
 # Author: l2isbad, vorph1
 
+import os
 from re import compile as r_compile
-from os import listdir, access, R_OK
-from os.path import isfile, join, getsize, basename, isdir
-try:
-    from queue import Queue
-except ImportError:
-    from Queue import Queue
-from threading import Thread
-from base import SimpleService
-from collections import namedtuple
 
-# default module values (can be overridden per job in `config`)
-update_every = 5
-priority = 60000
+from bases.collection import read_last_line
+from bases.FrameworkServices.SimpleService import SimpleService
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = ['1', '4', '5', '7', '9', '12', '193', '194', '197', '198', '200']
@@ -95,7 +86,12 @@ SMART_ATTR = {
    '250': 'Read Error Retry Rate'
 }
 
-NAMED_DISKS = namedtuple('disks', ['name', 'size', 'number'])
+
+class Disk:
+    def __init__(self, name, path):
+        self.name = name
+        self.path = path
+        self.status = True
 
 
 class Service(SimpleService):
@@ -105,118 +101,76 @@ class Service(SimpleService):
         self.log_path = self.configuration.get('log_path', '/var/log/smartd')
         self.raw_values = self.configuration.get('raw_values')
         self.attr = self.configuration.get('smart_attributes', [])
-        self.previous_data = dict()
+        self.exclude_disks = self.configuration.get('exclude_disks', str()).split()
+        self.order = list()
+        self.definitions = dict()
+        self.disks = list()
+
+        for path_to_disk in find_disks_in_log_path(self.log_path):
+            disk_name = os.path.basename(path_to_disk).split('.')[-3]
+            for pattern in self.exclude_disks:
+                if pattern in disk_name:
+                    break
+            else:
+                self.disks.append(Disk(name=disk_name, path=path_to_disk))
 
     def check(self):
-        # Can\'t start without smartd readable diks log files
-        disks = find_disks_in_log_path(self.log_path)
-        if not disks:
-            self.error('Can\'t locate any smartd log files in %s' % self.log_path)
+        if not self.disks:
+            self.error('Can\'t locate any smartd log files in {0}'.format(self.log_path))
             return False
 
-        # List of namedtuples to track smartd log file size
-        self.disks = [NAMED_DISKS(name=disks[i], size=0, number=i) for i in range(len(disks))]
+        self.create_charts()
+        return True
 
-        if self._get_data():
-            self.create_charts()
-            return True
-        else:
-            self.error('Can\'t collect any data. Sorry.')
-            return False
+    def get_data(self):
+        data = dict()
+        for disk in self.disks:
+            if not disk.status:
+                continue
 
-    def _get_raw_data(self, queue, disk):
-        # The idea is to open a file.
-        # Jump to the end.
-        # Seek backward until '\n' symbol appears
-        # If '\n' is found or it's the beginning of the file
-        # readline()! (last or first line)
-        with open(disk, 'rb') as f:
-            f.seek(-2, 2)
-            while f.read(1) != b'\n':
-                f.seek(-2, 1)
-                if f.tell() == 0:
-                    break
-            result = f.readline()
+            try:
+                last_line = read_last_line(disk.path)
+            except OSError:
+                disk.status = False
+                continue
 
-        result = result.decode()
-        result = self.regex.findall(result)
+            result = self.regex.findall(last_line)
+            if not result:
+                continue
+            for a, n, r in result:
+                data.update({'_'.join([disk.name, a]): r if self.raw_values else n})
 
-        queue.put([basename(disk), result])
-
-    def _get_data(self):
-        threads, result = list(), list()
-        queue = Queue()
-        to_netdata = dict()
-
-        # If the size has not changed there is no reason to poll log files.
-        disks = [disk for disk in self.disks if self.size_changed(disk)]
-        if disks:
-            for disk in disks:
-                th = Thread(target=self._get_raw_data, args=(queue, disk.name))
-                th.start()
-                threads.append(th)
-
-            for thread in threads:
-                thread.join()
-                result.append(queue.get())
-        else:
-            # Data from last real poll
-            return self.previous_data or None
-
-        for elem in result:
-            for a, n, r in elem[1]:
-                to_netdata.update({'_'.join([elem[0], a]): r if self.raw_values else n})
-
-        self.previous_data.update(to_netdata)
-
-        return to_netdata or None
-
-    def size_changed(self, disk):
-        # We are not interested in log files:
-        # 1. zero size
-        # 2. size is not changed since last poll
-        try:
-            size = getsize(disk.name)
-            if  size != disk.size and size:
-                self.disks[disk.number] = disk._replace(size=size)
-                return True
-            else:
-                return False
-        except OSError:
-            # Remove unreadable/nonexisting log files from list of disks and previous_data
-            self.disks.remove(disk)
-            self.previous_data = dict([(k, v) for k, v in self.previous_data.items() if basename(disk.name) not in k])
-            return False
+        return data or None
 
     def create_charts(self):
 
-        def create_lines(attrid):
+        def create_lines(attr_id):
             result = list()
             for disk in self.disks:
-                name = basename(disk.name)
-                result.append(['_'.join([name, attrid]), name[:name.index('.')], 'absolute'])
+                result.append(['_'.join([disk.name, attr_id]), disk.name, 'absolute'])
             return result
 
-        # Use configured attributes, if present. If something goes wrong we don't care.
-        order = ORDER
         try:
             order = [attr for attr in self.attr.split() if attr in SMART_ATTR.keys()] or ORDER
-        except Exception:
-            pass
-        self.order = [''.join(['attrid', i]) for i in order]
-        self.definitions = dict()
+        except AttributeError:
+            order = ORDER
+
+        self.order = [''.join(['attr_id', i]) for i in order]
         units = 'raw' if self.raw_values else 'normalized'
 
-        for k, v in dict([(k, v) for k, v in SMART_ATTR.items() if k in ORDER]).items():
-            self.definitions.update({''.join(['attrid', k]): {
-                                      'options': [None, v, units, v.lower(), 'smartd.attrid' + k, 'line'],
-                                       'lines': create_lines(k)}})
+        for k, v in dict([(k, v) for k, v in SMART_ATTR.items() if k in order]).items():
+            self.definitions[''.join(['attr_id', k])] =\
+                {'options': [None, v, units, v.lower(), 'smartd.attr_id' + k, 'line'],
+                 'lines': create_lines(k)}
+
 
 def find_disks_in_log_path(log_path):
-    # smartd log file is OK if:
-    # 1. it is a file
-    # 2. file name endswith with 'csv'
-    # 3. file is readable
-    if not isdir(log_path): return None
-    return [join(log_path, f) for f in listdir(log_path)
-            if all([isfile(join(log_path, f)), f.endswith('.csv'), access(join(log_path, f), R_OK)])]
+    if not os.path.isdir(log_path):
+        raise StopIteration
+    for f in os.listdir(log_path):
+        f = os.path.join(log_path, f)
+        if all([os.path.isfile(f),
+                os.access(f, os.R_OK),
+                f.endswith('.csv'),
+                os.path.getsize(f)]):
+            yield f

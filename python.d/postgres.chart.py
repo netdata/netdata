@@ -13,7 +13,7 @@ try:
 except ImportError:
     PSYCOPG2 = False
 
-from base import SimpleService
+from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values
 update_every = 1
@@ -262,7 +262,8 @@ class Service(SimpleService):
             return False
         result, error = self._connect()
         if not result:
-            conf = dict([(k, (lambda k, v: v if k != 'password' else '*****')(k, v)) for k, v in self.configuration.items()])
+            conf = dict((k, (lambda k, v: v if k != 'password' else '*****')(k, v))
+                        for k, v in self.configuration.items())
             self.error('Failed to connect to %s. Error: %s' % (str(conf), error))
             return False
         try:
@@ -272,8 +273,9 @@ class Service(SimpleService):
             self.server_version = detect_server_version(cursor, QUERIES['DETECT_SERVER_VERSION'])
             cursor.close()
 
-            if (self.database_poll and isinstance(self.database_poll, str)):
-                self.databases = [dbase for dbase in self.databases if dbase in self.database_poll.split()] or self.databases
+            if self.database_poll and isinstance(self.database_poll, str):
+                self.databases = [dbase for dbase in self.databases if dbase in self.database_poll.split()]\
+                                 or self.databases
 
             self.locks_zeroed = populate_lock_types(self.databases)
             self.add_additional_queries_(is_superuser)

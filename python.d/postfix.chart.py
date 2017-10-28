@@ -2,7 +2,7 @@
 # Description: postfix netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import ExecutableService
+from bases.FrameworkServices.ExecutableService import ExecutableService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2

@@ -2,8 +2,8 @@
 # Description: squid netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import SocketService
-import select
+from bases.FrameworkServices.SocketService import SocketService
+
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -60,7 +60,7 @@ class Service(SocketService):
         """
         response = self._get_raw_data()
 
-        data = {}
+        data = dict()
         try:
             raw = ""
             for tmp in response.split('\r\n'):
@@ -81,11 +81,10 @@ class Service(SocketService):
             self.error("invalid data received")
             return None
 
-        if len(data) == 0:
+        if not data:
             self.error("no data received")
             return None
-        else:
-            return data
+        return data
 
     def _check_raw_data(self, data):
         header = data[:1024].lower()

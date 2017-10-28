@@ -2,9 +2,10 @@
 # Description: PHP-FPM netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import UrlService
 import json
 import re
+
+from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -39,6 +40,7 @@ PER_PROCESS_INFO = [
 
 def average(collection):
     return sum(collection, 0.0) / max(len(collection), 1)
+
 
 CALC = [
     ('min', min),
@@ -130,8 +132,8 @@ class Service(UrlService):
 
             if p_info:
                 for new_name in PER_PROCESS_INFO:
-                    for name, function in CALC:
-                        to_netdata[name + new_name[1]] = function([p_info[k] for k in p_info if new_name[1] in k])
+                    for name, func in CALC:
+                        to_netdata[name + new_name[1]] = func([p_info[k] for k in p_info if new_name[1] in k])
 
         return to_netdata or None
 
@@ -165,4 +167,3 @@ def parse_raw_data_(is_json, regex, raw_data):
     else:
         raw_data = ' '.join(raw_data.split())
         return dict(regex.findall(raw_data))
-

@@ -15,8 +15,10 @@
 # a lot there, bring one or more out into its own chart and make it incremental
 # (like find and notify... good examples).
 
-from base import ExecutableService
 import re
+
+from bases.collection import find_binary
+from bases.FrameworkServices.ExecutableService import ExecutableService
 
 # default module values (can be overridden per job in `config`)
 update_every = 5
@@ -94,10 +96,10 @@ class Service(ExecutableService):
         self.rgx_smb2 = re.compile(r'(smb2_[^:]+|syscall_.*file_bytes):\s+(\d+)')
 
     def check(self):
-        sudo_binary, smbstatus_binary = self.find_binary('sudo'), self.find_binary('smbstatus')
+        sudo_binary, smbstatus_binary = find_binary('sudo'), find_binary('smbstatus')
 
         if not (sudo_binary and smbstatus_binary):
-            self.error('Can\'t locate \'sudo\' or \'smbstatus\' binary')
+            self.error("Can\'t locate 'sudo' or 'smbstatus' binary")
             return False
 
         self.command = [sudo_binary, '-v']

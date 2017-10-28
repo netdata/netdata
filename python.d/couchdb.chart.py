@@ -12,7 +12,7 @@ try:
 except ImportError:
     from Queue import Queue
 
-from base import UrlService
+from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
 update_every = 1
