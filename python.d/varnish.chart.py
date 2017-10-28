@@ -2,9 +2,11 @@
 # Description:  varnish netdata python.d module
 # Author: l2isbad
 
-from base import SimpleService
 from re import compile
 from subprocess import Popen, PIPE
+
+from bases.collection import find_binary
+from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -48,12 +50,14 @@ CHARTS = {'backend_health':
              {'lines': [['cache_hit_perc', 'hit', 'absolute', 1, 100],
                        ['cache_miss_perc', 'miss', 'absolute', 1, 100],
                        ['cache_hitpass_perc', 'hitpass', 'absolute', 1, 100]],
-              'options': [None, 'All history hit rate ratio','percent', 'Cache performance', 'varnish.hit_rate', 'stacked']},
+              'options': [None, 'All history hit rate ratio','percent', 'Cache performance',
+                          'varnish.hit_rate', 'stacked']},
           'chit_rate': 
              {'lines': [['cache_hit_cperc', 'hit', 'absolute', 1, 100],
                        ['cache_miss_cperc', 'miss', 'absolute', 1, 100],
                        ['cache_hitpass_cperc', 'hitpass', 'absolute', 1, 100]],
-              'options': [None, 'Current poll hit rate ratio','percent', 'Cache performance', 'varnish.chit_rate', 'stacked']},
+              'options': [None, 'Current poll hit rate ratio','percent', 'Cache performance',
+                          'varnish.chit_rate', 'stacked']},
           'memory_usage': 
              {'lines': [['s0.g_space', 'available', 'absolute', 1, 1048576],
                        ['s0.g_bytes', 'allocated', 'absolute', -1, 1048576]],
@@ -82,7 +86,7 @@ CHARTS = {'backend_health':
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
-        self.varnish = self.find_binary('varnishstat')
+        self.varnish = find_binary('varnishstat')
         self.rgx_all = compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')
         # Could be
         # VBE.boot.super_backend.pipe_hdrbyte (new)
@@ -122,8 +126,6 @@ class Service(SimpleService):
 
         # We are about to start!
         self.create_charts()
-
-        self.info('Plugin was started successfully')
         return True
      
     def _get_raw_data(self):
@@ -152,10 +154,10 @@ class Service(SimpleService):
             return None
 
         # 1. ALL data from 'varnishstat -1'. t - type(MAIN, MEMPOOL etc)
-        to_netdata = dict([(k, int(v)) for t, k, v in data_all])
+        to_netdata = dict((k, int(v)) for t, k, v in data_all)
         
         # 2. ADD backend statistics
-        to_netdata.update(dict([('_'.join([n, k]), int(v)) for n, k, v in data_backend]))
+        to_netdata.update(dict(('_'.join([n, k]), int(v)) for n, k, v in data_backend))
 
         # 3. ADD additional keys to dict
         # 3.1 Cache hit/miss/hitpass OVERALL in percent
@@ -169,41 +171,33 @@ class Service(SimpleService):
         if self.cache_prev:
             cache_summary = sum([to_netdata.get('cache_hit', 0), to_netdata.get('cache_miss', 0),
                                  to_netdata.get('cache_hitpass', 0)]) - sum(self.cache_prev)
-            to_netdata['cache_hit_cperc'] = find_percent(to_netdata.get('cache_hit', 0) - self.cache_prev[0], cache_summary, 10000)
-            to_netdata['cache_miss_cperc'] = find_percent(to_netdata.get('cache_miss', 0) - self.cache_prev[1], cache_summary, 10000)
-            to_netdata['cache_hitpass_cperc'] = find_percent(to_netdata.get('cache_hitpass', 0) - self.cache_prev[2], cache_summary, 10000)
+            to_netdata['cache_hit_cperc'] = find_percent(to_netdata.get('cache_hit', 0)
+                                                         - self.cache_prev[0], cache_summary, 10000)
+            to_netdata['cache_miss_cperc'] = find_percent(to_netdata.get('cache_miss', 0)
+                                                          - self.cache_prev[1], cache_summary, 10000)
+            to_netdata['cache_hitpass_cperc'] = find_percent(to_netdata.get('cache_hitpass', 0)
+                                                             - self.cache_prev[2], cache_summary, 10000)
         else:
             to_netdata['cache_hit_cperc'] = 0
             to_netdata['cache_miss_cperc'] = 0
             to_netdata['cache_hitpass_cperc'] = 0
 
-        self.cache_prev = [to_netdata.get('cache_hit', 0), to_netdata.get('cache_miss', 0), to_netdata.get('cache_hitpass', 0)]
+        self.cache_prev = [to_netdata.get('cache_hit', 0),
+                           to_netdata.get('cache_miss', 0),
+                           to_netdata.get('cache_hitpass', 0)]
 
         # 3.3 Problems summary chart
-        for elem in ['backend_busy', 'backend_unhealthy', 'esi_errors', 'esi_warnings', 'losthdr', 'sess_drop', 'sc_pipe_overflow',
-                     'sess_fail', 'sess_pipe_overflow', 'threads_destroyed', 'threads_failed', 'threads_limited', 'thread_queue_len']:
+        for elem in ['backend_busy', 'backend_unhealthy', 'esi_errors',
+                     'esi_warnings', 'losthdr', 'sess_drop', 'sc_pipe_overflow',
+                     'sess_fail', 'sess_pipe_overflow', 'threads_destroyed',
+                     'threads_failed', 'threads_limited', 'thread_queue_len']:
             if to_netdata.get(elem) is not None:
                 to_netdata[''.join([elem, '_b'])] = to_netdata.get(elem)
 
-        # Ready steady go!
         return to_netdata
 
     def create_charts(self):
-        # If 'all_charts' is true...ALL charts are displayed. If no only default + 'extra_charts'
-        #if self.configuration.get('all_charts'):
-        #    self.order = EXTRA_ORDER
-        #else:
-        #    try:
-        #        extra_charts = list(filter(lambda chart: chart in EXTRA_ORDER, self.extra_charts.split()))
-        #    except (AttributeError, NameError, ValueError):
-        #        self.error('Extra charts disabled.')
-        #        extra_charts = []
-    
         self.order = ORDER[:]
-        #self.order.extend(extra_charts)
-
-        # Create static charts
-        #self.definitions = {chart: values for chart, values in CHARTS.items() if chart in self.order}
         self.definitions = CHARTS
  
         # Create dynamic backend charts
@@ -227,5 +221,4 @@ def find_percent(value1, value2, multiply):
     # If value2 is 0 return 0
     if not value2:
         return 0
-    else:
-        return round(float(value1) / float(value2) * multiply)
+    return round(float(value1) / float(value2) * multiply)

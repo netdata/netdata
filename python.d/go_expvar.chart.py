@@ -3,8 +3,9 @@
 # Author: Jan Kral (kralewitz)
 
 from __future__ import division
-from base import UrlService
 import json
+
+from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -14,44 +15,52 @@ retries = 60
 
 MEMSTATS_CHARTS = {
     'memstats_heap': {
-        'options': ['heap', 'memory: size of heap memory structures', 'kB', 'memstats', 'expvar.memstats.heap', 'line'],
+        'options': ['heap', 'memory: size of heap memory structures', 'kB', 'memstats',
+                    'expvar.memstats.heap', 'line'],
         'lines': [
             ['memstats_heap_alloc', 'alloc', 'absolute', 1, 1024],
             ['memstats_heap_inuse', 'inuse', 'absolute', 1, 1024]
         ]},
     'memstats_stack': {
-        'options': ['stack', 'memory: size of stack memory structures', 'kB', 'memstats', 'expvar.memstats.stack', 'line'],
+        'options': ['stack', 'memory: size of stack memory structures', 'kB', 'memstats',
+                    'expvar.memstats.stack', 'line'],
         'lines': [
             ['memstats_stack_inuse', 'inuse', 'absolute', 1, 1024]
         ]},
     'memstats_mspan': {
-        'options': ['mspan', 'memory: size of mspan memory structures', 'kB', 'memstats', 'expvar.memstats.mspan', 'line'],
+        'options': ['mspan', 'memory: size of mspan memory structures', 'kB', 'memstats',
+                    'expvar.memstats.mspan', 'line'],
         'lines': [
             ['memstats_mspan_inuse', 'inuse', 'absolute', 1, 1024]
         ]},
     'memstats_mcache': {
-        'options': ['mcache', 'memory: size of mcache memory structures', 'kB', 'memstats', 'expvar.memstats.mcache', 'line'],
+        'options': ['mcache', 'memory: size of mcache memory structures', 'kB', 'memstats',
+                    'expvar.memstats.mcache', 'line'],
         'lines': [
             ['memstats_mcache_inuse', 'inuse', 'absolute', 1, 1024]
         ]},
     'memstats_live_objects': {
-        'options': ['live_objects', 'memory: number of live objects', 'objects', 'memstats', 'expvar.memstats.live_objects', 'line'],
+        'options': ['live_objects', 'memory: number of live objects', 'objects', 'memstats',
+                    'expvar.memstats.live_objects', 'line'],
         'lines': [
             ['memstats_live_objects', 'live']
         ]},
     'memstats_sys': {
-        'options': ['sys', 'memory: size of reserved virtual address space', 'kB', 'memstats', 'expvar.memstats.sys', 'line'],
+        'options': ['sys', 'memory: size of reserved virtual address space', 'kB', 'memstats',
+                    'expvar.memstats.sys', 'line'],
         'lines': [
             ['memstats_sys', 'sys', 'absolute', 1, 1024]
         ]},
     'memstats_gc_pauses': {
-        'options': ['gc_pauses', 'memory: average duration of GC pauses', 'ns', 'memstats', 'expvar.memstats.gc_pauses', 'line'],
+        'options': ['gc_pauses', 'memory: average duration of GC pauses', 'ns', 'memstats',
+                    'expvar.memstats.gc_pauses', 'line'],
         'lines': [
             ['memstats_gc_pauses', 'avg']
         ]},
 }
 
-MEMSTATS_ORDER = ['memstats_heap', 'memstats_stack', 'memstats_mspan', 'memstats_mcache', 'memstats_sys', 'memstats_live_objects', 'memstats_gc_pauses']
+MEMSTATS_ORDER = ['memstats_heap', 'memstats_stack', 'memstats_mspan', 'memstats_mcache',
+                  'memstats_sys', 'memstats_live_objects', 'memstats_gc_pauses']
 
 
 def flatten(d, top='', sep='.'):
@@ -71,8 +80,8 @@ class Service(UrlService):
 
         # if memstats collection is enabled, add the charts and their order
         if self.configuration.get('collect_memstats'):
-            self.definitions = MEMSTATS_CHARTS
-            self.order = MEMSTATS_ORDER
+            self.definitions = dict(MEMSTATS_CHARTS)
+            self.order = list(MEMSTATS_ORDER)
         else:
             self.definitions = dict()
             self.order = list()

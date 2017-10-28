@@ -4,8 +4,8 @@
 
 import glob
 import os
-import time
-from base import SimpleService
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -14,11 +14,12 @@ ORDER = ['cpufreq']
 
 CHARTS = {
     'cpufreq': {
-        'options': [None, 'CPU Clock', 'MHz', 'cpufreq', None, 'line'],
+        'options': [None, 'CPU Clock', 'MHz', 'cpufreq', 'cpufreq', 'line'],
         'lines': [
             # lines are created dynamically in `check()` method
         ]}
 }
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
@@ -29,7 +30,7 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self._orig_name = ""
+        self.fake_name = 'cpu'
         self.assignment = {}
         self.accurate_exists = True
         self.accurate_last = {}
@@ -72,7 +73,6 @@ class Service(SimpleService):
             if accurate_ok:
                 return data
 
-
         for name, paths in self.assignment.items():
             data[name] = open(paths['inaccurate'], 'r').read()
 
@@ -83,8 +83,6 @@ class Service(SimpleService):
             self.sys_dir = str(self.configuration['sys_dir'])
         except (KeyError, TypeError):
             self.error("No path specified. Using: '" + self.sys_dir + "'")
-
-        self._orig_name = self.chart_name
 
         for path in glob.glob(self.sys_dir + '/system/cpu/cpu*/cpufreq/stats/time_in_state'):
             path_elem = path.split('/')
@@ -113,14 +111,3 @@ class Service(SimpleService):
 
         return True
 
-    def create(self):
-        self.chart_name = "cpu"
-        status = SimpleService.create(self)
-        self.chart_name = self._orig_name
-        return status
-
-    def update(self, interval):
-        self.chart_name = "cpu"
-        status = SimpleService.update(self, interval=interval)
-        self.chart_name = self._orig_name
-        return status

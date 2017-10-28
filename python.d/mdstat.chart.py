@@ -2,9 +2,10 @@
 # Description: mdstat netdata python.d module
 # Author: l2isbad
 
-from re import compile as re_compile
 from collections import defaultdict
-from base import SimpleService
+from re import compile as re_compile
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 60000
 retries = 60

@@ -2,10 +2,10 @@
 # Description: chrony netdata python.d module
 # Author: Dominik Schloesser (domschl)
 
-from base import ExecutableService
+from bases.FrameworkServices.ExecutableService import ExecutableService
 
 # default module values (can be overridden per job in `config`)
-# update_every = 10
+update_every = 5
 priority = 60000
 retries = 10
 

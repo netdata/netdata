@@ -27,7 +27,6 @@ dist_nodeconfig_DATA = \
 pythonconfigdir=$(configdir)/python.d
 dist_pythonconfig_DATA = \
     python.d/apache.conf \
-    python.d/apache_cache.conf \
     python.d/bind_rndc.conf \
     python.d/chrony.conf \
     python.d/couchdb.conf \

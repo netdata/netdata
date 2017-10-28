@@ -5,14 +5,15 @@
 import glob
 import os
 import platform
-import time
-from base import SimpleService
+
+from bases.FrameworkServices.SimpleService import SimpleService
 
 import ctypes
 syscall = ctypes.CDLL('libc.so.6').syscall
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
@@ -24,11 +25,12 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = []
         self.definitions = {}
-        self._orig_name = ""
+        self.fake_name = 'cpu'
         self.assignment = {}
         self.last_schedstat = None
 
-    def __gettid(self):
+    @staticmethod
+    def __gettid():
         # This is horrendous. We need the *thread id* (not the *process id*),
         # but there's no Python standard library way of doing that. If you need
         # to enable this module on a non-x86 machine type, you'll have to find
@@ -108,8 +110,6 @@ class Service(SimpleService):
             self.error("Cannot get thread ID. Stats would be completely broken.")
             return False
 
-        self._orig_name = self.chart_name
-
         for path in sorted(glob.glob(self.sys_dir + '/cpu*/cpuidle/state*/name')):
             # ['', 'sys', 'devices', 'system', 'cpu', 'cpu0', 'cpuidle', 'state3', 'name']
             path_elem = path.split('/')
@@ -122,7 +122,7 @@ class Service(SimpleService):
                 self.order.append(orderid)
                 active_name = '%s_active_time' % (cpu,)
                 self.definitions[orderid] = {
-                    'options': [None, 'C-state residency', 'time%', 'cpuidle', None, 'stacked'],
+                    'options': [None, 'C-state residency', 'time%', 'cpuidle', 'cpuidle', 'stacked'],
                     'lines': [
                         [active_name, 'C0 (active)', 'percentage-of-incremental-row', 1, 1],
                     ],
@@ -146,16 +146,3 @@ class Service(SimpleService):
 
         return True
 
-    def create(self):
-        self.chart_name = "cpu"
-        status = SimpleService.create(self)
-        self.chart_name = self._orig_name
-        return status
-
-    def update(self, interval):
-        self.chart_name = "cpu"
-        status = SimpleService.update(self, interval=interval)
-        self.chart_name = self._orig_name
-        return status
-
-# vim: set ts=4 sts=4 sw=4 et:

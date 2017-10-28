@@ -10,7 +10,9 @@ try:
 except ImportError:
     from urllib.parse import urlparse
 
-from base import UrlService, SocketService
+from bases.FrameworkServices.SocketService import SocketService
+from bases.FrameworkServices.UrlService import UrlService
+
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2

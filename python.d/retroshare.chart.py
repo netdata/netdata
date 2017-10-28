@@ -2,8 +2,9 @@
 # Description: RetroShare netdata python.d module
 # Authors: sehraf
 
-from base import UrlService
 import json
+
+from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -38,10 +39,7 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        try:
-            self.baseurl = str(self.configuration['url'])
-        except (KeyError, TypeError):
-            self.baseurl = 'http://localhost:9090'
+        self.baseurl = self.configuration.get('url', 'http://localhost:9090')
         self.order = ORDER
         self.definitions = CHARTS
 
@@ -55,7 +53,7 @@ class Service(UrlService):
             parsed = json.loads(raw)
             if str(parsed['returncode']) != 'ok':
                 return None
-        except:
+        except (TypeError, ValueError):
             return None
 
         return parsed['data'][0]

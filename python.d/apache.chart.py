@@ -2,7 +2,7 @@
 # Description: apache netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import UrlService
+from bases.FrameworkServices.UrlService import UrlService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 2
@@ -31,9 +31,7 @@ CHARTS = {
         'options': [None, 'apache Workers', 'workers', 'workers', 'apache.workers', 'stacked'],
         'lines': [
             ["idle"],
-            ["idle_servers", 'idle'],
             ["busy"],
-            ["busy_servers", 'busy']
         ]},
     'reqpersec': {
         'options': [None, 'apache Lifetime Avg. Requests/s', 'requests/s', 'statistics',
@@ -94,15 +92,22 @@ class Service(UrlService):
         self.url = self.configuration.get('url', 'http://localhost/server-status?auto')
 
     def check(self):
-        if UrlService.check(self):
-            if 'idle_servers' in self._data_from_check:
-                self.__module__ = 'lighttpd'
-                for chart in self.definitions:
-                    opts = self.definitions[chart]['options']
-                    opts[1] = opts[1].replace('apache', 'lighttpd')
-                    opts[4] = opts[4].replace('apache', 'lighttpd')
-            return True
-        return False
+        self._manager = self._build_manager()
+        data = self._get_data()
+        if not data:
+            return None
+
+        if 'idle_servers' in data:
+            self.module_name = 'lighttpd'
+            for chart in self.definitions:
+                if chart == 'workers':
+                    lines = self.definitions[chart]['lines']
+                    lines[0] = ["idle_servers", 'idle']
+                    lines[1] = ["busy_servers", 'busy']
+                opts = self.definitions[chart]['options']
+                opts[1] = opts[1].replace('apache', 'lighttpd')
+                opts[4] = opts[4].replace('apache', 'lighttpd')
+        return True
 
     def _get_data(self):
         """
