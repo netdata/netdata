@@ -1899,7 +1899,7 @@ var NETDATA = window.NETDATA || {};
 
         // return true if global selection sync can be enabled now
         enabled: function() {
-            console.log('enabled()');
+            // console.log('enabled()');
             // can we globally apply selection sync?
             if(NETDATA.options.current.sync_selection === false)
                 return false;
@@ -1909,7 +1909,7 @@ var NETDATA = window.NETDATA || {};
 
         // set the global selection sync master
         setMaster: function(state) {
-            console.log('setMaster()');
+            // console.log('setMaster()');
             if(NETDATA.options.current.sync_selection === false || this.state === state)
                 return;
 
@@ -1934,7 +1934,7 @@ var NETDATA = window.NETDATA || {};
 
         // stop global selection sync
         stop: function() {
-            console.log('stop()');
+            // console.log('stop()');
             if(this.state !== null) {
                 var len = this.slaves.length;
                 while (len--)
@@ -1950,7 +1950,7 @@ var NETDATA = window.NETDATA || {};
 
         // delay global selection sync for some time
         delay: function(ms) {
-            console.log('delay()');
+            // console.log('delay()');
 
             if(this.state !== null && NETDATA.options.current.sync_selection === true) {
                 if(typeof ms === 'number')
@@ -1972,7 +1972,7 @@ var NETDATA = window.NETDATA || {};
         // sync all the visible charts to the given time
         // this is to be called from the chart libraries
         sync: function(state, t) {
-            console.log('sync()');
+            // console.log('sync()');
 
             if(NETDATA.options.current.sync_selection === true) {
                 if(this.state !== state)
