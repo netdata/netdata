@@ -812,7 +812,7 @@ send_pushover() {
         priority=-2
         case "${status}" in
             CLEAR) priority=-1;;   # low priority: no sound or vibration
-            WARNING) priotity=0;;  # normal priority: respect quiet hours
+            WARNING) priority=0;;  # normal priority: respect quiet hours
             CRITICAL) priority=1;; # high priority: bypass quiet hours
             *) priority=-2;;       # lowest priority: no notification at all
         esac
