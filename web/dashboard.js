@@ -1950,7 +1950,7 @@ var NETDATA = window.NETDATA || {};
         delay: function(ms) {
             // console.log('delay()');
 
-            if(this.state !== null && NETDATA.options.current.sync_selection === true) {
+            if(NETDATA.options.current.sync_selection === true) {
                 if(typeof ms === 'number')
                     this.dont_sync_before = Date.now() + ms;
                 else
@@ -1959,12 +1959,14 @@ var NETDATA = window.NETDATA || {};
         },
 
         __syncSlaves: function() {
-            var t = NETDATA.globalSelectionSync.last_t;
-            var len = NETDATA.globalSelectionSync.slaves.length;
-            while(len--)
-                NETDATA.globalSelectionSync.slaves[len].setSelection(t);
+            if(NETDATA.globalSelectionSync.enabled() === true) {
+                var t = NETDATA.globalSelectionSync.last_t;
+                var len = NETDATA.globalSelectionSync.slaves.length;
+                while (len--)
+                    NETDATA.globalSelectionSync.slaves[len].setSelection(t);
 
-            this.timeout_id = null;
+                this.timeout_id = null;
+            }
         },
 
         // sync all the visible charts to the given time
@@ -2836,7 +2838,7 @@ var NETDATA = window.NETDATA || {};
             }
         };
 
-        this.updateChartPanOrZoom = function(after, before) {
+        this.updateChartPanOrZoom = function(after, before, callback) {
             var logme = 'updateChartPanOrZoom(' + after + ', ' + before + '): ';
             var ret = true;
 
@@ -2909,7 +2911,22 @@ var NETDATA = window.NETDATA || {};
             this.current.force_after_ms = after;
             this.current.force_before_ms = before;
             NETDATA.globalPanAndZoom.setMaster(this, after, before);
+
+            if(ret === true && typeof callback === 'function')
+                callback();
+
             return ret;
+        };
+
+        this.updateChartPanOrZoomAsyncTimeOutId = null;
+        this.updateChartPanOrZoomAsync = function(after, before, callback) {
+            if(this.updateChartPanOrZoomAsyncTimeOutId !== null)
+                clearTimeout(this.updateChartPanOrZoomAsyncTimeOutId);
+
+            setTimeout(function() {
+                that.updateChartPanOrZoom(after, before, callback);
+                that.updateChartPanOrZoomAsyncTimeOutId = null;
+            }, 0);
         };
 
         var __unitsConversionLastUnits = undefined;
@@ -5003,8 +5020,9 @@ var NETDATA = window.NETDATA || {};
         NETDATA.globalSelectionSync.delay();
         state.tmp.dygraph_user_action = true;
         state.tmp.dygraph_force_zoom = true;
-        state.updateChartPanOrZoom(after, before);
-        NETDATA.globalPanAndZoom.setMaster(state, after, before);
+        state.updateChartPanOrZoomAsync(after, before, function() {
+            NETDATA.globalPanAndZoom.setMaster(state, after, before);
+        });
     };
 
     NETDATA.dygraphSetSelection = function(state, t) {
@@ -5315,7 +5333,7 @@ var NETDATA = window.NETDATA || {};
                         state.log('dygraphDrawCallback(dygraph, ' + is_initial + '): ' + (after / 1000).toString() + ' - ' + (before / 1000).toString());
 
                     if(before <= state.netdata_last && after >= state.netdata_first)
-                        state.updateChartPanOrZoom(after, before);
+                        state.updateChartPanOrZoomAsync(after, before);
                 }
             },
             zoomCallback: function(minDate, maxDate, yRanges) {
@@ -5331,7 +5349,7 @@ var NETDATA = window.NETDATA || {};
                 // refresh it to the greatest possible zoom level
                 state.tmp.dygraph_user_action = true;
                 state.tmp.dygraph_force_zoom = true;
-                state.updateChartPanOrZoom(minDate, maxDate);
+                state.updateChartPanOrZoomAsync(minDate, maxDate);
             },
             highlightCallback: function(event, x, points, row, seriesName) {
                 void(seriesName);
@@ -5562,8 +5580,9 @@ var NETDATA = window.NETDATA || {};
                         }
 
                         state.setMode('zoom');
-                        if(state.updateChartPanOrZoom(after, before) === true)
+                        state.updateChartPanOrZoomAsync(after, before, function() {
                             dygraph.updateOptions({ dateWindow: [ after, before ] });
+                        });
 
                         event.preventDefault();
                     }
