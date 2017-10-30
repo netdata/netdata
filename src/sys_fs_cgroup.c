@@ -762,7 +762,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
                 }
 
                 if(!*t) {
-                    error("CGROUP: empty container interface returned by script");
+                    error("CGROUP: empty guest interface returned by script");
                     continue;
                 }
 
