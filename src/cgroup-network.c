@@ -1,4 +1,5 @@
 #include "common.h"
+#include <libgen.h>
 
 #ifdef HAVE_SETNS
 #ifndef _GNU_SOURCE
@@ -269,6 +270,145 @@ pid_t read_pid_from_cgroup(const char *path) {
     return pid;
 }
 
+
+// ----------------------------------------------------------------------------
+// send the result to netdata
+
+struct found_device {
+    const char *host_device;
+    const char *guest_device;
+
+    uint32_t host_device_hash;
+
+    struct found_device *next;
+} *detected_devices = NULL;
+
+void add_device(const char *host, const char *guest) {
+    uint32_t hash = simple_hash(host);
+
+    if(guest && (!*guest || strcmp(host, guest) == 0))
+        guest = NULL;
+
+    struct found_device *f;
+    for(f = detected_devices; f ; f = f->next) {
+        if(f->host_device_hash == hash && strcmp(host, f->host_device) == 0) {
+
+            if(guest && !f->guest_device)
+                f->guest_device = strdup(guest);
+
+            return;
+        }
+    }
+
+    f = mallocz(sizeof(struct found_device));
+    f->host_device = strdupz(host);
+    f->host_device_hash = hash;
+    f->guest_device = (guest)?strdupz(guest):NULL;
+    f->next = detected_devices;
+    detected_devices = f;
+}
+
+int send_devices(void) {
+    int found = 0;
+
+    struct found_device *f;
+    for(f = detected_devices; f ; f = f->next) {
+        found++;
+        printf("%s %s\n", f->host_device, (f->guest_device)?f->guest_device:f->host_device);
+    }
+
+    return found;
+}
+
+// ----------------------------------------------------------------------------
+// this function should be called only **ONCE**
+// also it has to be the **LAST** to be called
+// since it switches namespaces, so after this call, everything is different!
+
+void detect_veth_interfaces(pid_t pid) {
+    struct iface *host, *cgroup, *h, *c;
+    const char *prefix = getenv("NETDATA_HOST_PREFIX");
+
+    host = read_proc_net_dev(prefix);
+    if(!host)
+        fatal("cannot read host interface list.");
+
+    if(!eligible_ifaces(host))
+        fatal("there are no double-linked host interfaces available.");
+
+    if(switch_namespace(prefix, pid))
+        fatal("cannot switch to the namespace of pid %u", (unsigned int)pid);
+
+    cgroup = read_proc_net_dev(NULL);
+    if(!cgroup)
+        fatal("cannot read cgroup interface list.");
+
+    if(!eligible_ifaces(cgroup))
+        fatal("there are not double-linked cgroup interfaces available.");
+
+    for(h = host; h ; h = h->next) {
+        if(iface_is_eligible(h)) {
+            for (c = cgroup; c; c = c->next) {
+                if(iface_is_eligible(c) && h->ifindex == c->iflink && h->iflink == c->ifindex) {
+                    add_device(h->device, c->device);
+                }
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// call the external helper
+
+#define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
+void call_the_helper(const char *me, pid_t pid, const char *cgroup) {
+    const char *pluginsdir = getenv("NETDATA_PLUGINS_DIR");
+    if(!pluginsdir || !*pluginsdir) {
+        char *m = strdupz(me);
+        pluginsdir = dirname(m);
+    }
+
+    if(setresuid(0, 0, 0) == -1)
+        error("setresuid(0, 0, 0) failed.");
+
+    char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
+    if(cgroup)
+        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s/cgroup-network-helper.sh --cgroup '%s'", pluginsdir, cgroup);
+    else
+        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s/cgroup-network-helper.sh --pid %d", pluginsdir, pid);
+
+    info("running: %s", buffer);
+
+    pid_t cgroup_pid;
+    FILE *fp = mypopen(buffer, &cgroup_pid);
+    if(fp) {
+        char *s;
+        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+            trim(s);
+
+            if(*s && *s != '\n') {
+                char *t = s;
+                while(*t && *t != ' ') t++;
+                if(*t == ' ') {
+                    *t = '\0';
+                    t++;
+                }
+
+                if(!*s || !*t) continue;
+                add_device(s, t);
+            }
+        }
+
+        mypclose(fp, cgroup_pid);
+    }
+    else
+        error("cannot execute cgroup-network helper script: %s", buffer);
+}
+
+
+// ----------------------------------------------------------------------------
+// main
+
 void usage(void) {
     fprintf(stderr, "%s [ -p PID | --pid PID | --cgroup /path/to/cgroup ]\n", program_name);
     exit(1);
@@ -291,50 +431,28 @@ int main(int argc, char **argv) {
 
     if(!strcmp(argv[1], "-p") || !strcmp(argv[1], "--pid")) {
         pid = atoi(argv[2]);
+
+        if(pid <= 0) {
+            errno = 0;
+            fatal("Invalid pid %d given", (int) pid);
+        }
+
+        call_the_helper(argv[0], pid, NULL);
     }
     else if(!strcmp(argv[1], "--cgroup")) {
         pid = read_pid_from_cgroup(argv[2]);
+        call_the_helper(argv[0], pid, argv[2]);
+
+        if(pid <= 0 && !detected_devices) {
+            errno = 0;
+            fatal("Invalid pid %d read from cgroup '%s'", (int) pid, argv[2]);
+        }
     }
     else
         usage();
 
-    if(pid <= 0)
-        fatal("Invalid pid %d", (int)pid);
+    if(pid > 0)
+        detect_veth_interfaces(pid);
 
-    struct iface *host, *cgroup, *h, *c;
-    const char *prefix = getenv("NETDATA_HOST_PREFIX");
-
-    host = read_proc_net_dev(prefix);
-    if(!host)
-        fatal("cannot read host interface list.");
-
-    if(!eligible_ifaces(host))
-        fatal("there are no double-linked host interfaces available.");
-
-    if(switch_namespace(prefix, pid))
-        fatal("cannot switch to the namespace of pid %u", (unsigned int)pid);
-
-    cgroup = read_proc_net_dev(NULL);
-    if(!cgroup)
-        fatal("cannot read cgroup interface list.");
-
-    if(!eligible_ifaces(cgroup))
-        fatal("there are not double-linked cgroup interfaces available.");
-
-    int found = 0;
-    for(h = host; h ; h = h->next) {
-        if(iface_is_eligible(h)) {
-            for (c = cgroup; c; c = c->next) {
-                if(iface_is_eligible(c) && h->ifindex == c->iflink && h->iflink == c->ifindex) {
-                    printf("%s %s\n", h->device, c->device);
-                    found++;
-                }
-            }
-        }
-    }
-
-    if(!found)
-        return 1;
-
-    return 0;
+    return send_devices();
 }
