@@ -6393,7 +6393,8 @@ var NETDATA = window.NETDATA || {};
                 state.tmp.easyPieChartUnits.innerText = units;
         };
         state.legendShowUndefined = function() {
-            NETDATA.easypiechartClearSelection(state);
+            if(typeof state.tmp.easyPieChart_instance !== 'undefined')
+                NETDATA.easypiechartClearSelection(state);
         };
 
         return true;
@@ -6766,7 +6767,8 @@ var NETDATA = window.NETDATA || {};
             }
         };
         state.legendShowUndefined = function() {
-            NETDATA.gaugeClearSelection(state);
+            if(typeof state.tmp.gauge_instance !== 'undefined')
+                NETDATA.gaugeClearSelection(state);
         };
 
         return true;
