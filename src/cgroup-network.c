@@ -15,6 +15,10 @@ void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
 
+void health_reload(void) {};
+void rrdhost_save_all(void) {};
+
+
 struct iface {
     const char *device;
     uint32_t hash;
