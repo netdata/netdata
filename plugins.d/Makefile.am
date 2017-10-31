@@ -12,6 +12,7 @@ dist_plugins_SCRIPTS = \
 	alarm-notify.sh \
 	alarm-test.sh \
 	cgroup-name.sh \
+	cgroup-network-helper.sh \
 	charts.d.dryrun-helper.sh \
 	charts.d.plugin \
 	fping.plugin \
