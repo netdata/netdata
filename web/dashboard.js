@@ -4198,7 +4198,7 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.isAutoRefreshable = function() {
-            return (this.current.autorefresh && NETDATA.globalSelectionSync.active() === false && NETDATA.globalPanAndZoom.isActive() === false);
+            return (this.current.autorefresh);
         };
 
         this.canBeAutoRefreshed = function() {
