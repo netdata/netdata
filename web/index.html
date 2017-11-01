@@ -3597,7 +3597,7 @@
                                                     Set it to <b>Your Time</b> to have a common time-reference, no matter where the server is and which time zone it uses (all your dashboards will report your local time).
                                                     Set it to <b>Server Time</b> when you need to compare netdata charts with server log files.
                                                     <br/>
-                                                    Your browser time zone is: <b><span id="browser_timezone">-</span></b>.</br>
+                                                    Your browser time zone is: <b><span id="browser_timezone">-</span></b>.<br/>
                                                     The server reported timezone is: <b><span id="server_timezone">-</span></b> (you can set this in netdata.conf <code>[global].timezone</code>).<br/>
                                                     The current time zone on the dashboard is: <b><span id="current_timezone">-</span></b>.
                                                     <br/>
@@ -4046,13 +4046,13 @@
                     You can copy and paste the following ID to all your browsers (e.g. work and home).
                     <br/>
                     All the browsers with the same ID will identify <b>you</b>, so please don't share this with others.
-                    <p style="text-align: center; padding-top: 10px; padding-bottom: 10px; line-height: 2;">
+                    <div style="text-align: center; padding-top: 10px; padding-bottom: 10px; line-height: 2;">
                         <form action="#">
                             <input type="text" class="form-control" id="switchRegistryPersonGUID" placeholder="your personal ID" maxlength="36" autocomplete="off" style="text-align: center; font-size: 1.4em;">
                         </form>
-                    </p>
+                    </div>
                     Either copy this ID and paste it to another browser, or paste here the ID you have taken from another browser.
-                    <p style="padding-top: 10px;"><small>
+                    <div style="padding-top: 10px;"><small>
                         Keep in mind that:
                         <ul>
                             <li>when you switch ID, your previous ID will be lost forever - this is irreversible.</li>
@@ -4060,7 +4060,7 @@
                             <li>both IDs have to be known by the registry: <b><span id="switchRegistryURL"></span></b>.</li>
                             <li>to get a new ID, just clear your browser cookies.</li>
                         </ul>
-                    </small></p>
+                    </small></div>
                     <div id="switchRegistryResponse" style="display: block; width: 100%; text-align: center; padding-top: 20px;"></div>
                 </div>
                 <div class="modal-footer">
@@ -4095,6 +4095,6 @@
             </div>
         </div>
     </div>
+    <script type="text/javascript" src="dashboard.js?v20171031-1"></script>
 </body>
 </html>
-<script type="text/javascript" src="dashboard.js?v20171027-1"></script>
