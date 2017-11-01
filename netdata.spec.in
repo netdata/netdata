@@ -9,6 +9,7 @@
 # Conditional build:
 %bcond_without  systemd  # systemd
 %bcond_with     nfacct   # build with nfacct plugin
+%bcond_with     freeipmi # build with freeipmi plugin
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 %else
@@ -98,6 +99,11 @@ Requires: libmnl
 Requires: libnetfilter_acct
 %endif
 
+%if %{with freeipmi}
+BuildRequires:	freeipmi-devel
+Requires: freeipmi
+%endif
+
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 Requires(post): libcap
@@ -124,6 +130,7 @@ happened, on your systems and applications.
 	--with-zlib \
 	--with-math \
 	%{?with_nfacct:--enable-plugin-nfacct} \
+	%{?with_freeipmi:--enable-plugin-freeipmi} \
 	--with-user=netdata
 %{__make} %{?_smp_mflags}
 
@@ -186,6 +193,16 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sbindir}/%{name}
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0555,root,root) %{_libexecdir}/%{name}/plugins.d/apps.plugin
+
+# cgroup-network detects the network interfaces of CGROUPs
+# it must be able to use setns() and run cgroup-network-helper.sh as root
+# the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
+%caps(cap_setuid=ep) %attr(4555,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network
+%attr(0555,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
+
+%if %{with freeipmi}
+%caps(cap_setuid=ep) %attr(4555,root,root) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%endif
 
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
 %attr(0700,netdata,netdata) %dir %{_localstatedir}/log/%{name}
