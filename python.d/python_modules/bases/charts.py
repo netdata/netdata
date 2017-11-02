@@ -109,13 +109,6 @@ class Charts:
     def __nonzero__(self):
         return self.__bool__()
 
-    def penalty_exceeded(self, penalty_max):
-        """
-        :param penalty_max: <int>
-        :return:
-        """
-        return (chart for chart in self if chart.penalty > penalty_max and chart.alive)
-
     def add_chart(self, params):
         """
         Create Chart instance and add it to the dict
@@ -125,16 +118,16 @@ class Charts:
         :return:
         """
         params = [self.job_name()] + params
-        chart_id = params[1]
-        if chart_id in self.charts:
-            raise DuplicateItemError("'{chart}' already in charts".format(chart=chart_id))
-        else:
-            new_chart = Chart(params)
-            new_chart.params['update_every'] = self.get_update_every()
-            new_chart.params['priority'] = self.priority
-            self.priority += 1
-            self.charts[new_chart.id] = new_chart
-            return new_chart
+        new_chart = Chart(params)
+        new_chart.params['update_every'] = self.get_update_every()
+        new_chart.params['priority'] = self.priority
+        self.priority += 1
+        self.charts[new_chart.id] = new_chart
+
+        return new_chart
+
+    def active_charts(self):
+        return [chart.id for chart in self if not chart.flags.obsolete]
 
 
 class Chart:
@@ -156,7 +149,7 @@ class Chart:
 
         self.dimensions = list()
         self.variables = set()
-        self.alive = True
+        self.flags = ChartFlags()
         self.penalty = 0
 
     def __getattr__(self, item):
@@ -178,13 +171,6 @@ class Chart:
     def __contains__(self, item):
         return item in [dimension.id for dimension in self.dimensions]
 
-    def suppress(self):
-        self.alive = False
-
-    def unsuppress(self):
-        self.penalty = 0
-        self.alive = True
-
     def add_variable(self, variable):
         """
         :param variable: <list>
@@ -202,43 +188,69 @@ class Chart:
         if dim.id in self:
             raise DuplicateItemError("'{dimension}' already in '{chart}' dimensions".format(dimension=dim.id,
                                                                                             chart=self.name))
+        self.refresh()
         self.dimensions.append(dim)
         return dim
 
-    def add_dimension_and_push_chart(self, dimension):
+    def create(self):
         """
-        :param dimension: <list>
-        :return:
-        """
-        dim = self.add_dimension(dimension)
-        self.unsuppress()
-        safe_print(self.create(dim))
-
-    def create(self, dimension=None):
-        """
-        :param dimension: Dimension
         :return:
         """
         chart = CHART_CREATE.format(**self.params)
-        if not dimension:
-            dimensions = ''.join([dimension.create() for dimension in self.dimensions])
-            variables = ''.join([var.set(var.value) for var in self.variables if var])
-            return chart + dimensions + variables
+        dimensions = ''.join([dimension.create() for dimension in self.dimensions])
+        variables = ''.join([var.set(var.value) for var in self.variables if var])
+
+        return chart + dimensions + variables
+
+    def push_obsolete(self):
+        self.flags.obsolete = True
+        safe_print(CHART_OBSOLETE.format(**self.params))
+
+    def update(self, data, since_last):
+        updated_dimensions, updated_variables = str(), str()
+
+        for dimension in self.dimensions:
+            try:
+                value = int(data[dimension.id])
+            except (KeyError, TypeError):
+                continue
+            else:
+                updated_dimensions += dimension.set(value)
+
+        for var in self.variables:
+            try:
+                value = int(data[var.id])
+            except (KeyError, TypeError):
+                continue
+            else:
+                updated_variables += var.set(value)
+
+        if updated_dimensions:
+            if self.flags.push:
+                self.push_created()
+
+            chart_begin = CHART_BEGIN.format(type=self.type, id=self.id, since_last=since_last)
+            self.push_updates(chart_begin, updated_dimensions, updated_variables, 'END\n')
         else:
-            dimensions = dimension.create()
-            return chart + dimensions
+            self.penalty += 1
 
-    def begin(self, since_last):
-        """
-        :param since_last: <int>: microseconds
-        :return:
-        """
-        return CHART_BEGIN.format(type=self.type,
-                                  id=self.id,
-                                  since_last=since_last)
+        return bool(updated_dimensions)
 
-    def obsolete(self):
-        return CHART_OBSOLETE.format(**self.params)
+    def push_created(self):
+        self.penalty = 0
+        self.flags.push = False
+        self.flags.new = False
+        safe_print(self.create())
+
+    @staticmethod
+    def push_updates(*data):
+        safe_print(''.join(data))
+
+    def refresh(self):
+        self.flags.push = True
+        if self.flags.obsolete:
+            self.flags.new = True
+        self.flags.obsolete = False
 
 
 class Dimension:
@@ -332,3 +344,10 @@ class ChartVariable:
     def set(self, value):
         return CHART_VARIABLE_SET.format(id=self.id,
                                          value=value)
+
+
+class ChartFlags:
+    def __init__(self):
+        self.new = True
+        self.obsolete = False
+        self.push = True
