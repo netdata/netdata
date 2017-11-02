@@ -6638,7 +6638,7 @@ var NETDATA = window.NETDATA || {};
         var strokeColor = NETDATA.dataAttribute(state.element, 'gauge-stroke-color', NETDATA.themes.current.gauge_stroke);
         var startColor = NETDATA.dataAttribute(state.element, 'gauge-start-color', state.chartCustomColors()[0]);
         var stopColor = NETDATA.dataAttribute(state.element, 'gauge-stop-color', void 0);
-        var generateGradient = NETDATA.dataAttributeBoolean(state.element, 'gauge-generate-gradient', false);
+        var generateGradient = NETDATA.dataAttribute(state.element, 'gauge-generate-gradient', false);
 
         if(min === null) {
             min = NETDATA.commonMin.get(state);
