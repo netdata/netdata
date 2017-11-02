@@ -37,7 +37,7 @@ class Service(SimpleService):
         dimension = ''.join(['random', str(random.randint(1, 3))])
 
         if dimension not in self.charts['random']:
-            self.charts['random'].add_dimension_and_push_chart([dimension])
+            self.charts['random'].add_dimension([dimension])
 
         self.data[dimension] = random.randint(0, 100)
 
