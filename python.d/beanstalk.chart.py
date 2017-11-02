@@ -3,7 +3,6 @@
 # Author: l2isbad
 
 from collections import defaultdict
-from sys import version_info
 
 try:
     import beanstalkc
@@ -11,12 +10,11 @@ try:
 except ImportError:
     BEANSTALKC = False
 
-
-if version_info[:2] > (3, 1):
-    import pyyaml3 as yaml
-else:
-    import pyyaml2 as yaml
-
+try:
+    import yaml
+    YAML = True
+except ImportError:
+    YAML = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -168,7 +166,7 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.configuration = configuration
-        self.conn = self.connect()
+        self.conn = None
         self.order = ORDER[:]
         self.definitions = dict(CHARTS)
         self.alive = True
@@ -177,6 +175,12 @@ class Service(SimpleService):
         if not BEANSTALKC:
             self.error("'beanstalkc' module is needed to use beanstalk.chart.py")
             return False
+
+        if not YAML:
+            self.error("'yaml' module is needed to use beanstalk.chart.py")
+            return False
+
+        self.conn = self.connect()
 
         if not self.conn:
             return False
