@@ -8,6 +8,7 @@
 #define ZFS_FAMILY_HASH "hashes"
 
 struct arcstats {
+    // values
     unsigned long long hits;
     unsigned long long misses;
     unsigned long long demand_data_hits;
@@ -99,9 +100,10 @@ struct arcstats {
     unsigned long long arc_meta_min;
     unsigned long long arc_need_free;
     unsigned long long arc_sys_free;
-};
 
-int l2exist;
+    // flags
+    int l2exist;
+};
 
 void generate_charts_arcstats(const char *plugin, int update_every);
 void generate_charts_arc_summary(const char *plugin, int update_every);

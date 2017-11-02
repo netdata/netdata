@@ -1,7 +1,7 @@
 #include "common.h"
 #include "zfs_common.h"
 
-extern struct arcstats arcstats;
+struct arcstats arcstats = { 0 };
 
 void generate_charts_arcstats(const char *plugin, int update_every) {
 
@@ -70,7 +70,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
 
     // --------------------------------------------------------------------
 
-    if(likely(l2exist)) {
+    if(likely(arcstats.l2exist)) {
         static RRDSET *st_l2_size = NULL;
         static RRDDIM *rd_l2_size = NULL;
         static RRDDIM *rd_l2_asize = NULL;
@@ -133,7 +133,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
             rd_pread  = rrddim_add(st_reads, "preads",  "prefetch", 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_mread  = rrddim_add(st_reads, "mreads",  "metadata", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-            if(l2exist)
+            if(arcstats.l2exist)
                 rd_l2read = rrddim_add(st_reads, "l2reads", "l2",       1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else
@@ -144,7 +144,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
         rrddim_set_by_pointer(st_reads, rd_pread,  pread);
         rrddim_set_by_pointer(st_reads, rd_mread,  mread);
 
-        if(l2exist)
+        if(arcstats.l2exist)
             rrddim_set_by_pointer(st_reads, rd_l2read, l2read);
 
         rrdset_done(st_reads);
@@ -152,7 +152,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
 
     // --------------------------------------------------------------------
 
-    if(likely(l2exist)) {
+    if(likely(arcstats.l2exist)) {
         static RRDSET *st_l2bytes = NULL;
         static RRDDIM *rd_l2_read_bytes = NULL;
         static RRDDIM *rd_l2_write_bytes = NULL;
@@ -322,7 +322,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
 
     // --------------------------------------------------------------------
 
-    if(likely(l2exist)) {
+    if(likely(arcstats.l2exist)) {
         static RRDSET *st_l2hits = NULL;
         static RRDDIM *rd_l2hits = NULL;
         static RRDDIM *rd_l2misses = NULL;
