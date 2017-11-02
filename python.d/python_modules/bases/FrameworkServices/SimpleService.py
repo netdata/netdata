@@ -149,10 +149,6 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         del self.order
         del self.definitions
 
-        # push charts to netdata
-        for chart in self.charts:
-            safe_print(chart.create())
-
         # True if job has at least 1 chart else False
         return bool(self.charts)
 
@@ -209,55 +205,33 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             self.debug('get_data() returned incorrect type data')
             return False
 
-        charts_updated = False
-
-        for chart in self.charts.penalty_exceeded(penalty_max=CHART_OBSOLETE_PENALTY):
-            safe_print(chart.obsolete())
-            chart.suppress()
-            self.error("chart '{0}' was removed due to non updating".format(chart.name))
+        updated = False
 
         for chart in self.charts:
-            if not chart.alive:
+
+            if chart.flags.obsolete:
                 continue
-            dimension_updated, variables_updated = str(), str()
+            elif chart.penalty > CHART_OBSOLETE_PENALTY:
+                chart.push_obsolete()
+                self.error("chart '{0}' was removed due to non updating".format(chart.name))
+                continue
 
-            for dimension in chart:
-                try:
-                    value = int(data[dimension.id])
-                except (KeyError, TypeError):
-                    continue
-                else:
-                    dimension_updated += dimension.set(value)
+            since_last = 0 if chart.flags.new else interval
+            ok = chart.update(data, since_last)
+            if ok:
+                updated = True
 
-            for var in chart.variables:
-                try:
-                    value = int(data[var.id])
-                except (KeyError, TypeError):
-                    continue
-                else:
-                    variables_updated += var.set(value)
-
-            if dimension_updated:
-                charts_updated = True
-                safe_print(''.join([chart.begin(since_last=interval),
-                                    dimension_updated,
-                                    variables_updated,
-                                    'END\n']))
-            else:
-                chart.penalty += 1
-
-        if not charts_updated:
+        if not updated:
             self.debug('none of the charts have been updated')
 
-        return charts_updated
+        return updated
 
     def manage_retries(self):
         self._runtime_counters.RETRIES += 1
         if self._runtime_counters.RETRIES % 5 == 0:
             self._runtime_counters.PENALTY = int(self._runtime_counters.RETRIES * self.update_every / 2)
         if self._runtime_counters.RETRIES >= self._runtime_counters.RETRIES_MAX:
-            self.error('stopped after {retries_max} data '
-                       'collection failures in a row'.format(retries_max=self._runtime_counters.RETRIES_MAX))
+            self.error('stopped after {0} data collection failures in a row'.format(self._runtime_counters.RETRIES_MAX))
             return False
         return True
 
