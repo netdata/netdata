@@ -236,9 +236,12 @@ class Service(SimpleService):
     def connect(self):
         host = self.configuration.get('host', '127.0.0.1')
         port = self.configuration.get('port', 11300)
+        timeout = self.configuration.get('timeout', 1)
         try:
             return beanstalkc.Connection(host=host,
-                                         port=port)
+                                         port=port,
+                                         connect_timeout=timeout,
+                                         parse_yaml=yaml.load)
         except beanstalkc.SocketError as error:
             self.error('Connection to {0}:{1} failed: {2}'.format(host, port, error))
             return None
