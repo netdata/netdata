@@ -24,8 +24,8 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
     unsigned long long mread = mhit + mmiss;
 
     // l2 reads
-    unsigned long long l2hit = arcstats.l2_hits + arcstats.l2_misses;
-    unsigned long long l2miss = arcstats.prefetch_metadata_misses + arcstats.demand_metadata_misses;
+    unsigned long long l2hit = arcstats.l2_hits;
+    unsigned long long l2miss = arcstats.l2_misses;
     unsigned long long l2read = l2hit + l2miss;
 
     // --------------------------------------------------------------------
