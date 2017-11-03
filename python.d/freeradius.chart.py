@@ -84,7 +84,7 @@ class Service(SimpleService):
         self.sub_echo = [self.echo, RADIUS_MSG]
         self.sub_radclient = [self.radclient, '-r', '1', '-t', '1',
                               ':'.join([self.host, self.port]), 'status', self.secret]
-    
+
     def check(self):
         if not all([self.echo, self.radclient]):
             self.error('Can\'t locate "radclient" binary or binary is not executable by netdata')
