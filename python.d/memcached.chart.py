@@ -149,7 +149,6 @@ class Service(SocketService):
                     data[t[0]] = t[1]
                 except (IndexError, ValueError):
                     self.debug("invalid line received: " + str(line))
-                    pass
 
         if not data:
             self.error("received data doesn't have any records")

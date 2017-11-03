@@ -225,7 +225,7 @@ CHARTS = {
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
-        super(self.__class__, self).__init__(configuration=configuration, name=name)
+        SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER[:]
         self.definitions = deepcopy(CHARTS)
         self.table_stats = configuration.pop('table_stats', False)
