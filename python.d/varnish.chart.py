@@ -105,6 +105,8 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.varnish = find_binary('varnishstat')
+        self.order = ORDER[:]
+        self.definitions = dict(CHARTS)
         self.regex_all = re.compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')
         self.regex_backend = None
         self.cache_prev = list()
@@ -218,10 +220,6 @@ class Service(SimpleService):
         return to_netdata
 
     def create_charts(self):
-        self.order = ORDER[:]
-        self.definitions = CHARTS
- 
-        # Create dynamic backend charts
         if self.backend_list:
             for backend in self.backend_list:
                 self.order.insert(0, ''.join([backend[0], '_resp_stats']))

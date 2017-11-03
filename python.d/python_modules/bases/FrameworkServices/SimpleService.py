@@ -14,8 +14,6 @@ from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import OldVersionCompatibility, safe_print
 from bases.loggers import PythonDLimitedLogger
 
-CHART_OBSOLETE_PENALTY = 10
-
 RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
                        'SET run_time = {elapsed}\n' \
                        'END\n'
@@ -66,6 +64,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         self._runtime_counters = RuntimeCounters(configuration=configuration)
         self.charts = Charts(job_name=self.actual_name,
                              priority=configuration.pop('priority'),
+                             cleanup=configuration.pop('chart_cleanup'),
                              get_update_every=self.get_update_every)
 
     def __repr__(self):
@@ -211,7 +210,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
             if chart.flags.obsolete:
                 continue
-            elif chart.penalty > CHART_OBSOLETE_PENALTY:
+            elif chart.cleanup and chart.penalty > chart.cleanup:
                 chart.push_obsolete()
                 self.error("chart '{0}' was removed due to non updating".format(chart.name))
                 continue
