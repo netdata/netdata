@@ -123,7 +123,7 @@ class Charts:
 
         new_chart.params['update_every'] = self.get_update_every()
         new_chart.params['priority'] = self.priority
-        new_chart.params['cleanup'] = self.cleanup
+        new_chart.cleanup = self.cleanup
 
         self.priority += 1
         self.charts[new_chart.id] = new_chart
