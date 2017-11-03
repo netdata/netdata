@@ -17,7 +17,7 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values
 update_every = 1
-priority = 90000
+priority = 60000
 retries = 60
 
 METRICS = dict(
