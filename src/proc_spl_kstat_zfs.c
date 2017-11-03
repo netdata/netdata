@@ -3,7 +3,7 @@
 
 #define ZFS_PROC_ARCSTATS "/proc/spl/kstat/zfs/arcstats"
 
-struct arcstats arcstats = { 0 };
+extern struct arcstats arcstats;
 
 int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     (void)dt;
@@ -11,7 +11,7 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     static procfile *ff = NULL;
     static ARL_BASE *arl_base = NULL;
 
-    l2exist = -1;
+    arcstats.l2exist = -1;
 
     if(unlikely(!arl_base)) {
         arl_base = arl_create("arcstats", NULL, 60);
@@ -135,16 +135,16 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
         const char *key   = procfile_lineword(ff, l, 0);
         const char *value = procfile_lineword(ff, l, 2);
 
-        if(unlikely(l2exist == -1)) {
+        if(unlikely(arcstats.l2exist == -1)) {
             if(key[0] == 'l' && key[1] == '2' && key[2] == '_')
-                l2exist = 1;
+                arcstats.l2exist = 1;
         }
 
         if(unlikely(arl_check(arl_base, key, value))) break;
     }
 
-    if(unlikely(l2exist == -1))
-        l2exist = 0;
+    if(unlikely(arcstats.l2exist == -1))
+        arcstats.l2exist = 0;
 
     generate_charts_arcstats("proc", update_every);
     generate_charts_arc_summary("proc", update_every);
