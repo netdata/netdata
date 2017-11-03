@@ -295,36 +295,31 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             if(unlikely(!title)) title = "";
             if(unlikely(!units)) units = "unknown";
 
-            st = rrdset_find_bytype(host, type, id);
-            if(unlikely(!st)) {
-                debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d"
-                      , type, id
-                      , name?name:""
-                      , family?family:""
-                      , context?context:""
-                      , rrdset_type_name(chart_type)
-                      , priority
-                      , update_every
-                );
+            debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d"
+                  , type, id
+                  , name?name:""
+                  , family?family:""
+                  , context?context:""
+                  , rrdset_type_name(chart_type)
+                  , priority
+                  , update_every
+            );
 
-                st = rrdset_create(
-                        host
-                        , type
-                        , id
-                        , name
-                        , family
-                        , context
-                        , title
-                        , units
-                        , (plugin && *plugin)?plugin:cd->filename
-                        , module
-                        , priority
-                        , update_every
-                        , chart_type
-                );
-                cd->update_every = update_every;
-            }
-            else debug(D_PLUGINSD, "PLUGINSD: Chart '%s' already exists. Not adding it again.", st->id);
+            st = rrdset_create(
+                    host
+                    , type
+                    , id
+                    , name
+                    , family
+                    , context
+                    , title
+                    , units
+                    , (plugin && *plugin)?plugin:cd->filename
+                    , module
+                    , priority
+                    , update_every
+                    , chart_type
+            );
 
             if(options && *options) {
                 if(strstr(options, "obsolete"))
@@ -341,6 +336,11 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                     rrdset_flag_set(st, RRDSET_FLAG_STORE_FIRST);
                 else
                     rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
+            }
+            else {
+                rrdset_isnot_obsolete(st);
+                rrdset_flag_clear(st, RRDSET_FLAG_DETAIL);
+                rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
             }
         }
         else if(likely(hash == DIMENSION_HASH && !strcmp(s, PLUGINSD_KEYWORD_DIMENSION))) {
