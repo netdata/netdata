@@ -48,7 +48,7 @@ CHARTS = {
         ]
     },
     'commands_rate': {
-        'options': [None, 'Commands Rate', 'command/s', 'statistics', 'beanstalk.commands_rate', 'stacked'],
+        'options': [None, 'Commands Rate', 'commands/s', 'statistics', 'beanstalk.commands_rate', 'stacked'],
         'lines': [
             ['cmd-put', 'put', 'incremental'],
             ['cmd-peek', 'peek', 'incremental'],
