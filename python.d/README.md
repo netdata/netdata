@@ -127,7 +127,7 @@ If no configuration is given, module will attempt to read log file at `/var/log/
 
 # beanstalk
 
-Module monitors provides server and tube level statistics:
+Module provides server and tube level statistics:
 
 **Requirements:**
  * `python-beanstalkc`
