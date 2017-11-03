@@ -63,7 +63,7 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
  - **Sophisticated alerting**<br/>
    hundreds of alarms, **out of the box**!<br/>
    supports dynamic thresholds, hysteresis, alarm templates,
-   multiple role-based notification methods (such as email, slack.com,
+   multiple role-based notification methods (such as email, slack.com, flock.com,
    pushover.net, pushbullet.com, telegram.org, twilio.com, messagebird.com, kavenegar.com)
 
  - **Extensible**<br/>
@@ -290,7 +290,7 @@ And you can extend it, by writing plugins that collect data from any source, usi
 This is a high level overview of netdata feature set and architecture.
 Click it to to interact with it (it has direct links to documentation).
 
-[![netdata-overview](https://user-images.githubusercontent.com/112292/31050340-85344750-a615-11e7-96a6-ab71f3132189.png)](https://my-netdata.io/infographic.html)
+[![netdata-overview](https://user-images.githubusercontent.com/2662304/32356021-19baa4a2-c03b-11e7-981a-b3b6ec30d5b7.png)](https://my-netdata.io/infographic.html)
 
 ---
 
