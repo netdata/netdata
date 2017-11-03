@@ -251,6 +251,7 @@ class Chart:
         safe_print(''.join(data))
 
     def refresh(self):
+        self.penalty = 0
         self.flags.push = True
         if self.flags.obsolete:
             self.flags.new = True
