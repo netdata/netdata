@@ -105,15 +105,10 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.varnish = find_binary('varnishstat')
-        self.rgx_all = compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')
-        # Could be
-        # VBE.boot.super_backend.pipe_hdrbyte (new)
-        # or
-        # VBE.default2(127.0.0.2,,81).bereq_bodybytes (old)
-        # Regex result: [('super_backend', 'beresp_hdrbytes', '0'), ('super_backend', 'beresp_bodybytes', '0')]
-        self.rgx_bck = (re.compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)'),
-                        re.compile(r'VBE\.[\d\w-]+\.([\w\d_]+).(beresp[\w_]+)\s+(\d+)'))
+        self.regex_all = re.compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')
+        self.regex_backend = None
         self.cache_prev = list()
+        self.backend_list = list()
 
     def check(self):
         # Cant start without 'varnishstat' command
@@ -129,18 +124,27 @@ class Service(SimpleService):
             return False
 
         # 2. Output is parsable (list is not empty after regex findall)
-        is_parsable = self.rgx_all.findall(reply)
-        if not is_parsable:
+        found = self.regex_all.findall(reply)
+        if not found:
             self.error('Cant parse output...')
             return False
 
         # We need to find the right regex for backend parse
-        self.backend_list = self.rgx_bck[0].findall(reply)[::2]
+        # Could be
+        # VBE.boot.super_backend.pipe_hdrbyte (new)
+        # or
+        # VBE.default2(127.0.0.2,,81).bereq_bodybytes (old)
+        # Regex result: [('super_backend', 'beresp_hdrbytes', '0'), ('super_backend', 'beresp_bodybytes', '0')]
+
+        regex1 = re.compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)')
+        regex2 = re.compile(r'VBE\.[\d\w-]+\.([\w\d_]+).(beresp[\w_]+)\s+(\d+)')
+
+        self.backend_list = regex1.findall(reply)[::2]
         if self.backend_list:
-            self.rgx_bck = self.rgx_bck[0]
+            self.regex_backend = regex1
         else:
-            self.backend_list = self.rgx_bck[1].findall(reply)[::2]
-            self.rgx_bck = self.rgx_bck[1]
+            self.backend_list = self.regex2.findall(reply)[::2]
+            self.regex_backend = regex2
 
         self.create_charts()
         return True
@@ -164,15 +168,15 @@ class Service(SimpleService):
         :return: dict
         """
         raw_data = self._get_raw_data()
-        data_all = self.rgx_all.findall(raw_data)
-        data_backend = self.rgx_bck.findall(raw_data)
+        data_all = self.regex_all.findall(raw_data)
+        data_backend = self.regex_backend.findall(raw_data)
 
         if not data_all:
             return None
 
         # 1. ALL data from 'varnishstat -1'. t - type(MAIN, MEMPOOL etc)
         to_netdata = dict((k, int(v)) for t, k, v in data_all)
-        
+
         # 2. ADD backend statistics
         to_netdata.update(dict(('_'.join([n, k]), int(v)) for n, k, v in data_backend))
 
