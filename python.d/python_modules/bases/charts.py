@@ -71,7 +71,7 @@ class Charts:
     All charts stored in a dict.
     Chart is a instance of Chart class.
     Charts adding must be done using Charts.add_chart() method only"""
-    def __init__(self, job_name, priority, get_update_every):
+    def __init__(self, job_name, priority, cleanup, get_update_every):
         """
         :param job_name: <bound method>
         :param priority: <int>
@@ -79,6 +79,7 @@ class Charts:
         """
         self.job_name = job_name
         self.priority = priority
+        self.cleanup = cleanup
         self.get_update_every = get_update_every
         self.charts = dict()
 
@@ -119,8 +120,11 @@ class Charts:
         """
         params = [self.job_name()] + params
         new_chart = Chart(params)
+
         new_chart.params['update_every'] = self.get_update_every()
         new_chart.params['priority'] = self.priority
+        new_chart.params['cleanup'] = self.cleanup
+
         self.priority += 1
         self.charts[new_chart.id] = new_chart
 
