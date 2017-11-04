@@ -211,10 +211,14 @@ class Chart:
         updated_dimensions, updated_variables = str(), str()
 
         for dim in self.dimensions:
-            updated_dimensions += dim.set(dim.get_value(data))
+            value = dim.get_value(data)
+            if value is not None:
+                updated_dimensions += dim.set(value)
 
         for var in self.variables:
-            updated_variables += var.set(var.get_value(data))
+            value = var.get_value(data)
+            if value is not None:
+                updated_variables += var.set(var.get_value(data))
 
         if updated_dimensions:
             if self.flags.create:
@@ -288,7 +292,7 @@ class Dimension:
         try:
             return int(data[self.id])
         except (KeyError, TypeError):
-            return ''
+            return None
 
 
 class ChartVariable:
@@ -340,7 +344,7 @@ class ChartVariable:
         try:
             return int(data[self.id])
         except (KeyError, TypeError):
-            return ''
+            return None
 
 
 class ChartFlags:
