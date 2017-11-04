@@ -42,7 +42,8 @@ CHARTS = {
         ]
     },
     'connections_rate': {
-        'options': [None, 'Connections Rate', 'connections/s', 'server statistics', 'beanstalk.connections_rate', 'area'],
+        'options': [None, 'Connections Rate', 'connections/s', 'server statistics', 'beanstalk.connections_rate',
+                    'area'],
         'lines': [
             ['total-connections', 'connections', 'incremental']
         ]
