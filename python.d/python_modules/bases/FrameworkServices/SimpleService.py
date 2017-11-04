@@ -215,8 +215,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 self.error("chart '{0}' was removed due to non updating".format(chart.name))
                 continue
 
-            since_last = 0 if chart.flags.new else interval
-            ok = chart.update(data, since_last)
+            ok = chart.update(data, interval)
             if ok:
                 chart.penalty = 0
                 updated = True

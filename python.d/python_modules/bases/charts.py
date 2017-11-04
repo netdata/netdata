@@ -207,7 +207,7 @@ class Chart:
 
         safe_print(chart + dimensions + variables)
 
-    def update(self, data, since_last):
+    def update(self, data, interval):
         updated_dimensions, updated_variables = str(), str()
 
         for dim in self.dimensions:
@@ -224,6 +224,7 @@ class Chart:
             if self.flags.create:
                 self.create()
 
+            since_last = 0 if self.flags.new else interval
             chart_begin = CHART_BEGIN.format(type=self.type, id=self.id, since_last=since_last)
             safe_print(chart_begin, updated_dimensions, updated_variables, 'END\n')
 
