@@ -28,27 +28,27 @@ ORDER = ['cpu_usage', 'jobs_rate', 'connections_rate', 'commands_rate', 'current
 
 CHARTS = {
     'cpu_usage': {
-        'options': [None, 'Cpu Usage', 'cpu time', 'statistics', 'beanstalk.cpu_usage', 'area'],
+        'options': [None, 'Cpu Usage', 'cpu time', 'server statistics', 'beanstalk.cpu_usage', 'area'],
         'lines': [
             ['rusage-utime', 'user', 'incremental'],
             ['rusage-stime', 'system', 'incremental']
         ]
     },
     'jobs_rate': {
-        'options': [None, 'Jobs Rate', 'jobs/s', 'statistics', 'beanstalk.jobs_rate', 'line'],
+        'options': [None, 'Jobs Rate', 'jobs/s', 'server statistics', 'beanstalk.jobs_rate', 'line'],
         'lines': [
             ['total-jobs', 'total', 'incremental'],
             ['job-timeouts', 'timeouts', 'incremental']
         ]
     },
     'connections_rate': {
-        'options': [None, 'Connections Rate', 'connections/s', 'statistics', 'beanstalk.connections_rate', 'area'],
+        'options': [None, 'Connections Rate', 'connections/s', 'server statistics', 'beanstalk.connections_rate', 'area'],
         'lines': [
             ['total-connections', 'connections', 'incremental']
         ]
     },
     'commands_rate': {
-        'options': [None, 'Commands Rate', 'commands/s', 'statistics', 'beanstalk.commands_rate', 'stacked'],
+        'options': [None, 'Commands Rate', 'commands/s', 'server statistics', 'beanstalk.commands_rate', 'stacked'],
         'lines': [
             ['cmd-put', 'put', 'incremental'],
             ['cmd-peek', 'peek', 'incremental'],
@@ -73,13 +73,13 @@ CHARTS = {
         ]
     },
     'current_tubes': {
-        'options': [None, 'Current Tubes', 'tubes', 'statistics', 'beanstalk.current_tubes', 'area'],
+        'options': [None, 'Current Tubes', 'tubes', 'server statistics', 'beanstalk.current_tubes', 'area'],
         'lines': [
             ['current-tubes', 'tubes']
         ]
     },
     'current_jobs': {
-        'options': [None, 'Current Jobs', 'jobs', 'statistics', 'beanstalk.current_jobs', 'stacked'],
+        'options': [None, 'Current Jobs', 'jobs', 'server statistics', 'beanstalk.current_jobs', 'stacked'],
         'lines': [
             ['current-jobs-urgent', 'urgent'],
             ['current-jobs-ready', 'ready'],
@@ -89,7 +89,8 @@ CHARTS = {
         ]
     },
     'current_connections': {
-        'options': [None, 'Current Connections', 'connections', 'statistics', 'beanstalk.current_connections', 'line'],
+        'options': [None, 'Current Connections', 'connections', 'server statistics',
+                    'beanstalk.current_connections', 'line'],
         'lines': [
             ['current-connections', 'written'],
             ['current-producers', 'producers'],
@@ -98,14 +99,14 @@ CHARTS = {
         ]
     },
     'binlog': {
-        'options': [None, 'Binlog', 'records/s', 'statistics', 'beanstalk.binlog', 'line'],
+        'options': [None, 'Binlog', 'records/s', 'server statistics', 'beanstalk.binlog', 'line'],
         'lines': [
             ['binlog-records-written', 'written', 'incremental'],
             ['binlog-records-migrated', 'migrated', 'incremental']
         ]
     },
     'uptime': {
-        'options': [None, 'Uptime', 'seconds', 'statistics', 'beanstalk.uptime', 'line'],
+        'options': [None, 'Uptime', 'seconds', 'server statistics', 'beanstalk.uptime', 'line'],
         'lines': [
             ['uptime'],
             ]
