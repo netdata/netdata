@@ -123,7 +123,6 @@ class Charts:
 
         new_chart.params['update_every'] = self.get_update_every()
         new_chart.params['priority'] = self.priority
-        new_chart.cleanup = self.cleanup
 
         self.priority += 1
         self.charts[new_chart.id] = new_chart
@@ -131,7 +130,7 @@ class Charts:
         return new_chart
 
     def active_charts(self):
-        return [chart.id for chart in self if not chart.flags.OBSOLETE]
+        return [chart.id for chart in self if not chart.flags.obsoleted]
 
 
 class Chart:
@@ -203,59 +202,40 @@ class Chart:
         chart = CHART_CREATE.format(**self.params)
         dimensions = ''.join([dimension.create() for dimension in self.dimensions])
         variables = ''.join([var.set(var.value) for var in self.variables if var])
+        self.flags.new = False
+        self.flags.create = False
 
-        return chart + dimensions + variables
-
-    def push_obsolete(self):
-        self.flags.OBSOLETE = True
-        safe_print(CHART_OBSOLETE.format(**self.params))
+        safe_print(chart + dimensions + variables)
 
     def update(self, data, since_last):
         updated_dimensions, updated_variables = str(), str()
 
-        for dimension in self.dimensions:
-            try:
-                value = int(data[dimension.id])
-            except (KeyError, TypeError):
-                continue
-            else:
-                updated_dimensions += dimension.set(value)
+        for dim in self.dimensions:
+            updated_dimensions += dim.set(dim.get_value(data))
 
         for var in self.variables:
-            try:
-                value = int(data[var.id])
-            except (KeyError, TypeError):
-                continue
-            else:
-                updated_variables += var.set(value)
+            updated_variables += var.set(var.get_value(data))
 
         if updated_dimensions:
-            if self.flags.PUSH:
-                self.push_created()
+            if self.flags.create:
+                self.create()
 
             chart_begin = CHART_BEGIN.format(type=self.type, id=self.id, since_last=since_last)
-            self.push_updates(chart_begin, updated_dimensions, updated_variables, 'END\n')
-        else:
-            self.penalty += 1
+            safe_print(chart_begin, updated_dimensions, updated_variables, 'END\n')
 
         return bool(updated_dimensions)
 
-    def push_created(self):
-        self.penalty = 0
-        self.flags.PUSH = False
-        self.flags.NEW = False
-        safe_print(self.create())
-
-    @staticmethod
-    def push_updates(*data):
-        safe_print(''.join(data))
+    def obsolete(self):
+        self.flags.obsoleted = True
+        if not self.flags.new:
+            safe_print(CHART_OBSOLETE.format(**self.params))
 
     def refresh(self):
         self.penalty = 0
-        self.flags.PUSH = True
-        if self.flags.OBSOLETE:
-            self.flags.NEW = True
-        self.flags.OBSOLETE = False
+        self.flags.create = True
+        if self.flags.obsoleted:
+            self.flags.new = True
+        self.flags.obsoleted = False
 
 
 class Dimension:
@@ -304,6 +284,12 @@ class Dimension:
         return DIMENSION_SET.format(id=self.id,
                                     value=value)
 
+    def get_value(self, data):
+        try:
+            return int(data[self.id])
+        except (KeyError, TypeError):
+            return ''
+
 
 class ChartVariable:
     """Represent a chart variable"""
@@ -350,9 +336,15 @@ class ChartVariable:
         return CHART_VARIABLE_SET.format(id=self.id,
                                          value=value)
 
+    def get_value(self, data):
+        try:
+            return int(data[self.id])
+        except (KeyError, TypeError):
+            return ''
+
 
 class ChartFlags:
     def __init__(self):
-        self.NEW = True
-        self.OBSOLETE = False
-        self.PUSH = True
+        self.new = True
+        self.create = True
+        self.obsoleted = False
