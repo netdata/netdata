@@ -145,7 +145,7 @@ def tube_chart_template(name):
                 ['_'.join([name, 'current-watching']), 'watching']
             ]},
         order[3]: {
-            'options': [None, 'Commands', 'command/s', family, 'beanstalk.commands', 'stacked'],
+            'options': [None, 'Commands', 'commands/s', family, 'beanstalk.commands', 'stacked'],
             'lines': [
                 ['_'.join([name, 'cmd-delete']), 'deletes', 'incremental'],
                 ['_'.join([name, 'cmd-pause-tube']), 'pauses', 'incremental']

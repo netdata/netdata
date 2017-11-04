@@ -131,7 +131,7 @@ class Charts:
         return new_chart
 
     def active_charts(self):
-        return [chart.id for chart in self if not chart.flags.obsolete]
+        return [chart.id for chart in self if not chart.flags.OBSOLETE]
 
 
 class Chart:
@@ -207,7 +207,7 @@ class Chart:
         return chart + dimensions + variables
 
     def push_obsolete(self):
-        self.flags.obsolete = True
+        self.flags.OBSOLETE = True
         safe_print(CHART_OBSOLETE.format(**self.params))
 
     def update(self, data, since_last):
@@ -230,7 +230,7 @@ class Chart:
                 updated_variables += var.set(value)
 
         if updated_dimensions:
-            if self.flags.push:
+            if self.flags.PUSH:
                 self.push_created()
 
             chart_begin = CHART_BEGIN.format(type=self.type, id=self.id, since_last=since_last)
@@ -242,8 +242,8 @@ class Chart:
 
     def push_created(self):
         self.penalty = 0
-        self.flags.push = False
-        self.flags.new = False
+        self.flags.PUSH = False
+        self.flags.NEW = False
         safe_print(self.create())
 
     @staticmethod
@@ -252,10 +252,10 @@ class Chart:
 
     def refresh(self):
         self.penalty = 0
-        self.flags.push = True
-        if self.flags.obsolete:
-            self.flags.new = True
-        self.flags.obsolete = False
+        self.flags.PUSH = True
+        if self.flags.OBSOLETE:
+            self.flags.NEW = True
+        self.flags.OBSOLETE = False
 
 
 class Dimension:
@@ -353,6 +353,6 @@ class ChartVariable:
 
 class ChartFlags:
     def __init__(self):
-        self.new = True
-        self.obsolete = False
-        self.push = True
+        self.NEW = True
+        self.OBSOLETE = False
+        self.PUSH = True
