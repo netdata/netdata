@@ -214,8 +214,9 @@ class Service(SimpleService):
             self.alive = False
             return None
 
+        active_charts = self.charts.active_charts()
         for tube in tubes_stats:
-            if tube + '_jobs' not in self.charts.active_charts():
+            if tube + '_jobs_rate' not in active_charts:
                 self.create_new_tube_charts(tube)
 
             data.update(tubes_stats[tube])
