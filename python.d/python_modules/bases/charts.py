@@ -221,10 +221,11 @@ class Chart:
                 updated_variables += var.set(value)
 
         if updated_dimensions:
+            since_last = 0 if self.flags.new else interval
+
             if self.flags.create:
                 self.create()
 
-            since_last = 0 if self.flags.new else interval
             chart_begin = CHART_BEGIN.format(type=self.type, id=self.id, since_last=since_last)
             safe_print(chart_begin, updated_dimensions, updated_variables, 'END\n')
 

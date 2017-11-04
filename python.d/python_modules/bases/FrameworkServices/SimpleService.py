@@ -207,7 +207,6 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         updated = False
 
         for chart in self.charts:
-
             if chart.flags.obsoleted:
                 continue
             elif self.charts.cleanup and chart.penalty >= self.charts.cleanup:
