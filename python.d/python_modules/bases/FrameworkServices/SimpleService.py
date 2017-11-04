@@ -227,11 +227,12 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         return updated
 
     def manage_retries(self):
-        self._runtime_counters.RETRIES += 1
-        if self._runtime_counters.RETRIES % 5 == 0:
-            self._runtime_counters.PENALTY = int(self._runtime_counters.RETRIES * self.update_every / 2)
-        if self._runtime_counters.RETRIES >= self._runtime_counters.RETRIES_MAX:
-            self.error('stopped after {0} data collection failures in a row'.format(self._runtime_counters.RETRIES_MAX))
+        rc = self._runtime_counters
+        rc.RETRIES += 1
+        if rc.RETRIES % 5 == 0:
+            rc.PENALTY = int(rc.RETRIES * self.update_every / 2)
+        if rc.RETRIES >= rc.RETRIES_MAX:
+            self.error('stopped after {0} data collection failures in a row'.format(rc.RETRIES_MAX))
             return False
         return True
 
