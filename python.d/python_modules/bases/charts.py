@@ -218,7 +218,7 @@ class Chart:
         for var in self.variables:
             value = var.get_value(data)
             if value is not None:
-                updated_variables += var.set(var.get_value(data))
+                updated_variables += var.set(value)
 
         if updated_dimensions:
             if self.flags.create:
