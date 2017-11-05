@@ -274,7 +274,7 @@ This is a list of what it currently monitors:
   frequencies, offsets, delays, etc.
 
 - **beanstalkd**</br>
-  global and per tube monitoting
+  global and per tube monitoring
 
 - **statsd**<br/>
   [netdata is a fully featured statsd server](https://github.com/firehol/netdata/wiki/statsd)
