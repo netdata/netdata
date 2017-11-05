@@ -14,8 +14,6 @@ from bases.charts import Charts, ChartError, create_runtime_chart
 from bases.collection import OldVersionCompatibility, safe_print
 from bases.loggers import PythonDLimitedLogger
 
-CHART_OBSOLETE_PENALTY = 10
-
 RUNTIME_CHART_UPDATE = 'BEGIN netdata.runtime_{job_name} {since_last}\n' \
                        'SET run_time = {elapsed}\n' \
                        'END\n'
@@ -66,7 +64,9 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         self._runtime_counters = RuntimeCounters(configuration=configuration)
         self.charts = Charts(job_name=self.actual_name,
                              priority=configuration.pop('priority'),
-                             get_update_every=self.get_update_every)
+                             cleanup=configuration.pop('chart_cleanup'),
+                             get_update_every=self.get_update_every,
+                             module_name=self.module_name)
 
     def __repr__(self):
         return '<{cls_bases}: {name}>'.format(cls_bases=', '.join(c.__name__ for c in self.__class__.__bases__),
@@ -149,10 +149,6 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
         del self.order
         del self.definitions
 
-        # push charts to netdata
-        for chart in self.charts:
-            safe_print(chart.create())
-
         # True if job has at least 1 chart else False
         return bool(self.charts)
 
@@ -209,55 +205,32 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
             self.debug('get_data() returned incorrect type data')
             return False
 
-        charts_updated = False
-
-        for chart in self.charts.penalty_exceeded(penalty_max=CHART_OBSOLETE_PENALTY):
-            safe_print(chart.obsolete())
-            chart.suppress()
-            self.error("chart '{0}' was removed due to non updating".format(chart.name))
+        updated = False
 
         for chart in self.charts:
-            if not chart.alive:
+            if chart.flags.obsoleted:
                 continue
-            dimension_updated, variables_updated = str(), str()
+            elif self.charts.cleanup and chart.penalty >= self.charts.cleanup:
+                chart.obsolete()
+                self.error("chart '{0}' was suppressed due to non updating".format(chart.name))
+                continue
 
-            for dimension in chart:
-                try:
-                    value = int(data[dimension.id])
-                except (KeyError, TypeError):
-                    continue
-                else:
-                    dimension_updated += dimension.set(value)
+            ok = chart.update(data, interval)
+            if ok:
+                updated = True
 
-            for var in chart.variables:
-                try:
-                    value = int(data[var.id])
-                except (KeyError, TypeError):
-                    continue
-                else:
-                    variables_updated += var.set(value)
+        if not updated:
+            self.debug('none of the charts has been updated')
 
-            if dimension_updated:
-                charts_updated = True
-                safe_print(''.join([chart.begin(since_last=interval),
-                                    dimension_updated,
-                                    variables_updated,
-                                    'END\n']))
-            else:
-                chart.penalty += 1
-
-        if not charts_updated:
-            self.debug('none of the charts have been updated')
-
-        return charts_updated
+        return updated
 
     def manage_retries(self):
-        self._runtime_counters.RETRIES += 1
-        if self._runtime_counters.RETRIES % 5 == 0:
-            self._runtime_counters.PENALTY = int(self._runtime_counters.RETRIES * self.update_every / 2)
-        if self._runtime_counters.RETRIES >= self._runtime_counters.RETRIES_MAX:
-            self.error('stopped after {retries_max} data '
-                       'collection failures in a row'.format(retries_max=self._runtime_counters.RETRIES_MAX))
+        rc = self._runtime_counters
+        rc.RETRIES += 1
+        if rc.RETRIES % 5 == 0:
+            rc.PENALTY = int(rc.RETRIES * self.update_every / 2)
+        if rc.RETRIES >= rc.RETRIES_MAX:
+            self.error('stopped after {0} data collection failures in a row'.format(rc.RETRIES_MAX))
             return False
         return True
 

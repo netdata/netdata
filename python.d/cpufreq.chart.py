@@ -14,7 +14,7 @@ ORDER = ['cpufreq']
 
 CHARTS = {
     'cpufreq': {
-        'options': [None, 'CPU Clock', 'MHz', 'cpufreq', 'cpufreq', 'line'],
+        'options': [None, 'CPU Clock', 'MHz', 'cpufreq', 'cpufreq.cpufreq', 'line'],
         'lines': [
             # lines are created dynamically in `check()` method
         ]}
