@@ -13,7 +13,7 @@ DIMENSION_ALGORITHMS = ['absolute', 'incremental', 'percentage-of-absolute-row',
 
 CHART_BEGIN = 'BEGIN {type}.{id} {since_last}\n'
 CHART_CREATE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{context}' " \
-               "{chart_type} {priority} {update_every}\n"
+               "{chart_type} {priority} {update_every} '' 'python.d.plugin' '{module_name}'\n"
 CHART_OBSOLETE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{context}' " \
                "{chart_type} {priority} {update_every} 'obsolete'\n"
 
@@ -71,7 +71,7 @@ class Charts:
     All charts stored in a dict.
     Chart is a instance of Chart class.
     Charts adding must be done using Charts.add_chart() method only"""
-    def __init__(self, job_name, priority, cleanup, get_update_every):
+    def __init__(self, job_name, priority, cleanup, get_update_every, module_name):
         """
         :param job_name: <bound method>
         :param priority: <int>
@@ -81,6 +81,7 @@ class Charts:
         self.priority = priority
         self.cleanup = cleanup
         self.get_update_every = get_update_every
+        self.module_name = module_name
         self.charts = dict()
 
     def __len__(self):
@@ -123,6 +124,7 @@ class Charts:
 
         new_chart.params['update_every'] = self.get_update_every()
         new_chart.params['priority'] = self.priority
+        new_chart.params['module_name'] = self.module_name
 
         self.priority += 1
         self.charts[new_chart.id] = new_chart
