@@ -287,6 +287,9 @@ var NETDATA = window.NETDATA || {};
                                         // rendering the chart that is panned or zoomed).
                                         // Used with .current.global_pan_sync_time
 
+        on_scroll_refresher_stop_until: 0, // timestamp in ms - used to stop evaluating
+                                        // charts for some time, after a page scroll
+
         last_page_resize: Date.now(),   // the timestamp of the last resize request
 
         last_page_scroll: 0,            // the timestamp the last time the page was scrolled
@@ -327,11 +330,11 @@ var NETDATA = window.NETDATA || {};
             idle_lost_focus: 500,       // ms - when the window does not have focus, check
                                         // if focus has been regained, every this time
 
-            global_pan_sync_time: 1000, // ms - when you pan or zoom a chart, the background
+            global_pan_sync_time: 300,  // ms - when you pan or zoom a chart, the background
                                         // auto-refreshing of charts is paused for this amount
                                         // of time
 
-            sync_selection_delay: 1500, // ms - when you pan or zoom a chart, wait this amount
+            sync_selection_delay: 400,  // ms - when you pan or zoom a chart, wait this amount
                                         // of time before setting up synchronized selections
                                         // on hover.
 
@@ -589,16 +592,13 @@ var NETDATA = window.NETDATA || {};
             NETDATA.onresizeCallback();
     };
 
+    NETDATA.onscroll_updater_timeout_id = 0;
     NETDATA.onscroll_updater_count = 0;
-    NETDATA.onscroll_updater_running = false;
-    NETDATA.onscroll_updater_last_run = 0;
-    NETDATA.onscroll_updater_watchdog = null;
     NETDATA.onscroll_updater_max_duration = 0;
     NETDATA.onscroll_updater_above_threshold_count = 0;
     NETDATA.onscroll_updater = function() {
         NETDATA.globalSelectionSync.stop();
 
-        NETDATA.onscroll_updater_running = true;
         NETDATA.onscroll_updater_count++;
         var start = Date.now();
 
@@ -653,8 +653,7 @@ var NETDATA = window.NETDATA || {};
             }
         }
 
-        NETDATA.onscroll_updater_last_run = start;
-        NETDATA.onscroll_updater_running = false;
+        NETDATA.onscroll_updater_timeout_id = 0;
     };
 
     NETDATA.scrollUp = false;
@@ -666,29 +665,16 @@ var NETDATA = window.NETDATA || {};
         NETDATA.scrollY = window.scrollY;
 
         NETDATA.options.last_page_scroll = Date.now();
-        NETDATA.options.auto_refresher_stop_until = 0;
+        NETDATA.options.on_scroll_refresher_stop_until = NETDATA.options.last_page_scroll + 25;
 
         if(NETDATA.options.targets === null) return;
 
         if(NETDATA.options.current.async_on_scroll === true) {
             // async
-            if(NETDATA.onscroll_updater_running === false) {
-                NETDATA.onscroll_updater_running = true;
-                setTimeout(NETDATA.onscroll_updater, 0);
-            }
-            else {
-                if(NETDATA.onscroll_updater_watchdog !== null)
-                    clearTimeout(NETDATA.onscroll_updater_watchdog);
+            if(NETDATA.onscroll_updater_timeout_id !== 0)
+                clearTimeout(NETDATA.onscroll_updater_timeout_id);
 
-                NETDATA.onscroll_updater_watchdog = setTimeout(function() {
-                    if(NETDATA.onscroll_updater_running === false && NETDATA.options.last_page_scroll > NETDATA.onscroll_updater_last_run) {
-                        // console.log('watchdog');
-                        NETDATA.onscroll_updater();
-                    }
-
-                    NETDATA.onscroll_updater_watchdog = null;
-                }, 200);
-            }
+            NETDATA.onscroll_updater_timeout_id = setTimeout(NETDATA.onscroll_updater, 0);
         }
         else {
             // sync
@@ -2448,10 +2434,14 @@ var NETDATA = window.NETDATA || {};
 
             if(that.chart_created === true) {
                 if(NETDATA.options.current.destroy_on_hide === true) {
+                    // that.log('hideChart() init');
+
                     // we should destroy it
                     init('force');
                 }
                 else {
+                    // that.log('hideChart()');
+
                     showRendering();
                     that.element_chart.style.display = 'none';
                     if(that.element_legend !== null) that.element_legend.style.display = 'none';
@@ -2479,11 +2469,13 @@ var NETDATA = window.NETDATA || {};
             that.updates_since_last_unhide = 0;
 
             if(that.chart_created === false) {
+                // that.log('unhideChart() init');
                 // we need to re-initialize it, to show our background
                 // logo in bootstrap tabs, until the chart loads
                 init('force');
             }
             else {
+                // that.log('unhideChart()');
                 that.tm.last_unhidden = Date.now();
                 that.element_chart.style.display = '';
                 if(that.element_legend !== null) that.element_legend.style.display = '';
@@ -2495,7 +2487,13 @@ var NETDATA = window.NETDATA || {};
         };
 
         var canBeRendered = function() {
-            return (isHidden() === false && that.isVisible(true) === true);
+            return (
+                (
+                    NETDATA.options.page_is_visible === true ||
+                    NETDATA.options.current.stop_updates_when_focus_is_lost === false
+                )
+                && isHidden() === false && that.isVisible(true) === true
+            );
         };
 
         // https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
@@ -3189,7 +3187,7 @@ var NETDATA = window.NETDATA || {};
         this.legendShowUndefined = function() {
             this.legendSetDateString(this.legendPluginModuleString(false));
             this.legendSetTimeString(this.chart.context.toString());
-            this.legendSetUnitsString(' ');
+            // this.legendSetUnitsString(' ');
 
             if(this.data && this.element_legend_childs.series !== null) {
                 var labels = this.data.dimension_names;
@@ -4230,6 +4228,7 @@ var NETDATA = window.NETDATA || {};
             this.tmp.___isVisible___ = __isVisible();
             if(this.tmp.___isVisible___ === true) unhideChart();
             else hideChart();
+
             return this.tmp.___isVisible___;
         };
 
@@ -4294,7 +4293,7 @@ var NETDATA = window.NETDATA || {};
                 }
 
                 // options valid only for autoRefresh()
-                if(NETDATA.options.auto_refresher_stop_until === 0 || NETDATA.options.auto_refresher_stop_until < now) {
+                if(NETDATA.options.auto_refresher_stop_until < now) {
                     if(NETDATA.globalPanAndZoom.isActive()) {
                         if(NETDATA.globalPanAndZoom.shouldBeAutoRefreshed(this)) {
                             if(this.debug === true)
@@ -4696,6 +4695,13 @@ var NETDATA = window.NETDATA || {};
     // the default refresher
     NETDATA.chartRefresher = function() {
         // console.log('auto-refresher...');
+
+        var now = Date.now();
+        if( now < NETDATA.options.on_scroll_refresher_stop_until ) {
+            setTimeout(NETDATA.chartRefresher,
+                NETDATA.chartRefresherWaitTime());
+            return;
+        }
 
         if(NETDATA.options.pause === true) {
             // console.log('auto-refresher is paused');
