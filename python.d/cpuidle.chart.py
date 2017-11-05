@@ -122,7 +122,7 @@ class Service(SimpleService):
                 self.order.append(orderid)
                 active_name = '%s_active_time' % (cpu,)
                 self.definitions[orderid] = {
-                    'options': [None, 'C-state residency', 'time%', 'cpuidle', 'cpuidle', 'stacked'],
+                    'options': [None, 'C-state residency', 'time%', 'cpuidle', 'cpuidle.cpuidle', 'stacked'],
                     'lines': [
                         [active_name, 'C0 (active)', 'percentage-of-incremental-row', 1, 1],
                     ],

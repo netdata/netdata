@@ -165,7 +165,7 @@ class Service(SimpleService):
                 if dimension_id not in self.data:
                     dimension = dimension_id.replace(chart_name[:9], '')
                     if dimension_id not in self.charts[chart_name]:
-                        self.charts[chart_name].add_dimension_and_push_chart([dimension_id, dimension, 'incremental'])
+                        self.charts[chart_name].add_dimension([dimension_id, dimension, 'incremental'])
 
                 self.data[dimension_id] = value
 
