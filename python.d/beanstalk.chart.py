@@ -2,8 +2,6 @@
 # Description: beanstalk netdata python.d module
 # Author: l2isbad
 
-from collections import defaultdict
-
 try:
     import beanstalkc
     BEANSTALKC = True
@@ -168,9 +166,9 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.configuration = configuration
-        self.conn = None
-        self.order = ORDER[:]
+        self.order = list(ORDER)
         self.definitions = dict(CHARTS)
+        self.conn = None
         self.alive = True
 
     def check(self):
@@ -184,15 +182,7 @@ class Service(SimpleService):
 
         self.conn = self.connect()
 
-        if not self.conn:
-            return False
-
-        for tube in self.conn.tubes():
-            order, charts = tube_chart_template(tube)
-            self.order.extend(order)
-            self.definitions.update(charts)
-
-        return bool(self.order)
+        return True if self.conn else False
 
     def get_data(self):
         """
@@ -202,26 +192,24 @@ class Service(SimpleService):
         if not self.is_alive():
             return None
 
-        tubes_stats, data = defaultdict(dict), dict()
+        active_charts = self.charts.active_charts()
+        data = dict()
+
         try:
             data.update(self.conn.stats())
 
             for tube in self.conn.tubes():
                 stats = self.conn.stats_tube(tube)
+
+                if tube + '_jobs_rate' not in active_charts:
+                    self.create_new_tube_charts(tube)
+
                 for stat in stats:
-                    dimension, value = '_'.join([tube, stat]),  stats[stat]
-                    tubes_stats[tube][dimension] = value
+                    data['_'.join([tube, stat])] = stats[stat]
 
         except beanstalkc.SocketError:
             self.alive = False
             return None
-
-        active_charts = self.charts.active_charts()
-        for tube in tubes_stats:
-            if tube + '_jobs_rate' not in active_charts:
-                self.create_new_tube_charts(tube)
-
-            data.update(tubes_stats[tube])
 
         return data or None
 
