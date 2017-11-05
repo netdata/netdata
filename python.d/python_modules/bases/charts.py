@@ -202,7 +202,7 @@ class Chart:
         chart = CHART_CREATE.format(**self.params)
         dimensions = ''.join([dimension.create() for dimension in self.dimensions])
         variables = ''.join([var.set(var.value) for var in self.variables if var])
-        self.flags.new = False
+
         self.flags.create = False
 
         safe_print(chart + dimensions + variables)
@@ -228,7 +228,12 @@ class Chart:
 
             chart_begin = CHART_BEGIN.format(type=self.type, id=self.id, since_last=since_last)
             safe_print(chart_begin, updated_dimensions, updated_variables, 'END\n')
+
             self.flags.new = False
+            self.penalty = 0
+        else:
+            self.penalty += 1
+            self.flags.new = True
 
         return bool(updated_dimensions)
 
@@ -240,8 +245,6 @@ class Chart:
     def refresh(self):
         self.penalty = 0
         self.flags.create = True
-        if self.flags.obsoleted:
-            self.flags.new = True
         self.flags.obsoleted = False
 
 

@@ -216,11 +216,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
 
             ok = chart.update(data, interval)
             if ok:
-                chart.penalty = 0
                 updated = True
-            else:
-                chart.flags.new = True
-                chart.penalty += 1
 
         if not updated:
             self.debug('none of the charts has been updated')
