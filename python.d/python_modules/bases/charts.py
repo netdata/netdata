@@ -228,6 +228,7 @@ class Chart:
 
             chart_begin = CHART_BEGIN.format(type=self.type, id=self.id, since_last=since_last)
             safe_print(chart_begin, updated_dimensions, updated_variables, 'END\n')
+            self.flags.new = False
 
         return bool(updated_dimensions)
 
