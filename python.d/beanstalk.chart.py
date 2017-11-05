@@ -186,7 +186,6 @@ class Service(SimpleService):
 
     def get_data(self):
         """
-        Format data received from shell command
         :return: dict
         """
         if not self.is_alive():
