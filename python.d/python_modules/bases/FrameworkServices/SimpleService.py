@@ -219,6 +219,7 @@ class SimpleService(Thread, PythonDLimitedLogger, OldVersionCompatibility, objec
                 chart.penalty = 0
                 updated = True
             else:
+                chart.flags.new = True
                 chart.penalty += 1
 
         if not updated:
