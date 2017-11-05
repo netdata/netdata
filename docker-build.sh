@@ -8,9 +8,6 @@ DEBIAN_FRONTEND=noninteractive
 
 # some mirrors have issues, i skipped httpredir in favor of an eu mirror
 
-echo "deb http://ftp.nl.debian.org/debian/ jessie main" > /etc/apt/sources.list
-echo "deb http://security.debian.org/debian-security jessie/updates main" >> /etc/apt/sources.list
-
 # install dependencies for build
 
 apt-get -qq update
