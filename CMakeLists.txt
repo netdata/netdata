@@ -49,6 +49,7 @@ set(NETDATA_LINUX_FILES
         src/proc_net_rpc_nfsd.c
         src/proc_net_snmp.c
         src/proc_net_snmp6.c
+        src/proc_net_sockstat.c
         src/proc_net_softnet_stat.c
         src/proc_net_stat_conntrack.c
         src/proc_net_stat_synproxy.c
