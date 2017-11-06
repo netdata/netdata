@@ -151,7 +151,8 @@ void read_cgroup_plugin_configuration() {
             // ----------------------------------------------------------------
 
                     " !*/init.scope "                      // ignore init.scope
-                    " *.scope "                            // we need all *.scope for sure
+                    " !/system.slice/run-*.scope "         // ignore system.slice/run-XXXX.scope
+                    " *.scope "                            // we need all other *.scope for sure
 
             // ----------------------------------------------------------------
 
