@@ -437,12 +437,30 @@ RRDSET *rrdset_create_custom(
         , long history_entries
 ) {
     if(!type || !type[0]) {
-        fatal("Cannot create rrd stats without a type.");
+        fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
+              , (id && *id)?id:"<unset>"
+              , (name && *name)?name:"<unset>"
+              , (family && *family)?family:"<unset>"
+              , (context && *context)?context:"<unset>"
+              , (title && *title)?title:"<unset>"
+              , (units && *units)?units:"<unset>"
+              , (plugin && *plugin)?plugin:"<unset>"
+              , (module && *module)?module:"<unset>"
+        );
         return NULL;
     }
 
     if(!id || !id[0]) {
-        fatal("Cannot create rrd stats without an id.");
+        fatal("Cannot create rrd stats without an id: type '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."
+              , type
+              , (name && *name)?name:"<unset>"
+              , (family && *family)?family:"<unset>"
+              , (context && *context)?context:"<unset>"
+              , (title && *title)?title:"<unset>"
+              , (units && *units)?units:"<unset>"
+              , (plugin && *plugin)?plugin:"<unset>"
+              , (module && *module)?module:"<unset>"
+        );
         return NULL;
     }
 

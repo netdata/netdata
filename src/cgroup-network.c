@@ -367,8 +367,10 @@ void detect_veth_interfaces(pid_t pid) {
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
 void call_the_helper(const char *me, pid_t pid, const char *cgroup) {
     const char *pluginsdir = getenv("NETDATA_PLUGINS_DIR");
+    char *m = NULL;
+
     if(!pluginsdir || !*pluginsdir) {
-        char *m = strdupz(me);
+        m = strdupz(me);
         pluginsdir = dirname(m);
     }
 
@@ -407,6 +409,8 @@ void call_the_helper(const char *me, pid_t pid, const char *cgroup) {
     }
     else
         error("cannot execute cgroup-network helper script: %s", buffer);
+
+    freez(m);
 }
 
 
