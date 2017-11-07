@@ -23,15 +23,6 @@ static struct proc_net_sockstat {
 } sockstat_root = { 0 };
 
 
-static inline void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, const char *value, void *dst) {
-    (void)name;
-    (void)hash;
-
-    register kernel_uint_t *d = dst;
-    *d = str2kernel_uint_t(value);
-    // fprintf(stderr, "name '%s' with hash %u and value '%s' is %llu\n", name, hash, value, (unsigned long long)*d);
-}
-
 static kernel_uint_t read_tcp_max_orphans(void) {
     static char *filename = NULL;
     static RRDVAR *tcp_max_orphans_var = NULL;
@@ -92,6 +83,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         do_raw_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 RAW sockets", CONFIG_BOOLEAN_AUTO);
         do_frag_sockets    = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG sockets", CONFIG_BOOLEAN_AUTO);
         do_frag_mem        = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG memory", CONFIG_BOOLEAN_AUTO);
+
         update_tcp_max_orphans_every = config_get_number("plugin:proc:/proc/net/sockstat", "update tcp_max_orphans every", update_tcp_max_orphans_every);
         update_tcp_max_orphans_count = update_tcp_max_orphans_every;
 
@@ -191,7 +183,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , NULL
                     , "sockets"
                     , NULL
-                    , "IPv4 Sockets In Use"
+                    , "IPv4 Sockets Used"
                     , "sockets"
                     , "proc"
                     , "net/sockstat"
@@ -224,13 +216,13 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     "ipv4"
                     , "sockstat_tcp_sockets"
                     , NULL
-                    , "sockets"
+                    , "tcp"
                     , NULL
                     , "IPv4 TCP Sockets"
-                    , "sockets"
+                    , "tcp"
                     , "proc"
                     , "net/sockstat"
-                    , 2405
+                    , 2500
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -262,13 +254,13 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     "ipv4"
                     , "sockstat_tcp_mem"
                     , NULL
-                    , "sockets"
+                    , "tcp"
                     , NULL
                     , "IPv4 TCP Sockets Memory"
                     , "KB"
                     , "proc"
                     , "net/sockstat"
-                    , 2406
+                    , 2540
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -294,13 +286,13 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     "ipv4"
                     , "sockstat_udp_sockets"
                     , NULL
-                    , "sockets"
+                    , "udp"
                     , NULL
                     , "IPv4 UDP Sockets"
                     , "sockets"
                     , "proc"
                     , "net/sockstat"
-                    , 2410
+                    , 2600
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -326,13 +318,13 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     "ipv4"
                     , "sockstat_udp_mem"
                     , NULL
-                    , "sockets"
+                    , "udp"
                     , NULL
                     , "IPv4 UDP Sockets Memory"
                     , "KB"
                     , "proc"
                     , "net/sockstat"
-                    , 2411
+                    , 2603
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -358,13 +350,13 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     "ipv4"
                     , "sockstat_udplite_sockets"
                     , NULL
-                    , "sockets"
+                    , "udplite"
                     , NULL
                     , "IPv4 UDPLITE Sockets"
                     , "sockets"
                     , "proc"
                     , "net/sockstat"
-                    , 2420
+                    , 2602
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -390,13 +382,13 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     "ipv4"
                     , "sockstat_raw_sockets"
                     , NULL
-                    , "sockets"
+                    , "raw"
                     , NULL
                     , "IPv4 RAW Sockets"
                     , "sockets"
                     , "proc"
                     , "net/sockstat"
-                    , 2430
+                    , 3010
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -422,13 +414,13 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     "ipv4"
                     , "sockstat_frag_sockets"
                     , NULL
-                    , "sockets"
+                    , "fragments"
                     , NULL
                     , "IPv4 FRAG Sockets"
-                    , "sockets"
+                    , "fragments"
                     , "proc"
                     , "net/sockstat"
-                    , 2440
+                    , 3010
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -454,13 +446,13 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     "ipv4"
                     , "sockstat_frag_mem"
                     , NULL
-                    , "sockets"
+                    , "fragments"
                     , NULL
                     , "IPv4 FRAG Sockets Memory"
                     , "KB"
                     , "proc"
                     , "net/sockstat"
-                    , 2441
+                    , 3020
                     , update_every
                     , RRDSET_TYPE_AREA
             );
