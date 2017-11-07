@@ -2,199 +2,209 @@
 # Description: traefik netdata python.d module
 # Author: Alexandre Menezes (@ale_menezes)
 
-from bases.FrameworkServices.SocketService import SocketService
+from collections import namedtuple
+from json import loads
+from socket import gethostbyname, gaierror
+from threading import Thread
+try:
+        from queue import Queue
+except ImportError:
+        from Queue import Queue
+
+#from bases.FrameworkServices.UrlService import UrlService
+from base import UrlService
 
 # default module values (can be overridden per job in `config`)
+update_every = 5
 priority = 60000
 retries = 60
 
-# default job configuration (overridden by python.d.plugin)
-# config = {'local': {
-#             'update_every': update_every,
-#             'retries': retries,
-#             'priority': priority,
-#             'host': 'localhost',
-#             'port': 8080,
-#             'unix_socket': None
-#          }}
+METHODS = namedtuple('METHODS', ['get_data', 'url', 'run'])
 
-ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'net', 'connections', 'clients', 'slaves', 'persistence',
-         'bgsave_now', 'bgsave_health']
+HEALTH_STATS = [
+    'average_response_time_sec',
+    'total_response_time_sec',
+    'total_count',
+    'total_status_code_count.200',
+    'total_status_code_count.201',
+    'total_status_code_count.202',
+    'total_status_code_count.203',
+    'total_status_code_count.204',
+    'total_status_code_count.205',
+    'total_status_code_count.206',
+    'total_status_code_count.300',
+    'total_status_code_count.301',
+    'total_status_code_count.302',
+    'total_status_code_count.303',
+    'total_status_code_count.304',
+    'total_status_code_count.305',
+    'total_status_code_count.306',
+    'total_status_code_count.307',
+    'total_status_code_count.400',
+    'total_status_code_count.401',
+    'total_status_code_count.404',
+    'total_status_code_count.405',
+    'total_status_code_count.406',
+    'total_status_code_count.407',
+    'total_status_code_count.408',
+    'total_status_code_count.409',
+    'total_status_code_count.410',
+    'total_status_code_count.411',
+    'total_status_code_count.412',
+    'total_status_code_count.413',
+    'total_status_code_count.414',
+    'total_status_code_count.415',
+    'total_status_code_count.416',
+    'total_status_code_count.417',
+    'total_status_code_count.500',
+    'total_status_code_count.501',
+    'total_status_code_count.502',
+    'total_status_code_count.504',
+    'total_status_code_count.505',
+    'uptime_sec'
+]
+
+# charts order (can be overridden if you want less charts, or different order)
+ORDER = [
+    'avg_response_time_sec', 'total_response_time_sec', 'status_code', 'uptime_sec'
+    ]
 
 CHARTS = {
-    'operations': {
-        'options': [None, 'Redis Operations', 'operations/s', 'operations', 'redis.operations', 'line'],
+    'avg_response_time_sec': {
+        'options': [None, 'avg response time', 'seconds', 'avg response time', 'traefik.avg_response_time_sec', 'line'],
         'lines': [
-            ['total_commands_processed', 'commands', 'incremental'],
-            ['instantaneous_ops_per_sec', 'operations', 'absolute']
+            ['average_response_time_sec', 'time', 'divisor', 1000]
         ]},
-    'hit_rate': {
-        'options': [None, 'Redis Hit rate', 'percent', 'hits', 'redis.hit_rate', 'line'],
+    'total_response_time_sec': {
+        'options': [None, 'total response time', 'seconds', 'total response time', 'traefik.total_response_time_sec', 'line'],
         'lines': [
-            ['hit_rate', 'rate', 'absolute']
+            ['total_response_time_sec', 'total', 'absolute']
         ]},
-    'memory': {
-        'options': [None, 'Redis Memory utilization', 'kilobytes', 'memory', 'redis.memory', 'line'],
+    'status_code': {
+        'options': [None, 'status code', 'total', 'http status code', 'traefik.status_code_total', 'area'],
         'lines': [
-            ['used_memory', 'total', 'absolute', 1, 1024],
-            ['used_memory_lua', 'lua', 'absolute', 1, 1024]
+            ['total_count', 'total', 'absolute'],
+            ['total_status_code_count_200', '200', 'absolute'],
+            ['total_status_code_count_201', '201', 'absolute'],
+            ['total_status_code_count_202', '202', 'absolute'],
+            ['total_status_code_count_203', '203', 'absolute'],
+            ['total_status_code_count_204', '204', 'absolute'],
+            ['total_status_code_count_205', '205', 'absolute'],
+            ['total_status_code_count_206', '206', 'absolute'],
+            ['total_status_code_count_300', '300', 'absolute'],
+            ['total_status_code_count_301', '301', 'absolute'],
+            ['total_status_code_count_302', '302', 'absolute'],
+            ['total_status_code_count_303', '303', 'absolute'],
+            ['total_status_code_count_304', '304', 'absolute'],
+            ['total_status_code_count_305', '305', 'absolute'],
+            ['total_status_code_count_306', '306', 'absolute'],
+            ['total_status_code_count_307', '307', 'absolute'],
+            ['total_status_code_count_400', '400', 'absolute'],
+            ['total_status_code_count_401', '401', 'absolute'],
+            ['total_status_code_count_404', '404', 'absolute'],
+            ['total_status_code_count_405', '405', 'absolute'],
+            ['total_status_code_count_406', '406', 'absolute'],
+            ['total_status_code_count_407', '407', 'absolute'],
+            ['total_status_code_count_408', '408', 'absolute'],
+            ['total_status_code_count_409', '409', 'absolute'],
+            ['total_status_code_count_410', '410', 'absolute'],
+            ['total_status_code_count_411', '411', 'absolute'],
+            ['total_status_code_count_412', '412', 'absolute'],
+            ['total_status_code_count_413', '413', 'absolute'],
+            ['total_status_code_count_414', '414', 'absolute'],
+            ['total_status_code_count_415', '415', 'absolute'],
+            ['total_status_code_count_416', '416', 'absolute'],
+            ['total_status_code_count_417', '417', 'absolute'],
+            ['total_status_code_count_500', '500', 'absolute'],
+            ['total_status_code_count_501', '501', 'absolute'],
+            ['total_status_code_count_502', '502', 'absolute'],
+            ['total_status_code_count_504', '504', 'absolute'],
+            ['total_status_code_count_505', '505', 'absolute']
         ]},
-    'net': {
-        'options': [None, 'Redis Bandwidth', 'kilobits/s', 'network', 'redis.net', 'area'],
+    'uptime_sec': {
+        'options': [None, 'uptime', 'seconds', 'uptime', 'traefik.uptime_sec', 'line'],
         'lines': [
-            ['total_net_input_bytes', 'in', 'incremental', 8, 1024],
-            ['total_net_output_bytes', 'out', 'incremental', -8, 1024]
-        ]},
-    'keys': {
-        'options': [None, 'Redis Keys per Database', 'keys', 'keys', 'redis.keys', 'line'],
-        'lines': [
-            # lines are created dynamically in `check()` method
-        ]},
-    'connections': {
-        'options': [None, 'Redis Connections', 'connections/s', 'connections', 'redis.connections', 'line'],
-        'lines': [
-            ['total_connections_received', 'received', 'incremental', 1],
-            ['rejected_connections', 'rejected', 'incremental', -1]
-        ]},
-    'clients': {
-        'options': [None, 'Redis Clients', 'clients', 'connections', 'redis.clients', 'line'],
-        'lines': [
-            ['connected_clients', 'connected', 'absolute', 1],
-            ['blocked_clients', 'blocked', 'absolute', -1]
-        ]},
-    'slaves': {
-        'options': [None, 'Redis Slaves', 'slaves', 'replication', 'redis.slaves', 'line'],
-        'lines': [
-            ['connected_slaves', 'connected', 'absolute']
-        ]},
-    'persistence': {
-        'options': [None, 'Redis Persistence Changes Since Last Save', 'changes', 'persistence',
-                    'redis.rdb_changes', 'line'],
-        'lines': [
-            ['rdb_changes_since_last_save', 'changes', 'absolute']
-        ]},
-    'bgsave_now': {
-        'options': [None, 'Duration of the RDB Save Operation', 'seconds', 'persistence',
-                    'redis.bgsave_now', 'absolute'],
-        'lines': [
-            ['rdb_bgsave_in_progress', 'rdb save', 'absolute']
-        ]},
-    'bgsave_health': {
-        'options': [None, 'Status of the Last RDB Save Operation', 'status', 'persistence',
-                    'redis.bgsave_health', 'line'],
-        'lines': [
-            ['rdb_last_bgsave_status', 'rdb save', 'absolute']
+            ['uptime_sec', 'uptime', 'absolute']
         ]}
-}
+    }
 
 
-class Service(SocketService):
+class Service(UrlService):
     def __init__(self, configuration=None, name=None):
-        SocketService.__init__(self, configuration=configuration, name=name)
+        UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self._keep_alive = True
-        self.chart_name = ""
-        self.host = self.configuration.get('host', 'localhost')
-        self.port = self.configuration.get('port', 6379)
-        self.unix_socket = self.configuration.get('socket')
-        password = self.configuration.get('pass', str())
-        self.bgsave_time = 0
-        self.requests = dict(request='INFO\r\n'.encode(),
-                             password=' '.join(['AUTH', password, '\r\n']).encode() if password else None)
-        self.request = self.requests['request']
-
-    def _get_data(self):
-        """
-        Get data from socket
-        :return: dict
-        """
-        if self.requests['password']:
-            self.request = self.requests['password']
-            raw = self._get_raw_data().strip()
-            if raw != "+OK":
-                self.error("invalid password")
-                return None
-            self.request = self.requests['request']
-        response = self._get_raw_data()
-        if response is None:
-            # error has already been logged
-            return None
-
-        try:
-            parsed = response.split("\n")
-        except AttributeError:
-            self.error("response is invalid/empty")
-            return None
-
-        data = dict()
-        for line in parsed:
-            if len(line) < 5 or line[0] == '$' or line[0] == '#':
-                continue
-
-            if line.startswith('db'):
-                tmp = line.split(',')[0].replace('keys=', '')
-                record = tmp.split(':')
-                data[record[0]] = record[1]
-                continue
-
-            try:
-                t = line.split(':')
-                data[t[0]] = t[1]
-            except (IndexError, ValueError):
-                self.debug("invalid line received: " + str(line))
-
-        if not data:
-            self.error("received data doesn't have any records")
-            return None
-
-        try:
-            data['hit_rate'] = (int(data['keyspace_hits']) * 100) / (int(data['keyspace_hits'])
-                                                                     + int(data['keyspace_misses']))
-        except (KeyError, ZeroDivisionError, TypeError):
-            data['hit_rate'] = 0
-
-        if data['rdb_bgsave_in_progress'] != '0\r':
-            self.bgsave_time += self.update_every
-        else:
-            self.bgsave_time = 0
-
-        data['rdb_last_bgsave_status'] = 0 if data['rdb_last_bgsave_status'] == 'ok\r' else 1
-        data['rdb_bgsave_in_progress'] = self.bgsave_time
-
-        return data
-
-    def _check_raw_data(self, data):
-        """
-        Check if all data has been gathered from socket.
-        Parse first line containing message length and check against received message
-        :param data: str
-        :return: boolean
-        """
-        length = len(data)
-        supposed = data.split('\n')[0][1:-1]
-        offset = len(supposed) + 4  # 1 dollar sing, 1 new line character + 1 ending sequence '\r\n'
-        if not supposed.isdigit():
-            return True
-        supposed = int(supposed)
-
-        if length - offset >= supposed:
-            self.debug("received full response from redis")
-            return True
-
-        self.debug("waiting more data from redis")
-        return False
+        self.host = self.configuration.get('host')
+        self.port = self.configuration.get('port', 8080)
+        self.url = '{scheme}://{host}:{port}'.format(scheme=self.configuration.get('scheme', 'http'),
+                                                     host=self.host,
+                                                     port=self.port)
+        self.methods = list()
 
     def check(self):
-        """
-        Parse configuration, check if redis is available, and dynamically create chart lines data
-        :return: boolean
-        """
-        data = self._get_data()
-        if data is None:
+        if not all([self.host,
+                    self.port,
+                    isinstance(self.host, str),
+                    isinstance(self.port, (str, int))]):
+            self.error('Host is not defined in the module configuration file')
             return False
 
-        for name in data:
-            if name.startswith('db'):
-                self.definitions['keys']['lines'].append([name, None, 'absolute'])
-        return True
+        try:
+            self.host = gethostbyname(self.host)
+        except gaierror as error:
+            self.error(str(error))
+            return False
+
+        self.methods = [METHODS(get_data=self._get_health_stats,
+                                url=self.url + '/health',
+                                run=self.configuration.get('health_status', True))
+                        ]
+        return UrlService.check(self)
+
+    def _get_data(self):
+        threads = list()
+        queue = Queue()
+        result = dict()
+
+        for method in self.methods:
+            if not method.run:
+                continue
+            th = Thread(target=method.get_data,
+                        args=(queue, method.url))
+            th.start()
+            threads.append(th)
+
+        for thread in threads:
+            thread.join()
+            result.update(queue.get())
+
+        return result or None
+
+    def _get_health_stats(self, queue, url):
+        """
+        Format data received from http request
+        :return: dict
+        """
+        raw_data = self._get_raw_data(url)
+
+        if not raw_data:
+            return queue.put(dict())
+
+        data = loads(raw_data)
+        to_netdata = fetch_data_(raw_data=data,
+                                 metrics=HEALTH_STATS)
+
+        return queue.put(to_netdata)
+
+def fetch_data_(raw_data, metrics):
+    data = dict()
+    for metric in metrics:
+        value = raw_data
+        metrics_list = metric.split('.')
+        try:
+            for m in metrics_list:
+                value = value[m]
+        except KeyError:
+            continue
+        data['_'.join(metrics_list)] = value
+    return data
