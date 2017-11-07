@@ -23,6 +23,48 @@ static struct proc_net_sockstat {
 } sockstat_root = { 0 };
 
 
+static int read_tcp_mem(void) {
+    static char *filename = NULL;
+    static RRDVAR *tcp_mem_low_threshold = NULL,
+                  *tcp_mem_pressure_threshold = NULL,
+                  *tcp_mem_high_threshold = NULL;
+
+    if(unlikely(!tcp_mem_low_threshold)) {
+        tcp_mem_low_threshold      = rrdvar_custom_host_variable_create(localhost, "tcp_mem_low");
+        tcp_mem_pressure_threshold = rrdvar_custom_host_variable_create(localhost, "tcp_mem_pressure");
+        tcp_mem_high_threshold     = rrdvar_custom_host_variable_create(localhost, "tcp_mem_high");
+    }
+
+    if(unlikely(!filename)) {
+        char buffer[FILENAME_MAX + 1];
+        snprintfz(buffer, FILENAME_MAX, "%s/proc/sys/net/ipv4/tcp_mem", netdata_configured_host_prefix);
+        filename = strdupz(buffer);
+    }
+
+    char buffer[200 + 1], *start, *end;
+    if(read_file(filename, buffer, 200) != 0) return 1;
+    buffer[200] = '\0';
+
+    unsigned long long low = 0, pressure = 0, high = 0;
+
+    start = buffer;
+    low = strtoull(start, &end, 10);
+
+    start = end;
+    pressure = strtoull(start, &end, 10);
+
+    start = end;
+    high = strtoull(start, &end, 10);
+
+    // fprintf(stderr, "TCP MEM low = %llu, pressure = %llu, high = %llu\n", low, pressure, high);
+
+    rrdvar_custom_host_variable_set(localhost, tcp_mem_low_threshold, low * sysconf(_SC_PAGESIZE));
+    rrdvar_custom_host_variable_set(localhost, tcp_mem_pressure_threshold, pressure * sysconf(_SC_PAGESIZE));
+    rrdvar_custom_host_variable_set(localhost, tcp_mem_high_threshold, high * sysconf(_SC_PAGESIZE));
+
+    return 0;
+}
+
 static kernel_uint_t read_tcp_max_orphans(void) {
     static char *filename = NULL;
     static RRDVAR *tcp_max_orphans_var = NULL;
@@ -58,7 +100,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     hash_udp = 0,
                     hash_udplite = 0;
 
-    static long long update_tcp_max_orphans_every = 60, update_tcp_max_orphans_count = 0;
+    static long long update_constants_every = 60, update_constants_count = 0;
 
     static ARL_BASE *arl_sockets = NULL;
     static ARL_BASE *arl_tcp = NULL;
@@ -84,8 +126,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         do_frag_sockets    = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG sockets", CONFIG_BOOLEAN_AUTO);
         do_frag_mem        = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG memory", CONFIG_BOOLEAN_AUTO);
 
-        update_tcp_max_orphans_every = config_get_number("plugin:proc:/proc/net/sockstat", "update tcp_max_orphans every", update_tcp_max_orphans_every);
-        update_tcp_max_orphans_count = update_tcp_max_orphans_every;
+        update_constants_every = config_get_number("plugin:proc:/proc/net/sockstat", "update constants every", update_constants_every);
+        update_constants_count = update_constants_every;
 
         arl_sockets = arl_create("sockstat/sockets", arl_callback_str2kernel_uint_t, 60);
         arl_expect(arl_sockets, "used", &sockstat_root.sockets_used);
@@ -126,9 +168,12 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         keys[5] = "FRAG";    hashes[5] = hash_frag;    bases[5] = arl_frag;
     }
 
-    update_tcp_max_orphans_count += update_every;
-    if(unlikely(update_tcp_max_orphans_count > update_tcp_max_orphans_every))
+    update_constants_count += update_every;
+    if(unlikely(update_constants_count > update_constants_every)) {
         read_tcp_max_orphans();
+        read_tcp_mem();
+        update_constants_count = 0;
+    }
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
