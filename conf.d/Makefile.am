@@ -72,6 +72,7 @@ healthconfigdir=$(configdir)/health.d
 dist_healthconfig_DATA = \
     health.d/apache.conf \
     health.d/backend.conf \
+    health.d/beanstalkd.conf \
     health.d/bind_rndc.conf \
     health.d/cpu.conf \
     health.d/couchdb.conf \
