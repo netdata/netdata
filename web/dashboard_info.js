@@ -1214,16 +1214,16 @@ netdataDashboard.context = {
     // beanstalkd
     // system charts
     'beanstalk.cpu_usage': {
-        info: 'Amount of CPU Time for user and system used by beanstalkd'
+        info: 'Amount of CPU Time for user and system used by beanstalkd.'
     },
 
     // This is also a per-tube stat
     'beanstalk.jobs_rate': {
-        info: 'The rate of jobs processed by the beanstalkd server'
+        info: 'The rate of jobs processed by the beanstalkd served.'
     },
 
     'beanstalk.connections_rate': {
-        info: 'Tthe rate of connections opened to beanstalkd'
+        info: 'Tthe rate of connections opened to beanstalkd.'
     },
 
     'beanstalk.commands_rate': {
@@ -1231,15 +1231,15 @@ netdataDashboard.context = {
     },
 
     'beanstalk.current_tubes': {
-        info: 'Total number of current tubes on the server including the default tube (which always exists)'
+        info: 'Total number of current tubes on the server including the default tube (which always exists).'
     },
 
     'beanstalk.current_jobs': {
-        info: 'Current number of jobs in all tubes grouped by status: urgent, ready, reserved, delayed and buried'
+        info: 'Current number of jobs in all tubes grouped by status: urgent, ready, reserved, delayed and buried.'
     },
 
     'beanstalk.current_connections': {
-        info: 'Current number of connections group by connection type: written, producers, workers, waiting'
+        info: 'Current number of connections group by connection type: written, producers, workers, waiting.'
     },
 
     'beanstalk.binlog': {
@@ -1247,24 +1247,24 @@ netdataDashboard.context = {
     },
 
     'beanstalk.uptime': {
-        info: 'Total time beanstalkd server has been up for'
+        info: 'Total time beanstalkd server has been up for.'
     },
 
     // tube charts
     'beanstalk.jobs': {
-        info: 'Number of jobs currently in the tube grouped by status: urgent, ready, reserved, delayed and buried'
+        info: 'Number of jobs currently in the tube grouped by status: urgent, ready, reserved, delayed and buried.'
     },
 
     'beanstalk.connections': {
-        info: 'The current number of connections to this tube grouped by connection type; using, waiting and watching'
+        info: 'The current number of connections to this tube grouped by connection type; using, waiting and watching.'
     },
 
     'beanstalk.commands': {
-        info: 'The rate of <code>delete</code> and <code>pause</code> commands executed by beanstalkd'
+        info: 'The rate of <code>delete</code> and <code>pause</code> commands executed by beanstalkd.'
     },
 
     'beanstalk.pause': {
-        info: 'Shows info on how long the tube has been paused for, and how long is left remaining on the pause'
+        info: 'Shows info on how long the tube has been paused for, and how long is left remaining on the pause.'
     },
 
     // ------------------------------------------------------------------------
