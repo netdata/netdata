@@ -639,18 +639,18 @@ class Web:
         # requests per http method
         if match_dict.get('method'):
             if match_dict['method'] not in self.data:
-                self.charts['http_method'].add_dimension_and_push_chart([match_dict['method'],
-                                                                         match_dict['method'],
-                                                                         'incremental'])
+                self.charts['http_method'].add_dimension([match_dict['method'],
+                                                          match_dict['method'],
+                                                          'incremental'])
                 self.data[match_dict['method']] = 0
             self.data[match_dict['method']] += 1
         # requests per http version
         if match_dict.get('http_version'):
             dim_id = match_dict['http_version'].replace('.', '_')
             if dim_id not in self.data:
-                self.charts['http_version'].add_dimension_and_push_chart([dim_id,
-                                                                         match_dict['http_version'],
-                                                                         'incremental'])
+                self.charts['http_version'].add_dimension([dim_id,
+                                                           match_dict['http_version'],
+                                                           'incremental'])
                 self.data[dim_id] = 0
             self.data[dim_id] += 1
 
@@ -662,12 +662,12 @@ class Web:
         """
         if code not in self.data:
             if self.configuration.get('detailed_response_aggregate', True):
-                self.charts['detailed_response_codes'].add_dimension_and_push_chart([code, code, 'incremental'])
+                self.charts['detailed_response_codes'].add_dimension([code, code, 'incremental'])
                 self.data[code] = 0
             else:
                 code_index = int(code[0]) if int(code[0]) < 6 else 6
                 chart_key = 'detailed_response_codes' + DET_RESP_AGGR[code_index]
-                self.charts[chart_key].add_dimension_and_push_chart([code, code, 'incremental'])
+                self.charts[chart_key].add_dimension([code, code, 'incremental'])
                 self.data[code] = 0
         self.data[code] += 1
 
@@ -835,9 +835,9 @@ class Squid:
                     dimension_id = values['func_dim_id'](match[key]) if values['func_dim_id'] else match[key]
                     if dimension_id not in self.data:
                         dimension = values['func_dim'](match[key]) if values['func_dim'] else dimension_id
-                        self.charts[values['chart']].add_dimension_and_push_chart([dimension_id,
-                                                                                   dimension,
-                                                                                   'incremental'])
+                        self.charts[values['chart']].add_dimension([dimension_id,
+                                                                    dimension,
+                                                                    'incremental'])
                         self.data[dimension_id] = 0
                     self.data[dimension_id] += 1
             else:
@@ -872,7 +872,7 @@ class Squid:
         :return:
         """
         if code not in self.data:
-            self.charts['squid_code'].add_dimension_and_push_chart([code, code, 'incremental'])
+            self.charts['squid_code'].add_dimension([code, code, 'incremental'])
             self.data[code] = 0
         self.data[code] += 1
 
@@ -883,7 +883,7 @@ class Squid:
                 continue
             dimension_id = '_'.join(['code_detailed', tag])
             if dimension_id not in self.data:
-                self.charts[chart_key].add_dimension_and_push_chart([dimension_id, tag, 'incremental'])
+                self.charts[chart_key].add_dimension([dimension_id, tag, 'incremental'])
                 self.data[dimension_id] = 0
             self.data[dimension_id] += 1
 

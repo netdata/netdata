@@ -6,7 +6,7 @@ from bases.FrameworkServices.MySQLService import MySQLService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 3
-priority = 90000
+priority = 60000
 retries = 60
 
 # query executed on MySQL server

@@ -41,6 +41,7 @@ BASE_CONFIG = {'update_every': os.getenv('NETDATA_UPDATE_EVERY', 1),
                'retries': 60,
                'priority': 60000,
                'autodetection_retry': 0,
+               'chart_cleanup': 10,
                'name': str()}
 
 
@@ -173,16 +174,14 @@ class Module(object):
                 initialized_job = self.service.Service(configuration=job_config)
             except Exception as error:
                 Logger.error("job initialization: '{module_name} {job_name}' "
-                             "=> [{status}] ({error})".format(status='FAILED',
-                                                              module_name=self.name,
+                             "=> ['FAILED'] ({error})".format(module_name=self.name,
                                                               job_name=job_name,
                                                               error=error))
                 continue
             else:
                 Logger.debug("job initialization: '{module_name} {job_name}' "
-                             "=> [{status}]".format(status='OK',
-                                                    module_name=self.name,
-                                                    job_name=job_name or self.name))
+                             "=> ['OK']".format(module_name=self.name,
+                                                job_name=job_name or self.name))
                 self.jobs[job_id] = Job(initialized_job=initialized_job,
                                         job_id=job_id)
         del self.config

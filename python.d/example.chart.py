@@ -2,7 +2,7 @@
 # Description: example netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-import random
+from random import SystemRandom
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -24,22 +24,24 @@ CHARTS = {
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
-        super(self.__class__, self).__init__(configuration=configuration, name=name)
+        SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.data = dict()
+        self.random = SystemRandom()
 
     @staticmethod
     def check():
         return True
 
     def get_data(self):
-        dimension = ''.join(['random', str(random.randint(1, 3))])
+        data = dict()
 
-        if dimension not in self.charts['random']:
-            self.charts['random'].add_dimension_and_push_chart([dimension])
+        for i in range(1, 4):
+            dimension_id = ''.join(['random', str(i)])
 
-        self.data[dimension] = random.randint(0, 100)
+            if dimension_id not in self.charts['random']:
+                self.charts['random'].add_dimension([dimension_id])
 
-        return self.data
+            data[dimension_id] = self.random.randint(0, 100)
 
+        return data

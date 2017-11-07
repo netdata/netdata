@@ -52,12 +52,12 @@ def static_vars(**kwargs):
 
 
 @on_try_except_finally(on_except=(exit, 1))
-def safe_print(msg):
+def safe_print(*msg):
     """
-    :param msg: <str>
+    :param msg:
     :return:
     """
-    print(msg)
+    print(''.join(msg))
 
 
 def find_binary(binary):
