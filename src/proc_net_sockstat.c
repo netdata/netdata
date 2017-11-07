@@ -1,7 +1,5 @@
 #include "common.h"
 
-#define RRD_TYPE_NET_SNMP           "ipv4"
-
 static struct proc_net_sockstat {
     kernel_uint_t sockets_used;
 
@@ -111,9 +109,9 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     static int do_sockets = -1, do_tcp_sockets = -1, do_tcp_mem = -1, do_udp_sockets = -1, do_udp_mem = -1, do_udplite_sockets = -1, do_raw_sockets = -1, do_frag_sockets = -1, do_frag_mem = -1;
 
-    static char     *keys[6]  = { NULL };
-    static uint32_t hashes[6] = { 0 };
-    static ARL_BASE *bases[6] = { NULL };
+    static char     *keys[7]  = { NULL };
+    static uint32_t hashes[7] = { 0 };
+    static ARL_BASE *bases[7] = { NULL };
 
     if(unlikely(!arl_sockets)) {
         do_sockets         = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 sockets", CONFIG_BOOLEAN_AUTO);
@@ -166,6 +164,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         keys[3] = "UDPLITE"; hashes[3] = hash_udplite; bases[3] = arl_udplite;
         keys[4] = "RAW";     hashes[4] = hash_raw;     bases[4] = arl_raw;
         keys[5] = "FRAG";    hashes[5] = hash_frag;    bases[5] = arl_frag;
+        keys[6] = NULL; // terminator
     }
 
     update_constants_count += update_every;
