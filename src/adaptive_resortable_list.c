@@ -2,13 +2,22 @@
 
 // the default processor() of the ARL
 // can be overwritten at arl_create()
-static inline void arl_callback_str2ull(const char *name, uint32_t hash, const char *value, void *dst) {
+inline void arl_callback_str2ull(const char *name, uint32_t hash, const char *value, void *dst) {
     (void)name;
     (void)hash;
 
     register unsigned long long *d = dst;
     *d = str2ull(value);
     // fprintf(stderr, "name '%s' with hash %u and value '%s' is %llu\n", name, hash, value, *d);
+}
+
+inline void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name;
+    (void)hash;
+
+    register kernel_uint_t *d = dst;
+    *d = str2kernel_uint_t(value);
+    // fprintf(stderr, "name '%s' with hash %u and value '%s' is %llu\n", name, hash, value, (unsigned long long)*d);
 }
 
 // create a new ARL
