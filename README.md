@@ -29,11 +29,6 @@ netdata runs on **Linux**, **FreeBSD**, and **MacOS**.
 
 ## News
 
-<p align="center">
-Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank">GitHub's State Of The Octoverse 2016</a></b><br/>
-<a href="https://octoverse.github.com/" target="_blank"><img src="https://cloud.githubusercontent.com/assets/2662304/21743260/23ebe62c-d507-11e6-80c0-76b95f53e464.png"/></a>
-</p>
-
 `Sep 17th, 2017` - **[netdata v1.8.0 released!](https://github.com/firehol/netdata/releases)**
 
  - mainly a bug fix release - all users are advised to update this release
@@ -63,7 +58,7 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
  - **Sophisticated alerting**<br/>
    hundreds of alarms, **out of the box**!<br/>
    supports dynamic thresholds, hysteresis, alarm templates,
-   multiple role-based notification methods (such as email, slack.com,
+   multiple role-based notification methods (such as email, slack.com, flock.com,
    pushover.net, pushbullet.com, telegram.org, twilio.com, messagebird.com, kavenegar.com)
 
  - **Extensible**<br/>
@@ -278,6 +273,9 @@ This is a list of what it currently monitors:
 - **chrony**</br>
   frequencies, offsets, delays, etc.
 
+- **beanstalkd**</br>
+  global and per tube monitoring
+
 - **statsd**<br/>
   [netdata is a fully featured statsd server](https://github.com/firehol/netdata/wiki/statsd)
 
@@ -290,7 +288,7 @@ And you can extend it, by writing plugins that collect data from any source, usi
 This is a high level overview of netdata feature set and architecture.
 Click it to to interact with it (it has direct links to documentation).
 
-[![netdata-overview](https://user-images.githubusercontent.com/112292/31050340-85344750-a615-11e7-96a6-ab71f3132189.png)](https://my-netdata.io/infographic.html)
+[![netdata-overview](https://user-images.githubusercontent.com/2662304/32415725-a4779606-c246-11e7-8985-2b350181aa27.png)](https://my-netdata.io/infographic.html)
 
 ---
 

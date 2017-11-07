@@ -219,6 +219,7 @@ sendmail=
 
 # enable / disable features
 SEND_SLACK="YES"
+SEND_FLOCK="YES"
 SEND_DISCORD="YES"
 SEND_PUSHOVER="YES"
 SEND_TWILIO="YES"
@@ -236,6 +237,11 @@ SEND_CUSTOM="YES"
 SLACK_WEBHOOK_URL=
 DEFAULT_RECIPIENT_SLACK=
 declare -A role_recipients_slack=()
+
+# flock configs
+FLOCK_WEBHOOK_URL=
+DEFAULT_RECIPIENT_FLOCK=
+declare -A role_recipients_flock=()
 
 # discord configs
 DISCORD_WEBHOOK_URL=
@@ -380,6 +386,7 @@ filter_recipient_by_criticality() {
 # find the recipients' addresses per method
 
 declare -A arr_slack=()
+declare -A arr_flock=()
 declare -A arr_discord=()
 declare -A arr_pushover=()
 declare -A arr_pushbullet=()
@@ -472,6 +479,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 
+    # flock
+    a="${role_recipients_flock[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_FLOCK}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality flock "${r}" && arr_flock[${r/|*/}]="1"
+    done
+
     # discord
     a="${role_recipients_discord[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_DISCORD}"
@@ -501,6 +516,10 @@ done
 # build the list of slack recipients (channels)
 to_slack="${!arr_slack[*]}"
 [ -z "${to_slack}" ] && SEND_SLACK="NO"
+
+# build the list of flock recipients (channels)
+to_flock="${!arr_flock[*]}"
+[ -z "${to_flock}" ] && SEND_FLOCK="NO"
 
 # build the list of discord recipients (channels)
 to_discord="${!arr_discord[*]}"
@@ -558,6 +577,9 @@ done
 # check slack
 [ -z "${SLACK_WEBHOOK_URL}" ] && SEND_SLACK="NO"
 
+# check flock
+[ -z "${FLOCK_WEBHOOK_URL}" ] && SEND_FLOCK="NO"
+
 # check discord
 [ -z "${DISCORD_WEBHOOK_URL}" ] && SEND_DISCORD="NO"
 
@@ -602,6 +624,7 @@ fi
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
+        -o "${SEND_FLOCK}"       = "YES" \
         -o "${SEND_DISCORD}"     = "YES" \
         -o "${SEND_HIPCHAT}"     = "YES" \
         -o "${SEND_TWILIO}"      = "YES" \
@@ -621,6 +644,7 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+        SEND_FLOCK="NO"
         SEND_DISCORD="NO"
         SEND_TWILIO="NO"
         SEND_HIPCHAT="NO"
@@ -647,6 +671,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
     -a "${SEND_TELEGRAM}"       != "YES" \
     -a "${SEND_SLACK}"          != "YES" \
+    -a "${SEND_FLOCK}"          != "YES" \
     -a "${SEND_DISCORD}"        != "YES" \
     -a "${SEND_TWILIO}"         != "YES" \
     -a "${SEND_HIPCHAT}"        != "YES" \
@@ -812,7 +837,7 @@ send_pushover() {
         priority=-2
         case "${status}" in
             CLEAR) priority=-1;;   # low priority: no sound or vibration
-            WARNING) priotity=0;;  # normal priority: respect quiet hours
+            WARNING) priority=0;;  # normal priority: respect quiet hours
             CRITICAL) priority=1;; # high priority: bypass quiet hours
             *) priority=-2;;       # lowest priority: no notification at all
         esac
@@ -1223,6 +1248,61 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# flock sender
+
+send_flock() {
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel color payload
+
+    [ "${SEND_FLOCK}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  color="warning" ;;
+        CRITICAL) color="danger" ;;
+        CLEAR)    color="good" ;;
+        *)        color="#777777" ;;
+    esac
+
+    for channel in ${channels}
+    do
+        httpcode=$(docurl -X POST "${webhook}" -H "Content-Type: application/json" -d "{
+            \"sendAs\": {
+                \"name\" : \"netdata on ${host}\",
+                \"profileImage\" : \"${images_base_url}/images/seo-performance-128.png\"
+            },
+            \"text\": \"${host} *${status_message}*\",
+            \"timestamp\": \"${when}\",
+            \"attachments\": [
+                {
+                    \"description\": \"${chart} (${family}) - ${info}\",
+                    \"color\": \"${color}\",
+                    \"title\": \"${alarm}\",
+                    \"url\": \"${goto_url}\",
+                    \"text\": \"${info}\",
+                    \"views\": {
+                        \"image\": {
+                            \"original\": { \"src\": \"${image}\", \"width\": 400, \"height\": 400 },
+                            \"thumbnail\": { \"src\": \"${image}\", \"width\": 50, \"height\": 50 },
+                            \"filename\": \"${image}\"
+                            }
+                    }
+                }
+            ]
+        }" )
+        if [ "${httpcode}" = "200" ]
+        then
+            info "sent flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send flock notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # discord sender
 
 send_discord() {
@@ -1384,6 +1464,15 @@ raised_for_html=
 
 send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
+
+# -----------------------------------------------------------------------------
+# send the flock notification
+
+# flock aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_flock "${FLOCK_WEBHOOK_URL}" "${to_flock}"
+SENT_FLOCK=$?
 
 # -----------------------------------------------------------------------------
 # send the discord notification
@@ -1644,6 +1733,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHOVER}     -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
+    -o ${SENT_FLOCK}        -eq 0 \
     -o ${SENT_DISCORD}      -eq 0 \
     -o ${SENT_TWILIO}       -eq 0 \
     -o ${SENT_HIPCHAT}      -eq 0 \

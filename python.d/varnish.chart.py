@@ -2,7 +2,7 @@
 # Description:  varnish netdata python.d module
 # Author: l2isbad
 
-from re import compile
+import re
 from subprocess import Popen, PIPE
 
 from bases.collection import find_binary
@@ -15,71 +15,89 @@ retries = 60
 
 ORDER = ['session', 'hit_rate', 'chit_rate', 'expunge', 'threads', 'backend_health', 'memory_usage', 'bad', 'uptime']
 
-CHARTS = {'backend_health': 
-             {'lines': [['backend_conn', 'conn', 'incremental', 1, 1],
-                       ['backend_unhealthy', 'unhealthy', 'incremental', 1, 1],
-                       ['backend_busy', 'busy', 'incremental', 1, 1],
-                       ['backend_fail', 'fail', 'incremental', 1, 1],
-                       ['backend_reuse', 'reuse', 'incremental', 1, 1],
-                       ['backend_recycle', 'resycle', 'incremental', 1, 1],
-                       ['backend_toolate', 'toolate', 'incremental', 1, 1],
-                       ['backend_retry', 'retry', 'incremental', 1, 1],
-                       ['backend_req', 'req', 'incremental', 1, 1]],
-              'options': [None, 'Backend health', 'connections', 'Backend health', 'varnish.backend_traf', 'line']},
-          'bad': 
-             {'lines': [['sess_drop_b', None, 'incremental', 1, 1],
-                       ['backend_unhealthy_b', None, 'incremental', 1, 1],
-                       ['fetch_failed', None, 'incremental', 1, 1],
-                       ['backend_busy_b', None, 'incremental', 1, 1],
-                       ['threads_failed_b', None, 'incremental', 1, 1],
-                       ['threads_limited_b', None, 'incremental', 1, 1],
-                       ['threads_destroyed_b', None, 'incremental', 1, 1],
-                       ['thread_queue_len_b', 'queue_len', 'absolute', 1, 1],
-                       ['losthdr_b', None, 'incremental', 1, 1],
-                       ['esi_errors_b', None, 'incremental', 1, 1],
-                       ['esi_warnings_b', None, 'incremental', 1, 1],
-                       ['sess_fail_b', None, 'incremental', 1, 1],
-                       ['sc_pipe_overflow_b', None, 'incremental', 1, 1],
-                       ['sess_pipe_overflow_b', None, 'incremental', 1, 1]],
-              'options': [None, 'Misbehavior', 'problems', 'Problems summary', 'varnish.bad', 'line']},
-          'expunge':
-             {'lines': [['n_expired', 'expired', 'incremental', 1, 1],
-                       ['n_lru_nuked', 'lru_nuked', 'incremental', 1, 1]],
-              'options': [None, 'Object expunging', 'objects', 'Cache performance', 'varnish.expunge', 'line']},
-          'hit_rate': 
-             {'lines': [['cache_hit_perc', 'hit', 'absolute', 1, 100],
-                       ['cache_miss_perc', 'miss', 'absolute', 1, 100],
-                       ['cache_hitpass_perc', 'hitpass', 'absolute', 1, 100]],
-              'options': [None, 'All history hit rate ratio','percent', 'Cache performance',
-                          'varnish.hit_rate', 'stacked']},
-          'chit_rate': 
-             {'lines': [['cache_hit_cperc', 'hit', 'absolute', 1, 100],
-                       ['cache_miss_cperc', 'miss', 'absolute', 1, 100],
-                       ['cache_hitpass_cperc', 'hitpass', 'absolute', 1, 100]],
-              'options': [None, 'Current poll hit rate ratio','percent', 'Cache performance',
-                          'varnish.chit_rate', 'stacked']},
-          'memory_usage': 
-             {'lines': [['s0.g_space', 'available', 'absolute', 1, 1048576],
-                       ['s0.g_bytes', 'allocated', 'absolute', -1, 1048576]],
-              'options': [None, 'Memory usage', 'megabytes', 'Memory usage', 'varnish.memory_usage', 'stacked']},
-          'session': 
-             {'lines': [['sess_conn', 'sess_conn', 'incremental', 1, 1],
-                       ['client_req', 'client_requests', 'incremental', 1, 1],
-                       ['client_conn', 'client_conn', 'incremental', 1, 1],
-                       ['client_drop', 'client_drop', 'incremental', 1, 1],
-                       ['sess_dropped', 'sess_dropped', 'incremental', 1, 1]],
-              'options': [None, 'Sessions', 'units', 'Client metrics', 'varnish.session', 'line']},
-          'threads': 
-             {'lines': [['threads', None, 'absolute', 1, 1],
-                       ['threads_created', 'created', 'incremental', 1, 1],
-                       ['threads_failed', 'failed', 'incremental', 1, 1],
-                       ['threads_limited', 'limited', 'incremental', 1, 1],
-                       ['thread_queue_len', 'queue_len', 'incremental', 1, 1],
-                       ['sess_queued', 'sess_queued', 'incremental', 1, 1]],
-              'options': [None, 'Thread status', 'threads', 'Thread-related metrics', 'varnish.threads', 'line']},
-          'uptime': 
-             {'lines': [['uptime', None, 'absolute', 1, 1]],
-              'options': [None, 'Varnish uptime', 'seconds', 'Uptime', 'varnish.uptime', 'line']}
+CHARTS = {
+    'backend_health': {
+        'lines': [
+            ['backend_conn', 'conn', 'incremental', 1, 1],
+            ['backend_unhealthy', 'unhealthy', 'incremental', 1, 1],
+            ['backend_busy', 'busy', 'incremental', 1, 1],
+            ['backend_fail', 'fail', 'incremental', 1, 1],
+            ['backend_reuse', 'reuse', 'incremental', 1, 1],
+            ['backend_recycle', 'resycle', 'incremental', 1, 1],
+            ['backend_toolate', 'toolate', 'incremental', 1, 1],
+            ['backend_retry', 'retry', 'incremental', 1, 1],
+            ['backend_req', 'req', 'incremental', 1, 1]],
+        'options': [None, 'Backend Health', 'connections/s', 'backend health', 'varnish.backend_health', 'line']
+    },
+    'bad': {
+        'lines': [
+            ['sess_drop_b', None, 'incremental', 1, 1],
+            ['backend_unhealthy_b', None, 'incremental', 1, 1],
+            ['fetch_failed', None, 'incremental', 1, 1],
+            ['backend_busy_b', None, 'incremental', 1, 1],
+            ['threads_failed_b', None, 'incremental', 1, 1],
+            ['threads_limited_b', None, 'incremental', 1, 1],
+            ['threads_destroyed_b', None, 'incremental', 1, 1],
+            ['thread_queue_len_b', 'queue_len', 'absolute', 1, 1],
+            ['losthdr_b', None, 'incremental', 1, 1],
+            ['esi_errors_b', None, 'incremental', 1, 1],
+            ['esi_warnings_b', None, 'incremental', 1, 1],
+            ['sess_fail_b', None, 'incremental', 1, 1],
+            ['sc_pipe_overflow_b', None, 'incremental', 1, 1],
+            ['sess_pipe_overflow_b', None, 'incremental', 1, 1]],
+        'options': [None, 'Misbehavior', 'problems/s', 'problems summary', 'varnish.bad', 'line']
+    },
+    'expunge': {
+        'lines': [
+            ['n_expired', 'expired', 'incremental', 1, 1],
+            ['n_lru_nuked', 'lru_nuked', 'incremental', 1, 1]],
+        'options': [None, 'Object expunging', 'objects/s', 'cache performance', 'varnish.expunge', 'line']
+    },
+    'hit_rate': {
+        'lines': [
+            ['cache_hit_perc', 'hit', 'absolute', 1, 100],
+            ['cache_miss_perc', 'miss', 'absolute', 1, 100],
+            ['cache_hitpass_perc', 'hitpass', 'absolute', 1, 100]],
+        'options': [None, 'All History Hit Rate Ratio', 'percent', 'cache performance', 'varnish.hit_rate', 'stacked']
+    },
+    'chit_rate': {
+        'lines': [
+            ['cache_hit_cperc', 'hit', 'absolute', 1, 100],
+            ['cache_miss_cperc', 'miss', 'absolute', 1, 100],
+            ['cache_hitpass_cperc', 'hitpass', 'absolute', 1, 100]],
+        'options': [None, 'Current Poll Hit Rate Ratio', 'percent', 'cache performance', 'varnish.chit_rate', 'stacked']
+    },
+    'memory_usage': {
+        'lines': [
+            ['s0.g_space', 'available', 'absolute', 1, 1 << 20],
+            ['s0.g_bytes', 'allocated', 'absolute', -1, 1 << 20]],
+        'options': [None, 'Memory Usage', 'megabytes', 'memory usage', 'varnish.memory_usage', 'stacked']
+    },
+    'session': {
+        'lines': [
+            ['sess_conn', 'sess_conn', 'incremental', 1, 1],
+            ['client_req', 'client_requests', 'incremental', 1, 1],
+            ['client_conn', 'client_conn', 'incremental', 1, 1],
+            ['client_drop', 'client_drop', 'incremental', 1, 1],
+            ['sess_dropped', 'sess_dropped', 'incremental', 1, 1]],
+        'options': [None, 'Sessions', 'units/s', 'client metrics', 'varnish.session', 'line']
+    },
+    'threads': {
+        'lines': [
+            ['threads', None, 'absolute', 1, 1],
+            ['threads_created', 'created', 'incremental', 1, 1],
+            ['threads_failed', 'failed', 'incremental', 1, 1],
+            ['threads_limited', 'limited', 'incremental', 1, 1],
+            ['thread_queue_len', 'queue_len', 'incremental', 1, 1],
+            ['sess_queued', 'sess_queued', 'incremental', 1, 1]],
+        'options': [None, 'Thread Status', 'threads/s', 'thread related metrics', 'varnish.threads', 'line']
+    },
+    'uptime': {
+        'lines': [
+            ['uptime', None, 'absolute', 1, 1]
+        ],
+        'options': [None, 'Uptime', 'seconds', 'uptime', 'varnish.uptime', 'line']
+    }
 }
 
 
@@ -87,15 +105,12 @@ class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.varnish = find_binary('varnishstat')
-        self.rgx_all = compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')
-        # Could be
-        # VBE.boot.super_backend.pipe_hdrbyte (new)
-        # or
-        # VBE.default2(127.0.0.2,,81).bereq_bodybytes (old)
-        # Regex result: [('super_backend', 'beresp_hdrbytes', '0'), ('super_backend', 'beresp_bodybytes', '0')]
-        self.rgx_bck = (compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)'),
-                        compile(r'VBE\.[\d\w-]+\.([\w\d_]+).(beresp[\w_]+)\s+(\d+)'))
+        self.order = ORDER[:]
+        self.definitions = dict(CHARTS)
+        self.regex_all = re.compile(r'([A-Z]+\.)?([\d\w_.]+)\s+(\d+)')
+        self.regex_backend = None
         self.cache_prev = list()
+        self.backend_list = list()
 
     def check(self):
         # Cant start without 'varnishstat' command
@@ -107,27 +122,35 @@ class Service(SimpleService):
         # 1. STDOUT is not empty
         reply = self._get_raw_data()
         if not reply:
-            self.error('No output from \'varnishstat\' (not enough privileges?)')
+            self.error("No output from 'varnishstat' (not enough privileges?)")
             return False
 
         # 2. Output is parsable (list is not empty after regex findall)
-        is_parsable = self.rgx_all.findall(reply)
-        if not is_parsable:
+        found = self.regex_all.findall(reply)
+        if not found:
             self.error('Cant parse output...')
             return False
 
         # We need to find the right regex for backend parse
-        self.backend_list = self.rgx_bck[0].findall(reply)[::2]
-        if self.backend_list:
-            self.rgx_bck = self.rgx_bck[0]
-        else:
-            self.backend_list = self.rgx_bck[1].findall(reply)[::2]
-            self.rgx_bck = self.rgx_bck[1]
+        # Could be
+        # VBE.boot.super_backend.pipe_hdrbyte (new)
+        # or
+        # VBE.default2(127.0.0.2,,81).bereq_bodybytes (old)
+        # Regex result: [('super_backend', 'beresp_hdrbytes', '0'), ('super_backend', 'beresp_bodybytes', '0')]
 
-        # We are about to start!
+        regex1 = re.compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)')
+        regex2 = re.compile(r'VBE\.[\d\w-]+\.([\w\d_]+).(beresp[\w_]+)\s+(\d+)')
+
+        self.backend_list = regex1.findall(reply)[::2]
+        if self.backend_list:
+            self.regex_backend = regex1
+        else:
+            self.backend_list = self.regex2.findall(reply)[::2]
+            self.regex_backend = regex2
+
         self.create_charts()
         return True
-     
+
     def _get_raw_data(self):
         try:
             reply = Popen([self.varnish, '-1'], stdout=PIPE, stderr=PIPE, shell=False)
@@ -147,15 +170,15 @@ class Service(SimpleService):
         :return: dict
         """
         raw_data = self._get_raw_data()
-        data_all = self.rgx_all.findall(raw_data)
-        data_backend = self.rgx_bck.findall(raw_data)
+        data_all = self.regex_all.findall(raw_data)
+        data_backend = self.regex_backend.findall(raw_data)
 
         if not data_all:
             return None
 
         # 1. ALL data from 'varnishstat -1'. t - type(MAIN, MEMPOOL etc)
         to_netdata = dict((k, int(v)) for t, k, v in data_all)
-        
+
         # 2. ADD backend statistics
         to_netdata.update(dict(('_'.join([n, k]), int(v)) for n, k, v in data_backend))
 
@@ -197,10 +220,6 @@ class Service(SimpleService):
         return to_netdata
 
     def create_charts(self):
-        self.order = ORDER[:]
-        self.definitions = CHARTS
- 
-        # Create dynamic backend charts
         if self.backend_list:
             for backend in self.backend_list:
                 self.order.insert(0, ''.join([backend[0], '_resp_stats']))

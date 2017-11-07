@@ -1,7 +1,7 @@
 #include "common.h"
 #include "zfs_common.h"
 
-struct arcstats arcstats = { 0 };
+extern struct arcstats arcstats;
 
 // --------------------------------------------------------------------------------------------------------------------
 // kstat.zfs.misc.arcstats
@@ -105,15 +105,15 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
         int arc_sys_free[5];
     } mibs;
 
-    l2exist = -1;
+    arcstats.l2exist = -1;
 
     if(unlikely(sysctlbyname("kstat.zfs.misc.arcstats.l2_size", &l2_size, &uint64_t_size, NULL, 0)))
         return 0;
 
     if(likely(l2_size))
-        l2exist = 1;
+        arcstats.l2exist = 1;
     else
-        l2exist = 0;
+        arcstats.l2exist = 0;
 
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.hits", mibs.hits, arcstats.hits);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.misses", mibs.misses, arcstats.misses);

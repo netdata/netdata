@@ -260,6 +260,8 @@ cgroup_network_SOURCES = \
     inlined.h \
     log.c log.h \
 	procfile.c procfile.h \
+	popen.c popen.h \
+	signals.c signals.h \
     $(NULL)
 
 cgroup_network_LDADD = \
