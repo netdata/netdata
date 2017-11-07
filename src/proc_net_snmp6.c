@@ -360,13 +360,13 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "fragsout"
                     , NULL
-                    , "fragments"
+                    , "fragments6"
                     , NULL
                     , "IPv6 Fragments Sent"
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3010
+                    , 3011
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -406,13 +406,13 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "fragsin"
                     , NULL
-                    , "fragments"
+                    , "fragments6"
                     , NULL
                     , "IPv6 Fragments Reassembly"
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3011
+                    , 3012
                     , update_every
                     , RRDSET_TYPE_LINE);
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
@@ -510,7 +510,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "udppackets"
                     , NULL
-                    , "udp"
+                    , "udp6"
                     , NULL
                     , "IPv6 UDP Packets"
                     , "packets/s"
@@ -556,7 +556,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "udperrors"
                     , NULL
-                    , "udp"
+                    , "udp6"
                     , NULL
                     , "IPv6 UDP Errors"
                     , "events/s"
@@ -599,13 +599,13 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "udplitepackets"
                     , NULL
-                    , "udplite"
+                    , "udplite6"
                     , NULL
                     , "IPv6 UDPlite Packets"
                     , "packets/s"
                     , "proc"
                     , "net/snmp6"
-                    , 3601
+                    , 3602
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -644,7 +644,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "udpliteerrors"
                     , NULL
-                    , "udplite"
+                    , "udplite6"
                     , NULL
                     , "IPv6 UDP Lite Errors"
                     , "events/s"
@@ -685,7 +685,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "mcast"
                     , NULL
-                    , "multicast"
+                    , "multicast6"
                     , NULL
                     , "IPv6 Multicast Bandwidth"
                     , "kilobits/s"
@@ -720,7 +720,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "bcast"
                     , NULL
-                    , "broadcast"
+                    , "broadcast6"
                     , NULL
                     , "IPv6 Broadcast Bandwidth"
                     , "kilobits/s"
@@ -755,7 +755,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "mcastpkts"
                     , NULL
-                    , "multicast"
+                    , "multicast6"
                     , NULL
                     , "IPv6 Multicast Packets"
                     , "packets/s"
@@ -790,7 +790,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "icmp"
                     , NULL
-                    , "icmp"
+                    , "icmp6"
                     , NULL
                     , "IPv6 ICMP Messages"
                     , "messages/s"
@@ -824,7 +824,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "icmpredir"
                     , NULL
-                    , "icmp"
+                    , "icmp6"
                     , NULL
                     , "IPv6 ICMP Redirects"
                     , "redirects/s"
@@ -880,7 +880,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "icmperrors"
                     , NULL
-                    , "icmp"
+                    , "icmp6"
                     , NULL
                     , "IPv6 ICMP Errors"
                     , "errors/s"
@@ -940,7 +940,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "icmpechos"
                     , NULL
-                    , "icmp"
+                    , "icmp6"
                     , NULL
                     , "IPv6 ICMP Echo"
                     , "messages/s"
@@ -990,7 +990,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "groupmemb"
                     , NULL
-                    , "icmp"
+                    , "icmp6"
                     , NULL
                     , "IPv6 ICMP Group Membership"
                     , "messages/s"
@@ -1039,7 +1039,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "icmprouter"
                     , NULL
-                    , "icmp"
+                    , "icmp6"
                     , NULL
                     , "IPv6 Router Messages"
                     , "messages/s"
@@ -1085,7 +1085,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "icmpneighbor"
                     , NULL
-                    , "icmp"
+                    , "icmp6"
                     , NULL
                     , "IPv6 Neighbor Messages"
                     , "messages/s"
@@ -1123,7 +1123,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "icmpmldv2"
                     , NULL
-                    , "icmp"
+                    , "icmp6"
                     , NULL
                     , "IPv6 ICMP MLDv2 Reports"
                     , "reports/s"
@@ -1177,7 +1177,7 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
                     RRD_TYPE_NET_SNMP6
                     , "icmptypes"
                     , NULL
-                    , "icmp"
+                    , "icmp6"
                     , NULL
                     , "IPv6 ICMP Types"
                     , "messages/s"

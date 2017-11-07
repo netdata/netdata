@@ -33,6 +33,7 @@ static struct proc_module {
         // network metrics
         { .name = "/proc/net/dev", .dim = "netdev", .func = do_proc_net_dev },
         { .name = "/proc/net/sockstat", .dim = "sockstat", .func = do_proc_net_sockstat },
+        { .name = "/proc/net/sockstat6", .dim = "sockstat6", .func = do_proc_net_sockstat6 },
         { .name = "/proc/net/netstat", .dim = "netstat", .func = do_proc_net_netstat }, // this has to be before /proc/net/snmp, because there is a shared metric
         { .name = "/proc/net/snmp", .dim = "snmp", .func = do_proc_net_snmp },
         { .name = "/proc/net/snmp6", .dim = "snmp6", .func = do_proc_net_snmp6 },
