@@ -1219,15 +1219,15 @@ netdataDashboard.context = {
 
     // This is also a per-tube stat
     'beanstalk.jobs_rate': {
-        info: 'Number of jobs processed per second'
+        info: 'The rate of jobs processed by the beanstalkd server'
     },
 
     'beanstalk.connections_rate': {
-        info: 'Number of connections opened per second'
+        info: 'Tthe rate of connections opened to beanstalkd'
     },
 
     'beanstalk.commands_rate': {
-        info: 'Number of commands per second, group by command name'
+        info: 'The rate of commands received by beanstalkd.'
     },
 
     'beanstalk.current_tubes': {
@@ -1243,7 +1243,7 @@ netdataDashboard.context = {
     },
 
     'beanstalk.binlog': {
-        info: 'Written: Cumulative number of records writen to the binlog<br> Migrated: Cumulative number of records written as part of the compaction'
+        info: 'The rate of records <code>written</code> to binlog and <code>migrated</code> as part of compaction.'
     },
 
     'beanstalk.uptime': {
@@ -1252,15 +1252,15 @@ netdataDashboard.context = {
 
     // tube charts
     'beanstalk.jobs': {
-        info: 'Cumulative number of jobs currently in the tube grouped by status: urgent, ready, reserved, delayed and buried'
+        info: 'Number of jobs currently in the tube grouped by status: urgent, ready, reserved, delayed and buried'
     },
 
     'beanstalk.connections': {
-        info: 'Total number of connections to this tube grouped by connection type; using, waiting and watching'
+        info: 'The current number of connections to this tube grouped by connection type; using, waiting and watching'
     },
 
     'beanstalk.commands': {
-        info: 'Total number of delete and pause commands per second'
+        info: 'The rate of <code>delete</code> and <code>pause</code> commands executed by beanstalkd'
     },
 
     'beanstalk.pause': {
