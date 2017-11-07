@@ -63,6 +63,7 @@ SUBDIRS = \
 dist_noinst_DATA= \
 	configs.signatures \
 	Dockerfile \
+	Dockerfile.armv7hf \
 	netdata.spec \
 	package.json \
 	$(NULL)
