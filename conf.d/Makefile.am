@@ -103,6 +103,7 @@ dist_healthconfig_DATA = \
     health.d/squid.conf \
     health.d/swap.conf \
     health.d/tcp_listen.conf \
+    health.d/tcp_orphans.conf \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
     health.d/varnish.conf \

@@ -32,6 +32,29 @@ static inline void arl_callback_str2kernel_uint_t(const char *name, uint32_t has
     // fprintf(stderr, "name '%s' with hash %u and value '%s' is %llu\n", name, hash, value, (unsigned long long)*d);
 }
 
+static kernel_uint_t read_tcp_max_orphans(void) {
+    static char *filename = NULL;
+    static RRDVAR *tcp_max_orphans_var = NULL;
+
+    if(unlikely(!filename)) {
+        char buffer[FILENAME_MAX + 1];
+        snprintfz(buffer, FILENAME_MAX, "%s/proc/sys/net/ipv4/tcp_max_orphans", netdata_configured_host_prefix);
+        filename = strdupz(buffer);
+    }
+
+    unsigned long long tcp_max_orphans = 0;
+    if(read_single_number_file(filename, &tcp_max_orphans) == 0) {
+
+        if(unlikely(!tcp_max_orphans_var))
+            tcp_max_orphans_var = rrdvar_custom_host_variable_create(localhost, "tcp_max_orphans");
+
+        rrdvar_custom_host_variable_set(localhost, tcp_max_orphans_var, tcp_max_orphans);
+        return  tcp_max_orphans;
+    }
+
+    return 0;
+}
+
 int do_proc_net_sockstat(int update_every, usec_t dt) {
     (void)dt;
 
@@ -44,6 +67,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     hash_udp = 0,
                     hash_udplite = 0;
 
+    static long long update_tcp_max_orphans_every = 60, update_tcp_max_orphans_count = 0;
 
     static ARL_BASE *arl_sockets = NULL;
     static ARL_BASE *arl_tcp = NULL;
@@ -68,6 +92,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         do_raw_sockets     = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 RAW sockets", CONFIG_BOOLEAN_AUTO);
         do_frag_sockets    = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG sockets", CONFIG_BOOLEAN_AUTO);
         do_frag_mem        = config_get_boolean_ondemand("plugin:proc:/proc/net/sockstat", "ipv4 FRAG memory", CONFIG_BOOLEAN_AUTO);
+        update_tcp_max_orphans_every = config_get_number("plugin:proc:/proc/net/sockstat", "update tcp_max_orphans every", update_tcp_max_orphans_every);
+        update_tcp_max_orphans_count = update_tcp_max_orphans_every;
 
         arl_sockets = arl_create("sockstat/sockets", arl_callback_str2kernel_uint_t, 60);
         arl_expect(arl_sockets, "used", &sockstat_root.sockets_used);
@@ -107,6 +133,10 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
         keys[4] = "RAW";     hashes[4] = hash_raw;     bases[4] = arl_raw;
         keys[5] = "FRAG";    hashes[5] = hash_frag;    bases[5] = arl_frag;
     }
+
+    update_tcp_max_orphans_count += update_every;
+    if(unlikely(update_tcp_max_orphans_count > update_tcp_max_orphans_every))
+        read_tcp_max_orphans();
 
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
@@ -240,7 +270,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "net/sockstat"
                     , 2406
                     , update_every
-                    , RRDSET_TYPE_LINE
+                    , RRDSET_TYPE_AREA
             );
 
             rd_mem = rrddim_add(st, "mem", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -304,7 +334,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "net/sockstat"
                     , 2411
                     , update_every
-                    , RRDSET_TYPE_LINE
+                    , RRDSET_TYPE_AREA
             );
 
             rd_mem = rrddim_add(st, "mem", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_ABSOLUTE);
@@ -432,7 +462,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "net/sockstat"
                     , 2441
                     , update_every
-                    , RRDSET_TYPE_LINE
+                    , RRDSET_TYPE_AREA
             );
 
             rd_mem = rrddim_add(st, "mem", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
