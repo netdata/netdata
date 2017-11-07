@@ -26,6 +26,8 @@ extern int do_proc_uptime(int update_every, usec_t dt);
 extern int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt);
 extern int do_proc_sys_devices_system_node(int update_every, usec_t dt);
 extern int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt);
+extern int do_proc_net_sockstat(int update_every, usec_t dt);
+extern int do_proc_net_sockstat6(int update_every, usec_t dt);
 
 extern int get_numa_node_count(void);
 

@@ -110,6 +110,9 @@ extern int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const ch
 // begin an ARL iteration
 extern void arl_begin(ARL_BASE *base);
 
+extern void arl_callback_str2ull(const char *name, uint32_t hash, const char *value, void *dst);
+extern void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, const char *value, void *dst);
+
 // check a keyword against the ARL
 // this is to be called for each keyword read from source data
 // s = the keyword, as collected
