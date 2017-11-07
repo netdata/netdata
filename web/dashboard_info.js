@@ -317,6 +317,13 @@ netdataDashboard.menu = {
     'couchdb': {
         icon: '<i class="fa fa-database" aria-hidden="true"></i>',
         info: 'Performance metrics for <b><a href="https://couchdb.apache.org/">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
+    },
+    
+    
+    'beanstalk': {
+        title: 'Beanstalkd',
+        icon: '<i class="fa fa-tasks" aria-hidden="true"></i>',
+        info: 'Provides statistics on the <b><a href="http://kr.github.io/beanstalkd/">beanstalkd</a></b> server and any tubes available on that server using data pulled from beanstalkc'
     }
 };
 
@@ -1201,6 +1208,63 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             }
         ]
+    },
+    
+    // ------------------------------------------------------------------------
+    // beanstalkd
+    // system charts
+    'beanstalk.cpu_usage': {
+        info: 'Amount of CPU Time for user and system used by beanstalkd'
+    },
+
+    // This is also a per-tube stat
+    'beanstalk.jobs_rate': {
+        info: 'Number of jobs processed per second'
+    },
+
+    'beanstalk.connections_rate': {
+        info: 'Number of connections opened per second'
+    },
+
+    'beanstalk.commands_rate': {
+        info: 'Number of commands per second, group by command name'
+    },
+
+    'beanstalk.current_tubes': {
+        info: 'Total number of current tubes on the server including the default tube (which always exists)'
+    },
+
+    'beanstalk.current_jobs': {
+        info: 'Current number of jobs in all tubes grouped by status: urgent, ready, reserved, delayed and buried'
+    },
+
+    'beanstalk.current_connections': {
+        info: 'Current number of connections group by connection type: written, producers, workers, waiting'
+    },
+
+    'beanstalk.binlog': {
+        info: 'Written: Cumulative number of records writen to the binlog<br> Migrated: Cumulative number of records written as part of the compaction'
+    },
+
+    'beanstalk.uptime': {
+        info: 'Total time beanstalkd server has been up for'
+    },
+
+    // tube charts
+    'beanstalk.jobs': {
+        info: 'Cumulative number of jobs currently in the tube grouped by status: urgent, ready, reserved, delayed and buried'
+    },
+
+    'beanstalk.connections': {
+        info: 'Total number of connections to this tube grouped by connection type; using, waiting and watching'
+    },
+
+    'beanstalk.commands': {
+        info: 'Total number of delete and pause commands per second'
+    },
+
+    'beanstalk.pause': {
+        info: 'Shows info on how long the tube has been paused for, and how long is left remaining on the pause'
     },
 
     // ------------------------------------------------------------------------
