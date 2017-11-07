@@ -607,24 +607,13 @@ done
 # check kafka
 [ -z "${KAFKA_URL}" -o -z "${KAFKA_SENDER_IP}" ] && SEND_KAFKA="NO"
 
-# check pagerduty.com
-# if we need pd-send, check for the pd-send command
-# https://www.pagerduty.com/docs/guides/agent-install-guide/
-if [ "${SEND_PD}" = "YES" ]
-    then
-    pd_send="$(which pd-send 2>/dev/null || command -v pd-send 2>/dev/null)"
-    if [ -z "${pd_send}" ]
-        then
-        error "Cannot find pd-send command in the system path. Disabling pagerduty.com notifications."
-        SEND_PD="NO"
-    fi
-fi
 
 # if we need curl, check for the curl command
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
         -o "${SEND_FLOCK}"       = "YES" \
+        -o "${SEND_PD}"          = "YES" \
         -o "${SEND_DISCORD}"     = "YES" \
         -o "${SEND_HIPCHAT}"     = "YES" \
         -o "${SEND_TWILIO}"      = "YES" \
@@ -652,6 +641,7 @@ if [ \( \
         SEND_KAVENEGAR="NO"
         SEND_KAFKA="NO"
         SEND_CUSTOM="NO"
+        SEND_PD="NO"
     fi
 fi
 
@@ -950,38 +940,42 @@ send_pd() {
         then
         for PD_SERVICE_KEY in ${recipients}
         do
-            d="${status} ${name} = ${value_string} - ${host}, ${family}"
-            ${pd_send} -k ${PD_SERVICE_KEY} \
-                       -t ${t} \
-                       -d "${d}" \
-                       -i ${alarm_id} \
-                       -f 'info'="${info}" \
-                       -f 'value_w_units'="${value_string}" \
-                       -f 'when'="${when}" \
-                       -f 'duration'="${duration}" \
-                       -f 'roles'="${roles}" \
-                       -f 'host'="${host}" \
-                       -f 'unique_id'="${unique_id}" \
-                       -f 'alarm_id'="${alarm_id}" \
-                       -f 'event_id'="${event_id}" \
-                       -f 'name'="${name}" \
-                       -f 'chart'="${chart}" \
-                       -f 'family'="${family}" \
-                       -f 'status'="${status}" \
-                       -f 'old_status'="${old_status}" \
-                       -f 'value'="${value}" \
-                       -f 'old_value'="${old_value}" \
-                       -f 'src'="${src}" \
-                       -f 'non_clear_duration'="${non_clear_duration}" \
-                       -f 'units'="${units}"
-            retval=$?
-            if [ ${retval} -eq 0 ]
-                then
-                    info "sent pagerduty.com notification for host ${host} ${chart}.${name} using service key ${PD_SERVICE_KEY::-26}....: ${d}"
-                    sent=$((sent + 1))
-                else
-                    error "failed to send pagerduty.com notification for ${host} ${chart}.${name} using service key ${PD_SERVICE_KEY::-26}.... (error code ${retval}): ${d}"
-            fi
+        d="${status} ${name} = ${value_string} - ${host}, ${family}"
+            payload="$(cat << EOF
+            {
+              "service_key": "${PD_SERVICE_KEY}",
+              "event_type": "${t}",
+              "incident_key" : "${alarm_id}",
+              "description": "${d}",
+              "details": {
+                "value_w_units": "${value_string}",
+                "when": "${when}",
+                "duration" : "${duration}",
+                "roles": "${roles}",
+                "alarm_id" : "${alarm_id}",
+                "name" : "${name}",
+                "chart" : "${chart}",
+                "family" : "${family}",
+                "status" : "${status}",
+                "old_status" : "${old_status}",
+                "value" : "${value}",
+                "old_value" : "${old_value}",
+                "src" : "${src}",
+                "non_clear_duration" : "${non_clear_duration}",
+                "units" : "${units}",
+                "info" : "${info}"
+              }
+            }
+EOF
+            )"
+         httpcode=$(docurl -X POST --data "${payload}" "https://events.pagerduty.com/generic/2010-04-15/create_event.json")
+         if [ "${httpcode}" = "200" ]
+         then
+             info "sent pagerduty notification for: ${host} ${chart}.${name} is ${status}'"
+             sent=$((sent + 1))
+         else
+             error "failed to send pagerduty notification for: ${host} ${chart}.${name} is ${status}, with HTTP error code ${httpcode}."
+         fi
         done
 
         [ ${sent} -gt 0 ] && return 0
@@ -1090,7 +1084,7 @@ send_messagebird() {
                 --data-urlencode "originator=${messagebirdnumber}" \
                 --data-urlencode "recipients=${user}" \
                 --data-urlencode "body=${title} ${message}" \
-		        --data-urlencode "datacoding=auto" \
+                --data-urlencode "datacoding=auto" \
                 -H "Authorization: AccessKey ${accesskey}" \
                 "https://rest.messagebird.com/messages")
 
@@ -1398,7 +1392,7 @@ image="${images_base_url}/images/seo-performance-128.png"
 
 # prepare the title based on status
 case "${status}" in
-	CRITICAL)
+    CRITICAL)
         image="${images_base_url}/images/alert-128-red.png"
         status_message="is critical"
         color="#ca414b"
@@ -1408,13 +1402,13 @@ case "${status}" in
         image="${images_base_url}/images/alert-128-orange.png"
         status_message="needs attention"
         color="#ffc107"
-		;;
+        ;;
 
-	CLEAR)
+    CLEAR)
         image="${images_base_url}/images/check-mark-2-128-green.png"
-    	status_message="recovered"
-		color="#77ca6d"
-		;;
+        status_message="recovered"
+        color="#77ca6d"
+        ;;
 esac
 
 if [ "${status}" = "CLEAR" ]
