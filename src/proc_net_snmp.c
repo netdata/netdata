@@ -94,7 +94,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
         do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1, do_udplite_packets = -1;
     static uint32_t hash_ip = 0, hash_icmp = 0, hash_tcp = 0, hash_udp = 0, hash_icmpmsg = 0, hash_udplite = 0;
 
-    ARL_BASE *arl_ip = NULL,
+    static ARL_BASE *arl_ip = NULL,
              *arl_icmp = NULL,
              *arl_icmpmsg = NULL,
              *arl_tcp = NULL,
