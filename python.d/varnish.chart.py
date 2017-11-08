@@ -145,7 +145,7 @@ class Service(SimpleService):
         if self.backend_list:
             self.regex_backend = regex1
         else:
-            self.backend_list = self.regex2.findall(reply)[::2]
+            self.backend_list = regex2.findall(reply)[::2]
             self.regex_backend = regex2
 
         self.create_charts()
