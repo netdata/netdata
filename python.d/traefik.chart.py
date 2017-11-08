@@ -66,17 +66,17 @@ HEALTH_STATS = [
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
-    'avg_response_time_sec', 'total_response_time_sec', 'status_code', 'uptime_sec'
+    'avg_response_time', 'total_response_time', 'status_code', 'uptime'
     ]
 
 CHARTS = {
-    'avg_response_time_sec': {
-        'options': [None, 'AVG Response Time', 'seconds', 'avg response time', 'traefik.avg_response_time_sec', 'line'],
+    'avg_response_time': {
+        'options': [None, 'AVG Response Time', 'seconds', 'avg response time', 'traefik.avg_response_time', 'line'],
         'lines': [
             ['average_response_time_sec', None, 'absolute', 1, 1000]
         ]},
-    'total_response_time_sec': {
-        'options': [None, 'Total Response Time', 'seconds', 'total response time', 'traefik.total_response_time_sec', 'line'],
+    'total_response_time': {
+        'options': [None, 'Total Response Time', 'seconds', 'total response time', 'traefik.total_response_time', 'line'],
         'lines': [
             ['total_response_time_sec', None, 'absolute', 1, 1]
         ]},
@@ -121,8 +121,8 @@ CHARTS = {
             ['total_status_code_count_504', '504', 'absolute'],
             ['total_status_code_count_505', '505', 'absolute']
         ]},
-    'uptime_sec': {
-        'options': [None, 'Uptime', 'seconds', 'uptime', 'traefik.uptime_sec', 'line'],
+    'uptime': {
+        'options': [None, 'Uptime', 'seconds', 'uptime', 'traefik.uptime', 'line'],
         'lines': [
             ['uptime_sec', None, 'absolute', 1, 1]
         ]}
