@@ -56,9 +56,9 @@ static int read_tcp_mem(void) {
 
     // fprintf(stderr, "TCP MEM low = %llu, pressure = %llu, high = %llu\n", low, pressure, high);
 
-    rrdvar_custom_host_variable_set(localhost, tcp_mem_low_threshold, low * sysconf(_SC_PAGESIZE));
-    rrdvar_custom_host_variable_set(localhost, tcp_mem_pressure_threshold, pressure * sysconf(_SC_PAGESIZE));
-    rrdvar_custom_host_variable_set(localhost, tcp_mem_high_threshold, high * sysconf(_SC_PAGESIZE));
+    rrdvar_custom_host_variable_set(localhost, tcp_mem_low_threshold, low * sysconf(_SC_PAGESIZE) / 1024);
+    rrdvar_custom_host_variable_set(localhost, tcp_mem_pressure_threshold, pressure * sysconf(_SC_PAGESIZE) / 1024);
+    rrdvar_custom_host_variable_set(localhost, tcp_mem_high_threshold, high * sysconf(_SC_PAGESIZE) / 1024);
 
     return 0;
 }
