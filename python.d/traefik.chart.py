@@ -71,14 +71,14 @@ ORDER = [
 
 CHARTS = {
     'avg_response_time_sec': {
-        'options': [None, 'avg response time', 'seconds', 'avg response time', 'traefik.avg_response_time_sec', 'line'],
+        'options': [None, 'AVG Response Time', 'seconds', 'avg response time', 'traefik.avg_response_time_sec', 'line'],
         'lines': [
-            ['average_response_time_sec', 'time', 'divisor', 1000]
+            ['average_response_time_sec', None, 'absolute', 1, 1000]
         ]},
     'total_response_time_sec': {
-        'options': [None, 'total response time', 'seconds', 'total response time', 'traefik.total_response_time_sec', 'line'],
+        'options': [None, 'Total Response Time', 'seconds', 'total response time', 'traefik.total_response_time_sec', 'line'],
         'lines': [
-            ['total_response_time_sec', 'total', 'absolute']
+            ['total_response_time_sec', None, 'absolute', 1, 1]
         ]},
     'status_code': {
         'options': [None, 'status code', 'total', 'http status code', 'traefik.status_code_total', 'area'],
@@ -122,9 +122,9 @@ CHARTS = {
             ['total_status_code_count_505', '505', 'absolute']
         ]},
     'uptime_sec': {
-        'options': [None, 'uptime', 'seconds', 'uptime', 'traefik.uptime_sec', 'line'],
+        'options': [None, 'Uptime', 'seconds', 'uptime', 'traefik.uptime_sec', 'line'],
         'lines': [
-            ['uptime_sec', 'uptime', 'absolute']
+            ['uptime_sec', None, 'absolute', 1, 1]
         ]}
     }
 
