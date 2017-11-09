@@ -2,24 +2,13 @@
 # Description: traefik netdata python.d module
 # Author: Alexandre Menezes (@ale_menezes)
 
-from collections import namedtuple
 from json import loads
-from socket import gethostbyname, gaierror
-from threading import Thread
-try:
-        from queue import Queue
-except ImportError:
-        from Queue import Queue
-
-#from bases.FrameworkServices.UrlService import UrlService
 from base import UrlService
 
 # default module values (can be overridden per job in `config`)
 update_every = 5
 priority = 60000
 retries = 60
-
-METHODS = namedtuple('METHODS', ['get_data', 'url', 'run'])
 
 HEALTH_STATS = [
     'average_response_time_sec',
@@ -66,65 +55,69 @@ HEALTH_STATS = [
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
-    'avg_response_time', 'total_response_time', 'status_code', 'uptime'
+    'avg_response_time', 'total_response_time', 'requests', 'status_code', 'uptime'
     ]
 
 CHARTS = {
     'avg_response_time': {
-        'options': [None, 'AVG Response Time', 'seconds', 'avg response time', 'traefik.avg_response_time', 'line'],
+        'options': [None, 'AVG Response Time', 'milliseconds', 'avg response time', 'traefik.avg_response_time', 'line'],
         'lines': [
-            ['average_response_time_sec', None, 'absolute', 1, 1000]
+            ['average_response_time_sec', None, 'absolute', 1000000, 1000]
         ]},
     'total_response_time': {
         'options': [None, 'Total Response Time', 'seconds', 'total response time', 'traefik.total_response_time', 'line'],
         'lines': [
             ['total_response_time_sec', None, 'absolute', 1, 1]
         ]},
-    'status_code': {
-        'options': [None, 'status code', 'total', 'http status code', 'traefik.status_code_total', 'area'],
+    'requests': {
+        'options': [None, 'traefik Requests', 'requests/s', 'requests', 'traefik.requests', 'line'],
         'lines': [
-            ['total_count', 'total', 'absolute'],
-            ['total_status_code_count_200', '200', 'absolute'],
-            ['total_status_code_count_201', '201', 'absolute'],
-            ['total_status_code_count_202', '202', 'absolute'],
-            ['total_status_code_count_203', '203', 'absolute'],
-            ['total_status_code_count_204', '204', 'absolute'],
-            ['total_status_code_count_205', '205', 'absolute'],
-            ['total_status_code_count_206', '206', 'absolute'],
-            ['total_status_code_count_300', '300', 'absolute'],
-            ['total_status_code_count_301', '301', 'absolute'],
-            ['total_status_code_count_302', '302', 'absolute'],
-            ['total_status_code_count_303', '303', 'absolute'],
-            ['total_status_code_count_304', '304', 'absolute'],
-            ['total_status_code_count_305', '305', 'absolute'],
-            ['total_status_code_count_306', '306', 'absolute'],
-            ['total_status_code_count_307', '307', 'absolute'],
-            ['total_status_code_count_400', '400', 'absolute'],
-            ['total_status_code_count_401', '401', 'absolute'],
-            ['total_status_code_count_404', '404', 'absolute'],
-            ['total_status_code_count_405', '405', 'absolute'],
-            ['total_status_code_count_406', '406', 'absolute'],
-            ['total_status_code_count_407', '407', 'absolute'],
-            ['total_status_code_count_408', '408', 'absolute'],
-            ['total_status_code_count_409', '409', 'absolute'],
-            ['total_status_code_count_410', '410', 'absolute'],
-            ['total_status_code_count_411', '411', 'absolute'],
-            ['total_status_code_count_412', '412', 'absolute'],
-            ['total_status_code_count_413', '413', 'absolute'],
-            ['total_status_code_count_414', '414', 'absolute'],
-            ['total_status_code_count_415', '415', 'absolute'],
-            ['total_status_code_count_416', '416', 'absolute'],
-            ['total_status_code_count_417', '417', 'absolute'],
-            ['total_status_code_count_500', '500', 'absolute'],
-            ['total_status_code_count_501', '501', 'absolute'],
-            ['total_status_code_count_502', '502', 'absolute'],
-            ['total_status_code_count_504', '504', 'absolute'],
-            ['total_status_code_count_505', '505', 'absolute']
+            ['total_count', None, 'incremental'],
+        ]},
+    'status_code': {
+        'options': [None, 'status code', None, 'http status code', 'traefik.status_code_total', 'stacked'],
+        'lines': [
+            ['total_status_code_count_200', '200', 'incremental'],
+            ['total_status_code_count_201', '201', 'incremental'],
+            ['total_status_code_count_202', '202', 'incremental'],
+            ['total_status_code_count_203', '203', 'incremental'],
+            ['total_status_code_count_204', '204', 'incremental'],
+            ['total_status_code_count_205', '205', 'incremental'],
+            ['total_status_code_count_206', '206', 'incremental'],
+            ['total_status_code_count_300', '300', 'incremental'],
+            ['total_status_code_count_301', '301', 'incremental'],
+            ['total_status_code_count_302', '302', 'incremental'],
+            ['total_status_code_count_303', '303', 'incremental'],
+            ['total_status_code_count_304', '304', 'incremental'],
+            ['total_status_code_count_305', '305', 'incremental'],
+            ['total_status_code_count_306', '306', 'incremental'],
+            ['total_status_code_count_307', '307', 'incremental'],
+            ['total_status_code_count_400', '400', 'incremental'],
+            ['total_status_code_count_401', '401', 'incremental'],
+            ['total_status_code_count_404', '404', 'incremental'],
+            ['total_status_code_count_405', '405', 'incremental'],
+            ['total_status_code_count_406', '406', 'incremental'],
+            ['total_status_code_count_407', '407', 'incremental'],
+            ['total_status_code_count_408', '408', 'incremental'],
+            ['total_status_code_count_409', '409', 'incremental'],
+            ['total_status_code_count_410', '410', 'incremental'],
+            ['total_status_code_count_411', '411', 'incremental'],
+            ['total_status_code_count_412', '412', 'incremental'],
+            ['total_status_code_count_413', '413', 'incremental'],
+            ['total_status_code_count_414', '414', 'incremental'],
+            ['total_status_code_count_415', '415', 'incremental'],
+            ['total_status_code_count_416', '416', 'incremental'],
+            ['total_status_code_count_417', '417', 'incremental'],
+            ['total_status_code_count_500', '500', 'incremental'],
+            ['total_status_code_count_501', '501', 'incremental'],
+            ['total_status_code_count_502', '502', 'incremental'],
+            ['total_status_code_count_504', '504', 'incremental'],
+            ['total_status_code_count_505', '505', 'incremental']
         ]},
     'uptime': {
         'options': [None, 'Uptime', 'seconds', 'uptime', 'traefik.uptime', 'line'],
         'lines': [
-            ['uptime_sec', None, 'absolute', 1, 1]
+            ['uptime_sec', None, 'absolute']
         ]}
     }
 
@@ -132,69 +125,19 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
+        self.url = self.configuration.get('url', 'http://localhost:8080/health')
         self.order = ORDER
         self.definitions = CHARTS
-        self.host = self.configuration.get('host')
-        self.port = self.configuration.get('port', 8080)
-        self.url = '{scheme}://{host}:{port}'.format(scheme=self.configuration.get('scheme', 'http'),
-                                                     host=self.host,
-                                                     port=self.port)
-        self.methods = list()
-
-    def check(self):
-        if not all([self.host,
-                    self.port,
-                    isinstance(self.host, str),
-                    isinstance(self.port, (str, int))]):
-            self.error('Host is not defined in the module configuration file')
-            return False
-
-        try:
-            self.host = gethostbyname(self.host)
-        except gaierror as error:
-            self.error(str(error))
-            return False
-
-        self.methods = [METHODS(get_data=self._get_health_stats,
-                                url=self.url + '/health',
-                                run=self.configuration.get('health_status', True))
-                        ]
-        return UrlService.check(self)
 
     def _get_data(self):
-        threads = list()
-        queue = Queue()
-        result = dict()
+        data = self._get_raw_data()
 
-        for method in self.methods:
-            if not method.run:
-                continue
-            th = Thread(target=method.get_data,
-                        args=(queue, method.url))
-            th.start()
-            threads.append(th)
+        if not data:
+            return None
 
-        for thread in threads:
-            thread.join()
-            result.update(queue.get())
-
-        return result or None
-
-    def _get_health_stats(self, queue, url):
-        """
-        Format data received from http request
-        :return: dict
-        """
-        raw_data = self._get_raw_data(url)
-
-        if not raw_data:
-            return queue.put(dict())
-
-        data = loads(raw_data)
-        to_netdata = fetch_data_(raw_data=data,
-                                 metrics=HEALTH_STATS)
-
-        return queue.put(to_netdata)
+        data = loads(data)
+        to_netdata = fetch_data_(raw_data=data, metrics=HEALTH_STATS)
+        return to_netdata or None
 
 def fetch_data_(raw_data, metrics):
     data = dict()
