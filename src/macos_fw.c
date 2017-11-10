@@ -112,8 +112,14 @@ int do_macos_iokit(int update_every, usec_t dt) {
             CFRelease(properties);
             IOObjectRelease(drive_media);
 
+            if(unlikely(!diskstat.name || !*diskstat.name)) {
+                IOObjectRelease(drive);
+                continue;
+            }
+
             /* Obtain the properties for this drive object. */
             if (unlikely(IORegistryEntryCreateCFProperties(drive, (CFMutableDictionaryRef *)&properties, kCFAllocatorDefault, 0))) {
+                IOObjectRelease(drive);
                 error("MACOS: IORegistryEntryCreateCFProperties() failed");
                 do_io = 0;
                 error("DISABLED: system.io");
