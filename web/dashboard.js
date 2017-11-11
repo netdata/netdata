@@ -144,7 +144,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.themes = {
         white: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20170725-1',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20171111-5',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#F0F0F0',
@@ -161,7 +161,7 @@ var NETDATA = window.NETDATA || {};
         },
         slate: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20170725-1',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20171111-5',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
@@ -305,6 +305,9 @@ var NETDATA = window.NETDATA || {};
             seconds_as_time: true,      // show seconds as DDd:HH:MM:SS ?
             timezone: 'default',        // the timezone to use, or 'default'
             user_set_server_timezone: 'default', // as set by the user on the dashboard
+
+            legend_toolbox: true,       // show the legend toolbox on charts
+            resize_charts: true,        // show the resize handler on charts
 
             pixels_per_point: isSlowDevice()?5:1, // the minimum pixels per point for all charts
                                         // increase this to speed javascript up
@@ -1313,7 +1316,7 @@ var NETDATA = window.NETDATA || {};
         if(this.name_div !== name_div) {
             this.name_div = name_div;
             this.name_div.title = this.label;
-            this.name_div.style.color = this.color;
+            this.name_div.style.setProperty('color', this.color, 'important');
             if(this.selected === false)
                 this.name_div.className = 'netdata-legend-name not-selected';
             else
@@ -1323,7 +1326,7 @@ var NETDATA = window.NETDATA || {};
         if(this.value_div !== value_div) {
             this.value_div = value_div;
             this.value_div.title = this.label;
-            this.value_div.style.color = this.color;
+            this.value_div.style.setProperty('color', this.color, 'important');
             if(this.selected === false)
                 this.value_div.className = 'netdata-legend-value not-selected';
             else
@@ -2598,6 +2601,21 @@ var NETDATA = window.NETDATA || {};
             resizeChart();
         };
 
+        this.resizeForPrint = function() {
+            if(typeof this.element_legend_childs !== 'undefined' && this.element_legend_childs.perfect_scroller !== null) {
+                var current = this.element.clientHeight;
+                var optimal = current
+                    + this.element_legend_childs.perfect_scroller.scrollHeight
+                    - this.element_legend_childs.perfect_scroller.clientHeight;
+
+                if(optimal > current) {
+                    // this.log('resized');
+                    this.element.style.height = optimal + 'px';
+                    this.library.resize(this);
+                }
+            }
+        };
+
         this.resizeHandler = function(e) {
             e.preventDefault();
 
@@ -3479,7 +3497,7 @@ var NETDATA = window.NETDATA || {};
                 label.name.innerHTML = '<table class="netdata-legend-name-table-'
                     + state.chart.chart_type
                     + '" style="background-color: '
-                    + 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current['color_fill_opacity_' + state.chart.chart_type] + ')'
+                    + 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current['color_fill_opacity_' + state.chart.chart_type] + ') !important'
                     + '"><tr class="netdata-legend-name-tr"><td class="netdata-legend-name-td"></td></tr></table>';
 
                 var text = document.createTextNode(' ' + name);
@@ -3516,14 +3534,14 @@ var NETDATA = window.NETDATA || {};
 
                 this.element_legend_childs = {
                     content: content,
-                    resize_handler: document.createElement('div'),
-                    toolbox: document.createElement('div'),
-                    toolbox_left: document.createElement('div'),
-                    toolbox_right: document.createElement('div'),
-                    toolbox_reset: document.createElement('div'),
-                    toolbox_zoomin: document.createElement('div'),
-                    toolbox_zoomout: document.createElement('div'),
-                    toolbox_volume: document.createElement('div'),
+                    resize_handler: null,
+                    toolbox: null,
+                    toolbox_left: null,
+                    toolbox_right: null,
+                    toolbox_reset: null,
+                    toolbox_zoomin: null,
+                    toolbox_zoomout: null,
+                    toolbox_volume: null,
                     title_date: document.createElement('span'),
                     title_time: document.createElement('span'),
                     title_units: document.createElement('span'),
@@ -3531,7 +3549,15 @@ var NETDATA = window.NETDATA || {};
                     series: {}
                 };
 
-                if(this.library.toolboxPanAndZoom !== null) {
+                if(NETDATA.options.current.legend_toolbox === true && this.library.toolboxPanAndZoom !== null) {
+                    this.element_legend_childs.toolbox = document.createElement('div');
+                    this.element_legend_childs.toolbox_left = document.createElement('div');
+                    this.element_legend_childs.toolbox_right = document.createElement('div');
+                    this.element_legend_childs.toolbox_reset = document.createElement('div');
+                    this.element_legend_childs.toolbox_zoomin = document.createElement('div');
+                    this.element_legend_childs.toolbox_zoomout = document.createElement('div');
+                    this.element_legend_childs.toolbox_volume = document.createElement('div');
+
                     var get_pan_and_zoom_step = function(event) {
                         if (event.ctrlKey)
                             return NETDATA.options.current.pan_and_zoom_factor * NETDATA.options.current.pan_and_zoom_factor_multiplier_control;
@@ -3671,41 +3697,39 @@ var NETDATA = window.NETDATA || {};
                         //alert('clicked toolbox_volume on ' + that.id);
                     //}
                 }
-                else {
-                    this.element_legend_childs.toolbox = null;
-                    this.element_legend_childs.toolbox_left = null;
-                    this.element_legend_childs.toolbox_reset = null;
-                    this.element_legend_childs.toolbox_right = null;
-                    this.element_legend_childs.toolbox_zoomin = null;
-                    this.element_legend_childs.toolbox_zoomout = null;
-                    this.element_legend_childs.toolbox_volume = null;
-                }
 
-                this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
-                this.element_legend_childs.resize_handler.innerHTML = '<i class="fa fa-chevron-up"></i><i class="fa fa-chevron-down"></i>';
-                this.element.appendChild(this.element_legend_childs.resize_handler);
-                if(NETDATA.options.current.show_help === true)
-                    $(this.element_legend_childs.resize_handler).popover({
-                    container: "body",
-                    animation: false,
-                    html: true,
-                    trigger: 'hover',
-                    placement: 'bottom',
-                    delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
-                    title: 'Chart Resize',
-                    content: 'Drag this point with your mouse or your finger (on touch devices), to resize the chart vertically. You can also <b>double click it</b> or <b>double tap it</b> to reset between 2 states: the default and the one that fits all the values.<br/><small>Help, can be disabled from the settings.</small>'
-                });
+                if(NETDATA.options.current.resize_charts === true) {
+                    this.element_legend_childs.resize_handler = document.createElement('div');
 
-                // mousedown event
-                this.element_legend_childs.resize_handler.onmousedown =
-                    function(e) {
+                    this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
+                    this.element_legend_childs.resize_handler.innerHTML = '<i class="fa fa-chevron-up"></i><i class="fa fa-chevron-down"></i>';
+                    this.element.appendChild(this.element_legend_childs.resize_handler);
+                    if (NETDATA.options.current.show_help === true)
+                        $(this.element_legend_childs.resize_handler).popover({
+                            container: "body",
+                            animation: false,
+                            html: true,
+                            trigger: 'hover',
+                            placement: 'bottom',
+                            delay: {
+                                show: NETDATA.options.current.show_help_delay_show_ms,
+                                hide: NETDATA.options.current.show_help_delay_hide_ms
+                            },
+                            title: 'Chart Resize',
+                            content: 'Drag this point with your mouse or your finger (on touch devices), to resize the chart vertically. You can also <b>double click it</b> or <b>double tap it</b> to reset between 2 states: the default and the one that fits all the values.<br/><small>Help, can be disabled from the settings.</small>'
+                        });
+
+                    // mousedown event
+                    this.element_legend_childs.resize_handler.onmousedown =
+                        function (e) {
+                            that.resizeHandler(e);
+                        };
+
+                    // touchstart event
+                    this.element_legend_childs.resize_handler.addEventListener('touchstart', function (e) {
                         that.resizeHandler(e);
-                    };
-
-                // touchstart event
-                this.element_legend_childs.resize_handler.addEventListener('touchstart', function(e) {
-                    that.resizeHandler(e);
-                }, false);
+                    }, false);
+                }
 
                 if(this.chart) {
                     this.element_legend_childs.title_date.title = this.legendPluginModuleString(true);
@@ -3725,6 +3749,7 @@ var NETDATA = window.NETDATA || {};
                 this.element_legend.appendChild(document.createElement('br'));
 
                 this.element_legend_childs.title_units.className += " netdata-legend-title-units";
+                this.element_legend_childs.title_units.innerText = this.units_current;
                 this.element_legend.appendChild(this.element_legend_childs.title_units);
                 this.tmp.__last_shown_legend_units = undefined;
 
@@ -4198,6 +4223,9 @@ var NETDATA = window.NETDATA || {};
         };
 
         var __isVisible = function() {
+            if(NETDATA.options.current.update_only_visible === false)
+                return true;
+
             // tolerance is the number of pixels a chart can be off-screen
             // to consider it as visible and refresh it as if was visible
             var tolerance = 0;
