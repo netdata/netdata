@@ -121,7 +121,7 @@ int do_proc_net_sockstat6(int update_every, usec_t dt) {
                     , "tcp6"
                     , NULL
                     , "IPv6 TCP Sockets"
-                    , "tcp6"
+                    , "sockets"
                     , "proc"
                     , "net/sockstat6"
                     , 3599
