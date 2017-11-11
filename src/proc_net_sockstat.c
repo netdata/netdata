@@ -263,7 +263,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "tcp"
                     , NULL
                     , "IPv4 TCP Sockets"
-                    , "tcp"
+                    , "sockets"
                     , "proc"
                     , "net/sockstat"
                     , 2500
