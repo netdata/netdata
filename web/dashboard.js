@@ -4114,7 +4114,7 @@ var NETDATA = window.NETDATA || {};
                     this.log('I am already updating...');
 
                 if(typeof callback === 'function')
-                    return callback();
+                    return callback(false, 'already running');
 
                 return;
             }
@@ -4126,14 +4126,14 @@ var NETDATA = window.NETDATA || {};
                     this.log('I am not enabled');
 
                 if(typeof callback === 'function')
-                    return callback();
+                    return callback(false, 'not enabled');
 
                 return;
             }
 
             if(canBeRendered() === false) {
                 if(typeof callback === 'function')
-                    return callback();
+                    return callback(false, 'cannot be rendered');
 
                 return;
             }
@@ -4156,7 +4156,7 @@ var NETDATA = window.NETDATA || {};
                     error('chart library "' + this.library_name + '" is not available.');
 
                     if(typeof callback === 'function')
-                        return callback();
+                        return callback(false, 'library not available');
 
                     return;
                 }
@@ -4176,6 +4176,8 @@ var NETDATA = window.NETDATA || {};
 
             this.fetching_data = true;
 
+            var ok = false;
+
             this.xhr = $.ajax( {
                 url: this.data_url,
                 cache: false,
@@ -4189,6 +4191,8 @@ var NETDATA = window.NETDATA || {};
             .done(function(data) {
                 that.xhr = undefined;
                 that.retries_on_data_failures = 0;
+
+                ok = true;
 
                 if(that.debug === true)
                     that.log('data received. updating chart.');
@@ -4218,7 +4222,7 @@ var NETDATA = window.NETDATA || {};
                 that.fetching_data = false;
 
                 if(typeof callback === 'function')
-                    return callback();
+                    return callback(ok, 'download');
             });
         };
 
