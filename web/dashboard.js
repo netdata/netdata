@@ -297,6 +297,9 @@ var NETDATA = window.NETDATA || {};
         browser_timezone: 'unknown',    // timezone detected by javascript
         server_timezone: 'unknown',     // timezone reported by the server
 
+        force_data_points: 0,           // force the number of points to be returned for charts
+        fake_chart_rendering: false,    // when set to true, the dashboard will download data but will not render the charts
+
         // the current profile
         // we may have many...
         current: {
@@ -2506,6 +2509,9 @@ var NETDATA = window.NETDATA || {};
             if(canBeRendered() === false)
                 return false;
 
+            if(NETDATA.options.fake_chart_rendering === true)
+                return true;
+
             if(NETDATA.options.debug.chart_errors === true)
                 status = that.library.update(that, data);
             else {
@@ -2531,6 +2537,9 @@ var NETDATA = window.NETDATA || {};
 
             if(canBeRendered() === false)
                 return false;
+
+            if(NETDATA.options.fake_chart_rendering === true)
+                return true;
 
             if(NETDATA.options.debug.chart_errors === true)
                 status = that.library.create(that, data);
@@ -3946,12 +3955,20 @@ var NETDATA = window.NETDATA || {};
             this.requested_after = after * 1000;
             this.requested_before = before * 1000;
 
-            this.data_points = this.points || Math.round(this.chartWidth() / this.chartPixelsPerPoint());
+            var data_points;
+            if(NETDATA.options.force_data_points !== 0) {
+                data_points = NETDATA.options.force_data_points;
+                this.data_points = data_points;
+            }
+            else {
+                this.data_points = this.points || Math.round(this.chartWidth() / this.chartPixelsPerPoint());
+                data_points = this.data_points * points_multiplier;
+            }
 
             // build the data URL
             this.data_url = this.host + this.chart.data_url;
             this.data_url += "&format="  + this.library.format();
-            this.data_url += "&points="  + (this.data_points * points_multiplier).toString();
+            this.data_url += "&points="  + (data_points).toString();
             this.data_url += "&group="   + this.method;
 
             if(this.override_options !== null)
@@ -3977,7 +3994,7 @@ var NETDATA = window.NETDATA || {};
                 this.data_url += "&dimensions=" + this.dimensions;
 
             if(NETDATA.options.debug.chart_data_url === true || this.debug === true)
-                this.log('chartURL(): ' + this.data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + this.data_points + ' library: ' + this.library_name);
+                this.log('chartURL(): ' + this.data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
         };
 
         this.redrawChart = function() {

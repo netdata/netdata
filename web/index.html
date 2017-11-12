@@ -1070,6 +1070,9 @@
             families_idx: {},
             hosts: [],
 
+            duration: 0, // the default duration of the charts
+            update_every: 1,
+
             chartsPerRow: 0,
             // chartsMinWidth: 1450,
             chartsHeight: 180
@@ -1606,6 +1609,9 @@
 
             // find the proper duration for per-second updates
             var duration = Math.round(($(div).width() * pcent_width / 100 * data.update_every / 3) / 60) * 60;
+            options.duration = duration;
+            options.update_every = data.update_every;
+
             var html = '';
             var sidebar = '<ul class="nav dashboard-sidenav" data-spy="affix" id="sidebar_ul">';
             var mainhead = headMain(netdataDashboard.os, data.charts, duration);
@@ -2793,12 +2799,20 @@
                     document.getElementById('loadJSONNetdataVersion').innerHTML = result.charts.version;
                     document.getElementById('loadJSONCharts').innerHTML = result.charts.charts_count.toString() + ' charts / ' + result.charts.dimensions_count.toString() + ' dimensions';
 
+                    var date_after = new Date(result.after_ms);
+                    var date_before = new Date(result.before_ms);
+                    console.log(date_after);
+                    console.log(date_before);
+                    document.getElementById('loadJSONTimeRange').innerHTML = NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + ' to ' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before);
+                    document.getElementById('loadJSONDataResolution').innerHTML = Math.round(result.duration_ms / result.data_points).toString() + ' ms per point, ' + result.data_points.toString() + ' points per dimension';
+
                     document.getElementById('loadJSONStatus').className = "alert alert-success";
                     document.getElementById('loadJSONStatus').innerHTML = "File loaded, click <b>Import</b> to render it!";
                     $('#loadJSONImport').prop('disabled', false);
                     $('#loadJSONImport').removeAttr('disabled');
                 }
                 catch(e) {
+                    console.log(e);
                     document.getElementById('loadJSONStatus').className = "alert alert-danger";
                     document.getElementById('loadJSONStatus').innerHTML = "Failed to parse this file!";
                 }
@@ -2842,9 +2856,26 @@
             var eltxt = document.getElementById('saveModalProgressBarText');
 
             var saveJSON = {
+                after_ms: Date.now() - options.duration * 1000,
+                before_ms: Date.now(),
+                duration_ms: options.duration * 1000,
+                update_every_ms: options.update_every * 1000,
+                data_points: 0,
                 charts: {},
                 data: {}
             }
+
+            var clearPanAndZoom = false;
+            if(NETDATA.globalPanAndZoom.isActive() === false) {
+                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], saveJSON.after_ms, saveJSON.before_ms);
+                clearPanAndZoom = true;
+            }
+
+            saveJSON.after_ms = NETDATA.globalPanAndZoom.force_after_ms;
+            saveJSON.before_ms = NETDATA.globalPanAndZoom.force_before_ms;
+            saveJSON.duration_ms = saveJSON.before_ms - saveJSON.after_ms;
+            saveJSON.data_points = Math.round((saveJSON.before_ms - saveJSON.after_ms) / saveJSON.update_every_ms);
+
             var charts_count = 0;
             var charts_fetched = 0;
             var charts_failed = 0;
@@ -2862,11 +2893,19 @@
                 $(el).css('width', '0%').attr('aria-valuenow', 0);
                 eltxt.innerText = '0%';
 
+                if(clearPanAndZoom)
+                    NETDATA.globalPanAndZoom.clearMaster();
+
+                NETDATA.options.force_data_points = 0;
+                NETDATA.options.fake_chart_rendering = false;
+                NETDATA.onresize();
                 NETDATA.unpause();
             }
 
             NETDATA.pause(function() {
                 NETDATA.globalSelectionSync.stop();
+                NETDATA.options.force_data_points = saveJSON.data_points;
+                NETDATA.options.fake_chart_rendering = true;
 
                 function update_chart(idx) {
                     if(savePageStop === true) {
@@ -3667,7 +3706,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="loadModalLabel">Select JSON file to load...</h4>
+                    <h4 class="modal-title" id="loadModalLabel">Load a netdata dashboard snapshot...</h4>
                 </div>
                 <div class="modal-body">
                     <p>
@@ -3690,8 +3729,7 @@
                             <tr><th>Filename</th><td id="loadJSONFilename"></td></tr>
                             <tr><th>Hostname</th><td id="loadJSONHostname"></td></tr>
                             <tr><th>Netdata Version</th><td id="loadJSONNetdataVersion"></td></tr>
-                            <tr><th>DateTime From</th><td></td id="loadJSONDateTimeFrom"></tr>
-                            <tr><th>DateTime To</th><td></td id="loadJSONDateTimeTo"></tr>
+                            <tr><th>Time Range</th><td id="loadJSONTimeRange"></td></tr>
                             <tr><th>Charts</th><td id="loadJSONCharts"></td></tr>
                             <tr><th>Data Resolution</th><td id="loadJSONDataResolution"></td></tr>
                         </tbody>
@@ -4597,6 +4635,6 @@
             </div>
         </div>
     </div>
-    <script type="text/javascript" src="dashboard.js?v20171111-12"></script>
+    <script type="text/javascript" src="dashboard.js?v20171112-13"></script>
 </body>
 </html>
