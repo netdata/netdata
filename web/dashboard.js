@@ -202,6 +202,9 @@ var NETDATA = window.NETDATA || {};
     //                         (blue)     (red)      (orange)   (green)    (pink)     (brown)    (purple)   (yellow)   (gray)
     //NETDATA.colors        = [ '#5DA5DA', '#F15854', '#FAA43A', '#60BD68', '#F17CB0', '#B2912F', '#B276B2', '#DECF3F', '#4D4D4D' ];
 
+    if(typeof netdataSnapshotData === 'undefined')
+        netdataSnapshotData = null;
+
     if(typeof netdataShowHelp === 'undefined')
         netdataShowHelp = true;
 
@@ -999,6 +1002,11 @@ var NETDATA = window.NETDATA || {};
         keys: {},
         latest: {},
 
+        globalReset: function() {
+            this.keys = {};
+            this.latest = {};
+        },
+
         get: function(state) {
             if(typeof state.tmp.__commonMin === 'undefined') {
                 // get the commonMin setting
@@ -1052,6 +1060,11 @@ var NETDATA = window.NETDATA || {};
     NETDATA.commonMax = {
         keys: {},
         latest: {},
+
+        globalReset: function() {
+            this.keys = {};
+            this.latest = {};
+        },
 
         get: function(state) {
             if(typeof state.tmp.__commonMax === 'undefined') {
@@ -1123,6 +1136,10 @@ var NETDATA = window.NETDATA || {};
     NETDATA.chartRegistry = {
         charts: {},
 
+        globalReset: function() {
+            this.charts = {};
+        },
+
         fixid: function(id) {
             return id.replace(/:/g, "_").replace(/\//g, "_");
         },
@@ -1157,13 +1174,7 @@ var NETDATA = window.NETDATA || {};
 
             var self = this;
 
-            $.ajax({
-                url: host + '/api/v1/charts',
-                async: true,
-                cache: false,
-                xhrFields: { withCredentials: true } // required for the cookie
-            })
-            .done(function(data) {
+            function fix_data(data, callback) {
                 if(data !== null) {
                     var h = NETDATA.chartRegistry.fixid(host);
                     self.charts[h] = data.charts;
@@ -1175,14 +1186,29 @@ var NETDATA = window.NETDATA || {};
                 else NETDATA.error(406, host + '/api/v1/charts');
 
                 if(typeof callback === 'function')
-                    return callback(data);
-            })
-            .fail(function() {
-                NETDATA.error(405, host + '/api/v1/charts');
+                    callback(data);
+            }
 
-                if(typeof callback === 'function')
-                    return callback(null);
-            });
+            if(netdataSnapshotData !== null) {
+                fix_data(netdataSnapshotData.charts, callback);
+            }
+            else {
+                $.ajax({
+                    url: host + '/api/v1/charts',
+                    async: true,
+                    cache: false,
+                    xhrFields: {withCredentials: true} // required for the cookie
+                })
+                    .done(function (data) {
+                        fix_data(data, callback);
+                    })
+                    .fail(function () {
+                        NETDATA.error(405, host + '/api/v1/charts');
+
+                        if (typeof callback === 'function')
+                            callback(null);
+                    });
+            }
         }
     };
 
@@ -1208,6 +1234,15 @@ var NETDATA = window.NETDATA || {};
         force_after_ms: null,
 
         callback: null,
+
+        globalReset: function() {
+            this.clearMaster();
+            this.seq = 0;
+            this.master = null;
+            this.force_after_ms = null;
+            this.force_before_ms = null;
+            this.callback = null;
+        },
 
         delay: function() {
             if(NETDATA.options.debug.globalPanAndZoom === true)
@@ -1619,6 +1654,11 @@ var NETDATA = window.NETDATA || {};
         keys: {},       // keys for data-common-units
         latest: {},     // latest selected units for data-common-units
 
+        globalReset: function() {
+            this.keys = {};
+            this.latest = {};
+        },
+
         scalableUnits: {
             'kilobits/s': {
                 'bits/s': 1 / 1000,
@@ -1909,6 +1949,15 @@ var NETDATA = window.NETDATA || {};
         last_t: 0,
         slaves: [],
         timeout_id: null,
+
+        globalReset: function() {
+            this.stop();
+            this.state = null;
+            this.dont_sync_before =  0;
+            this.last_t = 0;
+            this.slaves = [];
+            this.timeout_id = null;
+        },
 
         active: function() {
             return (this.state !== null);
@@ -3908,37 +3957,62 @@ var NETDATA = window.NETDATA || {};
             return ret;
         };
 
+        this.chartDataUniqueID = function() {
+            return this.id + ',' + this.library_name + ',' + this.dimensions + ',' + this.chartURLOptions();
+        };
+
+        this.chartURLOptions = function() {
+            var ret = '';
+
+            if(this.override_options !== null)
+                ret = this.override_options.toString();
+            else
+                ret = this.library.options(this);
+
+            if(this.append_options !== null)
+                ret += '|' + this.append_options.toString();
+
+            ret += '|jsonwrap';
+
+            if(NETDATA.options.current.eliminate_zero_dimensions === true)
+                ret += '|nonzero';
+
+            return ret;
+        };
+
         this.chartURL = function() {
             var after, before, points_multiplier = 1;
-            if(NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(this) === false) {
-                this.tm.pan_and_zoom_seq = NETDATA.globalPanAndZoom.seq;
+            if(NETDATA.globalPanAndZoom.isActive()) {
+                if(this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
+                    this.tm.pan_and_zoom_seq = 0;
 
-                after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
-                before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
-                this.view_after = after * 1000;
-                this.view_before = before * 1000;
+                    before = Math.round(this.current.force_before_ms / 1000);
+                    after  = Math.round(this.current.force_after_ms / 1000);
+                    this.view_after = after * 1000;
+                    this.view_before = before * 1000;
 
-                this.requested_padding = null;
-                points_multiplier = 1;
-            }
-            else if(this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
-                this.tm.pan_and_zoom_seq = 0;
+                    if(NETDATA.options.current.pan_and_zoom_data_padding === true) {
+                        this.requested_padding = Math.round((before - after) / 2);
+                        after -= this.requested_padding;
+                        before += this.requested_padding;
+                        this.requested_padding *= 1000;
+                        points_multiplier = 2;
+                    }
 
-                before = Math.round(this.current.force_before_ms / 1000);
-                after  = Math.round(this.current.force_after_ms / 1000);
-                this.view_after = after * 1000;
-                this.view_before = before * 1000;
-
-                if(NETDATA.options.current.pan_and_zoom_data_padding === true) {
-                    this.requested_padding = Math.round((before - after) / 2);
-                    after -= this.requested_padding;
-                    before += this.requested_padding;
-                    this.requested_padding *= 1000;
-                    points_multiplier = 2;
+                    this.current.force_before_ms = null;
+                    this.current.force_after_ms = null;
                 }
+                else {
+                    this.tm.pan_and_zoom_seq = NETDATA.globalPanAndZoom.seq;
 
-                this.current.force_before_ms = null;
-                this.current.force_after_ms = null;
+                    after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
+                    before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
+                    this.view_after = after * 1000;
+                    this.view_before = before * 1000;
+
+                    this.requested_padding = null;
+                    points_multiplier = 1;
+                }
             }
             else {
                 this.tm.pan_and_zoom_seq = 0;
@@ -3970,19 +4044,7 @@ var NETDATA = window.NETDATA || {};
             this.data_url += "&format="  + this.library.format();
             this.data_url += "&points="  + (data_points).toString();
             this.data_url += "&group="   + this.method;
-
-            if(this.override_options !== null)
-                this.data_url += "&options=" + this.override_options.toString();
-            else
-                this.data_url += "&options=" + this.library.options(this);
-
-            this.data_url += '|jsonwrap';
-
-            if(NETDATA.options.current.eliminate_zero_dimensions === true)
-                this.data_url += '|nonzero';
-
-            if(this.append_options !== null)
-                this.data_url += '|' + this.append_options.toString();
+            this.data_url += "&options=" + this.chartURLOptions();
 
             if(after)
                 this.data_url += "&after="  + after.toString();
@@ -4182,18 +4244,41 @@ var NETDATA = window.NETDATA || {};
             this.clearSelection();
             this.chartURL();
 
-            if(this.debug === true)
-                this.log('updating from ' + this.data_url);
-
             NETDATA.statistics.refreshes_total++;
             NETDATA.statistics.refreshes_active++;
 
             if(NETDATA.statistics.refreshes_active > NETDATA.statistics.refreshes_active_max)
                 NETDATA.statistics.refreshes_active_max = NETDATA.statistics.refreshes_active;
 
+            var ok = false;
             this.fetching_data = true;
 
-            var ok = false;
+            if(netdataSnapshotData !== null) {
+                var key = this.chartDataUniqueID();
+
+                if(this.debug === true)
+                    this.log('updating from snapshot: ' + key);
+
+                if(typeof netdataSnapshotData.data[key] === 'string') {
+                    ok = true;
+                    this.updateChartWithData(JSON.parse(netdataSnapshotData.data[key]));
+                }
+                else {
+                    ok = false;
+                    error('data not found in snapshot for key: ' + key);
+                }
+
+                NETDATA.statistics.refreshes_active--;
+                this.fetching_data = false;
+
+                if(typeof callback === 'function')
+                    callback(ok, 'snapshot');
+
+                return;
+            }
+
+            if(this.debug === true)
+                this.log('updating from ' + this.data_url);
 
             this.xhr = $.ajax( {
                 url: this.data_url,
@@ -4208,7 +4293,6 @@ var NETDATA = window.NETDATA || {};
             .done(function(data) {
                 that.xhr = undefined;
                 that.retries_on_data_failures = 0;
-
                 ok = true;
 
                 if(that.debug === true)
@@ -4898,6 +4982,18 @@ var NETDATA = window.NETDATA || {};
             netdataCallback();
     };
 
+    NETDATA.globalReset = function() {
+        NETDATA.globalSelectionSync.globalReset();
+        NETDATA.globalPanAndZoom.globalReset();
+        NETDATA.chartRegistry.globalReset();
+        NETDATA.commonMin.globalReset();
+        NETDATA.commonMax.globalReset();
+        NETDATA.unitsConversion.globalReset();
+        NETDATA.options.targets = null;
+        NETDATA.parseDom();
+        NETDATA.unpause();
+    };
+
     // ----------------------------------------------------------------------------------------------------------------
     // peity
 
@@ -5263,6 +5359,12 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.dygraphChartCreate(state, data);
                 return;
             }
+        }
+
+        if(netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+            // pan and zoom on snapshots
+            options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
+            options.isZoomedIgnoreProgrammaticZoom = true;
         }
 
         dygraph.updateOptions(options);
@@ -5792,6 +5894,12 @@ var NETDATA = window.NETDATA || {};
                 state.tmp.dygraph_options.plotter = smoothPlotter;
         }
         else state.tmp.dygraph_smooth_eligible = false;
+
+        if(netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+            // pan and zoom on snapshots
+            state.tmp.dygraph_options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
+            state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
+        }
 
         state.tmp.dygraph_instance = new Dygraph(state.element_chart,
             data.result.data, state.tmp.dygraph_options);
@@ -7457,6 +7565,9 @@ var NETDATA = window.NETDATA || {};
         },
 
         update_forever: function() {
+            if(netdataShowAlarms !== true || netdataSnapshotData !== null)
+                return;
+
             NETDATA.alarms.get('active', function(data) {
                 if(data !== null) {
                     NETDATA.alarms.current = data;
