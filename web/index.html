@@ -759,6 +759,16 @@
             var link = document.createElement( 'a' );
             link.setAttribute( 'href', url );
             link.setAttribute( 'download', filename );
+
+            var el = document.getElementById('hiddenDownloadLinks');
+            el.innerHTML = '';
+            el.appendChild(link);
+
+            setTimeout(function(){
+                el.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 60);
+
             link.click();
         }
 
@@ -4806,6 +4816,7 @@
             </div>
         </div>
     </div>
+    <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
     <script type="text/javascript" src="dashboard.js?v20171112-21"></script>
 </body>
 </html>
