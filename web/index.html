@@ -2513,9 +2513,16 @@
                     options.hosts = data.hosts;
 
                 // update the dashboard hostname
-                document.getElementById('hostname').innerHTML = options.hostname;
+                document.getElementById('hostname').innerHTML = options.hostname + ((netdataSnapshotData !== null)?' (snap)':'').toString();
                 document.getElementById('hostname').href = NETDATA.serverDefault;
                 document.getElementById('netdataVersion').innerHTML = options.version;
+
+                if(netdataSnapshotData !== null) {
+                    $('#alarmsButton').hide();
+                    $('#loadButton').hide();
+                    $('#saveButton').hide();
+                    $('#printButton').hide();
+                }
 
                 // update the dashboard title
                 document.title = options.hostname + ' netdata dashboard';
@@ -3597,15 +3604,15 @@
             </div>
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
-                    <li><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i>&nbsp;<span class="hidden-sm">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
+                    <li id="alarmsButton"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i>&nbsp;<span class="hidden-sm">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
                     <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-sliders"></i>&nbsp;<span class="hidden-sm">Settings</span></a></li>
                     <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal" title="check for update"><i class="fa fa-cloud-download"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
-                    <li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata on github"><i class="fa fa-github"></i></a></li>
-                    <li><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank" title="netdata on twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
-                    <li><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank" title="netdata on facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal" title="load a saved dashboard"><i class="fa fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md">Load</span></a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal" title="save this dashboard as JSON"><i class="fa fa-download"></i>&nbsp;<span class="hidden-sm hidden-md">Save</span></a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal" title="print this dashboard"><i class="fa fa-print"></i>&nbsp;<span class="hidden-sm hidden-md">Print</span></a></li>
+                    <li class="hidden-sm"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata on github"><i class="fa fa-github"></i></a></li>
+                    <li class="hidden-sm"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank" title="netdata on twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
+                    <li class="hidden-sm"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank" title="netdata on facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a></li>
+                    <li id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal" title="load a saved dashboard"><i class="fa fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md">Load</span></a></li>
+                    <li id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal" title="save this dashboard as JSON"><i class="fa fa-download"></i>&nbsp;<span class="hidden-sm hidden-md">Save</span></a></li>
+                    <li id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal" title="print this dashboard"><i class="fa fa-print"></i>&nbsp;<span class="hidden-sm hidden-md">Print</span></a></li>
                     <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal" title="dashboard help"><i class="fa fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
                     <li class="dropdown hidden-sm hidden-md hidden-lg">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
