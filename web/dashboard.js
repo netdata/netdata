@@ -250,7 +250,6 @@ var NETDATA = window.NETDATA || {};
     // if the user does not specify any of these, the following will be used
 
     NETDATA.chartDefaults = {
-        host: NETDATA.serverDefault,    // the server to get data from
         width: '100%',                  // the chart width - can be null
         height: '100%',                 // the chart height - can be null
         min_width: null,                // the chart minimum width - can be null
@@ -2241,7 +2240,7 @@ var NETDATA = window.NETDATA || {};
                 return;
 
             // string - the netdata server URL, without any path
-            that.host = NETDATA.dataAttribute(that.element, 'host', NETDATA.chartDefaults.host);
+            that.host = NETDATA.dataAttribute(that.element, 'host', NETDATA.serverDefault);
 
             // make sure the host does not end with /
             // all netdata API requests use absolute paths
