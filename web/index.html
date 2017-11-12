@@ -471,6 +471,9 @@
 
     <!-- check which theme to use -->
     <script type="text/javascript">
+        // netdata snapshot data
+        var netdataSnapshotData = null;
+
         // enable alarms checking and notifications
         var netdataShowAlarms = true;
 
@@ -487,7 +490,7 @@
             hash: '#',
             theme: null,
             help: null,
-            mode: 'live',         // 'live', 'print', 'save', 'load'
+            mode: 'live',         // 'live', 'print'
             update_always: false,
             pan_and_zoom: false,
             after: 0,
@@ -553,6 +556,12 @@
                         urlOptions[booleans[len]] = false;
                 }
 
+                if(typeof urlOptions.after === 'string')
+                    urlOptions.after = parseInt(urlOptions.after);
+
+                if(typeof urlOptions.before === 'string')
+                    urlOptions.before = parseInt(urlOptions.before);
+
                 if(urlOptions.before > 0 && urlOptions.after > 0) {
                     urlOptions.pan_and_zoom = true;
                     urlOptions.nowelcome = true;
@@ -561,32 +570,27 @@
                     urlOptions.pan_and_zoom = false;
 
                 switch(urlOptions.mode) {
-                    case 'live':
                     case 'print':
-                    case 'load':
-                    case 'save':
+                        urlOptions.theme = 'white';
+                        urlOptions.welcome = false;
+                        urlOptions.help = false;
+                        urlOptions.show_alarms = false;
+
+                        if(urlOptions.pan_and_zoom === false) {
+                            urlOptions.pan_and_zoom = true;
+                            urlOptions.before = Date.now();
+                            urlOptions.after = urlOptions.before - 600000;
+                        }
+
+                        netdataShowAlarms = false;
+                        netdataRegistry = false;
+                        this_is_demo = false;
                         break;
 
+                    case 'live':
                     default:
                         urlOptions.mode = 'live';
                         break;
-                }
-
-                if(urlOptions.mode === 'print') {
-                    urlOptions.theme = 'white';
-                    urlOptions.welcome = false;
-                    urlOptions.help = false;
-                    urlOptions.show_alarms = false;
-
-                    if(urlOptions.pan_and_zoom === false) {
-                        urlOptions.pan_and_zoom = true;
-                        urlOptions.before = Date.now();
-                        urlOptions.after = urlOptions.before - 600000;
-                    }
-
-                    netdataShowAlarms = false;
-                    netdataRegistry = false;
-                    this_is_demo = false;
                 }
 
                 // console.log(urlOptions);
@@ -623,6 +627,7 @@
                     localStorageTested = true;
                 }
                 catch (e) {
+                    console.log(e);
                     localStorageTested = false;
                 }
             }
@@ -638,8 +643,13 @@
             try {
                 if(localStorageTest() === true)
                     ret = localStorage.getItem(name);
+                else
+                    console.log('localStorage is not available');
             }
-            catch(error) {}
+            catch(error) {
+                console.log(error);
+                return null;
+            }
 
             if(typeof ret === 'undefined' || ret === null)
                 return null;
@@ -657,7 +667,9 @@
                     return true;
                 }
             }
-            catch(error) {}
+            catch(error) {
+                console.log(error);
+            }
 
             return false;
         }
@@ -733,6 +745,25 @@
             }
 
             return aa.length - bb.length;
+        }
+
+        // --------------------------------------------------------------------
+        // saving files to client
+
+        function saveTextToClient(data, filename) {
+            var blob = new Blob( [ data ], {
+                type: 'application/octet-stream'
+            });
+
+            var url = URL.createObjectURL( blob );
+            var link = document.createElement( 'a' );
+            link.setAttribute( 'href', url );
+            link.setAttribute( 'download', filename );
+            link.click();
+        }
+
+        function saveObjectToClient(data, filename) {
+            saveTextToClient(JSON.stringify(data), filename);
         }
 
         // --------------------------------------------------------------------
@@ -1064,10 +1095,6 @@
             data: null,
             hostname: 'netdata_server', // will be overwritten by the netdata server
             version: 'unknown',
-            categories: [],
-            categories_idx: {},
-            families: [],
-            families_idx: {},
             hosts: [],
 
             duration: 0, // the default duration of the charts
@@ -1075,7 +1102,7 @@
 
             chartsPerRow: 0,
             // chartsMinWidth: 1450,
-            chartsHeight: 180
+            chartsHeight: 180,
         };
 
         function chartsPerRow(total) {
@@ -1728,6 +1755,9 @@
         }
 
         function renderChartsAndMenu(data) {
+            options.menus = {};
+            options.submenu_names = {};
+
             var menus = options.menus;
             var charts = data.charts;
             var m, menu_key;
@@ -2675,6 +2705,7 @@
         }
 
         // ----------------------------------------------------------------------------
+        // printing dashboards
 
         function showPageFooter() {
             document.getElementById('footer').style.display = 'block';
@@ -2685,8 +2716,8 @@
             var url = document.location.origin + document.location.search + '#' + urlOptions.genHash() + ';mode=print';
             var width = 990;
             var height = screen.height * 90 / 100;
-            console.log(url);
-            console.log(document.location);
+            //console.log(url);
+            //console.log(document.location);
             window.open(url, '', 'width=' + width.toString() + ',height=' + height.toString() + ',menubar=no,toolbar=no,personalbar=no,location=no,resizable=no,scrollbars=yes,status=no,chrome=yes,centerscreen=yes,attention=yes,dialog=yes');
             $('#printPreflightModal').modal('hide');
         }
@@ -2763,73 +2794,86 @@
             $('#printModal').modal('show');
         }
 
-        function saveObject(data, filename){
-            var blob = new Blob( [ JSON.stringify(data) ], {
-                type: 'application/octet-stream'
-            });
+        // --------------------------------------------------------------------
+        // loading snapshots
 
-            var url = URL.createObjectURL( blob );
-            var link = document.createElement( 'a' );
-            link.setAttribute( 'href', url );
-            link.setAttribute( 'download', filename );
-            link.click();
+        function loadSnapshotModalLog(priority, msg) {
+            document.getElementById('loadSnapshotStatus').className = "alert alert-" + priority;
+            document.getElementById('loadSnapshotStatus').innerHTML = msg;
         }
 
-        function loadPage() {
-            var files = document.getElementById('loadJSONSelectFiles').files;
+        var tmpSnapshotData = null;
+        function loadSnapshot() {
+            if(tmpSnapshotData === null) {
+                loadSnapshotModalLog('danger', 'no data have been loaded');
+                return;
+            }
+            loadSnapshotModalLog('info', 'Please wait, activating snapshot...');
+
+            netdataShowAlarms === false;
+            netdataRegistry = false;
+
+            document.getElementById('charts_div').innerHTML = '';
+            document.getElementById('sidebar').innerHTML = '';
+            NETDATA.globalReset();
+
+            netdataSnapshotData = tmpSnapshotData;
+            initializeDynamicDashboard(netdataSnapshotData.url);
+
+            $('#loadSnapshotModal').modal('hide');
+        }
+
+        function loadSnapshotPreflight() {
+            var files = document.getElementById('loadSnapshotSelectFiles').files;
             if (files.length <= 0) {
-                document.getElementById('loadJSONStatus').className = "alert alert-danger";
-                document.getElementById('loadJSONStatus').innerHTML = "No file selected";
+                loadSnapshotModalLog('danger', 'No file selected');
                 return;
             }
 
-            document.getElementById('loadJSONStatus').className = "alert alert-info";
-            document.getElementById('loadJSONStatus').innerHTML = "Loading file...";
+            loadSnapshotModalLog('info', 'Loading file...');
 
             var fr = new FileReader();
             fr.onload = function(e) {
-                console.log(e);
+                // console.log(e);
 
-                document.getElementById('loadJSONFilename').innerHTML = files.item(0).name;
+                document.getElementById('loadSnapshotFilename').innerHTML = files.item(0).name;
                 var result = null;
                 try {
                     result = JSON.parse(e.target.result);
-                    console.log(result);
-                    document.getElementById('loadJSONHostname').innerHTML = result.charts.hostname;
-                    document.getElementById('loadJSONNetdataVersion').innerHTML = result.charts.version;
-                    document.getElementById('loadJSONCharts').innerHTML = result.charts.charts_count.toString() + ' charts / ' + result.charts.dimensions_count.toString() + ' dimensions';
-
+                    //console.log(result);
                     var date_after = new Date(result.after_ms);
                     var date_before = new Date(result.before_ms);
-                    console.log(date_after);
-                    console.log(date_before);
-                    document.getElementById('loadJSONTimeRange').innerHTML = NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + ' to ' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before);
-                    document.getElementById('loadJSONDataResolution').innerHTML = Math.round(result.duration_ms / result.data_points).toString() + ' ms per point, ' + result.data_points.toString() + ' points per dimension';
+                    document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version <b>' + result.version + '</b>';
+                    document.getElementById('loadSnapshotURL').innerHTML = result.url;
+                    document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
+                    document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
+                    loadSnapshotModalLog('success', 'File loaded, click <b>Import</b> to render it!');
+                    $('#loadSnapshotImport').prop('disabled', false);
+                    $('#loadSnapshotImport').removeAttr('disabled');
 
-                    document.getElementById('loadJSONStatus').className = "alert alert-success";
-                    document.getElementById('loadJSONStatus').innerHTML = "File loaded, click <b>Import</b> to render it!";
-                    $('#loadJSONImport').prop('disabled', false);
-                    $('#loadJSONImport').removeAttr('disabled');
+                    tmpSnapshotData = result;
                 }
                 catch(e) {
                     console.log(e);
-                    document.getElementById('loadJSONStatus').className = "alert alert-danger";
-                    document.getElementById('loadJSONStatus').innerHTML = "Failed to parse this file!";
+                    document.getElementById('loadSnapshotStatus').className = "alert alert-danger";
+                    document.getElementById('loadSnapshotStatus').innerHTML = "Failed to parse this file!";
                 }
             }
 
+            //console.log(files.item(0));
             fr.readAsText(files.item(0));
         }
 
-        var savePageJSON = '';
-        var savePageStop = false;
-        function savePageCancel() {
-            savePageStop = true;
+        // --------------------------------------------------------------------
+        // saving snapshots
+
+        var saveSnapshotStop = false;
+        function saveSnapshotCancel() {
+            saveSnapshotStop = true;
         }
 
-        function savePageStart() {
-            savePageStop = false;
-            savePageJSON = '';
+        function saveSnapshotStart() {
+            saveSnapshotStop = false;
 
             var save_options = {
                 stop_updates_when_focus_is_lost: false,
@@ -2852,36 +2896,56 @@
                 }
             }
 
-            var el = document.getElementById('saveModalProgressBar');
-            var eltxt = document.getElementById('saveModalProgressBarText');
+            var el = document.getElementById('saveSnapshotModalProgressBar');
+            var eltxt = document.getElementById('saveSnapshotModalProgressBarText');
 
-            var saveJSON = {
+            options.data.charts_by_name = null;
+
+            var saveData = {
+                hostname: options.hostname,
+                version: options.data.version,
                 after_ms: Date.now() - options.duration * 1000,
                 before_ms: Date.now(),
                 duration_ms: options.duration * 1000,
                 update_every_ms: options.update_every * 1000,
                 data_points: 0,
-                charts: {},
+                url: document.location.origin.toString() + document.location.search.toString(),
+                charts: options.data,
                 data: {}
+            };
+
+            function pack_api1_v1_chart_data(state) {
+                if(state.library_name === null || state.data === null)
+                    return;
+
+                var data = state.data;
+                state.data = null;
+                data.state = null;
+
+                saveData.data[state.chartDataUniqueID()] = JSON.stringify(data);
             }
 
             var clearPanAndZoom = false;
             if(NETDATA.globalPanAndZoom.isActive() === false) {
-                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], saveJSON.after_ms, saveJSON.before_ms);
+                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], saveData.after_ms, saveData.before_ms);
                 clearPanAndZoom = true;
             }
 
-            saveJSON.after_ms = NETDATA.globalPanAndZoom.force_after_ms;
-            saveJSON.before_ms = NETDATA.globalPanAndZoom.force_before_ms;
-            saveJSON.duration_ms = saveJSON.before_ms - saveJSON.after_ms;
-            saveJSON.data_points = Math.round((saveJSON.before_ms - saveJSON.after_ms) / saveJSON.update_every_ms);
+            saveData.after_ms = NETDATA.globalPanAndZoom.force_after_ms;
+            saveData.before_ms = NETDATA.globalPanAndZoom.force_before_ms;
+            saveData.duration_ms = saveData.before_ms - saveData.after_ms;
+            saveData.data_points = Math.round((saveData.before_ms - saveData.after_ms) / saveData.update_every_ms);
+            if(saveData.data_points > 10000) {
+                console.log('data points ' + saveData.data_points.toString() + ' is too big - limiting it to 10000');
+                saveData.data_points = 10000;
+            }
 
             var charts_count = 0;
             var charts_fetched = 0;
             var charts_failed = 0;
 
-            function savePageRestore() {
-                $('#saveModal').modal('hide');
+            function saveSnapshotRestore() {
+                $('#saveSnapshotModal').modal('hide');
 
                 // restore the options
                 var x;
@@ -2904,12 +2968,12 @@
 
             NETDATA.pause(function() {
                 NETDATA.globalSelectionSync.stop();
-                NETDATA.options.force_data_points = saveJSON.data_points;
+                NETDATA.options.force_data_points = saveData.data_points;
                 NETDATA.options.fake_chart_rendering = true;
 
                 function update_chart(idx) {
-                    if(savePageStop === true) {
-                        savePageRestore();
+                    if(saveSnapshotStop === true) {
+                        saveSnapshotRestore();
                         return;
                     }
 
@@ -2922,8 +2986,12 @@
                     setTimeout(function() {
                         charts_count++;
                         state.isVisible(true);
+                        state.current.force_after_ms = saveData.after_ms;
+                        state.current.force_before_ms = saveData.before_ms;
 
                         state.updateChart(function(status, reason) {
+                            state.current.force_after_ms = null;
+                            state.current.force_before_ms = null;
 
                             if(status === true) {
                                 charts_fetched++;
@@ -2934,30 +3002,18 @@
                                 state.log('failed to be updated: ' + reason);
                             }
 
-                            // saveJSON.charts[state.id] = state.chart;
-                            if(state.library_name !== null) {
-                                var d = state.data;
-                                state.data = null;
-                                d.state = undefined;
-
-                                if (typeof saveJSON.data[state.library_name] === 'undefined')
-                                    saveJSON.data[state.library_name] = {};
-
-                                saveJSON.data[state.library_name][state.id] = d;
-                            }
+                            pack_api1_v1_chart_data(state);
 
                             if (idx > 0) {
                                 update_chart(idx);
                             }
                             else {
-                                // FIXME save it
-                                saveJSON.charts = options.data;
-                                saveJSON.charts.charts_by_name = undefined;
+                                // save it
+                                // console.log(saveData);
+                                saveObjectToClient(saveData, 'netdata-dashboard-' + saveData.hostname.toString() + '-' + saveData.after_ms.toString() + '-' + saveData.before_ms.toString() + '.json');
 
-                                console.log(saveJSON);
-                                saveObject(saveJSON, 'netdata-dashboard.json');
-
-                                savePageRestore();
+                                saveSnapshotRestore();
+                                saveData = null;
                             }
                         })
                     }, 0);
@@ -2966,6 +3022,9 @@
                 update_chart(NETDATA.options.targets.length);
             });
         }
+
+        // --------------------------------------------------------------------
+        // activate netdata on the page
 
         function finalizePage() {
             // resize all charts - without starting the background thread
@@ -3170,8 +3229,8 @@
                 //else console.log('el.find(): not found');
             });
 
-            $('#saveModal').on('shown.bs.modal', savePageStart);
-            $('#saveModal').on('hide.bs.modal',  savePageCancel);
+            $('#saveSnapshotModal').on('shown.bs.modal', saveSnapshotStart);
+            $('#saveSnapshotModal').on('hide.bs.modal',  saveSnapshotCancel);
 
             showPageFooter();
 
@@ -3490,6 +3549,7 @@
 
         // our entry point
         // var netdataStarted = performance.now();
+
         var netdataCallback = initializeDynamicDashboard;
 
     </script>
@@ -3543,8 +3603,8 @@
                     <li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata on github"><i class="fa fa-github"></i></a></li>
                     <li><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank" title="netdata on twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
                     <li><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank" title="netdata on facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#loadModal" title="load a saved dashboard"><i class="fa fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md">Load</span></a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#saveModal" title="save this dashboard as JSON"><i class="fa fa-download"></i>&nbsp;<span class="hidden-sm hidden-md">Save</span></a></li>
+                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal" title="load a saved dashboard"><i class="fa fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md">Load</span></a></li>
+                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal" title="save this dashboard as JSON"><i class="fa fa-download"></i>&nbsp;<span class="hidden-sm hidden-md">Save</span></a></li>
                     <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal" title="print this dashboard"><i class="fa fa-print"></i>&nbsp;<span class="hidden-sm hidden-md">Print</span></a></li>
                     <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal" title="dashboard help"><i class="fa fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
                     <li class="dropdown hidden-sm hidden-md hidden-lg">
@@ -3690,7 +3750,7 @@
                     Please wait while we initialize and render all the charts on the dashboard.
                     <div class="progress progress-striped active" style="height: 2em !important;">
                         <div id="printModalProgressBar" class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em;">
-                            <span id="printModalProgressBarText" style="padding-top: 4px; font-size: 1.2em; text-align: center; width: 100%; position: absolute; display: block; color: black;"></span>
+                            <span id="printModalProgressBarText" style="padding-left: 10px; padding-top: 4px; font-size: 1.2em; text-align: left; width: 100%; position: absolute; display: block; color: black;"></span>
                         </div>
                     </div>
                     The print dialog will appear as soon as we finish rendering the page.
@@ -3701,66 +3761,66 @@
         </div>
     </div>
 
-    <div class="modal fade" id="loadModal" tabindex="-1" role="dialog" aria-labelledby="loadModalLabel">
+    <div class="modal fade" id="loadSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="loadSnapshotModalLabel">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="loadModalLabel">Load a netdata dashboard snapshot...</h4>
+                    <h4 class="modal-title" id="loadSnapshotModalLabel">Load a netdata snapshot</h4>
                 </div>
                 <div class="modal-body">
                     <p>
-                        netdata can load JSON snapshots of netdata dashboards.<br/>
+                        netdata can save and load JSON snapshots of netdata dashboards.<br/>
                         Any netdata can load a saved snapshot of the dashboard of any other netdata.
                     </p>
                     <p>
                         <label class="btn btn-default">
                             Select a netdata saved JSON file to load
-                            <input type="file" id="loadJSONSelectFiles" value="Import" style="display: none;"
-                                   onchange="loadPage();">
+                            <input type="file" id="loadSnapshotSelectFiles" value="Import" style="display: none;"
+                                   onchange="loadSnapshotPreflight();">
                         </label>
                     </p>
-                    <div id="loadJSONStatus" class="alert alert-info" role="alert">
+                    <div id="loadSnapshotStatus" class="alert alert-info" role="alert">
                         Click the button above to select the file to load, then click <b>Import</b> to render it.
                     </div>
                     <p>
                         <table class="table">
                         <tbody>
-                            <tr><th>Filename</th><td id="loadJSONFilename"></td></tr>
-                            <tr><th>Hostname</th><td id="loadJSONHostname"></td></tr>
-                            <tr><th>Netdata Version</th><td id="loadJSONNetdataVersion"></td></tr>
-                            <tr><th>Time Range</th><td id="loadJSONTimeRange"></td></tr>
-                            <tr><th>Charts</th><td id="loadJSONCharts"></td></tr>
-                            <tr><th>Data Resolution</th><td id="loadJSONDataResolution"></td></tr>
+                            <tr><th>Filename</th><td id="loadSnapshotFilename"></td></tr>
+                            <tr><th>Hostname</th><td id="loadSnapshotHostname"></td></tr>
+                            <tr><th>Origin URL</th><td id="loadSnapshotURL"></td></tr>
+                            <tr><th>Time Range</th><td id="loadSnapshotTimeRange"></td></tr>
+                            <tr><th>Charts</th><td id="loadSnapshotCharts"></td></tr>
                         </tbody>
                         </table>
                     </p>
                 </div>
                 <div class="modal-footer">
-                    <button id="loadJSONImport" type="button" class="btn btn-success btn-disabled" disabled>Import</button>
+                    <a id="loadSnapshotImport" href="#" onclick="loadSnapshot(); return false;" type="button" class="btn btn-success btn-disabled" disabled>Import</a>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="saveModal" tabindex="-1" role="dialog" aria-labelledby="saveModalLabel" data-keyboard="false" data-backdrop="static">
+    <div class="modal fade" id="saveSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="saveSnapshotModalLabel" data-keyboard="false" data-backdrop="static">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="saveModalLabel">Preparing save file...</h4>
+                    <h4 class="modal-title" id="saveSnapshotModalLabel">Preparing netdata dashboard snapshot...</h4>
                 </div>
                 <div class="modal-body">
                     Please wait while we collect all the dashboard data...
                     <div class="progress progress-striped active" style="height: 2em !important;">
-                        <div id="saveModalProgressBar" class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em;">
-                            <span id="saveModalProgressBarText" style="padding-top: 4px; font-size: 1.2em; text-align: center; width: 100%; position: absolute; display: block;"></span>
+                        <div id="saveSnapshotModalProgressBar" class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em;">
+                            <span id="saveSnapshotModalProgressBarText" style="padding-left: 10px; padding-top: 4px; font-size: 1.2em; text-align: left; width: 100%; position: absolute; display: block;"></span>
                         </div>
                     </div>
                     The save dialog will appear once we have collected all data.
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
                 </div>
             </div>
         </div>
@@ -4635,6 +4695,6 @@
             </div>
         </div>
     </div>
-    <script type="text/javascript" src="dashboard.js?v20171112-13"></script>
+    <script type="text/javascript" src="dashboard.js?v20171112-20"></script>
 </body>
 </html>
