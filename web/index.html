@@ -2819,6 +2819,8 @@
 
             netdataShowAlarms === false;
             netdataRegistry = false;
+            netdataServer = tmpSnapshotData.server;
+            NETDATA.serverDefault = netdataServer;
 
             document.getElementById('charts_div').innerHTML = '';
             document.getElementById('sidebar').innerHTML = '';
@@ -2910,6 +2912,7 @@
 
             var saveData = {
                 hostname: options.hostname,
+                server: NETDATA.serverDefault,
                 version: options.data.version,
                 after_ms: Date.now() - options.duration * 1000,
                 before_ms: Date.now(),
@@ -3718,12 +3721,9 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="printPreflightModalLabel">Export this dashboard?</h4>
+                    <h4 class="modal-title" id="printPreflightModalLabel">Print this netdata dashboard</h4>
                 </div>
                 <div class="modal-body">
-                    <p>
-                        <b>Print to printer (i.e. PDF)?</b>
-                    </p>
                     <p>
                         netdata dashboards cannot be captured, since we are lazy loading and hiding all but the visible charts.
                         <br/>
