@@ -1863,6 +1863,18 @@
             else callback();
         }
 
+        var bootstrapSliderLoaded = false;
+        function loadBootstrapSlider(callback) {
+            if(bootstrapSliderLoaded === false) {
+                bootstrapSliderLoaded = true;
+                loadJs(NETDATA.serverDefault + 'lib/bootstrap-slider-10.0.0.min.js', function() {
+                    NETDATA._loadCSS(NETDATA.serverDefault + 'css/bootstrap-slider-10.0.0.min.css');
+                    callback();
+                });
+            }
+            else callback();
+        }
+
         function alarmsUpdateModal() {
             var active = '<h3>Raised Alarms</h3><table class="table">';
             var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
@@ -2881,8 +2893,82 @@
             saveSnapshotStop = true;
         }
 
-        function saveSnapshotStart() {
+        function saveSnapshotModalLog(priority, msg) {
+            document.getElementById('saveSnapshotStatus').className = "alert alert-" + priority;
+            document.getElementById('saveSnapshotStatus').innerHTML = msg;
+        }
+
+        var saveSnapshotSlider = null;
+        var saveSnapshotSelectedSecondsPerPoint = 1;
+        function saveSnapshotModalInit() {
+            $('#saveSnapshotModalProgressSection').hide();
+            $('#saveSnapshotResolutionRadio').show();
+            saveSnapshotModalLog('info', 'Select resolution and click <b>Save</b>');
+
+            loadBootstrapSlider(function() {
+                var view_duration = options.duration;
+
+                if(NETDATA.globalPanAndZoom.isActive() === true)
+                    view_duration = Math.round((NETDATA.globalPanAndZoom.force_before_ms - NETDATA.globalPanAndZoom.force_after_ms) / 1000);
+
+
+                var min = options.update_every;
+                var max = Math.round(view_duration / 100);
+
+                if(NETDATA.globalPanAndZoom.isActive() === false)
+                    max = Math.round(view_duration / 50);
+
+                var view = Math.round(view_duration / Math.round($(document.getElementById('charts_div')).width() / 2));
+
+                // console.log('view duration: ' + view_duration + ', min: ' + min + ', max: ' + max + ', view: ' + view);
+
+                if(max < 10) max = 10;
+                if(max < min) max = min;
+                if(view < min) view = min;
+                if(view > max) view = max;
+
+                if(saveSnapshotSlider !== null)
+                    saveSnapshotSlider.destroy();
+
+                saveSnapshotSlider = new Slider('#saveSnapshotResolutionSlider', {
+                    ticks: [ min, view, max ],
+                    min: min,
+                    max: max,
+                    step: options.update_every,
+                    value: view,
+                    scale: (max > 100)?'logarithmic':'linear',
+                    tooltip: 'always',
+                    formatter: function(value) {
+                        var points = Math.round(view_duration / value);
+                        var priority = 'info';
+                        var msg = 'Moderate size.';
+
+                        if(points < 500) {
+                            priority = 'success';
+                            msg = 'A small snapshot.';
+                        }
+                        if(points > 5000) {
+                            priority = 'warning';
+                            msg = 'Expect a large file and quite some pressure on your browser.';
+                        }
+                        if(points > 10000) {
+                            priority = 'danger';
+                            msg = 'Will most probably crash your browser.';
+                        }
+
+                        saveSnapshotModalLog(priority, 'The snapshot will have ' + points.toString() + ' points per dimension. ' + msg);
+                        saveSnapshotSelectedSecondsPerPoint = value;
+                        return value + ' seconds per point';
+                    }
+                });
+            });
+        }
+
+        function saveSnapshot() {
             saveSnapshotStop = false;
+            $('#saveSnapshotModalProgressSection').show();
+            $('#saveSnapshotResolutionRadio').hide();
+            saveSnapshotModalLog('info', 'Generating snapshot...');
 
             var save_options = {
                 stop_updates_when_focus_is_lost: false,
@@ -2944,11 +3030,8 @@
             saveData.after_ms = NETDATA.globalPanAndZoom.force_after_ms;
             saveData.before_ms = NETDATA.globalPanAndZoom.force_before_ms;
             saveData.duration_ms = saveData.before_ms - saveData.after_ms;
-            saveData.data_points = Math.round((saveData.before_ms - saveData.after_ms) / saveData.update_every_ms);
-            if(saveData.data_points > 10000) {
-                console.log('data points ' + saveData.data_points.toString() + ' is too big - limiting it to 10000');
-                saveData.data_points = 10000;
-            }
+            saveData.data_points = Math.round((saveData.before_ms - saveData.after_ms) / (saveSnapshotSelectedSecondsPerPoint * 1000));
+            saveSnapshotModalLog('info', 'Generating snapshot with ' + saveData.data_points.toString() + ' data points per dimension...');
 
             var charts_count = 0;
             var charts_fetched = 0;
@@ -2983,6 +3066,7 @@
 
                 function update_chart(idx) {
                     if(saveSnapshotStop === true) {
+                        saveSnapshotModalLog('info', 'Cancelled!');
                         saveSnapshotRestore();
                         return;
                     }
@@ -3009,6 +3093,7 @@
                             }
                             else {
                                 charts_failed++;
+                                saveSnapshotModalLog('danger', charts_failed.toString() + ' have failed to be downloaded');
                                 state.log('failed to be updated: ' + reason);
                             }
 
@@ -3239,7 +3324,7 @@
                 //else console.log('el.find(): not found');
             });
 
-            $('#saveSnapshotModal').on('shown.bs.modal', saveSnapshotStart);
+            $('#saveSnapshotModal').on('show.bs.modal', saveSnapshotModalInit);
             $('#saveSnapshotModal').on('hide.bs.modal',  saveSnapshotCancel);
 
             showPageFooter();
@@ -3810,7 +3895,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="saveSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="saveSnapshotModalLabel" data-keyboard="false" data-backdrop="static">
+    <div class="modal fade" id="saveSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="saveSnapshotModalLabel">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
@@ -3818,16 +3903,34 @@
                     <h4 class="modal-title" id="saveSnapshotModalLabel">Preparing netdata dashboard snapshot...</h4>
                 </div>
                 <div class="modal-body">
-                    Please wait while we collect all the dashboard data...
-                    <div class="progress progress-striped active" style="height: 2em !important;">
-                        <div id="saveSnapshotModalProgressBar" class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em;">
-                            <span id="saveSnapshotModalProgressBarText" style="padding-left: 10px; padding-top: 4px; font-size: 1.2em; text-align: left; width: 100%; position: absolute; display: block;"></span>
+                    <div id="saveSnapshotModalProgressSection" hidden>
+                        Please wait while we collect all the dashboard data...
+                        <div class="progress progress-striped active" style="height: 2em !important;">
+                            <div id="saveSnapshotModalProgressBar" class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em;">
+                                <span id="saveSnapshotModalProgressBarText" style="padding-left: 10px; padding-top: 4px; font-size: 1.2em; text-align: left; width: 100%; position: absolute; display: block;"></span>
+                            </div>
                         </div>
+                    </div>
+
+                    <div id="saveSnapshotResolutionRadio" style="text-align: center;">
+                        Select the desired resolution of the snapshot. This is the <b>seconds of data per point</b>.
+                        <br/>
+                        &nbsp;
+                        <br/>
+                        &nbsp;
+                        <br/>
+                        <input id="saveSnapshotResolutionSlider" data-slider-id='saveSnapshotResolutionSlider' type="text" style="width: 80%;"/>
+                    </div>
+
+                    &nbsp;
+                    <div id="saveSnapshotStatus" class="alert alert-info" role="alert">
+                        Select resolution for saving the snapshot.
                     </div>
                     The generated snapshot will include all charts of this dashboard, for the visible timeframe, so align pan and zoom the charts as need before saving.
                     The snapshot will be downloaded on your computer, as a JSON file, that can be loaded back into any netdata (no need to load it on this one).
                 </div>
                 <div class="modal-footer">
+                    <a id="saveSnapshotExport" href="#" onclick="saveSnapshot(); return false;" type="button" class="btn btn-success">Save</a>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
                 </div>
             </div>
