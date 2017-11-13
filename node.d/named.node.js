@@ -201,7 +201,7 @@ var named = {
                 r = JSON.parse(data);
 
             if(typeof r === 'undefined' || r === null) {
-                netdata.serviceError(service, "Cannot parse these data: " + data);
+                service.error("Cannot parse these data: " + data.toString());
                 return;
             }
 
