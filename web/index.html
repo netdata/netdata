@@ -2920,6 +2920,9 @@
             loadBootstrapSlider(function() {
                 var view_duration = options.duration;
 
+                var bytes_per_chart = 2048;
+                var bytes_per_point_per_dimension = 5.3;
+
                 if(NETDATA.globalPanAndZoom.isActive() === true)
                     view_duration = Math.round((NETDATA.globalPanAndZoom.force_before_ms - NETDATA.globalPanAndZoom.force_after_ms) / 1000);
 
@@ -2953,22 +2956,24 @@
                     formatter: function(value) {
                         var points = Math.round(view_duration / value);
                         var priority = 'info';
-                        var msg = 'Moderate size.';
+                        var msg = 'A moderate snapshot.';
 
-                        if(points < 500) {
+                        var sizemb = Math.round((options.data.charts_count * bytes_per_chart + options.data.dimensions_count * points * bytes_per_point_per_dimension) / 1024 / 1024);
+
+                        if(sizemb < 10) {
                             priority = 'success';
-                            msg = 'A small snapshot.';
+                            msg = 'A nice small snapshot!';
                         }
-                        if(points > 5000) {
+                        if(sizemb > 50) {
                             priority = 'warning';
-                            msg = 'Expect a large file and quite some pressure on your browser.';
+                            msg = 'Will stress your browser...';
                         }
-                        if(points > 10000) {
+                        if(sizemb > 100) {
                             priority = 'danger';
-                            msg = 'Will most probably crash your browser.';
+                            msg = 'Hm... good luck...';
                         }
 
-                        saveSnapshotModalLog(priority, 'The snapshot will have ' + points.toString() + ' points per dimension. ' + msg);
+                        saveSnapshotModalLog(priority, 'The snapshot will have ' + points.toString() + ' points per dimension. Expected size ' + sizemb + ' MB. ' + msg);
                         saveSnapshotSelectedSecondsPerPoint = value;
                         return value + ' seconds per point';
                     }
@@ -3030,8 +3035,10 @@
                 var data = state.data;
                 state.data = null;
                 data.state = null;
+                str = JSON.stringify(data);
 
-                saveData.data[state.chartDataUniqueID()] = JSON.stringify(data);
+                saveData.data[state.chartDataUniqueID()] = str;
+                return str.length;
             }
 
             var clearPanAndZoom = false;
@@ -3076,6 +3083,7 @@
                 NETDATA.globalSelectionSync.stop();
                 NETDATA.options.force_data_points = saveData.data_points;
                 NETDATA.options.fake_chart_rendering = true;
+                var size = 0;
 
                 function update_chart(idx) {
                     if(saveSnapshotStop === true) {
@@ -3106,11 +3114,12 @@
                             }
                             else {
                                 charts_failed++;
-                                saveSnapshotModalLog('danger', charts_failed.toString() + ' have failed to be downloaded');
                                 state.log('failed to be updated: ' + reason);
                             }
 
-                            pack_api1_v1_chart_data(state);
+                            size += pack_api1_v1_chart_data(state);
+
+                            saveSnapshotModalLog((charts_failed)?'danger':'info', 'Generated size ' + (Math.round(size  * 100 / 1024 / 1024) / 100).toString() + ' MB. ' + ((charts_failed)?(charts_failed.toString() + ' charts have failed to be downloaded'):'').toString());
 
                             if (idx > 0) {
                                 update_chart(idx);
@@ -3875,8 +3884,9 @@
                 </div>
                 <div class="modal-body">
                     <p>
-                        netdata can save and load JSON snapshots of netdata dashboards.<br/>
-                        Any netdata can import a saved snapshot of the dashboard of any other netdata.
+                        netdata can save and load snapshots of netdata dashboards.<br/>
+                        Any netdata dashboard can import a saved snapshot of the dashboard of any other netdata.<br/>
+                        The snapshot data are not uploaded to a server. The snapshot is only loaded to your web browser.
                     </p>
                     <p>
                         <label class="btn btn-default">
@@ -3939,8 +3949,13 @@
                     <div id="saveSnapshotStatus" class="alert alert-info" role="alert">
                         Select resolution for saving the snapshot.
                     </div>
-                    The generated snapshot will include all charts of this dashboard, <b>for the visible timeframe</b>, so align pan and zoom the charts as need before saving.
-                    The snapshot will be downloaded on your computer, as a JSON file, that can be loaded back into any netdata (no need to load it on this one).
+                    <p>
+                    The generated snapshot will include all charts of this dashboard, <b>for the visible timeframe</b>, so align, pan and zoom the charts as needed.
+                    The snapshot will be downloaded on your computer, as a JSON file, that can be loaded back into any netdata dashboard (no need to load it on this one).
+                    </p>
+                    <p>
+                    Snapshots are handled entirely by the web browser. The netdata servers are not aware of them.
+                    </p>
                 </div>
                 <div class="modal-footer">
                     <a id="saveSnapshotExport" href="#" onclick="saveSnapshot(); return false;" type="button" class="btn btn-success">Export</a>
