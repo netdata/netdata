@@ -2541,6 +2541,7 @@
 
                 if(netdataSnapshotData !== null) {
                     $('#alarmsButton').hide();
+                    $('#updateButton').hide();
                     $('#loadButton').hide();
                     $('#saveButton').hide();
                     $('#printButton').hide();
@@ -2874,7 +2875,8 @@
                     //console.log(result);
                     var date_after = new Date(result.after_ms);
                     var date_before = new Date(result.before_ms);
-                    document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version <b>' + result.version + '</b>';
+                    document.getElementById('loadSnapshotFilename').innerHTML = '<b>' + files.item(0).name + '</b>, snapshot version: <b>' +  result.snapshot_version.toString() + '</b>';
+                    document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
                     document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
                     document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
@@ -3009,7 +3011,8 @@
             var saveData = {
                 hostname: options.hostname,
                 server: NETDATA.serverDefault,
-                version: options.data.version,
+                netdata_version: options.data.version,
+                snapshot_version: 1,
                 after_ms: Date.now() - options.duration * 1000,
                 before_ms: Date.now(),
                 duration_ms: options.duration * 1000,
