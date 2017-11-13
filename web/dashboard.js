@@ -144,7 +144,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.themes = {
         white: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20170725-1',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20171111-5',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#F0F0F0',
@@ -161,7 +161,7 @@ var NETDATA = window.NETDATA || {};
         },
         slate: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20170725-1',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20171111-5',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
@@ -201,6 +201,9 @@ var NETDATA = window.NETDATA || {};
     // http://www.mulinblog.com/a-color-palette-optimized-for-data-visualization/
     //                         (blue)     (red)      (orange)   (green)    (pink)     (brown)    (purple)   (yellow)   (gray)
     //NETDATA.colors        = [ '#5DA5DA', '#F15854', '#FAA43A', '#60BD68', '#F17CB0', '#B2912F', '#B276B2', '#DECF3F', '#4D4D4D' ];
+
+    if(typeof netdataSnapshotData === 'undefined')
+        netdataSnapshotData = null;
 
     if(typeof netdataShowHelp === 'undefined')
         netdataShowHelp = true;
@@ -247,7 +250,6 @@ var NETDATA = window.NETDATA || {};
     // if the user does not specify any of these, the following will be used
 
     NETDATA.chartDefaults = {
-        host: NETDATA.serverDefault,    // the server to get data from
         width: '100%',                  // the chart width - can be null
         height: '100%',                 // the chart height - can be null
         min_width: null,                // the chart minimum width - can be null
@@ -297,6 +299,9 @@ var NETDATA = window.NETDATA || {};
         browser_timezone: 'unknown',    // timezone detected by javascript
         server_timezone: 'unknown',     // timezone reported by the server
 
+        force_data_points: 0,           // force the number of points to be returned for charts
+        fake_chart_rendering: false,    // when set to true, the dashboard will download data but will not render the charts
+
         // the current profile
         // we may have many...
         current: {
@@ -305,6 +310,9 @@ var NETDATA = window.NETDATA || {};
             seconds_as_time: true,      // show seconds as DDd:HH:MM:SS ?
             timezone: 'default',        // the timezone to use, or 'default'
             user_set_server_timezone: 'default', // as set by the user on the dashboard
+
+            legend_toolbox: true,       // show the legend toolbox on charts
+            resize_charts: true,        // show the resize handler on charts
 
             pixels_per_point: isSlowDevice()?5:1, // the minimum pixels per point for all charts
                                         // increase this to speed javascript up
@@ -993,6 +1001,11 @@ var NETDATA = window.NETDATA || {};
         keys: {},
         latest: {},
 
+        globalReset: function() {
+            this.keys = {};
+            this.latest = {};
+        },
+
         get: function(state) {
             if(typeof state.tmp.__commonMin === 'undefined') {
                 // get the commonMin setting
@@ -1046,6 +1059,11 @@ var NETDATA = window.NETDATA || {};
     NETDATA.commonMax = {
         keys: {},
         latest: {},
+
+        globalReset: function() {
+            this.keys = {};
+            this.latest = {};
+        },
 
         get: function(state) {
             if(typeof state.tmp.__commonMax === 'undefined') {
@@ -1117,6 +1135,10 @@ var NETDATA = window.NETDATA || {};
     NETDATA.chartRegistry = {
         charts: {},
 
+        globalReset: function() {
+            this.charts = {};
+        },
+
         fixid: function(id) {
             return id.replace(/:/g, "_").replace(/\//g, "_");
         },
@@ -1151,13 +1173,7 @@ var NETDATA = window.NETDATA || {};
 
             var self = this;
 
-            $.ajax({
-                url: host + '/api/v1/charts',
-                async: true,
-                cache: false,
-                xhrFields: { withCredentials: true } // required for the cookie
-            })
-            .done(function(data) {
+            function fix_data(data, callback) {
                 if(data !== null) {
                     var h = NETDATA.chartRegistry.fixid(host);
                     self.charts[h] = data.charts;
@@ -1169,14 +1185,29 @@ var NETDATA = window.NETDATA || {};
                 else NETDATA.error(406, host + '/api/v1/charts');
 
                 if(typeof callback === 'function')
-                    return callback(data);
-            })
-            .fail(function() {
-                NETDATA.error(405, host + '/api/v1/charts');
+                    callback(data);
+            }
 
-                if(typeof callback === 'function')
-                    return callback(null);
-            });
+            if(netdataSnapshotData !== null) {
+                fix_data(netdataSnapshotData.charts, callback);
+            }
+            else {
+                $.ajax({
+                    url: host + '/api/v1/charts',
+                    async: true,
+                    cache: false,
+                    xhrFields: {withCredentials: true} // required for the cookie
+                })
+                    .done(function (data) {
+                        fix_data(data, callback);
+                    })
+                    .fail(function () {
+                        NETDATA.error(405, host + '/api/v1/charts');
+
+                        if (typeof callback === 'function')
+                            callback(null);
+                    });
+            }
         }
     };
 
@@ -1202,6 +1233,15 @@ var NETDATA = window.NETDATA || {};
         force_after_ms: null,
 
         callback: null,
+
+        globalReset: function() {
+            this.clearMaster();
+            this.seq = 0;
+            this.master = null;
+            this.force_after_ms = null;
+            this.force_before_ms = null;
+            this.callback = null;
+        },
 
         delay: function() {
             if(NETDATA.options.debug.globalPanAndZoom === true)
@@ -1313,7 +1353,7 @@ var NETDATA = window.NETDATA || {};
         if(this.name_div !== name_div) {
             this.name_div = name_div;
             this.name_div.title = this.label;
-            this.name_div.style.color = this.color;
+            this.name_div.style.setProperty('color', this.color, 'important');
             if(this.selected === false)
                 this.name_div.className = 'netdata-legend-name not-selected';
             else
@@ -1323,7 +1363,7 @@ var NETDATA = window.NETDATA || {};
         if(this.value_div !== value_div) {
             this.value_div = value_div;
             this.value_div.title = this.label;
-            this.value_div.style.color = this.color;
+            this.value_div.style.setProperty('color', this.color, 'important');
             if(this.selected === false)
                 this.value_div.className = 'netdata-legend-value not-selected';
             else
@@ -1612,6 +1652,11 @@ var NETDATA = window.NETDATA || {};
     NETDATA.unitsConversion = {
         keys: {},       // keys for data-common-units
         latest: {},     // latest selected units for data-common-units
+
+        globalReset: function() {
+            this.keys = {};
+            this.latest = {};
+        },
 
         scalableUnits: {
             'kilobits/s': {
@@ -1904,6 +1949,15 @@ var NETDATA = window.NETDATA || {};
         slaves: [],
         timeout_id: null,
 
+        globalReset: function() {
+            this.stop();
+            this.state = null;
+            this.dont_sync_before =  0;
+            this.last_t = 0;
+            this.slaves = [];
+            this.timeout_id = null;
+        },
+
         active: function() {
             return (this.state !== null);
         },
@@ -2186,7 +2240,7 @@ var NETDATA = window.NETDATA || {};
                 return;
 
             // string - the netdata server URL, without any path
-            that.host = NETDATA.dataAttribute(that.element, 'host', NETDATA.chartDefaults.host);
+            that.host = NETDATA.dataAttribute(that.element, 'host', NETDATA.serverDefault);
 
             // make sure the host does not end with /
             // all netdata API requests use absolute paths
@@ -2503,6 +2557,9 @@ var NETDATA = window.NETDATA || {};
             if(canBeRendered() === false)
                 return false;
 
+            if(NETDATA.options.fake_chart_rendering === true)
+                return true;
+
             if(NETDATA.options.debug.chart_errors === true)
                 status = that.library.update(that, data);
             else {
@@ -2528,6 +2585,9 @@ var NETDATA = window.NETDATA || {};
 
             if(canBeRendered() === false)
                 return false;
+
+            if(NETDATA.options.fake_chart_rendering === true)
+                return true;
 
             if(NETDATA.options.debug.chart_errors === true)
                 status = that.library.create(that, data);
@@ -2596,6 +2656,21 @@ var NETDATA = window.NETDATA || {};
             // force a resize
             that.tm.last_resized = 0;
             resizeChart();
+        };
+
+        this.resizeForPrint = function() {
+            if(typeof this.element_legend_childs !== 'undefined' && this.element_legend_childs.perfect_scroller !== null) {
+                var current = this.element.clientHeight;
+                var optimal = current
+                    + this.element_legend_childs.perfect_scroller.scrollHeight
+                    - this.element_legend_childs.perfect_scroller.clientHeight;
+
+                if(optimal > current) {
+                    // this.log('resized');
+                    this.element.style.height = optimal + 'px';
+                    this.library.resize(this);
+                }
+            }
         };
 
         this.resizeHandler = function(e) {
@@ -3479,7 +3554,7 @@ var NETDATA = window.NETDATA || {};
                 label.name.innerHTML = '<table class="netdata-legend-name-table-'
                     + state.chart.chart_type
                     + '" style="background-color: '
-                    + 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current['color_fill_opacity_' + state.chart.chart_type] + ')'
+                    + 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + NETDATA.options.current['color_fill_opacity_' + state.chart.chart_type] + ') !important'
                     + '"><tr class="netdata-legend-name-tr"><td class="netdata-legend-name-td"></td></tr></table>';
 
                 var text = document.createTextNode(' ' + name);
@@ -3516,14 +3591,14 @@ var NETDATA = window.NETDATA || {};
 
                 this.element_legend_childs = {
                     content: content,
-                    resize_handler: document.createElement('div'),
-                    toolbox: document.createElement('div'),
-                    toolbox_left: document.createElement('div'),
-                    toolbox_right: document.createElement('div'),
-                    toolbox_reset: document.createElement('div'),
-                    toolbox_zoomin: document.createElement('div'),
-                    toolbox_zoomout: document.createElement('div'),
-                    toolbox_volume: document.createElement('div'),
+                    resize_handler: null,
+                    toolbox: null,
+                    toolbox_left: null,
+                    toolbox_right: null,
+                    toolbox_reset: null,
+                    toolbox_zoomin: null,
+                    toolbox_zoomout: null,
+                    toolbox_volume: null,
                     title_date: document.createElement('span'),
                     title_time: document.createElement('span'),
                     title_units: document.createElement('span'),
@@ -3531,7 +3606,15 @@ var NETDATA = window.NETDATA || {};
                     series: {}
                 };
 
-                if(this.library.toolboxPanAndZoom !== null) {
+                if(NETDATA.options.current.legend_toolbox === true && this.library.toolboxPanAndZoom !== null) {
+                    this.element_legend_childs.toolbox = document.createElement('div');
+                    this.element_legend_childs.toolbox_left = document.createElement('div');
+                    this.element_legend_childs.toolbox_right = document.createElement('div');
+                    this.element_legend_childs.toolbox_reset = document.createElement('div');
+                    this.element_legend_childs.toolbox_zoomin = document.createElement('div');
+                    this.element_legend_childs.toolbox_zoomout = document.createElement('div');
+                    this.element_legend_childs.toolbox_volume = document.createElement('div');
+
                     var get_pan_and_zoom_step = function(event) {
                         if (event.ctrlKey)
                             return NETDATA.options.current.pan_and_zoom_factor * NETDATA.options.current.pan_and_zoom_factor_multiplier_control;
@@ -3671,41 +3754,39 @@ var NETDATA = window.NETDATA || {};
                         //alert('clicked toolbox_volume on ' + that.id);
                     //}
                 }
-                else {
-                    this.element_legend_childs.toolbox = null;
-                    this.element_legend_childs.toolbox_left = null;
-                    this.element_legend_childs.toolbox_reset = null;
-                    this.element_legend_childs.toolbox_right = null;
-                    this.element_legend_childs.toolbox_zoomin = null;
-                    this.element_legend_childs.toolbox_zoomout = null;
-                    this.element_legend_childs.toolbox_volume = null;
-                }
 
-                this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
-                this.element_legend_childs.resize_handler.innerHTML = '<i class="fa fa-chevron-up"></i><i class="fa fa-chevron-down"></i>';
-                this.element.appendChild(this.element_legend_childs.resize_handler);
-                if(NETDATA.options.current.show_help === true)
-                    $(this.element_legend_childs.resize_handler).popover({
-                    container: "body",
-                    animation: false,
-                    html: true,
-                    trigger: 'hover',
-                    placement: 'bottom',
-                    delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
-                    title: 'Chart Resize',
-                    content: 'Drag this point with your mouse or your finger (on touch devices), to resize the chart vertically. You can also <b>double click it</b> or <b>double tap it</b> to reset between 2 states: the default and the one that fits all the values.<br/><small>Help, can be disabled from the settings.</small>'
-                });
+                if(NETDATA.options.current.resize_charts === true) {
+                    this.element_legend_childs.resize_handler = document.createElement('div');
 
-                // mousedown event
-                this.element_legend_childs.resize_handler.onmousedown =
-                    function(e) {
+                    this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
+                    this.element_legend_childs.resize_handler.innerHTML = '<i class="fa fa-chevron-up"></i><i class="fa fa-chevron-down"></i>';
+                    this.element.appendChild(this.element_legend_childs.resize_handler);
+                    if (NETDATA.options.current.show_help === true)
+                        $(this.element_legend_childs.resize_handler).popover({
+                            container: "body",
+                            animation: false,
+                            html: true,
+                            trigger: 'hover',
+                            placement: 'bottom',
+                            delay: {
+                                show: NETDATA.options.current.show_help_delay_show_ms,
+                                hide: NETDATA.options.current.show_help_delay_hide_ms
+                            },
+                            title: 'Chart Resize',
+                            content: 'Drag this point with your mouse or your finger (on touch devices), to resize the chart vertically. You can also <b>double click it</b> or <b>double tap it</b> to reset between 2 states: the default and the one that fits all the values.<br/><small>Help, can be disabled from the settings.</small>'
+                        });
+
+                    // mousedown event
+                    this.element_legend_childs.resize_handler.onmousedown =
+                        function (e) {
+                            that.resizeHandler(e);
+                        };
+
+                    // touchstart event
+                    this.element_legend_childs.resize_handler.addEventListener('touchstart', function (e) {
                         that.resizeHandler(e);
-                    };
-
-                // touchstart event
-                this.element_legend_childs.resize_handler.addEventListener('touchstart', function(e) {
-                    that.resizeHandler(e);
-                }, false);
+                    }, false);
+                }
 
                 if(this.chart) {
                     this.element_legend_childs.title_date.title = this.legendPluginModuleString(true);
@@ -3725,6 +3806,7 @@ var NETDATA = window.NETDATA || {};
                 this.element_legend.appendChild(document.createElement('br'));
 
                 this.element_legend_childs.title_units.className += " netdata-legend-title-units";
+                this.element_legend_childs.title_units.innerText = this.units_current;
                 this.element_legend.appendChild(this.element_legend_childs.title_units);
                 this.tmp.__last_shown_legend_units = undefined;
 
@@ -3874,37 +3956,62 @@ var NETDATA = window.NETDATA || {};
             return ret;
         };
 
+        this.chartDataUniqueID = function() {
+            return this.id + ',' + this.library_name + ',' + this.dimensions + ',' + this.chartURLOptions();
+        };
+
+        this.chartURLOptions = function() {
+            var ret = '';
+
+            if(this.override_options !== null)
+                ret = this.override_options.toString();
+            else
+                ret = this.library.options(this);
+
+            if(this.append_options !== null)
+                ret += '|' + this.append_options.toString();
+
+            ret += '|jsonwrap';
+
+            if(NETDATA.options.current.eliminate_zero_dimensions === true)
+                ret += '|nonzero';
+
+            return ret;
+        };
+
         this.chartURL = function() {
             var after, before, points_multiplier = 1;
-            if(NETDATA.globalPanAndZoom.isActive() && NETDATA.globalPanAndZoom.isMaster(this) === false) {
-                this.tm.pan_and_zoom_seq = NETDATA.globalPanAndZoom.seq;
+            if(NETDATA.globalPanAndZoom.isActive()) {
+                if(this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
+                    this.tm.pan_and_zoom_seq = 0;
 
-                after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
-                before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
-                this.view_after = after * 1000;
-                this.view_before = before * 1000;
+                    before = Math.round(this.current.force_before_ms / 1000);
+                    after  = Math.round(this.current.force_after_ms / 1000);
+                    this.view_after = after * 1000;
+                    this.view_before = before * 1000;
 
-                this.requested_padding = null;
-                points_multiplier = 1;
-            }
-            else if(this.current.force_before_ms !== null && this.current.force_after_ms !== null) {
-                this.tm.pan_and_zoom_seq = 0;
+                    if(NETDATA.options.current.pan_and_zoom_data_padding === true) {
+                        this.requested_padding = Math.round((before - after) / 2);
+                        after -= this.requested_padding;
+                        before += this.requested_padding;
+                        this.requested_padding *= 1000;
+                        points_multiplier = 2;
+                    }
 
-                before = Math.round(this.current.force_before_ms / 1000);
-                after  = Math.round(this.current.force_after_ms / 1000);
-                this.view_after = after * 1000;
-                this.view_before = before * 1000;
-
-                if(NETDATA.options.current.pan_and_zoom_data_padding === true) {
-                    this.requested_padding = Math.round((before - after) / 2);
-                    after -= this.requested_padding;
-                    before += this.requested_padding;
-                    this.requested_padding *= 1000;
-                    points_multiplier = 2;
+                    this.current.force_before_ms = null;
+                    this.current.force_after_ms = null;
                 }
+                else {
+                    this.tm.pan_and_zoom_seq = NETDATA.globalPanAndZoom.seq;
 
-                this.current.force_before_ms = null;
-                this.current.force_after_ms = null;
+                    after = Math.round(NETDATA.globalPanAndZoom.force_after_ms / 1000);
+                    before = Math.round(NETDATA.globalPanAndZoom.force_before_ms / 1000);
+                    this.view_after = after * 1000;
+                    this.view_before = before * 1000;
+
+                    this.requested_padding = null;
+                    points_multiplier = 1;
+                }
             }
             else {
                 this.tm.pan_and_zoom_seq = 0;
@@ -3921,26 +4028,22 @@ var NETDATA = window.NETDATA || {};
             this.requested_after = after * 1000;
             this.requested_before = before * 1000;
 
-            this.data_points = this.points || Math.round(this.chartWidth() / this.chartPixelsPerPoint());
+            var data_points;
+            if(NETDATA.options.force_data_points !== 0) {
+                data_points = NETDATA.options.force_data_points;
+                this.data_points = data_points;
+            }
+            else {
+                this.data_points = this.points || Math.round(this.chartWidth() / this.chartPixelsPerPoint());
+                data_points = this.data_points * points_multiplier;
+            }
 
             // build the data URL
             this.data_url = this.host + this.chart.data_url;
             this.data_url += "&format="  + this.library.format();
-            this.data_url += "&points="  + (this.data_points * points_multiplier).toString();
+            this.data_url += "&points="  + (data_points).toString();
             this.data_url += "&group="   + this.method;
-
-            if(this.override_options !== null)
-                this.data_url += "&options=" + this.override_options.toString();
-            else
-                this.data_url += "&options=" + this.library.options(this);
-
-            this.data_url += '|jsonwrap';
-
-            if(NETDATA.options.current.eliminate_zero_dimensions === true)
-                this.data_url += '|nonzero';
-
-            if(this.append_options !== null)
-                this.data_url += '|' + this.append_options.toString();
+            this.data_url += "&options=" + this.chartURLOptions();
 
             if(after)
                 this.data_url += "&after="  + after.toString();
@@ -3952,7 +4055,7 @@ var NETDATA = window.NETDATA || {};
                 this.data_url += "&dimensions=" + this.dimensions;
 
             if(NETDATA.options.debug.chart_data_url === true || this.debug === true)
-                this.log('chartURL(): ' + this.data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + this.data_points + ' library: ' + this.library_name);
+                this.log('chartURL(): ' + this.data_url + ' WxH:' + this.chartWidth() + 'x' + this.chartHeight() + ' points: ' + data_points.toString() + ' library: ' + this.library_name);
         };
 
         this.redrawChart = function() {
@@ -4089,7 +4192,7 @@ var NETDATA = window.NETDATA || {};
                     this.log('I am already updating...');
 
                 if(typeof callback === 'function')
-                    return callback();
+                    return callback(false, 'already running');
 
                 return;
             }
@@ -4101,14 +4204,14 @@ var NETDATA = window.NETDATA || {};
                     this.log('I am not enabled');
 
                 if(typeof callback === 'function')
-                    return callback();
+                    return callback(false, 'not enabled');
 
                 return;
             }
 
             if(canBeRendered() === false) {
                 if(typeof callback === 'function')
-                    return callback();
+                    return callback(false, 'cannot be rendered');
 
                 return;
             }
@@ -4131,7 +4234,7 @@ var NETDATA = window.NETDATA || {};
                     error('chart library "' + this.library_name + '" is not available.');
 
                     if(typeof callback === 'function')
-                        return callback();
+                        return callback(false, 'library not available');
 
                     return;
                 }
@@ -4140,16 +4243,41 @@ var NETDATA = window.NETDATA || {};
             this.clearSelection();
             this.chartURL();
 
-            if(this.debug === true)
-                this.log('updating from ' + this.data_url);
-
             NETDATA.statistics.refreshes_total++;
             NETDATA.statistics.refreshes_active++;
 
             if(NETDATA.statistics.refreshes_active > NETDATA.statistics.refreshes_active_max)
                 NETDATA.statistics.refreshes_active_max = NETDATA.statistics.refreshes_active;
 
+            var ok = false;
             this.fetching_data = true;
+
+            if(netdataSnapshotData !== null) {
+                var key = this.chartDataUniqueID();
+
+                if(this.debug === true)
+                    this.log('updating from snapshot: ' + key);
+
+                if(typeof netdataSnapshotData.data[key] === 'string') {
+                    ok = true;
+                    this.updateChartWithData(JSON.parse(netdataSnapshotData.data[key]));
+                }
+                else {
+                    ok = false;
+                    error('data not found in snapshot for key: ' + key);
+                }
+
+                NETDATA.statistics.refreshes_active--;
+                this.fetching_data = false;
+
+                if(typeof callback === 'function')
+                    callback(ok, 'snapshot');
+
+                return;
+            }
+
+            if(this.debug === true)
+                this.log('updating from ' + this.data_url);
 
             this.xhr = $.ajax( {
                 url: this.data_url,
@@ -4164,6 +4292,7 @@ var NETDATA = window.NETDATA || {};
             .done(function(data) {
                 that.xhr = undefined;
                 that.retries_on_data_failures = 0;
+                ok = true;
 
                 if(that.debug === true)
                     that.log('data received. updating chart.');
@@ -4193,11 +4322,14 @@ var NETDATA = window.NETDATA || {};
                 that.fetching_data = false;
 
                 if(typeof callback === 'function')
-                    return callback();
+                    return callback(ok, 'download');
             });
         };
 
         var __isVisible = function() {
+            if(NETDATA.options.current.update_only_visible === false)
+                return true;
+
             // tolerance is the number of pixels a chart can be off-screen
             // to consider it as visible and refresh it as if was visible
             var tolerance = 0;
@@ -4849,6 +4981,18 @@ var NETDATA = window.NETDATA || {};
             netdataCallback();
     };
 
+    NETDATA.globalReset = function() {
+        NETDATA.globalSelectionSync.globalReset();
+        NETDATA.globalPanAndZoom.globalReset();
+        NETDATA.chartRegistry.globalReset();
+        NETDATA.commonMin.globalReset();
+        NETDATA.commonMax.globalReset();
+        NETDATA.unitsConversion.globalReset();
+        NETDATA.options.targets = null;
+        NETDATA.parseDom();
+        NETDATA.unpause();
+    };
+
     // ----------------------------------------------------------------------------------------------------------------
     // peity
 
@@ -5214,6 +5358,12 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.dygraphChartCreate(state, data);
                 return;
             }
+        }
+
+        if(netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+            // pan and zoom on snapshots
+            options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
+            options.isZoomedIgnoreProgrammaticZoom = true;
         }
 
         dygraph.updateOptions(options);
@@ -5743,6 +5893,12 @@ var NETDATA = window.NETDATA || {};
                 state.tmp.dygraph_options.plotter = smoothPlotter;
         }
         else state.tmp.dygraph_smooth_eligible = false;
+
+        if(netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
+            // pan and zoom on snapshots
+            state.tmp.dygraph_options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
+            state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
+        }
 
         state.tmp.dygraph_instance = new Dygraph(state.element_chart,
             data.result.data, state.tmp.dygraph_options);
@@ -7408,6 +7564,9 @@ var NETDATA = window.NETDATA || {};
         },
 
         update_forever: function() {
+            if(netdataShowAlarms !== true || netdataSnapshotData !== null)
+                return;
+
             NETDATA.alarms.get('active', function(data) {
                 if(data !== null) {
                     NETDATA.alarms.current = data;

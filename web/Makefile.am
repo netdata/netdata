@@ -39,6 +39,7 @@ dist_webold_DATA = \
 weblibdir=$(webdir)/lib
 dist_weblib_DATA = \
 	lib/bootstrap-3.3.7.min.js \
+	lib/bootstrap-slider-10.0.0.min.js \
 	lib/bootstrap-table-1.11.0.min.js \
 	lib/bootstrap-table-export-1.11.0.min.js \
 	lib/bootstrap-toggle-2.2.2.min.js \
@@ -63,6 +64,7 @@ dist_webcss_DATA = \
 	css/bootstrap-3.3.7.css \
 	css/bootstrap-theme-3.3.7.min.css \
 	css/bootstrap-slate-flat-3.3.7.css \
+	css/bootstrap-slider-10.0.0.min.css \
 	css/bootstrap-toggle-2.2.2.min.css \
 	css/font-awesome.min.css \
 	css/c3-0.4.11.min.css \

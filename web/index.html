@@ -105,7 +105,12 @@
         padding: 10px;
     }
 
-    .chart-message {
+    .dashboard-submenu-info {
+        display: block;
+        margin-top: 10px;
+    }
+
+    .dashboard-context-info {
         display: block;
         margin-top: 10px;
     }
@@ -305,6 +310,62 @@
         display: none;
     }
 
+    .dashboard-section-container {
+        display: block;
+        width: 100%;
+        page-break-before: auto;
+        page-break-after: auto;
+        page-break-inside: auto;
+    }
+
+    .dashboard-print-row {
+        display: block;
+        width: 100%;
+        page-break-before: auto;
+        page-break-after: auto;
+        page-break-inside: avoid;
+    }
+
+    .netdata-chartblock-container {
+        display: inline-block;
+    }
+
+    @media print {
+        body {
+            overflow: visible !important;
+            -webkit-print-color-adjust: exact;
+            page-break-inside: auto;
+            page-break-before: auto;
+            page-break-after: auto;
+        }
+
+        .dashboard-section {
+            page-break-inside: auto;
+            page-break-before: auto;
+            page-break-after: auto;
+        }
+
+        .dashboard-subsection {
+            page-break-before: avoid;
+            page-break-after: auto;
+            page-break-inside: auto;
+        }
+
+        .charts-body {
+            padding-left: 0%;
+            padding-right: 0%;
+            display: block;
+            page-break-inside: auto;
+            page-break-before: auto;
+            page-break-after: auto;
+        }
+
+        .back-to-top,
+        .dashboard-theme-toggle {
+            display: block;
+        }
+    }
+
     @media (min-width: 768px) {
         .charts-body {
             padding-left: 0%;
@@ -410,11 +471,17 @@
 
     <!-- check which theme to use -->
     <script type="text/javascript">
+        // netdata snapshot data
+        var netdataSnapshotData = null;
+
         // enable alarms checking and notifications
         var netdataShowAlarms = true;
 
         // enable registry updates
         var netdataRegistry = true;
+
+        // control the welcome modal and analytics
+        var this_is_demo = null;
 
         // --------------------------------------------------------------------
         // urlOptions
@@ -423,6 +490,7 @@
             hash: '#',
             theme: null,
             help: null,
+            mode: 'live',         // 'live', 'print'
             update_always: false,
             pan_and_zoom: false,
             after: 0,
@@ -458,6 +526,9 @@
                 if(urlOptions.update_always === true)
                     hash += ';update_always=true';
 
+                if(urlOptions.mode !== 'live')
+                    hash += ';mode=' + urlOptions.mode;
+
                 return hash;
             },
 
@@ -485,12 +556,42 @@
                         urlOptions[booleans[len]] = false;
                 }
 
+                if(typeof urlOptions.after === 'string')
+                    urlOptions.after = parseInt(urlOptions.after);
+
+                if(typeof urlOptions.before === 'string')
+                    urlOptions.before = parseInt(urlOptions.before);
+
                 if(urlOptions.before > 0 && urlOptions.after > 0) {
                     urlOptions.pan_and_zoom = true;
                     urlOptions.nowelcome = true;
                 }
                 else
                     urlOptions.pan_and_zoom = false;
+
+                switch(urlOptions.mode) {
+                    case 'print':
+                        urlOptions.theme = 'white';
+                        urlOptions.welcome = false;
+                        urlOptions.help = false;
+                        urlOptions.show_alarms = false;
+
+                        if(urlOptions.pan_and_zoom === false) {
+                            urlOptions.pan_and_zoom = true;
+                            urlOptions.before = Date.now();
+                            urlOptions.after = urlOptions.before - 600000;
+                        }
+
+                        netdataShowAlarms = false;
+                        netdataRegistry = false;
+                        this_is_demo = false;
+                        break;
+
+                    case 'live':
+                    default:
+                        urlOptions.mode = 'live';
+                        break;
+                }
 
                 // console.log(urlOptions);
             },
@@ -526,6 +627,7 @@
                     localStorageTested = true;
                 }
                 catch (e) {
+                    console.log(e);
                     localStorageTested = false;
                 }
             }
@@ -541,8 +643,13 @@
             try {
                 if(localStorageTest() === true)
                     ret = localStorage.getItem(name);
+                else
+                    console.log('localStorage is not available');
             }
-            catch(error) {}
+            catch(error) {
+                console.log(error);
+                return null;
+            }
 
             if(typeof ret === 'undefined' || ret === null)
                 return null;
@@ -560,12 +667,17 @@
                     return true;
                 }
             }
-            catch(error) {}
+            catch(error) {
+                console.log(error);
+            }
 
             return false;
         }
 
         function getTheme(def) {
+            if(urlOptions.mode === 'print')
+                return 'white';
+
             var ret = loadLocalStorage('netdataTheme');
             if(typeof ret === 'undefined' || ret === null || ret === 'undefined')
                 return def;
@@ -574,6 +686,8 @@
         }
 
         function setTheme(theme) {
+            if(urlOptions.mode === 'print') return false;
+
             if(theme === netdataTheme) return false;
             return saveLocalStorage('netdataTheme', theme);
         }
@@ -605,7 +719,7 @@
             var x = 0, y = -1, n = 0, i, j;
 
             while (i = (j = t.charAt(x++)).charCodeAt(0)) {
-                var m = (i === 46 || (i >= 48 && i <= 57));
+                var m = (i >= 48 && i <= 57);
                 if (m !== n) {
                     tz[++y] = "";
                     n = m;
@@ -631,6 +745,35 @@
             }
 
             return aa.length - bb.length;
+        }
+
+        // --------------------------------------------------------------------
+        // saving files to client
+
+        function saveTextToClient(data, filename) {
+            var blob = new Blob( [ data ], {
+                type: 'application/octet-stream'
+            });
+
+            var url = URL.createObjectURL( blob );
+            var link = document.createElement( 'a' );
+            link.setAttribute( 'href', url );
+            link.setAttribute( 'download', filename );
+
+            var el = document.getElementById('hiddenDownloadLinks');
+            el.innerHTML = '';
+            el.appendChild(link);
+
+            setTimeout(function(){
+                el.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 60);
+
+            link.click();
+        }
+
+        function saveObjectToClient(data, filename) {
+            saveTextToClient(JSON.stringify(data), filename);
         }
 
         // --------------------------------------------------------------------
@@ -750,7 +893,6 @@
             gotoServerInit();
         };
 
-        var this_is_demo = null; // FIXME
         function isdemo() {
             if(this_is_demo !== null) return this_is_demo;
             this_is_demo = false;
@@ -963,15 +1105,14 @@
             data: null,
             hostname: 'netdata_server', // will be overwritten by the netdata server
             version: 'unknown',
-            categories: [],
-            categories_idx: {},
-            families: [],
-            families_idx: {},
             hosts: [],
+
+            duration: 0, // the default duration of the charts
+            update_every: 1,
 
             chartsPerRow: 0,
             // chartsMinWidth: 1450,
-            chartsHeight: 180
+            chartsHeight: 180,
         };
 
         function chartsPerRow(total) {
@@ -1170,7 +1311,7 @@
                 var x = this.anyAttribute(this.context, 'info', id, null);
 
                 if(x !== null)
-                    return '<div class="chart-message netdata-chart-alignment" role="document">' + x + '</div>';
+                    return '<div class="shorten dashboard-context-info netdata-chart-alignment" role="document">' + x + '</div>';
                 else
                     return '';
             },
@@ -1311,6 +1452,9 @@
 
         function headMain(os, charts, duration) {
             void(os);
+
+            if(urlOptions.mode === 'print')
+                return '';
 
             var head = '';
 
@@ -1478,6 +1622,9 @@
         }
 
         function generateHeadCharts(type, chart, duration) {
+            if(urlOptions.mode === 'print')
+                return '';
+
             var head = '';
             var hcharts = netdataDashboard.anyAttribute(netdataDashboard.context, type, chart.context, []);
             if(hcharts.length > 0) {
@@ -1499,6 +1646,9 @@
 
             // find the proper duration for per-second updates
             var duration = Math.round(($(div).width() * pcent_width / 100 * data.update_every / 3) / 60) * 60;
+            options.duration = duration;
+            options.update_every = data.update_every;
+
             var html = '';
             var sidebar = '<ul class="nav dashboard-sidenav" data-spy="affix" id="sidebar_ul">';
             var mainhead = headMain(netdataDashboard.os, data.charts, duration);
@@ -1513,7 +1663,7 @@
 
                 var menuid = NETDATA.name2id('menu_' + menu);
                 sidebar += '<li class=""><a href="#' + menuid + '" onClick="return scrollToId(\'' + menuid + '\');">' + menus[menu].icon + ' ' + menus[menu].title + '</a><ul class="nav">';
-                html += '<div role="section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div role="document">';
+                html += '<div role="section" class="dashboard-section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div role="section"  class="dashboard-subsection">';
 
                 if(menus[menu].info !== null)
                     html += menus[menu].info;
@@ -1533,10 +1683,10 @@
                     // generate an entry at the submenu
                     var submenuid = NETDATA.name2id('menu_' + menu + '_submenu_' + submenu);
                     sidebar += '<li class><a href="#' + submenuid + '" onClick="return scrollToId(\'' + submenuid + '\');">' + menus[menu].submenus[submenu].title + '</a></li>';
-                    shtml += '<div class="netdata-group-container" id="' + submenuid + '" style="display: inline-block; width: ' + pcent_width.toString() + '%"><h2 id="' + submenuid + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
+                    shtml += '<div role="section" class="dashboard-section-container" id="' + submenuid + '"><h2 id="' + submenuid + '" class="netdata-chart-alignment" role="heading">' + menus[menu].submenus[submenu].title + '</h2>';
 
                     if(menus[menu].submenus[submenu].info !== null)
-                        shtml += '<div class="chart-message netdata-chart-alignment" role="document">' + menus[menu].submenus[submenu].info + '</div>';
+                        shtml += '<div class="dashboard-submenu-info netdata-chart-alignment" role="document">' + menus[menu].submenus[submenu].info + '</div>';
 
                     var head = '<div class="netdata-chart-row">';
                     var chtml = '';
@@ -1570,8 +1720,11 @@
                         }
 
                         // generate the chart
-                        chtml += netdataDashboard.contextInfo(chart.context) + '<div class="netdata-container" id="chart_' + NETDATA.name2id(chart.id) + '" data-netdata="' + chart.id + '"'
-                            + ' data-width="' + pcent_width.toString() + '%"'
+                        if(urlOptions.mode === 'print')
+                            chtml += '<div role="row" class="dashboard-print-row">';
+
+                        chtml += '<div class="netdata-chartblock-container" style="width: ' + pcent_width.toString() + '%;">' + netdataDashboard.contextInfo(chart.context) + '<div class="netdata-container" id="chart_' + NETDATA.name2id(chart.id) + '" data-netdata="' + chart.id + '"'
+                            + ' data-width="100%"'
                             + ' data-height="' + netdataDashboard.contextHeight(chart.context, options.chartsHeight).toString() + 'px"'
                             + ' data-dygraph-valuerange="' + netdataDashboard.contextValueRange(chart.context) + '"'
                             + ' data-before="0"'
@@ -1581,7 +1734,10 @@
                             + ' data-decimal-digits="' + netdataDashboard.contextDecimalDigits(chart.context, -1) + '"'
                             + chartCommonMin(chart.family, chart.context, chart.units)
                             + chartCommonMax(chart.family, chart.context, chart.units)
-                            + ' role="application"></div>';
+                            + ' role="application"></div></div>';
+
+                        if(urlOptions.mode === 'print')
+                            chtml += '</div>';
 
                         // console.log('         \------- ' + chart.id + ' (' + chart.priority + '): ' + chart.context  + ' height: ' + menus[menu].submenus[submenu].height);
                     }
@@ -1601,10 +1757,17 @@
             sidebar += '</ul>';
             div.innerHTML = html;
             document.getElementById('sidebar').innerHTML = sidebar;
-            finalizePage();
+
+            if(urlOptions.mode === 'print')
+                printPage();
+            else
+                finalizePage();
         }
 
         function renderChartsAndMenu(data) {
+            options.menus = {};
+            options.submenu_names = {};
+
             var menus = options.menus;
             var charts = data.charts;
             var m, menu_key;
@@ -1705,6 +1868,18 @@
                     loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-export-1.11.0.min.js', function() {
                         loadJs(NETDATA.serverDefault + 'lib/tableExport-1.6.0.min.js', callback);
                     })
+                });
+            }
+            else callback();
+        }
+
+        var bootstrapSliderLoaded = false;
+        function loadBootstrapSlider(callback) {
+            if(bootstrapSliderLoaded === false) {
+                bootstrapSliderLoaded = true;
+                loadJs(NETDATA.serverDefault + 'lib/bootstrap-slider-10.0.0.min.js', function() {
+                    NETDATA._loadCSS(NETDATA.serverDefault + 'css/bootstrap-slider-10.0.0.min.css');
+                    callback();
                 });
             }
             else callback();
@@ -2360,9 +2535,17 @@
                     options.hosts = data.hosts;
 
                 // update the dashboard hostname
-                document.getElementById('hostname').innerHTML = options.hostname;
+                document.getElementById('hostname').innerHTML = options.hostname + ((netdataSnapshotData !== null)?' (snap)':'').toString();
                 document.getElementById('hostname').href = NETDATA.serverDefault;
                 document.getElementById('netdataVersion').innerHTML = options.version;
+
+                if(netdataSnapshotData !== null) {
+                    $('#alarmsButton').hide();
+                    $('#updateButton').hide();
+                    $('#loadButton').hide();
+                    $('#saveButton').hide();
+                    $('#printButton').hide();
+                }
 
                 // update the dashboard title
                 document.title = options.hostname + ' netdata dashboard';
@@ -2552,6 +2735,404 @@
         }
 
         // ----------------------------------------------------------------------------
+        // printing dashboards
+
+        function showPageFooter() {
+            document.getElementById('footer').style.display = 'block';
+        }
+
+
+        function printPreflight() {
+            var url = document.location.origin + document.location.search + '#' + urlOptions.genHash() + ';mode=print';
+            var width = 990;
+            var height = screen.height * 90 / 100;
+            //console.log(url);
+            //console.log(document.location);
+            window.open(url, '', 'width=' + width.toString() + ',height=' + height.toString() + ',menubar=no,toolbar=no,personalbar=no,location=no,resizable=no,scrollbars=yes,status=no,chrome=yes,centerscreen=yes,attention=yes,dialog=yes');
+            $('#printPreflightModal').modal('hide');
+        }
+
+        function printPage() {
+            var print_is_rendering = true;
+
+            $('#printModal').on('hide.bs.modal', function(e) {
+                if(print_is_rendering === true) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                return true;
+            });
+
+            $('#printModal').on('show.bs.modal', function() {
+                var print_options = {
+                    stop_updates_when_focus_is_lost: false,
+                    update_only_visible: false,
+                    sync_selection: false,
+                    eliminate_zero_dimensions: false,
+                    pan_and_zoom_data_padding: false,
+                    show_help: false,
+                    legend_toolbox: false,
+                    resize_charts: false,
+                    pixels_per_point: 1
+                };
+
+                var x;
+                for(x in print_options) {
+                    if (print_options.hasOwnProperty(x))
+                        NETDATA.options.current[x] = print_options[x];
+                }
+
+                NETDATA.parseDom();
+                showPageFooter();
+
+                NETDATA.globalSelectionSync.stop();
+                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], urlOptions.after, urlOptions.before);
+                // NETDATA.onresize();
+
+                var el = document.getElementById('printModalProgressBar');
+                var eltxt = document.getElementById('printModalProgressBarText');
+
+                function update_chart(idx) {
+                    var state = NETDATA.options.targets[--idx];
+
+                    var pcent = (NETDATA.options.targets.length - idx) * 100 / NETDATA.options.targets.length;
+                    $(el).css('width', pcent+'%').attr('aria-valuenow', pcent);
+                    eltxt.innerText = Math.round(pcent).toString() + '%, ' + state.id;
+
+                    setTimeout(function() {
+                            state.updateChart(function () {
+                                NETDATA.options.targets[idx].resizeForPrint();
+
+                                if (idx > 0) {
+                                    update_chart(idx);
+                                }
+                                else {
+                                    print_is_rendering = false;
+                                    $('#printModal').modal('hide');
+                                    window.print();
+                                    window.close();
+                                }
+                            })
+                        }, 0);
+                }
+
+                print_is_rendering = true;
+                update_chart(NETDATA.options.targets.length);
+            });
+
+            $('#printModal').modal('show');
+        }
+
+        // --------------------------------------------------------------------
+        // loading snapshots
+
+        function loadSnapshotModalLog(priority, msg) {
+            document.getElementById('loadSnapshotStatus').className = "alert alert-" + priority;
+            document.getElementById('loadSnapshotStatus').innerHTML = msg;
+        }
+
+        var tmpSnapshotData = null;
+        function loadSnapshot() {
+            if(tmpSnapshotData === null) {
+                loadSnapshotModalLog('danger', 'no data have been loaded');
+                return;
+            }
+            loadSnapshotModalLog('info', 'Please wait, activating snapshot...');
+
+            netdataShowAlarms === false;
+            netdataRegistry = false;
+            netdataServer = tmpSnapshotData.server;
+            NETDATA.serverDefault = netdataServer;
+
+            document.getElementById('charts_div').innerHTML = '';
+            document.getElementById('sidebar').innerHTML = '';
+            NETDATA.globalReset();
+
+            netdataSnapshotData = tmpSnapshotData;
+            initializeDynamicDashboard(netdataSnapshotData.url);
+
+            $('#loadSnapshotModal').modal('hide');
+        }
+
+        function loadSnapshotPreflight() {
+            var files = document.getElementById('loadSnapshotSelectFiles').files;
+            if (files.length <= 0) {
+                loadSnapshotModalLog('danger', 'No file selected');
+                return;
+            }
+
+            loadSnapshotModalLog('info', 'Loading file...');
+
+            var fr = new FileReader();
+            fr.onload = function(e) {
+                // console.log(e);
+
+                document.getElementById('loadSnapshotFilename').innerHTML = files.item(0).name;
+                var result = null;
+                try {
+                    result = JSON.parse(e.target.result);
+                    //console.log(result);
+                    var date_after = new Date(result.after_ms);
+                    var date_before = new Date(result.before_ms);
+                    document.getElementById('loadSnapshotFilename').innerHTML = '<b>' + files.item(0).name + '</b>, snapshot version: <b>' +  result.snapshot_version.toString() + '</b>';
+                    document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
+                    document.getElementById('loadSnapshotURL').innerHTML = result.url;
+                    document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
+                    document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
+                    loadSnapshotModalLog('success', 'File loaded, click <b>Import</b> to render it!');
+                    $('#loadSnapshotImport').prop('disabled', false);
+                    $('#loadSnapshotImport').removeAttr('disabled');
+
+                    tmpSnapshotData = result;
+                }
+                catch(e) {
+                    console.log(e);
+                    document.getElementById('loadSnapshotStatus').className = "alert alert-danger";
+                    document.getElementById('loadSnapshotStatus').innerHTML = "Failed to parse this file!";
+                }
+            }
+
+            //console.log(files.item(0));
+            fr.readAsText(files.item(0));
+        }
+
+        // --------------------------------------------------------------------
+        // saving snapshots
+
+        var saveSnapshotStop = false;
+        function saveSnapshotCancel() {
+            saveSnapshotStop = true;
+        }
+
+        function saveSnapshotModalLog(priority, msg) {
+            document.getElementById('saveSnapshotStatus').className = "alert alert-" + priority;
+            document.getElementById('saveSnapshotStatus').innerHTML = msg;
+        }
+
+        var saveSnapshotSlider = null;
+        var saveSnapshotSelectedSecondsPerPoint = 1;
+        function saveSnapshotModalInit() {
+            $('#saveSnapshotModalProgressSection').hide();
+            $('#saveSnapshotResolutionRadio').show();
+            saveSnapshotModalLog('info', 'Select resolution and click <b>Save</b>');
+
+            loadBootstrapSlider(function() {
+                var view_duration = options.duration;
+
+                if(NETDATA.globalPanAndZoom.isActive() === true)
+                    view_duration = Math.round((NETDATA.globalPanAndZoom.force_before_ms - NETDATA.globalPanAndZoom.force_after_ms) / 1000);
+
+
+                var min = options.update_every;
+                var max = Math.round(view_duration / 100);
+
+                if(NETDATA.globalPanAndZoom.isActive() === false)
+                    max = Math.round(view_duration / 50);
+
+                var view = Math.round(view_duration / Math.round($(document.getElementById('charts_div')).width() / 2));
+
+                // console.log('view duration: ' + view_duration + ', min: ' + min + ', max: ' + max + ', view: ' + view);
+
+                if(max < 10) max = 10;
+                if(max < min) max = min;
+                if(view < min) view = min;
+                if(view > max) view = max;
+
+                if(saveSnapshotSlider !== null)
+                    saveSnapshotSlider.destroy();
+
+                saveSnapshotSlider = new Slider('#saveSnapshotResolutionSlider', {
+                    ticks: [ min, view, max ],
+                    min: min,
+                    max: max,
+                    step: options.update_every,
+                    value: view,
+                    scale: (max > 100)?'logarithmic':'linear',
+                    tooltip: 'always',
+                    formatter: function(value) {
+                        var points = Math.round(view_duration / value);
+                        var priority = 'info';
+                        var msg = 'Moderate size.';
+
+                        if(points < 500) {
+                            priority = 'success';
+                            msg = 'A small snapshot.';
+                        }
+                        if(points > 5000) {
+                            priority = 'warning';
+                            msg = 'Expect a large file and quite some pressure on your browser.';
+                        }
+                        if(points > 10000) {
+                            priority = 'danger';
+                            msg = 'Will most probably crash your browser.';
+                        }
+
+                        saveSnapshotModalLog(priority, 'The snapshot will have ' + points.toString() + ' points per dimension. ' + msg);
+                        saveSnapshotSelectedSecondsPerPoint = value;
+                        return value + ' seconds per point';
+                    }
+                });
+            });
+        }
+
+        function saveSnapshot() {
+            saveSnapshotStop = false;
+            $('#saveSnapshotModalProgressSection').show();
+            $('#saveSnapshotResolutionRadio').hide();
+            saveSnapshotModalLog('info', 'Generating snapshot...');
+
+            var save_options = {
+                stop_updates_when_focus_is_lost: false,
+                update_only_visible: false,
+                sync_selection: false,
+                eliminate_zero_dimensions: true,
+                pan_and_zoom_data_padding: false,
+                show_help: false,
+                legend_toolbox: false,
+                resize_charts: false,
+                pixels_per_point: 1
+            };
+            var backedup_options = {};
+
+            var x;
+            for(x in save_options) {
+                if (save_options.hasOwnProperty(x)) {
+                    backedup_options[x] = NETDATA.options.current[x];
+                    NETDATA.options.current[x] = save_options[x];
+                }
+            }
+
+            var el = document.getElementById('saveSnapshotModalProgressBar');
+            var eltxt = document.getElementById('saveSnapshotModalProgressBarText');
+
+            options.data.charts_by_name = null;
+
+            var saveData = {
+                hostname: options.hostname,
+                server: NETDATA.serverDefault,
+                netdata_version: options.data.version,
+                snapshot_version: 1,
+                after_ms: Date.now() - options.duration * 1000,
+                before_ms: Date.now(),
+                duration_ms: options.duration * 1000,
+                update_every_ms: options.update_every * 1000,
+                data_points: 0,
+                url: document.location.origin.toString() + document.location.search.toString(),
+                charts: options.data,
+                data: {}
+            };
+
+            function pack_api1_v1_chart_data(state) {
+                if(state.library_name === null || state.data === null)
+                    return;
+
+                var data = state.data;
+                state.data = null;
+                data.state = null;
+
+                saveData.data[state.chartDataUniqueID()] = JSON.stringify(data);
+            }
+
+            var clearPanAndZoom = false;
+            if(NETDATA.globalPanAndZoom.isActive() === false) {
+                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], saveData.after_ms, saveData.before_ms);
+                clearPanAndZoom = true;
+            }
+
+            saveData.after_ms = NETDATA.globalPanAndZoom.force_after_ms;
+            saveData.before_ms = NETDATA.globalPanAndZoom.force_before_ms;
+            saveData.duration_ms = saveData.before_ms - saveData.after_ms;
+            saveData.data_points = Math.round((saveData.before_ms - saveData.after_ms) / (saveSnapshotSelectedSecondsPerPoint * 1000));
+            saveSnapshotModalLog('info', 'Generating snapshot with ' + saveData.data_points.toString() + ' data points per dimension...');
+
+            var charts_count = 0;
+            var charts_fetched = 0;
+            var charts_failed = 0;
+
+            function saveSnapshotRestore() {
+                $('#saveSnapshotModal').modal('hide');
+
+                // restore the options
+                var x;
+                for(x in backedup_options) {
+                    if (backedup_options.hasOwnProperty(x))
+                        NETDATA.options.current[x] = backedup_options[x];
+                }
+
+                $(el).css('width', '0%').attr('aria-valuenow', 0);
+                eltxt.innerText = '0%';
+
+                if(clearPanAndZoom)
+                    NETDATA.globalPanAndZoom.clearMaster();
+
+                NETDATA.options.force_data_points = 0;
+                NETDATA.options.fake_chart_rendering = false;
+                NETDATA.onresize();
+                NETDATA.unpause();
+            }
+
+            NETDATA.pause(function() {
+                NETDATA.globalSelectionSync.stop();
+                NETDATA.options.force_data_points = saveData.data_points;
+                NETDATA.options.fake_chart_rendering = true;
+
+                function update_chart(idx) {
+                    if(saveSnapshotStop === true) {
+                        saveSnapshotModalLog('info', 'Cancelled!');
+                        saveSnapshotRestore();
+                        return;
+                    }
+
+                    var state = NETDATA.options.targets[--idx];
+
+                    var pcent = (NETDATA.options.targets.length - idx) * 100 / NETDATA.options.targets.length;
+                    $(el).css('width', pcent+'%').attr('aria-valuenow', pcent);
+                    eltxt.innerText = Math.round(pcent).toString() + '%, ' + state.id;
+
+                    setTimeout(function() {
+                        charts_count++;
+                        state.isVisible(true);
+                        state.current.force_after_ms = saveData.after_ms;
+                        state.current.force_before_ms = saveData.before_ms;
+
+                        state.updateChart(function(status, reason) {
+                            state.current.force_after_ms = null;
+                            state.current.force_before_ms = null;
+
+                            if(status === true) {
+                                charts_fetched++;
+                                // state.log('ok');
+                            }
+                            else {
+                                charts_failed++;
+                                saveSnapshotModalLog('danger', charts_failed.toString() + ' have failed to be downloaded');
+                                state.log('failed to be updated: ' + reason);
+                            }
+
+                            pack_api1_v1_chart_data(state);
+
+                            if (idx > 0) {
+                                update_chart(idx);
+                            }
+                            else {
+                                // save it
+                                // console.log(saveData);
+                                saveObjectToClient(saveData, 'netdata-dashboard-' + saveData.hostname.toString() + '-' + saveData.after_ms.toString() + '-' + saveData.before_ms.toString() + '.json');
+
+                                saveSnapshotRestore();
+                                saveData = null;
+                            }
+                        })
+                    }, 0);
+                }
+
+                update_chart(NETDATA.options.targets.length);
+            });
+        }
+
+        // --------------------------------------------------------------------
+        // activate netdata on the page
 
         function finalizePage() {
             // resize all charts - without starting the background thread
@@ -2560,7 +3141,7 @@
             // the Dom elements are initially zero-sized
             NETDATA.parseDom();
 
-            if(urlOptions.pan_and_zoom === true)
+            if(urlOptions.pan_and_zoom === true && NETDATA.options.targets.length > 0)
                 NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], urlOptions.after, urlOptions.before);
 
             // ------------------------------------------------------------------------
@@ -2695,7 +3276,7 @@
                 });
 
             };
-            $(".chart-message").shorten();
+            $(".shorten").shorten();
             // ------------------------------------------------------------------------
 
             // callback for us to track PanAndZoom operations
@@ -2756,7 +3337,10 @@
                 //else console.log('el.find(): not found');
             });
 
-            document.getElementById('footer').style.display = 'block';
+            $('#saveSnapshotModal').on('show.bs.modal', saveSnapshotModalInit);
+            $('#saveSnapshotModal').on('hide.bs.modal',  saveSnapshotCancel);
+
+            showPageFooter();
 
             var update_options_modal = function() {
                 // console.log('update_options_modal');
@@ -3073,6 +3657,7 @@
 
         // our entry point
         // var netdataStarted = performance.now();
+
         var netdataCallback = initializeDynamicDashboard;
 
     </script>
@@ -3120,12 +3705,15 @@
             </div>
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
-                    <li><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i>&nbsp;<span class="hidden-sm">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
-                    <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-sliders"></i>&nbsp;<span class="hidden-sm">Settings</span></a></li>
+                    <li id="alarmsButton"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
+                    <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-sliders"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
                     <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal" title="check for update"><i class="fa fa-cloud-download"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
-                    <li><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata on github"><i class="fa fa-github"></i></a></li>
-                    <li><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank" title="netdata on twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
-                    <li><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank" title="netdata on facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a></li>
+                    <li class="hidden-sm hidden-md"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata on github"><i class="fa fa-github"></i></a></li>
+                    <li class="hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank" title="netdata on twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
+                    <li class="hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank" title="netdata on facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a></li>
+                    <li id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal" title="import a dashboard snapshot"><i class="fa fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
+                    <li id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal" title="export a snapshot of this dashboard"><i class="fa fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Export</span></a></li>
+                    <li id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal" title="print this dashboard"><i class="fa fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
                     <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal" title="dashboard help"><i class="fa fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
                     <li class="dropdown hidden-sm hidden-md hidden-lg">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
@@ -3170,7 +3758,7 @@
             <div class="charts-body" role="main">
                 <div id="charts_div"></div>
             </div>
-            <div class="sidebar-body hidden-xs hidden-sm" id="sidebar-body" role="complementary">
+            <div class="sidebar-body hidden-xs hidden-sm hidden-print" id="sidebar-body" role="complementary">
                 <nav class="dashboard-sidebar hidden-print hidden-xs hidden-sm" id="sidebar" role="menu"></nav>
             </div>
         </div>
@@ -3221,6 +3809,142 @@
                         <i class="fa fa-copyright"></i> Copyright (c) 2015,2016 hhurz, <a href="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js" target="_blank">MIT License</a>
 
                     </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="printPreflightModal" tabindex="-1" role="dialog" aria-labelledby="printPreflightModalLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="printPreflightModalLabel">Print this netdata dashboard</h4>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        netdata dashboards cannot be captured, since we are lazy loading and hiding all but the visible charts.
+                        <br/>
+                        To capture the whole page with all the charts rendered, a new browser window will pop-up that will render all the charts at once.
+                        The new browser window will maintain the current pan and zoom settings of the charts. So, align the charts before proceeding.
+                    </p>
+                    <p>
+                        <small>
+                            This process will put some CPU and memory pressure on your browser.<br/>
+                            For the netdata server, we will sequencially download all the charts, to avoid congesting network and server resources.<br/>
+                            <b>Please, do not print netdata dashboards on paper!</b>
+                        </small>
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" onclick="printPreflight(); return false;" type="button" class="btn btn-default">Print</a>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="printModal" tabindex="-1" role="dialog" aria-labelledby="printModalLabel" data-keyboard="false" data-backdrop="static">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="printModalLabel">Preparing dashboard for printing...</h4>
+                </div>
+                <div class="modal-body">
+                    Please wait while we initialize and render all the charts on the dashboard.
+                    <div class="progress progress-striped active" style="height: 2em !important;">
+                        <div id="printModalProgressBar" class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em;">
+                            <span id="printModalProgressBarText" style="padding-left: 10px; padding-top: 4px; font-size: 1.2em; text-align: left; width: 100%; position: absolute; display: block; color: black;"></span>
+                        </div>
+                    </div>
+                    The print dialog will appear as soon as we finish rendering the page.
+                </div>
+                <div class="modal-footer">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="loadSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="loadSnapshotModalLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="loadSnapshotModalLabel">Import a netdata snapshot</h4>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        netdata can save and load JSON snapshots of netdata dashboards.<br/>
+                        Any netdata can import a saved snapshot of the dashboard of any other netdata.
+                    </p>
+                    <p>
+                        <label class="btn btn-default">
+                            Select a netdata saved JSON file to load
+                            <input type="file" id="loadSnapshotSelectFiles" value="Import" style="display: none;"
+                                   onchange="loadSnapshotPreflight();">
+                        </label>
+                    </p>
+                    <div id="loadSnapshotStatus" class="alert alert-info" role="alert">
+                        Click the button above to select the file to load, then click <b>Import</b> to render it.
+                    </div>
+                    <p>
+                        <table class="table">
+                        <tbody>
+                            <tr><th>Filename</th><td id="loadSnapshotFilename"></td></tr>
+                            <tr><th>Hostname</th><td id="loadSnapshotHostname"></td></tr>
+                            <tr><th>Origin URL</th><td id="loadSnapshotURL"></td></tr>
+                            <tr><th>Time Range</th><td id="loadSnapshotTimeRange"></td></tr>
+                            <tr><th>Charts</th><td id="loadSnapshotCharts"></td></tr>
+                        </tbody>
+                        </table>
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <a id="loadSnapshotImport" href="#" onclick="loadSnapshot(); return false;" type="button" class="btn btn-success btn-disabled" disabled>Import</a>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="saveSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="saveSnapshotModalLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="saveSnapshotModalLabel">Export a dashboard snapshot</h4>
+                </div>
+                <div class="modal-body">
+                    <div id="saveSnapshotModalProgressSection" hidden>
+                        Please wait while we collect all the dashboard data...
+                        <div class="progress progress-striped active" style="height: 2em !important;">
+                            <div id="saveSnapshotModalProgressBar" class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="min-width: 2em;">
+                                <span id="saveSnapshotModalProgressBarText" style="padding-left: 10px; padding-top: 4px; font-size: 1.2em; text-align: left; width: 100%; position: absolute; display: block;"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="saveSnapshotResolutionRadio" style="text-align: center;">
+                        Select the desired resolution of the snapshot. This is the <b>seconds of data per point</b>.
+                        <br/>
+                        &nbsp;
+                        <br/>
+                        &nbsp;
+                        <br/>
+                        <input id="saveSnapshotResolutionSlider" data-slider-id='saveSnapshotResolutionSlider' type="text" style="width: 80%;"/>
+                    </div>
+
+                    &nbsp;
+                    <div id="saveSnapshotStatus" class="alert alert-info" role="alert">
+                        Select resolution for saving the snapshot.
+                    </div>
+                    The generated snapshot will include all charts of this dashboard, <b>for the visible timeframe</b>, so align pan and zoom the charts as need before saving.
+                    The snapshot will be downloaded on your computer, as a JSON file, that can be loaded back into any netdata (no need to load it on this one).
+                </div>
+                <div class="modal-footer">
+                    <a id="saveSnapshotExport" href="#" onclick="saveSnapshot(); return false;" type="button" class="btn btn-success">Export</a>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
                 </div>
             </div>
         </div>
@@ -4095,6 +4819,7 @@
             </div>
         </div>
     </div>
-    <script type="text/javascript" src="dashboard.js?v20171031-1"></script>
+    <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
+    <script type="text/javascript" src="dashboard.js?v20171112-21"></script>
 </body>
 </html>
