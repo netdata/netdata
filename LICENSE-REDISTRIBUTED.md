@@ -54,6 +54,10 @@ connectivity is not available.
     Copyright 2015, Twitter
     [MIT License](http://getbootstrap.com/getting-started/#license-faqs)
 
+- [Bootstrap-slider](http://seiyria.com/bootstrap-slider/)
+
+    Copyright 2017 Kyle Kemp, Rohit Kalkur, and contributors
+    [MIT License](https://github.com/seiyria/bootstrap-slider/blob/master/LICENSE.md)
 
 - [Bootstrap Toggle](http://www.bootstraptoggle.com/)
 

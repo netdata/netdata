@@ -286,6 +286,7 @@ body {
     white-space: nowrap;
     display: inline-block;
     cursor: pointer;
+    -webkit-print-color-adjust: exact;
 }
 
 .netdata-legend-value {
