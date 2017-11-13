@@ -3871,12 +3871,12 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="loadSnapshotModalLabel">Load a netdata snapshot</h4>
+                    <h4 class="modal-title" id="loadSnapshotModalLabel">Import a netdata snapshot</h4>
                 </div>
                 <div class="modal-body">
                     <p>
                         netdata can save and load JSON snapshots of netdata dashboards.<br/>
-                        Any netdata can load a saved snapshot of the dashboard of any other netdata.
+                        Any netdata can import a saved snapshot of the dashboard of any other netdata.
                     </p>
                     <p>
                         <label class="btn btn-default">
@@ -3913,7 +3913,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="saveSnapshotModalLabel">Preparing netdata dashboard snapshot...</h4>
+                    <h4 class="modal-title" id="saveSnapshotModalLabel">Export a dashboard snapshot</h4>
                 </div>
                 <div class="modal-body">
                     <div id="saveSnapshotModalProgressSection" hidden>
@@ -3939,7 +3939,7 @@
                     <div id="saveSnapshotStatus" class="alert alert-info" role="alert">
                         Select resolution for saving the snapshot.
                     </div>
-                    The generated snapshot will include all charts of this dashboard, for the visible timeframe, so align pan and zoom the charts as need before saving.
+                    The generated snapshot will include all charts of this dashboard, <b>for the visible timeframe</b>, so align pan and zoom the charts as need before saving.
                     The snapshot will be downloaded on your computer, as a JSON file, that can be loaded back into any netdata (no need to load it on this one).
                 </div>
                 <div class="modal-footer">
