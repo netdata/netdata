@@ -101,7 +101,7 @@ class Service(UrlService):
             connector = None
             if self.connector_name:
                 for conn in xml.findall('connector'):
-                    if conn.get('name') == self.connector_name:
+                    if self.connector_name in conn.get('name'):
                         connector = conn
                         break
             else:
