@@ -2858,6 +2858,11 @@
             document.getElementById('sidebar').innerHTML = '';
             NETDATA.globalReset();
 
+            if(typeof tmpSnapshotData.hash !== 'undefined')
+                urlOptions.hash = tmpSnapshotData.hash;
+            else
+                urlOptions.hash = '#';
+
             netdataSnapshotData = tmpSnapshotData;
             initializeDynamicDashboard(netdataSnapshotData.url);
 
@@ -3044,6 +3049,7 @@
                 data_points: 0,
                 url: document.location.origin.toString() + document.location.search.toString(),
                 comments: document.getElementById('saveSnapshotComments').value.toString(),
+                hash: urlOptions.hash,
                 charts: options.data,
                 data: {}
             };
