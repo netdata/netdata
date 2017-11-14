@@ -2955,6 +2955,16 @@
                     //console.log(result);
                     var date_after = new Date(result.after_ms);
                     var date_before = new Date(result.before_ms);
+
+                    if(typeof result.charts_ok === 'undefined')
+                        result.charts_ok = 'unknown';
+
+                    if(typeof result.charts_failed === 'undefined')
+                        result.charts_failed = 0;
+
+                    if(typeof result.compression === 'undefined')
+                        result.compression = 'none';
+
                     document.getElementById('loadSnapshotFilename').innerHTML = '<b>' + files.item(0).name + '</b>';
                     document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
