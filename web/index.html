@@ -3004,7 +3004,7 @@
                 var start_ms = Math.round(Date.now() - view_duration * 1000);
 
                 var bytes_per_chart = 2048;
-                var bytes_per_point_per_dimension = 2.2;
+                var bytes_per_point_per_dimension = 2.6;
 
                 if(NETDATA.globalPanAndZoom.isActive() === true) {
                     view_duration = Math.round((NETDATA.globalPanAndZoom.force_before_ms - NETDATA.globalPanAndZoom.force_after_ms) / 1000);
