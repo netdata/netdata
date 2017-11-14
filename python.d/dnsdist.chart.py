@@ -2,10 +2,10 @@
 from json import loads
 from bases.FrameworkServices.UrlService import UrlService
 
-ORDER = ['latency_rel', 'latency_abs', 'cache_rel', 'cache_abs', 'acl_abs', 'invalid_abs', 'queries_rel', 'queries_abs', 'health_abs']
+ORDER = ['latency', 'cache', 'acl', 'noncompliant', 'queries', 'health']
 CHARTS = {
-	'latency_rel': {
-		'options': [None, 'Average latency', 'value', 'Latency', 'dnsdist.latency_rel', 'area'],
+	'latency': {
+		'options': [None, 'latency stats', 'percent', 'latency', 'dnsdist.latency', 'area'],
 		'lines': [
 			['latency-slow', '> 1sec', 'incremental'],
 			['latency100-1000', '100-1000ms', 'incremental'],
@@ -14,65 +14,42 @@ CHARTS = {
 			['latency1-10', '1-10ms', 'incremental'],
 			['latency0-1', '< 1ms', 'incremental']
 	]},
-	'latency_abs': {
-		'options': [None, 'Absolute latency', 'value', 'Latency', 'dnsdist.latency_abs', 'line'],
-		'lines': [
-			['latency-slow', '> 1sec', 'absolute'],
-			['latency100-1000', '100-1000ms', 'absolute'],
-			['latency50-100', '50-100ms', 'absolute'],
-			['latency10-50', '10-50ms', 'absolute'],
-			['latency1-10', '1-10ms', 'absolute'],
-			['latency0-1', '< 1ms', 'absolute']
-	]},
-	'cache_rel': {
-		'options': [None, 'Relative cache stats', 'value', 'Cache', 'dnsdist.cache_rel', 'area'],
+	'cache': {
+		'options': [None, 'cache stats', 'value', 'cache', 'dnsdist.cache', 'area'],
 		'lines': [
 			['cache-hits', 'hits', 'incremental'],
 			['cache-misses', 'misses', 'incremental']
 	]},
-	'cache_abs': {
-		'options': [None, 'Absolute cache stats', 'value', 'Cache', 'dnsdist.cache_abs', 'area'],
+	'acl': {
+		'options': [None, 'AccessControlList stats', 'value', 'acl', 'dnsdist.acl', 'area'],
 		'lines': [
-			['cache-hits', 'hits', 'absolute'],
-			['cache-misses', 'misses', 'absolute']
+			['acl-drops', None, 'incremental'],
+			['rule-drop', None, 'incremental'],
+			['rule-nxdomain', None, 'incremental'],
+			['rule-refused', None, 'incremental']
 	]},
-	'acl_abs': {
-		'options': [None, 'AccessControlList stats', 'value', 'ACL', 'dnsdist.acl_abs', 'line'],
+	'noncompliant': {
+		'options': [None, 'Noncompliant data', 'value', 'noncompliant', 'dnsdist.noncompliant', 'area'],
 		'lines': [
-			['acl-drops', 'drop by acl', 'absolute'],
-			['rule-drop', 'drop by rule', 'absolute'],
-			['rule-nxdomain', 'rnxdomain by rule', 'absolute'],
-			['rule-refused', 'refused by rule', 'absolute']
+			['empty-queries', None, 'incremental'],
+		    ['no-policy', None, 'incremental'],
+			['noncompliant-queries', None, 'incremental'],
+			['noncompliant-responses', None, 'incremental']
 	]},
-	'noncompliant_abs': {
-		'options': [None, 'Noncompliant data', 'value', 'Invalid', 'dnsdist.noncompliant_abs', 'line'],
+	'queries': {
+		'options': [None, 'Relative query stats', 'value', 'queries', 'dnsdist.queries', 'area'],
 		'lines': [
-			['empty-queries', 'empty queries', 'absolute'],
-		    ['no-policy', 'no policy', 'absolute'],
-			['noncompliant-queries', 'noncompliant queries', 'absolute'],
-			['noncompliant-responses', 'noncompliant responses', 'absolute']
+			['queries', None, 'incremental'],
+			['rdqueries', None, 'incremental'],
+			['responses', None, 'incremental']
 	]},
-	'queries_rel': {
-		'options': [None, 'Relative query stats', 'value', 'Queries', 'dnsdist.queries_rel', 'line'],
+	'health': {
+		'options': [None, 'Health', 'value', 'health', 'dnsdist.health', 'area'],
 		'lines': [
-			['queries', 'queries', 'incremental'],
-			['rdqueries', 'rd queries', 'incremental'],
-			['responses', 'responses', 'incremental']
-	]},
-	'queries_abs': {
-		'options': [None, 'Absolute query stats', 'value', 'Queries', 'dnsdist.queries_abs', 'line'],
-		'lines': [
-			['queries', 'queries', 'absolute'],
-			['rdqueries', 'rd queries', 'absolute'],
-			['responses', 'responses', 'absolute']
-	]},
-	'health_abs': {
-		'options': [None, 'Health', 'value', 'Health', 'dnsdist.health_abs', 'line'],
-		'lines': [
-			['downstream-send-errors', 'ds send errors', 'absolute'],
-			['downstream-timeouts', 'ds timeouts', 'absolute'],
-			['servfail-responses', 'servfail responses', 'absolute'],
-			['trunc-failures', 'trunc failures', 'absolute']
+			['downstream-send-errors', 'ds send errors', 'incremental'],
+			['downstream-timeouts', 'ds timeouts', 'incremental'],
+			['servfail-responses', 'servfail responses', 'incremental'],
+			['trunc-failures', 'trunc failures', 'incremental']
 	]}
 }
 
@@ -86,11 +63,6 @@ class Service(UrlService):
 		data = self._get_raw_data()
 		if not data:
 			return None
-			
-		rdict = dict()
-		jdata = loads(data)
-		for d in jdata:
-			rdict[str(d)] = jdata[str(d)]
 		
-		return rdict
-
+		return loads(data)
+		
