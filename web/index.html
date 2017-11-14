@@ -3074,7 +3074,7 @@
                 duration_ms: options.duration * 1000,
                 update_every_ms: options.update_every * 1000,
                 data_points: 0,
-                url: document.location.origin.toString() + document.location.search.toString(),
+                url: ((urlOptions.server !== null)?urlOptions.server:document.location.origin.toString() + document.location.search.toString()).toString(),
                 comments: document.getElementById('saveSnapshotComments').value.toString(),
                 hash: urlOptions.hash,
                 charts: options.data,
@@ -3083,6 +3083,8 @@
                     submenu: netdataDashboard.submenu,
                     context: netdataDashboard.context
                 }),
+                charts_ok: 0,
+                charts_failed: 0,
                 data: {}
             };
 
@@ -3095,8 +3097,12 @@
                 data.state = null;
                 str = JSON.stringify(data);
 
-                saveData.data[state.chartDataUniqueID()] = str;
-                return str.length;
+                if(typeof str === 'string') {
+                    saveData.data[state.chartDataUniqueID()] = str;
+                    return str.length;
+                }
+                else
+                    return 0;
             }
 
             var clearPanAndZoom = false;
@@ -3112,7 +3118,7 @@
             saveSnapshotModalLog('info', 'Generating snapshot with ' + saveData.data_points.toString() + ' data points per dimension...');
 
             var charts_count = 0;
-            var charts_fetched = 0;
+            var charts_ok = 0;
             var charts_failed = 0;
 
             function saveSnapshotRestore() {
@@ -3167,15 +3173,14 @@
                             state.current.force_before_ms = null;
 
                             if(status === true) {
-                                charts_fetched++;
+                                charts_ok++;
                                 // state.log('ok');
+                                size += pack_api1_v1_chart_data(state);
                             }
                             else {
                                 charts_failed++;
                                 state.log('failed to be updated: ' + reason);
                             }
-
-                            size += pack_api1_v1_chart_data(state);
 
                             saveSnapshotModalLog((charts_failed)?'danger':'info', 'Generated size ' + (Math.round(size  * 100 / 1024 / 1024) / 100).toString() + ' MB. ' + ((charts_failed)?(charts_failed.toString() + ' charts have failed to be downloaded'):'').toString());
 
@@ -3183,9 +3188,15 @@
                                 update_chart(idx);
                             }
                             else {
+                                saveData.charts_ok = charts_ok;
+                                saveData.charts_failed = charts_failed;
+
                                 // save it
                                 // console.log(saveData);
                                 saveObjectToClient(saveData, filename);
+
+                                if(charts_failed > 0)
+                                    alert(charts_failed.toString() + ' failed to be downloaded');
 
                                 saveSnapshotRestore();
                                 saveData = null;
