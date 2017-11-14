@@ -158,3 +158,7 @@ connectivity is not available.
     Copyright 2008-2016 Andrey Petrov and [contributors](https://github.com/shazow/urllib3/blob/master/CONTRIBUTORS.txt)
     [MIT License](https://github.com/shazow/urllib3/blob/master/LICENSE.txt)
 
+- [lz-string](http://pieroxy.net/blog/pages/lz-string/index.html)
+
+    Copyright 2013 Pieroxy
+    [WTFPL License](http://pieroxy.net/blog/pages/lz-string/index.html#inline_menu_10)
