@@ -204,6 +204,8 @@ void read_cgroup_plugin_configuration() {
                     " *lxc* "
                     " *qemu* "
                     " *.libvirt-qemu "                    //  #3010
+                    " !*/vcpu* "                          // libvirtd adds these sub-cgroups
+                    " !*/emulator* "                      // libvirtd adds these sub-cgroups
                     " !/ "
                     " !*.mount "
                     " !*.partition "

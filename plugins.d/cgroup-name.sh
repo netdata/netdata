@@ -126,7 +126,7 @@ if [ -z "${NAME}" ]
         # NAME="$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d//; s/\/x2d/\-/g; s/\.scope//g')"
         NAME="qemu_$(echo ${CGROUP} | sed 's/machine.slice_machine.*-qemu//; s/\/x2d[[:digit:]]*//; s/\/x2d//g; s/\.scope//g')"
 
-    elif [[ "${CGROUP}" =~ machine_*\.libvirt-qemu ]]
+    elif [[ "${CGROUP}" =~ machine_.*\.libvirt-qemu ]]
         then
         # libvirtd / qemu virtual machines
         NAME="qemu_$(echo ${CGROUP} | sed 's/^machine_//; s/\.libvirt-qemu$//; s/-/_/;')"
