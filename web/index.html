@@ -2593,7 +2593,7 @@
                 // download all the charts the server knows
                 NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
                     if(data !== null) {
-                        if(typeof data.custom_info !== 'undefined' && data.custom_info !== "") {
+                        if(typeof data.custom_info !== 'undefined' && data.custom_info !== "" && netdataSnapshotData === null) {
                             loadJs(NETDATA.serverDefault + data.custom_info, function () {
                                 $.extend(true, netdataDashboard, customDashboard);
                                 initializeDynamicDashboardWithData(data);
@@ -2834,6 +2834,21 @@
         }
 
         // --------------------------------------------------------------------
+
+        function jsonStringifyFn(obj) {
+            return JSON.stringify(obj, function (key, value) {
+                return (typeof value === 'function' ) ? value.toString() : value;
+            });
+        }
+
+        function jsonParseFn(str) {
+            return JSON.parse(str, function (key, value) {
+                if (typeof value != 'string') return value;
+                return ( value.substring(0, 8) == 'function') ? eval('(' + value + ')') : value;
+            });
+        }
+
+        // --------------------------------------------------------------------
         // loading snapshots
 
         function loadSnapshotModalLog(priority, msg) {
@@ -2862,6 +2877,10 @@
                 urlOptions.hash = tmpSnapshotData.hash;
             else
                 urlOptions.hash = '#';
+
+            if(typeof tmpSnapshotData.info !== 'undefined') {
+                $.extend(true, netdataDashboard, jsonParseFn(tmpSnapshotData.info));
+            }
 
             netdataSnapshotData = tmpSnapshotData;
             initializeDynamicDashboard(netdataSnapshotData.url);
@@ -3051,6 +3070,11 @@
                 comments: document.getElementById('saveSnapshotComments').value.toString(),
                 hash: urlOptions.hash,
                 charts: options.data,
+                info: jsonStringifyFn({
+                    menu: netdataDashboard.menu,
+                    submenu: netdataDashboard.submenu,
+                    context: netdataDashboard.context
+                }),
                 data: {}
             };
 
