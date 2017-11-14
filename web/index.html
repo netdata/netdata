@@ -510,7 +510,7 @@
                 return typeof this[property] !== 'undefined';
             },
 
-            genHash: function() {
+            genHash: function(forReload) {
                 var hash = urlOptions.hash;
 
                 if(urlOptions.pan_and_zoom === true) {
@@ -527,7 +527,7 @@
                 if(urlOptions.update_always === true)
                     hash += ';update_always=true';
 
-                if(urlOptions.server !== null)
+                if(forReload === true && urlOptions.server !== null)
                     hash += ';server=' + urlOptions.server.toString();
 
                 if(urlOptions.mode !== 'live')
@@ -606,7 +606,7 @@
             },
 
             hashUpdate: function() {
-                history.replaceState(null, '', urlOptions.genHash());
+                history.replaceState(null, '', urlOptions.genHash(true));
             },
 
             netdataPanAndZoomCallback: function(status, after, before) {
@@ -920,14 +920,14 @@
             return this_is_demo;
         }
 
-        function netdataURL(url) {
+        function netdataURL(url, forReload) {
             if(typeof url === 'undefined')
                 url = document.location.toString();
 
             if(url.indexOf('#') !== -1)
                 url = url.substring(0, url.indexOf('#'));
 
-            var hash = urlOptions.genHash();
+            var hash = urlOptions.genHash(forReload);
 
             // console.log('netdataURL: ' + url + hash);
 
@@ -935,7 +935,7 @@
         }
 
         function netdataReload(url) {
-            document.location = netdataURL(url);
+            document.location = netdataURL(url, true);
 
             // since we play with hash
             // this is needed to reload the page
