@@ -54,6 +54,7 @@ dist_weblib_DATA = \
 	lib/jquery.sparkline-2.1.2.min.js \
 	lib/lz-string-1.4.4.min.js \
 	lib/morris-0.5.1.min.js \
+	lib/pako-1.0.6.min.js \
 	lib/perfect-scrollbar-0.6.15.min.js \
 	lib/raphael-2.2.4-min.js \
 	lib/tableExport-1.6.0.min.js \
