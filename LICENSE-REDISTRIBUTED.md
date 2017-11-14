@@ -162,3 +162,8 @@ connectivity is not available.
 
     Copyright 2013 Pieroxy
     [WTFPL License](http://pieroxy.net/blog/pages/lz-string/index.html#inline_menu_10)
+
+- [pako](http://nodeca.github.io/pako/)
+
+    Copyright 2014-2017 Vitaly Puzrin and Andrei Tuputcyn
+    [MIT License](https://github.com/nodeca/pako/blob/master/LICENSE)
