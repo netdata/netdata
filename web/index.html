@@ -566,8 +566,10 @@
                 if(typeof urlOptions.before === 'string')
                     urlOptions.before = parseInt(urlOptions.before);
 
-                if(urlOptions.server !== null)
+                if(urlOptions.server !== null && urlOptions.server !== '')
                     netdataServer = urlOptions.server;
+                else
+                    urlOptions.server = null;
 
                 if(urlOptions.before > 0 && urlOptions.after > 0) {
                     urlOptions.pan_and_zoom = true;
