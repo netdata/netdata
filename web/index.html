@@ -2879,7 +2879,15 @@
                 urlOptions.hash = '#';
 
             if(typeof tmpSnapshotData.info !== 'undefined') {
-                $.extend(true, netdataDashboard, jsonParseFn(tmpSnapshotData.info));
+                var info = jsonParseFn(tmpSnapshotData.info);
+                if(typeof info.menu !== 'undefined')
+                    netdataDashboard.menu = info.menu;
+
+                if(typeof info.submenu !== 'undefined')
+                    netdataDashboard.submenu = info.submenu;
+
+                if(typeof info.context !== 'undefined')
+                    netdataDashboard.context = info.context;
             }
 
             netdataSnapshotData = tmpSnapshotData;
