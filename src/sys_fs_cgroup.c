@@ -181,6 +181,7 @@ void read_cgroup_plugin_configuration() {
             config_get("plugin:cgroups", "search for cgroups in subpaths matching",
                     " !*/init.scope "                      // ignore init.scope
                     " !*-qemu "                            //  #345
+                    " !*.libvirt-qemu "                    //  #3010
                     " !/init.scope "
                     " !/system "
                     " !/systemd "
@@ -202,6 +203,7 @@ void read_cgroup_plugin_configuration() {
                     " *docker* "
                     " *lxc* "
                     " *qemu* "
+                    " *.libvirt-qemu "                    //  #3010
                     " !/ "
                     " !*.mount "
                     " !*.partition "

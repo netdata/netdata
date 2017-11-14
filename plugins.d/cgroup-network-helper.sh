@@ -22,6 +22,9 @@
 
 # -----------------------------------------------------------------------------
 
+export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+export LC_ALL=C
+
 PROGRAM_NAME="$(basename "${0}")"
 
 logdate() {
@@ -145,13 +148,11 @@ virsh_cgroup_to_domain_name() {
     debug "extracting a possible virsh domain from cgroup ${c}..."
 
     # extract for the cgroup path
-    # \1 = domain id
-    # \2 = domain name
-
-    echo "${c}" |\
-        sed "s|.*/machine-qemu\\\\x2d\([0-9]\+\)\\\\x2d\(.*\)\.scope$|virsh_domain_found \2|" |\
-        grep ^virsh_domain_found |\
-        cut -d ' ' -f 2
+    sed -n -e "s|.*/machine-qemu\\\\x2d[0-9]\+\\\\x2d\(.*\)\.scope$|\1|p" \
+           -e "s|.*/machine/\(.*\)\.libvirt-qemu$|\1|p" \
+           <<EOF
+${c}
+EOF
 }
 
 virsh_find_all_interfaces_for_cgroup() {
@@ -168,10 +169,13 @@ virsh_find_all_interfaces_for_cgroup() {
         then
             debug "running: virsh domiflist ${d}; to find the network interfaces"
 
+            # match only 'network' interfaces from virsh output
+
             set_source "virsh"
             "${virsh}" domiflist ${d} |\
-                grep -Ev "^(Interface|----)" |\
-                cut -d ' ' -f 1
+                sed -n \
+                    -e "s|^\([^[:space:]]\+\)[[:space:]]\+network[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1|p" \
+                    -e "s|^\([^[:space:]]\+\)[[:space:]]\+bridge[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1|p"
         else
             debug "no virsh domain extracted from cgroup ${c}"
         fi
