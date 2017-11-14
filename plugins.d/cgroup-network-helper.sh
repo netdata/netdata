@@ -174,8 +174,8 @@ virsh_find_all_interfaces_for_cgroup() {
             set_source "virsh"
             "${virsh}" domiflist ${d} |\
                 sed -n \
-                    -e "s|^\([^[:space:]]\+\)[[:space:]]\+network[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1|p" \
-                    -e "s|^\([^[:space:]]\+\)[[:space:]]\+bridge[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1|p"
+                    -e "s|^\([^[:space:]]\+\)[[:space:]]\+network[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p" \
+                    -e "s|^\([^[:space:]]\+\)[[:space:]]\+bridge[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p"
         else
             debug "no virsh domain extracted from cgroup ${c}"
         fi
