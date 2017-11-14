@@ -2592,7 +2592,7 @@
                 NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
                     if(data !== null) {
                         if(typeof data.custom_info !== 'undefined' && data.custom_info !== "") {
-                            loadJs(data.custom_info, function () {
+                            loadJs(NETDATA.serverDefault + data.custom_info, function () {
                                 $.extend(true, netdataDashboard, customDashboard);
                                 initializeDynamicDashboardWithData(data);
                             });
@@ -2938,7 +2938,7 @@
                 }
 
                 var start_date = new Date(start_ms);
-                var yyyymmddhhssmm = start_date.getFullYear() + NETDATA.zeropad(start_date.getMonth() + 1) + NETDATA.zeropad(start_date.getDate()) + NETDATA.zeropad(start_date.getHours()) + NETDATA.zeropad(start_date.getMinutes()) + NETDATA.zeropad(start_date.getSeconds());
+                var yyyymmddhhssmm = start_date.getFullYear() + NETDATA.zeropad(start_date.getMonth() + 1) + NETDATA.zeropad(start_date.getDate()) + '-' + NETDATA.zeropad(start_date.getHours()) + NETDATA.zeropad(start_date.getMinutes()) + NETDATA.zeropad(start_date.getSeconds());
 
                 document.getElementById('saveSnapshotFilename').value = 'netdata-' + options.hostname.toString() + '-' + yyyymmddhhssmm.toString() + '-' +  view_duration.toString() + '.snapshot'
 
