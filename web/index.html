@@ -493,6 +493,7 @@
             mode: 'live',         // 'live', 'print'
             update_always: false,
             pan_and_zoom: false,
+            server: null,
             after: 0,
             before: 0,
             nowelcome: false,
@@ -525,6 +526,9 @@
 
                 if(urlOptions.update_always === true)
                     hash += ';update_always=true';
+
+                if(urlOptions.server !== null)
+                    hash += ';server=' + urlOptions.server.toString();
 
                 if(urlOptions.mode !== 'live')
                     hash += ';mode=' + urlOptions.mode;
@@ -561,6 +565,9 @@
 
                 if(typeof urlOptions.before === 'string')
                     urlOptions.before = parseInt(urlOptions.before);
+
+                if(urlOptions.server !== null)
+                    netdataServer = urlOptions.server;
 
                 if(urlOptions.before > 0 && urlOptions.after > 0) {
                     urlOptions.pan_and_zoom = true;
@@ -1864,9 +1871,9 @@
         function loadBootstrapTable(callback) {
             if(bootstrapTableLoaded === false) {
                 bootstrapTableLoaded = true;
-                loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-1.11.0.min.js', function() {
-                    loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-export-1.11.0.min.js', function() {
-                        loadJs(NETDATA.serverDefault + 'lib/tableExport-1.6.0.min.js', callback);
+                loadJs('lib/bootstrap-table-1.11.0.min.js', function() {
+                    loadJs('lib/bootstrap-table-export-1.11.0.min.js', function() {
+                        loadJs('lib/tableExport-1.6.0.min.js', callback);
                     })
                 });
             }
@@ -1877,8 +1884,8 @@
         function loadBootstrapSlider(callback) {
             if(bootstrapSliderLoaded === false) {
                 bootstrapSliderLoaded = true;
-                loadJs(NETDATA.serverDefault + 'lib/bootstrap-slider-10.0.0.min.js', function() {
-                    NETDATA._loadCSS(NETDATA.serverDefault + 'css/bootstrap-slider-10.0.0.min.css');
+                loadJs('lib/bootstrap-slider-10.0.0.min.js', function() {
+                    NETDATA._loadCSS('css/bootstrap-slider-10.0.0.min.css');
                     callback();
                 });
             }
@@ -2919,13 +2926,17 @@
 
             loadBootstrapSlider(function() {
                 var view_duration = options.duration;
+                var start_ms = Math.round(Date.now() - view_duration * 1000);
 
                 var bytes_per_chart = 2048;
                 var bytes_per_point_per_dimension = 5.3;
 
-                if(NETDATA.globalPanAndZoom.isActive() === true)
+                if(NETDATA.globalPanAndZoom.isActive() === true) {
                     view_duration = Math.round((NETDATA.globalPanAndZoom.force_before_ms - NETDATA.globalPanAndZoom.force_after_ms) / 1000);
+                    start_ms = NETDATA.globalPanAndZoom.force_after_ms;
+                }
 
+                document.getElementById('saveSnapshotFilename').value = 'netdata-dashboard-' + options.hostname.toString() + '-' + start_ms.toString() + '.json'
 
                 var min = options.update_every;
                 var max = Math.round(view_duration / 100);
@@ -2985,7 +2996,9 @@
             saveSnapshotStop = false;
             $('#saveSnapshotModalProgressSection').show();
             $('#saveSnapshotResolutionRadio').hide();
-            saveSnapshotModalLog('info', 'Generating snapshot...');
+            var filename = document.getElementById('saveSnapshotFilename').value;
+            // console.log(filename);
+            saveSnapshotModalLog('info', 'Generating snapshot as <code>' + filename.toString() + '</code>');
 
             var save_options = {
                 stop_updates_when_focus_is_lost: false,
@@ -3127,7 +3140,7 @@
                             else {
                                 // save it
                                 // console.log(saveData);
-                                saveObjectToClient(saveData, 'netdata-dashboard-' + saveData.hostname.toString() + '-' + saveData.after_ms.toString() + '-' + saveData.before_ms.toString() + '.json');
+                                saveObjectToClient(saveData, filename);
 
                                 saveSnapshotRestore();
                                 saveData = null;
@@ -3943,6 +3956,11 @@
                         &nbsp;
                         <br/>
                         <input id="saveSnapshotResolutionSlider" data-slider-id='saveSnapshotResolutionSlider' type="text" style="width: 80%;"/>
+                        <br/>&nbsp;<br/>
+                        <div class="input-group">
+                            <span class="input-group-addon" id="sizing-saveSnapshotFilename">Filename</span>
+                            <input id="saveSnapshotFilename" class="form-control" placeholder="Filename of the generated snapshot" aria-describedby="sizing-saveSnapshotFilename"/>
+                        </div>
                     </div>
 
                     &nbsp;
