@@ -493,6 +493,7 @@
             mode: 'live',         // 'live', 'print'
             update_always: false,
             pan_and_zoom: false,
+            server: null,
             after: 0,
             before: 0,
             nowelcome: false,
@@ -509,7 +510,7 @@
                 return typeof this[property] !== 'undefined';
             },
 
-            genHash: function() {
+            genHash: function(forReload) {
                 var hash = urlOptions.hash;
 
                 if(urlOptions.pan_and_zoom === true) {
@@ -525,6 +526,9 @@
 
                 if(urlOptions.update_always === true)
                     hash += ';update_always=true';
+
+                if(forReload === true && urlOptions.server !== null)
+                    hash += ';server=' + urlOptions.server.toString();
 
                 if(urlOptions.mode !== 'live')
                     hash += ';mode=' + urlOptions.mode;
@@ -562,6 +566,11 @@
                 if(typeof urlOptions.before === 'string')
                     urlOptions.before = parseInt(urlOptions.before);
 
+                if(urlOptions.server !== null && urlOptions.server !== '')
+                    netdataServer = urlOptions.server;
+                else
+                    urlOptions.server = null;
+
                 if(urlOptions.before > 0 && urlOptions.after > 0) {
                     urlOptions.pan_and_zoom = true;
                     urlOptions.nowelcome = true;
@@ -597,7 +606,7 @@
             },
 
             hashUpdate: function() {
-                history.replaceState(null, '', urlOptions.genHash());
+                history.replaceState(null, '', urlOptions.genHash(true));
             },
 
             netdataPanAndZoomCallback: function(status, after, before) {
@@ -911,14 +920,14 @@
             return this_is_demo;
         }
 
-        function netdataURL(url) {
+        function netdataURL(url, forReload) {
             if(typeof url === 'undefined')
                 url = document.location.toString();
 
             if(url.indexOf('#') !== -1)
                 url = url.substring(0, url.indexOf('#'));
 
-            var hash = urlOptions.genHash();
+            var hash = urlOptions.genHash(forReload);
 
             // console.log('netdataURL: ' + url + hash);
 
@@ -926,7 +935,7 @@
         }
 
         function netdataReload(url) {
-            document.location = netdataURL(url);
+            document.location = netdataURL(url, true);
 
             // since we play with hash
             // this is needed to reload the page
@@ -1864,9 +1873,9 @@
         function loadBootstrapTable(callback) {
             if(bootstrapTableLoaded === false) {
                 bootstrapTableLoaded = true;
-                loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-1.11.0.min.js', function() {
-                    loadJs(NETDATA.serverDefault + 'lib/bootstrap-table-export-1.11.0.min.js', function() {
-                        loadJs(NETDATA.serverDefault + 'lib/tableExport-1.6.0.min.js', callback);
+                loadJs('lib/bootstrap-table-1.11.0.min.js', function() {
+                    loadJs('lib/bootstrap-table-export-1.11.0.min.js', function() {
+                        loadJs('lib/tableExport-1.6.0.min.js', callback);
                     })
                 });
             }
@@ -1877,8 +1886,8 @@
         function loadBootstrapSlider(callback) {
             if(bootstrapSliderLoaded === false) {
                 bootstrapSliderLoaded = true;
-                loadJs(NETDATA.serverDefault + 'lib/bootstrap-slider-10.0.0.min.js', function() {
-                    NETDATA._loadCSS(NETDATA.serverDefault + 'css/bootstrap-slider-10.0.0.min.css');
+                loadJs('lib/bootstrap-slider-10.0.0.min.js', function() {
+                    NETDATA._loadCSS('css/bootstrap-slider-10.0.0.min.css');
                     callback();
                 });
             }
@@ -2584,8 +2593,8 @@
                 // download all the charts the server knows
                 NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
                     if(data !== null) {
-                        if(typeof data.custom_info !== 'undefined' && data.custom_info !== "") {
-                            loadJs(data.custom_info, function () {
+                        if(typeof data.custom_info !== 'undefined' && data.custom_info !== "" && netdataSnapshotData === null) {
+                            loadJs(NETDATA.serverDefault + data.custom_info, function () {
                                 $.extend(true, netdataDashboard, customDashboard);
                                 initializeDynamicDashboardWithData(data);
                             });
@@ -2825,6 +2834,21 @@
         }
 
         // --------------------------------------------------------------------
+
+        function jsonStringifyFn(obj) {
+            return JSON.stringify(obj, function (key, value) {
+                return (typeof value === 'function' ) ? value.toString() : value;
+            });
+        }
+
+        function jsonParseFn(str) {
+            return JSON.parse(str, function (key, value) {
+                if (typeof value != 'string') return value;
+                return ( value.substring(0, 8) == 'function') ? eval('(' + value + ')') : value;
+            });
+        }
+
+        // --------------------------------------------------------------------
         // loading snapshots
 
         function loadSnapshotModalLog(priority, msg) {
@@ -2848,6 +2872,23 @@
             document.getElementById('charts_div').innerHTML = '';
             document.getElementById('sidebar').innerHTML = '';
             NETDATA.globalReset();
+
+            if(typeof tmpSnapshotData.hash !== 'undefined')
+                urlOptions.hash = tmpSnapshotData.hash;
+            else
+                urlOptions.hash = '#';
+
+            if(typeof tmpSnapshotData.info !== 'undefined') {
+                var info = jsonParseFn(tmpSnapshotData.info);
+                if(typeof info.menu !== 'undefined')
+                    netdataDashboard.menu = info.menu;
+
+                if(typeof info.submenu !== 'undefined')
+                    netdataDashboard.submenu = info.submenu;
+
+                if(typeof info.context !== 'undefined')
+                    netdataDashboard.context = info.context;
+            }
 
             netdataSnapshotData = tmpSnapshotData;
             initializeDynamicDashboard(netdataSnapshotData.url);
@@ -2880,6 +2921,7 @@
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
                     document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
                     document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
+                    document.getElementById('loadSnapshotComments').innerHTML = ((result.comments)?result.comments:'').toString();
                     loadSnapshotModalLog('success', 'File loaded, click <b>Import</b> to render it!');
                     $('#loadSnapshotImport').prop('disabled', false);
                     $('#loadSnapshotImport').removeAttr('disabled');
@@ -2919,13 +2961,20 @@
 
             loadBootstrapSlider(function() {
                 var view_duration = options.duration;
+                var start_ms = Math.round(Date.now() - view_duration * 1000);
 
                 var bytes_per_chart = 2048;
                 var bytes_per_point_per_dimension = 5.3;
 
-                if(NETDATA.globalPanAndZoom.isActive() === true)
+                if(NETDATA.globalPanAndZoom.isActive() === true) {
                     view_duration = Math.round((NETDATA.globalPanAndZoom.force_before_ms - NETDATA.globalPanAndZoom.force_after_ms) / 1000);
+                    start_ms = NETDATA.globalPanAndZoom.force_after_ms;
+                }
 
+                var start_date = new Date(start_ms);
+                var yyyymmddhhssmm = start_date.getFullYear() + NETDATA.zeropad(start_date.getMonth() + 1) + NETDATA.zeropad(start_date.getDate()) + '-' + NETDATA.zeropad(start_date.getHours()) + NETDATA.zeropad(start_date.getMinutes()) + NETDATA.zeropad(start_date.getSeconds());
+
+                document.getElementById('saveSnapshotFilename').value = 'netdata-' + options.hostname.toString() + '-' + yyyymmddhhssmm.toString() + '-' +  view_duration.toString() + '.snapshot'
 
                 var min = options.update_every;
                 var max = Math.round(view_duration / 100);
@@ -2985,7 +3034,9 @@
             saveSnapshotStop = false;
             $('#saveSnapshotModalProgressSection').show();
             $('#saveSnapshotResolutionRadio').hide();
-            saveSnapshotModalLog('info', 'Generating snapshot...');
+            var filename = document.getElementById('saveSnapshotFilename').value;
+            // console.log(filename);
+            saveSnapshotModalLog('info', 'Generating snapshot as <code>' + filename.toString() + '</code>');
 
             var save_options = {
                 stop_updates_when_focus_is_lost: false,
@@ -3023,8 +3074,17 @@
                 duration_ms: options.duration * 1000,
                 update_every_ms: options.update_every * 1000,
                 data_points: 0,
-                url: document.location.origin.toString() + document.location.search.toString(),
+                url: ((urlOptions.server !== null)?urlOptions.server:document.location.origin.toString() + document.location.search.toString()).toString(),
+                comments: document.getElementById('saveSnapshotComments').value.toString(),
+                hash: urlOptions.hash,
                 charts: options.data,
+                info: jsonStringifyFn({
+                    menu: netdataDashboard.menu,
+                    submenu: netdataDashboard.submenu,
+                    context: netdataDashboard.context
+                }),
+                charts_ok: 0,
+                charts_failed: 0,
                 data: {}
             };
 
@@ -3037,8 +3097,12 @@
                 data.state = null;
                 str = JSON.stringify(data);
 
-                saveData.data[state.chartDataUniqueID()] = str;
-                return str.length;
+                if(typeof str === 'string') {
+                    saveData.data[state.chartDataUniqueID()] = str;
+                    return str.length;
+                }
+                else
+                    return 0;
             }
 
             var clearPanAndZoom = false;
@@ -3054,7 +3118,7 @@
             saveSnapshotModalLog('info', 'Generating snapshot with ' + saveData.data_points.toString() + ' data points per dimension...');
 
             var charts_count = 0;
-            var charts_fetched = 0;
+            var charts_ok = 0;
             var charts_failed = 0;
 
             function saveSnapshotRestore() {
@@ -3109,15 +3173,14 @@
                             state.current.force_before_ms = null;
 
                             if(status === true) {
-                                charts_fetched++;
+                                charts_ok++;
                                 // state.log('ok');
+                                size += pack_api1_v1_chart_data(state);
                             }
                             else {
                                 charts_failed++;
                                 state.log('failed to be updated: ' + reason);
                             }
-
-                            size += pack_api1_v1_chart_data(state);
 
                             saveSnapshotModalLog((charts_failed)?'danger':'info', 'Generated size ' + (Math.round(size  * 100 / 1024 / 1024) / 100).toString() + ' MB. ' + ((charts_failed)?(charts_failed.toString() + ' charts have failed to be downloaded'):'').toString());
 
@@ -3125,9 +3188,15 @@
                                 update_chart(idx);
                             }
                             else {
+                                saveData.charts_ok = charts_ok;
+                                saveData.charts_failed = charts_failed;
+
                                 // save it
                                 // console.log(saveData);
-                                saveObjectToClient(saveData, 'netdata-dashboard-' + saveData.hostname.toString() + '-' + saveData.after_ms.toString() + '-' + saveData.before_ms.toString() + '.json');
+                                saveObjectToClient(saveData, filename);
+
+                                if(charts_failed > 0)
+                                    alert(charts_failed.toString() + ' failed to be downloaded');
 
                                 saveSnapshotRestore();
                                 saveData = null;
@@ -3905,7 +3974,8 @@
                             <tr><th>Hostname</th><td id="loadSnapshotHostname"></td></tr>
                             <tr><th>Origin URL</th><td id="loadSnapshotURL"></td></tr>
                             <tr><th>Time Range</th><td id="loadSnapshotTimeRange"></td></tr>
-                            <tr><th>Charts</th><td id="loadSnapshotCharts"></td></tr>
+                            <tr><th>Chart Data</th><td id="loadSnapshotCharts"></td></tr>
+                            <tr><th>Comments</th><td id="loadSnapshotComments"></td></tr>
                         </tbody>
                         </table>
                     </p>
@@ -3918,7 +3988,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="saveSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="saveSnapshotModalLabel">
+    <div class="modal fade" id="saveSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="saveSnapshotModalLabel" data-keyboard="false" data-backdrop="static">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
@@ -3943,6 +4013,15 @@
                         &nbsp;
                         <br/>
                         <input id="saveSnapshotResolutionSlider" data-slider-id='saveSnapshotResolutionSlider' type="text" style="width: 80%;"/>
+                        <br/>&nbsp;<br/>
+                        <div class="input-group">
+                            <span class="input-group-addon" id="sizing-saveSnapshotFilename">Filename</span>
+                            <input id="saveSnapshotFilename" class="form-control" placeholder="Filename of the generated snapshot" aria-describedby="sizing-saveSnapshotFilename"/>
+                        </div>
+                        <div class="input-group" style="padding-top: 10px;">
+                            <span class="input-group-addon" id="sizing-saveSnapshotComments">Comments</span>
+                            <input id="saveSnapshotComments" class="form-control" placeholder="Any comments about this snapshot?" aria-describedby="sizing-saveSnapshotComments"/>
+                        </div>
                     </div>
 
                     &nbsp;
