@@ -1894,6 +1894,28 @@
             else callback();
         }
 
+        var lzStringLoaded = false;
+        function loadLzString(callback) {
+            if(lzStringLoaded === false) {
+                lzStringLoaded = true;
+                loadJs('lib/lz-string-1.4.4.min.js', function() {
+                    callback();
+                });
+            }
+            else callback();
+        }
+
+        var pakoLoaded = false;
+        function loadPako(callback) {
+            if(pakoLoaded === false) {
+                pakoLoaded = true;
+                loadJs('lib/pako-1.0.6.min.js', function() {
+                    callback();
+                });
+            }
+            else callback();
+        }
+
         function alarmsUpdateModal() {
             var active = '<h3>Raised Alarms</h3><table class="table">';
             var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
@@ -2862,38 +2884,82 @@
                 loadSnapshotModalLog('danger', 'no data have been loaded');
                 return;
             }
-            loadSnapshotModalLog('info', 'Please wait, activating snapshot...');
 
-            netdataShowAlarms === false;
-            netdataRegistry = false;
-            netdataServer = tmpSnapshotData.server;
-            NETDATA.serverDefault = netdataServer;
+            loadPako(function() {
+                loadLzString(function () {
+                    loadSnapshotModalLog('info', 'Please wait, activating snapshot...');
 
-            document.getElementById('charts_div').innerHTML = '';
-            document.getElementById('sidebar').innerHTML = '';
-            NETDATA.globalReset();
+                    netdataShowAlarms === false;
+                    netdataRegistry = false;
+                    netdataServer = tmpSnapshotData.server;
+                    NETDATA.serverDefault = netdataServer;
 
-            if(typeof tmpSnapshotData.hash !== 'undefined')
-                urlOptions.hash = tmpSnapshotData.hash;
-            else
-                urlOptions.hash = '#';
+                    document.getElementById('charts_div').innerHTML = '';
+                    document.getElementById('sidebar').innerHTML = '';
+                    NETDATA.globalReset();
 
-            if(typeof tmpSnapshotData.info !== 'undefined') {
-                var info = jsonParseFn(tmpSnapshotData.info);
-                if(typeof info.menu !== 'undefined')
-                    netdataDashboard.menu = info.menu;
+                    if (typeof tmpSnapshotData.hash !== 'undefined')
+                        urlOptions.hash = tmpSnapshotData.hash;
+                    else
+                        urlOptions.hash = '#';
 
-                if(typeof info.submenu !== 'undefined')
-                    netdataDashboard.submenu = info.submenu;
+                    if (typeof tmpSnapshotData.info !== 'undefined') {
+                        var info = jsonParseFn(tmpSnapshotData.info);
+                        if (typeof info.menu !== 'undefined')
+                            netdataDashboard.menu = info.menu;
 
-                if(typeof info.context !== 'undefined')
-                    netdataDashboard.context = info.context;
-            }
+                        if (typeof info.submenu !== 'undefined')
+                            netdataDashboard.submenu = info.submenu;
 
-            netdataSnapshotData = tmpSnapshotData;
-            initializeDynamicDashboard(netdataSnapshotData.url);
+                        if (typeof info.context !== 'undefined')
+                            netdataDashboard.context = info.context;
+                    }
 
-            $('#loadSnapshotModal').modal('hide');
+                    if (typeof tmpSnapshotData.compression !== 'string')
+                        tmpSnapshotData.compression = 'none';
+
+                    switch (tmpSnapshotData.compression) {
+                        case 'pako.deflate.base64':
+                            tmpSnapshotData.uncompress = function(s) {
+                                return pako.inflate(atob(s), { to: 'string' });
+                            };
+                            break;
+
+                        case 'pako.deflate':
+                            tmpSnapshotData.uncompress = function(s) {
+                                return pako.inflate(s, { to: 'string' });
+                            };
+                            break;
+
+                        case 'lzstring.utf16':
+                            tmpSnapshotData.uncompress = LZString.decompressFromUTF16;
+                            break;
+
+                        case 'lzstring.base64':
+                            tmpSnapshotData.uncompress = LZString.decompressFromBase64;
+                            break;
+
+                        case 'lzstring.uri':
+                            tmpSnapshotData.uncompress = LZString.decompressFromEncodedURIComponent;
+                            break;
+
+                        case 'none':
+                            tmpSnapshotData.uncompress = function (data) {
+                                return data;
+                            };
+                            break;
+
+                        default:
+                            alert('unknown compression method: ' + tmpSnapshotData.compression);
+                            break;
+                    }
+
+                    netdataSnapshotData = tmpSnapshotData;
+                    initializeDynamicDashboard(netdataSnapshotData.url);
+
+                    $('#loadSnapshotModal').modal('hide');
+                });
+            });
         }
 
         function loadSnapshotPreflight() {
@@ -2916,10 +2982,24 @@
                     //console.log(result);
                     var date_after = new Date(result.after_ms);
                     var date_before = new Date(result.before_ms);
-                    document.getElementById('loadSnapshotFilename').innerHTML = '<b>' + files.item(0).name + '</b>, snapshot version: <b>' +  result.snapshot_version.toString() + '</b>';
+
+                    if(typeof result.charts_ok === 'undefined')
+                        result.charts_ok = 'unknown';
+
+                    if(typeof result.charts_failed === 'undefined')
+                        result.charts_failed = 0;
+
+                    if(typeof result.compression === 'undefined')
+                        result.compression = 'none';
+
+                    if(typeof result.data_size === 'undefined')
+                        result.data_size = 0;
+
+                    document.getElementById('loadSnapshotFilename').innerHTML = '<b>' + files.item(0).name + '</b>';
                     document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
                     document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
+                    document.getElementById('loadSnapshotInfo').innerHTML = 'version: <b>' +  result.snapshot_version.toString() + '</b>, includes <b>' + result.charts_ok.toString() + '</b> unique chart data queries ' + ((result.charts_failed > 0)?('<b>' + result.charts_failed.toString() + '</b> failed'):'').toString() + ', compressed with <b>' + result.compression.toString() + '</b>, data size ' + (Math.round(result.data_size * 100 / 1024 / 1024) / 100).toString() + ' MB';
                     document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
                     document.getElementById('loadSnapshotComments').innerHTML = ((result.comments)?result.comments:'').toString();
                     loadSnapshotModalLog('success', 'File loaded, click <b>Import</b> to render it!');
@@ -2964,7 +3044,7 @@
                 var start_ms = Math.round(Date.now() - view_duration * 1000);
 
                 var bytes_per_chart = 2048;
-                var bytes_per_point_per_dimension = 5.3;
+                var bytes_per_point_per_dimension = 2.6;
 
                 if(NETDATA.globalPanAndZoom.isActive() === true) {
                     view_duration = Math.round((NETDATA.globalPanAndZoom.force_before_ms - NETDATA.globalPanAndZoom.force_after_ms) / 1000);
@@ -3031,181 +3111,229 @@
         }
 
         function saveSnapshot() {
-            saveSnapshotStop = false;
-            $('#saveSnapshotModalProgressSection').show();
-            $('#saveSnapshotResolutionRadio').hide();
-            var filename = document.getElementById('saveSnapshotFilename').value;
-            // console.log(filename);
-            saveSnapshotModalLog('info', 'Generating snapshot as <code>' + filename.toString() + '</code>');
+            loadPako(function () {
+                loadLzString(function () {
+                    saveSnapshotStop = false;
+                    $('#saveSnapshotModalProgressSection').show();
+                    $('#saveSnapshotResolutionRadio').hide();
+                    var filename = document.getElementById('saveSnapshotFilename').value;
+                    // console.log(filename);
+                    saveSnapshotModalLog('info', 'Generating snapshot as <code>' + filename.toString() + '</code>');
 
-            var save_options = {
-                stop_updates_when_focus_is_lost: false,
-                update_only_visible: false,
-                sync_selection: false,
-                eliminate_zero_dimensions: true,
-                pan_and_zoom_data_padding: false,
-                show_help: false,
-                legend_toolbox: false,
-                resize_charts: false,
-                pixels_per_point: 1
-            };
-            var backedup_options = {};
+                    var save_options = {
+                        stop_updates_when_focus_is_lost: false,
+                        update_only_visible: false,
+                        sync_selection: false,
+                        eliminate_zero_dimensions: true,
+                        pan_and_zoom_data_padding: false,
+                        show_help: false,
+                        legend_toolbox: false,
+                        resize_charts: false,
+                        pixels_per_point: 1
+                    };
+                    var backedup_options = {};
 
-            var x;
-            for(x in save_options) {
-                if (save_options.hasOwnProperty(x)) {
-                    backedup_options[x] = NETDATA.options.current[x];
-                    NETDATA.options.current[x] = save_options[x];
-                }
-            }
-
-            var el = document.getElementById('saveSnapshotModalProgressBar');
-            var eltxt = document.getElementById('saveSnapshotModalProgressBarText');
-
-            options.data.charts_by_name = null;
-
-            var saveData = {
-                hostname: options.hostname,
-                server: NETDATA.serverDefault,
-                netdata_version: options.data.version,
-                snapshot_version: 1,
-                after_ms: Date.now() - options.duration * 1000,
-                before_ms: Date.now(),
-                duration_ms: options.duration * 1000,
-                update_every_ms: options.update_every * 1000,
-                data_points: 0,
-                url: ((urlOptions.server !== null)?urlOptions.server:document.location.origin.toString() + document.location.search.toString()).toString(),
-                comments: document.getElementById('saveSnapshotComments').value.toString(),
-                hash: urlOptions.hash,
-                charts: options.data,
-                info: jsonStringifyFn({
-                    menu: netdataDashboard.menu,
-                    submenu: netdataDashboard.submenu,
-                    context: netdataDashboard.context
-                }),
-                charts_ok: 0,
-                charts_failed: 0,
-                data: {}
-            };
-
-            function pack_api1_v1_chart_data(state) {
-                if(state.library_name === null || state.data === null)
-                    return;
-
-                var data = state.data;
-                state.data = null;
-                data.state = null;
-                str = JSON.stringify(data);
-
-                if(typeof str === 'string') {
-                    saveData.data[state.chartDataUniqueID()] = str;
-                    return str.length;
-                }
-                else
-                    return 0;
-            }
-
-            var clearPanAndZoom = false;
-            if(NETDATA.globalPanAndZoom.isActive() === false) {
-                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], saveData.after_ms, saveData.before_ms);
-                clearPanAndZoom = true;
-            }
-
-            saveData.after_ms = NETDATA.globalPanAndZoom.force_after_ms;
-            saveData.before_ms = NETDATA.globalPanAndZoom.force_before_ms;
-            saveData.duration_ms = saveData.before_ms - saveData.after_ms;
-            saveData.data_points = Math.round((saveData.before_ms - saveData.after_ms) / (saveSnapshotSelectedSecondsPerPoint * 1000));
-            saveSnapshotModalLog('info', 'Generating snapshot with ' + saveData.data_points.toString() + ' data points per dimension...');
-
-            var charts_count = 0;
-            var charts_ok = 0;
-            var charts_failed = 0;
-
-            function saveSnapshotRestore() {
-                $('#saveSnapshotModal').modal('hide');
-
-                // restore the options
-                var x;
-                for(x in backedup_options) {
-                    if (backedup_options.hasOwnProperty(x))
-                        NETDATA.options.current[x] = backedup_options[x];
-                }
-
-                $(el).css('width', '0%').attr('aria-valuenow', 0);
-                eltxt.innerText = '0%';
-
-                if(clearPanAndZoom)
-                    NETDATA.globalPanAndZoom.clearMaster();
-
-                NETDATA.options.force_data_points = 0;
-                NETDATA.options.fake_chart_rendering = false;
-                NETDATA.onresize();
-                NETDATA.unpause();
-            }
-
-            NETDATA.pause(function() {
-                NETDATA.globalSelectionSync.stop();
-                NETDATA.options.force_data_points = saveData.data_points;
-                NETDATA.options.fake_chart_rendering = true;
-                var size = 0;
-
-                function update_chart(idx) {
-                    if(saveSnapshotStop === true) {
-                        saveSnapshotModalLog('info', 'Cancelled!');
-                        saveSnapshotRestore();
-                        return;
+                    var x;
+                    for (x in save_options) {
+                        if (save_options.hasOwnProperty(x)) {
+                            backedup_options[x] = NETDATA.options.current[x];
+                            NETDATA.options.current[x] = save_options[x];
+                        }
                     }
 
-                    var state = NETDATA.options.targets[--idx];
+                    var el = document.getElementById('saveSnapshotModalProgressBar');
+                    var eltxt = document.getElementById('saveSnapshotModalProgressBarText');
 
-                    var pcent = (NETDATA.options.targets.length - idx) * 100 / NETDATA.options.targets.length;
-                    $(el).css('width', pcent+'%').attr('aria-valuenow', pcent);
-                    eltxt.innerText = Math.round(pcent).toString() + '%, ' + state.id;
+                    options.data.charts_by_name = null;
 
-                    setTimeout(function() {
-                        charts_count++;
-                        state.isVisible(true);
-                        state.current.force_after_ms = saveData.after_ms;
-                        state.current.force_before_ms = saveData.before_ms;
+                    var saveData = {
+                        hostname: options.hostname,
+                        server: NETDATA.serverDefault,
+                        netdata_version: options.data.version,
+                        snapshot_version: 1,
+                        after_ms: Date.now() - options.duration * 1000,
+                        before_ms: Date.now(),
+                        duration_ms: options.duration * 1000,
+                        update_every_ms: options.update_every * 1000,
+                        data_points: 0,
+                        url: ((urlOptions.server !== null) ? urlOptions.server : document.location.origin.toString() + document.location.search.toString()).toString(),
+                        comments: document.getElementById('saveSnapshotComments').value.toString(),
+                        hash: urlOptions.hash,
+                        charts: options.data,
+                        info: jsonStringifyFn({
+                            menu: netdataDashboard.menu,
+                            submenu: netdataDashboard.submenu,
+                            context: netdataDashboard.context
+                        }),
+                        charts_ok: 0,
+                        charts_failed: 0,
+                        compression: 'lzstring.utf16',
+                        data_size: 0,
+                        data: {}
+                    };
 
-                        state.updateChart(function(status, reason) {
-                            state.current.force_after_ms = null;
-                            state.current.force_before_ms = null;
+                    var compress_length_multiplier = 1;
+                    var compress;
+                    switch (saveData.compression) {
+                        case 'pako.deflate.base64':
+                            compress = function(s) {
+                                return btoa(pako.deflate(s, { to: 'string' }));
+                            };
+                            compress_length_multiplier = 1;
+                            break;
 
-                            if(status === true) {
-                                charts_ok++;
-                                // state.log('ok');
-                                size += pack_api1_v1_chart_data(state);
-                            }
-                            else {
-                                charts_failed++;
-                                state.log('failed to be updated: ' + reason);
-                            }
+                        case 'pako.deflate':
+                            compress = function(s) {
+                                return pako.deflate(s, { to: 'string' });
+                            };
+                            compress_length_multiplier = 1;
+                            break;
 
-                            saveSnapshotModalLog((charts_failed)?'danger':'info', 'Generated size ' + (Math.round(size  * 100 / 1024 / 1024) / 100).toString() + ' MB. ' + ((charts_failed)?(charts_failed.toString() + ' charts have failed to be downloaded'):'').toString());
+                        case 'lzstring.utf16':
+                            compress = LZString.compressToUTF16;
+                            compress_length_multiplier = 2;
+                            break;
 
-                            if (idx > 0) {
-                                update_chart(idx);
-                            }
-                            else {
-                                saveData.charts_ok = charts_ok;
-                                saveData.charts_failed = charts_failed;
+                        case 'lzstring.base64':
+                            compress = LZString.compressToBase64;
+                            compress_length_multiplier = 1;
+                            break;
 
-                                // save it
-                                // console.log(saveData);
-                                saveObjectToClient(saveData, filename);
+                        default:
+                            alert('unknown compression method: ' + saveData.compression);
+                            saveData.compression = 'none';
+                            // no break here, let it continue
 
-                                if(charts_failed > 0)
-                                    alert(charts_failed.toString() + ' failed to be downloaded');
+                        case 'none':
+                            compress = function (data) {
+                                return data;
+                            };
+                            compress_length_multiplier = 1;
+                            break;
+                    }
 
+                    function pack_api1_v1_chart_data(state) {
+                        if (state.library_name === null || state.data === null)
+                            return;
+
+                        var data = state.data;
+                        state.data = null;
+                        data.state = null;
+                        str = JSON.stringify(data);
+
+                        if (typeof str === 'string') {
+                            var cstr = compress(str);
+                            saveData.data[state.chartDataUniqueID()] = cstr;
+                            return cstr.length * compress_length_multiplier;
+                        }
+                        else
+                            return 0;
+                    }
+
+                    var clearPanAndZoom = false;
+                    if (NETDATA.globalPanAndZoom.isActive() === false) {
+                        NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], saveData.after_ms, saveData.before_ms);
+                        clearPanAndZoom = true;
+                    }
+
+                    saveData.after_ms = NETDATA.globalPanAndZoom.force_after_ms;
+                    saveData.before_ms = NETDATA.globalPanAndZoom.force_before_ms;
+                    saveData.duration_ms = saveData.before_ms - saveData.after_ms;
+                    saveData.data_points = Math.round((saveData.before_ms - saveData.after_ms) / (saveSnapshotSelectedSecondsPerPoint * 1000));
+                    saveSnapshotModalLog('info', 'Generating snapshot with ' + saveData.data_points.toString() + ' data points per dimension...');
+
+                    var charts_count = 0;
+                    var charts_ok = 0;
+                    var charts_failed = 0;
+
+                    function saveSnapshotRestore() {
+                        $('#saveSnapshotModal').modal('hide');
+
+                        // restore the options
+                        var x;
+                        for (x in backedup_options) {
+                            if (backedup_options.hasOwnProperty(x))
+                                NETDATA.options.current[x] = backedup_options[x];
+                        }
+
+                        $(el).css('width', '0%').attr('aria-valuenow', 0);
+                        eltxt.innerText = '0%';
+
+                        if (clearPanAndZoom)
+                            NETDATA.globalPanAndZoom.clearMaster();
+
+                        NETDATA.options.force_data_points = 0;
+                        NETDATA.options.fake_chart_rendering = false;
+                        NETDATA.onresize();
+                        NETDATA.unpause();
+                    }
+
+                    NETDATA.pause(function () {
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.options.force_data_points = saveData.data_points;
+                        NETDATA.options.fake_chart_rendering = true;
+                        var size = 0;
+
+                        function update_chart(idx) {
+                            if (saveSnapshotStop === true) {
+                                saveSnapshotModalLog('info', 'Cancelled!');
                                 saveSnapshotRestore();
-                                saveData = null;
+                                return;
                             }
-                        })
-                    }, 0);
-                }
 
-                update_chart(NETDATA.options.targets.length);
+                            var state = NETDATA.options.targets[--idx];
+
+                            var pcent = (NETDATA.options.targets.length - idx) * 100 / NETDATA.options.targets.length;
+                            $(el).css('width', pcent + '%').attr('aria-valuenow', pcent);
+                            eltxt.innerText = Math.round(pcent).toString() + '%, ' + state.id;
+
+                            setTimeout(function () {
+                                charts_count++;
+                                state.isVisible(true);
+                                state.current.force_after_ms = saveData.after_ms;
+                                state.current.force_before_ms = saveData.before_ms;
+
+                                state.updateChart(function (status, reason) {
+                                    state.current.force_after_ms = null;
+                                    state.current.force_before_ms = null;
+
+                                    if (status === true) {
+                                        charts_ok++;
+                                        // state.log('ok');
+                                        size += pack_api1_v1_chart_data(state);
+                                    }
+                                    else {
+                                        charts_failed++;
+                                        state.log('failed to be updated: ' + reason);
+                                    }
+
+                                    saveSnapshotModalLog((charts_failed) ? 'danger' : 'info', 'Generated size ' + (Math.round(size * 100 / 1024 / 1024) / 100).toString() + ' MB. ' + ((charts_failed) ? (charts_failed.toString() + ' charts have failed to be downloaded') : '').toString());
+
+                                    if (idx > 0) {
+                                        update_chart(idx);
+                                    }
+                                    else {
+                                        saveData.charts_ok = charts_ok;
+                                        saveData.charts_failed = charts_failed;
+                                        saveData.data_size = size;
+
+                                        // save it
+                                        // console.log(saveData);
+                                        saveObjectToClient(saveData, filename);
+
+                                        if (charts_failed > 0)
+                                            alert(charts_failed.toString() + ' failed to be downloaded');
+
+                                        saveSnapshotRestore();
+                                        saveData = null;
+                                    }
+                                })
+                            }, 0);
+                        }
+
+                        update_chart(NETDATA.options.targets.length);
+                    });
+                });
             });
         }
 
@@ -3416,7 +3544,7 @@
             });
 
             $('#saveSnapshotModal').on('show.bs.modal', saveSnapshotModalInit);
-            $('#saveSnapshotModal').on('hide.bs.modal',  saveSnapshotCancel);
+            $('#saveSnapshotModal').on('hide.bs.modal', saveSnapshotCancel);
 
             showPageFooter();
 
@@ -3973,8 +4101,9 @@
                             <tr><th>Filename</th><td id="loadSnapshotFilename"></td></tr>
                             <tr><th>Hostname</th><td id="loadSnapshotHostname"></td></tr>
                             <tr><th>Origin URL</th><td id="loadSnapshotURL"></td></tr>
+                            <tr><th>Charts Info</th><td id="loadSnapshotCharts"></td></tr>
+                            <tr><th>Snapshot Info</th><td id="loadSnapshotInfo"></td></tr>
                             <tr><th>Time Range</th><td id="loadSnapshotTimeRange"></td></tr>
-                            <tr><th>Chart Data</th><td id="loadSnapshotCharts"></td></tr>
                             <tr><th>Comments</th><td id="loadSnapshotComments"></td></tr>
                         </tbody>
                         </table>
@@ -4914,6 +5043,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171112-21"></script>
+    <script type="text/javascript" src="dashboard.js?v20171114-1"></script>
 </body>
 </html>
