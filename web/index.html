@@ -2887,6 +2887,7 @@
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
                     document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
                     document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
+                    document.getElementById('loadSnapshotComments').innerHTML = ((result.comments)?result.comments:'').toString();
                     loadSnapshotModalLog('success', 'File loaded, click <b>Import</b> to render it!');
                     $('#loadSnapshotImport').prop('disabled', false);
                     $('#loadSnapshotImport').removeAttr('disabled');
@@ -2936,7 +2937,10 @@
                     start_ms = NETDATA.globalPanAndZoom.force_after_ms;
                 }
 
-                document.getElementById('saveSnapshotFilename').value = 'netdata-dashboard-' + options.hostname.toString() + '-' + start_ms.toString() + '.json'
+                var start_date = new Date(start_ms);
+                var yyyymmddhhssmm = start_date.getFullYear() + NETDATA.zeropad(start_date.getMonth() + 1) + NETDATA.zeropad(start_date.getDate()) + NETDATA.zeropad(start_date.getHours()) + NETDATA.zeropad(start_date.getMinutes()) + NETDATA.zeropad(start_date.getSeconds());
+
+                document.getElementById('saveSnapshotFilename').value = 'netdata-' + options.hostname.toString() + '-' + yyyymmddhhssmm.toString() + '-' +  view_duration.toString() + '.snapshot'
 
                 var min = options.update_every;
                 var max = Math.round(view_duration / 100);
@@ -3037,6 +3041,7 @@
                 update_every_ms: options.update_every * 1000,
                 data_points: 0,
                 url: document.location.origin.toString() + document.location.search.toString(),
+                comments: document.getElementById('saveSnapshotComments').value.toString(),
                 charts: options.data,
                 data: {}
             };
@@ -3918,7 +3923,8 @@
                             <tr><th>Hostname</th><td id="loadSnapshotHostname"></td></tr>
                             <tr><th>Origin URL</th><td id="loadSnapshotURL"></td></tr>
                             <tr><th>Time Range</th><td id="loadSnapshotTimeRange"></td></tr>
-                            <tr><th>Charts</th><td id="loadSnapshotCharts"></td></tr>
+                            <tr><th>Chart Data</th><td id="loadSnapshotCharts"></td></tr>
+                            <tr><th>Comments</th><td id="loadSnapshotComments"></td></tr>
                         </tbody>
                         </table>
                     </p>
@@ -3931,7 +3937,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="saveSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="saveSnapshotModalLabel">
+    <div class="modal fade" id="saveSnapshotModal" tabindex="-1" role="dialog" aria-labelledby="saveSnapshotModalLabel" data-keyboard="false" data-backdrop="static">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
@@ -3960,6 +3966,10 @@
                         <div class="input-group">
                             <span class="input-group-addon" id="sizing-saveSnapshotFilename">Filename</span>
                             <input id="saveSnapshotFilename" class="form-control" placeholder="Filename of the generated snapshot" aria-describedby="sizing-saveSnapshotFilename"/>
+                        </div>
+                        <div class="input-group" style="padding-top: 10px;">
+                            <span class="input-group-addon" id="sizing-saveSnapshotComments">Comments</span>
+                            <input id="saveSnapshotComments" class="form-control" placeholder="Any comments about this snapshot?" aria-describedby="sizing-saveSnapshotComments"/>
                         </div>
                     </div>
 
