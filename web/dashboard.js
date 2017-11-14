@@ -4260,7 +4260,7 @@ var NETDATA = window.NETDATA || {};
 
                 if(typeof netdataSnapshotData.data[key] === 'string') {
                     ok = true;
-                    this.updateChartWithData(JSON.parse(netdataSnapshotData.data[key]));
+                    this.updateChartWithData(JSON.parse(netdataSnapshotData.uncompress(netdataSnapshotData.data[key])));
                 }
                 else {
                     ok = false;
