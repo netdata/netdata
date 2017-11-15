@@ -3032,6 +3032,12 @@
             document.getElementById('saveSnapshotStatus').innerHTML = msg;
         }
 
+        var saveSnapshotCompression = 'lzstring.utf16';
+        function saveSnapshotSetCompression(name) {
+            saveSnapshotCompression = name;
+            document.getElementById('saveSnapshotCompressionName').innerHTML = saveSnapshotCompression;
+        }
+
         var saveSnapshotSlider = null;
         var saveSnapshotSelectedSecondsPerPoint = 1;
         function saveSnapshotModalInit() {
@@ -3055,6 +3061,7 @@
                 var yyyymmddhhssmm = start_date.getFullYear() + NETDATA.zeropad(start_date.getMonth() + 1) + NETDATA.zeropad(start_date.getDate()) + '-' + NETDATA.zeropad(start_date.getHours()) + NETDATA.zeropad(start_date.getMinutes()) + NETDATA.zeropad(start_date.getSeconds());
 
                 document.getElementById('saveSnapshotFilename').value = 'netdata-' + options.hostname.toString() + '-' + yyyymmddhhssmm.toString() + '-' +  view_duration.toString() + '.snapshot'
+                saveSnapshotSetCompression(saveSnapshotCompression);
 
                 var min = options.update_every;
                 var max = Math.round(view_duration / 100);
@@ -3167,7 +3174,7 @@
                         }),
                         charts_ok: 0,
                         charts_failed: 0,
-                        compression: 'lzstring.utf16',
+                        compression: saveSnapshotCompression,
                         data_size: 0,
                         data: {}
                     };
@@ -4144,11 +4151,27 @@
                         <input id="saveSnapshotResolutionSlider" data-slider-id='saveSnapshotResolutionSlider' type="text" style="width: 80%;"/>
                         <br/>&nbsp;<br/>
                         <div class="input-group">
-                            <span class="input-group-addon" id="sizing-saveSnapshotFilename">Filename</span>
+                            <span class="input-group-addon" id="sizing-saveSnapshotFilename" style="width: 100px;">Filename</span>
                             <input id="saveSnapshotFilename" class="form-control" placeholder="Filename of the generated snapshot" aria-describedby="sizing-saveSnapshotFilename"/>
+                            <div class="input-group-btn">
+                                <div class="input-group-btn">
+                                    <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="saveSnapshotCompressionName">Compression</span> <span class="caret"></span></button>
+                                    <ul class="dropdown-menu dropdown-menu-right">
+                                        <li class="disabled"><a href="#" class="disabled">Select Compression</a></li>
+                                        <li role="separator" class="divider"></li>
+                                        <li><a href="#" onclick="saveSnapshotSetCompression('none'); return false;">No Compression</a></li>
+                                        <li role="separator" class="divider"></li>
+                                        <li><a href="#" onclick="saveSnapshotSetCompression('pako.deflate'); return false;">pako.deflate (gzip, binary)</a></li>
+                                        <li><a href="#" onclick="saveSnapshotSetCompression('pako.deflate.base64'); return false;">pako.deflate.base64 (gzip, ascii)</a></li>
+                                        <li role="separator" class="divider"></li>
+                                        <li><a href="#" onclick="saveSnapshotSetCompression('lzstring.utf16'); return false;">lzstring.utf16 (LZ, utf16)</a></li>
+                                        <li><a href="#" onclick="saveSnapshotSetCompression('lzstring.base64'); return false;">lzstring.base64 (LZ, ascii)</a></li>
+                                    </ul>
+                                </div><!-- /btn-group -->
+                            </div>
                         </div>
-                        <div class="input-group" style="padding-top: 10px;">
-                            <span class="input-group-addon" id="sizing-saveSnapshotComments">Comments</span>
+                        <div class="input-group" style="padding-top: 10px; width: 100%">
+                            <span class="input-group-addon" id="sizing-saveSnapshotComments" style="width: 100px;">Comments</span>
                             <input id="saveSnapshotComments" class="form-control" placeholder="Any comments about this snapshot?" aria-describedby="sizing-saveSnapshotComments"/>
                         </div>
                     </div>
