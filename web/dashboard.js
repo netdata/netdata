@@ -4510,6 +4510,13 @@ var NETDATA = window.NETDATA || {};
                 if(typeof callback === 'function')
                     return callback();
             }
+            else if(netdataSnapshotData !== null ) {
+                NETDATA.error(404, that.chart_url);
+                error('chart not found in snapshot');
+
+                if(typeof callback === 'function')
+                    return callback();
+            }
             else {
                 this.chart_url = "/api/v1/chart?chart=" + this.id;
 
