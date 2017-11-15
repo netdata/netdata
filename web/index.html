@@ -2871,6 +2871,117 @@
         }
 
         // --------------------------------------------------------------------
+
+        var snapshotOptions = {
+            bytes_per_chart: 2048,
+            compressionDefault: 'lzstring.utf16',
+
+            compressions: {
+                'none': {
+                    bytes_per_point_memory: 5.2,
+                    bytes_per_point_disk: 5.6,
+
+                    compress: function (s) {
+                        return s;
+                    },
+
+                    compressed_length: function (s) {
+                        return s.length;
+                    },
+
+                    uncompress: function (s) {
+                        return s;
+                    }
+                },
+
+                'pako.deflate.base64': {
+                    bytes_per_point_memory: 1.8,
+                    bytes_per_point_disk: 1.9,
+
+                    compress: function (s) {
+                        return btoa(pako.deflate(s, { to: 'string' }));
+                    },
+
+                    compressed_length: function (s) {
+                        return s.length;
+                    },
+
+                    uncompress: function (s) {
+                        return pako.inflate(atob(s), {to: 'string'});
+                    }
+                },
+
+                'pako.deflate': {
+                    bytes_per_point_memory: 1.4,
+                    bytes_per_point_disk: 3.2,
+
+                    compress: function (s) {
+                        return pako.deflate(s, { to: 'string' });
+                    },
+
+                    compressed_length: function (s) {
+                        return s.length;
+                    },
+
+                    uncompress: function (s) {
+                        return pako.inflate(s, {to: 'string'});
+                    }
+                },
+
+                'lzstring.utf16': {
+                    bytes_per_point_memory: 1.7,
+                    bytes_per_point_disk: 2.6,
+
+                    compress: function (s) {
+                        return LZString.compressToUTF16(s);
+                    },
+
+                    compressed_length: function (s) {
+                        return s.length * 2;
+                    },
+
+                    uncompress: function (s) {
+                        return LZString.decompressFromUTF16(s);
+                    }
+                },
+
+                'lzstring.base64': {
+                    bytes_per_point_memory: 2.1,
+                    bytes_per_point_disk: 2.3,
+
+                    compress: function (s) {
+                        return LZString.compressToBase64(s);
+                    },
+
+                    compressed_length: function (s) {
+                        return s.length;
+                    },
+
+                    uncompress: function (s) {
+                        return LZString.decompressFromBase64(s);
+                    }
+                },
+
+                'lzstring.uri': {
+                    bytes_per_point_memory: 2.1,
+                    bytes_per_point_disk: 2.3,
+
+                    compress: function (s) {
+                        return LZString.compressToEncodedURIComponent(s);
+                    },
+
+                    compressed_length: function (s) {
+                        return s.length;
+                    },
+
+                    uncompress: function (s) {
+                        return LZString.decompressFromEncodedURIComponent(s);
+                    }
+                }
+            }
+        };
+
+        // --------------------------------------------------------------------
         // loading snapshots
 
         function loadSnapshotModalLog(priority, msg) {
@@ -2918,41 +3029,12 @@
                     if (typeof tmpSnapshotData.compression !== 'string')
                         tmpSnapshotData.compression = 'none';
 
-                    switch (tmpSnapshotData.compression) {
-                        case 'pako.deflate.base64':
-                            tmpSnapshotData.uncompress = function(s) {
-                                return pako.inflate(atob(s), { to: 'string' });
-                            };
-                            break;
-
-                        case 'pako.deflate':
-                            tmpSnapshotData.uncompress = function(s) {
-                                return pako.inflate(s, { to: 'string' });
-                            };
-                            break;
-
-                        case 'lzstring.utf16':
-                            tmpSnapshotData.uncompress = LZString.decompressFromUTF16;
-                            break;
-
-                        case 'lzstring.base64':
-                            tmpSnapshotData.uncompress = LZString.decompressFromBase64;
-                            break;
-
-                        case 'lzstring.uri':
-                            tmpSnapshotData.uncompress = LZString.decompressFromEncodedURIComponent;
-                            break;
-
-                        case 'none':
-                            tmpSnapshotData.uncompress = function (data) {
-                                return data;
-                            };
-                            break;
-
-                        default:
-                            alert('unknown compression method: ' + tmpSnapshotData.compression);
-                            break;
+                    if (typeof snapshotOptions.compressions[tmpSnapshotData.compression] === 'undefined') {
+                        alert('unknown compression method: ' + tmpSnapshotData.compression);
+                        tmpSnapshotData.compression = 'none';
                     }
+
+                    tmpSnapshotData.uncompress = snapshotOptions.compressions[tmpSnapshotData.compression].uncompress;
 
                     netdataSnapshotData = tmpSnapshotData;
                     initializeDynamicDashboard(netdataSnapshotData.url);
@@ -3032,46 +3114,76 @@
             document.getElementById('saveSnapshotStatus').innerHTML = msg;
         }
 
-        var saveSnapshotCompression = 'lzstring.utf16';
+        function saveSnapshotModalShowExpectedSize() {
+            var points = Math.round(saveSnapshotViewDuration / saveSnapshotSelectedSecondsPerPoint);
+            var priority = 'info';
+            var msg = 'A moderate snapshot.';
+
+            var sizemb = Math.round(
+                (options.data.charts_count * snapshotOptions.bytes_per_chart
+                    + options.data.dimensions_count * points * snapshotOptions.compressions[saveSnapshotCompression].bytes_per_point_disk)
+                * 10 / 1024 / 1024) / 10;
+
+            var memmb = Math.round(
+                (options.data.charts_count * snapshotOptions.bytes_per_chart
+                    + options.data.dimensions_count * points * snapshotOptions.compressions[saveSnapshotCompression].bytes_per_point_memory)
+                * 10 / 1024 / 1024) / 10;
+
+            if(sizemb < 10) {
+                priority = 'success';
+                msg = 'A nice small snapshot!';
+            }
+            if(sizemb > 50) {
+                priority = 'warning';
+                msg = 'Will stress your browser...';
+            }
+            if(sizemb > 100) {
+                priority = 'danger';
+                msg = 'Hm... good luck...';
+            }
+
+            saveSnapshotModalLog(priority, 'The snapshot will have ' + points.toString() + ' points per dimension. Expected size on disk ' + sizemb + ' MB, on browser memory ' + memmb + ' MB.<br/>' + msg);
+        }
+
+        var saveSnapshotCompression = snapshotOptions.compressionDefault;
         function saveSnapshotSetCompression(name) {
             saveSnapshotCompression = name;
             document.getElementById('saveSnapshotCompressionName').innerHTML = saveSnapshotCompression;
+            saveSnapshotModalShowExpectedSize();
         }
 
         var saveSnapshotSlider = null;
         var saveSnapshotSelectedSecondsPerPoint = 1;
+        var saveSnapshotViewDuration = 1;
         function saveSnapshotModalInit() {
             $('#saveSnapshotModalProgressSection').hide();
             $('#saveSnapshotResolutionRadio').show();
             saveSnapshotModalLog('info', 'Select resolution and click <b>Save</b>');
 
             loadBootstrapSlider(function() {
-                var view_duration = options.duration;
-                var start_ms = Math.round(Date.now() - view_duration * 1000);
-
-                var bytes_per_chart = 2048;
-                var bytes_per_point_per_dimension = 2.6;
+                saveSnapshotViewDuration = options.duration;
+                var start_ms = Math.round(Date.now() - saveSnapshotViewDuration * 1000);
 
                 if(NETDATA.globalPanAndZoom.isActive() === true) {
-                    view_duration = Math.round((NETDATA.globalPanAndZoom.force_before_ms - NETDATA.globalPanAndZoom.force_after_ms) / 1000);
+                    saveSnapshotViewDuration = Math.round((NETDATA.globalPanAndZoom.force_before_ms - NETDATA.globalPanAndZoom.force_after_ms) / 1000);
                     start_ms = NETDATA.globalPanAndZoom.force_after_ms;
                 }
 
                 var start_date = new Date(start_ms);
                 var yyyymmddhhssmm = start_date.getFullYear() + NETDATA.zeropad(start_date.getMonth() + 1) + NETDATA.zeropad(start_date.getDate()) + '-' + NETDATA.zeropad(start_date.getHours()) + NETDATA.zeropad(start_date.getMinutes()) + NETDATA.zeropad(start_date.getSeconds());
 
-                document.getElementById('saveSnapshotFilename').value = 'netdata-' + options.hostname.toString() + '-' + yyyymmddhhssmm.toString() + '-' +  view_duration.toString() + '.snapshot'
+                document.getElementById('saveSnapshotFilename').value = 'netdata-' + options.hostname.toString() + '-' + yyyymmddhhssmm.toString() + '-' +  saveSnapshotViewDuration.toString() + '.snapshot'
                 saveSnapshotSetCompression(saveSnapshotCompression);
 
                 var min = options.update_every;
-                var max = Math.round(view_duration / 100);
+                var max = Math.round(saveSnapshotViewDuration / 100);
 
                 if(NETDATA.globalPanAndZoom.isActive() === false)
-                    max = Math.round(view_duration / 50);
+                    max = Math.round(saveSnapshotViewDuration / 50);
 
-                var view = Math.round(view_duration / Math.round($(document.getElementById('charts_div')).width() / 2));
+                var view = Math.round(saveSnapshotViewDuration / Math.round($(document.getElementById('charts_div')).width() / 2));
 
-                // console.log('view duration: ' + view_duration + ', min: ' + min + ', max: ' + max + ', view: ' + view);
+                // console.log('view duration: ' + saveSnapshotViewDuration + ', min: ' + min + ', max: ' + max + ', view: ' + view);
 
                 if(max < 10) max = 10;
                 if(max < min) max = min;
@@ -3090,28 +3202,20 @@
                     scale: (max > 100)?'logarithmic':'linear',
                     tooltip: 'always',
                     formatter: function(value) {
-                        var points = Math.round(view_duration / value);
-                        var priority = 'info';
-                        var msg = 'A moderate snapshot.';
+                        if(value < 1)
+                            value = 1;
 
-                        var sizemb = Math.round((options.data.charts_count * bytes_per_chart + options.data.dimensions_count * points * bytes_per_point_per_dimension) / 1024 / 1024);
+                        if(value < options.data.update_every)
+                            value = options.data.update_every;
 
-                        if(sizemb < 10) {
-                            priority = 'success';
-                            msg = 'A nice small snapshot!';
-                        }
-                        if(sizemb > 50) {
-                            priority = 'warning';
-                            msg = 'Will stress your browser...';
-                        }
-                        if(sizemb > 100) {
-                            priority = 'danger';
-                            msg = 'Hm... good luck...';
-                        }
-
-                        saveSnapshotModalLog(priority, 'The snapshot will have ' + points.toString() + ' points per dimension. Expected size ' + sizemb + ' MB. ' + msg);
                         saveSnapshotSelectedSecondsPerPoint = value;
-                        return value + ' seconds per point';
+                        saveSnapshotModalShowExpectedSize();
+
+                        var seconds = ' seconds ';
+                        if(value === 1)
+                            seconds = ' second ';
+
+                        return value + seconds + 'per point' + ((value === options.data.update_every)?', server default':'').toString();
                     }
                 });
             });
@@ -3179,45 +3283,13 @@
                         data: {}
                     };
 
-                    var compress_length_multiplier = 1;
-                    var compress;
-                    switch (saveData.compression) {
-                        case 'pako.deflate.base64':
-                            compress = function(s) {
-                                return btoa(pako.deflate(s, { to: 'string' }));
-                            };
-                            compress_length_multiplier = 1;
-                            break;
-
-                        case 'pako.deflate':
-                            compress = function(s) {
-                                return pako.deflate(s, { to: 'string' });
-                            };
-                            compress_length_multiplier = 1;
-                            break;
-
-                        case 'lzstring.utf16':
-                            compress = LZString.compressToUTF16;
-                            compress_length_multiplier = 2;
-                            break;
-
-                        case 'lzstring.base64':
-                            compress = LZString.compressToBase64;
-                            compress_length_multiplier = 1;
-                            break;
-
-                        default:
-                            alert('unknown compression method: ' + saveData.compression);
-                            saveData.compression = 'none';
-                            // no break here, let it continue
-
-                        case 'none':
-                            compress = function (data) {
-                                return data;
-                            };
-                            compress_length_multiplier = 1;
-                            break;
+                    if(typeof snapshotOptions.compressions[saveData.compression] === 'undefined') {
+                        alert('unknown compression method: ' + saveData.compression);
+                        saveData.compression = 'none';
                     }
+
+                    var compress = snapshotOptions.compressions[saveData.compression].compress;
+                    var compressed_length = snapshotOptions.compressions[saveData.compression].compressed_length;
 
                     function pack_api1_v1_chart_data(state) {
                         if (state.library_name === null || state.data === null)
@@ -3231,7 +3303,7 @@
                         if (typeof str === 'string') {
                             var cstr = compress(str);
                             saveData.data[state.chartDataUniqueID()] = cstr;
-                            return cstr.length * compress_length_multiplier;
+                            return compressed_length(cstr);
                         }
                         else
                             return 0;
@@ -3323,6 +3395,7 @@
                                         saveData.charts_ok = charts_ok;
                                         saveData.charts_failed = charts_failed;
                                         saveData.data_size = size;
+                                        // console.log(saveData.compression + ': ' + (size / (options.data.dimensions_count * Math.round(saveSnapshotViewDuration / saveSnapshotSelectedSecondsPerPoint))).toString());
 
                                         // save it
                                         // console.log(saveData);
@@ -4094,13 +4167,13 @@
                     </p>
                     <p>
                         <label class="btn btn-default">
-                            Select a netdata saved JSON file to load
+                            Click here to select a netdata snapshot file
                             <input type="file" id="loadSnapshotSelectFiles" value="Import" style="display: none;"
                                    onchange="loadSnapshotPreflight();">
                         </label>
                     </p>
                     <div id="loadSnapshotStatus" class="alert alert-info" role="alert">
-                        Click the button above to select the file to load, then click <b>Import</b> to render it.
+                        Open a snapshot file, then click <b>Import</b> to render it.
                     </div>
                     <p>
                         <table class="table">
@@ -4129,7 +4202,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="saveSnapshotModalLabel">Export a dashboard snapshot</h4>
+                    <h4 class="modal-title" id="saveSnapshotModalLabel">Export a snapshot</h4>
                 </div>
                 <div class="modal-body">
                     <div id="saveSnapshotModalProgressSection" hidden>
@@ -4159,11 +4232,12 @@
                                     <ul class="dropdown-menu dropdown-menu-right">
                                         <li class="disabled"><a href="#" class="disabled">Select Compression</a></li>
                                         <li role="separator" class="divider"></li>
-                                        <li><a href="#" onclick="saveSnapshotSetCompression('none'); return false;">No Compression</a></li>
+                                        <li><a href="#" onclick="saveSnapshotSetCompression('none'); return false;">uncompressed</a></li>
                                         <li role="separator" class="divider"></li>
                                         <li><a href="#" onclick="saveSnapshotSetCompression('pako.deflate'); return false;">pako.deflate (gzip, binary)</a></li>
                                         <li><a href="#" onclick="saveSnapshotSetCompression('pako.deflate.base64'); return false;">pako.deflate.base64 (gzip, ascii)</a></li>
                                         <li role="separator" class="divider"></li>
+                                        <li><a href="#" onclick="saveSnapshotSetCompression('lzstring.uri'); return false;">lzstring.uri (LZ, ascii)</a></li>
                                         <li><a href="#" onclick="saveSnapshotSetCompression('lzstring.utf16'); return false;">lzstring.utf16 (LZ, utf16)</a></li>
                                         <li><a href="#" onclick="saveSnapshotSetCompression('lzstring.base64'); return false;">lzstring.base64 (LZ, ascii)</a></li>
                                     </ul>
@@ -4178,14 +4252,20 @@
 
                     &nbsp;
                     <div id="saveSnapshotStatus" class="alert alert-info" role="alert">
-                        Select resolution for saving the snapshot.
+                        Select snaphost resolution. This controls the size the snapshot file.
                     </div>
                     <p>
-                    The generated snapshot will include all charts of this dashboard, <b>for the visible timeframe</b>, so align, pan and zoom the charts as needed.
-                    The snapshot will be downloaded on your computer, as a JSON file, that can be loaded back into any netdata dashboard (no need to load it on this one).
+                        The generated snapshot will include all charts of this dashboard, <b>for the visible timeframe</b>, so align, pan and zoom the charts as needed.
+                        The scroll position of the dashboard will also be saved.
+                        The snapshot will be downloaded as a file, to your computer, that can be imported back into any netdata dashboard (no need to import it back on this server).
                     </p>
                     <p>
-                    Snapshots are handled entirely by the web browser. The netdata servers are not aware of them.
+                        <small>
+                            Snapshot files include all the information of the dashboard, including the URL of the origin server, its netdata unique ID, etc.
+                            So, if you share the snapshot file with third parties, they will be able to access the origin server, if this server is exposed on the internet.
+                            <br/>
+                            Snapshots are handled entirely by the web browser. The netdata servers are not aware of them.
+                        </small>
                     </p>
                 </div>
                 <div class="modal-footer">
