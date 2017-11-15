@@ -610,10 +610,12 @@
             },
 
             netdataPanAndZoomCallback: function(status, after, before) {
-                urlOptions.pan_and_zoom = status;
-                urlOptions.after = after;
-                urlOptions.before = before;
-                urlOptions.hashUpdate();
+                if(netdataSnapshotData === null) {
+                    urlOptions.pan_and_zoom = status;
+                    urlOptions.after = after;
+                    urlOptions.before = before;
+                    urlOptions.hashUpdate();
+                }
             }
 
         };
@@ -3624,6 +3626,10 @@
             });
 
             $('#saveSnapshotModal').on('show.bs.modal', saveSnapshotModalInit);
+            $('#saveSnapshotModal').on('shown.bs.modal', function() {
+                $('#saveSnapshotResolutionSlider').find(".slider-handle:first").attr("tabindex", 1);
+                document.getElementById('saveSnapshotComments').focus();
+            });
             $('#saveSnapshotModal').on('hide.bs.modal', saveSnapshotCancel);
 
             showPageFooter();
@@ -4225,11 +4231,11 @@
                         <br/>
                         &nbsp;
                         <br/>
-                        <input id="saveSnapshotResolutionSlider" data-slider-id='saveSnapshotResolutionSlider' type="text" style="width: 80%;"/>
+                        <input id="saveSnapshotResolutionSlider" data-slider-id='saveSnapshotResolutionSlider' type="text" style="width: 80%;"  tabindex="0"/>
                         <br/>&nbsp;<br/>
                         <div class="input-group">
                             <span class="input-group-addon" id="sizing-saveSnapshotFilename" style="width: 100px;">Filename</span>
-                            <input id="saveSnapshotFilename" class="form-control" placeholder="Filename of the generated snapshot" aria-describedby="sizing-saveSnapshotFilename"/>
+                            <input id="saveSnapshotFilename" class="form-control" placeholder="Filename of the generated snapshot" aria-describedby="sizing-saveSnapshotFilename"  tabindex="2"/>
                             <div class="input-group-btn">
                                 <div class="input-group-btn">
                                     <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span id="saveSnapshotCompressionName">Compression</span> <span class="caret"></span></button>
@@ -4250,7 +4256,7 @@
                         </div>
                         <div class="input-group" style="padding-top: 10px; width: 100%">
                             <span class="input-group-addon" id="sizing-saveSnapshotComments" style="width: 100px;">Comments</span>
-                            <input id="saveSnapshotComments" class="form-control" placeholder="Any comments about this snapshot?" aria-describedby="sizing-saveSnapshotComments"/>
+                            <input id="saveSnapshotComments" class="form-control" placeholder="Any comments about this snapshot?" aria-describedby="sizing-saveSnapshotComments" tabindex="3"/>
                         </div>
                     </div>
 
@@ -4273,8 +4279,8 @@
                     </p>
                 </div>
                 <div class="modal-footer">
-                    <a id="saveSnapshotExport" href="#" onclick="saveSnapshot(); return false;" type="button" class="btn btn-success">Export</a>
-                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                    <a id="saveSnapshotExport" href="#" onclick="saveSnapshot(); return false;" type="button" class="btn btn-success"  tabindex="4">Export</a>
+                    <button type="button" class="btn btn-default" data-dismiss="modal" tabindex="5">Cancel</button>
                 </div>
             </div>
         </div>
