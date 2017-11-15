@@ -3848,6 +3848,10 @@
                     NETDATA.unpause();
                 });
 
+            if(netdataSnapshotData !== null) {
+                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], netdataSnapshotData.after_ms, netdataSnapshotData.before_ms);
+            }
+
             // var netdataEnded = performance.now();
             // console.log('start up time: ' + (netdataEnded - netdataStarted).toString() + ' ms');
         }
