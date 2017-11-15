@@ -3077,11 +3077,11 @@
                     if(typeof result.data_size === 'undefined')
                         result.data_size = 0;
 
-                    document.getElementById('loadSnapshotFilename').innerHTML = '<b>' + files.item(0).name + '</b>';
+                    document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + files.item(0).name + '</code>';
                     document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
                     document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
-                    document.getElementById('loadSnapshotInfo').innerHTML = 'version: <b>' +  result.snapshot_version.toString() + '</b>, includes <b>' + result.charts_ok.toString() + '</b> unique chart data queries ' + ((result.charts_failed > 0)?('<b>' + result.charts_failed.toString() + '</b> failed'):'').toString() + ', compressed with <b>' + result.compression.toString() + '</b>, data size ' + (Math.round(result.data_size * 100 / 1024 / 1024) / 100).toString() + ' MB';
+                    document.getElementById('loadSnapshotInfo').innerHTML = 'version: <b>' +  result.snapshot_version.toString() + '</b>, includes <b>' + result.charts_ok.toString() + '</b> unique chart data queries ' + ((result.charts_failed > 0)?('<b>' + result.charts_failed.toString() + '</b> failed'):'').toString() + ', compressed with <code>' + result.compression.toString() + '</code>, data size ' + (Math.round(result.data_size * 100 / 1024 / 1024) / 100).toString() + ' MB';
                     document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
                     document.getElementById('loadSnapshotComments').innerHTML = ((result.comments)?result.comments:'').toString();
                     loadSnapshotModalLog('success', 'File loaded, click <b>Import</b> to render it!');
@@ -3142,7 +3142,7 @@
                 msg = 'Hm... good luck...';
             }
 
-            saveSnapshotModalLog(priority, 'The snapshot will have ' + points.toString() + ' points per dimension. Expected size on disk ' + sizemb + ' MB, on browser memory ' + memmb + ' MB.<br/>' + msg);
+            saveSnapshotModalLog(priority, 'The snapshot will have ' + points.toString() + ' points per dimension. Expected size on disk ' + sizemb + ' MB, at browser memory ' + memmb + ' MB.<br/>' + msg);
         }
 
         var saveSnapshotCompression = snapshotOptions.compressionDefault;
@@ -4161,13 +4161,13 @@
                 </div>
                 <div class="modal-body">
                     <p>
-                        netdata can save and load snapshots of netdata dashboards.<br/>
-                        Any netdata dashboard can import a saved snapshot of the dashboard of any other netdata.<br/>
-                        The snapshot data are not uploaded to a server. The snapshot is only loaded to your web browser.
+                        netdata can export and import dashboard snapshots.
+                        Any netdata can import the snapshot of any other netdata.
+                        The snapshots are not uploaded to a server. They are handled entirely by your web browser, on your computer.
                     </p>
-                    <p>
+                    <p style="text-align: center;">
                         <label class="btn btn-default">
-                            Click here to select a netdata snapshot file
+                            Click here to select the netdata snapshot file to import
                             <input type="file" id="loadSnapshotSelectFiles" value="Import" style="display: none;"
                                    onchange="loadSnapshotPreflight();">
                         </label>
@@ -5146,6 +5146,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171114-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20171115-1"></script>
 </body>
 </html>
