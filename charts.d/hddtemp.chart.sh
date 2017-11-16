@@ -43,7 +43,7 @@ hddtemp_create() {
 	return 0
 }
 
-# _update is called continiously, to collect the values
+# _update is called continuously, to collect the values
 hddtemp_last=0
 hddtemp_count=0
 hddtemp_update() {
@@ -56,7 +56,7 @@ hddtemp_update() {
 	IFS=$OLD_IFS
 
 	# check if there is some data
-	if [ -z "${all[3]}" ]; then 
+	if [ -z "${all[3]}" ]; then
 		return 1
 	fi
 

@@ -114,7 +114,7 @@ apache_get() {
 
 	apache_accesses="${apache_response[${apache_key_accesses}]}"
 	apache_kbytes="${apache_response[${apache_key_kbytes}]}"
-	
+
 	float2int "${apache_response[${apache_key_reqpersec}]}" ${apache_decimal_detail}
 	apache_reqpersec=${FLOAT2INT_RESULT}
 
@@ -201,7 +201,7 @@ EOF2
 	return 0
 }
 
-# _update is called continiously, to collect the values
+# _update is called continuously, to collect the values
 apache_update() {
 	local reqs net
 	# the first argument to this function is the microseconds since last update
