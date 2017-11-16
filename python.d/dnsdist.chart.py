@@ -5,7 +5,7 @@ from bases.FrameworkServices.UrlService import UrlService
 ORDER = ['latency', 'cache', 'acl', 'noncompliant', 'queries', 'health']
 CHARTS = {
 	'latency': {
-		'options': [None, 'latency stats', 'percent', 'latency', 'dnsdist.latency', 'area'],
+		'options': [None, 'response latency', 'value', 'latency', 'dnsdist.latency', 'area'],
 		'lines': [
 			['latency-slow', '> 1sec', 'incremental'],
 			['latency100-1000', '100-1000ms', 'incremental'],
@@ -15,36 +15,36 @@ CHARTS = {
 			['latency0-1', '< 1ms', 'incremental']
 	]},
 	'cache': {
-		'options': [None, 'cache stats', 'value', 'cache', 'dnsdist.cache', 'area'],
+		'options': [None, 'cache performance', 'value', 'cache', 'dnsdist.cache', 'area'],
 		'lines': [
 			['cache-hits', 'hits', 'incremental'],
 			['cache-misses', 'misses', 'incremental']
 	]},
 	'acl': {
-		'options': [None, 'AccessControlList stats', 'value', 'acl', 'dnsdist.acl', 'area'],
+		'options': [None, 'access-control-list events', 'value', 'acl', 'dnsdist.acl', 'area'],
 		'lines': [
-			['acl-drops', None, 'incremental'],
-			['rule-drop', None, 'incremental'],
-			['rule-nxdomain', None, 'incremental'],
-			['rule-refused', None, 'incremental']
+			['acl-drops', 'drop by acl', 'incremental'],
+			['rule-drop', 'drop by rule', 'incremental'],
+			['rule-nxdomain', 'nxdomain by rule', 'incremental'],
+			['rule-refused', 'refused by rule', 'incremental']
 	]},
 	'noncompliant': {
-		'options': [None, 'Noncompliant data', 'value', 'noncompliant', 'dnsdist.noncompliant', 'area'],
+		'options': [None, 'noncompliant data', 'value', 'noncompliant', 'dnsdist.noncompliant', 'area'],
 		'lines': [
-			['empty-queries', None, 'incremental'],
-		    ['no-policy', None, 'incremental'],
-			['noncompliant-queries', None, 'incremental'],
-			['noncompliant-responses', None, 'incremental']
+			['empty-queries', 'empty queries', 'incremental'],
+		    ['no-policy', 'no policy', 'incremental'],
+			['noncompliant-queries', 'noncompliant queries', 'incremental'],
+			['noncompliant-responses', 'noncompliant responses', 'incremental']
 	]},
 	'queries': {
-		'options': [None, 'Relative query stats', 'value', 'queries', 'dnsdist.queries', 'area'],
+		'options': [None, 'queries', 'value', 'queries', 'dnsdist.queries', 'area'],
 		'lines': [
-			['queries', None, 'incremental'],
-			['rdqueries', None, 'incremental'],
-			['responses', None, 'incremental']
+			['queries', 'queries', 'incremental'],
+			['rdqueries', 'recursive queries', 'incremental'],
+			['responses', 'responses', 'incremental']
 	]},
 	'health': {
-		'options': [None, 'Health', 'value', 'health', 'dnsdist.health', 'area'],
+		'options': [None, 'health', 'value', 'health', 'dnsdist.health', 'area'],
 		'lines': [
 			['downstream-send-errors', 'ds send errors', 'incremental'],
 			['downstream-timeouts', 'ds timeouts', 'incremental'],
@@ -63,6 +63,6 @@ class Service(UrlService):
 		data = self._get_raw_data()
 		if not data:
 			return None
-		
+
 		return loads(data)
-		
+
