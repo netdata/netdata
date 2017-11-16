@@ -45,6 +45,8 @@
  *                                                  (default: null) */
 /*global netdataServer               *//* string,   the URL of the netdata server to use
  *                                                  (default: the URL the page is hosted at) */
+/*global netdataSnapshotData         *//* object,   a netdata snapshot loaded
+ *                                                  (default: null) */
 
 // ----------------------------------------------------------------------------
 // global namespace
@@ -5324,7 +5326,7 @@ var NETDATA = window.NETDATA || {};
         };
 
         if(!NETDATA.chartLibraries.dygraph.isSparkline(state)) {
-            options.ylabel = (state.dimensions_visibility.unselected_count !== 0)?"":state.units_current;
+            options.ylabel = state.units_current; // (state.units_desired === 'auto')?"":state.units_current;
         }
 
         if(state.tmp.dygraph_force_zoom === true) {
@@ -5433,7 +5435,7 @@ var NETDATA = window.NETDATA || {};
             xRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-xrangepad', 0),
             yRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-yrangepad', 1),
             valueRange:             NETDATA.dataAttribute(state.element, 'dygraph-valuerange', [ null, null ]),
-            ylabel:                 state.units_current,
+            ylabel:                 state.units_current, // (state.units_desired === 'auto')?"":state.units_current,
             yLabelWidth:            NETDATA.dataAttribute(state.element, 'dygraph-ylabelwidth', 12),
 
                                     // the function to plot the chart
@@ -5508,7 +5510,29 @@ var NETDATA = window.NETDATA || {};
                             this.axes_[0].extremeRange[1]
                         );
 
-                        return state.legendFormatValue(y);
+                        var old_units = this.user_attrs_.ylabel;
+                        var v = state.legendFormatValue(y);
+                        var new_units = state.units_current;
+
+                        if(new_units !== old_units) {
+                            // console.log(this);
+                            // state.log('units discrepancy: old = ' + old_units + ', new = ' + new_units);
+                            var len = this.plugins_.length;
+                            while(len--) {
+                                // console.log(this.plugins_[len]);
+                                if(typeof this.plugins_[len].plugin.ylabel_div_ !== 'undefined') {
+                                    this.plugins_[len].plugin.ylabel_div_.children[0].children[0].innerHTML = new_units;
+                                    this.user_attrs_.ylabel = new_units;
+                                    break;
+                                }
+                            }
+
+                            if(len < 0)
+                                state.log('units discrepancy, but cannot find dygraphs div to change: old = ' + old_units + ', new = ' + new_units);
+
+                        }
+
+                        return v;
                     }
                 }
             },
