@@ -72,7 +72,7 @@ phpfpm_get() {
 	else
 	  	phpfpm_slow_requests="-1"
 	fi
-	
+
 	if [[ -z "${phpfpm_pool}" \
 		|| -z "${phpfpm_start_time}" \
 		|| -z "${phpfpm_start_since}" \
@@ -99,7 +99,7 @@ phpfpm_check() {
 	if [ ${#phpfpm_urls[@]} -eq 0 ]; then
 		phpfpm_urls[local]="http://localhost/status"
 	fi
-	
+
 	local m
 	for m in "${!phpfpm_urls[@]}"
 	do
@@ -110,12 +110,12 @@ phpfpm_check() {
 			continue
 		fi
 	done
-	
+
 	if [ ${#phpfpm_urls[@]} -eq 0 ]; then
 		error "no phpfpm servers found. Please set phpfpm_urls[name]='url' to whatever needed to get status to the phpfpm server, in $confd/phpfpm.conf"
 		return 1
 	fi
-	
+
 	# this should return:
 	#  - 0 to enable the chart
 	#  - 1 to disable the chart
@@ -145,11 +145,11 @@ EOF
 			echo "DIMENSION slow 'slow requests' absolute 1 1"
 		fi
 	done
-	
+
 	return 0
 }
 
-# _update is called continiously, to collect the values
+# _update is called continuously, to collect the values
 phpfpm_update() {
 	# the first argument to this function is the microseconds since last update
 	# pass this parameter to the BEGIN statement (see bellow).
@@ -165,7 +165,7 @@ phpfpm_update() {
 		if [ $? -ne 0 ]; then
 			continue
 		fi
-	
+
 		# write the result of the work.
 		cat <<EOF
 BEGIN phpfpm_$m.connections $1
@@ -185,7 +185,7 @@ EOF
 		fi
 		echo "END"
 	done
-	
+
 	return 0
 }
 
