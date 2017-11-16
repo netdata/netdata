@@ -5514,13 +5514,19 @@ var NETDATA = window.NETDATA || {};
                         var v = state.legendFormatValue(y);
                         var new_units = state.units_current;
 
-                        if(new_units !== old_units) {
+                        if(state.units_desired === 'auto' && typeof old_units !== 'undefined' && new_units !== old_units && !NETDATA.chartLibraries.dygraph.isSparkline(state)) {
                             // console.log(this);
                             // state.log('units discrepancy: old = ' + old_units + ', new = ' + new_units);
                             var len = this.plugins_.length;
                             while(len--) {
                                 // console.log(this.plugins_[len]);
-                                if(typeof this.plugins_[len].plugin.ylabel_div_ !== 'undefined') {
+                                if(typeof this.plugins_[len].plugin.ylabel_div_ !== 'undefined'
+                                    && this.plugins_[len].plugin.ylabel_div_ !== null
+                                    && typeof this.plugins_[len].plugin.ylabel_div_.children !== 'undefined'
+                                    && this.plugins_[len].plugin.ylabel_div_.children !== null
+                                    && typeof this.plugins_[len].plugin.ylabel_div_.children[0].children !== 'undefined'
+                                    && this.plugins_[len].plugin.ylabel_div_.children[0].children !== null
+                                ) {
                                     this.plugins_[len].plugin.ylabel_div_.children[0].children[0].innerHTML = new_units;
                                     this.user_attrs_.ylabel = new_units;
                                     break;
@@ -5529,7 +5535,6 @@ var NETDATA = window.NETDATA || {};
 
                             if(len < 0)
                                 state.log('units discrepancy, but cannot find dygraphs div to change: old = ' + old_units + ', new = ' + new_units);
-
                         }
 
                         return v;
