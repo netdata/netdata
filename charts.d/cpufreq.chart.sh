@@ -72,7 +72,7 @@ cpufreq_create() {
 	return 0
 }
 
-# _update is called continiously, to collect the values
+# _update is called continuously, to collect the values
 cpufreq_update() {
 	# the first argument to this function is the microseconds since last update
 	# pass this parameter to the BEGIN statement (see bellow).

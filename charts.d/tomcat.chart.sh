@@ -46,7 +46,7 @@ tomcat_check() {
 	fi
 	if [ -z "${tomcat_user}" ]; then
 		# check backwards compatibility
-		if [ -z "${tomcatUser}" ]; then		
+		if [ -z "${tomcatUser}" ]; then
     	  	error "tomcat user is unset or set to the empty string"
 			return 1
 		else
@@ -114,7 +114,7 @@ EOF
 	return 0
 }
 
-# _update is called continiously, to collect the values
+# _update is called continuously, to collect the values
 tomcat_update() {
 	local reqs net
 	# the first argument to this function is the microseconds since last update
