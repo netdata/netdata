@@ -82,7 +82,7 @@ class Service(SimpleService):
         self.echo = find_binary('echo')
         self.radclient = find_binary('radclient')
         self.sub_echo = [self.echo, RADIUS_MSG]
-        self.sub_radclient = [self.radclient, '-r', '1', '-t', '1',
+        self.sub_radclient = [self.radclient, '-r', '1', '-t', '1', '-x',
                               ':'.join([self.host, self.port]), 'status', self.secret]
 
     def check(self):
