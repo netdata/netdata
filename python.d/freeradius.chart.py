@@ -91,6 +91,7 @@ class Service(SimpleService):
             return False
         if not self.secret:
             self.error('"secret" not set')
+            return None
 
         if self._get_raw_data():
             return True
