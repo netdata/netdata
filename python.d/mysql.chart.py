@@ -428,10 +428,10 @@ CHARTS = {
             ['wsrep_replicated', 'tx', 'incremental', -1, 1],
         ]},
     'galera_bytes': {
-        'options': [None, 'Replicated bytes', 'bytes/s', 'galera', 'mysql.galera_bytes', 'line'],
+        'options': [None, 'Replicated bytes', 'KB/s', 'galera', 'mysql.galera_bytes', 'area'],
         'lines': [
-            ['wsrep_received_bytes', 'rx', 'incremental'],
-            ['wsrep_replicated_bytes', 'tx', 'incremental', -1, 1],
+            ['wsrep_received_bytes', 'rx', 'incremental', 1, 1024],
+            ['wsrep_replicated_bytes', 'tx', 'incremental', -1, 1024],
         ]},
     'galera_queue': {
         'options': [None, 'Galera queue', 'writesets', 'galera', 'mysql.galera_queue', 'line'],
