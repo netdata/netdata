@@ -4893,9 +4893,9 @@ var NETDATA = window.NETDATA || {};
             }
 
             if(NETDATA.scrollUp === true)
-                parallel.unshift(state);
-            else
                 parallel.push(state);
+            else
+                parallel.unshift(state);
         }
 
         if(parallel.length > 0) {
