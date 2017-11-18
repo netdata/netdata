@@ -3412,6 +3412,7 @@
 
                         NETDATA.options.force_data_points = 0;
                         NETDATA.options.fake_chart_rendering = false;
+                        NETDATA.onscroll_updater_enabled = true;
                         NETDATA.onresize();
                         NETDATA.unpause();
                     }
@@ -3420,6 +3421,9 @@
                         NETDATA.globalSelectionSync.stop();
                         NETDATA.options.force_data_points = saveData.data_points;
                         NETDATA.options.fake_chart_rendering = true;
+                        NETDATA.onscroll_updater_enabled = false;
+                        NETDATA.abort_all_refreshes();
+
                         var size = 0;
 
                         function update_chart(idx) {
