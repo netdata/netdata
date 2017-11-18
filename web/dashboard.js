@@ -151,6 +151,7 @@ var NETDATA = window.NETDATA || {};
             foreground: '#000000',
             grid: '#F0F0F0',
             axis: '#F0F0F0',
+            highlight: '#F5F5F5',
             colors: [   '#3366CC', '#DC3912',   '#109618', '#FF9900',   '#990099', '#DD4477',
                         '#3B3EAC', '#66AA00',   '#0099C6', '#B82E2E',   '#AAAA11', '#5574A6',
                         '#994499', '#22AA99',   '#6633CC', '#E67300',   '#316395', '#8B0707',
@@ -168,6 +169,7 @@ var NETDATA = window.NETDATA || {};
             foreground: '#C8C8C8',
             grid: '#283236',
             axis: '#283236',
+            highlight: '#383838',
 /*          colors: [   '#55bb33', '#ff2222',   '#0099C6', '#faa11b',   '#adbce0', '#DDDD00',
                         '#4178ba', '#f58122',   '#a5cc39', '#f58667',   '#f5ef89', '#cf93c0',
                         '#a5d18a', '#b8539d',   '#3954a3', '#c8a9cf',   '#c7de8a', '#fad20a',
@@ -303,6 +305,10 @@ var NETDATA = window.NETDATA || {};
 
         force_data_points: 0,           // force the number of points to be returned for charts
         fake_chart_rendering: false,    // when set to true, the dashboard will download data but will not render the charts
+
+        highlightCallback: null,        // what to call when a highlighted range is setup
+        highlight_after: null,          // highlight after this time
+        highlight_before: null,         // highlight before this time
 
         // the current profile
         // we may have many...
@@ -5626,6 +5632,29 @@ var NETDATA = window.NETDATA || {};
                 state.unpauseChart();
                 NETDATA.globalSelectionSync.stop();
             },
+            underlayCallback: function(canvas, area, g) {
+                if(NETDATA.options.highlight_after !== null && NETDATA.options.highlight_before !== null) {
+                    var after = NETDATA.options.highlight_after;
+                    var before = NETDATA.options.highlight_before;
+
+                    if(after < state.view_after)
+                        after = state.view_after;
+
+                    if(before > state.view_before)
+                        before = state.view_before;
+
+                    if(after < before) {
+                        var bottom_left = g.toDomCoords(after, -20);
+                        var top_right = g.toDomCoords(before, +20);
+
+                        var left = bottom_left[0];
+                        var right = top_right[0];
+
+                        canvas.fillStyle = NETDATA.themes.current.highlight;
+                        canvas.fillRect(left, area.y, right - left, area.h);
+                    }
+                }
+            },
             interactionModel : {
                 mousedown: function(event, dygraph, context) {
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
@@ -5646,26 +5675,52 @@ var NETDATA = window.NETDATA || {};
                     context.initializeMouseDown(event, dygraph, context);
 
                     if(event.button && event.button === 1) {
-                        if (event.altKey || event.shiftKey) {
+                        if (event.shiftKey) {
+                            // middle mouse button dragging (PAN)
                             state.setMode('pan');
                             // NETDATA.globalSelectionSync.delay();
+                            state.tmp.dygraph_highlight_after = undefined;
                             Dygraph.startPan(event, dygraph, context);
                         }
+                        else if(event.altKey) {
+                            // middle mouse button highlight
+                            if (!(event.offsetX && event.offsetY)) {
+                                event.offsetX = event.layerX - event.target.offsetLeft;
+                                event.offsetY = event.layerY - event.target.offsetTop;
+                            }
+                            state.tmp.dygraph_highlight_after = dygraph.toDataXCoord(event.offsetX);
+                            Dygraph.startZoom(event, dygraph, context);
+                        }
                         else {
+                            // middle mouse button selection for zoom (ZOOM)
                             state.setMode('zoom');
                             // NETDATA.globalSelectionSync.delay();
+                            state.tmp.dygraph_highlight_after = undefined;
                             Dygraph.startZoom(event, dygraph, context);
                         }
                     }
                     else {
-                        if (event.altKey || event.shiftKey) {
+                        if (event.shiftKey) {
+                            // left mouse button selection for zoom (ZOOM)
                             state.setMode('zoom');
                             // NETDATA.globalSelectionSync.delay();
+                            state.tmp.dygraph_highlight_after = undefined;
+                            Dygraph.startZoom(event, dygraph, context);
+                        }
+                        else if(event.altKey) {
+                            // left mouse button highlight
+                            if (!(event.offsetX && event.offsetY)) {
+                                event.offsetX = event.layerX - event.target.offsetLeft;
+                                event.offsetY = event.layerY - event.target.offsetTop;
+                            }
+                            state.tmp.dygraph_highlight_after = dygraph.toDataXCoord(event.offsetX);
                             Dygraph.startZoom(event, dygraph, context);
                         }
                         else {
+                            // left mouse button dragging (PAN)
                             state.setMode('pan');
                             // NETDATA.globalSelectionSync.delay();
+                            state.tmp.dygraph_highlight_after = undefined;
                             Dygraph.startPan(event, dygraph, context);
                         }
                     }
@@ -5674,7 +5729,12 @@ var NETDATA = window.NETDATA || {};
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.mousemove()');
 
-                    if(context.isPanning) {
+                    if(typeof state.tmp.dygraph_highlight_after !== 'undefined') {
+                        state.tmp.dygraph_user_action = true;
+                        Dygraph.moveZoom(event, dygraph, context);
+                        event.preventDefault();
+                    }
+                    else if(context.isPanning) {
                         state.tmp.dygraph_user_action = true;
                         //NETDATA.globalSelectionSync.stop();
                         //NETDATA.globalSelectionSync.delay();
@@ -5696,7 +5756,24 @@ var NETDATA = window.NETDATA || {};
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.mouseup()');
 
-                    if (context.isPanning) {
+                    if(typeof state.tmp.dygraph_highlight_after !== 'undefined') {
+                        if (!(event.offsetX && event.offsetY)){
+                            event.offsetX = event.layerX - event.target.offsetLeft;
+                            event.offsetY = event.layerY - event.target.offsetTop;
+                        }
+
+                        context.isZooming = false;
+                        NETDATA.options.highlight_after = state.tmp.dygraph_highlight_after;
+                        NETDATA.options.highlight_before = dygraph.toDataXCoord(event.offsetX);
+                        state.tmp.dygraph_highlight_after = undefined;
+                        dygraph.clearZoomRect_();
+                        dygraph.drawGraph_(false);
+                        NETDATA.globalPanAndZoom.setMaster(state, state.view_after, state.view_before);
+
+                        if(typeof NETDATA.options.highlightCallback === 'function')
+                            NETDATA.options.highlightCallback(true, NETDATA.options.highlight_after, NETDATA.options.highlight_before);
+                    }
+                    else if (context.isPanning) {
                         state.tmp.dygraph_user_action = true;
                         //NETDATA.globalSelectionSync.delay();
                         Dygraph.endPan(event, dygraph, context);
