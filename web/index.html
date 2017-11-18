@@ -659,6 +659,12 @@
             },
 
             netdataHighlightCallback: function(status, after, before) {
+                if(status === true && (after === null || before === null || after <= 0 || before <= 0 || after < before)) {
+                    status = false;
+                    after = 0;
+                    before = 0;
+                }
+
                 if(netdataSnapshotData === null) {
                     urlOptions.highlight = status;
                     urlOptions.highlight_after = Math.round(after);
@@ -666,7 +672,7 @@
                     urlOptions.hashUpdate();
                 }
 
-                if(status === true) {
+                if(status === true && after > 0 && before > 0 && after < before) {
                     var d1 = NETDATA.dateTime.localeDateString(after);
                     var d2 = NETDATA.dateTime.localeDateString(before);
                     if(d1 === d2) d2 = '';
@@ -3110,7 +3116,13 @@
                     tmpSnapshotData.uncompress = snapshotOptions.compressions[tmpSnapshotData.compression].uncompress;
                     netdataSnapshotData = tmpSnapshotData;
 
-                    if( typeof tmpSnapshotData.highlight_after_ms !== 'undefined' && tmpSnapshotData.highlight_after_ms !== null && typeof tmpSnapshotData.highlight_before_ms !== 'undefined' && tmpSnapshotData.highlight_before_ms !== null) {
+                    if( typeof tmpSnapshotData.highlight_after_ms !== 'undefined'
+                        && tmpSnapshotData.highlight_after_ms !== null
+                        && tmpSnapshotData.highlight_after_ms > 0
+                        && typeof tmpSnapshotData.highlight_before_ms !== 'undefined'
+                        && tmpSnapshotData.highlight_before_ms !== null
+                        && tmpSnapshotData.highlight_before_ms > 0
+                    ) {
                         NETDATA.options.highlight_after = tmpSnapshotData.highlight_after_ms;
                         NETDATA.options.highlight_before = tmpSnapshotData.highlight_before_ms;
                         urlOptions.netdataHighlightCallback(true, tmpSnapshotData.highlight_after_ms, tmpSnapshotData.highlight_before_ms);
