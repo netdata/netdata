@@ -895,8 +895,8 @@
                         icon = "window-restore";
                     }
 
-                    el += '<li id="registry_server_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '" onClick="return gotoHostedModalHandler(\'' + url + '\');">' + hostname + '</a></li>';
-                    a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fa fa-' + icon + '" aria-hidden="true" style="color: #999;"></i></a></li>';
+                    el += '<li id="registry_server_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');">' + hostname + '</a></li>';
+                    a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fa fa-' + icon + '" aria-hidden="true" style="color: #999;"></i></a></li>';
                     hosted++;
                     i++;
                 }
@@ -925,7 +925,7 @@
                 while(len--) {
                     var u = machines[i++];
                     found++;
-                    el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="' + u.url + '" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
+                    el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="' + u.url + '#" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
                     a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
                 }
             }
@@ -3928,6 +3928,11 @@
 
             $('#myNetdataDropdownParent')
                 .on('show.bs.dropdown', function () {
+                    var hash = urlOptions.genHash();
+                    $('.registry_link').each(function(idx) {
+                       this.setAttribute('href', this.getAttribute("href").replace(/#.*$/, hash));
+                    });
+
                     NETDATA.pause(function() {});
                 })
                 .on('shown.bs.dropdown', function () {
