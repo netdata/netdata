@@ -3083,6 +3083,17 @@
                     else
                         urlOptions.hash = '#';
 
+                    if( typeof tmpSnapshotData.highlight_after_ms !== 'undefined' && tmpSnapshotData.highlight_after_ms !== null && typeof tmpSnapshotData.highlight_before_ms !== 'undefined' && tmpSnapshotData.highlight_before_ms !== null) {
+                        urlOptions.highlight = true;
+                        urlOptions.highlight_after = tmpSnapshotData.highlight_after_ms;
+                        urlOptions.highlight_before = tmpSnapshotData.highlight_before_ms;
+                    }
+                    else {
+                        urlOptions.highlight = false;
+                        urlOptions.highlight_after = 0;
+                        urlOptions.highlight_before = 0;
+                    }
+
                     if (typeof tmpSnapshotData.info !== 'undefined') {
                         var info = jsonParseFn(tmpSnapshotData.info);
                         if (typeof info.menu !== 'undefined')
@@ -3333,6 +3344,8 @@
                         snapshot_version: 1,
                         after_ms: Date.now() - options.duration * 1000,
                         before_ms: Date.now(),
+                        highlight_after_ms: urlOptions.highlight_after,
+                        highlight_before_ms: urlOptions.highlight_before,
                         duration_ms: options.duration * 1000,
                         update_every_ms: options.update_every * 1000,
                         data_points: 0,
