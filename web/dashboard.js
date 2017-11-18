@@ -608,45 +608,49 @@ var NETDATA = window.NETDATA || {};
             NETDATA.onresizeCallback();
     };
 
+    NETDATA.abort_all_refreshes = function() {
+        var targets = NETDATA.options.targets;
+        var len = targets.length;
+
+        while (len--) {
+            if (targets[len].fetching_data === true) {
+                if (typeof targets[len].xhr !== 'undefined') {
+                    targets[len].xhr.abort();
+                    targets[len].running = false;
+                    targets[len].fetching_data = false;
+                }
+            }
+        }
+    };
+
     NETDATA.onscroll_updater_timeout_id = 0;
     NETDATA.onscroll_updater_count = 0;
     NETDATA.onscroll_updater_max_duration = 0;
     NETDATA.onscroll_updater_above_threshold_count = 0;
+    NETDATA.onscroll_updater_enabled = true;
     NETDATA.onscroll_updater = function() {
+        if(NETDATA.onscroll_updater_enabled === false)
+            return;
+
         NETDATA.globalSelectionSync.stop();
 
         NETDATA.onscroll_updater_count++;
         var start = Date.now();
 
-        var targets = NETDATA.options.targets;
-        var len = targets.length;
 
         // when the user scrolls he sees that we have
         // hidden all the not-visible charts
         // using this little function we try to switch
         // the charts back to visible quickly
 
+        if(NETDATA.options.abort_ajax_on_scroll === true)
+            NETDATA.abort_all_refreshes();
 
-        if(NETDATA.options.abort_ajax_on_scroll === true) {
-            // we have to cancel pending requests too
-
-            while (len--) {
-                if (targets[len].fetching_data === true) {
-                    if (typeof targets[len].xhr !== 'undefined') {
-                        targets[len].xhr.abort();
-                        targets[len].running = false;
-                        targets[len].fetching_data = false;
-                    }
-                    targets[len].isVisible();
-                }
-            }
-        }
-        else {
-            // just find which charts are visible
-
-            while (len--)
-                targets[len].isVisible();
-        }
+        // find which charts are visible
+        var targets = NETDATA.options.targets;
+        var len = targets.length;
+        while (len--)
+            targets[len].isVisible();
 
         var end = Date.now();
         // console.log('scroll No ' + NETDATA.onscroll_updater_count + ' calculation took ' + (end - start).toString() + ' ms');
