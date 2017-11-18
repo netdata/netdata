@@ -3657,6 +3657,15 @@
                     if(self.prop('checked') !== (NETDATA.getOption('units') === 'auto')) {
                         self.bootstrapToggle(NETDATA.getOption('units') === 'auto' ? 'on' : 'off');
                     }
+
+                    if(self.prop('checked') === true) {
+                        $('#settingsLocaleTempRow').show();
+                        $('#settingsLocaleTimeRow').show();
+                    }
+                    else {
+                        $('#settingsLocaleTempRow').hide();
+                        $('#settingsLocaleTimeRow').hide();
+                    }
                 };
                 var temp_sync_option = function(option) {
                     var self = $('#' + option);
@@ -4634,14 +4643,14 @@
                                                 </small>
                                             </td>
                                         </tr>
-                                        <tr class="option-row">
+                                        <tr id="settingsLocaleTempRow" class="option-row">
                                             <td class="option-control"><input id="units_temp" type="checkbox" checked data-toggle="toggle"  data-on="Celsius" data-off="Fahrenheit" data-width="110px"></td>
                                             <td class="option-info"><strong>Which units to use for temperatures?</strong><br/>
                                                 <small>Set the temperature units of the dashboard.
                                                 </small>
                                             </td>
                                         </tr>
-                                        <tr class="option-row">
+                                        <tr id="settingsLocaleTimeRow" class="option-row">
                                             <td class="option-control"><input id="seconds_as_time" type="checkbox" checked data-toggle="toggle"  data-on="Time" data-off="Seconds" data-onstyle="success" data-width="110px"></td>
                                             <td class="option-info"><strong>Convert seconds to time?</strong><br/>
                                                 <small>When set to <b>Time</b>, charts that present <code>seconds</code> will show <code>DDd:HH:MM:SS</code>.
@@ -5156,6 +5165,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171115-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20171117-1"></script>
 </body>
 </html>
