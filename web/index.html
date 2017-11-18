@@ -3720,9 +3720,11 @@
             });
 
             /* activate bootstrap scrollspy (needed for sidebar) */
-            var scrollspyOffset = $(window).height() / 5;
-            if(scrollspyOffset > 200) scrollspyOffset = 200;
-            if(scrollspyOffset < 50) scrollspyOffset = 50;
+            var scrollspyOffset = $(window).height() / 3;
+            if(scrollspyOffset > 250) scrollspyOffset = 250;
+            if(scrollspyOffset < 75) scrollspyOffset = 75;
+            document.body.setAttribute('data-offset', scrollspyOffset);
+            // console.log(scrollspyOffset);
             $(document.body).scrollspy({
                 target: '#sidebar',
                 offset: scrollspyOffset // controls the diff of the <hX> element to the top, to select it
@@ -4093,7 +4095,7 @@
     </script>
 </head>
 
-<body data-spy="scroll" data-target="#sidebar">
+<body data-spy="scroll" data-target="#sidebar" data-offset="100">
     <div id="loadOverlay" class="loadOverlay" style="background-color: #888; color: #888;">
         netdata<br/><div style="font-size: 3vh;">Real-time performance monitoring, done right!</div>
     </div>
