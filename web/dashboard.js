@@ -728,6 +728,7 @@ var NETDATA = window.NETDATA || {};
                 });
                 window.addEventListener("test", null, opts);
             } catch (e) {
+                console.log('browser does not support passive events');
             }
 
             NETDATA.options.passive_events = supportsPassive;
@@ -4995,7 +4996,7 @@ var NETDATA = window.NETDATA || {};
 
         len = parallel.length;
         while(len--) {
-            var state = parallel[len];
+            state = parallel[len];
             // console.log('auto-refresher executing in parallel for ' + parallel.length.toString() + ' charts');
             // this will execute the jobs in parallel
             setTimeout(state.autoRefresh, 0);
