@@ -673,12 +673,14 @@
                     before = 0;
                 }
 
-                if(netdataSnapshotData === null) {
+                if(netdataSnapshotData === null)
                     urlOptions.highlight = status;
-                    urlOptions.highlight_after = Math.round(after);
-                    urlOptions.highlight_before = Math.round(before);
-                    urlOptions.hashUpdate();
-                }
+                else
+                    urlOptions.highlight = false;
+
+                urlOptions.highlight_after = Math.round(after);
+                urlOptions.highlight_before = Math.round(before);
+                urlOptions.hashUpdate();
 
                 if(status === true && after > 0 && before > 0 && after < before) {
                     var d1 = NETDATA.dateTime.localeDateString(after);
