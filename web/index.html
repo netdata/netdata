@@ -659,7 +659,7 @@
             },
 
             netdataHighlightCallback: function(status, after, before) {
-                if(status === true && (after === null || before === null || after <= 0 || before <= 0 || after < before)) {
+                if(status === true && (after === null || before === null || after <= 0 || before <= 0 || after >= before)) {
                     status = false;
                     after = 0;
                     before = 0;
