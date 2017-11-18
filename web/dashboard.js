@@ -2326,6 +2326,7 @@ var NETDATA = window.NETDATA || {};
             that.element_chart = null; // the element with the chart
             that.element_legend = null; // the element with the legend of the chart (if created by us)
             that.element_legend_childs = {
+                content: null,
                 hidden: null,
                 title_date: null,
                 title_time: null,
@@ -2499,6 +2500,16 @@ var NETDATA = window.NETDATA || {};
             if(isHidden() === true) return;
 
             if(that.chart_created === true) {
+                if(NETDATA.options.current.show_help === true) {
+                    $(that.element_legend_childs.toolbox_left).popover('hide');
+                    $(that.element_legend_childs.toolbox_reset).popover('hide');
+                    $(that.element_legend_childs.toolbox_right).popover('hide');
+                    $(that.element_legend_childs.toolbox_zoomin).popover('hide');
+                    $(that.element_legend_childs.toolbox_zoomout).popover('hide');
+                    $(that.element_legend_childs.resize_handler).popover('hide');
+                    $(that.element_legend_childs.content).popover('hide');
+                }
+
                 if(NETDATA.options.current.destroy_on_hide === true) {
                     // that.log('hideChart() init');
 
@@ -3829,6 +3840,8 @@ var NETDATA = window.NETDATA || {};
 
                 content.className = 'netdata-legend-series-content';
                 this.element_legend_childs.perfect_scroller.appendChild(content);
+
+                this.element_legend_childs.content = content;
 
                 if(NETDATA.options.current.show_help === true)
                     $(content).popover({
