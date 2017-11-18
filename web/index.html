@@ -659,16 +659,18 @@
             },
 
             netdataHighlightCallback: function(status, after, before) {
-                urlOptions.highlight = status;
-                urlOptions.highlight_after = Math.round(after);
-                urlOptions.highlight_before = Math.round(before);
-                urlOptions.hashUpdate();
+                if(netdataSnapshotData === null) {
+                    urlOptions.highlight = status;
+                    urlOptions.highlight_after = Math.round(after);
+                    urlOptions.highlight_before = Math.round(before);
+                    urlOptions.hashUpdate();
+                }
 
                 if(status === true) {
-                    var d1 = NETDATA.dateTime.localeDateString(urlOptions.highlight_after);
-                    var d2 = NETDATA.dateTime.localeDateString(urlOptions.highlight_before);
+                    var d1 = NETDATA.dateTime.localeDateString(after);
+                    var d2 = NETDATA.dateTime.localeDateString(before);
                     if(d1 === d2) d2 = '';
-                    document.getElementById('navbar-highlight-content').innerHTML = 'Highlighted timeframe <b>' + d1 + ' <code>' + NETDATA.dateTime.localeTimeString(urlOptions.highlight_after) + '</code></b> to <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(urlOptions.highlight_before) + '</code></b>, duration <b>' + NETDATA.seconds4human(Math.round((urlOptions.highlight_before - urlOptions.highlight_after) / 1000)) + '</b> <span onclick="urlOptions.clearHighlight();" style="padding-left: 10px;"><i class="fa fa-times" aria-hidden="true"></i></span>';
+                    document.getElementById('navbar-highlight-content').innerHTML = 'Highlighted timeframe <b>' + d1 + ' <code>' + NETDATA.dateTime.localeTimeString(after) + '</code></b> to <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(before) + '</code></b>, duration <b>' + NETDATA.seconds4human(Math.round((before - after) / 1000)) + '</b> <span onclick="urlOptions.clearHighlight();" style="padding-left: 10px;"><i class="fa fa-times" aria-hidden="true"></i></span>';
                     $('.navbar-highlight').show();
                 }
                 else
@@ -2642,7 +2644,7 @@
                 if(netdataSnapshotData !== null) {
                     $('#alarmsButton').hide();
                     $('#updateButton').hide();
-                    $('#loadButton').hide();
+                    // $('#loadButton').hide();
                     $('#saveButton').hide();
                     $('#printButton').hide();
                 }
@@ -3060,6 +3062,8 @@
 
         var tmpSnapshotData = null;
         function loadSnapshot() {
+            $('#loadSnapshotImport').addClass('disabled');
+
             if(tmpSnapshotData === null) {
                 loadSnapshotModalLog('danger', 'no data have been loaded');
                 return;
@@ -3083,17 +3087,6 @@
                     else
                         urlOptions.hash = '#';
 
-                    if( typeof tmpSnapshotData.highlight_after_ms !== 'undefined' && tmpSnapshotData.highlight_after_ms !== null && typeof tmpSnapshotData.highlight_before_ms !== 'undefined' && tmpSnapshotData.highlight_before_ms !== null) {
-                        urlOptions.highlight = true;
-                        urlOptions.highlight_after = tmpSnapshotData.highlight_after_ms;
-                        urlOptions.highlight_before = tmpSnapshotData.highlight_before_ms;
-                    }
-                    else {
-                        urlOptions.highlight = false;
-                        urlOptions.highlight_after = 0;
-                        urlOptions.highlight_before = 0;
-                    }
-
                     if (typeof tmpSnapshotData.info !== 'undefined') {
                         var info = jsonParseFn(tmpSnapshotData.info);
                         if (typeof info.menu !== 'undefined')
@@ -3115,10 +3108,20 @@
                     }
 
                     tmpSnapshotData.uncompress = snapshotOptions.compressions[tmpSnapshotData.compression].uncompress;
-
                     netdataSnapshotData = tmpSnapshotData;
-                    initializeDynamicDashboard(netdataSnapshotData.url);
 
+                    if( typeof tmpSnapshotData.highlight_after_ms !== 'undefined' && tmpSnapshotData.highlight_after_ms !== null && typeof tmpSnapshotData.highlight_before_ms !== 'undefined' && tmpSnapshotData.highlight_before_ms !== null) {
+                        NETDATA.options.highlight_after = tmpSnapshotData.highlight_after_ms;
+                        NETDATA.options.highlight_before = tmpSnapshotData.highlight_before_ms;
+                        urlOptions.netdataHighlightCallback(true, tmpSnapshotData.highlight_after_ms, tmpSnapshotData.highlight_before_ms);
+                    }
+                    else {
+                        NETDATA.options.highlight_after = null;
+                        NETDATA.options.highlight_before = null;
+                        urlOptions.netdataHighlightCallback(false, 0, 0);
+                    }
+
+                    initializeDynamicDashboard(netdataSnapshotData.url);
                     $('#loadSnapshotModal').modal('hide');
                 });
             });
@@ -3127,6 +3130,14 @@
         function loadSnapshotPreflight() {
             var files = document.getElementById('loadSnapshotSelectFiles').files;
             if (files.length <= 0) {
+                document.getElementById('loadSnapshotFilename').innerHTML = '';
+                document.getElementById('loadSnapshotHostname').innerHTML = '';
+                document.getElementById('loadSnapshotURL').innerHTML = '';
+                document.getElementById('loadSnapshotCharts').innerHTML = '';
+                document.getElementById('loadSnapshotInfo').innerHTML = '';
+                document.getElementById('loadSnapshotTimeRange').innerHTML = '';
+                document.getElementById('loadSnapshotComments').innerHTML = '';
+                $('#loadSnapshotImport').addClass('disabled');
                 loadSnapshotModalLog('danger', 'No file selected');
                 return;
             }
@@ -3165,8 +3176,7 @@
                     document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
                     document.getElementById('loadSnapshotComments').innerHTML = ((result.comments)?result.comments:'').toString();
                     loadSnapshotModalLog('success', 'File loaded, click <b>Import</b> to render it!');
-                    $('#loadSnapshotImport').prop('disabled', false);
-                    $('#loadSnapshotImport').removeAttr('disabled');
+                    $('#loadSnapshotImport').removeClass('disabled');
 
                     tmpSnapshotData = result;
                 }
@@ -3174,6 +3184,7 @@
                     console.log(e);
                     document.getElementById('loadSnapshotStatus').className = "alert alert-danger";
                     document.getElementById('loadSnapshotStatus').innerHTML = "Failed to parse this file!";
+                    $('#loadSnapshotImport').addClass('disabled');
                 }
             }
 
@@ -3239,6 +3250,7 @@
             $('#saveSnapshotModalProgressSection').hide();
             $('#saveSnapshotResolutionRadio').show();
             saveSnapshotModalLog('info', 'Select resolution and click <b>Save</b>');
+            $('#saveSnapshotExport').removeClass('disabled');
 
             loadBootstrapSlider(function() {
                 saveSnapshotViewDuration = options.duration;
@@ -3307,6 +3319,8 @@
                     saveSnapshotStop = false;
                     $('#saveSnapshotModalProgressSection').show();
                     $('#saveSnapshotResolutionRadio').hide();
+                    $('#saveSnapshotExport').addClass('disabled');
+
                     var filename = document.getElementById('saveSnapshotFilename').value;
                     // console.log(filename);
                     saveSnapshotModalLog('info', 'Generating snapshot as <code>' + filename.toString() + '</code>');
@@ -3428,6 +3442,8 @@
                         NETDATA.onscroll_updater_enabled = true;
                         NETDATA.onresize();
                         NETDATA.unpause();
+
+                        $('#saveSnapshotExport').removeClass('disabled');
                     }
 
                     NETDATA.pause(function () {
@@ -3438,6 +3454,7 @@
                         NETDATA.abort_all_refreshes();
 
                         var size = 0;
+                        var info = ' Resolution: <b>' + saveSnapshotSelectedSecondsPerPoint.toString() + ((saveSnapshotSelectedSecondsPerPoint === 1)?' second ':' seconds ').toString() + 'per point</b>.';
 
                         function update_chart(idx) {
                             if (saveSnapshotStop === true) {
@@ -3472,7 +3489,7 @@
                                         state.log('failed to be updated: ' + reason);
                                     }
 
-                                    saveSnapshotModalLog((charts_failed) ? 'danger' : 'info', 'Generated size ' + (Math.round(size * 100 / 1024 / 1024) / 100).toString() + ' MB. ' + ((charts_failed) ? (charts_failed.toString() + ' charts have failed to be downloaded') : '').toString());
+                                    saveSnapshotModalLog((charts_failed) ? 'danger' : 'info', 'Generated snapshot data size <b>' + (Math.round(size * 100 / 1024 / 1024) / 100).toString() + ' MB</b>. ' + ((charts_failed) ? (charts_failed.toString() + ' charts have failed to be downloaded') : '').toString() + info);
 
                                     if (idx > 0) {
                                         update_chart(idx);
@@ -3655,7 +3672,7 @@
             NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
             NETDATA.options.highlightCallback = urlOptions.netdataHighlightCallback;
 
-            if(urlOptions.highlight === true) {
+            if(netdataSnapshotData !== null && urlOptions.highlight === true) {
                 NETDATA.options.highlight_after = urlOptions.highlight_after;
                 NETDATA.options.highlight_before = urlOptions.highlight_before;
                 urlOptions.netdataHighlightCallback(urlOptions.highlight, urlOptions.highlight_after, urlOptions.highlight_before);
@@ -4310,7 +4327,7 @@
                     </p>
                 </div>
                 <div class="modal-footer">
-                    <a id="loadSnapshotImport" href="#" onclick="loadSnapshot(); return false;" type="button" class="btn btn-success btn-disabled" disabled>Import</a>
+                    <a id="loadSnapshotImport" href="#" onclick="loadSnapshot(); return false;" type="button" class="btn btn-success disabled">Import</a>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
             </div>
