@@ -594,11 +594,19 @@
                         urlOptions[booleans[len]] = false;
                 }
 
-                if(typeof urlOptions.after === 'string')
-                    urlOptions.after = parseInt(urlOptions.after);
-
-                if(typeof urlOptions.before === 'string')
-                    urlOptions.before = parseInt(urlOptions.before);
+                var numeric = [ 'after', 'before', 'highlight_after', 'highlight_before' ];
+                len = numeric.length;
+                while(len--) {
+                    if(typeof urlOptions[numeric[len]] === 'string') {
+                        try {
+                            urlOptions[numeric[len]] = parseInt(urlOptions[numeric[len]]);
+                        }
+                        catch(e) {
+                            console.log('failed to parse URL hash parameter ' + numeric[len]);
+                            urlOptions[numeric[len]] = 0;
+                        }
+                    }
+                }
 
                 if(urlOptions.server !== null && urlOptions.server !== '')
                     netdataServer = urlOptions.server;
@@ -3684,7 +3692,7 @@
             NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
             NETDATA.options.highlightCallback = urlOptions.netdataHighlightCallback;
 
-            if(netdataSnapshotData !== null && urlOptions.highlight === true) {
+            if(urlOptions.highlight === true) {
                 NETDATA.options.highlight_after = urlOptions.highlight_after;
                 NETDATA.options.highlight_before = urlOptions.highlight_before;
                 urlOptions.netdataHighlightCallback(urlOptions.highlight, urlOptions.highlight_after, urlOptions.highlight_before);
