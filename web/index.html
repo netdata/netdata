@@ -65,6 +65,32 @@
         text-align: center;
     }
 
+    .navbar-highlight {
+        display: none;
+        position: fixed;
+        margin-top: 5px;
+        height: 26px;
+        width: 100%;
+        text-align: center;
+        overflow: hidden;
+        z-index: 30;
+    }
+
+    .navbar-highlight-content {
+        position: relative;
+        display: inline-block;
+        margin: 0 auto;
+        height: 26px;
+        min-width: 500px;
+        background-color:rgba(0, 0, 0, 0.7);
+        padding-top: 2px;
+        padding-bottom: 2px;
+        padding-left: 15px;
+        padding-right: 15px;
+        border-radius:10px;
+        color: lightgrey;
+    }
+
     .modal-wide .modal-dialog {
         width: 80%;
     }
@@ -496,6 +522,9 @@
             server: null,
             after: 0,
             before: 0,
+            highlight: false,
+            highlight_after: 0,
+            highlight_before: 0,
             nowelcome: false,
             show_alarms: false,
             chart: null,
@@ -515,7 +544,12 @@
 
                 if(urlOptions.pan_and_zoom === true) {
                     hash += ';after='  + urlOptions.after.toString() +
-                            ';before=' + urlOptions.before.toString();
+                        ';before=' + urlOptions.before.toString();
+                }
+
+                if(urlOptions.highlight === true) {
+                    hash += ';highlight_after='  + urlOptions.highlight_after.toString() +
+                        ';highlight_before=' + urlOptions.highlight_before.toString();
                 }
 
                 if(urlOptions.theme !== null)
@@ -551,7 +585,7 @@
                     }
                 }
 
-                var booleans = [ 'nowelcome', 'show_alarms', 'pan_and_zoom', 'update_always' ];
+                var booleans = [ 'nowelcome', 'show_alarms', 'update_always' ];
                 len = booleans.length;
                 while(len--) {
                     if(urlOptions[booleans[len]] === 'true' || urlOptions[booleans[len]] === true || urlOptions[booleans[len]] === '1' || urlOptions[booleans[len]] === 1)
@@ -577,6 +611,12 @@
                 }
                 else
                     urlOptions.pan_and_zoom = false;
+
+                if(urlOptions.highlight_before > 0 && urlOptions.highlight_after > 0) {
+                    urlOptions.highlight = true;
+                }
+                else
+                    urlOptions.highlight = false
 
                 switch(urlOptions.mode) {
                     case 'print':
@@ -616,6 +656,33 @@
                     urlOptions.before = before;
                     urlOptions.hashUpdate();
                 }
+            },
+
+            netdataHighlightCallback: function(status, after, before) {
+                urlOptions.highlight = status;
+                urlOptions.highlight_after = Math.round(after);
+                urlOptions.highlight_before = Math.round(before);
+                urlOptions.hashUpdate();
+
+                if(status === true) {
+                    var d1 = NETDATA.dateTime.localeDateString(urlOptions.highlight_after);
+                    var d2 = NETDATA.dateTime.localeDateString(urlOptions.highlight_before);
+                    if(d1 === d2) d2 = '';
+                    document.getElementById('navbar-highlight-content').innerHTML = 'Highlighted timeframe <b>' + d1 + ' <code>' + NETDATA.dateTime.localeTimeString(urlOptions.highlight_after) + '</code></b> to <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(urlOptions.highlight_before) + '</code></b>, duration <b>' + NETDATA.seconds4human(Math.round((urlOptions.highlight_before - urlOptions.highlight_after) / 1000)) + '</b> <span onclick="urlOptions.clearHighlight();" style="padding-left: 10px;"><i class="fa fa-times" aria-hidden="true"></i></span>';
+                    $('.navbar-highlight').show();
+                }
+                else
+                    $('.navbar-highlight').hide();
+            },
+
+            clearHighlight: function() {
+                NETDATA.options.highlight_after = null;
+                NETDATA.options.highlight_before = null;
+
+                if(NETDATA.globalPanAndZoom.isActive() === true)
+                    NETDATA.globalPanAndZoom.clearMaster();
+
+                urlOptions.netdataHighlightCallback(false, 0, 0);
             }
 
         };
@@ -3569,6 +3636,13 @@
 
             // callback for us to track PanAndZoom operations
             NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
+            NETDATA.options.highlightCallback = urlOptions.netdataHighlightCallback;
+
+            if(urlOptions.highlight === true) {
+                NETDATA.options.highlight_after = urlOptions.highlight_after;
+                NETDATA.options.highlight_before = urlOptions.highlight_before;
+                urlOptions.netdataHighlightCallback(urlOptions.highlight, urlOptions.highlight_after, urlOptions.highlight_before);
+            }
 
             // let it run (update the charts)
             NETDATA.unpause();
@@ -4030,6 +4104,11 @@
             </nav>
         </div>
     </nav>
+    <div class="navbar-highlight">
+        <div id="navbar-highlight-content" class="navbar-highlight-content">
+            hello world
+        </div>
+    </div>
 
     <div id="masthead" style="display: none;">
         <div class="container">
@@ -4374,7 +4453,7 @@
                             <hr/>
                             <div class="p">
                                 <h4>Drag Chart Contents</h4>
-                                Drag the contents of a chart to pan it horizontally.
+                                Drag the contents of a chart, by pressing the left mouse button and moving the mouse, to pan it horizontally.
                                 <br/>
                                 All the charts will follow soon after you let the chart alone (this little delay is by design: it speeds up your browser and lets you focus on what you are exploring).
                                 <br/>
@@ -4388,7 +4467,7 @@
                             <hr/>
                             <div class="p">
                                 <h4>SHIFT + Drag</h4>
-                                While pressing the shift key, click on the contents of a chart and move the mouse to select an area, to zoom in. The other charts will follow too. Zooming is performed in two phases:
+                                While pressing the <code>SHIFT</code> key, press the left mouse button on the contents of a chart and move the mouse to select an area, to zoom in. The other charts will follow too. Zooming is performed in two phases:
                                 <ul>
                                     <li>The already loaded chart contents are zoomed (low resolution)</li>
                                     <li>New data are transferred from the netdata server, to refresh the chart with possibly more detail.</li>
@@ -4397,8 +4476,13 @@
                             </div>
                             <hr/>
                             <div class="p">
+                                <h4>Highlight Timeframe</h4>
+                                While pressing the <code>ALT</code> key, press the left mouse button on the contents of a chart and move the mouse to select an area. The selected are will be highlighted on all charts.
+                            </div>
+                            <hr/>
+                            <div class="p">
                                 <h4>SHIFT + Mouse Wheel</h4>
-                                While pressing the shift key and the mouse pointer is over the contents of a chart, scroll the mouse wheel to zoom in or out. This kind of zooming is aligned to center below the mouse pointer. The other charts will follow too.
+                                While pressing the <code>SHIFT</code> key and the mouse pointer is over the contents of a chart, scroll the mouse wheel to zoom in or out. This kind of zooming is aligned to center below the mouse pointer. The other charts will follow too.
                                 <br/>
                                 Once a chart is zoomed, auto refreshing stops for all charts. To enable it again, <b>double click</b> a zoomed chart.
                             </div>
@@ -5165,6 +5249,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171117-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20171118-1"></script>
 </body>
 </html>
