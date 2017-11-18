@@ -5674,6 +5674,7 @@ var NETDATA = window.NETDATA || {};
                     state.tmp.dygraph_mouse_down = true;
                     context.initializeMouseDown(event, dygraph, context);
 
+                    // console.log(event);
                     if(event.button && event.button === 1) {
                         if (event.shiftKey) {
                             // middle mouse button dragging (PAN)
@@ -5682,7 +5683,7 @@ var NETDATA = window.NETDATA || {};
                             state.tmp.dygraph_highlight_after = undefined;
                             Dygraph.startPan(event, dygraph, context);
                         }
-                        else if(event.altKey) {
+                        else if(event.altKey || event.ctrlKey || event.metaKey) {
                             // middle mouse button highlight
                             if (!(event.offsetX && event.offsetY)) {
                                 event.offsetX = event.layerX - event.target.offsetLeft;
@@ -5707,7 +5708,7 @@ var NETDATA = window.NETDATA || {};
                             state.tmp.dygraph_highlight_after = undefined;
                             Dygraph.startZoom(event, dygraph, context);
                         }
-                        else if(event.altKey) {
+                        else if(event.altKey || event.ctrlKey || event.metaKey) {
                             // left mouse button highlight
                             if (!(event.offsetX && event.offsetY)) {
                                 event.offsetX = event.layerX - event.target.offsetLeft;
