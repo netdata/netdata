@@ -5851,6 +5851,13 @@ var NETDATA = window.NETDATA || {};
                         context.isZooming = false;
                         NETDATA.options.highlight_after = state.tmp.dygraph_highlight_after;
                         NETDATA.options.highlight_before = dygraph.toDataXCoord(event.offsetX);
+
+                        if(NETDATA.options.highlight_after > NETDATA.options.highlight_before) {
+                            var t = NETDATA.options.highlight_after;
+                            NETDATA.options.highlight_after = NETDATA.options.highlight_before;
+                            NETDATA.options.highlight_before = t;
+                        }
+
                         state.tmp.dygraph_highlight_after = null;
                         dygraph.clearZoomRect_();
                         dygraph.drawGraph_(false);
