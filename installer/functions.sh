@@ -120,6 +120,7 @@ netdata_banner() {
 # portable service command
 
 service_cmd="$(which_cmd service)"
+rcservice_cmd="$(which_cmd rc-service)"
 systemctl_cmd="$(which_cmd systemctl)"
 service() {
     local cmd="${1}" action="${2}"
@@ -131,6 +132,10 @@ service() {
     elif [ ! -z "${service_cmd}" ]
     then
         run "${service_cmd}" "${cmd}" "${action}"
+        return $?
+    elif [ ! -z "${rcservice_cmd}" ]
+    then
+        run "${rcservice_cmd}" "${cmd}" "${action}"
         return $?
     fi
     return 1
@@ -488,8 +493,15 @@ install_netdata_service() {
 
             if [ ${ret} -eq 0 ]
             then
-                NETDATA_START_CMD="service netdata start"
-                NETDATA_STOP_CMD="service netdata stop"
+                if [ ! -z "${service_cmd}" ]
+                then
+                    NETDATA_START_CMD="service netdata start"
+                    NETDATA_STOP_CMD="service netdata stop"
+                elif [ ! -z "${rcservice_cmd}" ]
+                then
+                    NETDATA_START_CMD="rc-service netdata start"
+                    NETDATA_STOP_CMD="rc-service netdata stop"
+                fi
             fi
 
             return ${ret}
