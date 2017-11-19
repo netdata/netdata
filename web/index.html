@@ -1860,6 +1860,12 @@
             div.innerHTML = html;
             document.getElementById('sidebar').innerHTML = sidebar;
 
+            if(urlOptions.highlight === true) {
+                NETDATA.options.highlight_after = urlOptions.highlight_after;
+                NETDATA.options.highlight_before = urlOptions.highlight_before;
+                urlOptions.netdataHighlightCallback(urlOptions.highlight, urlOptions.highlight_after, urlOptions.highlight_before);
+            }
+
             if(urlOptions.mode === 'print')
                 printPage();
             else
@@ -3700,12 +3706,6 @@
             NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
             NETDATA.options.highlightCallback = urlOptions.netdataHighlightCallback;
 
-            if(urlOptions.highlight === true) {
-                NETDATA.options.highlight_after = urlOptions.highlight_after;
-                NETDATA.options.highlight_before = urlOptions.highlight_before;
-                urlOptions.netdataHighlightCallback(urlOptions.highlight, urlOptions.highlight_after, urlOptions.highlight_before);
-            }
-
             // let it run (update the charts)
             NETDATA.unpause();
 
@@ -4696,7 +4696,7 @@
                                     <tr class="option-row">
                                         <td class="option-control"><input id="async_on_scroll" type="checkbox" data-toggle="toggle" data-on="Async" data-off="Sync" data-width="110px"></td>
                                         <td class="option-info"><strong>Page scroll handling?</strong><br/>
-                                            <small>When set to <b>Sync</b>, charts will be examined for their visibility synchronously. On slow computers this may impact the smoothness of page scrolling. To work asynchronously set it to <b>Async</b>. When set to <b>Sync</b>, the performance of page scrolling is monitored and this setting switches automatically to <b>Async</b> if the browser is found slow. Set it to <b>Sync</b> for best visual experience. Set it to <b>Async</b> for smoother page scrolling.</small>
+                                            <small>When set to <b>Sync</b>, charts will be examined for their visibility immediately after scrolling. On slow computers this may impact the smoothness of page scrolling. To update the page when scrolling ends, set it to <b>Async</b>. Set it to <b>Sync</b> for immediate chart updates when scrolling. Set it to <b>Async</b> for smoother page scrolling on slower computers.</small>
                                         </td>
                                         </tr>
                                     </table>
@@ -5318,6 +5318,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171118-3"></script>
+    <script type="text/javascript" src="dashboard.js?v20171118-5"></script>
 </body>
 </html>

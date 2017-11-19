@@ -396,7 +396,7 @@ var NETDATA = window.NETDATA || {};
 
             abort_ajax_on_scroll: false,            // kill pending ajax page scroll
             async_on_scroll: false,                 // sync/async onscroll handler
-            onscroll_worker_duration_threshold: 30, // time in ms, to consider slow the onscroll handler
+            onscroll_worker_duration_threshold: 30, // time in ms, for async scroll handler
 
             retries_on_data_failures: 3, // how many retries to make if we can't fetch chart data from the server
 
@@ -626,9 +626,6 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.onscroll_updater_timeout_id = 0;
-    NETDATA.onscroll_updater_count = 0;
-    NETDATA.onscroll_updater_max_duration = 0;
-    NETDATA.onscroll_updater_above_threshold_count = 0;
     NETDATA.onscroll_updater_enabled = true;
     NETDATA.onscroll_updater = function() {
         if(NETDATA.onscroll_updater_enabled === false)
@@ -638,7 +635,6 @@ var NETDATA = window.NETDATA || {};
 
         NETDATA.globalSelectionSync.stop();
 
-        NETDATA.onscroll_updater_count++;
         var start = Date.now();
 
 
@@ -664,25 +660,6 @@ var NETDATA = window.NETDATA || {};
         onscroll_updater_chart_is_visible();
 
         var end = Date.now();
-        // console.log('scroll No ' + NETDATA.onscroll_updater_count + ' calculation took ' + (end - start).toString() + ' ms');
-
-        if(NETDATA.options.current.async_on_scroll === false) {
-            var dt = end - start;
-            if(dt > NETDATA.onscroll_updater_max_duration) {
-                // console.log('max onscroll event handler duration increased to ' + dt);
-                NETDATA.onscroll_updater_max_duration = dt;
-            }
-
-            if(dt > NETDATA.options.current.onscroll_worker_duration_threshold) {
-                // console.log('slow: ' + dt);
-                NETDATA.onscroll_updater_above_threshold_count++;
-
-                if(NETDATA.onscroll_updater_above_threshold_count > 2 && NETDATA.onscroll_updater_above_threshold_count * 100 / NETDATA.onscroll_updater_count > 2) {
-                    NETDATA.setOption('async_on_scroll', true);
-                    console.log('NETDATA: your browser is slow - enabling asynchronous onscroll event handler.');
-                }
-            }
-        }
 
         NETDATA.onscroll_updater_timeout_id = 0;
         //console.log('onscroll_updater() done in ' + (end - start).toString() + ' ms');
@@ -698,22 +675,14 @@ var NETDATA = window.NETDATA || {};
         NETDATA.scrollY = window.scrollY;
 
         NETDATA.options.last_page_scroll = Date.now();
-        NETDATA.options.on_scroll_refresher_stop_until = NETDATA.options.last_page_scroll + 25;
+        NETDATA.options.on_scroll_refresher_stop_until = NETDATA.options.last_page_scroll + ((NETDATA.options.current.async_on_scroll === true)?NETDATA.options.current.onscroll_worker_duration_threshold:0);
 
         if(NETDATA.options.targets === null) return;
 
-        if(NETDATA.options.current.async_on_scroll === true) {
-            // async
-            if(NETDATA.onscroll_updater_timeout_id !== 0)
-                clearTimeout(NETDATA.onscroll_updater_timeout_id);
+        if(NETDATA.onscroll_updater_timeout_id !== 0)
+            clearTimeout(NETDATA.onscroll_updater_timeout_id);
 
-            NETDATA.onscroll_updater_timeout_id = setTimeout(NETDATA.onscroll_updater, 0);
-        }
-        else {
-            // sync
-            NETDATA.onscroll_updater();
-        }
-
+        NETDATA.onscroll_updater_timeout_id = setTimeout(NETDATA.onscroll_updater, 0);
         //console.log('onscroll() end');
     };
 
@@ -4914,9 +4883,11 @@ var NETDATA = window.NETDATA || {};
     NETDATA.chartRefresherTimeoutId = 0;
 
     NETDATA.chartRefresherReschedule = function() {
-        clearTimeout(NETDATA.chartRefresherTimeoutId);
-        NETDATA.chartRefresherTimeoutId = setTimeout(NETDATA.chartRefresher, NETDATA.chartRefresherWaitTime());
-        //console.log('chartRefresherReschedule()');
+        if(NETDATA.options.current.async_on_scroll === true) {
+            clearTimeout(NETDATA.chartRefresherTimeoutId);
+            NETDATA.chartRefresherTimeoutId = setTimeout(NETDATA.chartRefresher, NETDATA.options.current.onscroll_worker_duration_threshold);
+            //console.log('chartRefresherReschedule()');
+        }
     };
 
     NETDATA.chartRefresher = function() {
@@ -7217,7 +7188,7 @@ var NETDATA = window.NETDATA || {};
             create: NETDATA.dygraphChartCreate,
             update: NETDATA.dygraphChartUpdate,
             resize: function(state) {
-                if(typeof state.tmp.dygraph_instance.resize === 'function')
+                if(typeof state.tmp.dygraph_instance !== 'undefined' && typeof state.tmp.dygraph_instance.resize === 'function')
                     state.tmp.dygraph_instance.resize();
             },
             setSelection: NETDATA.dygraphSetSelection,
