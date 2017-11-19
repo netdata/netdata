@@ -114,8 +114,16 @@ GLOBAL_STATS = [
  'Connection_errors_max_connections',
  'Connection_errors_peer_address',
  'Connection_errors_select',
- 'Connection_errors_tcpwrap']
-
+ 'Connection_errors_tcpwrap',
+ 'wsrep_local_recv_queue',
+ 'wsrep_local_send_queue',
+ 'wsrep_received',
+ 'wsrep_replicated',
+ 'wsrep_received_bytes',
+ 'wsrep_replicated_bytes',
+ 'wsrep_local_bf_aborts',
+ 'wsrep_local_cert_failures',
+ 'wsrep_flow_control_paused_ns']
 
 def slave_seconds(value):
     try:
@@ -148,7 +156,8 @@ ORDER = ['net',
          'innodb_buffer_pool_read_ahead', 'innodb_buffer_pool_reqs', 'innodb_buffer_pool_ops',
          'qcache_ops', 'qcache', 'qcache_freemem', 'qcache_memblocks',
          'key_blocks', 'key_requests', 'key_disk_ops',
-         'files', 'files_rate', 'slave_behind', 'slave_status']
+         'files', 'files_rate', 'slave_behind', 'slave_status',
+         'galera_writesets', 'galera_bytes', 'galera_queue', 'galera_conflicts', 'galera_flow_control']
 
 CHARTS = {
     'net': {
@@ -411,6 +420,35 @@ CHARTS = {
         'lines': [
             ['Slave_SQL_Running', 'sql_running', 'absolute'],
             ['Slave_IO_Running', 'io_running', 'absolute']
+        ]},
+    'galera_writesets': {
+        'options': [None, 'Replicated writesets', 'writesets/s', 'galera', 'mysql.galera_writesets', 'line'],
+        'lines': [
+            ['wsrep_received', 'rx', 'incremental'],
+            ['wsrep_replicated', 'tx', 'incremental', -1, 1],
+        ]},
+    'galera_bytes': {
+        'options': [None, 'Replicated bytes', 'KB/s', 'galera', 'mysql.galera_bytes', 'area'],
+        'lines': [
+            ['wsrep_received_bytes', 'rx', 'incremental', 1, 1024],
+            ['wsrep_replicated_bytes', 'tx', 'incremental', -1, 1024],
+        ]},
+    'galera_queue': {
+        'options': [None, 'Galera queue', 'writesets', 'galera', 'mysql.galera_queue', 'line'],
+        'lines': [
+            ['wsrep_local_recv_queue', 'rx', 'absolute'],
+            ['wsrep_local_send_queue', 'tx', 'absolute', -1, 1],
+        ]},
+    'galera_conflicts': {
+        'options': [None, 'Replication conflicts', 'transactions', 'galera', 'mysql.galera_conflicts', 'area'],
+        'lines': [
+            ['wsrep_local_bf_aborts', 'bf_aborts', 'incremental'],
+            ['wsrep_local_cert_failures', 'cert_fails', 'incremental', -1, 1],
+        ]},
+    'galera_flow_control': {
+        'options': [None, 'Flow control', 'millisec', 'galera', 'mysql.galera_flow_control', 'area'],
+        'lines': [
+            ['wsrep_flow_control_paused_ns', 'paused', 'incremental', 1, 1000000],
         ]}
 }
 
