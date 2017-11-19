@@ -362,6 +362,14 @@
         display: inline-block;
     }
 
+    /* https://github.com/seiyria/bootstrap-slider/issues/746 */
+    .tooltip {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+
     @media print {
         body {
             overflow: visible !important;
