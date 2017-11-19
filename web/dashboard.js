@@ -2994,6 +2994,9 @@ var NETDATA = window.NETDATA || {};
             var logme = 'updateChartPanOrZoom(' + after + ', ' + before + '): ';
             var ret = true;
 
+            NETDATA.globalPanAndZoom.delay();
+            NETDATA.globalSelectionSync.delay();
+
             if(this.debug === true)
                 this.log(logme);
 
@@ -3086,8 +3089,8 @@ var NETDATA = window.NETDATA || {};
                 clearTimeout(this.updateChartPanOrZoomAsyncTimeOutId);
 
             setTimeout(function() {
-                that.updateChartPanOrZoom(after, before, callback);
                 that.updateChartPanOrZoomAsyncTimeOutId = null;
+                that.updateChartPanOrZoom(after, before, callback);
             }, 0);
         };
 
@@ -5306,6 +5309,7 @@ var NETDATA = window.NETDATA || {};
         NETDATA.globalSelectionSync.delay();
         state.tmp.dygraph_user_action = true;
         state.tmp.dygraph_force_zoom = true;
+        // state.log('toolboxPanAndZoom');
         state.updateChartPanOrZoom(after, before);
         NETDATA.globalPanAndZoom.setMaster(state, after, before);
     };
@@ -5643,6 +5647,16 @@ var NETDATA = window.NETDATA || {};
                 return '';
             },
             drawCallback: function(dygraph, is_initial) {
+
+                // the user has panned the chart and this is called to re-draw the chart
+                // 1. refresh this chart by adding data to it
+                // 2. notify all the other charts about the update they need
+
+                // to prevent an infinite loop (feedback), we use
+                //     state.tmp.dygraph_user_action
+                // - when true, this is initiated by a user
+                // - when false, this is feedback
+
                 if(state.current.name !== 'auto' && state.tmp.dygraph_user_action === true) {
                     state.tmp.dygraph_user_action = false;
 
@@ -5651,17 +5665,24 @@ var NETDATA = window.NETDATA || {};
                     var before = Math.round(x_range[1]);
 
                     if(NETDATA.options.debug.dygraph === true)
-                        state.log('dygraphDrawCallback(dygraph, ' + is_initial + '): ' + (after / 1000).toString() + ' - ' + (before / 1000).toString());
+                        state.log('dygraphDrawCallback(dygraph, ' + is_initial + '): mode ' + state.current.name + ' ' + (after / 1000).toString() + ' - ' + (before / 1000).toString());
+                        //console.log(state);
 
                     if(before <= state.netdata_last && after >= state.netdata_first)
-                        state.updateChartPanOrZoomAsync(after, before);
+                        // update only when we are within the data limits
+                        state.updateChartPanOrZoom(after, before);
                 }
             },
             zoomCallback: function(minDate, maxDate, yRanges) {
+
+                // the user has selected a range on the chart
+                // 1. refresh this chart by adding data to it
+                // 2. notify all the other charts about the update they need
+
                 void(yRanges);
 
                 if(NETDATA.options.debug.dygraph === true)
-                    state.log('dygraphZoomCallback()');
+                    state.log('dygraphZoomCallback(): ' + state.current.name);
 
                 NETDATA.globalSelectionSync.stop();
                 NETDATA.globalSelectionSync.delay();
@@ -5670,7 +5691,7 @@ var NETDATA = window.NETDATA || {};
                 // refresh it to the greatest possible zoom level
                 state.tmp.dygraph_user_action = true;
                 state.tmp.dygraph_force_zoom = true;
-                state.updateChartPanOrZoomAsync(minDate, maxDate);
+                state.updateChartPanOrZoom(minDate, maxDate);
             },
             highlightCallback: function(event, x, points, row, seriesName) {
                 void(seriesName);
@@ -5704,6 +5725,10 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.globalSelectionSync.stop();
             },
             underlayCallback: function(canvas, area, g) {
+
+                // the chart is about to be drawn
+                // this function renders global highlighted time-frame
+
                 if(NETDATA.options.highlight_after !== null && NETDATA.options.highlight_before !== null) {
                     var after = NETDATA.options.highlight_after;
                     var before = NETDATA.options.highlight_before;
@@ -6009,7 +6034,7 @@ var NETDATA = window.NETDATA || {};
                         }
 
                         state.setMode('zoom');
-                        state.updateChartPanOrZoomAsync(after, before, function() {
+                        state.updateChartPanOrZoom(after, before, function() {
                             dygraph.updateOptions({ dateWindow: [ after, before ] });
                         });
 
