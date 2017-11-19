@@ -8,7 +8,7 @@
 #define DISK_TYPE_VIRTUAL   3
 
 #define CONFIG_SECTION_DISKSTATS "plugin:proc:/proc/diskstats"
-#define DELAULT_EXLUDED_DISKS "loop* ram*"
+#define DEFAULT_EXCLUDED_DISKS "loop* ram*"
 
 static struct disk {
     char *disk;             // the name of the disk (sda, sdb, etc, after being looked up)
@@ -473,7 +473,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             if(unlikely(!excluded_disks)) {
                 excluded_disks = simple_pattern_create(
-                        config_get(CONFIG_SECTION_DISKSTATS, "exclude disks", DELAULT_EXLUDED_DISKS),
+                        config_get(CONFIG_SECTION_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS),
                         SIMPLE_PATTERN_EXACT
                 );
             }
