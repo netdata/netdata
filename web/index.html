@@ -74,6 +74,7 @@
         text-align: center;
         overflow: hidden;
         z-index: 30;
+        pointer-events: none !important;
     }
 
     .navbar-highlight-content {
@@ -89,6 +90,11 @@
         padding-right: 15px;
         border-radius:10px;
         color: lightgrey;
+        pointer-events: auto !important;
+    }
+
+    .navbar-highlight-content-close {
+        cursor: pointer;
     }
 
     .modal-wide .modal-dialog {
@@ -686,7 +692,7 @@
                     var d1 = NETDATA.dateTime.localeDateString(after);
                     var d2 = NETDATA.dateTime.localeDateString(before);
                     if(d1 === d2) d2 = '';
-                    document.getElementById('navbar-highlight-content').innerHTML = 'Highlighted timeframe <b>' + d1 + ' <code>' + NETDATA.dateTime.localeTimeString(after) + '</code></b> to <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(before) + '</code></b>, duration <b>' + NETDATA.seconds4human(Math.round((before - after) / 1000)) + '</b> <span onclick="urlOptions.clearHighlight();" style="padding-left: 10px;"><i class="fa fa-times" aria-hidden="true"></i></span>';
+                    document.getElementById('navbar-highlight-content').innerHTML = 'Highlighted timeframe <b>' + d1 + ' <code>' + NETDATA.dateTime.localeTimeString(after) + '</code></b> to <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(before) + '</code></b>, duration <b>' + NETDATA.seconds4human(Math.round((before - after) / 1000)) + '</b> <span class="navbar-highlight-content-close" onclick="urlOptions.clearHighlight();" style="padding-left: 10px;"><i class="fa fa-times" aria-hidden="true"></i></span>';
                     $('.navbar-highlight').show();
                 }
                 else
@@ -5312,6 +5318,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171118-2"></script>
+    <script type="text/javascript" src="dashboard.js?v20171118-3"></script>
 </body>
 </html>
