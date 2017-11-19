@@ -26,14 +26,14 @@ import lombok.Setter;
 
 /**
  * Configuration scheme to configure
- * {@link org.firehol.netdata.module.jmx.JmxPlugin}
+ * {@link org.firehol.netdata.module.jmx.JmxModule}
  * 
  * @since 1.0.0
  * @author Simon Nagl
  */
 @Getter
 @Setter
-public class JmxPluginConfiguration {
+public class JmxModuleConfiguration {
 
 	/**
 	 * If true auto detect and monitor running local virtual machines on plugin

@@ -18,14 +18,14 @@
 
 package org.firehol.netdata.module.jmx.exception;
 
-public class JmxPluginException extends Exception {
+public class JmxModuleException extends Exception {
 	private static final long serialVersionUID = -9084555240752421197L;
 
-	public JmxPluginException(String message, Throwable cause) {
+	public JmxModuleException(String message, Throwable cause) {
 		super(message, cause);
 	}
 
-	public JmxPluginException(String message) {
+	public JmxModuleException(String message) {
 		super(message);
 	}
 }

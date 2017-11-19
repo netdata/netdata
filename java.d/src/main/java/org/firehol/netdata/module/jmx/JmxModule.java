@@ -43,7 +43,7 @@ import org.firehol.netdata.exception.InitializationException;
 import org.firehol.netdata.model.Chart;
 import org.firehol.netdata.module.Module;
 import org.firehol.netdata.module.jmx.configuration.JmxChartConfiguration;
-import org.firehol.netdata.module.jmx.configuration.JmxPluginConfiguration;
+import org.firehol.netdata.module.jmx.configuration.JmxModuleConfiguration;
 import org.firehol.netdata.module.jmx.configuration.JmxServerConfiguration;
 import org.firehol.netdata.module.jmx.exception.JmxMBeanServerConnectionException;
 import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
@@ -71,17 +71,17 @@ import com.sun.tools.attach.VirtualMachineDescriptor;
  *      Management Extensions (JMX) Technology</a>
  *
  */
-public class JmxPlugin implements Module {
+public class JmxModule implements Module {
 
 	private final Logger log = Logger.getLogger("org.firehol.netdata.module.jmx");
 
 	private final ConfigurationService configurationService;
 
-	private JmxPluginConfiguration configuration;
+	private JmxModuleConfiguration configuration;
 
 	private final List<MBeanServerCollector> allMBeanCollector = new ArrayList<>();
 
-	public JmxPlugin(ConfigurationService configurationService) {
+	public JmxModule(ConfigurationService configurationService) {
 		this.configurationService = configurationService;
 	}
 
@@ -184,7 +184,7 @@ public class JmxPlugin implements Module {
 
 	private void readConfiguration() throws InitializationException {
 		try {
-			configuration = configurationService.readPluginConfiguration("jmx", JmxPluginConfiguration.class);
+			configuration = configurationService.readPluginConfiguration("jmx", JmxModuleConfiguration.class);
 		} catch (ConfigurationSchemeInstantiationException e) {
 			throw new InitializationException("Could not read jmx plugin configuration", e);
 		}

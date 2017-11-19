@@ -23,7 +23,7 @@ import lombok.Setter;
 
 /**
  * Configuration scheme of a dimension of a chart created by the
- * {@link org.firehol.netdata.module.jmx.JmxPlugin}.
+ * {@link org.firehol.netdata.module.jmx.JmxModule}.
  */
 @Getter
 @Setter

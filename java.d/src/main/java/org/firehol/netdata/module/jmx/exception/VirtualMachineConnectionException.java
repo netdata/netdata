@@ -18,7 +18,7 @@
 
 package org.firehol.netdata.module.jmx.exception;
 
-public class VirtualMachineConnectionException extends JmxPluginException {
+public class VirtualMachineConnectionException extends JmxModuleException {
 	private static final long serialVersionUID = -4214747861980964583L;
 
 	public VirtualMachineConnectionException(String message) {
