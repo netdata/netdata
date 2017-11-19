@@ -65,6 +65,38 @@
         text-align: center;
     }
 
+    .navbar-highlight {
+        display: none;
+        position: fixed;
+        margin-top: 5px;
+        height: 26px;
+        width: 100%;
+        text-align: center;
+        overflow: hidden;
+        z-index: 30;
+        pointer-events: none !important;
+    }
+
+    .navbar-highlight-content {
+        position: relative;
+        display: inline-block;
+        margin: 0 auto;
+        height: 26px;
+        min-width: 500px;
+        background-color:rgba(0, 0, 0, 0.7);
+        padding-top: 2px;
+        padding-bottom: 2px;
+        padding-left: 15px;
+        padding-right: 15px;
+        border-radius:10px;
+        color: lightgrey;
+        pointer-events: auto !important;
+    }
+
+    .navbar-highlight-content-close {
+        cursor: pointer;
+    }
+
     .modal-wide .modal-dialog {
         width: 80%;
     }
@@ -496,6 +528,9 @@
             server: null,
             after: 0,
             before: 0,
+            highlight: false,
+            highlight_after: 0,
+            highlight_before: 0,
             nowelcome: false,
             show_alarms: false,
             chart: null,
@@ -515,7 +550,12 @@
 
                 if(urlOptions.pan_and_zoom === true) {
                     hash += ';after='  + urlOptions.after.toString() +
-                            ';before=' + urlOptions.before.toString();
+                        ';before=' + urlOptions.before.toString();
+                }
+
+                if(urlOptions.highlight === true) {
+                    hash += ';highlight_after='  + urlOptions.highlight_after.toString() +
+                        ';highlight_before=' + urlOptions.highlight_before.toString();
                 }
 
                 if(urlOptions.theme !== null)
@@ -551,7 +591,7 @@
                     }
                 }
 
-                var booleans = [ 'nowelcome', 'show_alarms', 'pan_and_zoom', 'update_always' ];
+                var booleans = [ 'nowelcome', 'show_alarms', 'update_always' ];
                 len = booleans.length;
                 while(len--) {
                     if(urlOptions[booleans[len]] === 'true' || urlOptions[booleans[len]] === true || urlOptions[booleans[len]] === '1' || urlOptions[booleans[len]] === 1)
@@ -560,11 +600,19 @@
                         urlOptions[booleans[len]] = false;
                 }
 
-                if(typeof urlOptions.after === 'string')
-                    urlOptions.after = parseInt(urlOptions.after);
-
-                if(typeof urlOptions.before === 'string')
-                    urlOptions.before = parseInt(urlOptions.before);
+                var numeric = [ 'after', 'before', 'highlight_after', 'highlight_before' ];
+                len = numeric.length;
+                while(len--) {
+                    if(typeof urlOptions[numeric[len]] === 'string') {
+                        try {
+                            urlOptions[numeric[len]] = parseInt(urlOptions[numeric[len]]);
+                        }
+                        catch(e) {
+                            console.log('failed to parse URL hash parameter ' + numeric[len]);
+                            urlOptions[numeric[len]] = 0;
+                        }
+                    }
+                }
 
                 if(urlOptions.server !== null && urlOptions.server !== '')
                     netdataServer = urlOptions.server;
@@ -577,6 +625,12 @@
                 }
                 else
                     urlOptions.pan_and_zoom = false;
+
+                if(urlOptions.highlight_before > 0 && urlOptions.highlight_after > 0) {
+                    urlOptions.highlight = true;
+                }
+                else
+                    urlOptions.highlight = false
 
                 switch(urlOptions.mode) {
                     case 'print':
@@ -616,6 +670,43 @@
                     urlOptions.before = before;
                     urlOptions.hashUpdate();
                 }
+            },
+
+            netdataHighlightCallback: function(status, after, before) {
+                if(status === true && (after === null || before === null || after <= 0 || before <= 0 || after >= before)) {
+                    status = false;
+                    after = 0;
+                    before = 0;
+                }
+
+                if(netdataSnapshotData === null)
+                    urlOptions.highlight = status;
+                else
+                    urlOptions.highlight = false;
+
+                urlOptions.highlight_after = Math.round(after);
+                urlOptions.highlight_before = Math.round(before);
+                urlOptions.hashUpdate();
+
+                if(status === true && after > 0 && before > 0 && after < before) {
+                    var d1 = NETDATA.dateTime.localeDateString(after);
+                    var d2 = NETDATA.dateTime.localeDateString(before);
+                    if(d1 === d2) d2 = '';
+                    document.getElementById('navbar-highlight-content').innerHTML = 'Highlighted timeframe <b>' + d1 + ' <code>' + NETDATA.dateTime.localeTimeString(after) + '</code></b> to <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(before) + '</code></b>, duration <b>' + NETDATA.seconds4human(Math.round((before - after) / 1000)) + '</b> <span class="navbar-highlight-content-close" onclick="urlOptions.clearHighlight();" style="padding-left: 10px;"><i class="fa fa-times" aria-hidden="true"></i></span>';
+                    $('.navbar-highlight').show();
+                }
+                else
+                    $('.navbar-highlight').hide();
+            },
+
+            clearHighlight: function() {
+                NETDATA.options.highlight_after = null;
+                NETDATA.options.highlight_before = null;
+
+                if(NETDATA.globalPanAndZoom.isActive() === true)
+                    NETDATA.globalPanAndZoom.clearMaster();
+
+                urlOptions.netdataHighlightCallback(false, 0, 0);
             }
 
         };
@@ -828,8 +919,8 @@
                         icon = "window-restore";
                     }
 
-                    el += '<li id="registry_server_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '" onClick="return gotoHostedModalHandler(\'' + url + '\');">' + hostname + '</a></li>';
-                    a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fa fa-' + icon + '" aria-hidden="true" style="color: #999;"></i></a></li>';
+                    el += '<li id="registry_server_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');">' + hostname + '</a></li>';
+                    a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fa fa-' + icon + '" aria-hidden="true" style="color: #999;"></i></a></li>';
                     hosted++;
                     i++;
                 }
@@ -858,7 +949,7 @@
                 while(len--) {
                     var u = machines[i++];
                     found++;
-                    el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="' + u.url + '" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
+                    el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="' + u.url + '#" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
                     a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
                 }
             }
@@ -1769,6 +1860,12 @@
             div.innerHTML = html;
             document.getElementById('sidebar').innerHTML = sidebar;
 
+            if(urlOptions.highlight === true) {
+                NETDATA.options.highlight_after = urlOptions.highlight_after;
+                NETDATA.options.highlight_before = urlOptions.highlight_before;
+                urlOptions.netdataHighlightCallback(urlOptions.highlight, urlOptions.highlight_after, urlOptions.highlight_before);
+            }
+
             if(urlOptions.mode === 'print')
                 printPage();
             else
@@ -2575,7 +2672,7 @@
                 if(netdataSnapshotData !== null) {
                     $('#alarmsButton').hide();
                     $('#updateButton').hide();
-                    $('#loadButton').hide();
+                    // $('#loadButton').hide();
                     $('#saveButton').hide();
                     $('#printButton').hide();
                 }
@@ -2993,6 +3090,8 @@
 
         var tmpSnapshotData = null;
         function loadSnapshot() {
+            $('#loadSnapshotImport').addClass('disabled');
+
             if(tmpSnapshotData === null) {
                 loadSnapshotModalLog('danger', 'no data have been loaded');
                 return;
@@ -3037,10 +3136,26 @@
                     }
 
                     tmpSnapshotData.uncompress = snapshotOptions.compressions[tmpSnapshotData.compression].uncompress;
-
                     netdataSnapshotData = tmpSnapshotData;
-                    initializeDynamicDashboard(netdataSnapshotData.url);
 
+                    if( typeof tmpSnapshotData.highlight_after_ms !== 'undefined'
+                        && tmpSnapshotData.highlight_after_ms !== null
+                        && tmpSnapshotData.highlight_after_ms > 0
+                        && typeof tmpSnapshotData.highlight_before_ms !== 'undefined'
+                        && tmpSnapshotData.highlight_before_ms !== null
+                        && tmpSnapshotData.highlight_before_ms > 0
+                    ) {
+                        NETDATA.options.highlight_after = tmpSnapshotData.highlight_after_ms;
+                        NETDATA.options.highlight_before = tmpSnapshotData.highlight_before_ms;
+                        urlOptions.netdataHighlightCallback(true, tmpSnapshotData.highlight_after_ms, tmpSnapshotData.highlight_before_ms);
+                    }
+                    else {
+                        NETDATA.options.highlight_after = null;
+                        NETDATA.options.highlight_before = null;
+                        urlOptions.netdataHighlightCallback(false, 0, 0);
+                    }
+
+                    initializeDynamicDashboard(netdataSnapshotData.url);
                     $('#loadSnapshotModal').modal('hide');
                 });
             });
@@ -3049,6 +3164,14 @@
         function loadSnapshotPreflight() {
             var files = document.getElementById('loadSnapshotSelectFiles').files;
             if (files.length <= 0) {
+                document.getElementById('loadSnapshotFilename').innerHTML = '';
+                document.getElementById('loadSnapshotHostname').innerHTML = '';
+                document.getElementById('loadSnapshotURL').innerHTML = '';
+                document.getElementById('loadSnapshotCharts').innerHTML = '';
+                document.getElementById('loadSnapshotInfo').innerHTML = '';
+                document.getElementById('loadSnapshotTimeRange').innerHTML = '';
+                document.getElementById('loadSnapshotComments').innerHTML = '';
+                $('#loadSnapshotImport').addClass('disabled');
                 loadSnapshotModalLog('danger', 'No file selected');
                 return;
             }
@@ -3087,8 +3210,7 @@
                     document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
                     document.getElementById('loadSnapshotComments').innerHTML = ((result.comments)?result.comments:'').toString();
                     loadSnapshotModalLog('success', 'File loaded, click <b>Import</b> to render it!');
-                    $('#loadSnapshotImport').prop('disabled', false);
-                    $('#loadSnapshotImport').removeAttr('disabled');
+                    $('#loadSnapshotImport').removeClass('disabled');
 
                     tmpSnapshotData = result;
                 }
@@ -3096,6 +3218,7 @@
                     console.log(e);
                     document.getElementById('loadSnapshotStatus').className = "alert alert-danger";
                     document.getElementById('loadSnapshotStatus').innerHTML = "Failed to parse this file!";
+                    $('#loadSnapshotImport').addClass('disabled');
                 }
             }
 
@@ -3161,6 +3284,7 @@
             $('#saveSnapshotModalProgressSection').hide();
             $('#saveSnapshotResolutionRadio').show();
             saveSnapshotModalLog('info', 'Select resolution and click <b>Save</b>');
+            $('#saveSnapshotExport').removeClass('disabled');
 
             loadBootstrapSlider(function() {
                 saveSnapshotViewDuration = options.duration;
@@ -3229,6 +3353,8 @@
                     saveSnapshotStop = false;
                     $('#saveSnapshotModalProgressSection').show();
                     $('#saveSnapshotResolutionRadio').hide();
+                    $('#saveSnapshotExport').addClass('disabled');
+
                     var filename = document.getElementById('saveSnapshotFilename').value;
                     // console.log(filename);
                     saveSnapshotModalLog('info', 'Generating snapshot as <code>' + filename.toString() + '</code>');
@@ -3266,6 +3392,8 @@
                         snapshot_version: 1,
                         after_ms: Date.now() - options.duration * 1000,
                         before_ms: Date.now(),
+                        highlight_after_ms: urlOptions.highlight_after,
+                        highlight_before_ms: urlOptions.highlight_before,
                         duration_ms: options.duration * 1000,
                         update_every_ms: options.update_every * 1000,
                         data_points: 0,
@@ -3345,15 +3473,22 @@
 
                         NETDATA.options.force_data_points = 0;
                         NETDATA.options.fake_chart_rendering = false;
+                        NETDATA.onscroll_updater_enabled = true;
                         NETDATA.onresize();
                         NETDATA.unpause();
+
+                        $('#saveSnapshotExport').removeClass('disabled');
                     }
 
                     NETDATA.pause(function () {
                         NETDATA.globalSelectionSync.stop();
                         NETDATA.options.force_data_points = saveData.data_points;
                         NETDATA.options.fake_chart_rendering = true;
+                        NETDATA.onscroll_updater_enabled = false;
+                        NETDATA.abort_all_refreshes();
+
                         var size = 0;
+                        var info = ' Resolution: <b>' + saveSnapshotSelectedSecondsPerPoint.toString() + ((saveSnapshotSelectedSecondsPerPoint === 1)?' second ':' seconds ').toString() + 'per point</b>.';
 
                         function update_chart(idx) {
                             if (saveSnapshotStop === true) {
@@ -3388,7 +3523,7 @@
                                         state.log('failed to be updated: ' + reason);
                                     }
 
-                                    saveSnapshotModalLog((charts_failed) ? 'danger' : 'info', 'Generated size ' + (Math.round(size * 100 / 1024 / 1024) / 100).toString() + ' MB. ' + ((charts_failed) ? (charts_failed.toString() + ' charts have failed to be downloaded') : '').toString());
+                                    saveSnapshotModalLog((charts_failed) ? 'danger' : 'info', 'Generated snapshot data size <b>' + (Math.round(size * 100 / 1024 / 1024) / 100).toString() + ' MB</b>. ' + ((charts_failed) ? (charts_failed.toString() + ' charts have failed to be downloaded') : '').toString() + info);
 
                                     if (idx > 0) {
                                         update_chart(idx);
@@ -3569,6 +3704,7 @@
 
             // callback for us to track PanAndZoom operations
             NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
+            NETDATA.options.highlightCallback = urlOptions.netdataHighlightCallback;
 
             // let it run (update the charts)
             NETDATA.unpause();
@@ -3600,9 +3736,11 @@
             });
 
             /* activate bootstrap scrollspy (needed for sidebar) */
-            var scrollspyOffset = $(window).height() / 5;
-            if(scrollspyOffset > 200) scrollspyOffset = 200;
-            if(scrollspyOffset < 50) scrollspyOffset = 50;
+            var scrollspyOffset = $(window).height() / 3;
+            if(scrollspyOffset > 250) scrollspyOffset = 250;
+            if(scrollspyOffset < 75) scrollspyOffset = 75;
+            document.body.setAttribute('data-offset', scrollspyOffset);
+            // console.log(scrollspyOffset);
             $(document.body).scrollspy({
                 target: '#sidebar',
                 offset: scrollspyOffset // controls the diff of the <hX> element to the top, to select it
@@ -3854,6 +3992,11 @@
 
             $('#myNetdataDropdownParent')
                 .on('show.bs.dropdown', function () {
+                    var hash = urlOptions.genHash();
+                    $('.registry_link').each(function(idx) {
+                       this.setAttribute('href', this.getAttribute("href").replace(/#.*$/, hash));
+                    });
+
                     NETDATA.pause(function() {});
                 })
                 .on('shown.bs.dropdown', function () {
@@ -3968,7 +4111,7 @@
     </script>
 </head>
 
-<body data-spy="scroll" data-target="#sidebar">
+<body data-spy="scroll" data-target="#sidebar" data-offset="100">
     <div id="loadOverlay" class="loadOverlay" style="background-color: #888; color: #888;">
         netdata<br/><div style="font-size: 3vh;">Real-time performance monitoring, done right!</div>
     </div>
@@ -4030,6 +4173,11 @@
             </nav>
         </div>
     </nav>
+    <div class="navbar-highlight">
+        <div id="navbar-highlight-content" class="navbar-highlight-content">
+            hello world
+        </div>
+    </div>
 
     <div id="masthead" style="display: none;">
         <div class="container">
@@ -4209,7 +4357,7 @@
                     </p>
                 </div>
                 <div class="modal-footer">
-                    <a id="loadSnapshotImport" href="#" onclick="loadSnapshot(); return false;" type="button" class="btn btn-success btn-disabled" disabled>Import</a>
+                    <a id="loadSnapshotImport" href="#" onclick="loadSnapshot(); return false;" type="button" class="btn btn-success disabled">Import</a>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
             </div>
@@ -4374,7 +4522,7 @@
                             <hr/>
                             <div class="p">
                                 <h4>Drag Chart Contents</h4>
-                                Drag the contents of a chart to pan it horizontally.
+                                Drag the contents of a chart, by pressing the left mouse button and moving the mouse, to pan it horizontally.
                                 <br/>
                                 All the charts will follow soon after you let the chart alone (this little delay is by design: it speeds up your browser and lets you focus on what you are exploring).
                                 <br/>
@@ -4388,7 +4536,7 @@
                             <hr/>
                             <div class="p">
                                 <h4>SHIFT + Drag</h4>
-                                While pressing the shift key, click on the contents of a chart and move the mouse to select an area, to zoom in. The other charts will follow too. Zooming is performed in two phases:
+                                While pressing the <code>SHIFT</code> key, press the left mouse button on the contents of a chart and move the mouse to select an area, to zoom in. The other charts will follow too. Zooming is performed in two phases:
                                 <ul>
                                     <li>The already loaded chart contents are zoomed (low resolution)</li>
                                     <li>New data are transferred from the netdata server, to refresh the chart with possibly more detail.</li>
@@ -4397,8 +4545,13 @@
                             </div>
                             <hr/>
                             <div class="p">
+                                <h4>Highlight Timeframe</h4>
+                                While pressing the <code>ALT</code> key, press the left mouse button on the contents of a chart and move the mouse to select an area. The selected are will be highlighted on all charts.
+                            </div>
+                            <hr/>
+                            <div class="p">
                                 <h4>SHIFT + Mouse Wheel</h4>
-                                While pressing the shift key and the mouse pointer is over the contents of a chart, scroll the mouse wheel to zoom in or out. This kind of zooming is aligned to center below the mouse pointer. The other charts will follow too.
+                                While pressing the <code>SHIFT</code> key and the mouse pointer is over the contents of a chart, scroll the mouse wheel to zoom in or out. This kind of zooming is aligned to center below the mouse pointer. The other charts will follow too.
                                 <br/>
                                 Once a chart is zoomed, auto refreshing stops for all charts. To enable it again, <b>double click</b> a zoomed chart.
                             </div>
@@ -4543,7 +4696,7 @@
                                     <tr class="option-row">
                                         <td class="option-control"><input id="async_on_scroll" type="checkbox" data-toggle="toggle" data-on="Async" data-off="Sync" data-width="110px"></td>
                                         <td class="option-info"><strong>Page scroll handling?</strong><br/>
-                                            <small>When set to <b>Sync</b>, charts will be examined for their visibility synchronously. On slow computers this may impact the smoothness of page scrolling. To work asynchronously set it to <b>Async</b>. When set to <b>Sync</b>, the performance of page scrolling is monitored and this setting switches automatically to <b>Async</b> if the browser is found slow. Set it to <b>Sync</b> for best visual experience. Set it to <b>Async</b> for smoother page scrolling.</small>
+                                            <small>When set to <b>Sync</b>, charts will be examined for their visibility immediately after scrolling. On slow computers this may impact the smoothness of page scrolling. To update the page when scrolling ends, set it to <b>Async</b>. Set it to <b>Sync</b> for immediate chart updates when scrolling. Set it to <b>Async</b> for smoother page scrolling on slower computers.</small>
                                         </td>
                                         </tr>
                                     </table>
@@ -5165,6 +5318,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171117-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20171118-5"></script>
 </body>
 </html>
