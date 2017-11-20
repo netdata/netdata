@@ -4224,6 +4224,58 @@ var NETDATA = window.NETDATA || {};
                 this.refresh_dt_element.innerText = this.refresh_dt_ms.toString();
         };
 
+        this.getSnapshotData = function(key) {
+            if(this.debug === true)
+                this.log('updating from snapshot: ' + key);
+
+            if(typeof netdataSnapshotData.data[key] === 'undefined') {
+                this.log('snapshot does not include data for key "' + key + '"');
+                return null;
+            }
+
+            if(typeof netdataSnapshotData.data[key] !== 'string') {
+                this.log('snapshot data for key "' + key + '" is not string');
+                return null;
+            }
+
+            var uncompressed;
+            try {
+                uncompressed = netdataSnapshotData.uncompress(netdataSnapshotData.data[key]);
+
+                if(uncompressed === null) {
+                    this.log('uncompressed snapshot data for key ' + key + ' is null');
+                    return null;
+                }
+
+                if(typeof uncompressed === 'undefined') {
+                    this.log('uncompressed snapshot data for key ' + key + ' is undefined');
+                    return null;
+                }
+            }
+            catch(e) {
+                this.log('decompression of snapshot data for key ' + key + ' failed');
+                console.log(e);
+                uncompressed = null;
+            }
+
+            if(typeof uncompressed !== 'string') {
+                this.log('uncompressed snapshot data for key ' + key + ' is not string');
+                return null;
+            }
+
+            var data;
+            try {
+                data = JSON.parse(uncompressed);
+            }
+            catch(e) {
+                this.log('parsing snapshot data for key ' + key + ' failed');
+                console.log(e);
+                data = null;
+            }
+
+            return data;
+        };
+
         this.updateChart = function(callback) {
             if(this.debug === true)
                 this.log('updateChart()');
@@ -4295,17 +4347,14 @@ var NETDATA = window.NETDATA || {};
 
             if(netdataSnapshotData !== null) {
                 var key = this.chartDataUniqueID();
-
-                if(this.debug === true)
-                    this.log('updating from snapshot: ' + key);
-
-                if(typeof netdataSnapshotData.data[key] === 'string') {
+                var data = this.getSnapshotData(key);
+                if (data !== null) {
                     ok = true;
-                    this.updateChartWithData(JSON.parse(netdataSnapshotData.uncompress(netdataSnapshotData.data[key])));
+                    this.updateChartWithData(data);
                 }
                 else {
                     ok = false;
-                    error('data not found in snapshot for key: ' + key);
+                    error('cannot get data from snapshot for key: "' + key + '"');
                     that.tm.last_autorefreshed = Date.now();
                 }
 
