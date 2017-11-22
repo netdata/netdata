@@ -3469,7 +3469,7 @@
                         duration_ms: options.duration * 1000,
                         update_every_ms: options.update_every * 1000,
                         data_points: 0,
-                        url: ((urlOptions.server !== null) ? urlOptions.server : document.location.origin.toString() + document.location.search.toString()).toString(),
+                        url: ((urlOptions.server !== null) ? urlOptions.server : document.location.origin.toString() + document.location.pathname.toString() + document.location.search.toString()).toString(),
                         comments: document.getElementById('saveSnapshotComments').value.toString(),
                         hash: urlOptions.hash,
                         charts: options.data,
