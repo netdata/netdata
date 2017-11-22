@@ -150,7 +150,7 @@ def binding_active(lease_end_time, current_time):
     if lease_end_time.startswith('epoch'):
         epoch = int(lease_end_time.split()[1].replace(';',''))
         return epoch - current_time > 0
-    # max. int for lease-time causes lease to expire in year 2038. 
+    # max. int for lease-time causes lease to expire in year 2038.
     # dhcpd puts 'never' in the ends section of active lease
     elif lease_end_time == 'never':
         return True
