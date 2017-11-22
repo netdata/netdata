@@ -309,6 +309,9 @@ var NETDATA = window.NETDATA || {};
         highlightCallback: null,        // what to call when a highlighted range is setup
         highlight_after: null,          // highlight after this time
         highlight_before: null,         // highlight before this time
+        highlight_view_after: null,     // the charts after_ms viewport when the highlight was setup
+        highlight_view_before: null,    // the charts before_ms viewport, when the highlight was setup
+        highlight_state: null,          // the chart the highlight was setup
 
         passive_events: null,           // true if the browser supports passive events
 
@@ -4612,8 +4615,10 @@ var NETDATA = window.NETDATA || {};
                 if(typeof callback === 'function')
                     return callback();
             }
-            else if(netdataSnapshotData !== null ) {
-                NETDATA.error(404, that.chart_url);
+            else if(netdataSnapshotData !== null) {
+                // console.log(this);
+                // console.log(NETDATA.chartRegistry);
+                NETDATA.error(404, 'host: ' + this.host + ', chart: ' +  this.id);
                 error('chart not found in snapshot');
 
                 if(typeof callback === 'function')
@@ -5936,6 +5941,10 @@ var NETDATA = window.NETDATA || {};
                         dygraph.clearZoomRect_();
                         dygraph.drawGraph_(false);
                         NETDATA.globalPanAndZoom.setMaster(state, state.view_after, state.view_before);
+
+                        NETDATA.options.highlight_state = state;
+                        NETDATA.options.highlight_view_after = state.view_after;
+                        NETDATA.options.highlight_view_before = state.view_before;
 
                         if(typeof NETDATA.options.highlightCallback === 'function')
                             NETDATA.options.highlightCallback(true, NETDATA.options.highlight_after, NETDATA.options.highlight_before);
