@@ -701,12 +701,7 @@
                 urlOptions.highlight_before = Math.round(before);
                 urlOptions.hashUpdate();
 
-                if(NETDATA.options.highlight_view_after === null || NETDATA.options.highlight_view_before === null || NETDATA.options.highlight_state === null) {
-                    NETDATA.options.highlight_view_after = (urlOptions.after > 0) ? urlOptions.after : null ;
-                    NETDATA.options.highlight_view_before = (urlOptions.before > 0) ? urlOptions.before : null ;
-                    NETDATA.options.highlight_state = NETDATA.options.targets[0];
-                }
-                var show_eye = (!(NETDATA.options.highlight_view_after === null || NETDATA.options.highlight_view_before === null || NETDATA.options.highlight_state === null));
+                var show_eye = NETDATA.globalChartUnderlay.hasViewport();
 
                 if(status === true && after > 0 && before > 0 && after < before) {
                     var d1 = NETDATA.dateTime.localeDateString(after);
@@ -731,25 +726,11 @@
             },
 
             clearHighlight: function() {
-                NETDATA.options.highlight_after = null;
-                NETDATA.options.highlight_before = null;
-                NETDATA.options.highlight_view_after = null;
-                NETDATA.options.highlight_vew_before = null;
-                NETDATA.options.highlight_state = null;
-
-                if(NETDATA.globalPanAndZoom.isActive() === true)
-                    NETDATA.globalPanAndZoom.clearMaster();
-
-                urlOptions.netdataHighlightCallback(false, 0, 0);
+                NETDATA.globalChartUnderlay.clear();
             },
 
             showHighlight: function() {
-                if(NETDATA.options.highlight_view_after !== null && NETDATA.options.highlight_view_before !== null && NETDATA.options.highlight_state !== null) {
-                    if(NETDATA.globalPanAndZoom.isMaster(NETDATA.options.highlight_state) === true)
-                        NETDATA.globalPanAndZoom.clearMaster();
-
-                    NETDATA.globalPanAndZoom.setMaster(NETDATA.options.highlight_state, NETDATA.options.highlight_view_after, NETDATA.options.highlight_view_before, true);
-                }
+                NETDATA.globalChartUnderlay.focus();
             }
         };
 
@@ -1902,11 +1883,15 @@
             div.innerHTML = html;
             document.getElementById('sidebar').innerHTML = sidebar;
 
-            if(urlOptions.highlight === true) {
-                NETDATA.options.highlight_after = urlOptions.highlight_after;
-                NETDATA.options.highlight_before = urlOptions.highlight_before;
-                urlOptions.netdataHighlightCallback(urlOptions.highlight, urlOptions.highlight_after, urlOptions.highlight_before);
-            }
+            if(urlOptions.highlight === true)
+                NETDATA.globalChartUnderlay.init(null
+                    , urlOptions.highlight_after
+                    , urlOptions.highlight_before
+                    , (urlOptions.after > 0) ? urlOptions.after : null
+                    , (urlOptions.before > 0) ? urlOptions.before : null
+                );
+            else
+                NETDATA.globalChartUnderlay.clear();
 
             if(urlOptions.mode === 'print')
                 printPage();
@@ -3180,6 +3165,9 @@
                     tmpSnapshotData.uncompress = snapshotOptions.compressions[tmpSnapshotData.compression].uncompress;
                     netdataSnapshotData = tmpSnapshotData;
 
+                    urlOptions.after = tmpSnapshotData.after_ms;
+                    urlOptions.before = tmpSnapshotData.before_ms;
+
                     if( typeof tmpSnapshotData.highlight_after_ms !== 'undefined'
                         && tmpSnapshotData.highlight_after_ms !== null
                         && tmpSnapshotData.highlight_after_ms > 0
@@ -3187,14 +3175,14 @@
                         && tmpSnapshotData.highlight_before_ms !== null
                         && tmpSnapshotData.highlight_before_ms > 0
                     ) {
-                        NETDATA.options.highlight_after = tmpSnapshotData.highlight_after_ms;
-                        NETDATA.options.highlight_before = tmpSnapshotData.highlight_before_ms;
-                        urlOptions.netdataHighlightCallback(true, tmpSnapshotData.highlight_after_ms, tmpSnapshotData.highlight_before_ms);
+                        urlOptions.highlight_after = tmpSnapshotData.highlight_after_ms;
+                        urlOptions.highlight_before = tmpSnapshotData.highlight_before_ms;
+                        urlOptions.highlight = true;
                     }
                     else {
-                        NETDATA.options.highlight_after = null;
-                        NETDATA.options.highlight_before = null;
-                        urlOptions.netdataHighlightCallback(false, 0, 0);
+                        urlOptions.highlight_after = 0;
+                        urlOptions.highlight_before = 0;
+                        urlOptions.highlight = false;
                     }
 
                     initializeDynamicDashboard();
@@ -3272,7 +3260,6 @@
                         e.stopPropagation();
                     })
                     .on('drop', function (e) {
-                        console.log(e);
                         if(e.originalEvent.dataTransfer.files.length) {
                             loadSnapshotPreflightFile(e.originalEvent.dataTransfer.files.item(0));
                         }
@@ -3789,7 +3776,7 @@
 
             // callback for us to track PanAndZoom operations
             NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
-            NETDATA.options.highlightCallback = urlOptions.netdataHighlightCallback;
+            NETDATA.globalChartUnderlay.callback = urlOptions.netdataHighlightCallback;
 
             // let it run (update the charts)
             NETDATA.unpause();
@@ -5407,6 +5394,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171122-2"></script>
+    <script type="text/javascript" src="dashboard.js?v20171122-3"></script>
 </body>
 </html>
