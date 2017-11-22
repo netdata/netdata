@@ -306,13 +306,6 @@ var NETDATA = window.NETDATA || {};
         force_data_points: 0,           // force the number of points to be returned for charts
         fake_chart_rendering: false,    // when set to true, the dashboard will download data but will not render the charts
 
-        highlightCallback: null,        // what to call when a highlighted range is setup
-        highlight_after: null,          // highlight after this time
-        highlight_before: null,         // highlight before this time
-        highlight_view_after: null,     // the charts after_ms viewport when the highlight was setup
-        highlight_view_before: null,    // the charts before_ms viewport, when the highlight was setup
-        highlight_state: null,          // the chart the highlight was setup
-
         passive_events: null,           // true if the browser supports passive events
 
         // the current profile
@@ -1342,6 +1335,88 @@ var NETDATA = window.NETDATA || {};
             //  return true;
 
             return (state.tm.pan_and_zoom_seq !== this.seq);
+        }
+    };
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // global chart underlay (time-frame highlighting)
+
+    NETDATA.globalChartUnderlay = {
+        callback: null,         // what to call when a highlighted range is setup
+        after: null,            // highlight after this time
+        before: null,           // highlight before this time
+        view_after: null,       // the charts after_ms viewport when the highlight was setup
+        view_before: null,      // the charts before_ms viewport, when the highlight was setup
+        state: null,            // the chart the highlight was setup
+
+        isActive: function() {
+            return (this.after !== null && this.before !== null);
+        },
+
+        hasViewport: function() {
+            return (this.state !== null && this.view_after !== null && this.view_before !== null);
+        },
+
+        init: function(state, after, before, view_after, view_before) {
+            this.state = (typeof state !== 'undefined') ? state : null;
+            this.after = (typeof after !== 'undefined' && after !== null && after > 0) ? after : null;
+            this.before = (typeof before !== 'undefined' && before !== null && before > 0) ? before : null;
+            this.view_after = (typeof view_after !== 'undefined' && view_after !== null && view_after > 0) ? view_after : null;
+            this.view_before = (typeof view_before !== 'undefined' && view_before !== null && view_before > 0) ? view_before : null;
+        },
+
+        setup: function() {
+            if(this.isActive() === true) {
+                if (this.state === null)
+                    this.state = NETDATA.options.targets[0];
+
+                if (this.hasViewport() === true)
+                    NETDATA.globalPanAndZoom.setMaster(this.state, this.view_after, this.view_before);
+
+                if (typeof this.callback === 'function')
+                    this.callback(true, this.after, this.before);
+            }
+            else {
+                if (typeof this.callback === 'function')
+                    this.callback(false, 0, 0);
+            }
+        },
+
+        set: function(state, after, before, view_after, view_before) {
+            if(after > before) {
+                var t = after;
+                after = before;
+                before = t;
+            }
+
+            this.init(state, after, before, view_after, view_before);
+            this.setup();
+        },
+
+        clear: function() {
+            this.after = null;
+            this.before = null;
+            this.state = null;
+            this.view_after = null;
+            this.view_before = null;
+
+            if(NETDATA.globalPanAndZoom.isActive() === true)
+                NETDATA.globalPanAndZoom.clearMaster();
+
+            if(typeof this.callback === 'function')
+                this.callback(false, 0, 0);
+        },
+
+        focus: function() {
+            if(this.isActive() === true && this.hasViewport() === true) {
+                if(this.state === null)
+                    this.state = NETDATA.options.targets[0];
+
+                if(NETDATA.globalPanAndZoom.isMaster(this.state) === true)
+                    NETDATA.globalPanAndZoom.clearMaster();
+
+                NETDATA.globalPanAndZoom.setMaster(this.state, this.view_after, this.view_before, true);
+            }
         }
     };
 
@@ -5059,6 +5134,11 @@ var NETDATA = window.NETDATA || {};
             NETDATA.options.targets.push(NETDATA.chartState(targets[len]));
         }
 
+        if(NETDATA.globalChartUnderlay.isActive() === true)
+            NETDATA.globalChartUnderlay.setup();
+        else
+            NETDATA.globalChartUnderlay.clear();
+
         if(typeof callback === 'function')
             return callback();
     };
@@ -5068,11 +5148,12 @@ var NETDATA = window.NETDATA || {};
     NETDATA.start = function() {
         // this should be called only once
 
-        if(NETDATA.started === true)
+        if(NETDATA.started === true) {
             console.log('netdata is already started');
+            return;
+        }
 
         NETDATA.started = true;
-
         NETDATA.options.page_is_visible = true;
 
         $(window).blur(function() {
@@ -5783,9 +5864,9 @@ var NETDATA = window.NETDATA || {};
                 // the chart is about to be drawn
                 // this function renders global highlighted time-frame
 
-                if(NETDATA.options.highlight_after !== null && NETDATA.options.highlight_before !== null) {
-                    var after = NETDATA.options.highlight_after;
-                    var before = NETDATA.options.highlight_before;
+                if(NETDATA.globalChartUnderlay.isActive()) {
+                    var after = NETDATA.globalChartUnderlay.after;
+                    var before = NETDATA.globalChartUnderlay.before;
 
                     if(after < state.view_after)
                         after = state.view_after;
@@ -5927,27 +6008,18 @@ var NETDATA = window.NETDATA || {};
                             event.offsetY = event.layerY - event.target.offsetTop;
                         }
 
-                        context.isZooming = false;
-                        NETDATA.options.highlight_after = state.tmp.dygraph_highlight_after;
-                        NETDATA.options.highlight_before = dygraph.toDataXCoord(event.offsetX);
-
-                        if(NETDATA.options.highlight_after > NETDATA.options.highlight_before) {
-                            var t = NETDATA.options.highlight_after;
-                            NETDATA.options.highlight_after = NETDATA.options.highlight_before;
-                            NETDATA.options.highlight_before = t;
-                        }
+                        NETDATA.globalChartUnderlay.set(state
+                            , state.tmp.dygraph_highlight_after
+                            , dygraph.toDataXCoord(event.offsetX)
+                            , state.view_after
+                            , state.view_before
+                        );
 
                         state.tmp.dygraph_highlight_after = null;
+
+                        context.isZooming = false;
                         dygraph.clearZoomRect_();
                         dygraph.drawGraph_(false);
-                        NETDATA.globalPanAndZoom.setMaster(state, state.view_after, state.view_before);
-
-                        NETDATA.options.highlight_state = state;
-                        NETDATA.options.highlight_view_after = state.view_after;
-                        NETDATA.options.highlight_view_before = state.view_before;
-
-                        if(typeof NETDATA.options.highlightCallback === 'function')
-                            NETDATA.options.highlightCallback(true, NETDATA.options.highlight_after, NETDATA.options.highlight_before);
                     }
                     else if (context.isPanning) {
                         //console.log('done panning');
