@@ -4,7 +4,7 @@
 
 from random import choice
 from threading import Thread
-from socket import gethostbyname, gaierror
+from socket import getaddrinfo, gaierror
 
 try:
     from time import monotonic as time
@@ -109,7 +109,7 @@ def dns_request(server_list, timeout, domains):
 
 def check_ns(ns):
     try:
-        return gethostbyname(ns)
+        return getaddrinfo(ns, 'domain')[0][4][0]
     except gaierror:
         return False
 
