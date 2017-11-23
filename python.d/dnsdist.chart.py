@@ -18,7 +18,7 @@ CHARTS = {
 			['dyn-blocked', 'dynamic block', 'incremental'],
 			['no-policy', 'no policy', 'incremental'],
 			['noncompliant-queries', 'non compliant', 'incremental'],
-			['acl-drops', 'acl', 'incremental'],
+			['acl-drops', 'acl', 'incremental']
 	]},
 	'answers': {
 		'options': [None, 'Answers statistics', 'answers/s', 'answers', 'dnsdist.answers', 'line'],
