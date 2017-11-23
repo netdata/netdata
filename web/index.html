@@ -93,8 +93,12 @@
         pointer-events: auto !important;
     }
 
-    .navbar-highlight-content-close {
+    .navbar-highlight-bar {
         cursor: pointer;
+    }
+    .navbar-highlight-button-right {
+        cursor: pointer;
+        padding-left: 10px;
     }
 
     .modal-wide .modal-dialog {
@@ -696,27 +700,40 @@
                 urlOptions.highlight_before = Math.round(before);
                 urlOptions.hashUpdate();
 
+                var show_eye = NETDATA.globalChartUnderlay.hasViewport();
+
                 if(status === true && after > 0 && before > 0 && after < before) {
                     var d1 = NETDATA.dateTime.localeDateString(after);
                     var d2 = NETDATA.dateTime.localeDateString(before);
                     if(d1 === d2) d2 = '';
-                    document.getElementById('navbar-highlight-content').innerHTML = 'Highlighted timeframe <b>' + d1 + ' <code>' + NETDATA.dateTime.localeTimeString(after) + '</code></b> to <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(before) + '</code></b>, duration <b>' + NETDATA.seconds4human(Math.round((before - after) / 1000)) + '</b> <span class="navbar-highlight-content-close" onclick="urlOptions.clearHighlight();" style="padding-left: 10px;"><i class="fa fa-times" aria-hidden="true"></i></span>';
+                    document.getElementById('navbar-highlight-content').innerHTML =
+                        ((show_eye === true)?'<span class="navbar-highlight-bar highlight-tooltip" onclick="urlOptions.showHighlight();" title="restore the highlighted view" data-toggle="tooltip" data-placement="bottom">':'<span>').toString()
+                        + 'highlighted time-frame'
+                        + ' <b>' + d1 + ' <code>' + NETDATA.dateTime.localeTimeString(after) + '</code></b> to '
+                        + ' <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(before) + '</code></b>, '
+                        + 'duration <b>' + NETDATA.seconds4human(Math.round((before - after) / 1000)) + '</b>'
+                        + '</span>'
+                        + '<span class="navbar-highlight-button-right highlight-tooltip" onclick="urlOptions.clearHighlight();" title="clear the highlighted time-frame" data-toggle="tooltip" data-placement="bottom"><i class="fa fa-times" aria-hidden="true"></i></span>';
+
                     $('.navbar-highlight').show();
+
+                    $('.highlight-tooltip').tooltip({
+                        html: true,
+                        delay: {show: 500, hide: 0},
+                        container: 'body'
+                    });
                 }
                 else
                     $('.navbar-highlight').hide();
             },
 
             clearHighlight: function() {
-                NETDATA.options.highlight_after = null;
-                NETDATA.options.highlight_before = null;
+                NETDATA.globalChartUnderlay.clear();
+            },
 
-                if(NETDATA.globalPanAndZoom.isActive() === true)
-                    NETDATA.globalPanAndZoom.clearMaster();
-
-                urlOptions.netdataHighlightCallback(false, 0, 0);
+            showHighlight: function() {
+                NETDATA.globalChartUnderlay.focus();
             }
-
         };
 
         urlOptions.parseHash();
@@ -1868,11 +1885,15 @@
             div.innerHTML = html;
             document.getElementById('sidebar').innerHTML = sidebar;
 
-            if(urlOptions.highlight === true) {
-                NETDATA.options.highlight_after = urlOptions.highlight_after;
-                NETDATA.options.highlight_before = urlOptions.highlight_before;
-                urlOptions.netdataHighlightCallback(urlOptions.highlight, urlOptions.highlight_after, urlOptions.highlight_before);
-            }
+            if(urlOptions.highlight === true)
+                NETDATA.globalChartUnderlay.init(null
+                    , urlOptions.highlight_after
+                    , urlOptions.highlight_before
+                    , (urlOptions.after > 0) ? urlOptions.after : null
+                    , (urlOptions.before > 0) ? urlOptions.before : null
+                );
+            else
+                NETDATA.globalChartUnderlay.clear();
 
             if(urlOptions.mode === 'print')
                 printPage();
@@ -2250,7 +2271,7 @@
                 all += "</div>";
 
                 if(!count_active)
-                    active += "<h4>Everything is normal. No raised alarms.</h4>";
+                    active += '<div style="width:100%; height: 100px; text-align: center;"><span style="font-size: 50px;"><i class="fa fa-thumbs-up" aria-hidden="true"></i></span><br/>Everything is normal. No raised alarms.</div>';
                 else
                     active += footer;
 
@@ -3146,6 +3167,9 @@
                     tmpSnapshotData.uncompress = snapshotOptions.compressions[tmpSnapshotData.compression].uncompress;
                     netdataSnapshotData = tmpSnapshotData;
 
+                    urlOptions.after = tmpSnapshotData.after_ms;
+                    urlOptions.before = tmpSnapshotData.before_ms;
+
                     if( typeof tmpSnapshotData.highlight_after_ms !== 'undefined'
                         && tmpSnapshotData.highlight_after_ms !== null
                         && tmpSnapshotData.highlight_after_ms > 0
@@ -3153,44 +3177,27 @@
                         && tmpSnapshotData.highlight_before_ms !== null
                         && tmpSnapshotData.highlight_before_ms > 0
                     ) {
-                        NETDATA.options.highlight_after = tmpSnapshotData.highlight_after_ms;
-                        NETDATA.options.highlight_before = tmpSnapshotData.highlight_before_ms;
-                        urlOptions.netdataHighlightCallback(true, tmpSnapshotData.highlight_after_ms, tmpSnapshotData.highlight_before_ms);
+                        urlOptions.highlight_after = tmpSnapshotData.highlight_after_ms;
+                        urlOptions.highlight_before = tmpSnapshotData.highlight_before_ms;
+                        urlOptions.highlight = true;
                     }
                     else {
-                        NETDATA.options.highlight_after = null;
-                        NETDATA.options.highlight_before = null;
-                        urlOptions.netdataHighlightCallback(false, 0, 0);
+                        urlOptions.highlight_after = 0;
+                        urlOptions.highlight_before = 0;
+                        urlOptions.highlight = false;
                     }
 
-                    initializeDynamicDashboard(netdataSnapshotData.url);
+                    initializeDynamicDashboard();
                     $('#loadSnapshotModal').modal('hide');
                 });
             });
-        }
+        };
 
-        function loadSnapshotPreflight() {
-            var files = document.getElementById('loadSnapshotSelectFiles').files;
-            if (files.length <= 0) {
-                document.getElementById('loadSnapshotFilename').innerHTML = '';
-                document.getElementById('loadSnapshotHostname').innerHTML = '';
-                document.getElementById('loadSnapshotURL').innerHTML = '';
-                document.getElementById('loadSnapshotCharts').innerHTML = '';
-                document.getElementById('loadSnapshotInfo').innerHTML = '';
-                document.getElementById('loadSnapshotTimeRange').innerHTML = '';
-                document.getElementById('loadSnapshotComments').innerHTML = '';
-                $('#loadSnapshotImport').addClass('disabled');
-                loadSnapshotModalLog('danger', 'No file selected');
-                return;
-            }
 
-            loadSnapshotModalLog('info', 'Loading file...');
-
+        function loadSnapshotPreflightFile(file) {
             var fr = new FileReader();
             fr.onload = function(e) {
-                // console.log(e);
-
-                document.getElementById('loadSnapshotFilename').innerHTML = files.item(0).name;
+                document.getElementById('loadSnapshotFilename').innerHTML = file.name;
                 var result = null;
                 try {
                     result = JSON.parse(e.target.result);
@@ -3198,31 +3205,31 @@
                     var date_after = new Date(result.after_ms);
                     var date_before = new Date(result.before_ms);
 
-                    if(typeof result.charts_ok === 'undefined')
+                    if (typeof result.charts_ok === 'undefined')
                         result.charts_ok = 'unknown';
 
-                    if(typeof result.charts_failed === 'undefined')
+                    if (typeof result.charts_failed === 'undefined')
                         result.charts_failed = 0;
 
-                    if(typeof result.compression === 'undefined')
+                    if (typeof result.compression === 'undefined')
                         result.compression = 'none';
 
-                    if(typeof result.data_size === 'undefined')
+                    if (typeof result.data_size === 'undefined')
                         result.data_size = 0;
 
-                    document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + files.item(0).name + '</code>';
+                    document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + file.name + '</code>';
                     document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
                     document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
-                    document.getElementById('loadSnapshotInfo').innerHTML = 'version: <b>' +  result.snapshot_version.toString() + '</b>, includes <b>' + result.charts_ok.toString() + '</b> unique chart data queries ' + ((result.charts_failed > 0)?('<b>' + result.charts_failed.toString() + '</b> failed'):'').toString() + ', compressed with <code>' + result.compression.toString() + '</code>, data size ' + (Math.round(result.data_size * 100 / 1024 / 1024) / 100).toString() + ' MB';
+                    document.getElementById('loadSnapshotInfo').innerHTML = 'version: <b>' + result.snapshot_version.toString() + '</b>, includes <b>' + result.charts_ok.toString() + '</b> unique chart data queries ' + ((result.charts_failed > 0) ? ('<b>' + result.charts_failed.toString() + '</b> failed') : '').toString() + ', compressed with <code>' + result.compression.toString() + '</code>, data size ' + (Math.round(result.data_size * 100 / 1024 / 1024) / 100).toString() + ' MB';
                     document.getElementById('loadSnapshotTimeRange').innerHTML = '<b>' + NETDATA.dateTime.localeDateString(date_after) + ' ' + NETDATA.dateTime.localeTimeString(date_after) + '</b> to <b>' + NETDATA.dateTime.localeDateString(date_before) + ' ' + NETDATA.dateTime.localeTimeString(date_before) + '</b>';
-                    document.getElementById('loadSnapshotComments').innerHTML = ((result.comments)?result.comments:'').toString();
+                    document.getElementById('loadSnapshotComments').innerHTML = ((result.comments) ? result.comments : '').toString();
                     loadSnapshotModalLog('success', 'File loaded, click <b>Import</b> to render it!');
                     $('#loadSnapshotImport').removeClass('disabled');
 
                     tmpSnapshotData = result;
                 }
-                catch(e) {
+                catch (e) {
                     console.log(e);
                     document.getElementById('loadSnapshotStatus').className = "alert alert-danger";
                     document.getElementById('loadSnapshotStatus').innerHTML = "Failed to parse this file!";
@@ -3230,8 +3237,53 @@
                 }
             }
 
-            //console.log(files.item(0));
-            fr.readAsText(files.item(0));
+            //console.log(file);
+            fr.readAsText(file);
+        };
+
+        function loadSnapshotPreflightEmpty() {
+            document.getElementById('loadSnapshotFilename').innerHTML = '';
+            document.getElementById('loadSnapshotHostname').innerHTML = '';
+            document.getElementById('loadSnapshotURL').innerHTML = '';
+            document.getElementById('loadSnapshotCharts').innerHTML = '';
+            document.getElementById('loadSnapshotInfo').innerHTML = '';
+            document.getElementById('loadSnapshotTimeRange').innerHTML = '';
+            document.getElementById('loadSnapshotComments').innerHTML = '';
+            $('#loadSnapshotImport').addClass('disabled');
+        };
+
+        var loadSnapshotDragAndDropInitialized = false;
+        function loadSnapshotDragAndDropInit() {
+            if(loadSnapshotDragAndDropInitialized === false) {
+                loadSnapshotDragAndDropInitialized = true;
+                $('#loadSnapshotDragAndDrop')
+                    .on('drag dragstart dragend dragover dragenter dragleave drop', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    })
+                    .on('drop', function (e) {
+                        if(e.originalEvent.dataTransfer.files.length) {
+                            loadSnapshotPreflightFile(e.originalEvent.dataTransfer.files.item(0));
+                        }
+                        else {
+                            loadSnapshotPreflightEmpty();
+                            loadSnapshotModalLog('danger', 'No file selected');
+                        }
+                    });
+            }
+        };
+
+        function loadSnapshotPreflight() {
+            var files = document.getElementById('loadSnapshotSelectFiles').files;
+            if (files.length <= 0) {
+                loadSnapshotPreflightEmpty();
+                loadSnapshotModalLog('danger', 'No file selected');
+                return;
+            }
+
+            loadSnapshotModalLog('info', 'Loading file...');
+
+            loadSnapshotPreflightFile(files.item(0));
         }
 
         // --------------------------------------------------------------------
@@ -3241,6 +3293,20 @@
         function saveSnapshotCancel() {
             saveSnapshotStop = true;
         }
+
+        var saveSnapshotModalInitialized = false;
+        function saveSnapshotModalInit() {
+            if(saveSnapshotModalInitialized === false) {
+                saveSnapshotModalInitialized = true;
+                $('#saveSnapshotModal')
+                    .on('hide.bs.modal', saveSnapshotCancel)
+                    .on('show.bs.modal', saveSnapshotModalInit)
+                    .on('shown.bs.modal', function() {
+                        $('#saveSnapshotResolutionSlider').find(".slider-handle:first").attr("tabindex", 1);
+                        document.getElementById('saveSnapshotComments').focus();
+                    });
+            }
+        };
 
         function saveSnapshotModalLog(priority, msg) {
             document.getElementById('saveSnapshotStatus').className = "alert alert-" + priority;
@@ -3405,7 +3471,7 @@
                         duration_ms: options.duration * 1000,
                         update_every_ms: options.update_every * 1000,
                         data_points: 0,
-                        url: ((urlOptions.server !== null) ? urlOptions.server : document.location.origin.toString() + document.location.search.toString()).toString(),
+                        url: ((urlOptions.server !== null) ? urlOptions.server : document.location.origin.toString() + document.location.pathname.toString() + document.location.search.toString()).toString(),
                         comments: document.getElementById('saveSnapshotComments').value.toString(),
                         hash: urlOptions.hash,
                         charts: options.data,
@@ -3712,7 +3778,7 @@
 
             // callback for us to track PanAndZoom operations
             NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
-            NETDATA.options.highlightCallback = urlOptions.netdataHighlightCallback;
+            NETDATA.globalChartUnderlay.callback = urlOptions.netdataHighlightCallback;
 
             // let it run (update the charts)
             NETDATA.unpause();
@@ -3771,13 +3837,17 @@
                 //else console.log('el.find(): not found');
             });
 
-            $('#saveSnapshotModal').on('show.bs.modal', saveSnapshotModalInit);
-            $('#saveSnapshotModal').on('shown.bs.modal', function() {
-                $('#saveSnapshotResolutionSlider').find(".slider-handle:first").attr("tabindex", 1);
-                document.getElementById('saveSnapshotComments').focus();
+            $('[data-toggle="tooltip"]').tooltip({
+                animated: 'fade',
+                trigger: 'hover',
+                html: true,
+                delay: {show: 500, hide: 0},
+                container: 'body'
             });
-            $('#saveSnapshotModal').on('hide.bs.modal', saveSnapshotCancel);
+            $('[data-toggle="popover"]').popover();
 
+            loadSnapshotDragAndDropInit();
+            saveSnapshotModalInit();
             showPageFooter();
 
             var update_options_modal = function() {
@@ -4131,7 +4201,7 @@
         <div class="container">
             <nav id="mynetdata_nav" class="collapse navbar-collapse navbar-left hidden-sm hidden-xs" role="navigation" style="padding-right: 20px;">
                 <ul class="nav navbar-nav">
-                    <li class="dropdown" id="myNetdataDropdownParent">
+                    <li class="dropdown" id="myNetdataDropdownParent" title="your other netdata servers" data-toggle="tooltip" data-placement="right">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
                         <ul class="dropdown-menu scrollable-menu inpagemenu multi-column columns-2" role="menu" id="myNetdataDropdownUL">
                             <div class="row">
@@ -4157,20 +4227,20 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a href="/" class="navbar-brand" id="hostname" title="reload the dashboard">netdata</a>
+                <a href="/" class="navbar-brand" id="hostname" title="server hostname<br/>click it to reload the dashboard" data-toggle="tooltip" data-placement="bottom">netdata</a>
             </div>
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
-                    <li id="alarmsButton"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal" title="alarms"><i class="fa fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
-                    <li><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal" title="dashboard settings"><i class="fa fa-sliders"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
-                    <li class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal" title="check for update"><i class="fa fa-cloud-download"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
-                    <li class="hidden-sm hidden-md"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank" title="netdata on github"><i class="fa fa-github"></i></a></li>
-                    <li class="hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank" title="netdata on twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
-                    <li class="hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank" title="netdata on facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a></li>
-                    <li id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal" title="import a dashboard snapshot"><i class="fa fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
-                    <li id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal" title="export a snapshot of this dashboard"><i class="fa fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Export</span></a></li>
-                    <li id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal" title="print this dashboard"><i class="fa fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
-                    <li class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal" title="dashboard help"><i class="fa fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
+                    <li id="alarmsButton"  title="check the health monitoring alarms and their log" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fa fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
+                    <li title="change dashboard settings" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-sliders"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
+                    <li title="check for netdata updates<br/>you should keep your netdata updated" data-toggle="tooltip" data-placement="bottom" class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fa fa-cloud-download"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
+                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fa fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i></a></li>
+                    <li title="follow netdata on twitter" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
+                    <li title="like netdata on facebook" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank"><i class="fa fa-facebook-official" aria-hidden="true"></i></a></li>
+                    <li title="import / load a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal"><i class="fa fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
+                    <li title="export / save a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal"><i class="fa fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Export</span></a></li>
+                    <li title="print this dashboard to PDF" data-toggle="tooltip" data-placement="bottom" id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal"><i class="fa fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
+                    <li title="get help on using the charts" data-toggle="tooltip" data-placement="bottom" class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
                     <li class="dropdown hidden-sm hidden-md hidden-lg">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
                         <ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
@@ -4334,7 +4404,7 @@
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                     <h4 class="modal-title" id="loadSnapshotModalLabel">Import a netdata snapshot</h4>
                 </div>
-                <div class="modal-body">
+                <div id="loadSnapshotDragAndDrop" class="modal-body">
                     <p>
                         netdata can export and import dashboard snapshots.
                         Any netdata can import the snapshot of any other netdata.
@@ -4348,7 +4418,7 @@
                         </label>
                     </p>
                     <div id="loadSnapshotStatus" class="alert alert-info" role="alert">
-                        Open a snapshot file, then click <b>Import</b> to render it.
+                        Browse for a snapshot file (or drag it and drop it here), then click <b>Import</b> to render it.
                     </div>
                     <p>
                         <table class="table">
@@ -5326,6 +5396,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171120-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20171122-3"></script>
 </body>
 </html>
