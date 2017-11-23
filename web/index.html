@@ -93,9 +93,8 @@
         pointer-events: auto !important;
     }
 
-    .navbar-highlight-button-left {
+    .navbar-highlight-bar {
         cursor: pointer;
-        padding-right: 10px;
     }
     .navbar-highlight-button-right {
         cursor: pointer;
@@ -708,16 +707,19 @@
                     var d2 = NETDATA.dateTime.localeDateString(before);
                     if(d1 === d2) d2 = '';
                     document.getElementById('navbar-highlight-content').innerHTML =
-                        ((show_eye === true)?'<span class="navbar-highlight-button-left highlight-tooltip" onclick="urlOptions.showHighlight();" title="view the highlighted time-frame" data-toggle="tooltip" data-placement="bottom"><i class="fa fa-eye" aria-hidden="true"></i></span>':'').toString()
+                        ((show_eye === true)?'<span class="navbar-highlight-bar highlight-tooltip" onclick="urlOptions.showHighlight();" title="restore the highlighted view" data-toggle="tooltip" data-placement="bottom">':'<span>').toString()
                         + 'highlighted time-frame'
                         + ' <b>' + d1 + ' <code>' + NETDATA.dateTime.localeTimeString(after) + '</code></b> to '
                         + ' <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(before) + '</code></b>, '
                         + 'duration <b>' + NETDATA.seconds4human(Math.round((before - after) / 1000)) + '</b>'
+                        + '</span>'
                         + '<span class="navbar-highlight-button-right highlight-tooltip" onclick="urlOptions.clearHighlight();" title="clear the highlighted time-frame" data-toggle="tooltip" data-placement="bottom"><i class="fa fa-times" aria-hidden="true"></i></span>';
 
                     $('.navbar-highlight').show();
 
                     $('.highlight-tooltip').tooltip({
+                        html: true,
+                        delay: {show: 500, hide: 0},
                         container: 'body'
                     });
                 }
