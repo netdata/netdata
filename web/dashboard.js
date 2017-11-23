@@ -1154,14 +1154,7 @@ var NETDATA = window.NETDATA || {};
             this.charts = {};
         },
 
-        fixid: function(id) {
-            return id.replace(/:/g, "_").replace(/\//g, "_");
-        },
-
         add: function(host, id, data) {
-            host = this.fixid(host);
-            id   = this.fixid(id);
-
             if(typeof this.charts[host] === 'undefined')
                 this.charts[host] = {};
 
@@ -1170,9 +1163,6 @@ var NETDATA = window.NETDATA || {};
         },
 
         get: function(host, id) {
-            host = this.fixid(host);
-            id   = this.fixid(id);
-
             if(typeof this.charts[host] === 'undefined')
                 return null;
 
@@ -1188,23 +1178,22 @@ var NETDATA = window.NETDATA || {};
 
             var self = this;
 
-            function fix_data(data, callback) {
+            function got_data(h, data, callback) {
                 if(data !== null) {
-                    var h = NETDATA.chartRegistry.fixid(host);
                     self.charts[h] = data.charts;
 
                     // update the server timezone in our options
                     if(typeof data.timezone === 'string')
                         NETDATA.options.server_timezone = data.timezone;
                 }
-                else NETDATA.error(406, host + '/api/v1/charts');
+                else NETDATA.error(406, h + '/api/v1/charts');
 
                 if(typeof callback === 'function')
                     callback(data);
             }
 
             if(netdataSnapshotData !== null) {
-                fix_data(netdataSnapshotData.charts, callback);
+                got_data(host, netdataSnapshotData.charts, callback);
             }
             else {
                 $.ajax({
@@ -1214,7 +1203,7 @@ var NETDATA = window.NETDATA || {};
                     xhrFields: {withCredentials: true} // required for the cookie
                 })
                     .done(function (data) {
-                        fix_data(data, callback);
+                        got_data(host, data, callback);
                     })
                     .fail(function () {
                         NETDATA.error(405, host + '/api/v1/charts');
@@ -3839,7 +3828,7 @@ var NETDATA = window.NETDATA || {};
                         placement: 'bottom',
                         delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
                         title: 'Chart Zoom In',
-                        content: 'Zoom in the chart. You can also press SHIFT and select an area of the chart to zoom in. On Chrome and Opera, you can press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Zoom in the chart. You can also press SHIFT and select an area of the chart, or press SHIFT or ALT and use the mouse wheel or 2-finger touchpad scroll to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
                     });
 
                     this.element_legend_childs.toolbox_zoomout.className += ' netdata-legend-toolbox-button';
@@ -3862,7 +3851,7 @@ var NETDATA = window.NETDATA || {};
                         placement: 'bottom',
                         delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
                         title: 'Chart Zoom Out',
-                        content: 'Zoom out the chart. On Chrome and Opera, you can also press the SHIFT or the ALT keys and then use the mouse wheel to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Zoom out the chart. You can also press SHIFT or ALT and use the mouse wheel, or 2-finger touchpad scroll to zoom in or out.<br/><small>Help, can be disabled from the settings.</small>'
                     });
 
                     //this.element_legend_childs.toolbox_volume.className += ' netdata-legend-toolbox-button';
