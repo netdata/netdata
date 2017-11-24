@@ -522,6 +522,49 @@ static void send_metrics_to_netdata() {
 
 }
 
+static int *excluded_record_ids = NULL;
+size_t excluded_record_ids_length = 0;
+
+static void excluded_record_ids_parse(const char *s) {
+    if(!s) return;
+
+    while(*s) {
+        while(*s && !isdigit(*s)) s++;
+
+        if(isdigit(*s)) {
+            char *e;
+            unsigned long n = strtoul(s, &e, 10);
+            s = e;
+
+            if(n != 0) {
+                excluded_record_ids = realloc(excluded_record_ids, (excluded_record_ids_length + 1) * sizeof(int));
+                excluded_record_ids[excluded_record_ids_length++] = (int)n;
+            }
+        }
+    }
+
+    if(debug) {
+        fprintf(stderr, "freeipmi.plugin: excluded record ids:");
+        size_t i;
+        for(i = 0; i < excluded_record_ids_length; i++) {
+            fprintf(stderr, " %d", excluded_record_ids[i]);
+        }
+        fprintf(stderr, "\n");
+    }
+}
+
+
+static int excluded_record_ids_check(int record_id) {
+    size_t i;
+
+    for(i = 0; i < excluded_record_ids_length; i++) {
+        if(excluded_record_ids[i] == record_id)
+            return 1;
+    }
+
+    return 0;
+}
+
 static void netdata_get_sensor(
           int record_id
         , int sensor_number
@@ -545,6 +588,10 @@ static void netdata_get_sensor(
 
     if(!sn) {
         // not found, create it
+
+        // check if it is excluded
+        if(excluded_record_ids_check(record_id))
+            return;
 
         sn = calloc(1, sizeof(struct sensor));
         if(!sn) {
@@ -1482,6 +1529,9 @@ int main (int argc, char **argv) {
                     "  sensor-config-file FILE filename to read sensor configuration\n"
                     "                          default: %s\n"
                     "\n"
+                    "  ignore N1,N2,N3,...     sensor IDs to ignore\n"
+                    "                          default: none\n"
+                    "\n"
                     "  -v\n"
                     "  -V\n"
                     "  version                 print version and exit\n"
@@ -1538,9 +1588,15 @@ int main (int argc, char **argv) {
             if(debug) fprintf(stderr, "freeipmi.plugin: sensor config file set to '%s'\n", sensor_config_file);
             continue;
         }
+        else if(i < argc && strcmp("ignore", argv[i]) == 0) {
+            excluded_record_ids_parse(argv[++i]);
+            continue;
+        }
 
         error("freeipmi.plugin: ignoring parameter '%s'", argv[i]);
     }
+
+    errno = 0;
 
     if(freq > netdata_update_every)
         netdata_update_every = freq;
