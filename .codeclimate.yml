@@ -34,10 +34,8 @@ checks:
       threshold: 4
   similar-code:
     enabled: true
-    config:
   identical-code:
     enabled: true
-    config:
 plugins:
   csslint:
     enabled: true
