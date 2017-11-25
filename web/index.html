@@ -3253,7 +3253,7 @@
         };
 
         var loadSnapshotDragAndDropInitialized = false;
-        function loadSnapshotDragAndDropInit() {
+        function loadSnapshotDragAndDropSetup() {
             if(loadSnapshotDragAndDropInitialized === false) {
                 loadSnapshotDragAndDropInitialized = true;
                 $('#loadSnapshotDragAndDrop')
@@ -3295,7 +3295,7 @@
         }
 
         var saveSnapshotModalInitialized = false;
-        function saveSnapshotModalInit() {
+        function saveSnapshotModalSetup() {
             if(saveSnapshotModalInitialized === false) {
                 saveSnapshotModalInitialized = true;
                 $('#saveSnapshotModal')
@@ -3846,8 +3846,8 @@
             });
             $('[data-toggle="popover"]').popover();
 
-            loadSnapshotDragAndDropInit();
-            saveSnapshotModalInit();
+            loadSnapshotDragAndDropSetup();
+            saveSnapshotModalSetup();
             showPageFooter();
 
             var update_options_modal = function() {
