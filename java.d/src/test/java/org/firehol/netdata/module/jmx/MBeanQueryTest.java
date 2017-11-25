@@ -1,4 +1,4 @@
-package org.firehol.netdata.module.jmx.entity;
+package org.firehol.netdata.module.jmx;
 
 import static org.junit.Assert.assertEquals;
 

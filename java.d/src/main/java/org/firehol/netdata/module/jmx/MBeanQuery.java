@@ -16,7 +16,7 @@
  *
  */
 
-package org.firehol.netdata.module.jmx.entity;
+package org.firehol.netdata.module.jmx;
 
 import java.util.LinkedList;
 import java.util.List;
