@@ -50,9 +50,9 @@ plugins:
           mass_threshold: 100
     checks:
       Similar code:
-        enabled: true
+        enabled: false
       Identical code:
-        enabled: true
+        enabled: false
   eslint:
     enabled: true
     checks:
