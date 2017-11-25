@@ -1,15 +1,55 @@
----
-engines:
+version: "2"
+checks:
+  argument-count:
+    enabled: false
+    config:
+      threshold: 6
+  complex-logic:
+    enabled: true
+    config:
+      threshold: 4
+  file-lines:
+    enabled: false
+    config:
+      threshold: 250
+  method-complexity:
+    enabled: true
+    config:
+      threshold: 5
+  method-count:
+    enabled: false
+    config:
+      threshold: 20
+  method-lines:
+    enabled: false
+    config:
+      threshold: 25
+  nested-control-flow:
+    enabled: true
+    config:
+      threshold: 4
+  return-statements:
+    enabled: true
+    config:
+      threshold: 4
+  similar-code:
+    enabled: true
+    config:
+  identical-code:
+    enabled: true
+    config:
+plugins:
   csslint:
     enabled: true
   duplication:
     enabled: true
     config:
       languages:
-      - ruby
-      - javascript
-      - python
-      - php
+      - javascript:
+          mass_threshold: 20
+      - python:
+          python_version: 3
+          mass_threshold: 20
     checks:
       Similar code:
         enabled: false
@@ -41,31 +81,22 @@ engines:
     checks:
       Complexity:
         enabled: false
-ratings:
-  paths:
-  - "**.css"
-  - "**.inc"
-  - "**.js"
-  - "**.jsx"
-  - "**.module"
-  - "**.php"
-  - "**.py"
-  - "**.rb"
-exclude_paths:
-- .gitignore
-- conf.d/
-- hooks/
-- tests/
-- m4/
-- web/css/
-- web/lib/
-- web/fonts/
-- web/old/
-- python.d/python_modules/pyyaml2/
-- python.d/python_modules/pyyaml3/
-- python.d/python_modules/urllib3/
-- node.d/node_modules/lib/
-- node.d/node_modules/asn1-ber.js
-- node.d/node_modules/extend.js
-- node.d/node_modules/pixl-xml.js
-- node.d/node_modules/net-snmp.js
+exclude_patterns:
+  - ".gitignore"
+  - "conf.d/"
+  - "hooks/"
+  - "tests/"
+  - "m4/"
+  - "web/css/"
+  - "web/lib/"
+  - "web/fonts/"
+  - "web/old/"
+  - "python.d/python_modules/pyyaml2/"
+  - "python.d/python_modules/pyyaml3/"
+  - "python.d/python_modules/urllib3/"
+  - "node.d/node_modules/lib/"
+  - "node.d/node_modules/asn1-ber.js"
+  - "node.d/node_modules/extend.js"
+  - "node.d/node_modules/pixl-xml.js"
+  - "node.d/node_modules/net-snmp.js"
+
