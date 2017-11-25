@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 import javax.management.MBeanServerConnection;
@@ -63,7 +64,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 
 	private JMXConnector jmxConnector;
 
-	private List<MBeanQuery> allMBeanQueryInfo = new LinkedList<>();
+	private List<MBeanQuery> allMBeanQuery = new LinkedList<>();
 
 	private List<Chart> allChart = new LinkedList<>();
 
@@ -160,15 +161,26 @@ public class MBeanServerCollector implements Collector, Closeable {
 				chart.getAllDimension().add(dimension);
 
 				// Add to queryInfo
-				MBeanQuery queryInfo;
+				final MBeanQuery queryInfo;
 				try {
-					queryInfo = initializeMBeanQueryInfo(dimensionConfig, dimension);
+					queryInfo = initializeMBeanQueryInfo(dimensionConfig);
 				} catch (JmxMBeanServerQueryException e) {
 					log.warning(LoggingUtils.buildMessage("Could not query one dimension. Skipping...", e));
 					continue;
 				}
-				allMBeanQueryInfo.add(queryInfo);
 
+				Optional<MBeanQuery> foundQueryInfo = allMBeanQuery.stream()
+						.filter(presentQueryInfo -> presentQueryInfo.queryDestinationEquals(queryInfo)).findAny();
+
+				MBeanQuery query;
+				if (!foundQueryInfo.isPresent()) {
+					allMBeanQuery.add(queryInfo);
+					query = queryInfo;
+				} else {
+					query = foundQueryInfo.get();
+				}
+
+				query.addDimension(dimension);
 			}
 
 			allChart.add(chart);
@@ -206,7 +218,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 		return dimension;
 	}
 
-	protected MBeanQuery initializeMBeanQueryInfo(JmxDimensionConfiguration dimensionConfig, Dimension dimension)
+	protected MBeanQuery initializeMBeanQueryInfo(JmxDimensionConfiguration dimensionConfig)
 			throws JmxMBeanServerQueryException {
 
 		// Query once to get dataType.
@@ -221,7 +233,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 		Object value = getAttribute(name, dimensionConfig.getValue());
 
 		// Add to queryInfo
-		MBeanQuery queryInfo = new MBeanQuery(name, dimensionConfig.getValue(), value.getClass(), dimension);
+		MBeanQuery queryInfo = new MBeanQuery(name, dimensionConfig.getValue(), value.getClass());
 
 		return queryInfo;
 	}
@@ -232,7 +244,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 
 	public Collection<Chart> collectValues() {
 		// Query all attributes and fill charts.
-		Iterator<MBeanQuery> queryInfoIterator = allMBeanQueryInfo.iterator();
+		Iterator<MBeanQuery> queryInfoIterator = allMBeanQuery.iterator();
 
 		while (queryInfoIterator.hasNext()) {
 			MBeanQuery queryInfo = queryInfoIterator.next();

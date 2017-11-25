@@ -20,6 +20,7 @@ package org.firehol.netdata.module.jmx;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 
 import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
@@ -53,14 +54,17 @@ public class MBeanQuery {
 	 */
 	private Class<?> type;
 
+	@Getter(AccessLevel.NONE)
 	private List<Dimension> dimensions = new LinkedList<>();
 
-	public MBeanQuery(ObjectName name, String attribute, Class<?> attributeType, Dimension dimension) {
+	public MBeanQuery(ObjectName name, String attribute, Class<?> attributeType) {
 		this.name = name;
 		this.attribute = attribute;
 		this.type = attributeType;
+	}
 
-		if (Double.class.isAssignableFrom(attributeType)) {
+	public void addDimension(Dimension dimension) {
+		if (Double.class.isAssignableFrom(type)) {
 			dimension.setDivisor(dimension.getDivisor() * this.LONG_RESOLUTION);
 		}
 		this.dimensions.add(dimension);
@@ -68,7 +72,7 @@ public class MBeanQuery {
 
 	public void query(MBeanServerConnection server) throws JmxMBeanServerQueryException {
 		long value = toLong(MBeanServerUtils.getAttribute(server, getName(), getAttribute()));
-		for (Dimension dim : getDimensions()) {
+		for (Dimension dim : dimensions) {
 			dim.setCurrentValue(value);
 		}
 	}
@@ -83,6 +87,19 @@ public class MBeanQuery {
 			return (long) any;
 		}
 
+	}
+
+	public boolean queryDestinationEquals(MBeanQuery mBeanQuery) {
+
+		if (!Objects.equals(name, mBeanQuery.getName())) {
+			return false;
+		}
+
+		if (!Objects.equals(attribute, mBeanQuery.getAttribute())) {
+			return false;
+		}
+
+		return true;
 	}
 
 }

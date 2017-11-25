@@ -141,7 +141,7 @@ public class MBeanServerCollectorTest {
 		when(mBeanServer.getAttribute(name, "value")).thenReturn(new Long(1234));
 
 		// Test
-		MBeanQuery queryInfo = mBeanServerCollector.initializeMBeanQueryInfo(dimensionConfig, null);
+		MBeanQuery queryInfo = mBeanServerCollector.initializeMBeanQueryInfo(dimensionConfig);
 
 		// Verify
 		assertEquals(name, queryInfo.getName());
