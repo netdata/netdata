@@ -26,13 +26,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Logger;
 
-import javax.management.AttributeNotFoundException;
-import javax.management.InstanceNotFoundException;
-import javax.management.MBeanException;
 import javax.management.MBeanServerConnection;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
-import javax.management.ReflectionException;
 import javax.management.remote.JMXConnector;
 
 import org.firehol.netdata.exception.InitializationException;
@@ -42,8 +38,9 @@ import org.firehol.netdata.model.Dimension;
 import org.firehol.netdata.module.jmx.configuration.JmxChartConfiguration;
 import org.firehol.netdata.module.jmx.configuration.JmxDimensionConfiguration;
 import org.firehol.netdata.module.jmx.configuration.JmxServerConfiguration;
-import org.firehol.netdata.module.jmx.entity.MBeanQueryInfo;
+import org.firehol.netdata.module.jmx.entity.MBeanQuery;
 import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
+import org.firehol.netdata.module.jmx.utils.MBeanServerUtils;
 import org.firehol.netdata.plugin.Collector;
 import org.firehol.netdata.utils.LoggingUtils;
 
@@ -58,7 +55,7 @@ import lombok.Getter;
  */
 public class MBeanServerCollector implements Collector, Closeable {
 
-	private final int LONG_RESOLUTION = 100;
+	public static final int LONG_RESOLUTION = 100;
 
 	private final Logger log = Logger.getLogger("org.firehol.netdata.module.jmx");
 
@@ -69,7 +66,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 
 	private JMXConnector jmxConnector;
 
-	private List<MBeanQueryInfo> allMBeanQueryInfo = new LinkedList<>();
+	private List<MBeanQuery> allMBeanQueryInfo = new LinkedList<>();
 
 	private List<Chart> allChart = new LinkedList<>();
 
@@ -163,7 +160,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 			for (JmxDimensionConfiguration dimensionConfig : chartConfig.getDimensions()) {
 
 				// Add to queryInfo
-				MBeanQueryInfo queryInfo;
+				MBeanQuery queryInfo;
 				try {
 					queryInfo = initializeMBeanQueryInfo(dimensionConfig);
 				} catch (JmxMBeanServerQueryException e) {
@@ -216,7 +213,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 		return dimension;
 	}
 
-	protected MBeanQueryInfo initializeMBeanQueryInfo(JmxDimensionConfiguration dimensionConfig)
+	protected MBeanQuery initializeMBeanQueryInfo(JmxDimensionConfiguration dimensionConfig)
 			throws JmxMBeanServerQueryException {
 
 		// Query once to get dataType.
@@ -231,7 +228,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 		Object value = getAttribute(name, dimensionConfig.getValue());
 
 		// Add to queryInfo
-		MBeanQueryInfo queryInfo = new MBeanQueryInfo();
+		MBeanQuery queryInfo = new MBeanQuery();
 		queryInfo.setName(name);
 		queryInfo.setAttribute(dimensionConfig.getValue());
 		queryInfo.setType(value.getClass());
@@ -240,40 +237,18 @@ public class MBeanServerCollector implements Collector, Closeable {
 	}
 
 	protected Object getAttribute(ObjectName name, String attribute) throws JmxMBeanServerQueryException {
-		try {
-			return mBeanServer.getAttribute(name, attribute);
-		} catch (AttributeNotFoundException | InstanceNotFoundException | MBeanException | ReflectionException
-				| IOException e) {
-			throw new JmxMBeanServerQueryException(
-					"Could not query attribute '" + attribute + "' of MBean '" + name + "'", e);
-		}
-
-	}
-
-	protected long toLong(Object any) {
-		if (any instanceof Integer) {
-			return ((Integer) any).longValue();
-		} else if (any instanceof Double) {
-			double doubleValue = (double) any;
-			return (long) (doubleValue * this.LONG_RESOLUTION);
-		} else {
-			return (long) any;
-		}
-
+		return MBeanServerUtils.getAttribute(mBeanServer, name, attribute);
 	}
 
 	public Collection<Chart> collectValues() {
 		// Query all attributes and fill charts.
-		Iterator<MBeanQueryInfo> queryInfoIterator = allMBeanQueryInfo.iterator();
+		Iterator<MBeanQuery> queryInfoIterator = allMBeanQueryInfo.iterator();
 
 		while (queryInfoIterator.hasNext()) {
-			MBeanQueryInfo queryInfo = queryInfoIterator.next();
+			MBeanQuery queryInfo = queryInfoIterator.next();
 
 			try {
-				long value = toLong(getAttribute(queryInfo.getName(), queryInfo.getAttribute()));
-				for (Dimension dim : queryInfo.getDimensions()) {
-					dim.setCurrentValue(value);
-				}
+				queryInfo.query(mBeanServer);
 			} catch (JmxMBeanServerQueryException e) {
 				// Stop collecting this value.
 				log.warning(LoggingUtils.buildMessage(

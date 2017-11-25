@@ -21,9 +21,13 @@ package org.firehol.netdata.module.jmx.entity;
 import java.util.LinkedList;
 import java.util.List;
 
+import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
 
 import org.firehol.netdata.model.Dimension;
+import org.firehol.netdata.module.jmx.MBeanServerCollector;
+import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
+import org.firehol.netdata.module.jmx.utils.MBeanServerUtils;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -34,7 +38,7 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-public class MBeanQueryInfo {
+public class MBeanQuery {
 
 	private ObjectName name;
 
@@ -46,4 +50,24 @@ public class MBeanQueryInfo {
 	private Class<?> type;
 
 	private List<Dimension> dimensions = new LinkedList<>();
+
+	public void query(MBeanServerConnection server) throws JmxMBeanServerQueryException {
+		long value = toLong(MBeanServerUtils.getAttribute(server, getName(), getAttribute()));
+		for (Dimension dim : getDimensions()) {
+			dim.setCurrentValue(value);
+		}
+	}
+
+	protected long toLong(Object any) {
+		if (any instanceof Integer) {
+			return ((Integer) any).longValue();
+		} else if (any instanceof Double) {
+			double doubleValue = (double) any;
+			return (long) (doubleValue * MBeanServerCollector.LONG_RESOLUTION);
+		} else {
+			return (long) any;
+		}
+
+	}
+
 }
