@@ -25,10 +25,11 @@ import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
 
 import org.firehol.netdata.model.Dimension;
-import org.firehol.netdata.module.jmx.MBeanServerCollector;
 import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
 import org.firehol.netdata.module.jmx.utils.MBeanServerUtils;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -38,7 +39,10 @@ import lombok.Setter;
  */
 @Getter
 @Setter
+@AllArgsConstructor(access = AccessLevel.PACKAGE) // For Mockito
 public class MBeanQuery {
+
+	private final int LONG_RESOLUTION = 100;
 
 	private ObjectName name;
 
@@ -50,6 +54,17 @@ public class MBeanQuery {
 	private Class<?> type;
 
 	private List<Dimension> dimensions = new LinkedList<>();
+
+	public MBeanQuery(ObjectName name, String attribute, Class<?> attributeType, Dimension dimension) {
+		this.name = name;
+		this.attribute = attribute;
+		this.type = attributeType;
+
+		if (Double.class.isAssignableFrom(attributeType)) {
+			dimension.setDivisor(dimension.getDivisor() * this.LONG_RESOLUTION);
+		}
+		this.dimensions.add(dimension);
+	}
 
 	public void query(MBeanServerConnection server) throws JmxMBeanServerQueryException {
 		long value = toLong(MBeanServerUtils.getAttribute(server, getName(), getAttribute()));
@@ -63,7 +78,7 @@ public class MBeanQuery {
 			return ((Integer) any).longValue();
 		} else if (any instanceof Double) {
 			double doubleValue = (double) any;
-			return (long) (doubleValue * MBeanServerCollector.LONG_RESOLUTION);
+			return (long) (doubleValue * LONG_RESOLUTION);
 		} else {
 			return (long) any;
 		}
