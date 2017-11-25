@@ -5,7 +5,7 @@ checks:
     config:
       threshold: 6
   complex-logic:
-    enabled: true
+    enabled: false
     config:
       threshold: 4
   file-lines:
@@ -25,34 +25,34 @@ checks:
     config:
       threshold: 25
   nested-control-flow:
-    enabled: true
+    enabled: false
     config:
       threshold: 4
   return-statements:
-    enabled: true
+    enabled: false
     config:
       threshold: 4
   similar-code:
-    enabled: true
+    enabled: false
   identical-code:
-    enabled: true
+    enabled: false
 plugins:
   csslint:
     enabled: true
   duplication:
-    enabled: true
+    enabled: false
     config:
       languages:
       - javascript:
-          mass_threshold: 20
+          mass_threshold: 100
       - python:
           python_version: 3
-          mass_threshold: 20
+          mass_threshold: 100
     checks:
       Similar code:
-        enabled: false
+        enabled: true
       Identical code:
-        enabled: false
+        enabled: true
   eslint:
     enabled: true
     checks:
