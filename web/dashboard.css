@@ -44,6 +44,8 @@ body {
     display: inline-block;
     overflow: hidden;
 
+    transform: translate3d(0,0,0);
+
     /* required for child elements to have absolute position */
     position: relative;
 
@@ -53,6 +55,8 @@ body {
 .netdata-container-gauge {
     display: inline-block;
     overflow: hidden;
+
+    transform: translate3d(0,0,0);
 
     /* required for child elements to have absolute position */
     position: relative;
@@ -69,6 +73,8 @@ body {
 .netdata-container-easypiechart {
     display: inline-block;
     overflow: hidden;
+
+    transform: translate3d(0,0,0);
 
     /* required for child elements to have absolute position */
     position: relative;
@@ -92,6 +98,8 @@ body {
 .netdata-container-with-legend {
     display: inline-block;
     overflow: hidden;
+
+    transform: translate3d(0,0,0);
 
     /* fix minimum scrollbar issue in firefox */
     min-height: 99px;
