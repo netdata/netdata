@@ -3132,6 +3132,7 @@
             loadPako(function() {
                 loadLzString(function () {
                     loadSnapshotModalLog('info', 'Please wait, activating snapshot...');
+                    $('#loadSnapshotModal').modal('hide');
 
                     netdataShowAlarms === false;
                     netdataRegistry = false;
@@ -3191,7 +3192,6 @@
                     }
 
                     initializeDynamicDashboard();
-                    $('#loadSnapshotModal').modal('hide');
                 });
             });
         };
