@@ -146,7 +146,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.themes = {
         white: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20171111-5',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20171127-1',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#F0F0F0',
@@ -164,7 +164,7 @@ var NETDATA = window.NETDATA || {};
         },
         slate: {
             bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20171111-5',
+            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20171127-1',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
@@ -2712,7 +2712,6 @@ var NETDATA = window.NETDATA || {};
                     showRendering();
                     that.element_chart.style.display = 'none';
                     that.element.style.willChange = 'auto';
-                    that.element.style.transform = '';
                     if(that.element_legend !== null) that.element_legend.style.display = 'none';
                     if(that.element_legend_childs.toolbox !== null) that.element_legend_childs.toolbox.style.display = 'none';
                     if(that.element_legend_childs.resize_handler !== null) that.element_legend_childs.resize_handler.style.display = 'none';
@@ -2746,7 +2745,6 @@ var NETDATA = window.NETDATA || {};
             else {
                 // that.log('unhideChart()');
                 that.element.style.willChange = 'transform';
-                that.element.style.transform = 'translateZ(0)';
                 that.tm.last_unhidden = Date.now();
                 that.element_chart.style.display = '';
                 if(that.element_legend !== null) that.element_legend.style.display = '';
