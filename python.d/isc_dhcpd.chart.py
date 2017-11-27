@@ -56,7 +56,6 @@ class Service(SimpleService):
 
         # Will work only with 'default' db-time-format (weekday year/month/day hour:minute:second)
         # TODO: update algorithm to parse correctly 'local' db-time-format
-        # (epoch <seconds-since-epoch>; # <day-name> <month-name> <day-number> <hours>:<minutes>:<seconds> <year>)
         # Also only ipv4 supported
 
     def check(self):
@@ -147,7 +146,16 @@ class Service(SimpleService):
 
 
 def binding_active(lease_end_time, current_time):
-    return mktime(strptime(lease_end_time, '%w %Y/%m/%d %H:%M:%S')) - current_time > 0
+    # lease_end_time might be epoch
+    if lease_end_time.startswith('epoch'):
+        epoch = int(lease_end_time.split()[1].replace(';',''))
+        return epoch - current_time > 0
+    # max. int for lease-time causes lease to expire in year 2038.
+    # dhcpd puts 'never' in the ends section of active lease
+    elif lease_end_time == 'never':
+        return True
+    else:
+        return mktime(strptime(lease_end_time, '%w %Y/%m/%d %H:%M:%S')) - current_time > 0
 
 
 def find_lease(value):
