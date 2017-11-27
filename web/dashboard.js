@@ -423,74 +423,111 @@ var NETDATA = window.NETDATA || {};
 
 
     // ----------------------------------------------------------------------------------------------------------------
-    // faster / more accurate setTimeout() replacement
-    // https://gist.github.com/joelambert/1002116#file-requesttimeout-js
 
-    // requestAnimationFrame() shim by Paul Irish
-    // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
-    window.requestAnimFrame = (function() {
-        return window.requestAnimationFrame ||
-            window.webkitRequestAnimationFrame ||
-            window.mozRequestAnimationFrame ||
-            window.oRequestAnimationFrame ||
-            window.msRequestAnimationFrame ||
-            function (/* function */ callback, /* DOMElement */ element) {
-                window.setTimeout(callback, 1000 / 60);
-            };
-    })();
+    NETDATA.timeout = {
+        // by default, these are just wrappers to setTimeout() / clearTimeout()
 
-    /**
-     * Behaves the same as setTimeout except uses requestAnimationFrame() where possible for better performance
-     * @param {function} fn The callback function
-     * @param {int} delay The delay in milliseconds
-     */
+        step: function(callback) {
+            return window.setTimeout(callback, 1000 / 60);
+        },
 
-    window.requestTimeout = function(fn, delay) {
+        set: function(callback, delay) {
+            return window.setTimeout(callback, delay);
+        },
 
-        if (!window.requestAnimationFrame &&
-            !window.webkitRequestAnimationFrame &&
-            !(window.mozRequestAnimationFrame && window.mozCancelRequestAnimationFrame) && // Firefox 5 ships without cancel support
-            !window.oRequestAnimationFrame &&
-            !window.msRequestAnimationFrame)
-            return window.setTimeout(fn, delay);
+        clear: function(id) {
+            return window.clearTimeout(id);
+        },
 
-        var start = Date.now(),
-            handle = new Object();
+        init: function() {
+            var custom = true;
 
-        function loop() {
-            var current = Date.now(),
-                delta = current - start;
+            if(window.requestAnimationFrame) {
+                this.step = function(callback) {
+                    return window.requestAnimationFrame(callback);
+                };
 
-            if(delta >= delay) {
-                //var t1 = Date.now();
-                fn.call();
-                //var t2 = Date.now();
-
-                //if(t2 - t1 > 1000 / 60)
-                //    console.log('slow function ' + (t2 - t1).toString() + ' ms');
+                this.clear = function(handle) {
+                    return window.cancelAnimationFrame(handle.value);
+                };
             }
-            else {
-                handle.value = window.requestAnimFrame(loop);
-            }
-        };
+            else if(window.webkitRequestAnimationFrame) {
+                this.step = function(callback) {
+                    return window.webkitRequestAnimationFrame(callback);
+                };
 
-        handle.value = window.requestAnimFrame(loop);
-        return handle;
+                if(window.webkitCancelAnimationFrame) {
+                    this.clear = function (handle) {
+                        return window.webkitCancelAnimationFrame(handle.value);
+                    };
+                }
+                else if(window.webkitCancelRequestAnimationFrame) {
+                    this.clear = function (handle) {
+                        return window.webkitCancelRequestAnimationFrame(handle.value);
+                    };
+                }
+            }
+            else if(window.mozRequestAnimationFrame) {
+                this.step = function(callback) {
+                    return window.mozRequestAnimationFrame(callback);
+                };
+
+                this.clear = function(handle) {
+                    return window.mozCancelRequestAnimationFrame(handle.value);
+                };
+            }
+            else if(window.oRequestAnimationFrame) {
+                this.step = function(callback) {
+                    return window.oRequestAnimationFrame(callback);
+                };
+
+                this.clear = function(handle) {
+                    return window.oCancelRequestAnimationFrame(handle.value);
+                };
+            }
+            else if(window.msRequestAnimationFrame) {
+                this.step = function(callback) {
+                    return window.msRequestAnimationFrame(callback);
+                };
+
+                this.clear = function(handle) {
+                    return window.msCancelRequestAnimationFrame(handle.value);
+                };
+            }
+            else
+                custom = false;
+
+
+            if(custom === true) {
+                // we have installed custom .step() / .clear() functions
+                // overwrite the .set() too
+
+                this.set = function(callback, delay) {
+                    var that = this;
+
+                    var start = Date.now(),
+                        handle = new Object();
+
+                    function loop() {
+                        var current = Date.now(),
+                            delta = current - start;
+
+                        if(delta >= delay) {
+                            callback.call();
+                        }
+                        else {
+                            handle.value = that.step(loop);
+                        }
+                    }
+
+                    handle.value = that.step(loop);
+                    return handle;
+                };
+            }
+        }
     };
 
-    /**
-     * Behaves the same as clearTimeout except uses cancelRequestAnimationFrame() where possible for better performance
-     * @param {int|object} fn The callback function
-     */
-    window.clearRequestTimeout = function(handle) {
-        window.cancelAnimationFrame ? window.cancelAnimationFrame(handle.value) :
-            window.webkitCancelAnimationFrame ? window.webkitCancelAnimationFrame(handle.value) :
-                window.webkitCancelRequestAnimationFrame ? window.webkitCancelRequestAnimationFrame(handle.value) : /* Support for legacy API */
-                    window.mozCancelRequestAnimationFrame ? window.mozCancelRequestAnimationFrame(handle.value) :
-                        window.oCancelRequestAnimationFrame	? window.oCancelRequestAnimationFrame(handle.value) :
-                            window.msCancelRequestAnimationFrame ? window.msCancelRequestAnimationFrame(handle.value) :
-                                clearTimeout(handle);
-    };
+    NETDATA.timeout.init();
 
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -752,9 +789,9 @@ var NETDATA = window.NETDATA || {};
         NETDATA.scrollY = window.scrollY;
 
         if(NETDATA.onscroll_updater_timeout_id)
-            window.clearRequestTimeout(NETDATA.onscroll_updater_timeout_id);
+            NETDATA.timeout.clear(NETDATA.onscroll_updater_timeout_id);
 
-        NETDATA.onscroll_updater_timeout_id = window.requestTimeout(NETDATA.onscroll_updater, 0);
+        NETDATA.onscroll_updater_timeout_id = NETDATA.timeout.set(NETDATA.onscroll_updater, 0);
         //console.log('onscroll() end');
     };
 
@@ -2223,9 +2260,9 @@ var NETDATA = window.NETDATA || {};
                 this.last_t = t;
 
                 if (this.timeout_id)
-                    window.clearRequestTimeout(this.timeout_id);
+                    NETDATA.timeout.clear(this.timeout_id);
 
-                this.timeout_id = window.requestTimeout(this.__syncSlaves, 0);
+                this.timeout_id = NETDATA.timeout.set(this.__syncSlaves, 0);
             }
         }
     };
@@ -3236,9 +3273,9 @@ var NETDATA = window.NETDATA || {};
             }
 
             if(this.updateChartPanOrZoomAsyncTimeOutId)
-                window.clearRequestTimeout(this.updateChartPanOrZoomAsyncTimeOutId);
+                NETDATA.timeout.clear(this.updateChartPanOrZoomAsyncTimeOutId);
 
-            window.requestTimeout(function() {
+            NETDATA.timeout.set(function() {
                 that.updateChartPanOrZoomAsyncTimeOutId = undefined;
                 that.updateChartPanOrZoom(after, before, callback);
             }, 0);
@@ -5060,7 +5097,7 @@ var NETDATA = window.NETDATA || {};
                     console.log('fast rendering...');
 
                 if(state.isVisible() === true)
-                    window.requestTimeout(function() {
+                    NETDATA.timeout.set(function() {
                         state.autoRefresh(function () {
                             NETDATA.chartRefresherNoParallel(++index, callback);
                         });
@@ -5072,7 +5109,7 @@ var NETDATA = window.NETDATA || {};
                 if(NETDATA.options.debug.main_loop === true) console.log('waiting for next refresh...');
                 NETDATA.options.auto_refresher_fast_weight = 0;
 
-                window.requestTimeout(function() {
+                NETDATA.timeout.set(function() {
                     state.autoRefresh(function() {
                         NETDATA.chartRefresherNoParallel(++index, callback);
                     });
@@ -5092,8 +5129,8 @@ var NETDATA = window.NETDATA || {};
     NETDATA.chartRefresherReschedule = function() {
         if(NETDATA.options.current.async_on_scroll === true) {
             if(NETDATA.chartRefresherTimeoutId)
-                window.clearRequestTimeout(NETDATA.chartRefresherTimeoutId);
-            NETDATA.chartRefresherTimeoutId = window.requestTimeout(NETDATA.chartRefresher, NETDATA.options.current.onscroll_worker_duration_threshold);
+                NETDATA.timeout.clear(NETDATA.chartRefresherTimeoutId);
+            NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(NETDATA.chartRefresher, NETDATA.options.current.onscroll_worker_duration_threshold);
             //console.log('chartRefresherReschedule()');
         }
     };
@@ -5104,7 +5141,7 @@ var NETDATA = window.NETDATA || {};
         NETDATA.chartRefresherLastRun = now;
 
         if( now < NETDATA.options.on_scroll_refresher_stop_until ) {
-            NETDATA.chartRefresherTimeoutId = window.requestTimeout(
+            NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
                 NETDATA.chartRefresher,
                 NETDATA.chartRefresherWaitTime()
             );
@@ -5115,7 +5152,7 @@ var NETDATA = window.NETDATA || {};
 
         if(NETDATA.options.pause === true) {
             // console.log('auto-refresher is paused');
-            NETDATA.chartRefresherTimeoutId = window.requestTimeout(
+            NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
                 NETDATA.chartRefresher,
                 NETDATA.chartRefresherWaitTime()
             );
@@ -5138,7 +5175,7 @@ var NETDATA = window.NETDATA || {};
         if(NETDATA.options.current.parallel_refresher === false) {
             // console.log('auto-refresher is calling chartRefresherNoParallel(0)');
             NETDATA.chartRefresherNoParallel(0, function() {
-                NETDATA.chartRefresherTimeoutId = window.requestTimeout(
+                NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
                     NETDATA.chartRefresher,
                     NETDATA.options.current.idle_between_loops
                 );
@@ -5190,7 +5227,7 @@ var NETDATA = window.NETDATA || {};
                 // this will execute the jobs in parallel
 
                 if (state.running === false)
-                    window.requestTimeout(state.autoRefresh, 0);
+                    NETDATA.timeout.set(state.autoRefresh, 0);
             }
             //else {
             //    console.log('auto-refresher nothing to do');
@@ -5198,7 +5235,7 @@ var NETDATA = window.NETDATA || {};
         }
 
         // run the next refresh iteration
-        NETDATA.chartRefresherTimeoutId = window.requestTimeout(
+        NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
             NETDATA.chartRefresher,
             NETDATA.chartRefresherWaitTime()
         );
@@ -6881,7 +6918,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.easypiechartClearSelection = function(state) {
         if(typeof state.tmp.easyPieChartEvent !== 'undefined') {
             if(state.tmp.easyPieChartEvent.timer) {
-                window.clearRequestTimeout(state.tmp.easyPieChartEvent.timer);
+                NETDATA.timeout.clear(state.tmp.easyPieChartEvent.timer);
             }
 
             state.tmp.easyPieChartEvent.timer = undefined;
@@ -6927,7 +6964,7 @@ var NETDATA = window.NETDATA || {};
         if(state.tmp.easyPieChartEvent.timer === undefined) {
             state.tmp.easyPieChart_instance.disableAnimation();
 
-            state.tmp.easyPieChartEvent.timer = window.requestTimeout(function() {
+            state.tmp.easyPieChartEvent.timer = NETDATA.timeout.set(function() {
                 state.tmp.easyPieChartEvent.timer = undefined;
                 state.tmp.easyPieChart_instance.update(state.tmp.easyPieChartEvent.pcent);
             }, 0);
@@ -7158,7 +7195,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.gaugeClearSelection = function(state) {
         if(typeof state.tmp.gaugeEvent !== 'undefined') {
             if(state.tmp.gaugeEvent.timer) {
-                window.clearRequestTimeout(state.tmp.gaugeEvent.timer);
+                NETDATA.timeout.clear(state.tmp.gaugeEvent.timer);
             }
 
             state.tmp.gaugeEvent.timer = undefined;
@@ -7211,7 +7248,7 @@ var NETDATA = window.NETDATA || {};
         if(state.tmp.gaugeEvent.timer === undefined) {
             NETDATA.gaugeAnimation(state, false);
 
-            state.tmp.gaugeEvent.timer = window.requestTimeout(function() {
+            state.tmp.gaugeEvent.timer = NETDATA.timeout.set(function() {
                 state.tmp.gaugeEvent.timer = undefined;
                 NETDATA.gaugeSet(state, state.tmp.gaugeEvent.value, state.tmp.gaugeEvent.min, state.tmp.gaugeEvent.max);
             }, 0);
