@@ -729,6 +729,9 @@
 
             clearHighlight: function() {
                 NETDATA.globalChartUnderlay.clear();
+
+                if(NETDATA.globalPanAndZoom.isActive() === true)
+                    NETDATA.globalPanAndZoom.clearMaster();
             },
 
             showHighlight: function() {
@@ -3554,76 +3557,74 @@
                         $('#saveSnapshotExport').removeClass('disabled');
                     }
 
-                    NETDATA.pause(function () {
-                        NETDATA.globalSelectionSync.stop();
-                        NETDATA.options.force_data_points = saveData.data_points;
-                        NETDATA.options.fake_chart_rendering = true;
-                        NETDATA.onscroll_updater_enabled = false;
-                        NETDATA.abort_all_refreshes();
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.options.force_data_points = saveData.data_points;
+                    NETDATA.options.fake_chart_rendering = true;
+                    NETDATA.onscroll_updater_enabled = false;
+                    NETDATA.abort_all_refreshes();
 
-                        var size = 0;
-                        var info = ' Resolution: <b>' + saveSnapshotSelectedSecondsPerPoint.toString() + ((saveSnapshotSelectedSecondsPerPoint === 1)?' second ':' seconds ').toString() + 'per point</b>.';
+                    var size = 0;
+                    var info = ' Resolution: <b>' + saveSnapshotSelectedSecondsPerPoint.toString() + ((saveSnapshotSelectedSecondsPerPoint === 1)?' second ':' seconds ').toString() + 'per point</b>.';
 
-                        function update_chart(idx) {
-                            if (saveSnapshotStop === true) {
-                                saveSnapshotModalLog('info', 'Cancelled!');
-                                saveSnapshotRestore();
-                                return;
-                            }
-
-                            var state = NETDATA.options.targets[--idx];
-
-                            var pcent = (NETDATA.options.targets.length - idx) * 100 / NETDATA.options.targets.length;
-                            $(el).css('width', pcent + '%').attr('aria-valuenow', pcent);
-                            eltxt.innerText = Math.round(pcent).toString() + '%, ' + state.id;
-
-                            setTimeout(function () {
-                                charts_count++;
-                                state.isVisible(true);
-                                state.current.force_after_ms = saveData.after_ms;
-                                state.current.force_before_ms = saveData.before_ms;
-
-                                state.updateChart(function (status, reason) {
-                                    state.current.force_after_ms = null;
-                                    state.current.force_before_ms = null;
-
-                                    if (status === true) {
-                                        charts_ok++;
-                                        // state.log('ok');
-                                        size += pack_api1_v1_chart_data(state);
-                                    }
-                                    else {
-                                        charts_failed++;
-                                        state.log('failed to be updated: ' + reason);
-                                    }
-
-                                    saveSnapshotModalLog((charts_failed) ? 'danger' : 'info', 'Generated snapshot data size <b>' + (Math.round(size * 100 / 1024 / 1024) / 100).toString() + ' MB</b>. ' + ((charts_failed) ? (charts_failed.toString() + ' charts have failed to be downloaded') : '').toString() + info);
-
-                                    if (idx > 0) {
-                                        update_chart(idx);
-                                    }
-                                    else {
-                                        saveData.charts_ok = charts_ok;
-                                        saveData.charts_failed = charts_failed;
-                                        saveData.data_size = size;
-                                        // console.log(saveData.compression + ': ' + (size / (options.data.dimensions_count * Math.round(saveSnapshotViewDuration / saveSnapshotSelectedSecondsPerPoint))).toString());
-
-                                        // save it
-                                        // console.log(saveData);
-                                        saveObjectToClient(saveData, filename);
-
-                                        if (charts_failed > 0)
-                                            alert(charts_failed.toString() + ' failed to be downloaded');
-
-                                        saveSnapshotRestore();
-                                        saveData = null;
-                                    }
-                                })
-                            }, 0);
+                    function update_chart(idx) {
+                        if (saveSnapshotStop === true) {
+                            saveSnapshotModalLog('info', 'Cancelled!');
+                            saveSnapshotRestore();
+                            return;
                         }
 
-                        update_chart(NETDATA.options.targets.length);
-                    });
+                        var state = NETDATA.options.targets[--idx];
+
+                        var pcent = (NETDATA.options.targets.length - idx) * 100 / NETDATA.options.targets.length;
+                        $(el).css('width', pcent + '%').attr('aria-valuenow', pcent);
+                        eltxt.innerText = Math.round(pcent).toString() + '%, ' + state.id;
+
+                        setTimeout(function () {
+                            charts_count++;
+                            state.isVisible(true);
+                            state.current.force_after_ms = saveData.after_ms;
+                            state.current.force_before_ms = saveData.before_ms;
+
+                            state.updateChart(function (status, reason) {
+                                state.current.force_after_ms = null;
+                                state.current.force_before_ms = null;
+
+                                if (status === true) {
+                                    charts_ok++;
+                                    // state.log('ok');
+                                    size += pack_api1_v1_chart_data(state);
+                                }
+                                else {
+                                    charts_failed++;
+                                    state.log('failed to be updated: ' + reason);
+                                }
+
+                                saveSnapshotModalLog((charts_failed) ? 'danger' : 'info', 'Generated snapshot data size <b>' + (Math.round(size * 100 / 1024 / 1024) / 100).toString() + ' MB</b>. ' + ((charts_failed) ? (charts_failed.toString() + ' charts have failed to be downloaded') : '').toString() + info);
+
+                                if (idx > 0) {
+                                    update_chart(idx);
+                                }
+                                else {
+                                    saveData.charts_ok = charts_ok;
+                                    saveData.charts_failed = charts_failed;
+                                    saveData.data_size = size;
+                                    // console.log(saveData.compression + ': ' + (size / (options.data.dimensions_count * Math.round(saveSnapshotViewDuration / saveSnapshotSelectedSecondsPerPoint))).toString());
+
+                                    // save it
+                                    // console.log(saveData);
+                                    saveObjectToClient(saveData, filename);
+
+                                    if (charts_failed > 0)
+                                        alert(charts_failed.toString() + ' failed to be downloaded');
+
+                                    saveSnapshotRestore();
+                                    saveData = null;
+                                }
+                            })
+                        }, 0);
+                    }
+
+                    update_chart(NETDATA.options.targets.length);
                 });
             });
         }
@@ -3631,18 +3632,71 @@
         // --------------------------------------------------------------------
         // activate netdata on the page
 
-        function finalizePage() {
-            // resize all charts - without starting the background thread
-            // this has to be done while NETDATA is paused
-            // if we ommit this, the affix menu will be wrong, since all
-            // the Dom elements are initially zero-sized
-            NETDATA.parseDom();
+        var runOnceOnDashboardLastRun = 0;
+        function runOnceOnDashboardWithjQuery() {
+            if(runOnceOnDashboardLastRun !== 0)
+                return;
 
-            if(urlOptions.pan_and_zoom === true && NETDATA.options.targets.length > 0)
-                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], urlOptions.after, urlOptions.before);
+            runOnceOnDashboardLastRun = Date.now();
+
+            // prevent bootstrap modals from scrolling the page
+            // maintains the current scroll position
+            // https://stackoverflow.com/a/34754029/4525767
+
+            var scrollPos = 0;
+            var modal_shown = false;
+            var netdata_paused_on_modal = false;
+            $('.modal')
+                .on('show.bs.modal', function () {
+                    scrollPos = window.scrollY;
+
+                    $('body').css({
+                        overflow: 'hidden',
+                        position: 'fixed',
+                        top: -scrollPos
+                    });
+
+                    modal_shown = true;
+
+                    if(NETDATA.options.pauseCallback === null) {
+                        NETDATA.pause(function() {});
+                        netdata_paused_on_modal = true;
+                    }
+                    else
+                        netdata_paused_on_modal = false;
+                })
+                .on('hide.bs.modal', function () {
+
+                    $('body')
+                        .css({
+                            overflow: '',
+                            position: '',
+                            top: ''
+                        });
+
+                    $('html, body')
+                        .animate({ scrollTop: scrollPos }, 0);
+
+                    modal_shown = false;
+
+                    if(netdata_paused_on_modal === true) {
+                        NETDATA.unpause();
+                        netdata_paused_on_modal = false;
+                    }
+                });
+
+            // ------------------------------------------------------------------------
+            // fix bootstrap affix click bug
+            // https://stackoverflow.com/a/37847981/4525767
+
+            $( '#sidebar' ).on( 'affix-top.bs.affix', function() {
+                if(modal_shown) return false;
+            } );
+
 
             // ------------------------------------------------------------------------
             // https://github.com/viralpatel/jquery.shorten/blob/master/src/jquery.shorten.js
+
             $.fn.shorten = function(settings) {
                 "use strict";
 
@@ -3763,17 +3817,33 @@
                         }
 
                         var html = '<div class="shortcontent">' + c +
-                                '</div><div class="allcontent">' + content +
-                                '</div><span><a href="javascript://nop/" class="morelink">' + config.moreText + '</a></span>';
+                            '</div><div class="allcontent">' + content +
+                            '</div><span><a href="javascript://nop/" class="morelink">' + config.moreText + '</a></span>';
 
                         $this.html(html);
                         $this.find(".allcontent").hide(); // Hide all text
                         $('.shortcontent p:last', $this).css('margin-bottom', 0); //Remove bottom margin on last paragraph as it's likely shortened
                     }
                 });
-
             };
+        }
+
+        function finalizePage() {
+            runOnceOnDashboardWithjQuery();
+
+            // resize all charts - without starting the background thread
+            // this has to be done while NETDATA is paused
+            // if we ommit this, the affix menu will be wrong, since all
+            // the Dom elements are initially zero-sized
+            NETDATA.parseDom();
+
+            if(urlOptions.pan_and_zoom === true && NETDATA.options.targets.length > 0)
+                NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], urlOptions.after, urlOptions.before);
+
+            // ------------------------------------------------------------------------
+
             $(".shorten").shorten();
+
             // ------------------------------------------------------------------------
 
             // callback for us to track PanAndZoom operations
@@ -3989,11 +4059,10 @@
 
             var $alarmsModal = $('#alarmsModal');
             $alarmsModal.on('shown.bs.modal', function() {
-                NETDATA.pause(alarmsUpdateModal);
+                alarmsUpdateModal();
             });
 
             $alarmsModal.on('hidden.bs.modal', function() {
-                NETDATA.unpause();
                 document.getElementById('alarms_active').innerHTML =
                         document.getElementById('alarms_all').innerHTML =
                         document.getElementById('alarms_log').innerHTML =
@@ -4185,7 +4254,6 @@
         // var netdataStarted = performance.now();
 
         var netdataCallback = initializeDynamicDashboard;
-
     </script>
 </head>
 
@@ -4252,9 +4320,7 @@
         </div>
     </nav>
     <div class="navbar-highlight">
-        <div id="navbar-highlight-content" class="navbar-highlight-content">
-            hello world
-        </div>
+        <div id="navbar-highlight-content" class="navbar-highlight-content"></div>
     </div>
 
     <div id="masthead" style="display: none;">
