@@ -732,16 +732,15 @@ var NETDATA = window.NETDATA || {};
     NETDATA.onscroll_start_delay = function() {
         NETDATA.options.last_page_scroll = Date.now();
 
-        if(NETDATA.options.current.async_on_scroll === true)
-                NETDATA.options.on_scroll_refresher_stop_until = NETDATA.options.last_page_scroll + 5000;
+        NETDATA.options.on_scroll_refresher_stop_until =
+            NETDATA.options.last_page_scroll
+            + ((NETDATA.options.current.async_on_scroll === true) ? 1000 : 0);
     };
 
     NETDATA.onscroll_end_delay = function() {
-        if(NETDATA.options.current.async_on_scroll === true) {
-            NETDATA.options.on_scroll_refresher_stop_until =
-                Date.now()
-                + ((NETDATA.options.current.async_on_scroll === true) ? NETDATA.options.current.onscroll_worker_duration_threshold : 0);
-        }
+        NETDATA.options.on_scroll_refresher_stop_until =
+            Date.now()
+            + ((NETDATA.options.current.async_on_scroll === true) ? NETDATA.options.current.onscroll_worker_duration_threshold : 0);
     };
 
     NETDATA.onscroll_updater_timeout_id = undefined;
@@ -5148,6 +5147,16 @@ var NETDATA = window.NETDATA || {};
             return;
         }
 
+        if( now < NETDATA.options.auto_refresher_stop_until ) {
+            NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
+                NETDATA.chartRefresher,
+                NETDATA.chartRefresherWaitTime()
+            );
+
+            //console.log('chartRefresher() end2 will run in ' + NETDATA.chartRefresherWaitTime().toString() + ' ms');
+            return;
+        }
+
         if(NETDATA.options.pause === true) {
             // console.log('auto-refresher is paused');
             NETDATA.chartRefresherTimeoutId = NETDATA.timeout.set(
@@ -5155,7 +5164,7 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.chartRefresherWaitTime()
             );
 
-            //console.log('chartRefresher() end2 will run in ' + NETDATA.chartRefresherWaitTime().toString() + ' ms');
+            //console.log('chartRefresher() end3 will run in ' + NETDATA.chartRefresherWaitTime().toString() + ' ms');
             return;
         }
 
@@ -5166,7 +5175,7 @@ var NETDATA = window.NETDATA || {};
             NETDATA.options.pauseCallback();
             NETDATA.chartRefresher();
 
-            //console.log('chartRefresher() end3 (nested)');
+            //console.log('chartRefresher() end4 (nested)');
             return;
         }
 
@@ -5178,7 +5187,7 @@ var NETDATA = window.NETDATA || {};
                     NETDATA.options.current.idle_between_loops
                 );
             });
-            //console.log('chartRefresher() end4 (no parallel, nested)');
+            //console.log('chartRefresher() end5 (no parallel, nested)');
             return;
         }
 
@@ -5187,7 +5196,7 @@ var NETDATA = window.NETDATA || {};
             // get the dom parts again
             // console.log('auto-refresher is calling parseDom()');
             NETDATA.parseDom(NETDATA.chartRefresher);
-            //console.log('chartRefresher() end5 (parseDom)');
+            //console.log('chartRefresher() end6 (parseDom)');
             return;
         }
 
@@ -5578,15 +5587,17 @@ var NETDATA = window.NETDATA || {};
     NETDATA.dygraphSetSelection = function(state, t) {
         if(typeof state.tmp.dygraph_instance !== 'undefined') {
             var r = state.calculateRowForTime(t);
-            if(r !== -1)
+            if(r !== -1) {
                 state.tmp.dygraph_instance.setSelection(r);
+                return true;
+            }
             else {
                 state.tmp.dygraph_instance.clearSelection();
                 state.legendShowUndefined();
             }
         }
 
-        return true;
+        return false;
     };
 
     NETDATA.dygraphClearSelection = function(state) {
@@ -6019,14 +6030,14 @@ var NETDATA = window.NETDATA || {};
 
                     state.tmp.dygraph_user_action = true;
 
-                    if(state.current && state.current.name !== 'auto')
-                        NETDATA.globalSelectionSync.stop();
-
                     if(NETDATA.options.debug.dygraph === true)
                         state.log('dygraphMouseDown()');
 
-                    // Right-click should not initiate a zoom.
+                    // Right-click should not initiate anything.
                     if(event.button && event.button === 2) return;
+
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
 
                     state.tmp.dygraph_mouse_down = true;
                     context.initializeMouseDown(event, dygraph, context);
@@ -6096,12 +6107,18 @@ var NETDATA = window.NETDATA || {};
                     if(state.tmp.dygraph_highlight_after !== null) {
                         //console.log('highlight selection...');
 
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.globalSelectionSync.delay();
+
                         state.tmp.dygraph_user_action = true;
                         Dygraph.moveZoom(event, dygraph, context);
                         event.preventDefault();
                     }
                     else if(context.isPanning) {
                         //console.log('panning...');
+
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.globalSelectionSync.delay();
 
                         state.tmp.dygraph_user_action = true;
                         //NETDATA.globalSelectionSync.stop();
@@ -6112,6 +6129,9 @@ var NETDATA = window.NETDATA || {};
                     }
                     else if(context.isZooming) {
                         //console.log('zooming...');
+
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.globalSelectionSync.delay();
 
                         state.tmp.dygraph_user_action = true;
                         //NETDATA.globalSelectionSync.stop();
@@ -6128,6 +6148,9 @@ var NETDATA = window.NETDATA || {};
 
                     if(state.tmp.dygraph_highlight_after !== null) {
                         //console.log('done highlight selection');
+
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.globalSelectionSync.delay();
 
                         if (!(event.offsetX && event.offsetY)){
                             event.offsetX = event.layerX - event.target.offsetLeft;
@@ -6146,20 +6169,33 @@ var NETDATA = window.NETDATA || {};
                         context.isZooming = false;
                         dygraph.clearZoomRect_();
                         dygraph.drawGraph_(false);
+
+                        // refresh all the charts immediately
+                        NETDATA.options.auto_refresher_stop_until = 0;
                     }
                     else if (context.isPanning) {
                         //console.log('done panning');
 
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.globalSelectionSync.delay();
+
                         state.tmp.dygraph_user_action = true;
-                        //NETDATA.globalSelectionSync.delay();
                         Dygraph.endPan(event, dygraph, context);
+
+                        // refresh all the charts immediately
+                        NETDATA.options.auto_refresher_stop_until = 0;
                     }
                     else if (context.isZooming) {
                         //console.log('done zomming');
 
+                        NETDATA.globalSelectionSync.stop();
+                        NETDATA.globalSelectionSync.delay();
+
                         state.tmp.dygraph_user_action = true;
-                        //NETDATA.globalSelectionSync.delay();
                         Dygraph.endZoom(event, dygraph, context);
+
+                        // refresh all the charts immediately
+                        NETDATA.options.auto_refresher_stop_until = 0;
                     }
                 },
                 click: function(event, dygraph, context) {
@@ -6248,9 +6284,7 @@ var NETDATA = window.NETDATA || {};
                     if(event.altKey || event.shiftKey) {
                         state.tmp.dygraph_user_action = true;
 
-                        if(state.current && state.current.name !== 'auto')
-                            NETDATA.globalSelectionSync.stop();
-                        
+                        NETDATA.globalSelectionSync.stop();
                         NETDATA.globalSelectionSync.delay();
 
                         // http://dygraphs.com/gallery/interaction-api.js
@@ -6307,6 +6341,9 @@ var NETDATA = window.NETDATA || {};
                     state.setMode('zoom');
                     state.pauseChart();
 
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
                     Dygraph.defaultInteractionModel.touchstart(event, dygraph, context);
 
                     // we overwrite the touch directions at the end, to overwrite
@@ -6325,6 +6362,9 @@ var NETDATA = window.NETDATA || {};
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.touchmove()');
 
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
                     state.tmp.dygraph_user_action = true;
                     Dygraph.defaultInteractionModel.touchmove(event, dygraph, context);
 
@@ -6336,16 +6376,25 @@ var NETDATA = window.NETDATA || {};
                     if(NETDATA.options.debug.dygraph === true || state.debug === true)
                         state.log('interactionModel.touchend()');
 
+                    NETDATA.globalSelectionSync.stop();
+                    NETDATA.globalSelectionSync.delay();
+
                     state.tmp.dygraph_user_action = true;
                     Dygraph.defaultInteractionModel.touchend(event, dygraph, context);
 
                     // if it didn't move, it is a selection
                     if(state.dygraph_last_touch_move === 0 && state.dygraph_last_touch_page_x !== 0) {
+                        NETDATA.globalSelectionSync.dont_sync_before = 0;
+                        NETDATA.globalSelectionSync.setMaster(state);
+
                         // internal api of dygraph
                         var pct = (state.dygraph_last_touch_page_x - (dygraph.plotter_.area.x + state.element.getBoundingClientRect().left)) / dygraph.plotter_.area.w;
-                        var t = Math.round(state.data_after + (state.data_before - state.data_after) * pct);
-                        if(NETDATA.dygraphSetSelection(state, t) === true)
+                        console.log('pct: ' + pct.toString());
+
+                        var t = Math.round(state.view_after + (state.view_before - state.view_after) * pct);
+                        if(NETDATA.dygraphSetSelection(state, t) === true) {
                             NETDATA.globalSelectionSync.sync(state, t);
+                        }
                     }
 
                     // if it was double tap within double click time, reset the charts
@@ -6360,6 +6409,9 @@ var NETDATA = window.NETDATA || {};
 
                     // remember the timestamp of the last touch end
                     state.dygraph_last_touch_end = now;
+
+                    // refresh all the charts immediately
+                    NETDATA.options.auto_refresher_stop_until = 0;
                 }
             }
         };
