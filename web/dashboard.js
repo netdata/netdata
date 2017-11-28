@@ -2769,8 +2769,12 @@ var NETDATA = window.NETDATA || {};
         var callChartLibraryUpdateSafely = function(data) {
             var status;
 
-            if(canBeRendered(true) === false)
-                return false;
+            // we should not do this here
+            // if we prevent rendering the chart then:
+            // 1. globalSelectionSync will be wrong
+            // 2. globalPanAndZoom will be wrong
+            //if(canBeRendered(true) === false)
+            //    return false;
 
             if(NETDATA.options.fake_chart_rendering === true)
                 return true;
@@ -2802,8 +2806,12 @@ var NETDATA = window.NETDATA || {};
         var callChartLibraryCreateSafely = function(data) {
             var status;
 
-            if(canBeRendered(true) === false)
-                return false;
+            // we should not do this here
+            // if we prevent rendering the chart then:
+            // 1. globalSelectionSync will be wrong
+            // 2. globalPanAndZoom will be wrong
+            //if(canBeRendered(true) === false)
+            //    return false;
 
             if(NETDATA.options.fake_chart_rendering === true)
                 return true;
