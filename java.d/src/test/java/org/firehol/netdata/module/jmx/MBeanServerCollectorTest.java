@@ -45,6 +45,7 @@ import org.firehol.netdata.module.jmx.configuration.JmxChartConfiguration;
 import org.firehol.netdata.module.jmx.configuration.JmxDimensionConfiguration;
 import org.firehol.netdata.module.jmx.configuration.JmxServerConfiguration;
 import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
+import org.firehol.netdata.module.jmx.query.MBeanDefaultQuery;
 import org.firehol.netdata.test.utils.ReflectionUtils;
 import org.firehol.netdata.test.utils.TestObjectBuilder;
 import org.junit.Test;

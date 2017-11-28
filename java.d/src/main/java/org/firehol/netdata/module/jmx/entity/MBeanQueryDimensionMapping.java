@@ -1,4 +1,4 @@
-package org.firehol.netdata.module.jmx.query;
+package org.firehol.netdata.module.jmx.entity;
 
 import org.firehol.netdata.model.Dimension;
 

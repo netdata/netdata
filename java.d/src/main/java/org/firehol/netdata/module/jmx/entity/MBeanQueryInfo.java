@@ -1,4 +1,4 @@
-package org.firehol.netdata.module.jmx;
+package org.firehol.netdata.module.jmx.entity;
 
 import javax.management.ObjectName;
 

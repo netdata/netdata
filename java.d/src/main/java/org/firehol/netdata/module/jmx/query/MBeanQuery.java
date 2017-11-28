@@ -5,6 +5,7 @@ import java.util.Objects;
 import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
 
+import org.firehol.netdata.module.jmx.entity.MBeanQueryDimensionMapping;
 import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
 
 import lombok.AllArgsConstructor;

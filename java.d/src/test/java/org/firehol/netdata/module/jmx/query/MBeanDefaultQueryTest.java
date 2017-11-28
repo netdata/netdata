@@ -1,7 +1,8 @@
-package org.firehol.netdata.module.jmx;
+package org.firehol.netdata.module.jmx.query;
 
 import static org.junit.Assert.assertEquals;
 
+import org.firehol.netdata.module.jmx.query.MBeanDefaultQuery;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
