@@ -1,13 +1,14 @@
 package org.firehol.netdata.module.jmx;
 
-import javax.management.ObjectName;
+import org.firehol.netdata.module.jmx.query.MBeanQuery;
 
 public final class MBeanQueryFactory {
 
 	private MBeanQueryFactory() {
 	}
 
-	public MBeanQuery build(ObjectName name, String attribute, Class<?> attributeType) {
-		return null;
+	public static MBeanQuery build(MBeanQueryInfo queryInfo) {
+		return new MBeanDefaultQuery(queryInfo.getMBeanName(), queryInfo.getMBeanAttribute(),
+				queryInfo.getMBeanAttributeType());
 	}
 }

@@ -8,10 +8,10 @@ import org.mockito.InjectMocks;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
-public class MBeanQueryTest {
+public class MBeanDefaultQueryTest {
 
 	@InjectMocks
-	public MBeanQuery mBeanQuery;
+	public MBeanDefaultQuery mBeanQuery;
 
 	@Test
 	public void testQuery() {

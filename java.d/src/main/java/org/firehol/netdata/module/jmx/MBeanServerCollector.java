@@ -40,6 +40,8 @@ import org.firehol.netdata.module.jmx.configuration.JmxChartConfiguration;
 import org.firehol.netdata.module.jmx.configuration.JmxDimensionConfiguration;
 import org.firehol.netdata.module.jmx.configuration.JmxServerConfiguration;
 import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
+import org.firehol.netdata.module.jmx.query.MBeanQuery;
+import org.firehol.netdata.module.jmx.query.MBeanQueryDimensionMapping;
 import org.firehol.netdata.module.jmx.utils.MBeanServerUtils;
 import org.firehol.netdata.plugin.Collector;
 import org.firehol.netdata.utils.LoggingUtils;
@@ -180,7 +182,9 @@ public class MBeanServerCollector implements Collector, Closeable {
 					query = foundQueryInfo.get();
 				}
 
-				query.addDimension(dimension);
+				MBeanQueryDimensionMapping dimensionMapping = new MBeanQueryDimensionMapping();
+				dimensionMapping.setDimension(dimension);
+				query.addDimension(dimensionMapping);
 			}
 
 			allChart.add(chart);
@@ -233,9 +237,13 @@ public class MBeanServerCollector implements Collector, Closeable {
 		Object value = getAttribute(name, dimensionConfig.getValue());
 
 		// Add to queryInfo
-		MBeanQuery queryInfo = new MBeanQuery(name, dimensionConfig.getValue(), value.getClass());
+		MBeanQueryInfo queryInfo = new MBeanQueryInfo();
+		queryInfo.setMBeanName(name);
+		queryInfo.setMBeanAttribute(dimensionConfig.getValue());
+		queryInfo.setMBeanAttributeType(value.getClass());
+		MBeanQuery query = MBeanQueryFactory.build(queryInfo);
 
-		return queryInfo;
+		return query;
 	}
 
 	protected Object getAttribute(ObjectName name, String attribute) throws JmxMBeanServerQueryException {

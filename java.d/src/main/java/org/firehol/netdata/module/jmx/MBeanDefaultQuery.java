@@ -20,17 +20,17 @@ package org.firehol.netdata.module.jmx;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 
 import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
 
 import org.firehol.netdata.model.Dimension;
 import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
+import org.firehol.netdata.module.jmx.query.MBeanQuery;
+import org.firehol.netdata.module.jmx.query.MBeanQueryDimensionMapping;
 import org.firehol.netdata.module.jmx.utils.MBeanServerUtils;
 
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -40,14 +40,9 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-@AllArgsConstructor(access = AccessLevel.PACKAGE) // For Mockito
-public class MBeanQuery {
+public class MBeanDefaultQuery extends MBeanQuery {
 
 	private final int LONG_RESOLUTION = 100;
-
-	private ObjectName name;
-
-	private String attribute;
 
 	/**
 	 * The Class of the object returned by the query.
@@ -57,13 +52,15 @@ public class MBeanQuery {
 	@Getter(AccessLevel.NONE)
 	private List<Dimension> dimensions = new LinkedList<>();
 
-	public MBeanQuery(ObjectName name, String attribute, Class<?> attributeType) {
-		this.name = name;
-		this.attribute = attribute;
+	public MBeanDefaultQuery(ObjectName name, String attribute, Class<?> attributeType) {
+		super(name, attribute);
 		this.type = attributeType;
 	}
 
-	public void addDimension(Dimension dimension) {
+	@Override
+	public void addDimension(MBeanQueryDimensionMapping queryInfo) {
+		final Dimension dimension = queryInfo.getDimension();
+
 		if (Double.class.isAssignableFrom(type)) {
 			dimension.setDivisor(dimension.getDivisor() * this.LONG_RESOLUTION);
 		}
@@ -87,19 +84,6 @@ public class MBeanQuery {
 			return (long) any;
 		}
 
-	}
-
-	public boolean queryDestinationEquals(MBeanQuery mBeanQuery) {
-
-		if (!Objects.equals(name, mBeanQuery.getName())) {
-			return false;
-		}
-
-		if (!Objects.equals(attribute, mBeanQuery.getAttribute())) {
-			return false;
-		}
-
-		return true;
 	}
 
 }
