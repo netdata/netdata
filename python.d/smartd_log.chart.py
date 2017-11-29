@@ -12,8 +12,7 @@ from bases.collection import read_last_line
 from bases.FrameworkServices.SimpleService import SimpleService
 
 # charts order (can be overridden if you want less charts, or different order)
-# ORDER = ['1', '4', '5', '7', '9', '12', '193', '194', '197', '198', '200']
-ORDER = ['194']
+ORDER = ['1', '4', '5', '7', '9', '12', '193', '194', '197', '198', '200']
 
 SMART_ATTR = {
     '1': 'Read Error Rate',
