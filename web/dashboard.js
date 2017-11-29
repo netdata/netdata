@@ -1471,9 +1471,6 @@ var NETDATA = window.NETDATA || {};
                 if (this.state === null)
                     this.state = NETDATA.options.targets[0];
 
-                if (this.hasViewport() === true)
-                    NETDATA.globalPanAndZoom.setMaster(this.state, this.view_after, this.view_before);
-
                 if (typeof this.callback === 'function')
                     this.callback(true, this.after, this.before);
             }
@@ -1491,6 +1488,10 @@ var NETDATA = window.NETDATA || {};
             }
 
             this.init(state, after, before, view_after, view_before);
+
+            if (this.hasViewport() === true)
+                NETDATA.globalPanAndZoom.setMaster(this.state, this.view_after, this.view_before);
+
             this.setup();
         },
 
@@ -1748,12 +1749,14 @@ var NETDATA = window.NETDATA || {};
         // functions.
         // if this fails, we fallback to the above
         init: function(timezone) {
+            //console.log('init with timezone: ' + timezone);
 
             // detect browser timezone
             try {
                 NETDATA.options.browser_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             }
             catch(e) {
+                console.log('failed to detect browser timezone: ' + e.toString());
                 NETDATA.options.browser_timezone = 'cannot-detect-it';
             }
 
@@ -1833,6 +1836,7 @@ var NETDATA = window.NETDATA || {};
             }
 
             // save it
+            //console.log('init setOption timezone: ' + timezone);
             NETDATA.setOption('timezone', timezone);
 
             return ret;
