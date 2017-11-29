@@ -5,7 +5,7 @@
 from bases.collection import safe_print
 
 CHART_PARAMS = ['type', 'id', 'name', 'title', 'units', 'family', 'context', 'chart_type']
-DIMENSION_PARAMS = ['id', 'name', 'algorithm', 'multiplier', 'divisor']
+DIMENSION_PARAMS = ['id', 'name', 'algorithm', 'multiplier', 'divisor', 'hidden']
 VARIABLE_PARAMS = ['id', 'value']
 
 CHART_TYPES = ['line', 'area', 'stacked']
