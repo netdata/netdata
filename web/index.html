@@ -46,6 +46,12 @@
     <meta name="twitter:image"             content="https://cloud.githubusercontent.com/assets/2662304/14092712/93b039ea-f551-11e5-822c-beadbf2b2a2e.gif" />
 
     <style>
+
+    /* force the vertical window scrollbar */
+    html {
+        overflow-y: scroll;
+    }
+
     /* prevent body from hiding under the navbar */
     body {
         padding-top: 50px;
@@ -676,6 +682,9 @@
             },
 
             netdataPanAndZoomCallback: function(status, after, before) {
+                //console.log(1);
+                //console.log(new Error().stack);
+
                 if(netdataSnapshotData === null) {
                     urlOptions.pan_and_zoom = status;
                     urlOptions.after = after;
@@ -685,6 +694,9 @@
             },
 
             netdataHighlightCallback: function(status, after, before) {
+                //console.log(2);
+                //console.log(new Error().stack);
+
                 if(status === true && (after === null || before === null || after <= 0 || before <= 0 || after >= before)) {
                     status = false;
                     after = 0;
@@ -1292,8 +1304,10 @@
         function scrollToId(hash) {
             if(hash && hash !== '' && document.getElementById(hash) !== null) {
                 var offset = $('#' + hash).offset();
-                if(typeof offset !== 'undefined')
-                    $('html, body').animate({ scrollTop: offset.top - 30 }, 0);
+                if(typeof offset !== 'undefined') {
+                    //console.log('scrolling to ' + hash + ' at ' + offset.top.toString());
+                    $('html, body').animate({scrollTop: offset.top - 30}, 0);
+                }
             }
 
             // we must return false to prevent the default action
@@ -3632,66 +3646,382 @@
         // --------------------------------------------------------------------
         // activate netdata on the page
 
+        function dashboardSettingsSetup() {
+            var update_options_modal = function() {
+                // console.log('update_options_modal');
+
+                var sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    if(self.prop('checked') !== NETDATA.getOption(option)) {
+                        // console.log('switching ' + option.toString());
+                        self.bootstrapToggle(NETDATA.getOption(option)?'on':'off');
+                    }
+                };
+
+                var theme_sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    self.bootstrapToggle(netdataTheme === 'slate'?'on':'off');
+                };
+                var units_sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    if(self.prop('checked') !== (NETDATA.getOption('units') === 'auto')) {
+                        self.bootstrapToggle(NETDATA.getOption('units') === 'auto' ? 'on' : 'off');
+                    }
+
+                    if(self.prop('checked') === true) {
+                        $('#settingsLocaleTempRow').show();
+                        $('#settingsLocaleTimeRow').show();
+                    }
+                    else {
+                        $('#settingsLocaleTempRow').hide();
+                        $('#settingsLocaleTimeRow').hide();
+                    }
+                };
+                var temp_sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    if(self.prop('checked') !== (NETDATA.getOption('temperature') === 'celsius')) {
+                        self.bootstrapToggle(NETDATA.getOption('temperature') === 'celsius' ? 'on' : 'off');
+                    }
+                };
+                var timezone_sync_option = function(option) {
+                    var self = $('#' + option);
+
+                    document.getElementById('browser_timezone').innerText = NETDATA.options.browser_timezone;
+                    document.getElementById('server_timezone').innerText = NETDATA.options.server_timezone;
+                    document.getElementById('current_timezone').innerText = (NETDATA.options.current.timezone === 'default')?'unset, using browser default':NETDATA.options.current.timezone;
+
+                    if(self.prop('checked') === NETDATA.dateTime.using_timezone) {
+                        self.bootstrapToggle(NETDATA.dateTime.using_timezone ? 'off' : 'on');
+                    }
+                };
+
+                sync_option('eliminate_zero_dimensions');
+                sync_option('destroy_on_hide');
+                sync_option('async_on_scroll');
+                sync_option('parallel_refresher');
+                sync_option('concurrent_refreshes');
+                sync_option('sync_selection');
+                sync_option('sync_pan_and_zoom');
+                sync_option('stop_updates_when_focus_is_lost');
+                sync_option('smooth_plot');
+                sync_option('pan_and_zoom_data_padding');
+                sync_option('show_help');
+                sync_option('seconds_as_time');
+                theme_sync_option('netdata_theme_control');
+                units_sync_option('units_conversion');
+                temp_sync_option('units_temp');
+                timezone_sync_option('local_timezone');
+
+                if(NETDATA.getOption('parallel_refresher') === false) {
+                    $('#concurrent_refreshes_row').hide();
+                }
+                else {
+                    $('#concurrent_refreshes_row').show();
+                }
+            };
+            NETDATA.setOption('setOptionCallback', update_options_modal);
+
+            // handle options changes
+            $('#eliminate_zero_dimensions').change(function()       { NETDATA.setOption('eliminate_zero_dimensions', $(this).prop('checked')); });
+            $('#destroy_on_hide').change(function()                 { NETDATA.setOption('destroy_on_hide', $(this).prop('checked')); });
+            $('#async_on_scroll').change(function()                 { NETDATA.setOption('async_on_scroll', $(this).prop('checked')); });
+            $('#parallel_refresher').change(function()              { NETDATA.setOption('parallel_refresher', $(this).prop('checked')); });
+            $('#concurrent_refreshes').change(function()            { NETDATA.setOption('concurrent_refreshes', $(this).prop('checked')); });
+            $('#sync_selection').change(function()                  { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
+            $('#sync_pan_and_zoom').change(function()               { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
+            $('#stop_updates_when_focus_is_lost').change(function() {
+                urlOptions.update_always = !$(this).prop('checked');
+                urlOptions.hashUpdate();
+
+                NETDATA.setOption('stop_updates_when_focus_is_lost', !urlOptions.update_always);
+            });
+            $('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
+            $('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
+            $('#seconds_as_time').change(function()                 { NETDATA.setOption('seconds_as_time', $(this).prop('checked')); });
+            $('#local_timezone').change(function() {
+                if($(this).prop('checked'))
+                    selected_server_timezone('default', true);
+                else
+                    selected_server_timezone('default', false);
+            });
+
+
+            $('#units_conversion').change(function()                {
+                NETDATA.setOption('units', $(this).prop('checked')?'auto':'original');
+            });
+            $('#units_temp').change(function()                {
+                NETDATA.setOption('temperature', $(this).prop('checked')?'celsius':'fahrenheit');
+            });
+
+            $('#show_help').change(function()                       {
+                urlOptions.help = $(this).prop('checked');
+                urlOptions.hashUpdate();
+
+                NETDATA.setOption('show_help', urlOptions.help);
+                netdataReload();
+            });
+
+            // this has to be the last
+            // it reloads the page
+            $('#netdata_theme_control').change(function() {
+                urlOptions.theme = $(this).prop('checked')?'slate':'white';
+                urlOptions.hashUpdate();
+
+                if(setTheme(urlOptions.theme))
+                    netdataReload();
+            });
+        }
+
+        function scrollDashboardTo() {
+            if(netdataSnapshotData !== null && typeof netdataSnapshotData.hash !== 'undefined') {
+                //console.log(netdataSnapshotData.hash);
+                scrollToId(netdataSnapshotData.hash.replace('#',''));
+            }
+            else {
+                // check if we have to jump to a specific section
+                scrollToId(urlOptions.hash.replace('#', ''));
+
+                if (urlOptions.chart !== null) {
+                    NETDATA.alarms.scrollToChart(urlOptions.chart);
+                    //urlOptions.hash = '#' + NETDATA.name2id('menu_' + charts[c].menu + '_submenu_' + charts[c].submenu);
+                    //urlOptions.hash = '#chart_' + NETDATA.name2id(urlOptions.chart);
+                    //console.log('hash = ' + urlOptions.hash);
+                }
+            }
+        }
+
         var runOnceOnDashboardLastRun = 0;
         function runOnceOnDashboardWithjQuery() {
-            if(runOnceOnDashboardLastRun !== 0)
+            if(runOnceOnDashboardLastRun !== 0) {
+                scrollDashboardTo();
+
+                // restore the scrollspy at the proper position
+                $(document.body).scrollspy('refresh');
+                $(document.body).scrollspy('process');
+
                 return;
+            }
 
             runOnceOnDashboardLastRun = Date.now();
+
+            // ------------------------------------------------------------------------
+            // bootstrap modals
 
             // prevent bootstrap modals from scrolling the page
             // maintains the current scroll position
             // https://stackoverflow.com/a/34754029/4525767
 
             var scrollPos = 0;
-            var modal_shown = false;
-            var netdata_paused_on_modal = false;
+            var modal_depth = 0;                            // how many modals are currently open
+            var modal_shown = false;                        // set to true, if a modal is shown
+            var netdata_paused_on_modal = false;            // set to true, if the modal paused netdata
+            var scrollspyOffset = $(window).height() / 3;   // will be updated below - the offset of scrollspy to select an item
+
             $('.modal')
                 .on('show.bs.modal', function () {
-                    scrollPos = window.scrollY;
+                    if(modal_depth === 0) {
+                        scrollPos = window.scrollY;
 
-                    $('body').css({
-                        overflow: 'hidden',
-                        position: 'fixed',
-                        top: -scrollPos
-                    });
+                        $('body').css({
+                            overflow: 'hidden',
+                            position: 'fixed',
+                            top: -scrollPos
+                        });
 
-                    modal_shown = true;
+                        modal_shown = true;
 
-                    if(NETDATA.options.pauseCallback === null) {
-                        NETDATA.pause(function() {});
-                        netdata_paused_on_modal = true;
+                        if (NETDATA.options.pauseCallback === null) {
+                            NETDATA.pause(function () {});
+                            netdata_paused_on_modal = true;
+                        }
+                        else
+                            netdata_paused_on_modal = false;
                     }
-                    else
-                        netdata_paused_on_modal = false;
+
+                    modal_depth++;
+                    //console.log(urlOptions.after);
+
                 })
                 .on('hide.bs.modal', function () {
 
-                    $('body')
-                        .css({
-                            overflow: '',
-                            position: '',
-                            top: ''
-                        });
+                    modal_depth--;
 
-                    $('html, body')
-                        .animate({ scrollTop: scrollPos }, 0);
+                    if(modal_depth <= 0) {
+                        modal_depth = 0;
 
-                    modal_shown = false;
+                        $('body')
+                            .css({
+                                overflow: '',
+                                position: '',
+                                top: ''
+                            });
 
-                    if(netdata_paused_on_modal === true) {
-                        NETDATA.unpause();
-                        netdata_paused_on_modal = false;
+                        // scroll to the position we had open before the modal
+                        $('html, body')
+                            .animate({scrollTop: scrollPos}, 0);
+
+                        // unpause netdata, if we paused it
+                        if (netdata_paused_on_modal === true) {
+                            NETDATA.unpause();
+                            netdata_paused_on_modal = false;
+                        }
+
+                        // restore the scrollspy at the proper position
+                        $(document.body).scrollspy('process');
+                    }
+                    //console.log(urlOptions.after);
+                })
+                .on('hidden.bs.modal', function () {
+                    if(modal_depth === 0)
+                        modal_shown = false;
+                    //console.log(urlOptions.after);
+                });
+
+
+            // ------------------------------------------------------------------------
+            // sidebar / affix
+
+            $('#sidebar')
+                .affix({
+                    offset: {
+                        top: (isdemo())?150:0,
+                        bottom: 0
+                    }
+                })
+                .on('affixed.bs.affix', function() {
+                    // fix scrolling of very long affix lists
+                    // http://stackoverflow.com/questions/21691585/bootstrap-3-1-0-affix-too-long
+
+                    $(this).removeAttr('style');
+                })
+                .on( 'affix-top.bs.affix', function() {
+                    // fix bootstrap affix click bug
+                    // https://stackoverflow.com/a/37847981/4525767
+
+                    if(modal_shown) return false;
+                })
+                .on('activate.bs.scrollspy', function (e) {
+                    // change the URL based on the current position of the screen
+
+                    if(modal_shown === false) {
+                        var el = $(e.target);
+                        var hash = el.find('a').attr('href');
+                        if (typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
+                            urlOptions.hash = hash;
+                            urlOptions.hashUpdate();
+                        }
                     }
                 });
 
-            // ------------------------------------------------------------------------
-            // fix bootstrap affix click bug
-            // https://stackoverflow.com/a/37847981/4525767
+            Ps.initialize(document.getElementById('sidebar'), {
+                wheelSpeed: 0.5,
+                wheelPropagation: true,
+                swipePropagation: true,
+                minScrollbarLength: null,
+                maxScrollbarLength: null,
+                useBothWheelAxes: false,
+                suppressScrollX: true,
+                suppressScrollY: false,
+                scrollXMarginOffset: 0,
+                scrollYMarginOffset: 0,
+                theme: 'default'
+            });
 
-            $( '#sidebar' ).on( 'affix-top.bs.affix', function() {
-                if(modal_shown) return false;
-            } );
+
+            // ------------------------------------------------------------------------
+            // scrollspy
+
+            if(scrollspyOffset > 250) scrollspyOffset = 250;
+            if(scrollspyOffset < 75) scrollspyOffset = 75;
+            document.body.setAttribute('data-offset', scrollspyOffset);
+
+            // scroll the dashboard, before activating the scrollspy, so that our
+            // hash will not be updated before we got the chance to scroll to it
+            scrollDashboardTo();
+
+            $(document.body).scrollspy({
+                target: '#sidebar',
+                offset: scrollspyOffset // controls the diff of the <hX> element to the top, to select it
+            });
+
+
+            // ------------------------------------------------------------------------
+            // my-netdata menu
+
+            Ps.initialize(document.getElementById('myNetdataDropdownUL'), {
+                wheelSpeed: 1,
+                wheelPropagation: false,
+                swipePropagation: false,
+                minScrollbarLength: null,
+                maxScrollbarLength: null,
+                useBothWheelAxes: false,
+                suppressScrollX: true,
+                suppressScrollY: false,
+                scrollXMarginOffset: 0,
+                scrollYMarginOffset: 0,
+                theme: 'default'
+            });
+
+            $('#myNetdataDropdownParent')
+                .on('show.bs.dropdown', function () {
+                    var hash = urlOptions.genHash();
+                    $('.registry_link').each(function(idx) {
+                        this.setAttribute('href', this.getAttribute("href").replace(/#.*$/, hash));
+                    });
+
+                    NETDATA.pause(function() {});
+                })
+                .on('shown.bs.dropdown', function () {
+                    Ps.update(document.getElementById('myNetdataDropdownUL'));
+                })
+                .on('hidden.bs.dropdown', function () {
+                    NETDATA.unpause();
+                });
+
+
+            $('#deleteRegistryModal')
+                .on('hidden.bs.modal', function() {
+                    deleteRegistryGuid = null;
+                });
+
+
+            // ------------------------------------------------------------------------
+            // update modal
+
+            $('#updateModal')
+                .on('show.bs.modal', function() {
+                    versionLog('checking, please wait...');
+                })
+                .on('shown.bs.modal', function() {
+                    notifyForUpdate(true);
+                });
+
+
+            // ------------------------------------------------------------------------
+            // alarms modal
+
+            $('#alarmsModal')
+                .on('shown.bs.modal', function() {
+                    alarmsUpdateModal();
+                })
+                .on('hidden.bs.modal', function() {
+                    document.getElementById('alarms_active').innerHTML =
+                        document.getElementById('alarms_all').innerHTML =
+                            document.getElementById('alarms_log').innerHTML =
+                                'loading...';
+                });
+
+
+            // ------------------------------------------------------------------------
+
+            dashboardSettingsSetup();
+            loadSnapshotDragAndDropSetup();
+            saveSnapshotModalSetup();
+            showPageFooter();
 
 
             // ------------------------------------------------------------------------
@@ -3829,83 +4159,31 @@
         }
 
         function finalizePage() {
-            runOnceOnDashboardWithjQuery();
-
             // resize all charts - without starting the background thread
             // this has to be done while NETDATA is paused
             // if we ommit this, the affix menu will be wrong, since all
             // the Dom elements are initially zero-sized
             NETDATA.parseDom();
 
+            // ------------------------------------------------------------------------
+
+            NETDATA.globalPanAndZoom.callback = null;
+            NETDATA.globalChartUnderlay.callback = null;
+
             if(urlOptions.pan_and_zoom === true && NETDATA.options.targets.length > 0)
                 NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], urlOptions.after, urlOptions.before);
-
-            // ------------------------------------------------------------------------
-
-            $(".shorten").shorten();
-
-            // ------------------------------------------------------------------------
 
             // callback for us to track PanAndZoom operations
             NETDATA.globalPanAndZoom.callback = urlOptions.netdataPanAndZoomCallback;
             NETDATA.globalChartUnderlay.callback = urlOptions.netdataHighlightCallback;
 
+            // ------------------------------------------------------------------------
+
             // let it run (update the charts)
             NETDATA.unpause();
 
-            // check if we have to jump to a specific section
-            scrollToId(urlOptions.hash.replace('#',''));
-
-            if(urlOptions.chart !== null) {
-                NETDATA.alarms.scrollToChart(urlOptions.chart);
-                //urlOptions.hash = '#' + NETDATA.name2id('menu_' + charts[c].menu + '_submenu_' + charts[c].submenu);
-                //urlOptions.hash = '#chart_' + NETDATA.name2id(urlOptions.chart);
-                //console.log('hash = ' + urlOptions.hash);
-            }
-
-            var $sidebar = $('#sidebar');
-            /* activate bootstrap sidebar (affix) */
-            $sidebar.affix({
-                offset: {
-                    top: (isdemo())?150:0,
-                    bottom: 0
-                }
-            });
-
-            /* fix scrolling of very long affix lists
-               http://stackoverflow.com/questions/21691585/bootstrap-3-1-0-affix-too-long
-             */
-            $sidebar.on('affixed.bs.affix', function() {
-                $(this).removeAttr('style');
-            });
-
-            /* activate bootstrap scrollspy (needed for sidebar) */
-            var scrollspyOffset = $(window).height() / 3;
-            if(scrollspyOffset > 250) scrollspyOffset = 250;
-            if(scrollspyOffset < 75) scrollspyOffset = 75;
-            document.body.setAttribute('data-offset', scrollspyOffset);
-            // console.log(scrollspyOffset);
-            $(document.body).scrollspy({
-                target: '#sidebar',
-                offset: scrollspyOffset // controls the diff of the <hX> element to the top, to select it
-            });
-
-            // change the URL based on the current position of the screen
-            $sidebar.on('activate.bs.scrollspy', function (e) {
-                //console.log(e);
-                var el = $(e.target);
-                //if(el.find('ul').size() === 0) {
-                var hash = el.find('a').attr('href');
-                // console.log(hash);
-                if(typeof hash === 'string' && hash.substring(0, 1) === '#' && urlOptions.hash.startsWith(hash + '_submenu_') === false) {
-                    urlOptions.hash = hash;
-                    //console.log(urlOptions.hash);
-                    urlOptions.hashUpdate();
-                }
-                //else console.log('hash: not accepting ' + hash);
-                //}
-                //else console.log('el.find(): not found');
-            });
+            runOnceOnDashboardWithjQuery();
+            $(".shorten").shorten();
 
             $('[data-toggle="tooltip"]').tooltip({
                 animated: 'fade',
@@ -3916,162 +4194,6 @@
             });
             $('[data-toggle="popover"]').popover();
 
-            loadSnapshotDragAndDropSetup();
-            saveSnapshotModalSetup();
-            showPageFooter();
-
-            var update_options_modal = function() {
-                // console.log('update_options_modal');
-
-                var sync_option = function(option) {
-                    var self = $('#' + option);
-
-                    if(self.prop('checked') !== NETDATA.getOption(option)) {
-                        // console.log('switching ' + option.toString());
-                        self.bootstrapToggle(NETDATA.getOption(option)?'on':'off');
-                    }
-                };
-
-                var theme_sync_option = function(option) {
-                    var self = $('#' + option);
-
-                    self.bootstrapToggle(netdataTheme === 'slate'?'on':'off');
-                };
-                var units_sync_option = function(option) {
-                    var self = $('#' + option);
-
-                    if(self.prop('checked') !== (NETDATA.getOption('units') === 'auto')) {
-                        self.bootstrapToggle(NETDATA.getOption('units') === 'auto' ? 'on' : 'off');
-                    }
-
-                    if(self.prop('checked') === true) {
-                        $('#settingsLocaleTempRow').show();
-                        $('#settingsLocaleTimeRow').show();
-                    }
-                    else {
-                        $('#settingsLocaleTempRow').hide();
-                        $('#settingsLocaleTimeRow').hide();
-                    }
-                };
-                var temp_sync_option = function(option) {
-                    var self = $('#' + option);
-
-                    if(self.prop('checked') !== (NETDATA.getOption('temperature') === 'celsius')) {
-                        self.bootstrapToggle(NETDATA.getOption('temperature') === 'celsius' ? 'on' : 'off');
-                    }
-                };
-                var timezone_sync_option = function(option) {
-                    var self = $('#' + option);
-
-                    document.getElementById('browser_timezone').innerText = NETDATA.options.browser_timezone;
-                    document.getElementById('server_timezone').innerText = NETDATA.options.server_timezone;
-                    document.getElementById('current_timezone').innerText = (NETDATA.options.current.timezone === 'default')?'unset, using browser default':NETDATA.options.current.timezone;
-
-                    if(self.prop('checked') === NETDATA.dateTime.using_timezone) {
-                        self.bootstrapToggle(NETDATA.dateTime.using_timezone ? 'off' : 'on');
-                    }
-                };
-
-                sync_option('eliminate_zero_dimensions');
-                sync_option('destroy_on_hide');
-                sync_option('async_on_scroll');
-                sync_option('parallel_refresher');
-                sync_option('concurrent_refreshes');
-                sync_option('sync_selection');
-                sync_option('sync_pan_and_zoom');
-                sync_option('stop_updates_when_focus_is_lost');
-                sync_option('smooth_plot');
-                sync_option('pan_and_zoom_data_padding');
-                sync_option('show_help');
-                sync_option('seconds_as_time');
-                theme_sync_option('netdata_theme_control');
-                units_sync_option('units_conversion');
-                temp_sync_option('units_temp');
-                timezone_sync_option('local_timezone');
-
-                if(NETDATA.getOption('parallel_refresher') === false) {
-                    $('#concurrent_refreshes_row').hide();
-                }
-                else {
-                    $('#concurrent_refreshes_row').show();
-                }
-            };
-            NETDATA.setOption('setOptionCallback', update_options_modal);
-
-            // handle options changes
-            $('#eliminate_zero_dimensions').change(function()       { NETDATA.setOption('eliminate_zero_dimensions', $(this).prop('checked')); });
-            $('#destroy_on_hide').change(function()                 { NETDATA.setOption('destroy_on_hide', $(this).prop('checked')); });
-            $('#async_on_scroll').change(function()                 { NETDATA.setOption('async_on_scroll', $(this).prop('checked')); });
-            $('#parallel_refresher').change(function()              { NETDATA.setOption('parallel_refresher', $(this).prop('checked')); });
-            $('#concurrent_refreshes').change(function()            { NETDATA.setOption('concurrent_refreshes', $(this).prop('checked')); });
-            $('#sync_selection').change(function()                  { NETDATA.setOption('sync_selection', $(this).prop('checked')); });
-            $('#sync_pan_and_zoom').change(function()               { NETDATA.setOption('sync_pan_and_zoom', $(this).prop('checked')); });
-            $('#stop_updates_when_focus_is_lost').change(function() {
-                urlOptions.update_always = !$(this).prop('checked');
-                urlOptions.hashUpdate();
-
-                NETDATA.setOption('stop_updates_when_focus_is_lost', !urlOptions.update_always);
-            });
-            $('#smooth_plot').change(function()                     { NETDATA.setOption('smooth_plot', $(this).prop('checked')); });
-            $('#pan_and_zoom_data_padding').change(function()       { NETDATA.setOption('pan_and_zoom_data_padding', $(this).prop('checked')); });
-            $('#seconds_as_time').change(function()                 { NETDATA.setOption('seconds_as_time', $(this).prop('checked')); });
-            $('#local_timezone').change(function() {
-                if($(this).prop('checked'))
-                    selected_server_timezone('default', true);
-                else
-                    selected_server_timezone('default', false);
-            });
-
-
-            $('#units_conversion').change(function()                {
-                NETDATA.setOption('units', $(this).prop('checked')?'auto':'original');
-            });
-            $('#units_temp').change(function()                {
-                NETDATA.setOption('temperature', $(this).prop('checked')?'celsius':'fahrenheit');
-            });
-
-            $('#show_help').change(function()                       {
-                urlOptions.help = $(this).prop('checked');
-                urlOptions.hashUpdate();
-
-                NETDATA.setOption('show_help', urlOptions.help);
-                netdataReload();
-            });
-
-            // this has to be the last
-            // it reloads the page
-            $('#netdata_theme_control').change(function() {
-                urlOptions.theme = $(this).prop('checked')?'slate':'white';
-                urlOptions.hashUpdate();
-
-                if(setTheme(urlOptions.theme))
-                    netdataReload();
-            });
-
-            var $updateModal = $('#updateModal');
-            $updateModal.on('show.bs.modal', function() {
-                versionLog('checking, please wait...');
-            });
-
-            $updateModal.on('shown.bs.modal', function() {
-                notifyForUpdate(true);
-            });
-
-            var $alarmsModal = $('#alarmsModal');
-            $alarmsModal.on('shown.bs.modal', function() {
-                alarmsUpdateModal();
-            });
-
-            $alarmsModal.on('hidden.bs.modal', function() {
-                document.getElementById('alarms_active').innerHTML =
-                        document.getElementById('alarms_all').innerHTML =
-                        document.getElementById('alarms_log').innerHTML =
-                                'loading...';
-            });
-
-            $('#deleteRegistryModal').on('hidden.bs.modal', function() {
-                deleteRegistryGuid = null;
-            });
 
             if(isdemo()) {
                 // do not to give errors on netdata demo servers for 60 seconds
@@ -4100,58 +4222,11 @@
             if(urlOptions.show_alarms === true)
                 setTimeout(function() { $('#alarmsModal').modal('show'); }, 1000);
 
-            var sidebar = document.getElementById('sidebar');
-            Ps.initialize(sidebar, {
-                wheelSpeed: 0.5,
-                wheelPropagation: true,
-                swipePropagation: true,
-                minScrollbarLength: null,
-                maxScrollbarLength: null,
-                useBothWheelAxes: false,
-                suppressScrollX: true,
-                suppressScrollY: false,
-                scrollXMarginOffset: 0,
-                scrollYMarginOffset: 0,
-                theme: 'default'
-            });
-            Ps.update(sidebar);
-
-            var registry = document.getElementById('myNetdataDropdownUL');
-            Ps.initialize(registry, {
-                wheelSpeed: 1,
-                wheelPropagation: false,
-                swipePropagation: false,
-                minScrollbarLength: null,
-                maxScrollbarLength: null,
-                useBothWheelAxes: false,
-                suppressScrollX: true,
-                suppressScrollY: false,
-                scrollXMarginOffset: 0,
-                scrollYMarginOffset: 0,
-                theme: 'default'
-            });
-            Ps.update(registry);
-
             NETDATA.onresizeCallback = function() {
-                Ps.update(sidebar);
-                Ps.update(registry);
+                Ps.update(document.getElementById('sidebar'));
+                Ps.update(document.getElementById('myNetdataDropdownUL'));
             };
-
-            $('#myNetdataDropdownParent')
-                .on('show.bs.dropdown', function () {
-                    var hash = urlOptions.genHash();
-                    $('.registry_link').each(function(idx) {
-                       this.setAttribute('href', this.getAttribute("href").replace(/#.*$/, hash));
-                    });
-
-                    NETDATA.pause(function() {});
-                })
-                .on('shown.bs.dropdown', function () {
-                    Ps.update(registry);
-                })
-                .on('hidden.bs.dropdown', function () {
-                    NETDATA.unpause();
-                });
+            NETDATA.onresizeCallback();
 
             if(netdataSnapshotData !== null) {
                 NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], netdataSnapshotData.after_ms, netdataSnapshotData.before_ms);
@@ -4201,13 +4276,15 @@
         };
 
         var selected_server_timezone = function(timezone, status) {
-            // console.log(timezone + " " + ((typeof status === 'undefined')?'undefined':status).toString());
+            //console.log('called with timezone: ' + timezone + ", status: " + ((typeof status === 'undefined')?'undefined':status).toString());
 
             // clear the error
             document.getElementById('timezone_error_message').innerHTML = '';
 
             if (typeof status === 'undefined') {
                 // the user selected a timezone from the menu
+
+                NETDATA.setOption('user_set_server_timezone', timezone);
 
                 if (NETDATA.dateTime.init(timezone) === false) {
                     NETDATA.dateTime.init();
@@ -4219,30 +4296,32 @@
                     NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
                 }
                 else {
-                    NETDATA.setOption('user_set_server_timezone', timezone);
-
                     if($('#local_timezone').prop('checked'))
                         $('#local_timezone').bootstrapToggle('off');
                 }
             }
+            else if (status === true) {
+                // the user wants the browser default timezone to be activated
+
+                NETDATA.dateTime.init();
+            }
             else {
-                if (status === true) {
+                // the user wants the server default timezone to be activated
+                //console.log('found ' + NETDATA.options.current.user_set_server_timezone);
+
+                if (NETDATA.options.current.user_set_server_timezone === 'default')
+                    NETDATA.options.current.user_set_server_timezone = NETDATA.options.server_timezone;
+
+                timezone = NETDATA.options.current.user_set_server_timezone;
+
+                if (NETDATA.dateTime.init(timezone) === false) {
                     NETDATA.dateTime.init();
-                }
-                else {
-                    if (NETDATA.options.current.user_set_server_timezone === 'default')
-                        NETDATA.options.current.user_set_server_timezone = NETDATA.options.server_timezone;
 
-                    timezone = NETDATA.options.current.user_set_server_timezone;
-                    if (NETDATA.dateTime.init(timezone) === false) {
-                        NETDATA.dateTime.init();
+                    if(!$('#local_timezone').prop('checked'))
+                        $('#local_timezone').bootstrapToggle('on');
 
-                        if(!$('#local_timezone').prop('checked'))
-                            $('#local_timezone').bootstrapToggle('on');
-
-                        document.getElementById('timezone_error_message').innerHTML = 'Sorry. The timezone "' + timezone.toString() + '" is not accepted by your browser. Please select one from the list.';
-                        NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
-                    }
+                    document.getElementById('timezone_error_message').innerHTML = 'Sorry. The timezone "' + timezone.toString() + '" is not accepted by your browser. Please select one from the list.';
+                    NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
                 }
             }
 
@@ -5462,6 +5541,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171122-3"></script>
+    <script type="text/javascript" src="dashboard.js?v20171130-1"></script>
 </body>
 </html>
