@@ -39,6 +39,8 @@ public class JmxDimensionConfiguration {
 	 */
 	private String value;
 
+	private String compositeDataKey;
+
 	/**
 	 * Multiply the collected value before displaying it.
 	 */
@@ -57,4 +59,5 @@ public class JmxDimensionConfiguration {
 	 * If true the value get's collected but not displayed.
 	 */
 	private boolean hidden = false;
+
 }

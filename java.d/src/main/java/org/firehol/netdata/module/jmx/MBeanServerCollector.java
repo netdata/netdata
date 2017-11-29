@@ -185,6 +185,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 
 				MBeanQueryDimensionMapping dimensionMapping = new MBeanQueryDimensionMapping();
 				dimensionMapping.setDimension(dimension);
+				dimensionMapping.setCompositeDataKey(dimensionConfig.getCompositeDataKey());
 				query.addDimension(dimensionMapping);
 			}
 

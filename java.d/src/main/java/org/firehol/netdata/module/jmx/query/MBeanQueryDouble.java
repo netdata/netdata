@@ -14,9 +14,9 @@ import org.firehol.netdata.module.jmx.utils.MBeanServerUtils;
 import lombok.AccessLevel;
 import lombok.Getter;
 
-public class MBeanQueryLong extends MBeanQuery {
+public class MBeanQueryDouble extends MBeanQuery {
 
-	public MBeanQueryLong(ObjectName name, String attribute) {
+	public MBeanQueryDouble(ObjectName name, String attribute) {
 		super(name, attribute);
 	}
 

@@ -2,7 +2,6 @@ package org.firehol.netdata.module.jmx.query;
 
 import static org.junit.Assert.assertEquals;
 
-import org.firehol.netdata.module.jmx.query.MBeanDefaultQuery;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
@@ -40,18 +39,6 @@ public class MBeanDefaultQueryTest {
 
 		// Verify
 		assertEquals(1234, result);
-	}
-
-	@Test
-	public void testToLongDouble() {
-		// Static Object
-		double value = 1234;
-
-		// Test
-		long result = mBeanQuery.toLong(value);
-
-		// Verify
-		assertEquals(1234 * 100, result);
 	}
 
 }

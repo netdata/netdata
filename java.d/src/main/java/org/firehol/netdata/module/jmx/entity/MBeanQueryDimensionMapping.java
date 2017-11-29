@@ -12,4 +12,9 @@ import lombok.Setter;
 public class MBeanQueryDimensionMapping {
 
 	private Dimension dimension;
+
+	/**
+	 * Optional
+	 */
+	private String compositeDataKey;
 }
