@@ -221,7 +221,7 @@ class Service(ExecutableService):
     def create_backends_charts(self, backends):
         for backend in backends:
             chart_name = ''.join([backend, '_response_statistics'])
-            title = 'Backend "{0}" Response Statistics'.format(backend.capitalize())
+            title = 'Backend "{0}"'.format(backend.capitalize())
             hdr_bytes = ''.join([backend, '_beresp_hdrbytes'])
             body_bytes = ''.join([backend, '_beresp_bodybytes'])
 
