@@ -79,19 +79,19 @@ static char *path_to_sys_dev_block_major_minor_string = NULL;
 static char *path_to_sys_block_device = NULL;
 static char *path_to_sys_devices_virtual_block_device = NULL;
 static char *path_to_device_mapper = NULL;
+static char *path_to_device_label = NULL;
+static char *path_to_device_id = NULL;
+static int name_disks_by_id = CONFIG_BOOLEAN_NO;
 
-static inline char *get_disk_name(unsigned long major, unsigned long minor, char *disk) {
-    static int enabled = 1;
-
-    if(!enabled) goto cleanup;
-
+static inline int get_disk_name_from_path(const char *path, char *result, size_t result_size, unsigned long major, unsigned long minor, char *disk) {
     char filename[FILENAME_MAX + 1];
-    char link[FILENAME_MAX + 1];
+    int found = 0;
 
-    DIR *dir = opendir(path_to_device_mapper);
+    result_size--;
+
+    DIR *dir = opendir(path);
     if (!dir) {
-        error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'. Disabling device-mapper support.", disk, major, minor, path_to_device_mapper);
-        enabled = 0;
+        error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'. Disabling device-mapper support.", disk, major, minor, path);
         goto cleanup;
     }
 
@@ -99,18 +99,18 @@ static inline char *get_disk_name(unsigned long major, unsigned long minor, char
     while ((de = readdir(dir))) {
         if(de->d_type != DT_LNK) continue;
 
-        snprintfz(filename, FILENAME_MAX, "%s/%s", path_to_device_mapper, de->d_name);
-        ssize_t len = readlink(filename, link, FILENAME_MAX);
+        snprintfz(filename, FILENAME_MAX, "%s/%s", path, de->d_name);
+        ssize_t len = readlink(filename, result, result_size);
         if(len <= 0) {
             error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot read link '%s'.", disk, major, minor, filename);
             continue;
         }
 
-        link[len] = '\0';
-        if(link[0] != '/')
-            snprintfz(filename, FILENAME_MAX, "%s/%s", path_to_device_mapper, link);
+        result[len] = '\0';
+        if(result[0] != '/')
+            snprintfz(filename, FILENAME_MAX, "%s/%s", path, result);
         else
-            strncpyz(filename, link, FILENAME_MAX);
+            strncpyz(filename, result, FILENAME_MAX);
 
         struct stat sb;
         if(stat(filename, &sb) == -1) {
@@ -130,16 +130,36 @@ static inline char *get_disk_name(unsigned long major, unsigned long minor, char
 
         // info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
 
-        strncpy(link, de->d_name, FILENAME_MAX);
-        netdata_fix_chart_name(link);
-        disk = link;
+        strncpy(result, de->d_name, result_size);
+        found = 1;
         break;
     }
     closedir(dir);
 
+
 cleanup:
-    return strdupz(disk);
+
+    if(!found)
+        result[0] = '\0';
+
+    return found;
 }
+
+static inline char *get_disk_name(unsigned long major, unsigned long minor, char *disk) {
+    char result[FILENAME_MAX + 1] = "";
+
+    if(!path_to_device_mapper || !*path_to_device_mapper || !get_disk_name_from_path(path_to_device_mapper, result, FILENAME_MAX + 1, major, minor, disk))
+        if(!path_to_device_label || !*path_to_device_label || !get_disk_name_from_path(path_to_device_label, result, FILENAME_MAX + 1, major, minor, disk))
+            if(name_disks_by_id != CONFIG_BOOLEAN_YES || !path_to_device_id || !*path_to_device_id || !get_disk_name_from_path(path_to_device_id, result, FILENAME_MAX + 1, major, minor, disk))
+                strncpy(result, disk, FILENAME_MAX);
+
+    if(!result[0])
+        strncpy(result, disk, FILENAME_MAX);
+
+    netdata_fix_chart_name(result);
+    return strdup(result);
+}
+
 
 static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk) {
     static struct mountinfo *disk_mountinfo_root = NULL;
@@ -358,6 +378,14 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         snprintfz(buffer, FILENAME_MAX, "%s/dev/mapper", netdata_configured_host_prefix);
         path_to_device_mapper = config_get(CONFIG_SECTION_DISKSTATS, "path to device mapper", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s/dev/disk/by-label", netdata_configured_host_prefix);
+        path_to_device_label = config_get(CONFIG_SECTION_DISKSTATS, "path to /dev/disk/by-label", buffer);
+
+        snprintfz(buffer, FILENAME_MAX, "%s/dev/disk/by-id", netdata_configured_host_prefix);
+        path_to_device_id = config_get(CONFIG_SECTION_DISKSTATS, "path to /dev/disk/by-id", buffer);
+
+        name_disks_by_id = config_get_boolean(CONFIG_SECTION_DISKSTATS, "name disks by id", name_disks_by_id);
     }
 
     // --------------------------------------------------------------------------
