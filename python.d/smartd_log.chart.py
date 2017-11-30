@@ -211,7 +211,7 @@ class Service(SimpleService):
         self.log_path = self.configuration.get('log_path', '/var/log/smartd')
         self.raw = self.configuration.get('raw_values', True)
         self.exclude = self.configuration.get('exclude_disks', str()).split()
-        self.age = self.configuration.get('age', 60)
+        self.age = self.configuration.get('age', 30)
 
         self.runs = 0
         self.disks = list()
