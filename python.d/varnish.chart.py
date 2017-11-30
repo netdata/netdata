@@ -181,7 +181,7 @@ class Service(ExecutableService):
             self.error("No output from 'varnishstat'. Not enough privileges?")
             return False
 
-        self.parser.init(''.join(reply))
+        self.parser.init(reply)
 
         # Output is parsable
         if not self.parser.re_default:
