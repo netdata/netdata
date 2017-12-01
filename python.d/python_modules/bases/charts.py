@@ -5,7 +5,7 @@
 from bases.collection import safe_print
 
 CHART_PARAMS = ['type', 'id', 'name', 'title', 'units', 'family', 'context', 'chart_type']
-DIMENSION_PARAMS = ['id', 'name', 'algorithm', 'multiplier', 'divisor']
+DIMENSION_PARAMS = ['id', 'name', 'algorithm', 'multiplier', 'divisor', 'hidden']
 VARIABLE_PARAMS = ['id', 'value']
 
 CHART_TYPES = ['line', 'area', 'stacked']
@@ -197,6 +197,13 @@ class Chart:
         self.dimensions.append(dim)
         return dim
 
+    def hide_dimension(self, dimension_id, reverse=False):
+        if dimension_id in self:
+            idx = self.dimensions.index(dimension_id)
+            dimension = self.dimensions[idx]
+            dimension.params['hidden'] = 'hidden' if not reverse else str()
+            self.refresh()
+
     def create(self):
         """
         :return:
@@ -285,6 +292,11 @@ class Dimension:
 
     def __str__(self):
         return self.id
+
+    def __eq__(self, other):
+        if not isinstance(other, Dimension):
+            return self.id == other
+        return self.id == other.id
 
     def create(self):
         return DIMENSION_CREATE.format(**self.params)
