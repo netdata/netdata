@@ -22,7 +22,7 @@ ORDER = ['session_connections', 'client_requests',
 
 CHARTS = {
     'session_connections': {
-        'options': [None, 'Connections Statistics', 'connection/s',
+        'options': [None, 'Connections Statistics', 'connections/s',
                     'client metrics', 'varnish.session_connection', 'line'],
         'lines': [
             ['sess_conn', 'accepted', 'incremental'],
@@ -30,7 +30,7 @@ CHARTS = {
         ]
     },
     'client_requests': {
-        'options': [None, 'Received Client Requests', 'requests/s',
+        'options': [None, 'Client Requests', 'requests/s',
                     'client metrics', 'varnish.client_requests', 'line'],
         'lines': [
             ['client_req', 'received', 'incremental']
@@ -54,17 +54,17 @@ CHARTS = {
         ]
     },
     'cached_objects_expired': {
-        'options': [None, 'Expired Objects', 'objects/s', 'cache performance',
+        'options': [None, 'Expired Objects', 'expired/s', 'cache performance',
                     'varnish.cached_objects_expired', 'line'],
         'lines': [
-            ['n_expired', 'expired', 'incremental']
+            ['n_expired', 'objects', 'incremental']
         ]
     },
     'cached_objects_nuked': {
-        'options': [None, 'Least Recently Used Nuked Objects', 'objects/s', 'cache performance',
+        'options': [None, 'Least Recently Used Nuked Objects', 'nuked/s', 'cache performance',
                     'varnish.cached_objects_nuked', 'line'],
         'lines': [
-            ['n_lru_nuked', 'nuked', 'incremental']
+            ['n_lru_nuked', 'objects', 'incremental']
         ]
     },
     'threads_total': {
@@ -106,7 +106,7 @@ CHARTS = {
         'options': [None, 'Requests To The Backend', 'requests/s', 'backend metrics',
                     'varnish.backend_requests', 'line'],
         'lines': [
-            ['backend_req', 'requests', 'incremental']
+            ['backend_req', 'sent', 'incremental']
         ]
     },
     'esi_statistics': {
