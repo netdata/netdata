@@ -105,14 +105,15 @@ REGEX = re.compile(
 )
 
 
-def chart_template(attr, raw):
-    chart_name = 'attr_id' + attr
-    title = SMART_ATTR[attr]
-    units = 'raw' if raw else 'normalized'
+def chart_template(chart_name):
+    units, attr_id = chart_name.split('_')[-2:]
+    title = '{value_type} {description}'.format(value_type=units.capitalize(),
+                                                description=SMART_ATTR[attr_id])
+    family = SMART_ATTR[attr_id].lower()
 
     return {
         chart_name: {
-            'options': [None, title, units, title.lower(), 'smartd_log.' + chart_name, 'line'],
+            'options': [None, title, units, family, 'smartd_log.' + chart_name, 'line'],
             'lines': []
             }
     }
@@ -194,14 +195,12 @@ class Disk:
                                in REGEX.findall(last_line))
         return True
 
-    def data(self, raw=None):
+    def data(self):
         data = dict()
         for attr in self.attributes.values():
-            value = attr.raw if raw else attr.normalized
-            if value is None:
-                continue
-            key = '_'.join([self.name, attr.id])
-            data[key] = value
+            data['_'.join([self.name, 'normalized', attr.id])] = attr.normalized
+            if attr.raw is not None:
+                data['_'.join([self.name, 'raw', attr.id])] = attr.raw
         return data
 
 
@@ -261,54 +260,34 @@ class Service(SimpleService):
                     disk.status = False
                     continue
 
-            data.update(disk.data(self.raw))
+            data.update(disk.data())
 
         return data or None
 
     def create_charts(self, order):
         for attr in order:
-            chart_id = 'attr_id' + attr
-            chart = chart_template(attr, self.raw)
+            raw_name, normalized_name = 'attr_id_raw_' + attr, 'attr_id_normalized_' + attr
+            raw, normalized = chart_template(raw_name), chart_template(normalized_name)
+            self.order.extend([normalized_name, raw_name])
+            self.definitions.update(raw)
+            self.definitions.update(normalized)
 
             for disk in self.disks:
                 if attr not in disk.attributes:
                     self.debug("'{disk}' has no attribute '{attr_id}'".format(disk=disk.name,
                                                                               attr_id=attr))
                     continue
+                normalized[normalized_name]['lines'].append(['_'.join([disk.name, 'normalized', attr]), disk.name])
 
-                if self.raw and disk.attributes[attr].raw is None:
-                    self.debug("'{disk}' attribute '{attr_id}' value not in {limits}".format(disk=disk.name,
-                                                                                             attr_id=attr,
-                                                                                             limits=LIMITS[attr]))
-                    continue
-                chart[chart_id]['lines'].append(['_'.join([disk.name, attr]), disk.name])
-
-            self.order.append(chart_id)
-            self.definitions.update(chart)
-
-    def scan(self, only_new=None):
-        new_disks = list()
-        for f in os.listdir(self.log_path):
-            full_path = os.path.join(self.log_path, f)
-
-            if DiskLogFile.is_valid(full_path, self.exclude):
-                disk = Disk(full_path, self.age)
-
-                active = disk.is_active()
-                if active is None:
+                if not self.raw:
                     continue
 
-                if active:
-                    if not only_new:
-                        new_disks.append(disk)
-                    else:
-                        if disk not in self.disks:
-                            new_disks.append(disk)
-                else:
-                    if not only_new:
-                        self.debug("'{disk}' not updated in the last {age} minutes, "
-                                   "skipping it.".format(disk=disk.name, age=self.age))
-        return new_disks
+                if disk.attributes[attr].raw is not None:
+                    raw[raw_name]['lines'].append(['_'.join([disk.name, 'raw', attr]), disk.name])
+                    continue
+                self.debug("'{disk}' attribute '{attr_id}' value not in {limits}".format(disk=disk.name,
+                                                                                         attr_id=attr,
+                                                                                         limits=LIMITS[attr]))
 
     def cleanup_and_rescan(self):
         self.cleanup()
@@ -318,11 +297,11 @@ class Service(SimpleService):
             valid = False
 
             for chart in self.charts:
-                idx = chart.id[7:]
+                value_type, idx = chart.id.split('_')[2:]
 
                 if idx in disk.attributes:
                     valid = True
-                    dimension_id = '_'.join([disk.name, idx])
+                    dimension_id = '_'.join([disk.name, value_type, idx])
 
                     if dimension_id in chart:
                         chart.hide_dimension(dimension_id=dimension_id, reverse=True)
@@ -336,10 +315,32 @@ class Service(SimpleService):
 
             if not disk.is_active():
                 disk.status = False
-
             if not disk.status:
                 for chart in self.charts:
-                    dimension_id = '_'.join([disk.name, chart.id[7:]])
+                    dimension_id = '_'.join([disk.name, chart.id[8:]])
                     chart.hide_dimension(dimension_id=dimension_id)
 
         self.disks = [disk for disk in self.disks if disk.status]
+
+    def scan(self, only_new=None):
+        new_disks = list()
+        for f in os.listdir(self.log_path):
+            full_path = os.path.join(self.log_path, f)
+
+            if DiskLogFile.is_valid(full_path, self.exclude):
+                disk = Disk(full_path, self.age)
+
+                active = disk.is_active()
+                if active is None:
+                    continue
+                if active:
+                    if not only_new:
+                        new_disks.append(disk)
+                    else:
+                        if disk not in self.disks:
+                            new_disks.append(disk)
+                else:
+                    if not only_new:
+                        self.debug("'{disk}' not updated in the last {age} minutes, "
+                                   "skipping it.".format(disk=disk.name, age=self.age))
+        return new_disks
