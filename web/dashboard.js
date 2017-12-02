@@ -5145,8 +5145,21 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.chartRefresher = function() {
-        var now = Date.now();
         //console.log('chartRefresher() begin ' + (now - NETDATA.chartRefresherLastRun).toString() + ' ms since last run');
+
+        if(NETDATA.options.page_is_visible === false
+            && NETDATA.options.current.stop_updates_when_focus_is_lost === true
+            && NETDATA.chartRefresherLastRun > NETDATA.options.last_page_resize
+            && NETDATA.chartRefresherLastRun > NETDATA.options.last_page_scroll
+        ) {
+            setTimeout(
+                NETDATA.chartRefresher,
+                NETDATA.options.current.idle_lost_focus
+            );
+            return;
+        }
+
+        var now = Date.now();
         NETDATA.chartRefresherLastRun = now;
 
         if( now < NETDATA.options.on_scroll_refresher_stop_until ) {
