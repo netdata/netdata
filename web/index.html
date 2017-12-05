@@ -632,8 +632,10 @@
                     }
                 }
 
-                if(urlOptions.server !== null && urlOptions.server !== '')
+                if(urlOptions.server !== null && urlOptions.server !== '') {
+                    netdataServerStatic = document.location.origin.toString() + document.location.pathname.toString();
                     netdataServer = urlOptions.server;
+                }
                 else
                     urlOptions.server = null;
 
@@ -4251,17 +4253,17 @@
         // parallel javascript downloader in netdata
         var netdataPrepCallback = function() {
             NETDATA.requiredCSS.push({
-                url: NETDATA.serverDefault + 'css/bootstrap-toggle-2.2.2.min.css',
+                url: NETDATA.serverStatic + 'css/bootstrap-toggle-2.2.2.min.css',
                 isAlreadyLoaded: function() { return false; }
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'lib/bootstrap-toggle-2.2.2.min.js',
+                url: NETDATA.serverStatic + 'lib/bootstrap-toggle-2.2.2.min.js',
                 isAlreadyLoaded: function() { return false; }
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverDefault + 'dashboard_info.js?v20171107-1',
+                url: NETDATA.serverStatic + 'dashboard_info.js?v20171107-1',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
@@ -5541,6 +5543,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171130-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20171205-4"></script>
 </body>
 </html>
