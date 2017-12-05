@@ -17,4 +17,6 @@ public class MBeanQueryDimensionMapping {
 	 * Optional
 	 */
 	private String compositeDataKey;
+
+	private Class<?> compositeDataType;
 }

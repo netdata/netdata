@@ -49,8 +49,9 @@ public class MBeanDefaultQuery extends MBeanQuery {
 	@Getter(AccessLevel.NONE)
 	private List<Dimension> dimensions = new LinkedList<>();
 
-	public MBeanDefaultQuery(ObjectName name, String attribute, Class<?> attributeType) {
-		super(name, attribute);
+	public MBeanDefaultQuery(ObjectName name, String attribute, MBeanServerConnection mBeanServer,
+			Class<?> attributeType) {
+		super(name, attribute, mBeanServer);
 		this.type = attributeType;
 	}
 
@@ -59,8 +60,8 @@ public class MBeanDefaultQuery extends MBeanQuery {
 		this.dimensions.add(queryInfo.getDimension());
 	}
 
-	public void query(MBeanServerConnection server) throws JmxMBeanServerQueryException {
-		long value = toLong(MBeanServerUtils.getAttribute(server, getName(), getAttribute()));
+	public void query() throws JmxMBeanServerQueryException {
+		long value = toLong(MBeanServerUtils.getAttribute(mBeanServer, getName(), getAttribute()));
 		for (Dimension dim : dimensions) {
 			dim.setCurrentValue(value);
 		}

@@ -1,5 +1,6 @@
 package org.firehol.netdata.module.jmx.entity;
 
+import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
 
 import lombok.Getter;
@@ -9,9 +10,11 @@ import lombok.Setter;
 @Setter
 public class MBeanQueryInfo {
 
+	private MBeanServerConnection mBeanServer;
+
 	private ObjectName mBeanName;
 
 	private String mBeanAttribute;
 
-	private Class<?> mBeanAttributeType;
+	private Object mBeanAttributeExample;
 }

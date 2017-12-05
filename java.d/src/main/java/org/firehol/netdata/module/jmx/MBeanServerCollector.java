@@ -242,7 +242,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 		MBeanQueryInfo queryInfo = new MBeanQueryInfo();
 		queryInfo.setMBeanName(name);
 		queryInfo.setMBeanAttribute(dimensionConfig.getValue());
-		queryInfo.setMBeanAttributeType(value.getClass());
+		queryInfo.setMBeanAttributeExample(value);
 		MBeanQuery query = MBeanQueryFactory.build(queryInfo);
 
 		return query;
@@ -260,7 +260,7 @@ public class MBeanServerCollector implements Collector, Closeable {
 			MBeanQuery queryInfo = queryInfoIterator.next();
 
 			try {
-				queryInfo.query(mBeanServer);
+				queryInfo.query();
 			} catch (JmxMBeanServerQueryException e) {
 				// Stop collecting this value.
 				log.warning(LoggingUtils.buildMessage(

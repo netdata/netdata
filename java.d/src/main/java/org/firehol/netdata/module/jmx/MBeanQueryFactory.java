@@ -14,15 +14,17 @@ public final class MBeanQueryFactory {
 	}
 
 	public static MBeanQuery build(MBeanQueryInfo queryInfo) {
-		if (Double.class.isAssignableFrom(queryInfo.getMBeanAttributeType())) {
-			return new MBeanQueryDouble(queryInfo.getMBeanName(), queryInfo.getMBeanAttribute());
+		if (Double.class.isAssignableFrom(queryInfo.getMBeanAttributeExample().getClass())) {
+			return new MBeanQueryDouble(queryInfo.getMBeanServer(), queryInfo.getMBeanName(),
+					queryInfo.getMBeanAttribute());
 		}
 
-		if (CompositeData.class.isAssignableFrom(queryInfo.getMBeanAttributeType())) {
-			return new MBeanQueryCompositeData(queryInfo.getMBeanName(), queryInfo.getMBeanAttribute());
+		if (CompositeData.class.isAssignableFrom(queryInfo.getMBeanAttributeExample().getClass())) {
+			return new MBeanQueryCompositeData(queryInfo.getMBeanName(), queryInfo.getMBeanAttribute(),
+					queryInfo.getMBeanServer());
 		}
 
 		return new MBeanDefaultQuery(queryInfo.getMBeanName(), queryInfo.getMBeanAttribute(),
-				queryInfo.getMBeanAttributeType());
+				queryInfo.getMBeanServer(), queryInfo.getMBeanAttributeExample().getClass());
 	}
 }

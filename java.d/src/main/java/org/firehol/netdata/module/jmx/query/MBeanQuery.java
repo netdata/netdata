@@ -5,6 +5,7 @@ import java.util.Objects;
 import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
 
+import org.firehol.netdata.exception.InitializationException;
 import org.firehol.netdata.module.jmx.entity.MBeanQueryDimensionMapping;
 import org.firehol.netdata.module.jmx.exception.JmxMBeanServerQueryException;
 
@@ -20,6 +21,8 @@ public abstract class MBeanQuery {
 
 	private String attribute;
 
+	MBeanServerConnection mBeanServer;
+
 	public boolean queryDestinationEquals(MBeanQuery mBeanQuery) {
 
 		if (!Objects.equals(name, mBeanQuery.getName())) {
@@ -33,8 +36,8 @@ public abstract class MBeanQuery {
 		return true;
 	}
 
-	public abstract void addDimension(MBeanQueryDimensionMapping mappingInfo);
+	public abstract void addDimension(MBeanQueryDimensionMapping mappingInfo) throws InitializationException;
 
-	public abstract void query(MBeanServerConnection server) throws JmxMBeanServerQueryException;
+	public abstract void query() throws JmxMBeanServerQueryException;
 
 }
