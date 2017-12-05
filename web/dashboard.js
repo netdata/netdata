@@ -45,6 +45,8 @@
  *                                                  (default: null) */
 /*global netdataServer               *//* string,   the URL of the netdata server to use
  *                                                  (default: the URL the page is hosted at) */
+/*global netdataServerStatic         *//* string,   the URL of the netdata server to use for static files
+ *                                                  (default: netdataServer) */
 /*global netdataSnapshotData         *//* object,   a netdata snapshot loaded
  *                                                  (default: null) */
 
@@ -125,28 +127,38 @@ var NETDATA = window.NETDATA || {};
     else if(NETDATA.serverDefault.slice(-1) !== '/')
         NETDATA.serverDefault += '/';
 
+    if(typeof netdataServerStatic !== 'undefined' && netdataServerStatic !== null && netdataServerStatic !== '') {
+        NETDATA.serverStatic = netdataServerStatic;
+        if(NETDATA.serverStatic.slice(-1) !== '/')
+            NETDATA.serverStatic += '/';
+    }
+    else {
+        NETDATA.serverStatic = NETDATA.serverDefault;
+    }
+
+
     // default URLs for all the external files we need
     // make them RELATIVE so that the whole thing can also be
     // installed under a web server
-    NETDATA.jQuery              = NETDATA.serverDefault + 'lib/jquery-2.2.4.min.js';
-    NETDATA.peity_js            = NETDATA.serverDefault + 'lib/jquery.peity-3.2.0.min.js';
-    NETDATA.sparkline_js        = NETDATA.serverDefault + 'lib/jquery.sparkline-2.1.2.min.js';
-    NETDATA.easypiechart_js     = NETDATA.serverDefault + 'lib/jquery.easypiechart-97b5824.min.js';
-    NETDATA.gauge_js            = NETDATA.serverDefault + 'lib/gauge-1.3.2.min.js';
-    NETDATA.dygraph_js          = NETDATA.serverDefault + 'lib/dygraph-combined-dd74404.js';
-    NETDATA.dygraph_smooth_js   = NETDATA.serverDefault + 'lib/dygraph-smooth-plotter-dd74404.js';
-    NETDATA.raphael_js          = NETDATA.serverDefault + 'lib/raphael-2.2.4-min.js';
-    NETDATA.c3_js               = NETDATA.serverDefault + 'lib/c3-0.4.11.min.js';
-    NETDATA.c3_css              = NETDATA.serverDefault + 'css/c3-0.4.11.min.css';
-    NETDATA.d3_js               = NETDATA.serverDefault + 'lib/d3-3.5.17.min.js';
-    NETDATA.morris_js           = NETDATA.serverDefault + 'lib/morris-0.5.1.min.js';
-    NETDATA.morris_css          = NETDATA.serverDefault + 'css/morris-0.5.1.css';
+    NETDATA.jQuery              = NETDATA.serverStatic + 'lib/jquery-2.2.4.min.js';
+    NETDATA.peity_js            = NETDATA.serverStatic + 'lib/jquery.peity-3.2.0.min.js';
+    NETDATA.sparkline_js        = NETDATA.serverStatic + 'lib/jquery.sparkline-2.1.2.min.js';
+    NETDATA.easypiechart_js     = NETDATA.serverStatic + 'lib/jquery.easypiechart-97b5824.min.js';
+    NETDATA.gauge_js            = NETDATA.serverStatic + 'lib/gauge-1.3.2.min.js';
+    NETDATA.dygraph_js          = NETDATA.serverStatic + 'lib/dygraph-combined-dd74404.js';
+    NETDATA.dygraph_smooth_js   = NETDATA.serverStatic + 'lib/dygraph-smooth-plotter-dd74404.js';
+    NETDATA.raphael_js          = NETDATA.serverStatic + 'lib/raphael-2.2.4-min.js';
+    NETDATA.c3_js               = NETDATA.serverStatic + 'lib/c3-0.4.11.min.js';
+    NETDATA.c3_css              = NETDATA.serverStatic + 'css/c3-0.4.11.min.css';
+    NETDATA.d3_js               = NETDATA.serverStatic + 'lib/d3-3.5.17.min.js';
+    NETDATA.morris_js           = NETDATA.serverStatic + 'lib/morris-0.5.1.min.js';
+    NETDATA.morris_css          = NETDATA.serverStatic + 'css/morris-0.5.1.css';
     NETDATA.google_js           = 'https://www.google.com/jsapi';
 
     NETDATA.themes = {
         white: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-3.3.7.css',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.css?v20171127-1',
+            bootstrap_css: NETDATA.serverStatic + 'css/bootstrap-3.3.7.css',
+            dashboard_css: NETDATA.serverStatic + 'dashboard.css?v20171127-1',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#F0F0F0',
@@ -163,8 +175,8 @@ var NETDATA = window.NETDATA || {};
             gauge_gradient: false
         },
         slate: {
-            bootstrap_css: NETDATA.serverDefault + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
-            dashboard_css: NETDATA.serverDefault + 'dashboard.slate.css?v20171127-1',
+            bootstrap_css: NETDATA.serverStatic + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
+            dashboard_css: NETDATA.serverStatic + 'dashboard.slate.css?v20171127-1',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
@@ -5133,6 +5145,7 @@ var NETDATA = window.NETDATA || {};
 
     // the default refresher
     NETDATA.chartRefresherLastRun = 0;
+    NETDATA.chartRefresherRunsAfterParseDom = 0;
     NETDATA.chartRefresherTimeoutId = undefined;
 
     NETDATA.chartRefresherReschedule = function() {
@@ -5145,19 +5158,23 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.chartRefresher = function() {
-        //console.log('chartRefresher() begin ' + (now - NETDATA.chartRefresherLastRun).toString() + ' ms since last run');
+        // console.log('chartRefresher() begin ' + (Date.now() - NETDATA.chartRefresherLastRun).toString() + ' ms since last run');
 
         if(NETDATA.options.page_is_visible === false
             && NETDATA.options.current.stop_updates_when_focus_is_lost === true
             && NETDATA.chartRefresherLastRun > NETDATA.options.last_page_resize
             && NETDATA.chartRefresherLastRun > NETDATA.options.last_page_scroll
+            && NETDATA.chartRefresherRunsAfterParseDom > 10
         ) {
             setTimeout(
                 NETDATA.chartRefresher,
                 NETDATA.options.current.idle_lost_focus
             );
+
+            // console.log('chartRefresher() page without focus, will run in ' + NETDATA.options.current.idle_lost_focus.toString() + ' ms, ' + NETDATA.chartRefresherRunsAfterParseDom.toString());
             return;
         }
+        NETDATA.chartRefresherRunsAfterParseDom++;
 
         var now = Date.now();
         NETDATA.chartRefresherLastRun = now;
@@ -5168,7 +5185,7 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.chartRefresherWaitTime()
             );
 
-            //console.log('chartRefresher() end1 will run in ' + NETDATA.chartRefresherWaitTime().toString() + ' ms');
+            // console.log('chartRefresher() end1 will run in ' + NETDATA.chartRefresherWaitTime().toString() + ' ms');
             return;
         }
 
@@ -5178,7 +5195,7 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.chartRefresherWaitTime()
             );
 
-            //console.log('chartRefresher() end2 will run in ' + NETDATA.chartRefresherWaitTime().toString() + ' ms');
+            // console.log('chartRefresher() end2 will run in ' + NETDATA.chartRefresherWaitTime().toString() + ' ms');
             return;
         }
 
@@ -5189,7 +5206,7 @@ var NETDATA = window.NETDATA || {};
                 NETDATA.chartRefresherWaitTime()
             );
 
-            //console.log('chartRefresher() end3 will run in ' + NETDATA.chartRefresherWaitTime().toString() + ' ms');
+            // console.log('chartRefresher() end3 will run in ' + NETDATA.chartRefresherWaitTime().toString() + ' ms');
             return;
         }
 
@@ -5200,7 +5217,7 @@ var NETDATA = window.NETDATA || {};
             NETDATA.options.pauseCallback();
             NETDATA.chartRefresher();
 
-            //console.log('chartRefresher() end4 (nested)');
+            // console.log('chartRefresher() end4 (nested)');
             return;
         }
 
@@ -5212,7 +5229,7 @@ var NETDATA = window.NETDATA || {};
                     NETDATA.options.current.idle_between_loops
                 );
             });
-            //console.log('chartRefresher() end5 (no parallel, nested)');
+            // console.log('chartRefresher() end5 (no parallel, nested)');
             return;
         }
 
@@ -5221,7 +5238,7 @@ var NETDATA = window.NETDATA || {};
             // get the dom parts again
             // console.log('auto-refresher is calling parseDom()');
             NETDATA.parseDom(NETDATA.chartRefresher);
-            //console.log('chartRefresher() end6 (parseDom)');
+            // console.log('chartRefresher() end6 (parseDom)');
             return;
         }
 
@@ -5280,6 +5297,7 @@ var NETDATA = window.NETDATA || {};
 
         NETDATA.options.last_page_scroll = Date.now();
         NETDATA.options.updated_dom = false;
+        NETDATA.chartRefresherRunsAfterParseDom = 0;
 
         var targets = $('div[data-netdata]'); //.filter(':visible');
 
@@ -7774,7 +7792,7 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.requiredJs = [
         {
-            url: NETDATA.serverDefault + 'lib/bootstrap-3.3.7.min.js',
+            url: NETDATA.serverStatic + 'lib/bootstrap-3.3.7.min.js',
             async: false,
             isAlreadyLoaded: function() {
                 // check if bootstrap is loaded
@@ -7786,7 +7804,7 @@ var NETDATA = window.NETDATA || {};
             }
         },
         {
-            url: NETDATA.serverDefault + 'lib/perfect-scrollbar-0.6.15.min.js',
+            url: NETDATA.serverStatic + 'lib/perfect-scrollbar-0.6.15.min.js',
             isAlreadyLoaded: function() { return false; }
         }
     ];
@@ -7799,7 +7817,7 @@ var NETDATA = window.NETDATA || {};
             }
         },
         {
-            url: NETDATA.serverDefault + 'css/font-awesome.min.css?v4.7.0',
+            url: NETDATA.serverStatic + 'css/font-awesome.min.css?v4.7.0',
             isAlreadyLoaded: function() { return false; }
         },
         {
@@ -7999,7 +8017,7 @@ var NETDATA = window.NETDATA || {};
                         body: entry.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + status + ': ' + entry.info,
                         tag: tag,
                         requireInteraction: interaction,
-                        icon: NETDATA.serverDefault + icon,
+                        icon: NETDATA.serverStatic + icon,
                         data: data
                     });
 
