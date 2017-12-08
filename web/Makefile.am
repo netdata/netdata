@@ -47,6 +47,7 @@ dist_weblib_DATA = \
 	lib/d3-3.5.17.min.js \
 	lib/dygraph-combined-dd74404.js \
 	lib/dygraph-smooth-plotter-dd74404.js \
+	lib/fontawesome-all-5.0.0.min.js \
 	lib/gauge-1.3.2.min.js \
 	lib/jquery-2.2.4.min.js \
 	lib/jquery.easypiechart-97b5824.min.js \
@@ -68,7 +69,6 @@ dist_webcss_DATA = \
 	css/bootstrap-slate-flat-3.3.7.css \
 	css/bootstrap-slider-10.0.0.min.css \
 	css/bootstrap-toggle-2.2.2.min.css \
-	css/font-awesome.min.css \
 	css/c3-0.4.11.min.css \
 	$(NULL)
 
@@ -79,12 +79,6 @@ dist_webfonts_DATA = \
 	fonts/glyphicons-halflings-regular.ttf \
 	fonts/glyphicons-halflings-regular.woff \
 	fonts/glyphicons-halflings-regular.woff2 \
-	fonts/FontAwesome.otf \
-	fonts/fontawesome-webfont.eot \
-	fonts/fontawesome-webfont.svg \
-	fonts/fontawesome-webfont.ttf \
-	fonts/fontawesome-webfont.woff \
-	fonts/fontawesome-webfont.woff2 \
 	$(NULL)
 
 webimagesdir=$(webdir)/images

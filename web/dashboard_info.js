@@ -9,142 +9,142 @@ var netdataDashboard = window.netdataDashboard || {};
 netdataDashboard.menu = {
     'system': {
         title: 'System Overview',
-        icon: '<i class="fa fa-bookmark" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-bookmark"></i>',
         info: 'Overview of the key system metrics.'
     },
 
     'services': {
         title: 'systemd Services',
-        icon: '<i class="fa fa-cogs" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-cogs"></i>',
         info: 'Resources utilization of systemd services. netdata monitors all systemd services via cgroups (the resources accounting used by containers). '
     },
 
     'ap': {
         title: 'Access Points',
-        icon: '<i class="fa fa-wifi" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-wifi"></i>',
         info: 'Performance metrics for the access points (i.e. wireless interfaces in AP mode) found on the system.'
     },
 
     'tc': {
         title: 'Quality of Service',
-        icon: '<i class="fa fa-globe" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-globe"></i>',
         info: 'Netdata collects and visualizes <code>tc</code> class utilization using its <a href="https://github.com/firehol/netdata/blob/master/plugins.d/tc-qos-helper.sh" target="_blank">tc-helper plugin</a>. If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, netdata automatically collects interface and class names. If your QoS configuration includes overheads calculation, the values shown here will include these overheads (the total bandwidth for the same interface as reported in the Network Interfaces section, will be lower than the total bandwidth reported here). QoS data collection may have a slight time difference compared to the interface (QoS data collection uses a BASH script, so a shift in data collection of a few milliseconds should be justified).'
     },
 
     'net': {
         title: 'Network Interfaces',
-        icon: '<i class="fa fa-share-alt" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-share-alt"></i>',
         info: 'Performance metrics for network interfaces.'
     },
 
     'ipv4': {
         title: 'IPv4 Networking',
-        icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-cloud"></i>',
         info: 'Metrics for the IPv4 stack of the system. <a href="https://en.wikipedia.org/wiki/IPv4" target="_blank">Internet Protocol version 4 (IPv4)</a> is the fourth version of the Internet Protocol (IP). It is one of the core protocols of standards-based internetworking methods in the Internet. IPv4 is a connectionless protocol for use on packet-switched networks. It operates on a best effort delivery model, in that it does not guarantee delivery, nor does it assure proper sequencing or avoidance of duplicate delivery. These aspects, including data integrity, are addressed by an upper layer transport protocol, such as the Transmission Control Protocol (TCP).'
     },
 
     'ipv6': {
         title: 'IPv6 Networking',
-        icon: '<i class="fa fa-cloud" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-cloud"></i>',
         info: 'Metrics for the IPv6 stack of the system. <a href="https://en.wikipedia.org/wiki/IPv6" target="_blank">Internet Protocol version 6 (IPv6)</a> is the most recent version of the Internet Protocol (IP), the communications protocol that provides an identification and location system for computers on networks and routes traffic across the Internet. IPv6 was developed by the Internet Engineering Task Force (IETF) to deal with the long-anticipated problem of IPv4 address exhaustion. IPv6 is intended to replace IPv4.'
     },
 
     'ipvs': {
         title: 'IP Virtual Server',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: '<a href="http://www.linuxvirtualserver.org/software/ipvs.html" target="_blank">IPVS (IP Virtual Server)</a> implements transport-layer load balancing inside the Linux kernel, so called Layer-4 switching. IPVS running on a host acts as a load balancer at the front of a cluster of real servers, it can direct requests for TCP/UDP based services to the real servers, and makes services of the real servers to appear as a virtual service on a single IP address.'
     },
 
     'netfilter': {
         title: 'Firewall (netfilter)',
-        icon: '<i class="fa fa-shield" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-shield-alt"></i>',
         info: 'Performance metrics of the netfilter components.'
     },
 
     'ipfw': {
         title: 'Firewall (ipfw)',
-        icon: '<i class="fa fa-shield" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-shield-alt"></i>',
         info: 'Counters and memory usage for the ipfw rules.'
     },
 
     'cpu': {
         title: 'CPUs',
-        icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-bolt"></i>',
         info: 'Detailed information for each CPU of the system. A summary of the system for all CPUs can be found at the <a href="#menu_system">System Overview</a> section.'
     },
 
     'mem': {
         title: 'Memory',
-        icon: '<i class="fa fa-bolt" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-microchip"></i>',
         info: 'Detailed information about the memory management of the system.'
     },
 
     'disk': {
         title: 'Disks',
-        icon: '<i class="fa fa-folder" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-hdd"></i>',
         info: 'Charts with performance information for all the system disks. Special care has been given to present disk performance metrics in a way compatible with <code>iostat -x</code>. netdata by default prevents rendering performance charts for individual partitions and unmounted virtual disks. Disabled charts can still be enabled by configuring the relative settings in the netdata configuration file.'
     },
 
     'sensors': {
         title: 'Sensors',
-        icon: '<i class="fa fa-leaf" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-leaf"></i>',
         info: 'Readings of the configured system sensors.'
     },
 
     'ipmi': {
         title: 'IPMI',
-        icon: '<i class="fa fa-leaf" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-leaf"></i>',
         info: 'The Intelligent Platform Management Interface (IPMI) is a set of computer interface specifications for an autonomous computer subsystem that provides management and monitoring capabilities independently of the host system\'s CPU, firmware (BIOS or UEFI) and operating system.'
     },
 
     'samba': {
         title: 'Samba',
-        icon: "<i class=\"fa fa-folder-open\" aria-hidden=\"true\"></i>",
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics of the Samba file share operations of this system. Samba is a implementation of Windows services, including Windows SMB protocol file shares.'
     },
 
     'nfsd': {
         title: 'NFS Server',
-        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics of the Network File Server. NFS is a distributed file system protocol, allowing a user on a client computer to access files over a network, much like local storage is accessed. NFS, like many other protocols, builds on the Open Network Computing Remote Procedure Call (ONC RPC) system. The NFS is an open standard defined in Request for Comments (RFC).'
     },
 
     'nfs': {
         title: 'NFS Client',
-        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics of the NFS operations of this system, acting as an NFS client.'
     },
 
     'zfs': {
         title: 'ZFS filesystem',
-        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics of the ZFS filesystem. The following charts visualize all metrics reported by <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arcstat/arcstat.py" target="_blank">arcstat.py</a> and <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arc_summary/arc_summary.py" target="_blank">arc_summary.py</a>.'
     },
 
     'apps': {
         title: 'Applications',
-        icon: '<i class="fa fa-heartbeat" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-heartbeat"></i>',
         info: 'Per application statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics for applications of interest, defined in <code>/etc/netdata/apps_groups.conf</code> (the default is <a href="https://github.com/firehol/netdata/blob/master/conf.d/apps_groups.conf" target="_blank">here</a>). The plugin internally builds a process tree (much like <code>ps fax</code> does), and groups processes together (evaluating both child and parent processes) so that the result is always a chart with a predefined set of dimensions (of course, only application groups found running are reported). The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'users': {
         title: 'Users',
-        icon: '<i class="fa fa-user" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-user"></i>',
         info: 'Per user statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics per user. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'groups': {
         title: 'User Groups',
-        icon: '<i class="fa fa-users" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-users"></i>',
         info: 'Per user group statistics are collected using netdata\'s <code>apps.plugin</code>. This plugin walks through all processes and aggregates statistics per user group. The reported values are compatible with <code>top</code>, although the netdata plugin counts also the resources of exited children (unlike <code>top</code> which shows only the resources of the currently running processes). So for processes like shell scripts, the reported values include the resources used by the commands these scripts run within each timeframe.',
         height: 1.5
     },
 
     'netdata': {
         title: 'Netdata Monitoring',
-        icon: '<i class="fa fa-bar-chart" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-chart-bar"></i>',
         info: 'Performance metrics for the operation of netdata itself and its plugins.'
     },
 
@@ -155,174 +155,174 @@ netdataDashboard.menu = {
 
     'cgroup': {
         title: '',
-        icon: '<i class="fa fa-th" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-th"></i>',
         info: 'Container resource utilization metrics. Netdata reads this information from <b>cgroups</b> (abbreviated from <b>control groups</b>), a Linux kernel feature that limits and accounts resource usage (CPU, memory, disk I/O, network, etc.) of a collection of processes. <b>cgroups</b> together with <b>namespaces</b> (that offer isolation between processes) provide what we usually call: <b>containers</b>.'
     },
 
     'cgqemu': {
         title: '',
-        icon: '<i class="fa fa-th-large" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-th-large"></i>',
         info: 'QEMU virtual machine resource utilization metrics. QEMU (short for Quick Emulator) is a free and open-source hosted hypervisor that performs hardware virtualization.'
     },
 
     'fping': {
         title: 'fping',
-        icon: '<i class="fa fa-exchange" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-exchange-alt"></i>',
         info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
     },
 
     'memcached': {
         title: 'memcached',
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>memcached</b>. Memcached is a general-purpose distributed memory caching system. It is often used to speed up dynamic database-driven websites by caching data and objects in RAM to reduce the number of times an external data source (such as a database or API) must be read.'
     },
 
     'mysql': {
         title: 'MySQL',
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>mysql</b>, the open-source relational database management system (RDBMS).'
     },
 
     'postgres': {
         title: 'Postgres',
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>PostgresSQL</b>, the object-relational database (ORDBMS).'
     },
 
     'redis': {
         title: 'Redis',
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b>redis</b>. Redis (REmote DIctionary Server) is a software project that implements data structure servers. It is open-source, networked, in-memory, and stores keys with optional durability.'
     },
 
     'retroshare': {
         title: 'RetroShare',
-        icon: '<i class="fa fa-share-alt" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-share-alt"></i>',
         info: 'Performance metrics for <b>RetroShare</b>. RetroShare is open source software for encrypted filesharing, serverless email, instant messaging, online chat, and BBS, based on a friend-to-friend network built on GNU Privacy Guard (GPG).'
     },
 
     'ipfs': {
         title: 'IPFS',
-        icon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-folder-open"></i>',
         info: 'Performance metrics for the InterPlanetary File System (IPFS), a content-addressable, peer-to-peer hypermedia distribution protocol.'
     },
 
     'phpfpm': {
         title: 'PHP-FPM',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: 'Performance metrics for <b>PHP-FPM</b>, an alternative FastCGI implementation for PHP.'
     },
 
     'postfix': {
         title: 'postfix',
-        icon: '<i class="fa fa-envelope" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-envelope"></i>',
         info: undefined
     },
 
     'dovecot': {
         title: 'Dovecot',
-        icon: '<i class="fa fa-envelope" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-envelope"></i>',
         info: undefined
     },
 
     'hddtemp': {
         title: 'HDD Temp',
-        icon: '<i class="fa fa-thermometer-full" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-thermometer-half"></i>',
         info: undefined
     },
 
     'nginx': {
         title: 'nginx',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: undefined
     },
 
     'apache': {
         title: 'Apache',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: undefined
     },
 
     'lighttpd': {
         title: 'Lighttpd',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: undefined
     },
 
     'web_log': {
         title: undefined,
-        icon: '<i class="fa fa-file-text-o" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-file-alt"></i>',
         info: 'Information extracted from a server log file. <code>web_log</code> plugin incrementally parses the server log file to provide, in real-time, a break down of key server performance metrics. For web servers, an extended log file format may optionally be used (for <code>nginx</code> and <code>apache</code>) offering timing information and bandwidth for both requests and responses. <code>web_log</code> plugin may also be configured to provide a break down of requests per URL pattern (check <a href="https://github.com/firehol/netdata/blob/master/conf.d/python.d/web_log.conf" target="_blank"><code>/etc/netdata/python.d/web_log.conf</code></a>).'
     },
 
     'named': {
         title: 'named',
-        icon: '<i class="fa fa-tag" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-tag"></i>',
         info: undefined
     },
 
     'squid': {
         title: 'squid',
-        icon: '<i class="fa fa-exchange" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-exchange-alt"></i>',
         info: undefined
     },
 
     'nut': {
         title: 'UPS',
-        icon: '<i class="fa fa-battery-half" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-battery-half"></i>',
         info: undefined
     },
 
     'apcupsd': {
         title: 'UPS',
-        icon: '<i class="fa fa-battery-half" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-battery-half"></i>',
         info: undefined
     },
 
     'smawebbox': {
         title: 'Solar Power',
-        icon: '<i class="fa fa-sun-o" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-sun"></i>',
         info: undefined
     },
 
     'fronius': {
         title: 'Fronius',
-        icon: '<i class="fa fa-sun-o" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-sun"></i>',
         info: undefined
     },
 
     'stiebeleltron': {
         title: 'Stiebel Eltron',
-        icon: '<i class="fa fa-thermometer-full" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-thermometer-half"></i>',
         info: undefined
     },
 
     'snmp': {
         title: 'SNMP',
-        icon: '<i class="fa fa-random" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-random"></i>',
         info: undefined
     },
 
     'go_expvar': {
         title: 'Go - expvars',
-        icon: '<i class="fa fa-eye" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-eye"></i>',
         info: 'Statistics about running Go applications exposed by the <a href="https://golang.org/pkg/expvar/" target="_blank">expvar package</a>.'
     },
 
     'chrony': {
-        icon: '<i class="fa fa-clock-o" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-clock"></i>',
         info: 'chronyd parameters about the system’s clock performance.'
     },
 
     'couchdb': {
-        icon: '<i class="fa fa-database" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b><a href="https://couchdb.apache.org/">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
     },
     
     
     'beanstalk': {
         title: 'Beanstalkd',
-        icon: '<i class="fa fa-tasks" aria-hidden="true"></i>',
+        icon: '<i class="fas fa-tasks"></i>',
         info: 'Provides statistics on the <b><a href="http://kr.github.io/beanstalkd/">beanstalkd</a></b> server and any tubes available on that server using data pulled from beanstalkc'
     }
 };
