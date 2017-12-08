@@ -727,7 +727,7 @@
                         + ' <b>' + d2 + ' <code>' + NETDATA.dateTime.localeTimeString(before) + '</code></b>, '
                         + 'duration <b>' + NETDATA.seconds4human(Math.round((before - after) / 1000)) + '</b>'
                         + '</span>'
-                        + '<span class="navbar-highlight-button-right highlight-tooltip" onclick="urlOptions.clearHighlight();" title="clear the highlighted time-frame" data-toggle="tooltip" data-placement="bottom"><i class="fa fa-times" aria-hidden="true"></i></span>';
+                        + '<span class="navbar-highlight-button-right highlight-tooltip" onclick="urlOptions.clearHighlight();" title="clear the highlighted time-frame" data-toggle="tooltip" data-placement="bottom"><i class="fas fa-times"></i></span>';
 
                     $('.navbar-highlight').show();
 
@@ -933,7 +933,7 @@
                 // there are mirrored hosts here
 
                 el += '<li><a href="#" onClick="return false;" style="color: #666;" target="_blank">databases available on this host</a></li>';
-                a1 += '<li><a href="#" onClick="return false;"><i class="fa fa-info-circle" aria-hidden="true" style="color: #666;"></i></a></li>';
+                a1 += '<li><a href="#" onClick="return false;"><i class="fas fa-info-circle" style="color: #666;"></i></a></li>';
 
                 var base = document.location.origin.toString() + document.location.pathname.toString();
                 if(base.endsWith("/host/" + options.hostname + "/"))
@@ -962,7 +962,7 @@
                     }
 
                     el += '<li id="registry_server_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');">' + hostname + '</a></li>';
-                    a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fa fa-' + icon + '" aria-hidden="true" style="color: #999;"></i></a></li>';
+                    a1 += '<li id="registry_action_hosted_' + len.toString() + '"><a class="registry_link" href="' + url + '#" onClick="return gotoHostedModalHandler(\'' + url + '\');"><i class="fas fa-' + icon + '" style="color: #999;"></i></a></li>';
                     hosted++;
                     i++;
                 }
@@ -992,7 +992,7 @@
                     var u = machines[i++];
                     found++;
                     el += '<li id="registry_server_' + u.guid + '"><a class="registry_link" href="' + u.url + '#" onClick="return gotoServerModalHandler(\'' + u.guid + '\');">' + u.name + '</a></li>';
-                    a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fa fa-trash-o" aria-hidden="true" style="color: #999;"></i></a></li>';
+                    a1 += '<li id="registry_action_' + u.guid + '"><a href="#" onclick="deleteRegistryModalHandler(\'' + u.guid + '\',\'' + u.name + '\',\'' + u.url + '\'); return false;"><i class="fas fa-trash" style="color: #999;"></i></a></li>';
                 }
             }
 
@@ -1028,7 +1028,7 @@
             a1 += '<li role="separator" class="divider"></li>';
 
             el += '<li><a href="https://github.com/firehol/netdata/wiki/mynetdata-menu-item" style="color: #999;" target="_blank">What is this?</a></li>';
-            a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fa fa-sliders" aria-hidden="true" style="color: #999;"></i></a></li>'
+            a1 += '<li><a href="#" style="color: #999;" onclick="switchRegistryModalHandler(); return false;"><i class="fas fa-cog" style="color: #999;"></i></a></li>'
 
             document.getElementById('mynetdata_servers').innerHTML = el;
             document.getElementById('mynetdata_servers2').innerHTML = el;
@@ -1412,9 +1412,9 @@
 
             menuIcon: function(chart) {
                 if(typeof chart.menu_pattern !== 'undefined')
-                    return this.anyAttribute(this.menu, 'icon', chart.menu_pattern, '<i class="fa fa-puzzle-piece" aria-hidden="true"></i>').toString();
+                    return this.anyAttribute(this.menu, 'icon', chart.menu_pattern, '<i class="fas fa-puzzle-piece"></i>').toString();
 
-                return this.anyAttribute(this.menu, 'icon', chart.menu, '<i class="fa fa-puzzle-piece" aria-hidden="true"></i>');
+                return this.anyAttribute(this.menu, 'icon', chart.menu, '<i class="fas fa-puzzle-piece"></i>');
             },
 
             menuInfo: function(chart) {
@@ -1897,8 +1897,8 @@
                 html += mhead + shtml + '</div></div><hr role="separator"/>';
             }
 
-            sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more charts</a></li>';
-            sidebar += '<li class=""><a href="https://github.com/firehol/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fa fa-plus" aria-hidden="true"></i> add more alarms</a></li>';
+            sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/firehol/netdata/wiki/Add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
+            sidebar += '<li class=""><a href="https://github.com/firehol/netdata/wiki/Add-more-alarms-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
             sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1)?'second':data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, { space: '&nbsp;' }) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' +  data.version.toString() +'</small></li>';
             sidebar += '</ul>';
             div.innerHTML = html;
@@ -2137,7 +2137,7 @@
 
                     var has_alarm = (typeof alarm.warn !== 'undefined' || typeof alarm.crit !== 'undefined');
 
-                    var role_href = ((has_alarm === true)?('<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fa fa-line-chart" aria-hidden="true"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="NETDATA.alarms.scrollToChart(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small>'):('&nbsp;'));
+                    var role_href = ((has_alarm === true)?('<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fas fa-chart-line"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="NETDATA.alarms.scrollToChart(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small>'):('&nbsp;'));
 
                     var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20"/><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span>' + role_href + '</td>'
                         + '<td><table class="table">'
@@ -2290,7 +2290,7 @@
                 all += "</div>";
 
                 if(!count_active)
-                    active += '<div style="width:100%; height: 100px; text-align: center;"><span style="font-size: 50px;"><i class="fa fa-thumbs-up" aria-hidden="true"></i></span><br/>Everything is normal. No raised alarms.</div>';
+                    active += '<div style="width:100%; height: 100px; text-align: center;"><span style="font-size: 50px;"><i class="fas fa-thumbs-up"></i></span><br/>Everything is normal. No raised alarms.</div>';
                 else
                     active += footer;
 
@@ -2896,7 +2896,7 @@
                 }
                 else if(sha1 === sha2) {
                     save = true;
-                    versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/firehol/netdata" target="_blank">give netdata a <b>Star</b> at its github page</a>.</p>');
+                    versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/firehol/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
                 }
                 else {
                     save = true;
@@ -4036,8 +4036,8 @@
                     showChars: 750,
                     minHideChars: 10,
                     ellipsesText: "...",
-                    moreText: '<i class="fa fa-expand" aria-hidden="true"></i> show more information',
-                    lessText: '<i class="fa fa-compress" aria-hidden="true"></i> show less information',
+                    moreText: '<i class="fas fa-expand"></i> show more information',
+                    lessText: '<i class="fas fa-compress"></i> show less information',
                     onLess: function() { NETDATA.onscroll(); },
                     onMore: function() { NETDATA.onscroll(); },
                     errMsg: null,
@@ -4263,7 +4263,7 @@
             });
 
             NETDATA.requiredJs.push({
-                url: NETDATA.serverStatic + 'dashboard_info.js?v20171107-1',
+                url: NETDATA.serverStatic + 'dashboard_info.js?v20171208-1',
                 async: false,
                 isAlreadyLoaded: function() { return false; }
             });
@@ -4380,16 +4380,16 @@
             </div>
             <nav class="collapse navbar-collapse navbar-right" role="navigation">
                 <ul class="nav navbar-nav">
-                    <li id="alarmsButton"  title="check the health monitoring alarms and their log" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fa fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
-                    <li title="change dashboard settings" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fa fa-sliders"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
-                    <li title="check for netdata updates<br/>you should keep your netdata updated" data-toggle="tooltip" data-placement="bottom" class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fa fa-cloud-download"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
-                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fa fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fa fa-github"></i></a></li>
-                    <li title="follow netdata on twitter" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank"><i class="fa fa-twitter" aria-hidden="true"></i></a></li>
-                    <li title="like netdata on facebook" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank"><i class="fa fa-facebook-official" aria-hidden="true"></i></a></li>
-                    <li title="import / load a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal"><i class="fa fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
-                    <li title="export / save a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal"><i class="fa fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Export</span></a></li>
-                    <li title="print this dashboard to PDF" data-toggle="tooltip" data-placement="bottom" id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal"><i class="fa fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
-                    <li title="get help on using the charts" data-toggle="tooltip" data-placement="bottom" class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fa fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
+                    <li id="alarmsButton"  title="check the health monitoring alarms and their log" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#alarmsModal"><i class="fas fa-bell"></i>&nbsp;<span class="hidden-sm hidden-md">Alarms&nbsp;</span><span id="alarms_count_badge" class="badge"></span></a></li>
+                    <li title="change dashboard settings" data-toggle="tooltip" data-placement="bottom"><a href="#" class="btn" data-toggle="modal" data-target="#optionsModal"><i class="fas fa-cog"></i>&nbsp;<span class="hidden-sm hidden-md">Settings</span></a></li>
+                    <li title="check for netdata updates<br/>you should keep your netdata updated" data-toggle="tooltip" data-placement="bottom" class="hidden-sm" id="updateButton"><a href="#" class="btn" data-toggle="modal" data-target="#updateModal"><i class="fas fa-cloud-download-alt"></i> <span class="hidden-sm hidden-md">Update </span><span id="update_badge" class="badge"></span></a></li>
+                    <li title="the netdata wiki home at github<br/>remember to <b>give netdata a <i class=&quot;fas fa-star&quot;></i></b> !" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://github.com/firehol/netdata/wiki" class="btn" target="_blank"><i class="fab fa-github"></i></a></li>
+                    <li title="follow netdata on twitter" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://twitter.com/linuxnetdata" class="btn" target="_blank"><i class="fab fa-twitter"></i></a></li>
+                    <li title="like netdata on facebook" data-toggle="tooltip" data-placement="bottom" class="hidden-sm hidden-md"><a href="https://www.facebook.com/linuxnetdata/" class="btn" target="_blank"><i class="fab fa-facebook"></i></a></li>
+                    <li title="import / load a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="loadButton"><a href="#" class="btn" data-toggle="modal" data-target="#loadSnapshotModal"><i class="fas fa-download"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Import</span></a></li>
+                    <li title="export / save a netdata snapshot" data-toggle="tooltip" data-placement="bottom" id="saveButton"><a href="#" class="btn" data-toggle="modal" data-target="#saveSnapshotModal"><i class="fas fa-upload"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Export</span></a></li>
+                    <li title="print this dashboard to PDF" data-toggle="tooltip" data-placement="bottom" id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal"><i class="fas fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
+                    <li title="get help on using the charts" data-toggle="tooltip" data-placement="bottom" class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fas fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
                     <li class="dropdown hidden-sm hidden-md hidden-lg">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
                         <ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
@@ -4447,44 +4447,44 @@
             <div class="col-md-10" role="main">
                 <div class="p">
                     <big><a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a></big><br/>
-                    <i class="fa fa-copyright"></i> Copyright 2016-2017, <a href="mailto:costa@tsaousis.gr">Costa Tsaousis</a>.<br/>
+                    <i class="fas fa-copyright"></i> Copyright 2016-2017, <a href="mailto:costa@tsaousis.gr">Costa Tsaousis</a>.<br/>
                     Released under <a href="http://www.gnu.org/licenses/gpl-3.0.en.html" target="_blank">GPL v3 or later</a>.<br/>
                 </div>
                 <div class="p">
                     <small>
                         <a href="https://github.com/firehol/netdata/wiki" target="_blank">netdata</a> re-distributes these software tools:
 
-                        <i class="fa fa-circle"></i> The excellent <a href="http://dygraphs.com/" target="_blank">Dygraphs.com</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright 2009, Dan Vanderkam, <a href="http://dygraphs.com/legal.html" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> The excellent <a href="http://dygraphs.com/" target="_blank">Dygraphs.com</a> web chart library,
+                        <i class="fas fa-copyright"></i> Copyright 2009, Dan Vanderkam, <a href="http://dygraphs.com/legal.html" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://rendro.github.io/easy-pie-chart/" target="_blank">Easy Pie Chart</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright 2013, Robert Fleischmann, <a href="https://github.com/rendro/easy-pie-chart/blob/master/LICENSE" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://rendro.github.io/easy-pie-chart/" target="_blank">Easy Pie Chart</a> web chart library,
+                        <i class="fas fa-copyright"></i> Copyright 2013, Robert Fleischmann, <a href="https://github.com/rendro/easy-pie-chart/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://bernii.github.io/gauge.js/" target="_blank">Gauge.js</a> web chart library,
-                        <i class="fa fa-copyright"></i> Copyright, Bernard Kobos, <a href="http://bernii.github.io/gauge.js/" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="http://bernii.github.io/gauge.js/" target="_blank">Gauge.js</a> web chart library,
+                        <i class="fas fa-copyright"></i> Copyright, Bernard Kobos, <a href="http://bernii.github.io/gauge.js/" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://jquery.org/" target="_blank">jQuery</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2015, jQuery Foundation, <a href="https://jquery.org/license/" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://jquery.org/" target="_blank">jQuery</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2015, jQuery Foundation, <a href="https://jquery.org/license/" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://getbootstrap.com/getting-started/" target="_blank">Bootstrap</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2015, Twitter, <a href="http://getbootstrap.com/getting-started/#license-faqs" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="http://getbootstrap.com/getting-started/" target="_blank">Bootstrap</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2015, Twitter, <a href="http://getbootstrap.com/getting-started/#license-faqs" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://www.bootstraptoggle.com/" target="_blank">Bootstrap Toggle</a>,
-                        <i class="fa fa-copyright"></i> Copyright (c) 2011-2014 Min Hur, The New York Times Company, <a href="https://github.com/minhur/bootstrap-toggle/blob/master/LICENSE" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="http://www.bootstraptoggle.com/" target="_blank">Bootstrap Toggle</a>,
+                        <i class="fas fa-copyright"></i> Copyright (c) 2011-2014 Min Hur, The New York Times Company, <a href="https://github.com/minhur/bootstrap-toggle/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://github.com/noraesae/perfect-scrollbar" target="_blank">perfect-scrollbar</a>,
-                        <i class="fa fa-copyright"></i> Copyright 2016, Hyunje Alex Jun and other contributors, <a href="https://github.com/noraesae/perfect-scrollbar/blob/master/LICENSE" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://github.com/noraesae/perfect-scrollbar" target="_blank">perfect-scrollbar</a>,
+                        <i class="fas fa-copyright"></i> Copyright 2016, Hyunje Alex Jun and other contributors, <a href="https://github.com/noraesae/perfect-scrollbar/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://fortawesome.github.io/Font-Awesome/" target="_blank">FontAwesome</a>,
-                        <i class="fa fa-copyright"></i> Created by Dave Gandy, Font: <a href="http://scripts.sil.org/OFL" target="_blank">SIL OFL 1.1 License</a>, CSS: <a href="http://opensource.org/licenses/mit-license.html" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://fortawesome.github.io/Font-Awesome/" target="_blank">FontAwesome</a>,
+                        <i class="fas fa-copyright"></i> Created by Dave Gandy, Font: <a href="http://scripts.sil.org/OFL" target="_blank">SIL OFL 1.1 License</a>, CSS: <a href="http://opensource.org/licenses/mit-license.html" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html" target="_blank">IconsDB.com Icons</a>, Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
+                        <i class="fas fa-circle"></i> <a href="http://www.iconsdb.com/soylent-red-icons/seo-performance-icon.html" target="_blank">IconsDB.com Icons</a>, Icons provided as CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
 
-                        <i class="fa fa-circle"></i> <a href="http://bootstrap-table.wenzhixin.net.cn/" target="_blank">bootstrap-table</a>,
-                        <i class="fa fa-copyright"></i> Copyright (c) 2012-2016 Zhixin Wen, <a href="https://github.com/wenzhixin/bootstrap-table/blob/master/LICENSE" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="http://bootstrap-table.wenzhixin.net.cn/" target="_blank">bootstrap-table</a>,
+                        <i class="fas fa-copyright"></i> Copyright (c) 2012-2016 Zhixin Wen, <a href="https://github.com/wenzhixin/bootstrap-table/blob/master/LICENSE" target="_blank">MIT License</a>
 
-                        <i class="fa fa-circle"></i> <a href="https://github.com/hhurz/tableExport.jquery.plugin" target="_blank">tableExport.jquery.plugin</a>,
-                        <i class="fa fa-copyright"></i> Copyright (c) 2015,2016 hhurz, <a href="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js" target="_blank">MIT License</a>
+                        <i class="fas fa-circle"></i> <a href="https://github.com/hhurz/tableExport.jquery.plugin" target="_blank">tableExport.jquery.plugin</a>,
+                        <i class="fas fa-copyright"></i> Copyright (c) 2015,2016 hhurz, <a href="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js" target="_blank">MIT License</a>
 
                     </small>
                 </div>
@@ -5437,12 +5437,10 @@
                         <hr/>
                     </div>
                     <div>
-                        For progress reports and key netdata updates: <strong><a href="https://twitter.com/linuxnetdata" target="_blank">follow netdata on <i class="fa fa-twitter" aria-hidden="true"></i> twitter</a></strong>.
+                        For progress reports and key netdata updates: <strong><a href="https://twitter.com/linuxnetdata" target="_blank">follow netdata on <i class="fab fa-twitter"></i> twitter</a></strong>.
                         <br/>
-                        <small>
-                            You can also <a href="https://www.facebook.com/linuxnetdata/" target="_blank">follow netdata on <i class="fa fa-facebook" aria-hidden="true"></i> facebook</a>,
-                            or <a href="https://github.com/firehol/netdata" target="_blank">watch netdata on <i class="fa fa-github" aria-hidden="true"></i> github</a>.
-                        </small>
+                        You can also <a href="https://www.facebook.com/linuxnetdata/" target="_blank">follow netdata on <i class="fab fa-facebook"></i> facebook</a>,
+                        or <a href="https://github.com/firehol/netdata" target="_blank">watch netdata on <i class="fab fa-github"></i> github</a>.
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -5543,6 +5541,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20171205-4"></script>
+    <script type="text/javascript" src="dashboard.js?v20171208-5"></script>
 </body>
 </html>
