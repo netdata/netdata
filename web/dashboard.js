@@ -7804,7 +7804,7 @@ var NETDATA = window.NETDATA || {};
             }
         },
         {
-            url: NETDATA.serverStatic + 'lib/fontawesome-all.min.js?v5.0.0',
+            url: NETDATA.serverStatic + 'lib/fontawesome-all-5.0.0.min.js',
             async: true,
             isAlreadyLoaded: function() { return false; }
         },
