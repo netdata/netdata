@@ -213,8 +213,8 @@ class Service(ExecutableService):
 
         data.update(dict((param, value) for _, param, value in server_stats))
 
-        data['memory_allocated'] = int(data['s0.g_bytes'])
-        data['memory_free'] = int(data['s0.g_space']) - data['memory_allocated']
+        data['memory_allocated'] = data['s0.g_bytes']
+        data['memory_free'] = data['s0.g_space']
 
         return data
 
