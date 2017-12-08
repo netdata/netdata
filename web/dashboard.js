@@ -158,7 +158,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.themes = {
         white: {
             bootstrap_css: NETDATA.serverStatic + 'css/bootstrap-3.3.7.css',
-            dashboard_css: NETDATA.serverStatic + 'dashboard.css?v20171127-1',
+            dashboard_css: NETDATA.serverStatic + 'dashboard.css?v20171208-1',
             background: '#FFFFFF',
             foreground: '#000000',
             grid: '#F0F0F0',
@@ -176,7 +176,7 @@ var NETDATA = window.NETDATA || {};
         },
         slate: {
             bootstrap_css: NETDATA.serverStatic + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
-            dashboard_css: NETDATA.serverStatic + 'dashboard.slate.css?v20171127-1',
+            dashboard_css: NETDATA.serverStatic + 'dashboard.slate.css?v20171208-1',
             background: '#272b30',
             foreground: '#C8C8C8',
             grid: '#283236',
@@ -2545,7 +2545,7 @@ var NETDATA = window.NETDATA || {};
                 that.log('destroyDOM()');
 
             // that.element.className = 'netdata-message icon';
-            // that.element.innerHTML = '<i class="fa fa-refresh"></i> netdata';
+            // that.element.innerHTML = '<i class="fas fa-sync"></i> netdata';
             that.element.innerHTML = '';
             that.element_message = null;
             that.element_legend = null;
@@ -2671,19 +2671,19 @@ var NETDATA = window.NETDATA || {};
             var icon;
             if(that.chart !== null) {
                 if(that.chart.chart_type === 'line')
-                    icon = '<i class="fa fa-line-chart"></i>';
+                    icon = '<i class="fas fa-chart-line"></i>';
                 else
-                    icon = '<i class="fa fa-area-chart"></i>';
+                    icon = '<i class="fas fa-chart-area"></i>';
             }
             else
-                icon = '<i class="fa fa-area-chart"></i>';
+                icon = '<i class="fas fa-chart-area"></i>';
 
             showMessageIcon(icon + ' netdata');
         };
 
         var showLoading = function() {
             if(that.chart_created === false) {
-                showMessageIcon('<i class="fa fa-refresh"></i> netdata');
+                showMessageIcon('<i class="fas fa-sync"></i> netdata');
                 return true;
             }
             return false;
@@ -3049,7 +3049,7 @@ var NETDATA = window.NETDATA || {};
 
 
         var noDataToShow = function() {
-            showMessageIcon('<i class="fa fa-warning"></i> empty');
+            showMessageIcon('<i class="fas fa-exclamation-triangle"></i> empty');
             that.legendUpdateDOM();
             that.tm.last_autorefreshed = Date.now();
             // that.data_update_every = 30 * 1000;
@@ -3436,11 +3436,11 @@ var NETDATA = window.NETDATA || {};
                 s = r = this.legendFormatValue(value);
 
                 if(typeof series.last === 'number') {
-                    if(v > series.last) s += '<i class="fa fa-angle-up" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
-                    else if(v < series.last) s += '<i class="fa fa-angle-down" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
-                    else s += '<i class="fa fa-angle-left" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+                    if(v > series.last) s += '<i class="fas fa-angle-up" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+                    else if(v < series.last) s += '<i class="fas fa-angle-down" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+                    else s += '<i class="fas fa-angle-left" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
                 }
-                else s += '<i class="fa fa-angle-right" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
+                else s += '<i class="fas fa-angle-right" style="width: 8px; text-align: center; overflow: hidden; vertical-align: middle;"></i>';
 
                 series.last = v;
             }
@@ -3883,7 +3883,7 @@ var NETDATA = window.NETDATA || {};
                     this.element.appendChild(this.element_legend_childs.toolbox);
 
                     this.element_legend_childs.toolbox_left.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_left.innerHTML = '<i class="fa fa-backward"></i>';
+                    this.element_legend_childs.toolbox_left.innerHTML = '<i class="fas fa-backward"></i>';
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_left);
                     this.element_legend_childs.toolbox_left.onclick = function(e) {
                         e.preventDefault();
@@ -3908,7 +3908,7 @@ var NETDATA = window.NETDATA || {};
 
 
                     this.element_legend_childs.toolbox_reset.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_reset.innerHTML = '<i class="fa fa-play"></i>';
+                    this.element_legend_childs.toolbox_reset.innerHTML = '<i class="fas fa-play"></i>';
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_reset);
                     this.element_legend_childs.toolbox_reset.onclick = function(e) {
                         e.preventDefault();
@@ -3927,7 +3927,7 @@ var NETDATA = window.NETDATA || {};
                     });
 
                     this.element_legend_childs.toolbox_right.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_right.innerHTML = '<i class="fa fa-forward"></i>';
+                    this.element_legend_childs.toolbox_right.innerHTML = '<i class="fas fa-forward"></i>';
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_right);
                     this.element_legend_childs.toolbox_right.onclick = function(e) {
                         e.preventDefault();
@@ -3951,7 +3951,7 @@ var NETDATA = window.NETDATA || {};
 
 
                     this.element_legend_childs.toolbox_zoomin.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_zoomin.innerHTML = '<i class="fa fa-plus"></i>';
+                    this.element_legend_childs.toolbox_zoomin.innerHTML = '<i class="fas fa-plus"></i>';
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomin);
                     this.element_legend_childs.toolbox_zoomin.onclick = function(e) {
                         e.preventDefault();
@@ -3973,7 +3973,7 @@ var NETDATA = window.NETDATA || {};
                     });
 
                     this.element_legend_childs.toolbox_zoomout.className += ' netdata-legend-toolbox-button';
-                    this.element_legend_childs.toolbox_zoomout.innerHTML = '<i class="fa fa-minus"></i>';
+                    this.element_legend_childs.toolbox_zoomout.innerHTML = '<i class="fas fa-minus"></i>';
                     this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_zoomout);
                     this.element_legend_childs.toolbox_zoomout.onclick = function(e) {
                         e.preventDefault();
@@ -3996,7 +3996,7 @@ var NETDATA = window.NETDATA || {};
                     });
 
                     //this.element_legend_childs.toolbox_volume.className += ' netdata-legend-toolbox-button';
-                    //this.element_legend_childs.toolbox_volume.innerHTML = '<i class="fa fa-sort-amount-desc"></i>';
+                    //this.element_legend_childs.toolbox_volume.innerHTML = '<i class="fas fa-sort-amount-down"></i>';
                     //this.element_legend_childs.toolbox_volume.title = 'Visible Volume';
                     //this.element_legend_childs.toolbox.appendChild(this.element_legend_childs.toolbox_volume);
                     //this.element_legend_childs.toolbox_volume.onclick = function(e) {
@@ -4009,7 +4009,7 @@ var NETDATA = window.NETDATA || {};
                     this.element_legend_childs.resize_handler = document.createElement('div');
 
                     this.element_legend_childs.resize_handler.className += " netdata-legend-resize-handler";
-                    this.element_legend_childs.resize_handler.innerHTML = '<i class="fa fa-chevron-up"></i><i class="fa fa-chevron-down"></i>';
+                    this.element_legend_childs.resize_handler.innerHTML = '<i class="fas fa-sort"></i>';
                     this.element.appendChild(this.element_legend_childs.resize_handler);
                     if (NETDATA.options.current.show_help === true)
                         $(this.element_legend_childs.resize_handler).popover({
@@ -7804,6 +7804,11 @@ var NETDATA = window.NETDATA || {};
             }
         },
         {
+            url: NETDATA.serverStatic + 'lib/fontawesome-all.min.js?v5.0.0',
+            async: true,
+            isAlreadyLoaded: function() { return false; }
+        },
+        {
             url: NETDATA.serverStatic + 'lib/perfect-scrollbar-0.6.15.min.js',
             isAlreadyLoaded: function() { return false; }
         }
@@ -7815,10 +7820,6 @@ var NETDATA = window.NETDATA || {};
             isAlreadyLoaded: function() {
                 return (typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap === true);
             }
-        },
-        {
-            url: NETDATA.serverStatic + 'css/font-awesome.min.css?v4.7.0',
-            isAlreadyLoaded: function() { return false; }
         },
         {
             url: NETDATA.themes.current.dashboard_css,
