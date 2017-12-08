@@ -263,7 +263,7 @@ netdataDashboard.menu = {
 
     'squid': {
         title: 'squid',
-        icon: '<i class="fas fa-exchange"></i>',
+        icon: '<i class="fas fa-exchange-alt"></i>',
         info: undefined
     },
 
