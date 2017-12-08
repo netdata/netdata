@@ -1809,7 +1809,7 @@
 
                 var menuid = NETDATA.name2id('menu_' + menu);
                 sidebar += '<li class=""><a href="#' + menuid + '" onClick="return scrollToId(\'' + menuid + '\');">' + menus[menu].icon + ' ' + menus[menu].title + '</a><ul class="nav">';
-                html += '<div role="section" class="dashboard-section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].title + '</h1></div><div role="section"  class="dashboard-subsection">';
+                html += '<div role="section" class="dashboard-section"><div role="sectionhead"><h1 id="' + menuid + '" role="heading">' + menus[menu].icon + ' ' + menus[menu].title + '</h1></div><div role="section"  class="dashboard-subsection">';
 
                 if(menus[menu].info !== null)
                     html += menus[menu].info;
