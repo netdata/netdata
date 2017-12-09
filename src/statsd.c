@@ -979,39 +979,9 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
         , collected_number divisor
         , STATSD_APP_CHART_DIM_VALUE_TYPE value_type
 ) {
-    size_t len = strlen(metric_name) + 100;
-    char metric[ len + 1 ];
-    strcpy(metric, metric_name);
-    uint32_t hash = simple_hash(metric);
-
-    // check if the metric already exists in this chart
-    // if it is found, append the value type
-    // if it is still found, append a counter
-
-    STATSD_APP_CHART_DIM *tdim;
-    size_t count = 0, found = 1;
-    while(found) {
-        found = 0;
-        for (tdim = chart->dimensions; tdim && tdim->next; tdim = tdim->next) {
-            if (hash == tdim->metric_hash && !strcmp(tdim->metric, metric)) {
-                count++;
-
-                // the same metric!
-                if(count > 1)
-                    snprintfz(metric, len, "%s_%s%zu", metric_name, valuetype2string(value_type), count);
-                else
-                    snprintfz(metric, len, "%s_%s", metric_name, valuetype2string(value_type));
-
-                hash = simple_hash(metric);
-                found = 1;
-                break;
-            }
-        }
-    }
-
     STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
 
-    dim->metric = strdupz(metric);
+    dim->metric = strdupz(metric_name);
     dim->metric_hash = simple_hash(dim->metric);
 
     dim->name = strdupz((dim_name)?dim_name:"");
@@ -1026,6 +996,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
         dim->divisor = 1;
 
     // append it to the list of dimension
+    STATSD_APP_CHART_DIM *tdim;
     for(tdim = chart->dimensions; tdim && tdim->next ; tdim = tdim->next) ;
     if(!tdim) {
         dim->next = chart->dimensions;
@@ -1826,6 +1797,50 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
     }
 }
 
+static inline RRDDIM *statsd_add_dim_to_app_chart(STATSD_APP *app, STATSD_APP_CHART *chart, STATSD_APP_CHART_DIM *dim) {
+    (void)app;
+
+    // allow the same statsd metric to be added multiple times to the same chart
+
+    STATSD_APP_CHART_DIM *tdim;
+    size_t count_same_metric = 0, count_same_metric_value_type = 0;
+    size_t pos_same_metric_value_type = 0;
+
+    for (tdim = chart->dimensions; tdim && tdim->next; tdim = tdim->next) {
+        if (dim->metric_hash == tdim->metric_hash && !strcmp(dim->metric, tdim->metric)) {
+            count_same_metric++;
+
+            if(dim->value_type == tdim->value_type) {
+                count_same_metric_value_type++;
+                if (tdim == dim)
+                    pos_same_metric_value_type = count_same_metric_value_type;
+            }
+        }
+    }
+
+    if(count_same_metric > 1) {
+        // the same metric is found multiple times
+
+        size_t len = strlen(dim->metric) + 100;
+        char metric[ len + 1 ];
+
+        if(count_same_metric_value_type > 1) {
+            // the same metric, with the same value type, is added multiple times
+            snprintfz(metric, len, "%s_%s%zu", dim->metric, valuetype2string(dim->value_type), pos_same_metric_value_type);
+        }
+        else {
+            // the same metric, with different value type is added
+            snprintfz(metric, len, "%s_%s", dim->metric, valuetype2string(dim->value_type));
+        }
+
+        dim->rd = rrddim_add(chart->st, metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
+        return dim->rd;
+    }
+
+    dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
+    return dim->rd;
+}
+
 static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *chart) {
     debug(D_STATSD, "updating chart '%s' for app '%s'", chart->id, app->name);
 
@@ -1857,7 +1872,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
     for(dim = chart->dimensions; dim ;dim = dim->next) {
         if(likely(!dim->metric_pattern)) {
             if (unlikely(!dim->rd))
-                dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
+                statsd_add_dim_to_app_chart(app, chart, dim);
 
             if (unlikely(dim->value_ptr)) {
                 debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
