@@ -12,12 +12,11 @@ struct simple_pattern {
     struct simple_pattern *next;
 };
 
-static inline struct simple_pattern *parse_pattern(const char *str, SIMPLE_PREFIX_MODE default_mode) {
+static inline struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE default_mode) {
     SIMPLE_PREFIX_MODE mode;
     struct simple_pattern *child = NULL;
 
-    char *buf = strdupz(str);
-    char *s = buf, *c = buf;
+    char *s = str, *c = str;
 
     // skip asterisks in front
     while(*c == '*') c++;
@@ -64,8 +63,6 @@ static inline struct simple_pattern *parse_pattern(const char *str, SIMPLE_PREFI
 
     m->child = child;
 
-    freez(buf);
-
     return m;
 }
 
@@ -74,51 +71,62 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE defau
 
     if(unlikely(!list || !*list)) return root;
 
-    char *buf = strdupz(list);
-    if(buf && *buf) {
-        char *s = buf;
+    char *buf = mallocz(strlen(list) + 1);
+    const char *s = list;
 
-        while(s && *s) {
-            char negative = 0;
+    while(s && *s) {
+        buf[0] = '\0';
+        char *c = buf;
 
-            // skip all spaces
-            while(isspace(*s)) s++;
+        char negative = 0;
 
-            if(*s == '!') {
-                negative = 1;
+        // skip all spaces
+        while(isspace(*s))
+            s++;
+
+        if(*s == '!') {
+            negative = 1;
+            s++;
+        }
+
+        // empty string
+        if(unlikely(!*s))
+            break;
+
+        // find the next space
+        char escape = 0;
+        while(*s) {
+            if(*s == '\\' && !escape) {
+                escape = 1;
                 s++;
             }
-
-            // empty string
-            if(unlikely(!*s)) break;
-
-            // find the next space
-            char *c = s;
-            while(*c && !isspace(*c)) c++;
-
-            // find the next word
-            char *n;
-            if(likely(*c)) n = c + 1;
-            else n = NULL;
-
-            // terminate our string
-            *c = '\0';
-
-            struct simple_pattern *m = parse_pattern(s, default_mode);
-            m->negative = negative;
-
-            if(likely(n)) *c = ' ';
-
-            // link it at the end
-            if(unlikely(!root))
-                root = last = m;
             else {
-                last->next = m;
-                last = m;
-            }
+                if (isspace(*s) && !escape) {
+                    s++;
+                    break;
+                }
 
-            // prepare for next loop
-            s = n;
+                *c++ = *s++;
+                escape = 0;
+            }
+        }
+
+        // terminate our string
+        *c = '\0';
+
+        // if we matched the empty string, skip it
+        if(!*buf)
+            continue;
+
+        struct simple_pattern *m = parse_pattern(buf, default_mode);
+        m->negative = negative;
+
+        // link it at the end
+        if(unlikely(!root))
+            root = last = m;
+        else {
+            last->next = m;
+            last = m;
         }
     }
 
