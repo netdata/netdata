@@ -18,6 +18,9 @@ extern SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MOD
 // test if string str is matched from the pattern
 extern int simple_pattern_matches(SIMPLE_PATTERN *list, const char *str);
 
+// test if string str is matched from the pattern and fill 'wildcarded' with the parts matched by '*'
+extern int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size);
+
 // free a simple_pattern that was created with simple_pattern_create()
 // list can be NULL, in which case, this does nothing.
 extern void simple_pattern_free(SIMPLE_PATTERN *list);
