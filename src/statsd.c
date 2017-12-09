@@ -1194,12 +1194,20 @@ int statsd_readfile(const char *path, const char *filename) {
                 char *multipler     = words[i++];
                 char *divisor       = words[i++];
 
-                if(!pattern && app->dict && (!dim_name || !*dim_name)) {
-                    dim_name = dictionary_get(app->dict, metric_name);
-                }
+                if(!pattern) {
+                    if(app->dict) {
+                        if(dim_name && *dim_name) {
+                            char *n = dictionary_get(app->dict, dim_name);
+                            if(n) dim_name = n;
+                        }
+                        else {
+                            dim_name = dictionary_get(app->dict, metric_name);
+                        }
+                    }
 
-                if(!pattern && (!dim_name || !*dim_name))
-                    dim_name = metric_name;
+                    if(!dim_name || !*dim_name)
+                        dim_name = metric_name;
+                }
 
                 STATSD_APP_CHART_DIM *dim = add_dimension_to_app_chart(
                         app
@@ -1722,27 +1730,25 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                 STATSD_APP_CHART_DIM *dim;
                 for(dim = chart->dimensions; dim ; dim = dim->next) {
                     if(unlikely(dim->metric_pattern)) {
-                        size_t wildcarded_len = strlen(m->name) + 1;
+                        size_t dim_name_len = strlen(dim->name);
+                        size_t wildcarded_len = dim_name_len + strlen(m->name) + 1;
                         char wildcarded[wildcarded_len];
-                        if(simple_pattern_matches_extract(dim->metric_pattern, m->name, wildcarded, wildcarded_len)) {
+
+                        strcpy(wildcarded, dim->name);
+                        char *ws = &wildcarded[dim_name_len];
+
+                        if(simple_pattern_matches_extract(dim->metric_pattern, m->name, ws, wildcarded_len - dim_name_len)) {
 
                             char *final_name = NULL;
 
                             if(app->dict) {
-                                // use the name of the metric
-                                final_name = dictionary_get(app->dict, m->name);
-
-                                if(unlikely(!final_name)) {
-                                    // use the name given at the dynamic dimension + the wildcarded string
-                                    size_t key_len = strlen(dim->name) + wildcarded_len + 10;
-                                    char   key[key_len + 1];
-
-                                    snprintfz(key, key_len, "%s%s", dim->name, wildcarded);
-                                    final_name = dictionary_get(app->dict, key);
+                                if(likely(*wildcarded)) {
+                                    // use the name of the wildcarded string
+                                    final_name = dictionary_get(app->dict, wildcarded);
                                 }
 
-                                if(unlikely(!final_name && *wildcarded)) {
-                                    // use the name of the wildcarded string
+                                if(unlikely(!final_name)) {
+                                    // use the name of the metric
                                     final_name = dictionary_get(app->dict, m->name);
                                 }
                             }
