@@ -207,6 +207,7 @@ typedef struct statsd_app {
     SIMPLE_PATTERN *metrics;
     STATS_METRIC_OPTIONS default_options;
     RRD_MEMORY_MODE rrd_memory_mode;
+    DICTIONARY *dict;
     long rrd_history_entries;
 
     const char *source;
@@ -967,7 +968,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
     dim->metric = strdupz(metric_name);
     dim->metric_hash = simple_hash(dim->metric);
 
-    dim->name = strdupz((dim_name && *dim_name)?dim_name:metric_name);
+    dim->name = strdupz((dim_name)?dim_name:"");
     dim->multiplier = multiplier;
     dim->divisor = divisor;
     dim->value_type = value_type;
@@ -1012,6 +1013,7 @@ int statsd_readfile(const char *path, const char *filename) {
 
     STATSD_APP *app = NULL;
     STATSD_APP_CHART *chart = NULL;
+    DICTIONARY *dict = NULL;
 
     size_t line = 0;
     char *s;
@@ -1042,22 +1044,33 @@ int statsd_readfile(const char *path, const char *filename) {
                 app->next = statsd.apps;
                 statsd.apps = app;
                 chart = NULL;
+                dict = NULL;
             }
             else if(app) {
-                // a new chart
-                chart = callocz(sizeof(STATSD_APP_CHART), 1);
-                netdata_fix_chart_id(s);
-                chart->id = strdupz(s);
-                chart->name = strdupz(s);
-                chart->title = strdupz("Statsd chart");
-                chart->context = strdupz(s);
-                chart->family = strdupz("overview");
-                chart->units = strdupz("value");
-                chart->priority = STATSD_CHART_PRIORITY;
-                chart->chart_type = RRDSET_TYPE_LINE;
+                if(!strcmp(s, "dictionary")) {
+                    if(!app->dict)
+                        app->dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
 
-                chart->next = app->charts;
-                app->charts = chart;
+                    dict = app->dict;
+                }
+                else {
+                    dict = NULL;
+
+                    // a new chart
+                    chart = callocz(sizeof(STATSD_APP_CHART), 1);
+                    netdata_fix_chart_id(s);
+                    chart->id         = strdupz(s);
+                    chart->name       = strdupz(s);
+                    chart->title      = strdupz("Statsd chart");
+                    chart->context    = strdupz(s);
+                    chart->family     = strdupz("overview");
+                    chart->units      = strdupz("value");
+                    chart->priority   = STATSD_CHART_PRIORITY;
+                    chart->chart_type = RRDSET_TYPE_LINE;
+
+                    chart->next = app->charts;
+                    app->charts = chart;
+                }
             }
             else
                 error("STATSD: ignoring line %zu ('%s') of file '%s/%s', [app] is not defined.", line, s, path, filename);
@@ -1091,7 +1104,14 @@ int statsd_readfile(const char *path, const char *filename) {
             continue;
         }
 
-        if(!chart) {
+        if(unlikely(dict)) {
+            // parse [dictionary] members
+
+            dictionary_set(dict, name, value, strlen(value) + 1);
+        }
+        else if(!chart) {
+            // parse [app] members
+
             if(!strcmp(name, "name")) {
                 freez((void *)app->name);
                 netdata_fix_chart_name(value);
@@ -1125,6 +1145,8 @@ int statsd_readfile(const char *path, const char *filename) {
             }
         }
         else {
+            // parse [chart] members
+
             if(!strcmp(name, "name")) {
                 freez((void *)chart->name);
                 netdata_fix_chart_id(value);
@@ -1171,6 +1193,13 @@ int statsd_readfile(const char *path, const char *filename) {
                 char *type          = words[i++];
                 char *multipler     = words[i++];
                 char *divisor       = words[i++];
+
+                if(!pattern && app->dict && (!dim_name || !*dim_name)) {
+                    dim_name = dictionary_get(app->dict, metric_name);
+                }
+
+                if(!pattern && (!dim_name || !*dim_name))
+                    dim_name = metric_name;
 
                 STATSD_APP_CHART_DIM *dim = add_dimension_to_app_chart(
                         app
@@ -1693,14 +1722,39 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                 STATSD_APP_CHART_DIM *dim;
                 for(dim = chart->dimensions; dim ; dim = dim->next) {
                     if(unlikely(dim->metric_pattern)) {
-                        size_t len = strlen(m->name) + 1;
-                        char name[len];
-                        if(simple_pattern_matches_extract(dim->metric_pattern, m->name, name, len)) {
+                        size_t wildcarded_len = strlen(m->name) + 1;
+                        char wildcarded[wildcarded_len];
+                        if(simple_pattern_matches_extract(dim->metric_pattern, m->name, wildcarded, wildcarded_len)) {
+
+                            char *final_name = NULL;
+
+                            if(app->dict) {
+                                // use the name of the metric
+                                final_name = dictionary_get(app->dict, m->name);
+
+                                if(unlikely(!final_name)) {
+                                    // use the name given at the dynamic dimension + the wildcarded string
+                                    size_t key_len = strlen(dim->name) + wildcarded_len + 10;
+                                    char   key[key_len + 1];
+
+                                    snprintfz(key, key_len, "%s%s", dim->name, wildcarded);
+                                    final_name = dictionary_get(app->dict, key);
+                                }
+
+                                if(unlikely(!final_name && *wildcarded)) {
+                                    // use the name of the wildcarded string
+                                    final_name = dictionary_get(app->dict, m->name);
+                                }
+                            }
+
+                            if(unlikely(!final_name))
+                                final_name = wildcarded;
+
                             add_dimension_to_app_chart(
                                     app
                                     , chart
                                     , m->name
-                                    , name
+                                    , final_name
                                     , dim->multiplier
                                     , dim->divisor
                                     , dim->value_type
