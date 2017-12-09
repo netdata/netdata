@@ -954,6 +954,22 @@ static STATSD_APP_CHART_DIM_VALUE_TYPE string2valuetype(const char *type, size_t
     return STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
 }
 
+static const char *valuetype2string(STATSD_APP_CHART_DIM_VALUE_TYPE type) {
+    switch(type) {
+        case STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS: return "events";
+        case STATSD_APP_CHART_DIM_VALUE_TYPE_LAST: return "last";
+        case STATSD_APP_CHART_DIM_VALUE_TYPE_MIN: return "min";
+        case STATSD_APP_CHART_DIM_VALUE_TYPE_MAX: return "max";
+        case STATSD_APP_CHART_DIM_VALUE_TYPE_SUM: return "sum";
+        case STATSD_APP_CHART_DIM_VALUE_TYPE_AVERAGE: return "average";
+        case STATSD_APP_CHART_DIM_VALUE_TYPE_MEDIAN: return "median";
+        case STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV: return "stddev";
+        case STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE: return "percentile";
+    }
+
+    return "unknown";
+}
+
 static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
         STATSD_APP *app
         , STATSD_APP_CHART *chart
@@ -963,9 +979,39 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
         , collected_number divisor
         , STATSD_APP_CHART_DIM_VALUE_TYPE value_type
 ) {
+    size_t len = strlen(metric_name) + 100;
+    char metric[ len + 1 ];
+    strcpy(metric, metric_name);
+    uint32_t hash = simple_hash(metric);
+
+    // check if the metric already exists in this chart
+    // if it is found, append the value type
+    // if it is still found, append a counter
+
+    STATSD_APP_CHART_DIM *tdim;
+    size_t count = 0, found = 1;
+    while(found) {
+        found = 0;
+        for (tdim = chart->dimensions; tdim && tdim->next; tdim = tdim->next) {
+            if (hash == tdim->metric_hash && !strcmp(tdim->metric, metric)) {
+                count++;
+
+                // the same metric!
+                if(count > 1)
+                    snprintfz(metric, len, "%s_%s%zu", metric_name, valuetype2string(value_type), count);
+                else
+                    snprintfz(metric, len, "%s_%s", metric_name, valuetype2string(value_type));
+
+                hash = simple_hash(metric);
+                found = 1;
+                break;
+            }
+        }
+    }
+
     STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
 
-    dim->metric = strdupz(metric_name);
+    dim->metric = strdupz(metric);
     dim->metric_hash = simple_hash(dim->metric);
 
     dim->name = strdupz((dim_name)?dim_name:"");
@@ -980,7 +1026,6 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
         dim->divisor = 1;
 
     // append it to the list of dimension
-    STATSD_APP_CHART_DIM *tdim;
     for(tdim = chart->dimensions; tdim && tdim->next ; tdim = tdim->next) ;
     if(!tdim) {
         dim->next = chart->dimensions;
