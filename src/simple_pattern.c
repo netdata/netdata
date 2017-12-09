@@ -13,6 +13,8 @@ struct simple_pattern {
 };
 
 static inline struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE default_mode) {
+    // fprintf(stderr, "PARSING PATTERN: '%s'\n", str);
+
     SIMPLE_PREFIX_MODE mode;
     struct simple_pattern *child = NULL;
 
@@ -115,9 +117,10 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE defau
         *c = '\0';
 
         // if we matched the empty string, skip it
-        if(!*buf)
+        if(unlikely(!*buf))
             continue;
 
+        // fprintf(stderr, "FOUND PATTERN: '%s'\n", buf);
         struct simple_pattern *m = parse_pattern(buf, default_mode);
         m->negative = negative;
 
@@ -134,28 +137,58 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE defau
     return (SIMPLE_PATTERN *)root;
 }
 
-static inline int match_pattern(struct simple_pattern *m, const char *str, size_t len) {
-    char *s;
+static inline char *add_wildcarded(const char *matched, size_t matched_size, char *wildcarded, size_t *wildcarded_size) {
+    //if(matched_size) {
+    //    char buf[matched_size + 1];
+    //    strncpyz(buf, matched, matched_size);
+    //    fprintf(stderr, "ADD WILDCARDED '%s' of length %zu\n", buf, matched_size);
+    //}
+
+    if(matched && *matched && matched_size && wildcarded && *wildcarded_size) {
+        size_t wss = *wildcarded_size - 1;
+        size_t len = (matched_size < wss)?matched_size:wss;
+        if(len) {
+            strncpyz(wildcarded, matched, len);
+
+            *wildcarded_size -= len;
+            return &wildcarded[len];
+        }
+    }
+
+    return wildcarded;
+}
+
+static inline int match_pattern(struct simple_pattern *m, const char *str, size_t len, char *wildcarded, const size_t *wildcarded_size) {
+    char *s, *ws = wildcarded;
+    size_t wss = *wildcarded_size;
 
     if(m->len <= len) {
         switch(m->mode) {
             case SIMPLE_PATTERN_SUBSTRING:
                 if(!m->len) return 1;
                 if((s = strstr(str, m->match))) {
-                    if(!m->child) return 1;
-                    return match_pattern(m->child, &s[m->len], len - (s - str) - m->len);
+                    ws = add_wildcarded(str, s - str, ws, &wss);
+                    if(!m->child) {
+                        ws = add_wildcarded(&s[m->len], len - (&s[m->len] - str), ws, &wss);
+                        return 1;
+                    }
+                    return match_pattern(m->child, &s[m->len], len - (s - str) - m->len, ws, &wss);
                 }
                 break;
 
             case SIMPLE_PATTERN_PREFIX:
                 if(unlikely(strncmp(str, m->match, m->len) == 0)) {
-                    if(!m->child) return 1;
-                    return match_pattern(m->child, &str[m->len], len - m->len);
+                    if(!m->child) {
+                        ws = add_wildcarded(&str[m->len], len - m->len, ws, &wss);
+                        return 1;
+                    }
+                    return match_pattern(m->child, &str[m->len], len - m->len, ws, &wss);
                 }
                 break;
 
             case SIMPLE_PATTERN_SUFFIX:
                 if(unlikely(strcmp(&str[len - m->len], m->match) == 0)) {
+                    ws = add_wildcarded(str, len - m->len, ws, &wss);
                     if(!m->child) return 1;
                     return 0;
                 }
@@ -174,19 +207,32 @@ static inline int match_pattern(struct simple_pattern *m, const char *str, size_
     return 0;
 }
 
-int simple_pattern_matches(SIMPLE_PATTERN *list, const char *str) {
+int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size) {
     struct simple_pattern *m, *root = (struct simple_pattern *)list;
 
     if(unlikely(!root || !str || !*str)) return 0;
 
     size_t len = strlen(str);
-    for(m = root; m ; m = m->next)
-        if(match_pattern(m, str, len)) {
-            if(m->negative) return 0;
+    for(m = root; m ; m = m->next) {
+        char *ws = wildcarded;
+        size_t wss = wildcarded_size;
+        if(unlikely(ws)) *ws = '\0';
+
+        if (match_pattern(m, str, len, ws, &wss)) {
+
+            //if(ws && wss)
+            //    fprintf(stderr, "FINAL WILDCARDED '%s' of length %zu\n", ws, strlen(ws));
+
+            if (m->negative) return 0;
             return 1;
         }
+    }
 
     return 0;
+}
+
+int simple_pattern_matches(SIMPLE_PATTERN *list, const char *str) {
+    return simple_pattern_matches_extract(list, str, NULL, 0);
 }
 
 static inline void free_pattern(struct simple_pattern *m) {
