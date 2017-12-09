@@ -167,18 +167,21 @@ typedef enum statsd_app_chart_dimension_value_type {
 } STATSD_APP_CHART_DIM_VALUE_TYPE;
 
 typedef struct statsd_app_chart_dimension {
-    const char *name;
-    const char *metric;
-    uint32_t metric_hash;
-    collected_number multiplier;
-    collected_number divisor;
-    STATSD_APP_CHART_DIM_VALUE_TYPE value_type;
+    const char *name;               // the name of this dimension
+    const char *metric;             // the source metric name of this dimension
+    uint32_t metric_hash;           // hash for fast string comparisons
 
-    RRDDIM *rd;
-    collected_number *value_ptr;
-    RRD_ALGORITHM algorithm;
+    SIMPLE_PATTERN *metric_pattern; // set when the 'metric' is a simple pattern
 
-    struct statsd_app_chart_dimension *next;
+    collected_number multiplier;    // the multipler of the dimension
+    collected_number divisor;       // the divisor of the dimension
+    STATSD_APP_CHART_DIM_VALUE_TYPE value_type; // which value to use of the source metric
+
+    RRDDIM *rd;                     // a pointer to the RRDDIM that has been created for this dimension
+    collected_number *value_ptr;    // a pointer to the source metric value
+    RRD_ALGORITHM algorithm;        // the algorithm of this dimension
+
+    struct statsd_app_chart_dimension *next; // the next dimension for this chart
 } STATSD_APP_CHART_DIM;
 
 typedef struct statsd_app_chart {
@@ -933,6 +936,67 @@ void *statsd_collector_thread(void *ptr) {
 
 #define STATSD_CONF_LINE_MAX 8192
 
+static STATSD_APP_CHART_DIM_VALUE_TYPE string2valuetype(const char *type, size_t line, const char *path, const char *filename) {
+    if(!type || !*type) type = "last";
+
+    if(!strcmp(type, "events")) return STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS;
+    else if(!strcmp(type, "last")) return STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
+    else if(!strcmp(type, "min")) return STATSD_APP_CHART_DIM_VALUE_TYPE_MIN;
+    else if(!strcmp(type, "max")) return STATSD_APP_CHART_DIM_VALUE_TYPE_MAX;
+    else if(!strcmp(type, "sum")) return STATSD_APP_CHART_DIM_VALUE_TYPE_SUM;
+    else if(!strcmp(type, "average")) return STATSD_APP_CHART_DIM_VALUE_TYPE_AVERAGE;
+    else if(!strcmp(type, "median")) return STATSD_APP_CHART_DIM_VALUE_TYPE_MEDIAN;
+    else if(!strcmp(type, "stddev")) return STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV;
+    else if(!strcmp(type, "percentile")) return STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE;
+
+    error("STATSD: invalid type '%s' at line %zu of file '%s/%s'. Using 'last'.", type, line, path, filename);
+    return STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
+}
+
+static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
+        STATSD_APP *app
+        , STATSD_APP_CHART *chart
+        , const char *metric_name
+        , const char *dim_name
+        , collected_number multiplier
+        , collected_number divisor
+        , STATSD_APP_CHART_DIM_VALUE_TYPE value_type
+) {
+    STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
+
+    dim->metric = strdupz(metric_name);
+    dim->metric_hash = simple_hash(dim->metric);
+
+    dim->name = strdupz((dim_name && *dim_name)?dim_name:metric_name);
+    dim->multiplier = multiplier;
+    dim->divisor = divisor;
+    dim->value_type = value_type;
+
+    if(!dim->multiplier)
+        dim->multiplier = 1;
+
+    if(!dim->divisor)
+        dim->divisor = 1;
+
+    // append it to the list of dimension
+    STATSD_APP_CHART_DIM *tdim;
+    for(tdim = chart->dimensions; tdim && tdim->next ; tdim = tdim->next) ;
+    if(!tdim) {
+        dim->next = chart->dimensions;
+        chart->dimensions = dim;
+    }
+    else {
+        dim->next = tdim->next;
+        tdim->next = dim;
+    }
+    chart->dimensions_count++;
+
+    debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divisor " COLLECTED_NUMBER_FORMAT,
+            dim->name, chart->id, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divisor);
+
+    return dim;
+}
+
 int statsd_readfile(const char *path, const char *filename) {
     debug(D_STATSD, "STATSD configuration reading file '%s/%s'", path, filename);
 
@@ -1091,63 +1155,35 @@ int statsd_readfile(const char *path, const char *filename) {
             }
             else if (!strcmp(name, "dimension")) {
                 // metric [name [type [multiplier [divisor]]]]
-                char *words[5];
-                pluginsd_split_words(value, words, 5);
+                char *words[10];
+                pluginsd_split_words(value, words, 10);
 
-                char *metric_name = words[0];
-                char *dim_name = words[1];
-                char *type = words[2];
-                char *multipler = words[3];
-                char *divisor = words[4];
+                int pattern = 0;
+                size_t i = 0;
+                char *metric_name   = words[i++];
 
-                STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
-
-                dim->metric = strdupz(metric_name);
-                dim->metric_hash = simple_hash(dim->metric);
-
-                dim->name = strdupz((dim_name && *dim_name)?dim_name:metric_name);
-                dim->multiplier = (multipler && *multipler)?str2l(multipler):1;
-                dim->divisor = (divisor && *divisor)?str2l(divisor):1;
-
-                if(!type || !*type) type = "last";
-                if(!strcmp(type, "events")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS;
-                else if(!strcmp(type, "last")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
-                else if(!strcmp(type, "min")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_MIN;
-                else if(!strcmp(type, "max")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_MAX;
-                else if(!strcmp(type, "sum")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_SUM;
-                else if(!strcmp(type, "average")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_AVERAGE;
-                else if(!strcmp(type, "median")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_MEDIAN;
-                else if(!strcmp(type, "stddev")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV;
-                else if(!strcmp(type, "percentile")) dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE;
-                else {
-                    error("STATSD: invalid type '%s' at line %zu of file '%s/%s'. Using 'last'.", type, line, path, filename);
-                    dim->value_type = STATSD_APP_CHART_DIM_VALUE_TYPE_LAST;
+                if(strcmp(metric_name, "pattern") == 0) {
+                    metric_name = words[i++];
+                    pattern = 1;
                 }
 
-                if(!dim->multiplier) {
-                    error("STATSD: invalid multiplier value '%s' at line %zu of file '%s/%s'. Using 1.", multipler, line, path, filename);
-                    dim->multiplier = 1;
-                }
-                if(!dim->divisor) {
-                    error("STATSD: invalid divisor value '%s' at line %zu of file '%s/%s'. Using 1.", divisor, line, path, filename);
-                    dim->divisor = 1;
-                }
+                char *dim_name      = words[i++];
+                char *type          = words[i++];
+                char *multipler     = words[i++];
+                char *divisor       = words[i++];
 
-                // append it to the list of dimension
-                STATSD_APP_CHART_DIM *tdim;
-                for(tdim = chart->dimensions; tdim && tdim->next ; tdim = tdim->next) ;
-                if(!tdim) {
-                    dim->next = chart->dimensions;
-                    chart->dimensions = dim;
-                }
-                else {
-                    dim->next = tdim->next;
-                    tdim->next = dim;
-                }
-                chart->dimensions_count++;
+                STATSD_APP_CHART_DIM *dim = add_dimension_to_app_chart(
+                        app
+                        , chart
+                        , metric_name
+                        , dim_name
+                        , (multipler && *multipler)?str2l(multipler):1
+                        , (divisor && *divisor)?str2l(divisor):1
+                        , string2valuetype(type, line, path, filename)
+                );
 
-                debug(D_STATSD, "Added dimension '%s' to chart '%s' of app '%s', for metric '%s', with type %u, multiplier " COLLECTED_NUMBER_FORMAT ", divisor " COLLECTED_NUMBER_FORMAT,
-                    dim->name, chart->id, app->name, dim->metric, dim->value_type, dim->multiplier, dim->divisor);
+                if(pattern)
+                    dim->metric_pattern = simple_pattern_create(dim->metric, SIMPLE_PATTERN_EXACT);
             }
             else {
                 error("STATSD: ignoring line %zu ('%s') of file '%s/%s'. Unknown keyword for the [%s] section.", line, name, path, filename, chart->id);
@@ -1563,6 +1599,71 @@ static inline RRD_ALGORITHM statsd_algorithm_for_metric(STATSD_METRIC *m) {
     }
 }
 
+static inline void link_metric_to_app_dimension(STATSD_APP *app, STATSD_METRIC *m, STATSD_APP_CHART *chart, STATSD_APP_CHART_DIM *dim) {
+    if(dim->value_type == STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS) {
+        dim->value_ptr = &m->events;
+        dim->algorithm = RRD_ALGORITHM_INCREMENTAL;
+    }
+    else if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
+        dim->algorithm = RRD_ALGORITHM_ABSOLUTE;
+        dim->divisor *= statsd.decimal_detail;
+
+        switch(dim->value_type) {
+            case STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS:
+                // will never match - added to avoid warning
+                break;
+
+            case STATSD_APP_CHART_DIM_VALUE_TYPE_LAST:
+            case STATSD_APP_CHART_DIM_VALUE_TYPE_AVERAGE:
+                dim->value_ptr = &m->last;
+                break;
+
+            case STATSD_APP_CHART_DIM_VALUE_TYPE_SUM:
+                dim->value_ptr = &m->histogram.ext->last_sum;
+                break;
+
+            case STATSD_APP_CHART_DIM_VALUE_TYPE_MIN:
+                dim->value_ptr = &m->histogram.ext->last_min;
+                break;
+
+            case STATSD_APP_CHART_DIM_VALUE_TYPE_MAX:
+                dim->value_ptr = &m->histogram.ext->last_max;
+                break;
+
+            case STATSD_APP_CHART_DIM_VALUE_TYPE_MEDIAN:
+                dim->value_ptr = &m->histogram.ext->last_median;
+                break;
+
+            case STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE:
+                dim->value_ptr = &m->histogram.ext->last_percentile;
+                break;
+
+            case STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV:
+                dim->value_ptr = &m->histogram.ext->last_stddev;
+                break;
+        }
+    }
+    else {
+        if (dim->value_type != STATSD_APP_CHART_DIM_VALUE_TYPE_LAST)
+            error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->id, app->name, m->name);
+
+        dim->value_ptr = &m->last;
+        dim->algorithm = statsd_algorithm_for_metric(m);
+
+        if(m->type == STATSD_METRIC_TYPE_GAUGE)
+            dim->divisor *= statsd.decimal_detail;
+    }
+
+    if(unlikely(chart->st && dim->rd)) {
+        rrddim_set_algorithm(chart->st, dim->rd, dim->algorithm);
+        rrddim_set_multiplier(chart->st, dim->rd, dim->multiplier);
+        rrddim_set_divisor(chart->st, dim->rd, dim->divisor);
+    }
+
+    chart->dimensions_linked_count++;
+    debug(D_STATSD, "metric '%s' of type %u linked with app '%s', chart '%s', dimension '%s', algorithm '%s'", m->name, m->type, app->name, chart->id, dim->name, rrd_algorithm_name(dim->algorithm));
+}
+
 static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC *m) {
     (void)index;
 
@@ -1588,75 +1689,33 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
             // check if there is a chart in this app, willing to get this metric
             STATSD_APP_CHART *chart;
             for(chart = app->charts; chart; chart = chart->next) {
+
                 STATSD_APP_CHART_DIM *dim;
                 for(dim = chart->dimensions; dim ; dim = dim->next) {
-                    if(!dim->value_ptr && dim->metric_hash == m->hash && !strcmp(dim->metric, m->name)) {
+                    if(unlikely(dim->metric_pattern)) {
+                        size_t len = strlen(m->name) + 1;
+                        char name[len];
+                        if(simple_pattern_matches_extract(dim->metric_pattern, m->name, name, len)) {
+                            add_dimension_to_app_chart(
+                                    app
+                                    , chart
+                                    , m->name
+                                    , name
+                                    , dim->multiplier
+                                    , dim->divisor
+                                    , dim->value_type
+                            );
+
+                            // the new dimension is appended to the list
+                            // so, it will be matched and linked later too
+                        }
+                    }
+                    else if(!dim->value_ptr && dim->metric_hash == m->hash && !strcmp(dim->metric, m->name)) {
                         // we have a match - this metric should be linked to this dimension
-
-                        if(dim->value_type == STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS) {
-                            dim->value_ptr = &m->events;
-                            dim->algorithm = RRD_ALGORITHM_INCREMENTAL;
-                        }
-                        else if(m->type == STATSD_METRIC_TYPE_HISTOGRAM || m->type == STATSD_METRIC_TYPE_TIMER) {
-                            dim->algorithm = RRD_ALGORITHM_ABSOLUTE;
-                            dim->divisor *= statsd.decimal_detail;
-
-                            switch(dim->value_type) {
-                                case STATSD_APP_CHART_DIM_VALUE_TYPE_EVENTS:
-                                    // will never match - added to avoid warning
-                                    break;
-
-                                case STATSD_APP_CHART_DIM_VALUE_TYPE_LAST:
-                                case STATSD_APP_CHART_DIM_VALUE_TYPE_AVERAGE:
-                                    dim->value_ptr = &m->last;
-                                    break;
-
-                                case STATSD_APP_CHART_DIM_VALUE_TYPE_SUM:
-                                    dim->value_ptr = &m->histogram.ext->last_sum;
-                                    break;
-
-                                case STATSD_APP_CHART_DIM_VALUE_TYPE_MIN:
-                                    dim->value_ptr = &m->histogram.ext->last_min;
-                                    break;
-
-                                case STATSD_APP_CHART_DIM_VALUE_TYPE_MAX:
-                                    dim->value_ptr = &m->histogram.ext->last_max;
-                                    break;
-
-                                case STATSD_APP_CHART_DIM_VALUE_TYPE_MEDIAN:
-                                    dim->value_ptr = &m->histogram.ext->last_median;
-                                    break;
-
-                                case STATSD_APP_CHART_DIM_VALUE_TYPE_PERCENTILE:
-                                    dim->value_ptr = &m->histogram.ext->last_percentile;
-                                    break;
-
-                                case STATSD_APP_CHART_DIM_VALUE_TYPE_STDDEV:
-                                    dim->value_ptr = &m->histogram.ext->last_stddev;
-                                    break;
-                            }
-                        }
-                        else {
-                            if (dim->value_type != STATSD_APP_CHART_DIM_VALUE_TYPE_LAST)
-                                error("STATSD: unsupported value type for dimension '%s' of chart '%s' of app '%s' on metric '%s'", dim->name, chart->id, app->name, m->name);
-
-                            dim->value_ptr = &m->last;
-                            dim->algorithm = statsd_algorithm_for_metric(m);
-
-                            if(m->type == STATSD_METRIC_TYPE_GAUGE)
-                                dim->divisor *= statsd.decimal_detail;
-                        }
-
-                        if(unlikely(chart->st && dim->rd)) {
-                            rrddim_set_algorithm(chart->st, dim->rd, dim->algorithm);
-                            rrddim_set_multiplier(chart->st, dim->rd, dim->multiplier);
-                            rrddim_set_divisor(chart->st, dim->rd, dim->divisor);
-                        }
-
-                        chart->dimensions_linked_count++;
-                        debug(D_STATSD, "metric '%s' of type %u linked with app '%s', chart '%s', dimension '%s', algorithm '%s'", m->name, m->type, app->name, chart->id, dim->name, rrd_algorithm_name(dim->algorithm));
+                        link_metric_to_app_dimension(app, m, chart, dim);
                     }
                 }
+
             }
         }
     }
@@ -1691,12 +1750,14 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
 
     STATSD_APP_CHART_DIM *dim;
     for(dim = chart->dimensions; dim ;dim = dim->next) {
-        if(unlikely(!dim->rd))
-            dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
+        if(likely(!dim->metric_pattern)) {
+            if (unlikely(!dim->rd))
+                dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
 
-        if(unlikely(dim->value_ptr)) {
-            debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
-            rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
+            if (unlikely(dim->value_ptr)) {
+                debug(D_STATSD, "updating dimension '%s' (%s) of chart '%s' (%s) for app '%s' with value " COLLECTED_NUMBER_FORMAT, dim->name, dim->rd->id, chart->id, chart->st->id, app->name, *dim->value_ptr);
+                rrddim_set_by_pointer(chart->st, dim->rd, *dim->value_ptr);
+            }
         }
     }
 
