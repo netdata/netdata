@@ -771,18 +771,19 @@ int main(int argc, char **argv) {
 
                             const char *heystack = argv[optind];
                             const char *needle = argv[optind + 1];
+                            size_t len = strlen(needle) + 1;
+                            char wildcarded[len];
 
-                            SIMPLE_PATTERN *p = simple_pattern_create(heystack
-                                                                      , SIMPLE_PATTERN_EXACT);
-                            int ret = simple_pattern_matches(p, needle);
+                            SIMPLE_PATTERN *p = simple_pattern_create(heystack, SIMPLE_PATTERN_EXACT);
+                            int ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
                             simple_pattern_free(p);
 
                             if(ret) {
-                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s'\n", heystack, needle);
+                                fprintf(stdout, "RESULT: MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
                                 return 0;
                             }
                             else {
-                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s'\n", heystack, needle);
+                                fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", heystack, needle, wildcarded);
                                 return 1;
                             }
                         }
