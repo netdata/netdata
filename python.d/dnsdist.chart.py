@@ -2,7 +2,7 @@
 from json import loads
 from bases.FrameworkServices.UrlService import UrlService
 
-ORDER = ['queries', 'queries_dropped', 'answers', 'backend_responses', 'backend_commerrors', 'backend_errors', 'cache', 'servercpu', 'servermem', 'query_latency', 'query_latency_avg']
+ORDER = ['queries', 'queries_dropped', 'packets_dropped', 'answers', 'backend_responses', 'backend_commerrors', 'backend_errors', 'cache', 'servercpu', 'servermem', 'query_latency', 'query_latency_avg']
 CHARTS = {
 	'queries': {
 		'options': [None, 'Client queries received', 'queries/s', 'queries', 'dnsdist.queries', 'line'],
@@ -17,7 +17,11 @@ CHARTS = {
 			['rule-drop', 'rule drop', 'incremental'],
 			['dyn-blocked', 'dynamic block', 'incremental'],
 			['no-policy', 'no policy', 'incremental'],
-			['noncompliant-queries', 'non compliant', 'incremental'],
+			['noncompliant-queries', 'non compliant', 'incremental']
+	]},
+	'packets_dropped': {
+		'options': [None, 'Packets dropped', 'packets/s', 'packets', 'dnsdist.packets_dropped', 'line'],
+		'lines': [
 			['acl-drops', 'acl', 'incremental']
 	]},
 	'answers': {
@@ -58,7 +62,7 @@ CHARTS = {
 			['cpu-user-msec', 'user state', 'incremental']
 	]},
 	'servermem': {
-		'options': [None, 'DNSDIST server memory utilization', 'MiB', 'server', 'dnsdist.servermem', 'area'],
+		'options': [None, 'DNSDIST server memory utilization', 'MB', 'server', 'dnsdist.servermem', 'area'],
 		'lines': [
 			['real-memory-usage', 'memory usage', 'absolute', 1, 1048576]
 	]},
