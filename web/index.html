@@ -2137,7 +2137,7 @@
 
                     var has_alarm = (typeof alarm.warn !== 'undefined' || typeof alarm.crit !== 'undefined');
 
-                    var role_href = ((has_alarm === true)?('<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fas fa-chart-line"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="NETDATA.alarms.scrollToChart(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small>'):('&nbsp;'));
+                    var role_href = ((has_alarm === true)?('<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fas fa-chart-line"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="scrollToChartAfterHidingModal(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small>'):('&nbsp;'));
 
                     var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20"/><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span>' + role_href + '</td>'
                         + '<td><table class="table">'
@@ -3796,6 +3796,13 @@
             }
         }
 
+        var modalHiddenCallback = null;
+        function scrollToChartAfterHidingModal(chart) {
+            modalHiddenCallback = function() {
+                NETDATA.alarms.scrollToChart(chart);
+            };
+        }
+
         var runOnceOnDashboardLastRun = 0;
         function runOnceOnDashboardWithjQuery() {
             if(runOnceOnDashboardLastRun !== 0) {
@@ -3880,9 +3887,13 @@
                 .on('hidden.bs.modal', function () {
                     if(modal_depth === 0)
                         modal_shown = false;
+
+                    if(typeof modalHiddenCallback === 'function')
+                        modalHiddenCallback();
+
+                    modalHiddenCallback = null;
                     //console.log(urlOptions.after);
                 });
-
 
             // ------------------------------------------------------------------------
             // sidebar / affix

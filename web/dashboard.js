@@ -2600,6 +2600,10 @@ var NETDATA = window.NETDATA || {};
                 that.element.style.min_width = NETDATA.chartDefaults.min_width;
         };
 
+        var invisibleSearchableText = function() {
+            return '<span style="position:absolute; opacity: 0; width: 0px;">' + that.id + '</span>';
+        }
+
         /* init() private
          * initialize state variables
          * destroy all (possibly) created state elements
@@ -2609,6 +2613,7 @@ var NETDATA = window.NETDATA || {};
             if(that.enabled === false) return;
 
             runtimeInit();
+            that.element.innerHTML = invisibleSearchableText();
 
             that.tm.last_initialized = Date.now();
             that.setMode('auto');
@@ -2678,12 +2683,12 @@ var NETDATA = window.NETDATA || {};
             else
                 icon = '<i class="fas fa-chart-area"></i>';
 
-            showMessageIcon(icon + ' netdata');
+            showMessageIcon(icon + ' netdata' + invisibleSearchableText());
         };
 
         var showLoading = function() {
             if(that.chart_created === false) {
-                showMessageIcon('<i class="fas fa-sync"></i> netdata');
+                showMessageIcon('<i class="fas fa-sync-alt"></i> netdata');
                 return true;
             }
             return false;
@@ -7804,7 +7809,7 @@ var NETDATA = window.NETDATA || {};
             }
         },
         {
-            url: NETDATA.serverStatic + 'lib/fontawesome-all-5.0.0.min.js',
+            url: NETDATA.serverStatic + 'lib/fontawesome-all-5.0.1.min.js',
             async: true,
             isAlreadyLoaded: function() { return false; }
         },
