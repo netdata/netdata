@@ -382,7 +382,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
         calculated_number abs = value;
         if(isless(value, 0)) {
             lstop = 1;
-            abs = -value;
+            abs = calculated_number_fabs(value);
         }
 
         if(isgreaterequal(abs, 1000)) {
@@ -610,16 +610,22 @@ static inline const char *color_map(const char *color) {
     return color;
 }
 
+typedef enum color_comparison {
+    COLOR_COMPARE_EQUAL,
+    COLOR_COMPARE_NOTEQUAL,
+    COLOR_COMPARE_LESS,
+    COLOR_COMPARE_LESSEQUAL,
+    COLOR_COMPARE_GREATER,
+    COLOR_COMPARE_GREATEREQUAL,
+} BADGE_COLOR_COMPARISON;
+
 static inline void calc_colorz(const char *color, char *final, size_t len, calculated_number value) {
-    int value_is_null = 0;
-    if(isnan(value) || isinf(value)) {
-        value = 0.0;
-        value_is_null = 1;
-    }
+    if(isnan(value) || isinf(value))
+        value = NAN;
 
     char color_buffer[256 + 1] = "";
     char value_buffer[256 + 1] = "";
-    char comparison = '>';
+    BADGE_COLOR_COMPARISON comparison = COLOR_COMPARE_GREATER;
 
     // example input:
     // color<max|color>min|color:null...
@@ -633,8 +639,15 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 
         while(*t && *t != '|') {
             switch(*t) {
+                case '!':
+                    if(t[1] == '=') t++;
+                    comparison = COLOR_COMPARE_NOTEQUAL;
+                    dv = value_buffer;
+                    break;
+
+                case '=':
                 case ':':
-                    comparison = '=';
+                    comparison = COLOR_COMPARE_EQUAL;
                     dv = value_buffer;
                     break;
 
@@ -642,11 +655,11 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
                 case ')':
                 case '>':
                     if(t[1] == '=') {
-                        comparison = ')';
+                        comparison = COLOR_COMPARE_GREATEREQUAL;
                         t++;
                     }
                     else
-                        comparison = '>';
+                        comparison = COLOR_COMPARE_GREATER;
                     dv = value_buffer;
                     break;
 
@@ -654,11 +667,15 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
                 case '(':
                 case '<':
                     if(t[1] == '=') {
-                        comparison = '(';
+                        comparison = COLOR_COMPARE_LESSEQUAL;
+                        t++;
+                    }
+                    else if(t[1] == '>' || t[1] == ')' || t[1] == '}') {
+                        comparison = COLOR_COMPARE_NOTEQUAL;
                         t++;
                     }
                     else
-                        comparison = '<';
+                        comparison = COLOR_COMPARE_LESS;
                     dv = value_buffer;
                     break;
 
@@ -689,19 +706,28 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
         *dc = '\0';
         if(dv) {
             *dv = '\0';
+            calculated_number v;
 
-            if(value_is_null) {
-                if(!*value_buffer || !strcmp(value_buffer, "null"))
+            if(!*value_buffer || !strcmp(value_buffer, "null")) {
+                v = NAN;
+            }
+            else {
+                v = str2l(value_buffer);
+                if(isnan(v) || isinf(v))
+                    v = NAN;
+            }
+
+            if(unlikely(isnan(value) || isnan(v))) {
+                if(isnan(value) && isnan(v))
                     break;
             }
             else {
-                calculated_number v = str2l(value_buffer);
-
-                     if(comparison == '<' && value < v) break;
-                else if(comparison == '(' && value <= v) break;
-                else if(comparison == '>' && value > v) break;
-                else if(comparison == ')' && value >= v) break;
-                else if(comparison == '=' && value == v) break;
+                     if (unlikely(comparison == COLOR_COMPARE_LESS && isless(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_LESSEQUAL && islessequal(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_GREATER && isgreater(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_GREATEREQUAL && isgreaterequal(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_EQUAL && !islessgreater(value, v))) break;
+                else if (unlikely(comparison == COLOR_COMPARE_NOTEQUAL && islessgreater(value, v))) break;
             }
         }
         else
@@ -726,7 +752,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 // colors
 #define COLOR_STRING_SIZE 100
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision) {
+void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, uint32_t options) {
     char      label_buffer[LABEL_STRING_SIZE + 1]
             , value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
@@ -744,7 +770,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         value_color = (isnan(value) || isinf(value))?"#999":"#4c1";
 
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
-    format_value_and_unit(value_string, VALUE_STRING_SIZE, value, units, precision);
+    format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)?calculated_number_fabs(value):value, units, precision);
 
     // we need to copy the label, since verdana11_width may write to it
     strncpyz(label_buffer, label, LABEL_STRING_SIZE);

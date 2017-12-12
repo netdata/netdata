@@ -314,6 +314,7 @@
                             "enum": [
                                 "abs",
                                 "absolute",
+                                "display-absolute",
                                 "absolute-sum",
                                 "null2zero",
                                 "percentage",
