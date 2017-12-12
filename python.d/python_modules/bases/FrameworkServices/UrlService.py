@@ -61,6 +61,9 @@ class UrlService(SimpleService):
             manager = urllib3.PoolManager
             params = dict(headers=header)
         try:
+            url = header_kw.get('url') or self.url
+            if url.startswith('https'):
+                return manager(assert_hostname=False, cert_reqs='CERT_NONE', **params)
             return manager(**params)
         except (urllib3.exceptions.ProxySchemeUnknown, TypeError) as error:
             self.error('build_manager() error:', str(error))
