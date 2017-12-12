@@ -2688,7 +2688,7 @@ var NETDATA = window.NETDATA || {};
 
         var showLoading = function() {
             if(that.chart_created === false) {
-                showMessageIcon('<i class="fas fa-sync"></i> netdata');
+                showMessageIcon('<i class="fas fa-sync-alt"></i> netdata');
                 return true;
             }
             return false;
@@ -7809,7 +7809,7 @@ var NETDATA = window.NETDATA || {};
             }
         },
         {
-            url: NETDATA.serverStatic + 'lib/fontawesome-all-5.0.0.min.js',
+            url: NETDATA.serverStatic + 'lib/fontawesome-all-5.0.1.min.js',
             async: true,
             isAlreadyLoaded: function() { return false; }
         },
