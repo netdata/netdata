@@ -1,20 +1,105 @@
 #include "common.h"
 
+static struct {
+    const char *name;
+    uint32_t hash;
+    int value;
+} api_v1_data_groups[] = {
+        {  "average"        , 0    , GROUP_AVERAGE}
+        , {"min"            , 0    , GROUP_MIN}
+        , {"max"            , 0    , GROUP_MAX}
+        , {"sum"            , 0    , GROUP_SUM}
+        , {"incremental_sum", 0    , GROUP_INCREMENTAL_SUM}
+        , {"incremental-sum", 0    , GROUP_INCREMENTAL_SUM}
+        , {                 NULL, 0, 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    uint32_t value;
+} api_v1_data_options[] = {
+        {  "nonzero"         , 0    , RRDR_OPTION_NONZERO}
+        , {"flip"            , 0    , RRDR_OPTION_REVERSED}
+        , {"reversed"        , 0    , RRDR_OPTION_REVERSED}
+        , {"reverse"         , 0    , RRDR_OPTION_REVERSED}
+        , {"jsonwrap"        , 0    , RRDR_OPTION_JSON_WRAP}
+        , {"min2max"         , 0    , RRDR_OPTION_MIN2MAX}
+        , {"ms"              , 0    , RRDR_OPTION_MILLISECONDS}
+        , {"milliseconds"    , 0    , RRDR_OPTION_MILLISECONDS}
+        , {"abs"             , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute"        , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute_sum"    , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"absolute-sum"    , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"display_absolute", 0    , RRDR_OPTION_DISPLAY_ABS}
+        , {"display-absolute", 0    , RRDR_OPTION_DISPLAY_ABS}
+        , {"seconds"         , 0    , RRDR_OPTION_SECONDS}
+        , {"null2zero"       , 0    , RRDR_OPTION_NULL2ZERO}
+        , {"objectrows"      , 0    , RRDR_OPTION_OBJECTSROWS}
+        , {"google_json"     , 0    , RRDR_OPTION_GOOGLE_JSON}
+        , {"google-json"     , 0    , RRDR_OPTION_GOOGLE_JSON}
+        , {"percentage"      , 0    , RRDR_OPTION_PERCENTAGE}
+        , {"unaligned"       , 0    , RRDR_OPTION_NOT_ALIGNED}
+        , {                  NULL, 0, 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    uint32_t value;
+} api_v1_data_formats[] = {
+        {  DATASOURCE_FORMAT_DATATABLE_JSON , 0 , DATASOURCE_DATATABLE_JSON}
+        , {DATASOURCE_FORMAT_DATATABLE_JSONP, 0 , DATASOURCE_DATATABLE_JSONP}
+        , {DATASOURCE_FORMAT_JSON           , 0 , DATASOURCE_JSON}
+        , {DATASOURCE_FORMAT_JSONP          , 0 , DATASOURCE_JSONP}
+        , {DATASOURCE_FORMAT_SSV            , 0 , DATASOURCE_SSV}
+        , {DATASOURCE_FORMAT_CSV            , 0 , DATASOURCE_CSV}
+        , {DATASOURCE_FORMAT_TSV            , 0 , DATASOURCE_TSV}
+        , {"tsv-excel"                      , 0 , DATASOURCE_TSV}
+        , {DATASOURCE_FORMAT_HTML           , 0 , DATASOURCE_HTML}
+        , {DATASOURCE_FORMAT_JS_ARRAY       , 0 , DATASOURCE_JS_ARRAY}
+        , {DATASOURCE_FORMAT_SSV_COMMA      , 0 , DATASOURCE_SSV_COMMA}
+        , {DATASOURCE_FORMAT_CSV_JSON_ARRAY , 0 , DATASOURCE_CSV_JSON_ARRAY}
+        , {                                 NULL, 0, 0}
+};
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    uint32_t value;
+} api_v1_data_google_formats[] = {
+        // this is not error - when google requests json, it expects javascript
+        // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source#responseformat
+        {  "json"     , 0    , DATASOURCE_DATATABLE_JSONP}
+        , {"html"     , 0    , DATASOURCE_HTML}
+        , {"csv"      , 0    , DATASOURCE_CSV}
+        , {"tsv-excel", 0    , DATASOURCE_TSV}
+        , {           NULL, 0, 0}
+};
+
+void web_client_api_v1_init(void) {
+    int i;
+
+    for(i = 0; api_v1_data_groups[i].name ; i++)
+        api_v1_data_groups[i].hash = simple_hash(api_v1_data_groups[i].name);
+
+    for(i = 0; api_v1_data_options[i].name ; i++)
+        api_v1_data_options[i].hash = simple_hash(api_v1_data_options[i].name);
+
+    for(i = 0; api_v1_data_formats[i].name ; i++)
+        api_v1_data_formats[i].hash = simple_hash(api_v1_data_formats[i].name);
+
+    for(i = 0; api_v1_data_google_formats[i].name ; i++)
+        api_v1_data_google_formats[i].hash = simple_hash(api_v1_data_google_formats[i].name);
+}
+
 inline int web_client_api_request_v1_data_group(char *name, int def) {
-    if(!strcmp(name, "average"))
-        return GROUP_AVERAGE;
+    int i;
 
-    else if(!strcmp(name, "min"))
-        return GROUP_MIN;
-
-    else if(!strcmp(name, "max"))
-        return GROUP_MAX;
-
-    else if(!strcmp(name, "sum"))
-        return GROUP_SUM;
-
-    else if(!strcmp(name, "incremental-sum"))
-        return GROUP_INCREMENTAL_SUM;
+    uint32_t hash = simple_hash(name);
+    for(i = 0; api_v1_data_groups[i].name ; i++)
+        if(unlikely(hash == api_v1_data_groups[i].hash && !strcmp(name, api_v1_data_groups[i].name)))
+            return api_v1_data_groups[i].value;
 
     return def;
 }
@@ -26,84 +111,41 @@ inline uint32_t web_client_api_request_v1_data_options(char *o) {
     while(o && *o && (tok = mystrsep(&o, ", |"))) {
         if(!*tok) continue;
 
-        if(!strcmp(tok, "nonzero"))
-            ret |= RRDR_OPTION_NONZERO;
-        else if(!strcmp(tok, "flip") || !strcmp(tok, "reversed") || !strcmp(tok, "reverse"))
-            ret |= RRDR_OPTION_REVERSED;
-        else if(!strcmp(tok, "jsonwrap"))
-            ret |= RRDR_OPTION_JSON_WRAP;
-        else if(!strcmp(tok, "min2max"))
-            ret |= RRDR_OPTION_MIN2MAX;
-        else if(!strcmp(tok, "ms") || !strcmp(tok, "milliseconds"))
-            ret |= RRDR_OPTION_MILLISECONDS;
-        else if(!strcmp(tok, "abs") || !strcmp(tok, "absolute") || !strcmp(tok, "absolute_sum") || !strcmp(tok, "absolute-sum"))
-            ret |= RRDR_OPTION_ABSOLUTE;
-        else if(!strcmp(tok, "seconds"))
-            ret |= RRDR_OPTION_SECONDS;
-        else if(!strcmp(tok, "null2zero"))
-            ret |= RRDR_OPTION_NULL2ZERO;
-        else if(!strcmp(tok, "objectrows"))
-            ret |= RRDR_OPTION_OBJECTSROWS;
-        else if(!strcmp(tok, "google_json"))
-            ret |= RRDR_OPTION_GOOGLE_JSON;
-        else if(!strcmp(tok, "percentage"))
-            ret |= RRDR_OPTION_PERCENTAGE;
-        else if(!strcmp(tok, "unaligned"))
-            ret |= RRDR_OPTION_NOT_ALIGNED;
+        uint32_t hash = simple_hash(tok);
+        int i;
+        for(i = 0; api_v1_data_options[i].name ; i++) {
+            if (unlikely(hash == api_v1_data_options[i].hash && !strcmp(tok, api_v1_data_options[i].name))) {
+                ret |= api_v1_data_options[i].value;
+                break;
+            }
+        }
     }
 
     return ret;
 }
 
 inline uint32_t web_client_api_request_v1_data_format(char *name) {
-    if(!strcmp(name, DATASOURCE_FORMAT_DATATABLE_JSON)) // datatable
-        return DATASOURCE_DATATABLE_JSON;
+    uint32_t hash = simple_hash(name);
+    int i;
 
-    else if(!strcmp(name, DATASOURCE_FORMAT_DATATABLE_JSONP)) // datasource
-        return DATASOURCE_DATATABLE_JSONP;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_JSON)) // json
-        return DATASOURCE_JSON;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_JSONP)) // jsonp
-        return DATASOURCE_JSONP;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_SSV)) // ssv
-        return DATASOURCE_SSV;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_CSV)) // csv
-        return DATASOURCE_CSV;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_TSV) || !strcmp(name, "tsv-excel")) // tsv
-        return DATASOURCE_TSV;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_HTML)) // html
-        return DATASOURCE_HTML;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_JS_ARRAY)) // array
-        return DATASOURCE_JS_ARRAY;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_SSV_COMMA)) // ssvcomma
-        return DATASOURCE_SSV_COMMA;
-
-    else if(!strcmp(name, DATASOURCE_FORMAT_CSV_JSON_ARRAY)) // csvjsonarray
-        return DATASOURCE_CSV_JSON_ARRAY;
+    for(i = 0; api_v1_data_formats[i].name ; i++) {
+        if (unlikely(hash == api_v1_data_formats[i].hash && !strcmp(name, api_v1_data_formats[i].name))) {
+            return api_v1_data_formats[i].value;
+        }
+    }
 
     return DATASOURCE_JSON;
 }
 
 inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
-    if(!strcmp(name, "json"))
-        return DATASOURCE_DATATABLE_JSONP;
+    uint32_t hash = simple_hash(name);
+    int i;
 
-    else if(!strcmp(name, "html"))
-        return DATASOURCE_HTML;
-
-    else if(!strcmp(name, "csv"))
-        return DATASOURCE_CSV;
-
-    else if(!strcmp(name, "tsv-excel"))
-        return DATASOURCE_TSV;
+    for(i = 0; api_v1_data_google_formats[i].name ; i++) {
+        if (unlikely(hash == api_v1_data_google_formats[i].hash && !strcmp(name, api_v1_data_google_formats[i].name))) {
+            return api_v1_data_google_formats[i].value;
+        }
+    }
 
     return DATASOURCE_JSON;
 }
@@ -371,7 +413,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
-        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1);
+        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, 0);
         ret = 200;
         goto cleanup;
     }
@@ -382,7 +424,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         rc = rrdcalc_find(st, alarm);
         if (!rc) {
             buffer_no_cacheable(w->response.data);
-            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1);
+            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, 0);
             ret = 200;
             goto cleanup;
         }
@@ -498,7 +540,9 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                 units,
                 label_color,
                 value_color,
-                precision);
+                precision,
+                options
+        );
         ret = 200;
     }
     else {
@@ -532,7 +576,9 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                 units,
                 label_color,
                 value_color,
-                precision);
+                precision,
+                options
+        );
     }
 
     cleanup:
