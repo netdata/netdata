@@ -382,7 +382,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
         calculated_number abs = value;
         if(isless(value, 0)) {
             lstop = 1;
-            abs = -value;
+            abs = calculated_number_fabs(value);
         }
 
         if(isgreaterequal(abs, 1000)) {
@@ -752,7 +752,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 // colors
 #define COLOR_STRING_SIZE 100
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision) {
+void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, uint32_t options) {
     char      label_buffer[LABEL_STRING_SIZE + 1]
             , value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
@@ -770,7 +770,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         value_color = (isnan(value) || isinf(value))?"#999":"#4c1";
 
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
-    format_value_and_unit(value_string, VALUE_STRING_SIZE, value, units, precision);
+    format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)?calculated_number_fabs(value):value, units, precision);
 
     // we need to copy the label, since verdana11_width may write to it
     strncpyz(label_buffer, label, LABEL_STRING_SIZE);

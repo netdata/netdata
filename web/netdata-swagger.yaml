@@ -204,7 +204,7 @@ paths:
           type: array
           items:
             type: string
-            enum: [ 'abs', 'absolute', 'absolute-sum', 'null2zero', 'percentage', 'unaligned' ]
+            enum: [ 'abs', 'absolute', 'display-absolute', 'absolute-sum', 'null2zero', 'percentage', 'unaligned' ]
             collectionFormat: pipes
           default: ['absolute']
           allowEmptyValue: true
