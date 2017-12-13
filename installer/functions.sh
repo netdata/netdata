@@ -640,6 +640,84 @@ install_netdata_logrotate() {
 }
 
 # -----------------------------------------------------------------------------
+# download netdata.conf
+
+fix_netdata_conf() {
+    local owner="${1}"
+
+    if [ "${UID}" -eq 0 ]
+        then
+        run chown "${owner}" "${filename}"
+    fi
+    run chmod 0664 "${filename}"
+}
+
+generate_netdata_conf() {
+    local owner="${1}" filename="${2}" url="${3}"
+
+    if [ ! -s "${filename}" ]
+        then
+        cat >"${filename}" <<EOFCONF
+# netdata can generate its own config.
+# Get it with:
+#
+# wget -O ${filename} "${url}"
+#
+# or
+#
+# curl -s -o ${filename} "${url}"
+#
+EOFCONF
+        fix_netdata_conf "${owner}"
+    fi
+}
+
+download_netdata_conf() {
+    local owner="${1}" filename="${2}" url="${3}"
+
+    if [ ! -s "${filename}" ]
+        then
+        echo >&2
+        echo >&2 "-------------------------------------------------------------------------------"
+        echo >&2
+        echo >&2 "Downloading default configuration from netdata..."
+        sleep 5
+
+        # remove a possibly obsolete download
+        [ -f "${filename}.new" ] && rm "${filename}.new"
+
+        # disable a proxy to get data from the local netdata
+        export http_proxy=
+        export https_proxy=
+
+        # try curl
+        run curl -s -o "${filename}.new" "${url}"
+        ret=$?
+
+        if [ ${ret} -ne 0 -o ! -s "${filename}.new" ]
+            then
+            # try wget
+            run wget -O "${filename}.new" "${url}"
+            ret=$?
+        fi
+
+        if [ ${ret} -eq 0 -a -s "${filename}.new" ]
+            then
+            run mv "${filename}.new" "${filename}"
+            run_ok "New configuration saved for you to edit at ${filename}"
+        else
+            [ -f "${filename}.new" ] && rm "${filename}.new"
+            run_failed "Cannnot download configuration from netdata daemon using url '${url}'"
+
+            generate_netdata_conf "${owner}" "${filename}" "${url}"
+        fi
+
+        fix_netdata_conf "${owner}"
+    fi
+}
+
+
+# -----------------------------------------------------------------------------
 # add netdata user and group
 
 NETDATA_ADDED_TO_DOCKER=0
@@ -654,15 +732,15 @@ add_netdata_user_and_group() {
     if [ ${UID} -eq 0 ]
         then
         portable_add_group netdata || return 1
-        portable_add_user netdata || return 1
+        portable_add_user netdata  || return 1
         portable_add_user_to_group docker   netdata && NETDATA_ADDED_TO_DOCKER=1
         portable_add_user_to_group nginx    netdata && NETDATA_ADDED_TO_NGINX=1
         portable_add_user_to_group varnish  netdata && NETDATA_ADDED_TO_VARNISH=1
         portable_add_user_to_group haproxy  netdata && NETDATA_ADDED_TO_HAPROXY=1
         portable_add_user_to_group adm      netdata && NETDATA_ADDED_TO_ADM=1
         portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
-        portable_add_user_to_group proxy      netdata && NETDATA_ADDED_TO_PROXY=1
-        portable_add_user_to_group squid      netdata && NETDATA_ADDED_TO_SQUID=1
+        portable_add_user_to_group proxy    netdata && NETDATA_ADDED_TO_PROXY=1
+        portable_add_user_to_group squid    netdata && NETDATA_ADDED_TO_SQUID=1
         return 0
     fi
 

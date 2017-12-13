@@ -162,7 +162,9 @@ progress "starting netdata"
 restart_netdata "/opt/netdata/bin/netdata"
 if [ $? -eq 0 ]
     then
+    download_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
     netdata_banner "is installed and running now!"
 else
+    generate_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
     netdata_banner "is installed now!"
 fi
