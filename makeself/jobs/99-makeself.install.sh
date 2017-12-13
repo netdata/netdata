@@ -2,12 +2,44 @@
 
 . $(dirname "${0}")/../functions.sh "${@}" || exit 1
 
+run cd "${NETDATA_SOURCE_PATH}" || exit 1
+
+# -----------------------------------------------------------------------------
+# find the netdata version
+
+NOWNER="unknown"
+ORIGIN="$(git config --get remote.origin.url || echo "unknown")"
+if [[ "${ORIGIN}" =~ ^git@github.com:.*/netdata.*$ ]]
+    then
+    NOWNER="${ORIGIN/git@github.com:/}"
+    NOWNER="${NOWNER/\/netdata*/}"
+
+elif [[ "${ORIGIN}" =~ ^https://github.com/.*/netdata.*$ ]]
+    then
+    NOWNER="${ORIGIN/https:\/\/github.com\//}"
+    NOWNER="${NOWNER/\/netdata*/}"
+fi
+
+# make sure it does not have any slashes in it
+NOWNER="${NOWNER//\//_}"
+
+if [ "${NOWNER}" = "firehol" ]
+    then
+    NOWNER=
+else
+    NOWNER="-${NOWNER}"
+fi
+
+VERSION="$(git describe || echo "undefined")"
+[ -z "${VERSION}" ] && VERSION="undefined"
+
+FILE_VERSION="${VERSION}-$(uname -m)-$(date +"%Y%m%d-%H%M%S")${NOWNER}"
+
 
 # -----------------------------------------------------------------------------
 # copy the files needed by makeself installation
 
 run mkdir -p "${NETDATA_INSTALL_PATH}/system"
-run cd "${NETDATA_SOURCE_PATH}" || exit 1
 
 cp \
     makeself/post-installer.sh \
@@ -65,6 +97,9 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
 # -----------------------------------------------------------------------------
 # create the makeself archive
 
+cat "${NETDATA_MAKESELF_PATH}/makeself.lsm" |\
+    sed "s|NETDATA_VERSION|${FILE_VERSION}|g" >"${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
+
 "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     --gzip \
     --complevel 9 \
@@ -72,7 +107,7 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
     --needroot \
     --target "${NETDATA_INSTALL_PATH}" \
     --header "${NETDATA_MAKESELF_PATH}/makeself-header.sh" \
-    --lsm "${NETDATA_MAKESELF_PATH}/makeself.lsm" \
+    --lsm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp" \
     --license "${NETDATA_MAKESELF_PATH}/makeself-license.txt" \
     --help-header "${NETDATA_MAKESELF_PATH}/makeself-help-header.txt" \
     "${NETDATA_INSTALL_PATH}" \
@@ -81,37 +116,12 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
     ./system/post-installer.sh \
     ${NULL}
 
+rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
 # -----------------------------------------------------------------------------
 # copy it to the netdata build dir
 
-NOWNER="unknown"
-ORIGIN="$(git config --get remote.origin.url || echo "unknown")"
-if [[ "${ORIGIN}" =~ ^git@github.com:.*/netdata.*$ ]]
-    then
-    NOWNER="${ORIGIN/git@github.com:/}"
-    NOWNER="${NOWNER/\/netdata*/}"
-
-elif [[ "${ORIGIN}" =~ ^https://github.com/.*/netdata.*$ ]]
-    then
-    NOWNER="${ORIGIN/https:\/\/github.com\//}"
-    NOWNER="${NOWNER/\/netdata*/}"
-fi
-
-# make sure it does not have any slashes in it
-NOWNER="${NOWNER//\//_}"
-
-if [ "${NOWNER}" = "firehol" ]
-    then
-    NOWNER=
-else
-    NOWNER="-${NOWNER}"
-fi
-
-VERSION="$(git describe || echo "undefined")"
-[ -z "${VERSION}" ] && VERSION="undefined"
-
-FILE="netdata-${VERSION}-$(uname -m)-$(date +"%Y%m%d-%H%M%S")${NOWNER}.gz.run"
+FILE="netdata-${FILE_VERSION}.gz.run"
 
 cp "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
 echo >&2 "Self-extracting installer copied to '${FILE}'"

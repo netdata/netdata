@@ -16,8 +16,12 @@ run ./netdata-installer.sh --install "${NETDATA_INSTALL_PARENT}" \
     --dont-start-it \
     ${NULL}
 
+# delete the generated netdata.conf, so that the static installer will generate a new one
+rm "${NETDATA_INSTALL_PATH}/etc/netdata/netdata.conf"
+
 if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]
 then
     run strip ${NETDATA_INSTALL_PATH}/bin/netdata
     run strip ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/plugins.d/apps.plugin
+    run strip ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/plugins.d/cgroup-network
 fi
