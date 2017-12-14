@@ -41,7 +41,7 @@ FILE_VERSION="${VERSION}-$(uname -m)-$(date +"%Y%m%d-%H%M%S")${NOWNER}"
 
 run mkdir -p "${NETDATA_INSTALL_PATH}/system"
 
-cp \
+run cp \
     makeself/post-installer.sh \
     makeself/install-or-update.sh \
     installer/functions.sh \
@@ -57,9 +57,9 @@ cp \
 # -----------------------------------------------------------------------------
 # create a wrapper to start our netdata with a modified path
 
-mkdir -p "${NETDATA_INSTALL_PATH}/bin/srv"
+run mkdir -p "${NETDATA_INSTALL_PATH}/bin/srv"
 
-mv "${NETDATA_INSTALL_PATH}/bin/netdata" \
+run mv "${NETDATA_INSTALL_PATH}/bin/netdata" \
     "${NETDATA_INSTALL_PATH}/bin/srv/netdata" || exit 1
 
 cat >"${NETDATA_INSTALL_PATH}/bin/netdata" <<EOF
@@ -67,28 +67,34 @@ cat >"${NETDATA_INSTALL_PATH}/bin/netdata" <<EOF
 export PATH="${NETDATA_INSTALL_PATH}/bin:\${PATH}"
 exec "${NETDATA_INSTALL_PATH}/bin/srv/netdata" "\${@}"
 EOF
-chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
+run chmod 755 "${NETDATA_INSTALL_PATH}/bin/netdata"
 
 
 # -----------------------------------------------------------------------------
 # move etc to protect the destination when unpacked
 
-if [ -d "${NETDATA_INSTALL_PATH}/etc" ]
+if [ ! -z "${NETDATA_INSTALL_PATH}" -a -d "${NETDATA_INSTALL_PATH}/etc" ]
     then
     if [ -d "${NETDATA_INSTALL_PATH}/etc.new" ]
         then
-        rm -rf "${NETDATA_INSTALL_PATH}/etc.new" || exit 1
+        run rm -rf "${NETDATA_INSTALL_PATH}/etc.new" || exit 1
     fi
 
-    mv "${NETDATA_INSTALL_PATH}/etc" \
+    run mv "${NETDATA_INSTALL_PATH}/etc" \
         "${NETDATA_INSTALL_PATH}/etc.new" || exit 1
+
+    if [ -f "${NETDATA_INSTALL_PATH}/etc.new/netdata/netdata.conf" ]
+        then
+        # delete the generated netdata.conf, so that the static installer will generate a new one
+        run rm "${NETDATA_INSTALL_PATH}/etc.new/netdata/netdata.conf"
+    fi
 fi
 
 
 # -----------------------------------------------------------------------------
 # remove the links to allow untaring the archive
 
-rm "${NETDATA_INSTALL_PATH}/sbin" \
+run rm "${NETDATA_INSTALL_PATH}/sbin" \
     "${NETDATA_INSTALL_PATH}/usr/bin" \
     "${NETDATA_INSTALL_PATH}/usr/sbin" \
     "${NETDATA_INSTALL_PATH}/usr/local"
@@ -100,7 +106,7 @@ rm "${NETDATA_INSTALL_PATH}/sbin" \
 cat "${NETDATA_MAKESELF_PATH}/makeself.lsm" |\
     sed "s|NETDATA_VERSION|${FILE_VERSION}|g" >"${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
-"${NETDATA_MAKESELF_PATH}/makeself.sh" \
+run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     --gzip \
     --complevel 9 \
     --notemp \
@@ -116,16 +122,16 @@ cat "${NETDATA_MAKESELF_PATH}/makeself.lsm" |\
     ./system/post-installer.sh \
     ${NULL}
 
-rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
+run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
 # -----------------------------------------------------------------------------
 # copy it to the netdata build dir
 
 FILE="netdata-${FILE_VERSION}.gz.run"
 
-cp "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
+run cp "${NETDATA_INSTALL_PATH}.gz.run" "${FILE}"
 echo >&2 "Self-extracting installer copied to '${FILE}'"
 
 [ -f netdata-latest.gz.run ] && rm netdata-latest.gz.run
-ln -s "${FILE}" netdata-latest.gz.run
+run ln -s "${FILE}" netdata-latest.gz.run
 echo >&2 "Self-extracting installer linked to 'netdata-latest.gz.run'"
