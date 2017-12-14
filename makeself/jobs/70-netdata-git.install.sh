@@ -11,13 +11,17 @@ else
     export CFLAGS="-static -O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -D_FORTIFY_SOURCE=2 -DNETDATA_INTERNAL_CHECKS=1"
 fi
 
+if [ ! -z "${NETDATA_INSTALL_PATH}" -a -d "${NETDATA_INSTALL_PATH}/etc" ]
+    then
+    # make sure we don't have an old etc path, so that the installer
+    # will install all files without examining changes
+    run mv "${NETDATA_INSTALL_PATH}/etc" "${NETDATA_INSTALL_PATH}/etc.new"
+fi
+
 run ./netdata-installer.sh --install "${NETDATA_INSTALL_PARENT}" \
     --dont-wait \
     --dont-start-it \
     ${NULL}
-
-# delete the generated netdata.conf, so that the static installer will generate a new one
-rm "${NETDATA_INSTALL_PATH}/etc/netdata/netdata.conf"
 
 if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]
 then
