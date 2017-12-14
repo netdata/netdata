@@ -103,8 +103,7 @@ run rm "${NETDATA_INSTALL_PATH}/sbin" \
 # -----------------------------------------------------------------------------
 # create the makeself archive
 
-cat "${NETDATA_MAKESELF_PATH}/makeself.lsm" |\
-    sed "s|NETDATA_VERSION|${FILE_VERSION}|g" >"${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
+run sed "s|NETDATA_VERSION|${FILE_VERSION}|g" <"${NETDATA_MAKESELF_PATH}/makeself.lsm" >"${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
 run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     --gzip \
