@@ -21,6 +21,7 @@ dist_python_DATA = \
     cpufreq.chart.py \
     cpuidle.chart.py \
     dns_query_time.chart.py \
+    dnsdist.chart.py \
     dovecot.chart.py \
     elasticsearch.chart.py \
     example.chart.py \
