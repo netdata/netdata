@@ -23,9 +23,9 @@ ORDER = ['operations', 'hit_rate', 'memory', 'keys', 'net', 'connections', 'clie
 
 CHARTS = {
     'eviction':{
-        'options': [None, 'Evicted keys', 'keys/s', 'evicted', 'redis.evictios', 'line'],
+        'options': [None, 'Evicted keys', 'keys', 'evicted', 'redis.evictios', 'line'],
         'lines': [
-            ['evicted_keys', 'evictied', 'absolute']
+            ['evicted_keys', 'evictied', 'incremental']
         ]},
     'operations': {
         'options': [None, 'Redis Operations', 'operations/s', 'operations', 'redis.operations', 'line'],
