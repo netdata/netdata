@@ -33,6 +33,7 @@ dist_pythonconfig_DATA = \
     python.d/couchdb.conf \
     python.d/cpufreq.conf \
     python.d/dns_query_time.conf \
+    python.d/dnsdist.conf \
     python.d/dovecot.conf \
     python.d/elasticsearch.conf \
     python.d/example.conf \
