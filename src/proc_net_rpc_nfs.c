@@ -288,7 +288,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , "operations/s"
                     , "proc"
                     , "net/rpc/nfs"
-                    , 5007
+                    , 2207
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -328,7 +328,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , "calls/s"
                     , "proc"
                     , "net/rpc/nfs"
-                    , 5008
+                    , 2208
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -361,7 +361,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , "calls/s"
                     , "proc"
                     , "net/rpc/nfs"
-                    , 5009
+                    , 2209
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -394,7 +394,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , "calls/s"
                     , "proc"
                     , "net/rpc/nfs"
-                    , 5010
+                    , 2210
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -427,7 +427,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , "calls/s"
                     , "proc"
                     , "net/rpc/nfs"
-                    , 5011
+                    , 2211
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
