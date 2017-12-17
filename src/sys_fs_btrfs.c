@@ -11,9 +11,9 @@ typedef struct btrfs_node {
 
     char label[BTRFS_MAX_LABEL_LENGTH + 1];
 
-    unsigned long long int sectorsize;
-    unsigned long long int nodesize;
-    unsigned long long int quota_override;
+    // unsigned long long int sectorsize;
+    // unsigned long long int nodesize;
+    // unsigned long long int quota_override;
 
     #define declare_btrfs_allocation_section_field(SECTION, FIELD) \
         char *allocation_ ## SECTION ## _ ## FIELD ## _filename; \
@@ -138,26 +138,26 @@ static inline int find_all_btrfs_pools(const char *path) {
         if(!node->label[0])
             strncpyz(node->label, node->id, BTRFS_MAX_LABEL_LENGTH);
 
-        snprintfz(filename, FILENAME_MAX, "%s/%s/sectorsize", path, de->d_name);
-        if(read_single_number_file(filename, &node->sectorsize) != 0) {
-            error("BTRFS: failed to read '%s'", filename);
-            btrfs_free_node(node);
-            continue;
-        }
+        //snprintfz(filename, FILENAME_MAX, "%s/%s/sectorsize", path, de->d_name);
+        //if(read_single_number_file(filename, &node->sectorsize) != 0) {
+        //    error("BTRFS: failed to read '%s'", filename);
+        //    btrfs_free_node(node);
+        //    continue;
+        //}
 
-        snprintfz(filename, FILENAME_MAX, "%s/%s/nodesize", path, de->d_name);
-        if(read_single_number_file(filename, &node->nodesize) != 0) {
-            error("BTRFS: failed to read '%s'", filename);
-            btrfs_free_node(node);
-            continue;
-        }
+        //snprintfz(filename, FILENAME_MAX, "%s/%s/nodesize", path, de->d_name);
+        //if(read_single_number_file(filename, &node->nodesize) != 0) {
+        //    error("BTRFS: failed to read '%s'", filename);
+        //    btrfs_free_node(node);
+        //    continue;
+        //}
 
-        snprintfz(filename, FILENAME_MAX, "%s/%s/quota_override", path, de->d_name);
-        if(read_single_number_file(filename, &node->quota_override) != 0) {
-            error("BTRFS: failed to read '%s'", filename);
-            btrfs_free_node(node);
-            continue;
-        }
+        //snprintfz(filename, FILENAME_MAX, "%s/%s/quota_override", path, de->d_name);
+        //if(read_single_number_file(filename, &node->quota_override) != 0) {
+        //    error("BTRFS: failed to read '%s'", filename);
+        //    btrfs_free_node(node);
+        //    continue;
+        //}
 
         // --------------------------------------------------------------------
         // macros to simplify our life
