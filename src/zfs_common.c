@@ -48,7 +48,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "MB"
                     , plugin
                     , "zfs"
-                    , 2000
+                    , 2500
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -86,7 +86,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "MB"
                     , plugin
                     , "zfs"
-                    , 2000
+                    , 2500
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -123,7 +123,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "reads/s"
                     , plugin
                     , "zfs"
-                    , 2010
+                    , 2510
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -168,7 +168,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "kilobytes/s"
                     , plugin
                     , "zfs"
-                    , 2200
+                    , 2700
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -202,7 +202,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "percentage"
                     , plugin
                     , "zfs"
-                    , 2020
+                    , 2520
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -236,7 +236,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "percentage"
                     , plugin
                     , "zfs"
-                    , 2030
+                    , 2530
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -270,7 +270,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "percentage"
                     , plugin
                     , "zfs"
-                    , 2040
+                    , 2540
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -304,7 +304,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "percentage"
                     , plugin
                     , "zfs"
-                    , 2050
+                    , 2550
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -338,7 +338,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "percentage"
                     , plugin
                     , "zfs"
-                    , 2060
+                    , 2560
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -374,7 +374,7 @@ void generate_charts_arcstats(const char *plugin, int update_every) {
                     , "hits/s"
                     , plugin
                     , "zfs"
-                    , 2100
+                    , 2600
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -433,7 +433,7 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "percentage"
                     , plugin
                     , "zfs"
-                    , 2020
+                    , 2520
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -472,7 +472,7 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "operations/s"
                     , plugin
                     , "zfs"
-                    , 2023
+                    , 2523
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -518,7 +518,7 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "operations/s"
                     , plugin
                     , "zfs"
-                    , 2022
+                    , 2522
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -556,7 +556,7 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "percentage"
                     , plugin
                     , "zfs"
-                    , 2019
+                    , 2519
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -590,7 +590,7 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "percentage"
                     , plugin
                     , "zfs"
-                    , 2031
+                    , 2531
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -624,7 +624,7 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "percentage"
                     , plugin
                     , "zfs"
-                    , 2032
+                    , 2532
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -658,7 +658,7 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "elements"
                     , plugin
                     , "zfs"
-                    , 2300
+                    , 2800
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -692,7 +692,7 @@ void generate_charts_arc_summary(const char *plugin, int update_every) {
                     , "chains"
                     , plugin
                     , "zfs"
-                    , 2310
+                    , 2810
                     , update_every
                     , RRDSET_TYPE_LINE
             );

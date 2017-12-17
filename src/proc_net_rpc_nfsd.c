@@ -517,7 +517,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "reads/s"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5000
+                    , 2100
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -555,7 +555,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "handles/s"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5001
+                    , 2101
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -595,7 +595,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "kilobytes/s"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5002
+                    , 2102
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -628,7 +628,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                         , "threads"
                         , "proc"
                         , "net/rpc/nfsd"
-                        , 5003
+                        , 2103
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -656,7 +656,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                         , "ops/s"
                         , "proc"
                         , "net/rpc/nfsd"
-                        , 5004
+                        , 2104
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -693,7 +693,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                         , "percentage"
                         , "proc"
                         , "net/rpc/nfsd"
-                        , 5005
+                        , 2105
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -752,7 +752,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "percentage"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5005
+                    , 2105
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -806,7 +806,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "packets/s"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5007
+                    , 2107
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -845,7 +845,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "calls/s"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5008
+                    , 2108
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -881,7 +881,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "calls/s"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5009
+                    , 2109
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -914,7 +914,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "calls/s"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5010
+                    , 2110
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -947,7 +947,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "calls/s"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5011
+                    , 2111
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -980,7 +980,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
                     , "operations/s"
                     , "proc"
                     , "net/rpc/nfsd"
-                    , 5012
+                    , 2112
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
