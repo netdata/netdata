@@ -187,7 +187,7 @@ void read_cgroup_plugin_configuration() {
                     " !/systemd "
                     " !/user "
                     " !/user.slice "
-                    " !/lxc/*/* "                         //  #2161 #2649
+                    " !/lxc/*/* "                          //  #2161 #2649
                     " * "
             ), SIMPLE_PATTERN_EXACT);
 
@@ -199,13 +199,6 @@ void read_cgroup_plugin_configuration() {
 
     enabled_cgroup_renames = simple_pattern_create(
             config_get("plugin:cgroups", "run script to rename cgroups matching",
-                    " *.scope "
-                    " *docker* "
-                    " *lxc* "
-                    " *qemu* "
-                    " *.libvirt-qemu "                    //  #3010
-                    " !*/vcpu* "                          // libvirtd adds these sub-cgroups
-                    " !*/emulator* "                      // libvirtd adds these sub-cgroups
                     " !/ "
                     " !*.mount "
                     " !*.partition "
@@ -213,6 +206,14 @@ void read_cgroup_plugin_configuration() {
                     " !*.slice "
                     " !*.swap "
                     " !*.user "
+                    " !init.scope "
+                    " !*.scope/vcpu* "                    // libvirtd adds these sub-cgroups
+                    " !*.scope/emulator "                 // libvirtd adds these sub-cgroups
+                    " *.scope "
+                    " *docker* "
+                    " *lxc* "
+                    " *qemu* "
+                    " *.libvirt-qemu "                    //  #3010
                     " * "
             ), SIMPLE_PATTERN_EXACT);
 
