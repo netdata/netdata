@@ -505,7 +505,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , "MB"
                         , "proc"
                         , "sys/fs/btrfs"
-                        , 2302
+                        , 2303
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
