@@ -224,30 +224,32 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
     static int do_rc = -1, do_fh = -1, do_io = -1, do_th = -1, do_ra = -1, do_net = -1, do_rpc = -1, do_proc2 = -1, do_proc3 = -1, do_proc4 = -1, do_proc4ops = -1;
     static int ra_warning = 0, th_warning = 0, proc2_warning = 0, proc3_warning = 0, proc4_warning = 0, proc4ops_warning = 0;
 
-    if(!ff) {
+    if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/net/rpc/nfsd");
         ff = procfile_open(config_get("plugin:proc:/proc/net/rpc/nfsd", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff)) return 1;
     }
-    if(!ff) return 1;
 
     ff = procfile_readall(ff);
-    if(!ff) return 0; // we return 0, so that we will retry to open it next time
+    if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    if(do_rc == -1) do_rc = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "read cache", 1);
-    if(do_fh == -1) do_fh = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "file handles", 1);
-    if(do_io == -1) do_io = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "I/O", 1);
-    if(do_th == -1) do_th = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "threads", 1);
-    if(do_ra == -1) do_ra = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "read ahead", 1);
-    if(do_net == -1) do_net = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "network", 1);
-    if(do_rpc == -1) do_rpc = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "rpc", 1);
-    if(do_proc2 == -1) do_proc2 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v2 procedures", 1);
-    if(do_proc3 == -1) do_proc3 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v3 procedures", 1);
-    if(do_proc4 == -1) do_proc4 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v4 procedures", 1);
-    if(do_proc4ops == -1) do_proc4ops = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v4 operations", 1);
+    if(unlikely(do_rc == -1)) {
+        do_rc = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "read cache", 1);
+        do_fh = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "file handles", 1);
+        do_io = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "I/O", 1);
+        do_th = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "threads", 1);
+        do_ra = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "read ahead", 1);
+        do_net = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "network", 1);
+        do_rpc = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "rpc", 1);
+        do_proc2 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v2 procedures", 1);
+        do_proc3 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v3 procedures", 1);
+        do_proc4 = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v4 procedures", 1);
+        do_proc4ops = config_get_boolean("plugin:proc:/proc/net/rpc/nfsd", "NFS v4 operations", 1);
+    }
 
     // if they are enabled, reset them to 1
-    // later we do them =2 to avoid doing strcmp() for all lines
+    // later we do them = 2 to avoid doing strcmp() for all lines
     if(do_rc) do_rc = 1;
     if(do_fh) do_fh = 1;
     if(do_io) do_io = 1;
@@ -273,12 +275,12 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
-        if(!words) continue;
+        if(unlikely(!words)) continue;
 
         type = procfile_lineword(ff, l, 0);
 
         if(do_rc == 1 && strcmp(type, "rc") == 0) {
-            if(words < 4) {
+            if(unlikely(words < 4)) {
                 error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
                 continue;
             }
@@ -292,7 +294,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_rc = 2;
         }
         else if(do_fh == 1 && strcmp(type, "fh") == 0) {
-            if(words < 6) {
+            if(unlikely(words < 6)) {
                 error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
@@ -308,7 +310,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_fh = 2;
         }
         else if(do_io == 1 && strcmp(type, "io") == 0) {
-            if(words < 3) {
+            if(unlikely(words < 3)) {
                 error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 3);
                 continue;
             }
@@ -321,7 +323,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_io = 2;
         }
         else if(do_th == 1 && strcmp(type, "th") == 0) {
-            if(words < 13) {
+            if(unlikely(words < 13)) {
                 error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
@@ -352,7 +354,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_th = 2;
         }
         else if(do_ra == 1 && strcmp(type, "ra") == 0) {
-            if(words < 13) {
+            if(unlikely(words < 13)) {
                 error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
@@ -381,7 +383,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_ra = 2;
         }
         else if(do_net == 1 && strcmp(type, "net") == 0) {
-            if(words < 5) {
+            if(unlikely(words < 5)) {
                 error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 5);
                 continue;
             }
@@ -396,7 +398,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
             else do_net = 2;
         }
         else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
-            if(words < 6) {
+            if(unlikely(words < 6)) {
                 error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
