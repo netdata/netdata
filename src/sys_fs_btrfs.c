@@ -64,6 +64,9 @@ static inline void btrfs_free_node(BTRFS_NODE *node) {
     if(node->st_allocation_metadata)
         rrdset_is_obsolete(node->st_allocation_metadata);
 
+    if(node->st_allocation_global_rsv)
+        rrdset_is_obsolete(node->st_allocation_global_rsv);
+
     freez(node->allocation_system_bytes_used_filename);
     freez(node->allocation_system_total_bytes_filename);
 
