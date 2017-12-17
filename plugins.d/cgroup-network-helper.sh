@@ -172,7 +172,7 @@ virsh_find_all_interfaces_for_cgroup() {
             # match only 'network' interfaces from virsh output
 
             set_source "virsh"
-            "${virsh}" domiflist ${d} |\
+            "${virsh}" -r domiflist ${d} |\
                 sed -n \
                     -e "s|^\([^[:space:]]\+\)[[:space:]]\+network[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p" \
                     -e "s|^\([^[:space:]]\+\)[[:space:]]\+bridge[[:space:]]\+\([^[:space:]]\+\)[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+$|\1 \1_\2|p"
