@@ -300,8 +300,13 @@ static inline int find_all_btrfs_pools(const char *path) {
 
             snprintfz(filename, FILENAME_MAX, "%s/%s/label", path, de->d_name);
             read_file(filename, label, FILENAME_MAX);
-            if (label[0])
-                node->label = strdupz(label);
+
+            char *s = label;
+            if (s[0])
+                s = trim(label);
+
+            if(s && s[0])
+                node->label = strdupz(s);
             else
                 node->label = strdupz(node->id);
         }
