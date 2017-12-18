@@ -35,9 +35,13 @@ typedef struct btrfs_node {
         unsigned long long int allocation_ ## FIELD;
 
     RRDSET *st_allocation_disks;
-    RRDDIM *rd_allocation_disks_used;
     RRDDIM *rd_allocation_disks_unallocated;
-    RRDDIM *rd_allocation_disks_free;
+    RRDDIM *rd_allocation_disks_data_used;
+    RRDDIM *rd_allocation_disks_data_free;
+    RRDDIM *rd_allocation_disks_metadata_used;
+    RRDDIM *rd_allocation_disks_metadata_free;
+    RRDDIM *rd_allocation_disks_system_used;
+    RRDDIM *rd_allocation_disks_system_free;
     unsigned long long all_disks_total;
 
     RRDSET *st_allocation_data;
@@ -549,19 +553,26 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                 );
 
                 node->rd_allocation_disks_unallocated = rrddim_add(node->st_allocation_disks, "unallocated", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_allocation_disks_used = rrddim_add(node->st_allocation_disks, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-                node->rd_allocation_disks_free = rrddim_add(node->st_allocation_disks, "free", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_data_used = rrddim_add(node->st_allocation_disks, "data_used", "data used", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_data_free = rrddim_add(node->st_allocation_disks, "data_free", "data free", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_metadata_used = rrddim_add(node->st_allocation_disks, "meta_used", "meta used", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_metadata_free = rrddim_add(node->st_allocation_disks, "meta_free", "meta free", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_system_used = rrddim_add(node->st_allocation_disks, "sys_used", "sys used", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+                node->rd_allocation_disks_system_free = rrddim_add(node->st_allocation_disks, "sys_free", "sys free", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             }
             else rrdset_next(node->st_allocation_disks);
 
-
-            unsigned long long disk_used = node->allocation_data_disk_used + node->allocation_metadata_disk_used + node->allocation_system_disk_used;
+            // unsigned long long disk_used = node->allocation_data_disk_used + node->allocation_metadata_disk_used + node->allocation_system_disk_used;
             unsigned long long disk_total = node->allocation_data_disk_total + node->allocation_metadata_disk_total + node->allocation_system_disk_total;
             unsigned long long disk_unallocated = node->all_disks_total - disk_total;
 
             rrddim_set_by_pointer(node->st_allocation_disks, node->rd_allocation_disks_unallocated, disk_unallocated);
-            rrddim_set_by_pointer(node->st_allocation_disks, node->rd_allocation_disks_used, disk_used);
-            rrddim_set_by_pointer(node->st_allocation_disks, node->rd_allocation_disks_free, disk_total - disk_used);
+            rrddim_set_by_pointer(node->st_allocation_disks, node->rd_allocation_disks_data_used, node->allocation_data_disk_used);
+            rrddim_set_by_pointer(node->st_allocation_disks, node->rd_allocation_disks_data_free, node->allocation_data_disk_total - node->allocation_data_disk_used);
+            rrddim_set_by_pointer(node->st_allocation_disks, node->rd_allocation_disks_metadata_used, node->allocation_metadata_disk_used);
+            rrddim_set_by_pointer(node->st_allocation_disks, node->rd_allocation_disks_metadata_free, node->allocation_metadata_disk_total - node->allocation_metadata_disk_used);
+            rrddim_set_by_pointer(node->st_allocation_disks, node->rd_allocation_disks_system_used, node->allocation_system_disk_used);
+            rrddim_set_by_pointer(node->st_allocation_disks, node->rd_allocation_disks_system_free, node->allocation_system_disk_total - node->allocation_system_disk_used);
             rrdset_done(node->st_allocation_disks);
         }
 
