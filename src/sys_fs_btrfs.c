@@ -205,6 +205,7 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
 
         node->all_disks_total += d->size * d->hw_sector_size;
     }
+    closedir(dir);
 
     // ------------------------------------------------------------------------
     // cleanup
