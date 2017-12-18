@@ -644,7 +644,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , id
                         , name
                         , node->label
-                        , "btrfs.metdata"
+                        , "btrfs.metadata"
                         , title
                         , "MB"
                         , "proc"
