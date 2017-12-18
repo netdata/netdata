@@ -36,6 +36,7 @@ declare -A configs_signatures=(
   ['09e030d26be08a13fa3560e47fa27825']='apps_groups.conf'
   ['0a7039ecc7a86b480d9d499b12b02763']='python.d/freeradius.conf'
   ['0ad10fa896346202aee99384b0ec968d']='health.d/cpu.conf'
+  ['0b6903f981cdb018c17802ac4e295609']='health.d/btrfs.conf'
   ['0c5e0fa364d7bdf7c16e8459a0544572']='health.d/netfilter.conf'
   ['0cd4e1fb57497e4d4c2451a9e58f724d']='python.d/redis.conf'
   ['0d29fe9919a2975107db1f2583344e7a']='health.d/mdstat.conf'
