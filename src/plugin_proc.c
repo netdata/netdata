@@ -54,6 +54,9 @@ static struct proc_module {
         // ZFS metrics
         { .name = "/proc/spl/kstat/zfs/arcstats", .dim = "zfs_arcstats", .func = do_proc_spl_kstat_zfs_arcstats },
 
+        // BTRFS metrics
+        { .name = "/sys/fs/btrfs", .dim = "btrfs", .func = do_sys_fs_btrfs },
+
         // IPC metrics
         { .name = "ipc", .dim = "ipc", .func = do_ipc },
 

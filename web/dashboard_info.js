@@ -121,6 +121,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics of the ZFS filesystem. The following charts visualize all metrics reported by <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arcstat/arcstat.py" target="_blank">arcstat.py</a> and <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arc_summary/arc_summary.py" target="_blank">arc_summary.py</a>.'
     },
 
+    'btrfs': {
+        title: 'BTRFS filesystem',
+        icon: '<i class="fas fa-folder-open"></i>',
+        info: 'Disk space metrics for the BTRFS filesystem.'
+    },
+
     'apps': {
         title: 'Applications',
         icon: '<i class="fas fa-heartbeat"></i>',
@@ -1661,5 +1667,21 @@ netdataDashboard.context = {
 
     'couchdb.open_files': {
         info: 'Count of all files held open by CouchDB. If this value seems pegged at 1024 or 4096, your server process is probably hitting the open file handle limit and <a href="http://docs.couchdb.org/en/latest/maintenance/performance.html#pam-and-ulimit">needs to be increased.</a>'
+    },
+
+    'btrfs.disk': {
+        info: 'Physical disk usage of BTRFS. The disk space reported here, is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function.'
+    },
+
+    'btrfs.data': {
+        info: 'Logical disk usage for BTRFS data. The disk space reported here is the usable allocation (i.e. after any RAID levels).'
+    },
+
+    'btrfs.metadata': {
+        info: 'Logical disk usage for BTRFS metadata. The disk space reported here is the usable allocation (i.e. after any RAID levels).'
+    },
+
+    'btrfs.system': {
+        info: 'Logical disk usage for BTRFS system. The disk space reported here is the usable allocation (i.e. after any RAID levels).'
     }
 };

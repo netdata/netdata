@@ -79,16 +79,10 @@ netdata_SOURCES = \
 	plugin_checks.h \
 	plugin_idlejitter.c \
 	plugin_idlejitter.h \
-	plugin_nfacct.c \
-	plugin_nfacct.h \
-	plugin_tc.c \
-	plugin_tc.h \
 	plugins_d.c \
 	plugins_d.h \
 	popen.c \
 	popen.h \
-	proc_self_mountinfo.c \
-	proc_self_mountinfo.h \
 	procfile.c \
 	procfile.h \
 	registry.c \
@@ -133,8 +127,6 @@ netdata_SOURCES = \
 	statsd.h \
 	storage_number.c \
 	storage_number.h \
-	sys_devices_system_edac_mc.c \
-	sys_devices_system_node.c \
 	unit_test.c \
 	unit_test.h \
 	url.c \
@@ -179,10 +171,14 @@ else
 netdata_SOURCES += \
 	ipc.c \
 	ipc.h \
+	plugin_nfacct.c \
+	plugin_nfacct.h \
 	plugin_proc.c \
 	plugin_proc.h \
 	plugin_proc_diskspace.c \
 	plugin_proc_diskspace.h \
+	plugin_tc.c \
+	plugin_tc.h \
 	proc_diskstats.c \
 	proc_interrupts.c \
 	proc_softirqs.c \
@@ -200,6 +196,8 @@ netdata_SOURCES += \
 	proc_net_softnet_stat.c \
 	proc_net_stat_conntrack.c \
 	proc_net_stat_synproxy.c \
+	proc_self_mountinfo.c \
+	proc_self_mountinfo.h \
 	zfs_common.c \
     zfs_common.h \
 	proc_spl_kstat_zfs.c \
@@ -208,7 +206,10 @@ netdata_SOURCES += \
 	proc_vmstat.c \
 	proc_uptime.c \
 	sys_kernel_mm_ksm.c \
+	sys_devices_system_edac_mc.c \
+	sys_devices_system_node.c \
 	sys_fs_cgroup.c \
+	sys_fs_btrfs.c \
 	$(NULL)
 endif
 endif
