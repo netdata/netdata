@@ -75,6 +75,7 @@ dist_healthconfig_DATA = \
     health.d/backend.conf \
     health.d/beanstalkd.conf \
     health.d/bind_rndc.conf \
+    health.d/btrfs.conf \
     health.d/cpu.conf \
     health.d/couchdb.conf \
     health.d/disks.conf \
