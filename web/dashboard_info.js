@@ -1670,18 +1670,18 @@ netdataDashboard.context = {
     },
 
     'btrfs.disk': {
-        info: 'Physical disk usage of BTRFS. The disk space reported here, is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function.'
+        info: 'Physical disk usage of BTRFS. The disk space reported here is the raw physical disk space assigned to the BTRFS volume (i.e. <b>before any RAID levels</b>). BTRFS uses a two-stage allocator, first allocating large regions of disk space for one type of block (data, metadata, or system), and then using a regular block allocator inside those regions. <code>unallocated</code> is the physical disk space that is not allocated yet and is available to become data, metdata or system on demand. When <code>unallocated</code> is zero, all available disk space has been allocated to a specific function. Healthy volumes should ideally have at least five percent of their total space <code>unallocated/<code>. You can keep your volume healthy by running the <code>btrfs balance</code> command on it regularly (check <code>man btrfs-balance</code> for more info).'
     },
 
     'btrfs.data': {
-        info: 'Logical disk usage for BTRFS data. The disk space reported here is the usable allocation (i.e. after any RAID levels).'
+        info: 'Logical disk usage for BTRFS data. Data chunks are used to store the actual file data (file contents). The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
     },
 
     'btrfs.metadata': {
-        info: 'Logical disk usage for BTRFS metadata. The disk space reported here is the usable allocation (i.e. after any RAID levels).'
+        info: 'Logical disk usage for BTRFS metadata. Metadata chunks store most of the filesystem interal structures, as well as information like directory structure and file names. The disk space reported here is the usable allocation (i.e. after any striping or replication). Healthy volumes should ideally have no more than a few GB of free space reported here persistently. Running <code>btrfs balance</code> can help here.'
     },
 
     'btrfs.system': {
-        info: 'Logical disk usage for BTRFS system. The disk space reported here is the usable allocation (i.e. after any RAID levels).'
+        info: 'Logical disk usage for BTRFS system. System chunks store information aobut the allocation of other chunks. The disk space reported here is the usable allocation (i.e. after any striping or replication). The values reported here should be relatively small compared to Data and Metadata, and will scale with the volume size and overall space usage.'
     }
 };
