@@ -1294,14 +1294,15 @@ send_alerta() {
     for channel in ${channels}
     do
         content="{"
-        content="$content \"resource\": \"${chart}.${name}\","
-        content="$content \"event\": \"${alarm}\","
         content="$content \"environment\": \"${channel}\","
         content="$content \"service\": [\"${host}\"],"
+        content="$content \"resource\": \"${host}\","
+        content="$content \"event\": \"${chart}.${name}\","
         content="$content \"severity\": \"${severity}\","
-        content="$content \"value\": \"${status_message}\","
+        content="$content \"value\": \"${alarm}\","
         content="$content \"text\": \"${info}\""
         content="$content }"
+
 
         httpcode=$(docurl -X POST "${webhook}" -H "Content-Type: application/json" -H "Authorization: Key $ALERTA_API_KEY" -d "$content" )
 
