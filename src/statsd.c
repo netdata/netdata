@@ -175,6 +175,8 @@ typedef struct statsd_app_chart_dimension {
 
     collected_number multiplier;    // the multipler of the dimension
     collected_number divisor;       // the divisor of the dimension
+    RRDDIM_FLAGS flags;             // the RRDDIM flags for this dimension
+
     STATSD_APP_CHART_DIM_VALUE_TYPE value_type; // which value to use of the source metric
 
     RRDDIM *rd;                     // a pointer to the RRDDIM that has been created for this dimension
@@ -977,6 +979,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
         , const char *dim_name
         , collected_number multiplier
         , collected_number divisor
+        , RRDDIM_FLAGS flags
         , STATSD_APP_CHART_DIM_VALUE_TYPE value_type
 ) {
     STATSD_APP_CHART_DIM *dim = callocz(sizeof(STATSD_APP_CHART_DIM), 1);
@@ -988,6 +991,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
     dim->multiplier = multiplier;
     dim->divisor = divisor;
     dim->value_type = value_type;
+    dim->flags = flags;
 
     if(!dim->multiplier)
         dim->multiplier = 1;
@@ -1209,6 +1213,14 @@ int statsd_readfile(const char *path, const char *filename) {
                 char *type          = words[i++];
                 char *multipler     = words[i++];
                 char *divisor       = words[i++];
+                char *options       = words[i++];
+
+                RRDDIM_FLAGS flags = RRDDIM_FLAG_NONE;
+                if(options && *options) {
+                    if(strstr(options, "hidden") != NULL) flags |= RRDDIM_FLAG_HIDDEN;
+                    if(strstr(options, "noreset") != NULL) flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
+                    if(strstr(options, "nooverflow") != NULL) flags |= RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS;
+                }
 
                 if(!pattern) {
                     if(app->dict) {
@@ -1232,6 +1244,7 @@ int statsd_readfile(const char *path, const char *filename) {
                         , dim_name
                         , (multipler && *multipler)?str2l(multipler):1
                         , (divisor && *divisor)?str2l(divisor):1
+                        , flags
                         , string2valuetype(type, line, path, filename)
                 );
 
@@ -1779,6 +1792,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                                     , final_name
                                     , dim->multiplier
                                     , dim->divisor
+                                    , dim->flags
                                     , dim->value_type
                             );
 
@@ -1834,10 +1848,12 @@ static inline RRDDIM *statsd_add_dim_to_app_chart(STATSD_APP *app, STATSD_APP_CH
         }
 
         dim->rd = rrddim_add(chart->st, metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
+        if(dim->flags != RRDDIM_FLAG_NONE) dim->rd->flags |= dim->flags;
         return dim->rd;
     }
 
     dim->rd = rrddim_add(chart->st, dim->metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
+    if(dim->flags != RRDDIM_FLAG_NONE) dim->rd->flags |= dim->flags;
     return dim->rd;
 }
 
