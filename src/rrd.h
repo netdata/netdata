@@ -99,6 +99,7 @@ typedef struct rrdfamily RRDFAMILY;
 // and may lead to missing information.
 
 typedef enum rrddim_flags {
+    RRDDIM_FLAG_NONE                            = 0,
     RRDDIM_FLAG_HIDDEN                          = 1 << 0,  // this dimension will not be offered to callers
     RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = 1 << 1   // do not offer RESET or OVERFLOW info to callers
 } RRDDIM_FLAGS;
