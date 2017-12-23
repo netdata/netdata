@@ -717,6 +717,23 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 
     i = 0;
     if(rows) {
+        calculated_number total = 1;
+
+        if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
+            total = 0;
+            for(c = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+                calculated_number *cn = &r->v[ (0) * r->d ];
+                calculated_number n = cn[c];
+
+                if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+                    n = -n;
+
+                total += n;
+            }
+            // prevent a division by zero
+            if(total == 0) total = 1;
+        }
+
         for(c = 0, i = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
             if(unlikely(r->od[c] & RRDR_HIDDEN)) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_NONZERO))) continue;
@@ -726,11 +743,23 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, uint32_t opti
 
             calculated_number *cn = &r->v[ (0) * r->d ];
             uint8_t *co = &r->o[ (0) * r->d ];
+            calculated_number n = cn[c];
 
-            if(co[c] & RRDR_EMPTY)
-                buffer_strcat(wb, "null");
-            else
-                buffer_rrd_value(wb, cn[c]);
+            if(co[c] & RRDR_EMPTY) {
+                if(options & RRDR_OPTION_NULL2ZERO)
+                    buffer_strcat(wb, "0");
+                else
+                    buffer_strcat(wb, "null");
+            }
+            else {
+                if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+                    n = -n;
+
+                if(unlikely(options & RRDR_OPTION_PERCENTAGE))
+                    n = n * 100 / total;
+
+                buffer_rrd_value(wb, n);
+            }
         }
     }
     if(!i) {
@@ -963,6 +992,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
             buffer_strcat(wb, post_date);
         }
 
+        int set_min_max = 0;
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0, rd = r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
@@ -975,6 +1005,7 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
             }
             // prevent a division by zero
             if(total == 0) total = 1;
+            set_min_max = 1;
         }
 
         // for each dimension
@@ -999,8 +1030,17 @@ static void rrdr2json(RRDR *r, BUFFER *wb, uint32_t options, int datatable)
                 if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                     n = -n;
 
-                if(unlikely(options & RRDR_OPTION_PERCENTAGE))
+                if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
                     n = n * 100 / total;
+
+                    if(unlikely(set_min_max)) {
+                        r->min = r->max = n;
+                        set_min_max = 0;
+                    }
+
+                    if(n < r->min) r->min = n;
+                    if(n > r->max) r->max = n;
+                }
 
                 buffer_rrd_value(wb, n);
             }
@@ -1078,6 +1118,7 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
             buffer_date(wb, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
         }
 
+        int set_min_max = 0;
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
@@ -1090,6 +1131,7 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
             }
             // prevent a division by zero
             if(total == 0) total = 1;
+            set_min_max = 1;
         }
 
         // for each dimension
@@ -1111,8 +1153,17 @@ static void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t options, const char *startlin
                 if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
                     n = -n;
 
-                if(unlikely(options & RRDR_OPTION_PERCENTAGE))
+                if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
                     n = n * 100 / total;
+
+                    if(unlikely(set_min_max)) {
+                        r->min = r->max = n;
+                        set_min_max = 0;
+                    }
+
+                    if(n < r->min) r->min = n;
+                    if(n > r->max) r->max = n;
+                }
 
                 buffer_rrd_value(wb, n);
             }
@@ -1136,6 +1187,7 @@ inline static calculated_number rrdr2value(RRDR *r, long i, uint32_t options, in
     int all_null = 1, init = 1;
 
     calculated_number total = 1;
+    int set_min_max = 0;
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
         for(c = 0, d = r->st->dimensions; d && c < r->d ;c++, d = d->next) {
@@ -1148,6 +1200,7 @@ inline static calculated_number rrdr2value(RRDR *r, long i, uint32_t options, in
         }
         // prevent a division by zero
         if(total == 0) total = 1;
+        set_min_max = 1;
     }
 
     // for each dimension
@@ -1160,8 +1213,17 @@ inline static calculated_number rrdr2value(RRDR *r, long i, uint32_t options, in
         if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
             n = -n;
 
-        if(unlikely(options & RRDR_OPTION_PERCENTAGE))
+        if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             n = n * 100 / total;
+
+            if(unlikely(set_min_max)) {
+                r->min = r->max = n;
+                set_min_max = 0;
+            }
+
+            if(n < r->min) r->min = n;
+            if(n > r->max) r->max = n;
+        }
 
         if(unlikely(init)) {
             if(n > 0) {
