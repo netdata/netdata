@@ -517,6 +517,45 @@
         }
     }
 
+    .action-button {
+        position: relative;
+        display: inline-block;
+        color: gray;
+        cursor: pointer;
+        margin: 0 auto;
+        width: 30px;
+        height: 30px;
+        font-size: 25px;
+    }
+
+    .ripple {
+        position: relative;
+        /*overflow: hidden;*/
+        transform: translate3d(0, 0, 0)
+    }
+
+    .ripple:after {
+        content: "";
+        display: block;
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        background-image: radial-gradient(circle, #000 10%, transparent 10.01%);
+        background-repeat: no-repeat;
+        background-position: 50%;
+        transform: scale(18, 18); /* the size of the ripple */
+        opacity: 0;
+        transition: transform .5s, opacity 1s
+    }
+
+    .ripple:active:after {
+        transform: scale(0, 0);
+        opacity: .2;
+        transition: 0s
+    }
     </style>
 
     <!-- check which theme to use -->
@@ -2016,6 +2055,16 @@
             })
         }
 
+        var clipboardLoaded = false;
+        function loadClipboard(callback) {
+            if(clipboardLoaded === false) {
+                clipboardLoaded = true;
+                console.log('loading clipboard');
+                loadJs('lib/clipboard-polyfill-be05dad.js', callback);
+            }
+            else callback();
+        }
+
         var bootstrapTableLoaded = false;
         function loadBootstrapTable(callback) {
             if(bootstrapTableLoaded === false) {
@@ -2045,9 +2094,7 @@
         function loadLzString(callback) {
             if(lzStringLoaded === false) {
                 lzStringLoaded = true;
-                loadJs('lib/lz-string-1.4.4.min.js', function() {
-                    callback();
-                });
+                loadJs('lib/lz-string-1.4.4.min.js', callback);
             }
             else callback();
         }
@@ -2056,17 +2103,29 @@
         function loadPako(callback) {
             if(pakoLoaded === false) {
                 pakoLoaded = true;
-                loadJs('lib/pako-1.0.6.min.js', function() {
-                    callback();
-                });
+                loadJs('lib/pako-1.0.6.min.js', callback);
             }
             else callback();
         }
+
+        // ----------------------------------------------------------------------------
+
+        function clipboardCopy(text) {
+            clipboard.writeText(text);
+        }
+        function clipboardCopyBadgeEmbed(url) {
+            clipboard.writeText('<embed src="' + url + '" type="image/svg+xml" height="20"/>');
+        }
+
+
+        // ----------------------------------------------------------------------------
 
         function alarmsUpdateModal() {
             var active = '<h3>Raised Alarms</h3><table class="table">';
             var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
             var footer = '<hr/><a href="https://github.com/firehol/netdata/wiki/Generating-Badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/firehol/netdata/blob/master/conf.d/health_alarm_notify.conf">this configuration file</a> for more information.';
+
+            loadClipboard(function() {});
 
             NETDATA.alarms.get('all', function(data) {
                 options.alarm_families = [];
@@ -2136,10 +2195,14 @@
                     }
 
                     var has_alarm = (typeof alarm.warn !== 'undefined' || typeof alarm.crit !== 'undefined');
+                    var badge_url = NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto';
 
-                    var role_href = ((has_alarm === true)?('<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/><b><i class="fas fa-chart-line"></i></b><small>&nbsp;&nbsp;<a href="#" onClick="scrollToChartAfterHidingModal(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;">jump to chart</a></small>'):('&nbsp;'));
+                    var action_buttons = '<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/>'
+                        + '<div class="action-button ripple" title="click to scroll the dashboard to the chart of this alarm" data-toggle="tooltip" data-placement="bottom" onClick="scrollToChartAfterHidingModal(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;"><i class="fab fa-periscope"></i></div>'
+                        + '<div class="action-button ripple" title="click to copy to the clipboard the URL of this badge" data-toggle="tooltip" data-placement="bottom" onClick="clipboardCopy(\'' + badge_url + '\'); return false;"><i class="far fa-copy"></i></div>'
+                        + '<div class="action-button ripple" title="click to copy to the clipboard an auto-refreshing <code>embed</code> html element for this badge" data-toggle="tooltip" data-placement="bottom" onClick="clipboardCopyBadgeEmbed(\'' + badge_url + '\'); return false;"><i class="fas fa-copy"></i></div>';
 
-                    var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto" type="image/svg+xml" height="20"/><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span>' + role_href + '</td>'
+                    var html = '<tr><td class="text-center" style="vertical-align:middle" width="40%"><b>' + alarm.chart + '</b><br/>&nbsp;<br/><embed src="' + badge_url + '" type="image/svg+xml" height="20"/><br/>&nbsp;<br/><span style="font-size: 18px">' + alarm.info + '</span>' + action_buttons + '</td>'
                         + '<td><table class="table">'
                         + ((typeof alarm.warn !== 'undefined')?('<tr><td width="10%" style="text-align:right">warning&nbsp;when</td><td><span style="font-family: monospace; color:#fe7d37; font-weight: bold;">' + alarm.warn + '</span></td></tr>'):'')
                         + ((typeof alarm.crit !== 'undefined')?('<tr><td width="10%" style="text-align:right">critical&nbsp;when</td><td><span style="font-family: monospace; color: #e05d44; font-weight: bold;">' + alarm.crit + '</span></td></tr>'):'');
@@ -2194,6 +2257,7 @@
                     html += '</table>';
 
                     $('#alarm_all_' + id.toString()).html(html);
+                    enableTooltipsAndPopovers();
                 }
 
                 // find the proper family of each alarm
@@ -2301,6 +2365,7 @@
 
                 document.getElementById('alarms_active').innerHTML = active;
                 document.getElementById('alarms_all').innerHTML = all;
+                enableTooltipsAndPopovers();
 
                 if(families_sorted.length > 0) alarm_family_show(0);
 
@@ -3803,6 +3868,21 @@
             };
         }
 
+        // ----------------------------------------------------------------------------
+
+        function enableTooltipsAndPopovers() {
+            $('[data-toggle="tooltip"]').tooltip({
+                animated: 'fade',
+                trigger: 'hover',
+                html: true,
+                delay: {show: 500, hide: 0},
+                container: 'body'
+            });
+            $('[data-toggle="popover"]').popover();
+        }
+
+        // ----------------------------------------------------------------------------
+
         var runOnceOnDashboardLastRun = 0;
         function runOnceOnDashboardWithjQuery() {
             if(runOnceOnDashboardLastRun !== 0) {
@@ -4197,16 +4277,7 @@
 
             runOnceOnDashboardWithjQuery();
             $(".shorten").shorten();
-
-            $('[data-toggle="tooltip"]').tooltip({
-                animated: 'fade',
-                trigger: 'hover',
-                html: true,
-                delay: {show: 500, hide: 0},
-                container: 'body'
-            });
-            $('[data-toggle="popover"]').popover();
-
+            enableTooltipsAndPopovers();
 
             if(isdemo()) {
                 // do not to give errors on netdata demo servers for 60 seconds
