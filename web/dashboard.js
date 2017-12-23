@@ -49,6 +49,8 @@
  *                                                  (default: netdataServer) */
 /*global netdataSnapshotData         *//* object,   a netdata snapshot loaded
  *                                                  (default: null) */
+/*global netdataAlarmsRecipients     *//* array,    an array of alarm recipients to show notifications for
+ *                                                  (default: null) */
 
 // ----------------------------------------------------------------------------
 // global namespace
@@ -7916,6 +7918,7 @@ var NETDATA = window.NETDATA || {};
         server: null,                   // the server to connect to for fetching alarms
         current: null,                  // the list of raised alarms - updated in the background
         callback: null,                 // a callback function to call every time the list of raised alarms is refreshed
+        recipients: null,               // the list (array) of recipients to show alarms for, or null
 
         notify: function(entry) {
             // console.log('alarm ' + entry.unique_id);
@@ -7995,6 +7998,20 @@ var NETDATA = window.NETDATA || {};
                     return;
             }
 
+            // filter recipients
+            if(show === true && NETDATA.alarms.recipients !== null) {
+                show = false;
+                var r = ' ' + entry.recipient + ' ';
+                var len = NETDATA.alarms.recipients.length;
+                while(len--) {
+                    if(r.indexOf(' ' + NETDATA.alarms.recipients[len] + ' ') >= 0) {
+                        console.log('found');
+                        show = true;
+                        break;
+                    }
+                }
+            }
+
             /*
             // cleanup old notifications with the same alarm_id as this one
             // FIXME: it does not seem to work on any web browser!
@@ -8015,7 +8032,6 @@ var NETDATA = window.NETDATA || {};
             */
 
             if(show === true) {
-
                 setTimeout(function() {
                     // show this notification
                     // console.log('new notification: ' + title);
@@ -8212,6 +8228,9 @@ var NETDATA = window.NETDATA || {};
 
             if(NETDATA.alarms.onclick === null)
                 NETDATA.alarms.onclick = NETDATA.alarms.scrollToAlarm;
+
+            if(typeof netdataAlarmsRecipients !== 'undefined' && Array.isArray(netdataAlarmsRecipients))
+                NETDATA.alarms.recipients = netdataAlarmsRecipients;
 
             if(netdataShowAlarms === true) {
                 NETDATA.alarms.update_forever();
