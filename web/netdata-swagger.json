@@ -177,7 +177,9 @@
                                 "objectrows",
                                 "google_json",
                                 "percentage",
-                                "unaligned"
+                                "unaligned",
+                                "match-ids",
+                                "match-names"
                             ],
                             "collectionFormat": "pipes"
                         },

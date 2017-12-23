@@ -40,6 +40,10 @@ static struct {
         , {"google-json"     , 0    , RRDR_OPTION_GOOGLE_JSON}
         , {"percentage"      , 0    , RRDR_OPTION_PERCENTAGE}
         , {"unaligned"       , 0    , RRDR_OPTION_NOT_ALIGNED}
+        , {"match_ids"       , 0    , RRDR_OPTION_MATCH_IDS}
+        , {"match-ids"       , 0    , RRDR_OPTION_MATCH_IDS}
+        , {"match_names"     , 0    , RRDR_OPTION_MATCH_NAMES}
+        , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {                  NULL, 0, 0}
 };
 
