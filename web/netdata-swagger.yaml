@@ -110,7 +110,7 @@ paths:
           type: array
           items:
             type: string
-            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage', 'unaligned' ]
+            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage', 'unaligned', 'match-ids', 'match-names' ]
             collectionFormat: pipes
           default: [seconds, jsonwrap]
           allowEmptyValue: false

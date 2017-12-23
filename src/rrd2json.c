@@ -466,12 +466,24 @@ void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char 
 
     if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
 
-    long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
-    RRDDIM *d;
+    int match_ids = 0, match_names = 0;
+
+    if(unlikely(options & RRDR_OPTION_MATCH_IDS))
+        match_ids = 1;
+    if(unlikely(options & RRDR_OPTION_MATCH_NAMES))
+        match_names = 1;
+
+    if(likely(!match_ids && !match_names))
+        match_ids = match_names = 1;
 
     SIMPLE_PATTERN *pattern = simple_pattern_create(dims, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+
+    RRDDIM *d;
+    long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
     for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
-        if(simple_pattern_matches(pattern, d->id) || simple_pattern_matches(pattern, d->name)) {
+        if(    (match_ids   && simple_pattern_matches(pattern, d->id))
+            || (match_names && simple_pattern_matches(pattern, d->name))
+                ) {
             r->od[c] |= RRDR_SELECTED;
             if(unlikely(r->od[c] & RRDR_HIDDEN)) r->od[c] &= ~RRDR_HIDDEN;
             dims_selected++;

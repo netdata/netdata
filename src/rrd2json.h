@@ -62,6 +62,8 @@
 #define RRDR_OPTION_PERCENTAGE      0x00000800 // give values as percentage of total
 #define RRDR_OPTION_NOT_ALIGNED     0x00001000 // do not align charts for persistant timeframes
 #define RRDR_OPTION_DISPLAY_ABS     0x00002000 // for badges, display the absolute value, but calculate colors with sign
+#define RRDR_OPTION_MATCH_IDS       0x00004000 // when filtering dimensions, match only IDs
+#define RRDR_OPTION_MATCH_NAMES     0x00008000 // when filtering dimensions, match only names
 
 extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
 extern void rrd_stats_api_v1_charts(RRDHOST *host, BUFFER *wb);
