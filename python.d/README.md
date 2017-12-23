@@ -323,6 +323,41 @@ local:
 
 ---
 
+# ceph
+
+This module monitors the ceph cluster usage and consuption data of a server.
+
+It produces:
+
+* cluster disk statistics
+* OSD usage
+* pool usage
+* number of objects per pool
+
+**Requirements:**
+
+- `rados` python module
+- Add netdata user to ceph group
+```shell
+# useradd -g ceph netdata
+```
+
+- Granting read permissions to ceph group from keyring file
+```shell
+# chmod 640 /etc/ceph/ceph.client.admin.keyring
+```
+
+### Configuration
+
+Sample:
+```yaml
+local:
+  config_file: '/etc/ceph/ceph.conf'
+  keyring_file: '/etc/ceph/ceph.client.admin.keyring'
+```
+
+---
+
 # couchdb
 
 This module monitors vital statistics of a local Apache CouchDB 2.x server, including:
