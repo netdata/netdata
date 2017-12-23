@@ -167,3 +167,9 @@ connectivity is not available.
 
     Copyright 2014-2017 Vitaly Puzrin and Andrei Tuputcyn
     [MIT License](https://github.com/nodeca/pako/blob/master/LICENSE)
+
+- [clipboard-polyfill](https://github.com/lgarron/clipboard-polyfill)
+
+    Copyright (c) 2014 Lucas Garron
+    [MIT License](https://github.com/lgarron/clipboard-polyfill/blob/master/LICENSE.md)
+    
