@@ -175,7 +175,7 @@ void read_cgroup_plugin_configuration() {
                     " !/systemd "
                     " !/user "
                     " * "                                  // enable anything else
-            ), SIMPLE_PATTERN_EXACT);
+            ), NULL, SIMPLE_PATTERN_EXACT);
 
     enabled_cgroup_paths = simple_pattern_create(
             config_get("plugin:cgroups", "search for cgroups in subpaths matching",
@@ -189,7 +189,7 @@ void read_cgroup_plugin_configuration() {
                     " !/user.slice "
                     " !/lxc/*/* "                          //  #2161 #2649
                     " * "
-            ), SIMPLE_PATTERN_EXACT);
+            ), NULL, SIMPLE_PATTERN_EXACT);
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_plugins_dir);
     cgroups_rename_script = config_get("plugin:cgroups", "script to get cgroup names", filename);
@@ -215,14 +215,14 @@ void read_cgroup_plugin_configuration() {
                     " *qemu* "
                     " *.libvirt-qemu "                    //  #3010
                     " * "
-            ), SIMPLE_PATTERN_EXACT);
+            ), NULL, SIMPLE_PATTERN_EXACT);
 
     if(cgroup_enable_systemd_services) {
         systemd_services_cgroups = simple_pattern_create(
                 config_get("plugin:cgroups", "cgroups to match as systemd services",
                         " !/system.slice/*/*.service "
                         " /system.slice/*.service "
-                ), SIMPLE_PATTERN_EXACT);
+                ), NULL, SIMPLE_PATTERN_EXACT);
     }
 
     mountinfo_free(root);

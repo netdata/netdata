@@ -56,7 +56,7 @@ paths:
           default: system.cpu
         - name: dimension
           in: query
-          description: 'zero, one or more dimension ids, as returned by the /chart call.'
+          description: 'zero, one or more dimension ids or names, as returned by the /chart call, separated with comma or pipe. Netdata simple patterns are supported.'
           required: false
           type: array
           items:

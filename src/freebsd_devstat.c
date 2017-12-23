@@ -221,6 +221,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
         excluded_disks = simple_pattern_create(
                 config_get(CONFIG_SECTION_KERN_DEVSTAT, "disable by default disks matching", DELAULT_EXLUDED_DISKS)
+                , NULL
                 , SIMPLE_PATTERN_EXACT
         );
     }
