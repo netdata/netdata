@@ -68,10 +68,24 @@ static inline struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE
     return m;
 }
 
-SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE default_mode) {
+SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode) {
     struct simple_pattern *root = NULL, *last = NULL;
 
     if(unlikely(!list || !*list)) return root;
+
+    int isseparator[256] = {
+            [' '] = 1       // space
+            , ['\t'] = 1    // tab
+            , ['\r'] = 1    // carriage return
+            , ['\n'] = 1    // new line
+            , ['\f'] = 1    // form feed
+            , ['\v'] = 1    // vertical tab
+    };
+
+    if (unlikely(separators && *separators)) {
+        memset(&isseparator[0], 0, sizeof(isseparator));
+        while(*separators) isseparator[(unsigned char)*separators++] = 1;
+    }
 
     char *buf = mallocz(strlen(list) + 1);
     const char *s = list;
@@ -83,7 +97,7 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE defau
         char negative = 0;
 
         // skip all spaces
-        while(isspace(*s))
+        while(isseparator[(unsigned char)*s])
             s++;
 
         if(*s == '!') {
@@ -103,7 +117,7 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE defau
                 s++;
             }
             else {
-                if (isspace(*s) && !escape) {
+                if (isseparator[(unsigned char)*s] && !escape) {
                     s++;
                     break;
                 }

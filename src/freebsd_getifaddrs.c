@@ -170,8 +170,8 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                         CONFIG_BOOLEAN_AUTO);
 
         excluded_interfaces = simple_pattern_create(
-                config_get(CONFIG_SECTION_GETIFADDRS, "disable by default interfaces matching",
-                           DELAULT_EXLUDED_INTERFACES)
+                config_get(CONFIG_SECTION_GETIFADDRS, "disable by default interfaces matching", DELAULT_EXLUDED_INTERFACES)
+                , NULL
                 , SIMPLE_PATTERN_EXACT
         );
     }

@@ -464,47 +464,35 @@ static void rrdr_dump(RRDR *r)
 void rrdr_disable_not_selected_dimensions(RRDR *r, uint32_t options, const char *dims) {
     rrdset_check_rdlock(r->st);
 
-    if(unlikely(!dims || !*dims)) return;
-
-    char b[strlen(dims) + 1];
-    char *o = b, *tok;
-    strcpy(o, dims);
+    if(unlikely(!dims || !*dims || (dims[0] == '*' && dims[1] == '\0'))) return;
 
     long c, dims_selected = 0, dims_not_hidden_not_zero = 0;
     RRDDIM *d;
 
-    // disable all of them
-    for(c = 0, d = r->st->dimensions; d ;c++, d = d->next)
-        r->od[c] |= RRDR_HIDDEN;
+    SIMPLE_PATTERN *pattern = simple_pattern_create(dims, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT);
+    for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
+        if(simple_pattern_matches(pattern, d->id) || simple_pattern_matches(pattern, d->name)) {
+            r->od[c] |= RRDR_SELECTED;
+            if(unlikely(r->od[c] & RRDR_HIDDEN)) r->od[c] &= ~RRDR_HIDDEN;
+            dims_selected++;
 
-    while(o && *o && (tok = mystrsep(&o, ",|"))) {
-        if(!*tok) continue;
-        
-        uint32_t hash = simple_hash(tok);
+            // since the user needs this dimension
+            // make it appear as NONZERO, to return it
+            // even if the dimension has only zeros
+            // unless option non_zero is set
+            if(unlikely(!(options & RRDR_OPTION_NONZERO)))
+                r->od[c] |= RRDR_NONZERO;
 
-        // find it and enable it
-        for(c = 0, d = r->st->dimensions; d ;c++, d = d->next) {
-            if(unlikely((hash == d->hash && !strcmp(d->id, tok)) || (hash == d->hash_name && !strcmp(d->name, tok)))) {
-
-                if(likely(r->od[c] & RRDR_HIDDEN)) {
-                    r->od[c] |= RRDR_SELECTED;
-                    r->od[c] &= ~RRDR_HIDDEN;
-                    dims_selected++;
-                }
-
-                // since the user needs this dimension
-                // make it appear as NONZERO, to return it
-                // even if the dimension has only zeros
-                // unless option non_zero is set
-                if(likely(!(options & RRDR_OPTION_NONZERO)))
-                    r->od[c] |= RRDR_NONZERO;
-
-                // count the visible dimensions
-                if(likely(r->od[c] & RRDR_NONZERO))
-                    dims_not_hidden_not_zero++;
-            }
+            // count the visible dimensions
+            if(likely(r->od[c] & RRDR_NONZERO))
+                dims_not_hidden_not_zero++;
+        }
+        else {
+            r->od[c] |= RRDR_HIDDEN;
+            if(unlikely(r->od[c] & RRDR_SELECTED)) r->od[c] &= ~RRDR_SELECTED;
         }
     }
+    simple_pattern_free(pattern);
 
     // check if all dimensions are hidden
     if(unlikely(!dims_not_hidden_not_zero && dims_selected)) {

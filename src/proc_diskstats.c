@@ -501,8 +501,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             if(unlikely(!excluded_disks)) {
                 excluded_disks = simple_pattern_create(
-                        config_get(CONFIG_SECTION_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS),
-                        SIMPLE_PATTERN_EXACT
+                        config_get(CONFIG_SECTION_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS)
+                        , NULL
+                        , SIMPLE_PATTERN_EXACT
                 );
             }
 
