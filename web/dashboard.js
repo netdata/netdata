@@ -3755,7 +3755,7 @@ var NETDATA = window.NETDATA || {};
                     //var labels = this.data.dimension_names;
                     //var i = labels.length;
                     //while(i--)
-                    //  this.legendSetLabelValue(labels[i], this.data.latest_values[i]);
+                    //  this.legendSetLabelValue(labels[i], this.data.view_latest_values[i]);
                 }
                 return;
             }
