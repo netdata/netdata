@@ -4166,7 +4166,7 @@ var NETDATA = window.NETDATA || {};
 
             var leg = false;
             if(this.library && this.library.legend(this) === 'right-side')
-                leg = NETDATA.dataAttributeBoolean(this.element, 'legend', true);
+                leg = true;
 
             this.tmp.___hasLegendCache___ = leg;
             return leg;
@@ -5896,15 +5896,17 @@ var NETDATA = window.NETDATA || {};
 
             axes: {
                 x: {
-                    pixelsPerLabel: 50,
+                    pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-xpixelsperlabel', 50),
                     ticker: Dygraph.dateTicker,
+                    axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-xaxislabelwidth', 60),
                     axisLabelFormatter: function (d, gran) {
                         void(gran);
                         return NETDATA.dateTime.xAxisTimeString(d);
                     }
                 },
                 y: {
-                    pixelsPerLabel: 15,
+                    pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-ypixelsperlabel', 15),
+                    axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-yaxislabelwidth', 50),
                     axisLabelFormatter: function (y) {
 
                         // unfortunately, we have to call this every single time
@@ -7589,7 +7591,7 @@ var NETDATA = window.NETDATA || {};
             format: function(state) { void(state); return 'json'; },
             options: function(state) { void(state); return 'ms|flip'; },
             legend: function(state) {
-                return (this.isSparkline(state) === false)?'right-side':null;
+                return (this.isSparkline(state) === false && NETDATA.dataAttributeBoolean(state.element, 'legend', true) === true) ? 'right-side' : null;
             },
             autoresize: function(state) { void(state); return true; },
             max_updates_to_recreate: function(state) { void(state); return 5000; },
