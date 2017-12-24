@@ -21,6 +21,7 @@ dist_web_DATA = \
 	netdata-swagger.yaml \
 	netdata-swagger.json \
 	robots.txt \
+	refresh-badges.js \
 	registry.html \
 	sitemap.xml \
 	tv.html \
