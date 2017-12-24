@@ -7017,16 +7017,13 @@ var NETDATA = window.NETDATA || {};
         }
     };
 
-    NETDATA.easypiechartClearSelection = function(state) {
-        if(typeof state.tmp.easyPieChartEvent !== 'undefined') {
-            if(state.tmp.easyPieChartEvent.timer) {
-                NETDATA.timeout.clear(state.tmp.easyPieChartEvent.timer);
-            }
-
+    NETDATA.easypiechartClearSelection = function(state, force) {
+        if(typeof state.tmp.easyPieChartEvent !== 'undefined' && typeof state.tmp.easyPieChartEvent.timer !== 'undefined') {
+            NETDATA.timeout.clear(state.tmp.easyPieChartEvent.timer);
             state.tmp.easyPieChartEvent.timer = undefined;
         }
 
-        if(state.isAutoRefreshable() === true && state.data !== null) {
+        if(state.isAutoRefreshable() === true && state.data !== null && force !== true) {
             NETDATA.easypiechartChartUpdate(state, state.data);
         }
         else {
@@ -7040,11 +7037,11 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.easypiechartSetSelection = function(state, t) {
         if(state.timeIsVisible(t) !== true)
-            return NETDATA.easypiechartClearSelection(state);
+            return NETDATA.easypiechartClearSelection(state, true);
 
         var slot = state.calculateRowForTime(t);
         if(slot < 0 || slot >= state.data.result.length)
-            return NETDATA.easypiechartClearSelection(state);
+            return NETDATA.easypiechartClearSelection(state, true);
 
         if(typeof state.tmp.easyPieChartEvent === 'undefined') {
             state.tmp.easyPieChartEvent = {
@@ -7186,8 +7183,10 @@ var NETDATA = window.NETDATA || {};
         if(animate === false) state.tmp.easyPieChart_instance.enableAnimation();
 
         state.legendSetUnitsString = function(units) {
-            if(typeof state.tmp.easyPieChartUnits !== 'undefined')
+            if(typeof state.tmp.easyPieChartUnits !== 'undefined' && state.tmp.units !== units) {
                 state.tmp.easyPieChartUnits.innerText = units;
+                state.tmp.units = units;
+            }
         };
         state.legendShowUndefined = function() {
             if(typeof state.tmp.easyPieChart_instance !== 'undefined')
@@ -7294,16 +7293,13 @@ var NETDATA = window.NETDATA || {};
         }
     };
 
-    NETDATA.gaugeClearSelection = function(state) {
-        if(typeof state.tmp.gaugeEvent !== 'undefined') {
-            if(state.tmp.gaugeEvent.timer) {
-                NETDATA.timeout.clear(state.tmp.gaugeEvent.timer);
-            }
-
+    NETDATA.gaugeClearSelection = function(state, force) {
+        if(typeof state.tmp.gaugeEvent !== 'undefined' && typeof state.tmp.gaugeEvent.timer !== 'undefined') {
+            NETDATA.timeout.clear(state.tmp.gaugeEvent.timer);
             state.tmp.gaugeEvent.timer = undefined;
         }
 
-        if(state.isAutoRefreshable() === true && state.data !== null) {
+        if(state.isAutoRefreshable() === true && state.data !== null && force !== true) {
             NETDATA.gaugeChartUpdate(state, state.data);
         }
         else {
@@ -7318,11 +7314,11 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.gaugeSetSelection = function(state, t) {
         if(state.timeIsVisible(t) !== true)
-            return NETDATA.gaugeClearSelection(state);
+            return NETDATA.gaugeClearSelection(state, true);
 
         var slot = state.calculateRowForTime(t);
         if(slot < 0 || slot >= state.data.result.length)
-            return NETDATA.gaugeClearSelection(state);
+            return NETDATA.gaugeClearSelection(state, true);
 
         if(typeof state.tmp.gaugeEvent === 'undefined') {
             state.tmp.gaugeEvent = {
@@ -7556,11 +7552,12 @@ var NETDATA = window.NETDATA || {};
         NETDATA.gaugeAnimation(state, true);
 
         state.legendSetUnitsString = function(units) {
-            if(typeof state.tmp.gaugeChartUnits !== 'undefined') {
+            if(typeof state.tmp.gaugeChartUnits !== 'undefined' && state.tmp.units !== units) {
                 state.tmp.gaugeChartUnits.innerText = units;
                 state.tmp.___gaugeOld__.valueLabel = null;
                 state.tmp.___gaugeOld__.minLabel = null;
                 state.tmp.___gaugeOld__.maxLabel = null;
+                state.tmp.units = units;
             }
         };
         state.legendShowUndefined = function() {
