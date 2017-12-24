@@ -8004,7 +8004,6 @@ var NETDATA = window.NETDATA || {};
                 var len = NETDATA.alarms.recipients.length;
                 while(len--) {
                     if(r.indexOf(' ' + NETDATA.alarms.recipients[len] + ' ') >= 0) {
-                        console.log('found');
                         show = true;
                         break;
                     }
