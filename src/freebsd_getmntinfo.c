@@ -142,14 +142,16 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
         excluded_mountpoints = simple_pattern_create(
                 config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on paths",
-                           DELAULT_EXLUDED_PATHS),
-                SIMPLE_PATTERN_EXACT
+                           DELAULT_EXLUDED_PATHS)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
         );
 
         excluded_filesystems = simple_pattern_create(
                 config_get(CONFIG_SECTION_GETMNTINFO, "exclude space metrics on filesystems",
-                           DEFAULT_EXCLUDED_FILESYSTEMS),
-                SIMPLE_PATTERN_EXACT
+                           DEFAULT_EXCLUDED_FILESYSTEMS)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
         );
     }
 

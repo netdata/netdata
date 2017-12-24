@@ -1004,7 +1004,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     {
-        SIMPLE_PATTERN *key_allow_from = simple_pattern_create(appconfig_get(&stream_config, key, "allow from", "*"), SIMPLE_PATTERN_EXACT);
+        SIMPLE_PATTERN *key_allow_from = simple_pattern_create(appconfig_get(&stream_config, key, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
         if(key_allow_from) {
             if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
                 simple_pattern_free(key_allow_from);
@@ -1023,7 +1023,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     {
-        SIMPLE_PATTERN *machine_allow_from = simple_pattern_create(appconfig_get(&stream_config, machine_guid, "allow from", "*"), SIMPLE_PATTERN_EXACT);
+        SIMPLE_PATTERN *machine_allow_from = simple_pattern_create(appconfig_get(&stream_config, machine_guid, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
         if(machine_allow_from) {
             if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
                 simple_pattern_free(machine_allow_from);

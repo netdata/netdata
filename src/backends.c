@@ -529,7 +529,7 @@ void *backends_main(void *ptr) {
     long timeoutms          = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", backend_update_every * 2 * 1000);
     backend_send_names      = config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", backend_send_names);
 
-    charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), SIMPLE_PATTERN_EXACT);
+    charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
 
 
     // ------------------------------------------------------------------------

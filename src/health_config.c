@@ -556,7 +556,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         }
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
             char *os_match = value;
-            SIMPLE_PATTERN *os_pattern = simple_pattern_create(os_match, SIMPLE_PATTERN_EXACT);
+            SIMPLE_PATTERN *os_pattern = simple_pattern_create(os_match, NULL, SIMPLE_PATTERN_EXACT);
 
             if(!simple_pattern_matches(os_pattern, host->os)) {
                 if(rc)
@@ -572,7 +572,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         }
         else if(hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
             char *host_match = value;
-            SIMPLE_PATTERN *host_pattern = simple_pattern_create(host_match, SIMPLE_PATTERN_EXACT);
+            SIMPLE_PATTERN *host_pattern = simple_pattern_create(host_match, NULL, SIMPLE_PATTERN_EXACT);
 
             if(!simple_pattern_matches(host_pattern, host->hostname)) {
                 if(rc)
@@ -721,7 +721,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
                 simple_pattern_free(rt->family_pattern);
 
                 rt->family_match = strdupz(value);
-                rt->family_pattern = simple_pattern_create(rt->family_match, SIMPLE_PATTERN_EXACT);
+                rt->family_pattern = simple_pattern_create(rt->family_match, NULL, SIMPLE_PATTERN_EXACT);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
                 health_parse_db_lookup(line, path, filename, value, &rt->group, &rt->after, &rt->before,

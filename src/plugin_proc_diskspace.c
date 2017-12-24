@@ -96,13 +96,15 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         }
 
         excluded_mountpoints = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DELAULT_EXLUDED_PATHS),
-                mode
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DELAULT_EXLUDED_PATHS)
+                , NULL
+                , mode
         );
 
         excluded_filesystems = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS),
-                SIMPLE_PATTERN_EXACT
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
         );
 
         dict_mountpoints = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
