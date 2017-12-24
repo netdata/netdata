@@ -13,7 +13,7 @@ typedef void SIMPLE_PATTERN;
 // create a simple_pattern from the string given
 // default_mode is used in cases where EXACT matches, without an asterisk,
 // should be considered PREFIX matches.
-extern SIMPLE_PATTERN *simple_pattern_create(const char *list, SIMPLE_PREFIX_MODE default_mode);
+extern SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode);
 
 // test if string str is matched from the pattern and fill 'wildcarded' with the parts matched by '*'
 extern int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str, char *wildcarded, size_t wildcarded_size);
