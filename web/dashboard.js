@@ -780,7 +780,8 @@ var NETDATA = window.NETDATA || {};
             var len = targets.length;
 
             while (len--)
-                targets[len].isVisible();
+               if(targets[len].running === false)
+                   targets[len].isVisible();
         }
 
         //var end = Date.now();
@@ -2708,6 +2709,9 @@ var NETDATA = window.NETDATA || {};
             if(that.chart_created === true) {
                 if(NETDATA.options.current.show_help === true) {
                     if(that.element_legend_childs.toolbox !== null) {
+                        if(that.debug === true)
+                            that.log('hideChart(): hidding legend popovers');
+
                         $(that.element_legend_childs.toolbox_left).popover('hide');
                         $(that.element_legend_childs.toolbox_reset).popover('hide');
                         $(that.element_legend_childs.toolbox_right).popover('hide');
@@ -2723,13 +2727,15 @@ var NETDATA = window.NETDATA || {};
                 }
 
                 if(NETDATA.options.current.destroy_on_hide === true) {
-                    // that.log('hideChart() init');
+                    if(that.debug === true)
+                        that.log('hideChart(): initializing chart');
 
                     // we should destroy it
                     init('force');
                 }
                 else {
-                    // that.log('hideChart()');
+                    if(that.debug === true)
+                        that.log('hideChart(): hiding chart');
 
                     showRendering();
                     that.element_chart.style.display = 'none';
@@ -2759,13 +2765,17 @@ var NETDATA = window.NETDATA || {};
             that.updates_since_last_unhide = 0;
 
             if(that.chart_created === false) {
-                // that.log('unhideChart() init');
+                if(that.debug === true)
+                    that.log('unhideChart(): initializing chart');
+
                 // we need to re-initialize it, to show our background
                 // logo in bootstrap tabs, until the chart loads
                 init('force');
             }
             else {
-                // that.log('unhideChart()');
+                if(that.debug === true)
+                    that.log('unhideChart(): unhiding chart');
+
                 that.element.style.willChange = 'transform';
                 that.tm.last_unhidden = Date.now();
                 that.element_chart.style.display = '';
@@ -2778,7 +2788,10 @@ var NETDATA = window.NETDATA || {};
         };
 
         var canBeRendered = function(uncached_visibility) {
-            return (
+            if(that.debug === true)
+                that.log('canBeRendered() called');
+
+            var ret = (
                 (
                     NETDATA.options.page_is_visible === true ||
                     NETDATA.options.current.stop_updates_when_focus_is_lost === false ||
@@ -2786,6 +2799,11 @@ var NETDATA = window.NETDATA || {};
                 )
                 && isHidden() === false && that.isVisible(uncached_visibility) === true
             );
+
+            if(that.debug === true)
+                that.log('canBeRendered(): ' + ret);
+
+            return ret;
         };
 
         // https://github.com/petkaantonov/bluebird/wiki/Optimization-killers
@@ -2871,13 +2889,19 @@ var NETDATA = window.NETDATA || {};
         // to be called just before the chart library to make sure that
         // a properly sized dom is available
         var resizeChart = function() {
-            if(that.isVisible() === true && that.tm.last_resized < NETDATA.options.last_page_resize) {
+            if(that.tm.last_resized < NETDATA.options.last_page_resize) {
                 if(that.chart_created === false) return;
 
                 if(that.needsRecreation()) {
+                    if(that.debug === true)
+                        that.log('resizeChart(): initializing chart');
+
                     init('force');
                 }
                 else if(typeof that.library.resize === 'function') {
+                    if(that.debug === true)
+                        that.log('resizeChart(): resizing chart');
+
                     that.library.resize(that);
 
                     if(that.element_legend_childs.perfect_scroller !== null)
@@ -4492,14 +4516,14 @@ var NETDATA = window.NETDATA || {};
         };
 
         this.updateChart = function(callback) {
-            if(this.debug === true)
+            if (this.debug === true)
                 this.log('updateChart()');
 
-            if(this.fetching_data === true) {
-                if(this.debug === true)
-                    this.log('I am already updating...');
+            if (this.fetching_data === true) {
+                if (this.debug === true)
+                    this.log('updateChart(): I am already updating...');
 
-                if(typeof callback === 'function')
+                if (typeof callback === 'function')
                     return callback(false, 'already running');
 
                 return;
@@ -4507,33 +4531,47 @@ var NETDATA = window.NETDATA || {};
 
             // due to late initialization of charts and libraries
             // we need to check this too
-            if(this.enabled === false) {
-                if(this.debug === true)
-                    this.log('I am not enabled');
+            if (this.enabled === false) {
+                if (this.debug === true)
+                    this.log('updateChart(): I am not enabled');
 
-                if(typeof callback === 'function')
+                if (typeof callback === 'function')
                     return callback(false, 'not enabled');
 
                 return;
             }
 
-            if(canBeRendered() === false) {
-                if(typeof callback === 'function')
+            if (canBeRendered() === false) {
+                if (this.debug === true)
+                    this.log('updateChart(): cannot be rendered');
+
+                if (typeof callback === 'function')
                     return callback(false, 'cannot be rendered');
 
                 return;
             }
 
-            if(that.dom_created !== true)
-                createDOM();
+            if (that.dom_created !== true) {
+                if (this.debug === true)
+                    this.log('updateChart(): creating DOM');
 
-            if(this.chart === null)
-                return this.getChart(function() {
+                createDOM();
+            }
+
+            if (this.chart === null) {
+                if (this.debug === true)
+                    this.log('updateChart(): getting chart');
+
+                return this.getChart(function () {
                     return that.updateChart(callback);
                 });
+            }
 
             if(this.library.initialized === false) {
                 if(this.library.enabled === true) {
+                    if(this.debug === true)
+                        this.log('updateChart(): initializing chart library');
+
                     return this.library.initialize(function () {
                         return that.updateChart(callback);
                     });
@@ -4633,24 +4671,30 @@ var NETDATA = window.NETDATA || {};
         };
 
         var __isVisible = function() {
-            if(NETDATA.options.current.update_only_visible === false)
-                return true;
+            var ret = true;
 
-            // tolerance is the number of pixels a chart can be off-screen
-            // to consider it as visible and refresh it as if was visible
-            var tolerance = 0;
+            if(NETDATA.options.current.update_only_visible !== false) {
+                // tolerance is the number of pixels a chart can be off-screen
+                // to consider it as visible and refresh it as if was visible
+                var tolerance = 0;
 
-            that.tm.last_visible_check = Date.now();
+                that.tm.last_visible_check = Date.now();
 
-            var rect = that.element.getBoundingClientRect();
+                var rect = that.element.getBoundingClientRect();
 
-            var screenTop = window.scrollY;
-            var screenBottom = screenTop + window.innerHeight;
+                var screenTop = window.scrollY;
+                var screenBottom = screenTop + window.innerHeight;
 
-            var chartTop = rect.top + screenTop;
-            var chartBottom = chartTop + rect.height;
+                var chartTop = rect.top + screenTop;
+                var chartBottom = chartTop + rect.height;
 
-            return !(rect.width === 0 || rect.height === 0 || chartBottom + tolerance < screenTop || chartTop - tolerance > screenBottom);
+                ret = !(rect.width === 0 || rect.height === 0 || chartBottom + tolerance < screenTop || chartTop - tolerance > screenBottom);
+            }
+
+            if(that.debug === true)
+                that.log('__isVisible(): ' + ret);
+
+            return ret;
         };
 
         this.isVisible = function(nocache) {
@@ -4658,14 +4702,16 @@ var NETDATA = window.NETDATA || {};
 
             // caching - we do not evaluate the charts visibility
             // if the page has not been scrolled since the last check
-            if((typeof nocache === 'undefined' || nocache === false)
-                && typeof this.tmp.___isVisible___ !== 'undefined'
-                && this.tm.last_visible_check > NETDATA.options.last_page_scroll)
-                return this.tmp.___isVisible___;
+            if((typeof nocache !== 'undefined' && nocache === true)
+                || typeof this.tmp.___isVisible___ === 'undefined'
+                || this.tm.last_visible_check <= NETDATA.options.last_page_scroll) {
+                this.tmp.___isVisible___ = __isVisible();
+                if (this.tmp.___isVisible___ === true) unhideChart();
+                else hideChart();
+            }
 
-            this.tmp.___isVisible___ = __isVisible();
-            if(this.tmp.___isVisible___ === true) unhideChart();
-            else hideChart();
+            if(this.debug === true)
+                this.log('isVisible(' + nocache + '): ' + this.tmp.___isVisible___);
 
             return this.tmp.___isVisible___;
         };
@@ -5256,7 +5302,7 @@ var NETDATA = window.NETDATA || {};
             var state;
             while(len--) {
                 state = targets[len];
-                if(state.isVisible() === false || state.running === true)
+                if(state.running === true || state.isVisible() === false)
                     continue;
 
                 if(state.library.initialized === false) {
