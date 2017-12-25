@@ -1,6 +1,6 @@
 #include "common.h"
 
-#define DELAULT_EXLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
+#define DELAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS ""
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
@@ -96,7 +96,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         }
 
         excluded_mountpoints = simple_pattern_create(
-                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DELAULT_EXLUDED_PATHS)
+                config_get(CONFIG_SECTION_DISKSPACE, "exclude space metrics on paths", DELAULT_EXCLUDED_PATHS)
                 , NULL
                 , mode
         );
