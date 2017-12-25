@@ -2,18 +2,19 @@
 # Description: isc dhcpd lease netdata python.d module
 # Author: l2isbad
 
-from time import mktime, strptime, gmtime, time
-from os import stat, access, R_OK
-from os.path import isfile
+import os
+import re
+import time
+
+
 try:
-    from ipaddress import ip_network, ip_address
-    HAVE_IPADDRESS = True
+    import ipaddress
+    HAVE_IP_ADDRESS = True
 except ImportError:
-    HAVE_IPADDRESS = False
-try:
-    from itertools import filterfalse
-except ImportError:
-    from itertools import ifilterfalse as filterfalse
+    HAVE_IP_ADDRESS = False
+
+from collections import defaultdict
+from copy import deepcopy
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -21,146 +22,173 @@ priority = 60000
 retries = 60
 update_every = 5
 
-ORDER = ['pools_utilization', 'pools_active_leases', 'leases_total', 'parse_time', 'leases_size']
+ORDER = ['pools_utilization', 'pools_active_leases', 'leases_total']
 
 CHARTS = {
     'pools_utilization': {
-        'options': [None, 'Pools Utilization', 'used in percent', 'utilization',
+        'options': [None, 'Pools Utilization', '%', 'utilization',
                     'isc_dhcpd.utilization', 'line'],
         'lines': []},
     'pools_active_leases': {
-        'options': [None, 'Active Leases', 'leases per pool', 'active leases',
+        'options': [None, 'Active Leases Per Pool', 'leases', 'active leases',
                     'isc_dhcpd.active_leases', 'line'],
         'lines': []},
     'leases_total': {
-        'options': [None, 'Total All Pools', 'number', 'active leases',
+        'options': [None, 'All Active Leases', 'leases', 'active leases',
                     'isc_dhcpd.leases_total', 'line'],
-        'lines': [['leases_total', 'leases', 'absolute']]},
-    'parse_time': {
-        'options': [None, 'Parse Time', 'ms', 'parse stats',
-                    'isc_dhcpd.parse_time', 'line'],
-        'lines': [['parse_time', 'time', 'absolute']]},
-    'leases_size': {
-        'options': [None, 'Dhcpd Leases File Size', 'kilobytes',
-                    'parse stats', 'isc_dhcpd.leases_size', 'line'],
-        'lines': [['leases_size', 'size', 'absolute', 1, 1024]]}}
+        'lines': [['leases_total', 'leases', 'absolute']],
+        'variables': [
+            ['leases_size']
+        ]
+    }
+}
+
+
+class DhcpdLeasesFile:
+    def __init__(self, path):
+        self.path = path
+        self.mod_time = 0
+        self.size = 0
+
+    def is_valid(self):
+        return os.path.isfile(self.path) and os.access(self.path, os.R_OK)
+
+    def is_changed(self):
+        mod_time = os.path.getmtime(self.path)
+        if mod_time != self.mod_time:
+            self.mod_time = mod_time
+            self.size = int(os.path.getsize(self.path) / 1024)
+            return True
+        return False
+
+    def get_data(self):
+        try:
+            with open(self.path) as leases:
+                result = defaultdict(dict)
+                for row in leases:
+                    row = row.strip()
+                    if row.startswith('lease'):
+                        address = row[6:-2]
+                    elif row.startswith('iaaddr'):
+                        address = row[7:-2]
+                    elif row.startswith('ends'):
+                        result[address]['ends'] = row[5:-1]
+                    elif row.startswith('binding state'):
+                        result[address]['state'] = row[14:-1]
+                return result
+        except (OSError, IOError):
+            return None
+
+
+class Pool:
+    def __init__(self, name, network):
+        self.id = re.sub(r'[:/.-]+', '_', name)
+        self.name = name
+        self.network = ipaddress.ip_network(address=u'%s' % network)
+
+    def num_hosts(self):
+        return self.network.num_addresses - 2
+
+    def __contains__(self, item):
+        return item.address in self.network
+
+
+class Lease:
+    def __init__(self, address, ends, state):
+        self.address = ipaddress.ip_address(address=address)
+        self.ends = ends
+        self.state = state
+
+    def is_active(self, current_time):
+        # lease_end_time might be epoch
+        if self.ends.startswith('epoch'):
+            epoch = int(self.ends.split()[1].replace(';', ''))
+            return epoch - current_time > 0
+        # max. int for lease-time causes lease to expire in year 2038.
+        # dhcpd puts 'never' in the ends section of active lease
+        elif self.ends == 'never':
+            return True
+        return time.mktime(time.strptime(self.ends, '%w %Y/%m/%d %H:%M:%S')) - current_time > 0
+
+    def is_valid(self):
+        return self.state == 'active'
 
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
-        self.leases_path = self.configuration.get('leases_path', '/var/lib/dhcp/dhcpd.leases')
         self.order = ORDER
-        self.definitions = CHARTS
-        self.pools = dict()
+        self.definitions = deepcopy(CHARTS)
+
+        lease_path = self.configuration.get('leases_path', '/var/lib/dhcp/dhcpd.leases')
+        self.dhcpd_leases = DhcpdLeasesFile(path=lease_path)
+        self.pools = list()
+        self.data = dict()
 
         # Will work only with 'default' db-time-format (weekday year/month/day hour:minute:second)
         # TODO: update algorithm to parse correctly 'local' db-time-format
-        # Also only ipv4 supported
 
     def check(self):
-        if not HAVE_IPADDRESS:
-            self.error('\'python-ipaddress\' module is needed')
+        if not HAVE_IP_ADDRESS:
+            self.error("'python-ipaddress' module is needed")
             return False
-        if not (isfile(self.leases_path) and access(self.leases_path, R_OK)):
-            self.error('Make sure leases_path is correct and leases log file is readable by netdata')
+
+        if not self.dhcpd_leases.is_valid():
+            self.error("Make sure '{path}' is exist and readable by netdata".format(path=self.dhcpd_leases.path))
             return False
-        if not self.configuration.get('pools'):
+
+        pools = self.configuration.get('pools')
+        if not pools:
             self.error('Pools are not defined')
             return False
-        if not isinstance(self.configuration['pools'], dict):
-            self.error('Invalid \'pools\' format')
-            return False
 
-        for pool in self.configuration['pools']:
+        for pool in pools:
             try:
-                net = ip_network(u'%s' % self.configuration['pools'][pool])
-                self.pools[pool] = dict(net=net, num_hosts=net.num_addresses - 2)
+                new_pool = Pool(name=pool, network=pools[pool])
             except ValueError as error:
-                self.error('%s removed, error: %s' % (self.configuration['pools'][pool], error))
+                self.error("'{pool}' was removed, error: {error}".format(pool=pools[pool], error=error))
+            else:
+                self.pools.append(new_pool)
 
-        if not self.pools:
-            return False
         self.create_charts()
-        return True
+        return bool(self.pools)
 
-    def _get_raw_data(self):
-        """
-        Parses log file
-        :return: tuple(
-                       [ipaddress, lease end time, ...],
-                       time to parse leases file
-                      )
-        """
-        try:
-            with open(self.leases_path) as leases:
-                time_start = time()
-                part1 = filterfalse(find_lease, leases)
-                part2 = filterfalse(find_ends, leases)
-                result = dict(zip(part1, part2))
-                time_end = time()
-                file_parse_time = round((time_end - time_start) * 1000)
-                return result, file_parse_time
-        except (OSError, IOError) as error:
-            self.error("Failed to parse leases file:", str(error))
-            return None
-
-    def _get_data(self):
+    def get_data(self):
         """
         :return: dict
         """
-        raw_data = self._get_raw_data()
-        if not raw_data:
+        if not self.dhcpd_leases.is_changed():
+            return self.data
+
+        raw_leases = self.dhcpd_leases.get_data()
+        if not raw_leases:
+            self.data = dict()
             return None
 
-        raw_leases, parse_time = raw_data[0], raw_data[1]
+        active_leases = list()
+        current_time = time.mktime(time.gmtime())
 
-        # Result: {ipaddress: end lease time, ...}
-        active_leases, to_netdata = list(), dict()
-        current_time = mktime(gmtime())
-
-        for ip, lease_end_time in raw_leases.items():
-            # Result: [active binding, active binding....]. (Expire time (ends date;) - current time > 0)
-            if binding_active(lease_end_time=lease_end_time[7:-2],
-                              current_time=current_time):
-                active_leases.append(ip_address(u'%s' % ip[6:-3]))
+        for address in raw_leases:
+            try:
+                new_lease = Lease(address, **raw_leases[address])
+            except ValueError:
+                continue
+            else:
+                if new_lease.is_active(current_time) and new_lease.is_valid():
+                    active_leases.append(new_lease)
 
         for pool in self.pools:
-            dim_id = pool.replace('.', '_')
-            pool_leases_count = len([ip for ip in active_leases if ip in self.pools[pool]['net']])
-            to_netdata[dim_id + '_active_leases'] = pool_leases_count
-            to_netdata[dim_id + '_utilization'] = float(pool_leases_count) / self.pools[pool]['num_hosts'] * 10000
+            count = len([ip for ip in active_leases if ip in pool])
+            self.data[pool.id + '_active_leases'] = count
+            self.data[pool.id + '_utilization'] = float(count) / pool.num_hosts() * 10000
 
-        to_netdata['leases_total'] = len(active_leases)
-        to_netdata['leases_size'] = stat(self.leases_path)[6]
-        to_netdata['parse_time'] = parse_time
-        return to_netdata
+        self.data['leases_size'] = self.dhcpd_leases.size
+        self.data['leases_total'] = len(active_leases)
+
+        return self.data
 
     def create_charts(self):
         for pool in self.pools:
-            dim, dim_id = pool, pool.replace('.', '_')
-            self.definitions['pools_utilization']['lines'].append([dim_id + '_utilization',
-                                                                   dim, 'absolute', 1, 100])
-            self.definitions['pools_active_leases']['lines'].append([dim_id + '_active_leases',
-                                                                     dim, 'absolute'])
-
-
-def binding_active(lease_end_time, current_time):
-    # lease_end_time might be epoch
-    if lease_end_time.startswith('epoch'):
-        epoch = int(lease_end_time.split()[1].replace(';',''))
-        return epoch - current_time > 0
-    # max. int for lease-time causes lease to expire in year 2038.
-    # dhcpd puts 'never' in the ends section of active lease
-    elif lease_end_time == 'never':
-        return True
-    else:
-        return mktime(strptime(lease_end_time, '%w %Y/%m/%d %H:%M:%S')) - current_time > 0
-
-
-def find_lease(value):
-    return value[0:3] != 'lea'
-
-
-def find_ends(value):
-    return value[2:6] != 'ends'
+            self.definitions['pools_utilization']['lines'].append([pool.id + '_utilization', pool.name,
+                                                                   'absolute', 1, 100])
+            self.definitions['pools_active_leases']['lines'].append([pool.id + '_active_leases', pool.name])
