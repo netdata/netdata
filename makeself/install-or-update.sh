@@ -8,6 +8,21 @@ umask 002
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
 
+# -----------------------------------------------------------------------------
+
+STARTIT=1
+
+while [ ! -z "${1}" ]
+do
+    if [ "${1}" = "--dont-start-it" ]
+    then
+        STARTIT=0
+    else
+        echo >&2 "Unknown option '${1}'. Ignoring it."
+    fi
+    shift
+done
+
 
 # -----------------------------------------------------------------------------
 progress "Checking new configuration files"
@@ -136,6 +151,7 @@ run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 
 # -----------------------------------------------------------------------------
+
 progress "fix plugin permissions"
 
 for x in apps.plugin freeipmi.plugin cgroup-network
@@ -156,14 +172,22 @@ then
     run chmod 4750 bin/fping
 fi
 
-# -----------------------------------------------------------------------------
-progress "starting netdata"
 
-restart_netdata "/opt/netdata/bin/netdata"
-if [ $? -eq 0 ]
-    then
-    download_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
-    netdata_banner "is installed and running now!"
+# -----------------------------------------------------------------------------
+
+if [ ${STARTIT} -eq 1 ]
+then
+    progress "starting netdata"
+
+    restart_netdata "/opt/netdata/bin/netdata"
+    if [ $? -eq 0 ]
+        then
+        download_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
+        netdata_banner "is installed and running now!"
+    else
+        generate_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
+        netdata_banner "is installed now!"
+    fi
 else
     generate_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
     netdata_banner "is installed now!"
