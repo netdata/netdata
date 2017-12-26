@@ -77,6 +77,6 @@ extern int rrdset2anything_api_v1(RRDSET *st, BUFFER *out, BUFFER *dimensions, u
 
 extern int rrdset2value_api_v1(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensions, long points
                             , long long after, long long before, int group_method, uint32_t options
-                            , time_t *db_before, time_t *db_after, int *value_is_null);
+                            , time_t *db_after, time_t *db_before, int *value_is_null);
 
 #endif /* NETDATA_RRD2JSON_H */

@@ -4,10 +4,13 @@
     <builddir>cppcheck-build</builddir>
     <includedir>
         <dir name=".."/>
-        <dir name="/usr/include"/>
     </includedir>
     <libraries>
         <library>gnu</library>
         <library>posix</library>
     </libraries>
+    <suppressions>
+        <suppression>nullPointerRedundantCheck</suppression>
+        <suppression>unusedFunction</suppression>
+    </suppressions>
 </project>

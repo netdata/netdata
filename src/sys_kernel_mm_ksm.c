@@ -22,10 +22,10 @@ KSM_NAME_VALUE values[] = {
 int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     (void)dt;
     static procfile *ff_pages_shared = NULL, *ff_pages_sharing = NULL, *ff_pages_unshared = NULL, *ff_pages_volatile = NULL, *ff_pages_to_scan = NULL;
-    static long page_size = -1;
+    static unsigned long page_size = 0;
 
-    if(unlikely(page_size == -1))
-        page_size = sysconf(_SC_PAGESIZE);
+    if(unlikely(page_size == 0))
+        page_size = (unsigned long)sysconf(_SC_PAGESIZE);
 
     if(unlikely(!ff_pages_shared)) {
         snprintfz(values[PAGES_SHARED].filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/kernel/mm/ksm/pages_shared");

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# echo >>/tmp/cppcheck.log "cppcheck ${*}"
+
 cppcheck=$(which cppcheck 2>/dev/null || command -v cppcheck 2>/dev/null)
 [ -z "${cppcheck}" ] && echo >&2 "install cppcheck." && exit 1
 
@@ -27,4 +29,5 @@ shift
 	--force \
 	--enable=warning,performance,portability,information \
 	--suppress="unusedFunction:*" \
+	--suppress="nullPointerRedundantCheck:*" \
 	"${file}" "${@}"

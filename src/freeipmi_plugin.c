@@ -538,6 +538,10 @@ static void excluded_record_ids_parse(const char *s) {
 
             if(n != 0) {
                 excluded_record_ids = realloc(excluded_record_ids, (excluded_record_ids_length + 1) * sizeof(int));
+                if(!excluded_record_ids) {
+                    fprintf(stderr, "freeipmi.plugin: failed to allocate memory. Exiting.");
+                    exit(1);
+                }
                 excluded_record_ids[excluded_record_ids_length++] = (int)n;
             }
         }
