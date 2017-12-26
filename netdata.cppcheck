@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="1">
+    <root name="/home/costa/src/netdata-ktsaou.git/src"/>
+    <builddir>cppcheck-build</builddir>
+    <includedir>
+        <dir name=".."/>
+        <dir name="/usr/include"/>
+    </includedir>
+    <libraries>
+        <library>gnu</library>
+        <library>posix</library>
+    </libraries>
+</project>

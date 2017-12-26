@@ -99,6 +99,7 @@ profile/benchmark-dictionary
 profile/benchmark-registry
 profile/test-eval
 profile/benchmark-line-parsing
+profile/statsd-stress
 
 *.pyc
 *.run
@@ -108,12 +109,10 @@ diagrams/*.svg
 diagrams/*.atxt
 diagrams/plantuml.jar
 
-netdata.cppcheck
-
-profile/statsd-stress
 src/cgroup-network
 vgcore.*
 
 src/cppcheck-build/
 makeself/debug/
+
 
