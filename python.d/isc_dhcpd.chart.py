@@ -170,7 +170,7 @@ class Service(SimpleService):
 
         for address in raw_leases:
             try:
-                new_lease = Lease(address, **raw_leases[address])
+                new_lease = Lease(address=u'%s' % address, **raw_leases[address])
             except ValueError:
                 continue
             else:
