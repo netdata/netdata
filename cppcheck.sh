@@ -28,6 +28,8 @@ shift
 	-I .. \
 	--force \
 	--enable=warning,performance,portability,information \
+	--library=gnu \
+	--library=posix \
 	--suppress="unusedFunction:*" \
 	--suppress="nullPointerRedundantCheck:*" \
 	"${file}" "${@}"
