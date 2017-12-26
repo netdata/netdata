@@ -2480,6 +2480,8 @@ var NETDATA = window.NETDATA || {};
                 that.log('ignoring invalid value of property data-update-every');
                 that.force_update_every = null;
             }
+            else
+                that.force_update_every *= 1000;
 
             // the dimensions requested by the user
             that.dimensions = NETDATA.dataAttribute(that.element, 'dimensions', null);
