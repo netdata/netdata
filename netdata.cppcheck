@@ -6,6 +6,7 @@
         <dir name=".."/>
     </includedir>
     <libraries>
+        <library>cppcheck-lib</library>
         <library>gnu</library>
         <library>posix</library>
     </libraries>
