@@ -724,8 +724,6 @@ static void statsd_del_callback(int fd, int socktype, void *data) {
 
         freez(data);
     }
-
-    return;
 }
 
 // Receive data
@@ -1065,6 +1063,12 @@ int statsd_readfile(const char *path, const char *filename) {
                 statsd.apps = app;
                 chart = NULL;
                 dict = NULL;
+
+                {
+                    char lineandfile[FILENAME_MAX + 1];
+                    snprintfz(lineandfile, FILENAME_MAX, "%zu@%s", line, filename);
+                    app->source = strdupz(lineandfile);
+                }
             }
             else if(app) {
                 if(!strcmp(s, "dictionary")) {
@@ -1090,6 +1094,12 @@ int statsd_readfile(const char *path, const char *filename) {
 
                     chart->next = app->charts;
                     app->charts = chart;
+
+                    {
+                        char lineandfile[FILENAME_MAX + 1];
+                        snprintfz(lineandfile, FILENAME_MAX, "%zu@%s", line, filename);
+                        chart->source = strdupz(lineandfile);
+                    }
                 }
             }
             else
@@ -1364,7 +1374,7 @@ static inline RRDSET *statsd_private_rrdset_create(
             , title           // title
             , units           // units
             , "statsd"        // plugin
-            , NULL            // module
+            , "private_chart" // module
             , priority        // priority
             , update_every    // update every
             , chart_type      // chart type
@@ -1871,7 +1881,7 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
                 , chart->title              // title
                 , chart->units              // units
                 , "statsd"                  // plugin
-                , NULL                      // module
+                , chart->source             // module
                 , chart->priority           // priority
                 , statsd.update_every       // update every
                 , chart->chart_type         // chart type

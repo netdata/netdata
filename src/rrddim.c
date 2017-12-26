@@ -99,6 +99,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         return rd;
     }
 
+    RRDHOST *host = st->rrdhost;
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 
@@ -247,7 +248,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
                         rd->name,
                         st->name,
-                        st->rrdhost->hostname,
+                        host->hostname,
                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
                         rd->multiplier, td->multiplier,
                         rd->divisor, td->divisor
@@ -261,7 +262,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         td->next = rd;
     }
 
-    if(st->rrdhost->health_enabled) {
+    if(host->health_enabled) {
         rrddimvar_create(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_OPTION_DEFAULT);
         rrddimvar_create(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
@@ -330,9 +331,11 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 int rrddim_hide(RRDSET *st, const char *id) {
     debug(D_RRD_CALLS, "rrddim_hide() for chart %s, dimension %s", st->name, id);
 
+    RRDHOST *host = st->rrdhost;
+
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, st->rrdhost->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
         return 1;
     }
 
@@ -343,9 +346,10 @@ int rrddim_hide(RRDSET *st, const char *id) {
 int rrddim_unhide(RRDSET *st, const char *id) {
     debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", st->name, id);
 
+    RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, st->rrdhost->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
         return 1;
     }
 
@@ -372,9 +376,10 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
 }
 
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value) {
+    RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id);
     if(unlikely(!rd)) {
-        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, st->rrdhost->hostname);
+        error("Cannot find dimension with id '%s' on stats '%s' (%s) on host '%s'.", id, st->name, st->id, host->hostname);
         return 0;
     }
 

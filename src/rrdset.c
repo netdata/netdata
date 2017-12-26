@@ -83,7 +83,7 @@ static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name, ui
     result = avl_search_lock(&host->rrdset_root_index_name, (avl *) (&(tmp.avlname)));
     if(result) {
         RRDSET *st = rrdset_from_avlname(result);
-        if(strcmp(st->magic, RRDSET_MAGIC))
+        if(strcmp(st->magic, RRDSET_MAGIC) != 0)
             error("Search for RRDSET %s returned an invalid RRDSET %s (name %s)", name, st->id, st->name);
 
         // fprintf(stderr, "FOUND: %s\n", name);
@@ -139,6 +139,8 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     if(unlikely(st->name && !strcmp(st->name, name)))
         return 1;
 
+    RRDHOST *host = st->rrdhost;
+
     debug(D_RRD_CALLS, "rrdset_set_name() old: '%s', new: '%s'", st->name?st->name:"", name);
 
     char b[CONFIG_MAX_VALUE + 1];
@@ -147,13 +149,13 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     snprintfz(n, RRD_ID_LENGTH_MAX, "%s.%s", st->type, name);
     rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
 
-    if(rrdset_index_find_name(st->rrdhost, b, 0)) {
-        error("RRDSET: chart name '%s' on host '%s' already exists.", b, st->rrdhost->hostname);
+    if(rrdset_index_find_name(host, b, 0)) {
+        error("RRDSET: chart name '%s' on host '%s' already exists.", b, host->hostname);
         return 0;
     }
 
     if(st->name) {
-        rrdset_index_del_name(st->rrdhost, st);
+        rrdset_index_del_name(host, st);
         st->name = config_set_default(st->config_section, "name", b);
         st->hash_name = simple_hash(st->name);
         rrdsetvar_rename_all(st);
@@ -169,20 +171,22 @@ int rrdset_set_name(RRDSET *st, const char *name) {
         rrddimvar_rename_all(rd);
     rrdset_unlock(st);
 
-    if(unlikely(rrdset_index_add_name(st->rrdhost, st) != st))
+    if(unlikely(rrdset_index_add_name(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempted to index duplicate chart name '%s'", st->name);
 
     return 1;
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+
     if(unlikely(!(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 
         // the chart will not get more updates (data collection)
         // so, we have to push its definition now
-        if(unlikely(st->rrdhost->rrdpush_send_enabled))
+        if(unlikely(host->rrdpush_send_enabled))
             rrdset_push_chart_definition(st);
     }
 }
@@ -198,6 +202,7 @@ inline void rrdset_isnot_obsolete(RRDSET *st) {
 }
 
 inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
     RRDDIM *rd;
 
     rrdset_flag_clear(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
@@ -213,7 +218,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
                 info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present (algorithm is '%s' vs '%s', multiplier is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ", divisor is " COLLECTED_NUMBER_FORMAT " vs " COLLECTED_NUMBER_FORMAT ").",
                         rd->name,
                         st->name,
-                        st->rrdhost->hostname,
+                        host->hostname,
                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm),
                         rd->multiplier, multiplier,
                         rd->divisor, divisor
@@ -294,7 +299,9 @@ static inline void last_updated_time_align(RRDSET *st) {
 void rrdset_free(RRDSET *st) {
     if(unlikely(!st)) return;
 
-    rrdhost_check_wrlock(st->rrdhost);  // make sure we have a write lock on the host
+    RRDHOST *host = st->rrdhost;
+
+    rrdhost_check_wrlock(host);  // make sure we have a write lock on the host
     rrdset_wrlock(st);                  // lock this RRDSET
 
     // info("Removing chart '%s' ('%s')", st->id, st->name);
@@ -302,10 +309,10 @@ void rrdset_free(RRDSET *st) {
     // ------------------------------------------------------------------------
     // remove it from the indexes
 
-    if(unlikely(rrdset_index_del(st->rrdhost, st) != st))
+    if(unlikely(rrdset_index_del(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempt to remove from index chart '%s', removed a different chart.", st->id);
 
-    rrdset_index_del_name(st->rrdhost, st);
+    rrdset_index_del_name(host, st);
 
     // ------------------------------------------------------------------------
     // free its children structures
@@ -314,25 +321,25 @@ void rrdset_free(RRDSET *st) {
     while(st->alarms)     rrdsetcalc_unlink(st->alarms);
     while(st->dimensions) rrddim_free(st, st->dimensions);
 
-    rrdfamily_free(st->rrdhost, st->rrdfamily);
+    rrdfamily_free(host, st->rrdfamily);
 
-    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", st->rrdhost->hostname, st->id);
-    rrdvar_free_remaining_variables(st->rrdhost, &st->rrdvar_root_index);
+    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", host->hostname, st->id);
+    rrdvar_free_remaining_variables(host, &st->rrdvar_root_index);
 
     // ------------------------------------------------------------------------
     // unlink it from the host
 
-    if(st == st->rrdhost->rrdset_root) {
-        st->rrdhost->rrdset_root = st->next;
+    if(st == host->rrdset_root) {
+        host->rrdset_root = st->next;
     }
     else {
         // find the previous one
         RRDSET *s;
-        for(s = st->rrdhost->rrdset_root; s && s->next != st ; s = s->next) ;
+        for(s = host->rrdset_root; s && s->next != st ; s = s->next) ;
 
         // bypass it
         if(s) s->next = st->next;
-        else error("Request to free RRDSET '%s': cannot find it under host '%s'", st->id, st->rrdhost->hostname);
+        else error("Request to free RRDSET '%s': cannot find it under host '%s'", st->id, host->hostname);
     }
 
     rrdset_unlock(st);

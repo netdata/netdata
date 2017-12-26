@@ -6,7 +6,7 @@
 #define REGISTRY_URL_FLAGS_DEFAULT 0x00
 #define REGISTRY_URL_FLAGS_EXPIRED 0x01
 
-#define DICTIONARY_FLAGS DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE | DICTIONARY_FLAG_NAME_LINK_DONT_CLONE | DICTIONARY_FLAG_SINGLE_THREADED
+#define DICTIONARY_FLAGS (DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE | DICTIONARY_FLAG_NAME_LINK_DONT_CLONE | DICTIONARY_FLAG_SINGLE_THREADED)
 
 // ----------------------------------------------------------------------------
 // COMMON structures
@@ -59,8 +59,6 @@ struct registry {
     netdata_mutex_t lock;
 };
 
-extern int regenerate_guid(const char *guid, char *result);
-
 #include "registry_url.h"
 #include "registry_machine.h"
 #include "registry_person.h"
@@ -74,7 +72,7 @@ extern REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine
 extern REGISTRY_MACHINE *registry_request_machine(char *person_guid, char *machine_guid, char *url, char *request_machine, time_t when);
 
 // REGISTRY LOG (in registry_log.c)
-extern void registry_log(const char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name);
+extern void registry_log(char action, REGISTRY_PERSON *p, REGISTRY_MACHINE *m, REGISTRY_URL *u, char *name);
 extern int registry_log_open(void);
 extern void registry_log_close(void);
 extern void registry_log_recreate(void);

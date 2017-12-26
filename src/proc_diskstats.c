@@ -71,7 +71,7 @@ static struct disk {
     struct disk *next;
 } *disk_root = NULL;
 
-#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); st = NULL; } } while(st)
+#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); (st) = NULL; } } while(st)
 
 static char *path_to_get_hw_sector_size = NULL;
 static char *path_to_get_hw_sector_size_partitions = NULL;

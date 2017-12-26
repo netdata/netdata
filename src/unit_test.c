@@ -1086,7 +1086,7 @@ int run_test(struct test *test)
     int errors = 0;
 
     if(st->counter != test->result_entries) {
-        fprintf(stderr, "    %s stored %lu entries, but we were expecting %lu, ### E R R O R ###\n", test->name, st->counter, test->result_entries);
+        fprintf(stderr, "    %s stored %zu entries, but we were expecting %lu, ### E R R O R ###\n", test->name, st->counter, test->result_entries);
         errors++;
     }
 
