@@ -2477,7 +2477,9 @@ var NETDATA = window.NETDATA || {};
             // the forced update_every
             that.force_update_every = NETDATA.dataAttribute(that.element, 'update-every', null);
             if(typeof that.force_update_every !== 'number' || that.force_update_every <= 1) {
-                that.log('ignoring invalid value of property data-update-every');
+                if(that.force_update_every !== null)
+                    that.log('ignoring invalid value of property data-update-every');
+
                 that.force_update_every = null;
             }
             else
