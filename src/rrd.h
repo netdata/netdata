@@ -105,13 +105,13 @@ typedef enum rrddim_flags {
 } RRDDIM_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
-#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & flag)
-#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), flag, __ATOMIC_SEQ_CST)
-#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~flag, __ATOMIC_SEQ_CST)
+#define rrddim_flag_check(rd, flag) (__atomic_load_n(&((rd)->flags), __ATOMIC_SEQ_CST) & (flag))
+#define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_SEQ_CST)
+#define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_SEQ_CST)
 #else
-#define rrddim_flag_check(rd, flag) ((rd)->flags & flag)
-#define rrddim_flag_set(rd, flag)   (rd)->flags |= flag
-#define rrddim_flag_clear(rd, flag) (rd)->flags &= ~flag
+#define rrddim_flag_check(rd, flag) ((rd)->flags & (flag))
+#define rrddim_flag_set(rd, flag)   (rd)->flags |= (flag)
+#define rrddim_flag_clear(rd, flag) (rd)->flags &= ~(flag)
 #endif
 
 
@@ -205,10 +205,10 @@ typedef struct rrddim RRDDIM;
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrddim_foreach_read(rd, st) \
-    for(rd = st->dimensions, rrdset_check_rdlock(st); rd ; rd = rd->next)
+    for((rd) = (st)->dimensions, rrdset_check_rdlock(st); (rd) ; (rd) = (rd)->next)
 
 #define rrddim_foreach_write(rd, st) \
-    for(rd = st->dimensions, rrdset_check_wrlock(st); rd ; rd = rd->next)
+    for((rd) = (st)->dimensions, rrdset_check_wrlock(st); (rd) ; (rd) = (rd)->next)
 
 
 // ----------------------------------------------------------------------------
@@ -237,9 +237,9 @@ typedef enum rrdset_flags {
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~flag, __ATOMIC_SEQ_CST)
 #else
-#define rrdset_flag_check(st, flag) ((st)->flags & flag)
-#define rrdset_flag_set(st, flag)   (st)->flags |= flag
-#define rrdset_flag_clear(st, flag) (st)->flags &= ~flag
+#define rrdset_flag_check(st, flag) ((st)->flags & (flag))
+#define rrdset_flag_set(st, flag)   (st)->flags |= (flag)
+#define rrdset_flag_clear(st, flag) (st)->flags &= ~(flag)
 #endif
 
 struct rrdset {
@@ -360,10 +360,10 @@ typedef struct rrdset RRDSET;
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrdset_foreach_read(st, host) \
-    for(st = host->rrdset_root, rrdhost_check_rdlock(host); st ; st = st->next)
+    for((st) = (host)->rrdset_root, rrdhost_check_rdlock(host); st ; (st) = (st)->next)
 
 #define rrdset_foreach_write(st, host) \
-    for(st = host->rrdset_root, rrdhost_check_wrlock(host); st ; st = st->next)
+    for((st) = (host)->rrdset_root, rrdhost_check_wrlock(host); st ; (st) = (st)->next)
 
 
 // ----------------------------------------------------------------------------
@@ -383,9 +383,9 @@ typedef enum rrdhost_flags {
 #define rrdhost_flag_set(host, flag)   __atomic_or_fetch(&((host)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~flag, __ATOMIC_SEQ_CST)
 #else
-#define rrdhost_flag_check(host, flag) ((host)->flags & flag)
-#define rrdhost_flag_set(host, flag)   (host)->flags |= flag
-#define rrdhost_flag_clear(host, flag) (host)->flags &= ~flag
+#define rrdhost_flag_check(host, flag) ((host)->flags & (flag))
+#define rrdhost_flag_set(host, flag)   (host)->flags |= (flag)
+#define rrdhost_flag_clear(host, flag) (host)->flags &= ~(flag)
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -520,10 +520,10 @@ extern RRDHOST *localhost;
 // these loop macros make sure the linked list is accessed with the right lock
 
 #define rrdhost_foreach_read(var) \
-    for(var = localhost, rrd_check_rdlock(); var ; var = var->next)
+    for((var) = localhost, rrd_check_rdlock(); var ; (var) = (var)->next)
 
 #define rrdhost_foreach_write(var) \
-    for(var = localhost, rrd_check_wrlock(); var ; var = var->next)
+    for((var) = localhost, rrd_check_wrlock(); var ; (var) = (var)->next)
 
 
 // ----------------------------------------------------------------------------

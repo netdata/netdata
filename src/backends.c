@@ -56,6 +56,8 @@ inline calculated_number backend_calculate_value_from_stored_data(
         , time_t *first_timestamp   // the first point of the database used in this response
         , time_t *last_timestamp    // the timestamp that should be reported to backend
 ) {
+    RRDHOST *host = st->rrdhost;
+
     // find the edges of the rrd database for this chart
     time_t first_t = rrdset_first_entry_t(st);
     time_t last_t  = rrdset_last_entry_t(st);
@@ -87,7 +89,7 @@ inline calculated_number backend_calculate_value_from_stored_data(
     if(unlikely(before < first_t || after > last_t)) {
         // the chart has not been updated in the wanted timeframe
         debug(D_BACKEND, "BACKEND: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
-              st->rrdhost->hostname, st->id, rd->id,
+              host->hostname, st->id, rd->id,
               (unsigned long)after, (unsigned long)before,
               (unsigned long)first_t, (unsigned long)last_t
         );
@@ -124,7 +126,7 @@ inline calculated_number backend_calculate_value_from_stored_data(
 
     if(unlikely(!counter)) {
         debug(D_BACKEND, "BACKEND: %s.%s.%s: no values stored in database for range %lu to %lu",
-              st->rrdhost->hostname, st->id, rd->id,
+              host->hostname, st->id, rd->id,
               (unsigned long)after, (unsigned long)before
         );
         return NAN;
@@ -447,6 +449,8 @@ static inline int process_json_response(BUFFER *b) {
 static SIMPLE_PATTERN *charts_pattern = NULL;
 
 inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_BACKEND_IGNORE)))
         return 0;
 
@@ -456,18 +460,18 @@ inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
             rrdset_flag_set(st, RRDSET_FLAG_BACKEND_SEND);
         else {
             rrdset_flag_set(st, RRDSET_FLAG_BACKEND_IGNORE);
-            debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is disabled for backends.", st->id, st->rrdhost->hostname);
+            debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is disabled for backends.", st->id, host->hostname);
             return 0;
         }
     }
 
     if(unlikely(!rrdset_is_available_for_backends(st))) {
-        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, st->rrdhost->hostname);
+        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s', because it is not available for backends.", st->id, host->hostname);
         return 0;
     }
 
     if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE && !((options & BACKEND_SOURCE_BITS) == BACKEND_SOURCE_DATA_AS_COLLECTED))) {
-        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.", st->id, st->rrdhost->hostname, rrd_memory_mode_name(st->rrdhost->rrd_memory_mode));
+        debug(D_BACKEND, "BACKEND: not sending chart '%s' of host '%s' because its memory mode is '%s' and the backend requires database access.", st->id, host->hostname, rrd_memory_mode_name(host->rrd_memory_mode));
         return 0;
     }
 

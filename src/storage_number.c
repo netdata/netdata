@@ -1,9 +1,5 @@
 #include "common.h"
 
-extern char *print_number_lu_r(char *str, unsigned long uvalue);
-extern char *print_number_llu_r(char *str, unsigned long long uvalue);
-extern char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
-
 storage_number pack_storage_number(calculated_number value, uint32_t flags)
 {
     // bit 32 = sign 0:positive, 1:negative

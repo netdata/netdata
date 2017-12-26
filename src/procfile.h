@@ -107,7 +107,7 @@ extern char *procfile_filename(procfile *ff);
 extern int procfile_adaptive_initial_allocation;
 
 // return the number of lines present
-#define procfile_lines(ff) (ff->lines->len)
+#define procfile_lines(ff) ((ff)->lines->len)
 
 // return the number of words of the Nth line
 #define procfile_linewords(ff, line) (((line) < procfile_lines(ff)) ? (ff)->lines->lines[(line)].words : 0)
@@ -119,6 +119,6 @@ extern int procfile_adaptive_initial_allocation;
 #define procfile_line(ff, line) (((line) < procfile_lines(ff)) ? procfile_word((ff), (ff)->lines->lines[(line)].first) : "")
 
 // return the Nth word of the current line
-#define procfile_lineword(ff, line, word) (((line) < procfile_lines(ff) && (word) < procfile_linewords(ff, (line))) ? procfile_word((ff), (ff)->lines->lines[(line)].first + word) : "")
+#define procfile_lineword(ff, line, word) (((line) < procfile_lines(ff) && (word) < procfile_linewords((ff), (line))) ? procfile_word((ff), (ff)->lines->lines[(line)].first + (word)) : "")
 
 #endif /* NETDATA_PROCFILE_H */

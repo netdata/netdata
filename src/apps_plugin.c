@@ -870,8 +870,8 @@ static inline int read_proc_pid_ownership(struct pid_stat *p, void *ptr) {
 
 #define incremental_rate(rate_variable, last_kernel_variable, new_kernel_value, collected_usec, last_collected_usec) { \
         kernel_uint_t _new_tmp = new_kernel_value; \
-        rate_variable = (_new_tmp - last_kernel_variable) * (USEC_PER_SEC * RATES_DETAIL) / (collected_usec - last_collected_usec); \
-        last_kernel_variable = _new_tmp; \
+        (rate_variable) = (_new_tmp - (last_kernel_variable)) * (USEC_PER_SEC * RATES_DETAIL) / ((collected_usec) - (last_collected_usec)); \
+        (last_kernel_variable) = _new_tmp; \
     }
 
 // the same macro for struct pid members
@@ -930,7 +930,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
 #endif
 
-    if(strcmp(p->comm, comm)) {
+    if(strcmp(p->comm, comm) != 0) {
         if(unlikely(debug)) {
             if(p->comm[0])
                 fprintf(stderr, "apps.plugin: \tpid %d (%s) changed name to '%s'\n", p->pid, p->comm, comm);

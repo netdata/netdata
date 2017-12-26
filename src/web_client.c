@@ -344,6 +344,81 @@ gid_t web_files_gid(void) {
     return(owner_gid);
 }
 
+static struct {
+    const char *extension;
+    uint32_t hash;
+    uint8_t contenttype;
+} mime_types[] = {
+        {  "html" , 0    , CT_TEXT_HTML}
+        , {"js"   , 0    , CT_APPLICATION_X_JAVASCRIPT}
+        , {"css"  , 0    , CT_TEXT_CSS}
+        , {"xml"  , 0    , CT_TEXT_XML}
+        , {"xsl"  , 0    , CT_TEXT_XSL}
+        , {"txt"  , 0    , CT_TEXT_PLAIN}
+        , {"svg"  , 0    , CT_IMAGE_SVG_XML}
+        , {"ttf"  , 0    , CT_APPLICATION_X_FONT_TRUETYPE}
+        , {"otf"  , 0    , CT_APPLICATION_X_FONT_OPENTYPE}
+        , {"woff2", 0    , CT_APPLICATION_FONT_WOFF2}
+        , {"woff" , 0    , CT_APPLICATION_FONT_WOFF}
+        , {"eot"  , 0    , CT_APPLICATION_VND_MS_FONTOBJ}
+        , {"png"  , 0    , CT_IMAGE_PNG}
+        , {"jpg"  , 0    , CT_IMAGE_JPG}
+        , {"jpeg" , 0    , CT_IMAGE_JPG}
+        , {"gif"  , 0    , CT_IMAGE_GIF}
+        , {"bmp"  , 0    , CT_IMAGE_BMP}
+        , {"ico"  , 0    , CT_IMAGE_XICON}
+        , {"icns" , 0    , CT_IMAGE_ICNS}
+        , {       NULL, 0, 0}
+};
+
+static inline uint8_t contenttype_for_filename(const char *filename) {
+    // info("checking filename '%s'", filename);
+
+    static int initialized = 0;
+    int i;
+
+    if(unlikely(!initialized)) {
+        for (i = 0; mime_types[i].extension; i++)
+            mime_types[i].hash = simple_hash(mime_types[i].extension);
+
+        initialized = 1;
+    }
+
+    const char *s = filename, *last_dot = NULL;
+
+    // find the last dot
+    while(*s) {
+        if(unlikely(*s == '.')) last_dot = s;
+        s++;
+    }
+
+    if(unlikely(!last_dot || !*last_dot || !last_dot[1])) {
+        // info("no extension for filename '%s'", filename);
+        return CT_APPLICATION_OCTET_STREAM;
+    }
+    last_dot++;
+
+    // info("extension for filename '%s' is '%s'", filename, last_dot);
+
+    uint32_t hash = simple_hash(last_dot);
+    for(i = 0; mime_types[i].extension ; i++) {
+        if(unlikely(hash == mime_types[i].hash && !strcmp(last_dot, mime_types[i].extension))) {
+            // info("matched extension for filename '%s': '%s'", filename, last_dot);
+            return mime_types[i].contenttype;
+        }
+    }
+
+    // info("not matched extension for filename '%s': '%s'", filename, last_dot);
+    return CT_APPLICATION_OCTET_STREAM;
+}
+
+static inline int access_to_file_is_not_permitted(struct web_client *w, const char *filename) {
+    w->response.data->contenttype = CT_TEXT_HTML;
+    buffer_strcat(w->response.data, "Access to file is not permitted: ");
+    buffer_strcat_htmlescape(w->response.data, filename);
+    return 403;
+}
+
 int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
@@ -357,6 +432,7 @@ int mysendfile(struct web_client *w, char *filename) {
     if(strncmp(filename, WEB_PATH_FILE "/", strlen(WEB_PATH_FILE) + 1) == 0)
         filename = &filename[strlen(WEB_PATH_FILE) + 1];
 
+    // if the filename contains "strange" characters, refuse to serve it
     char *s;
     for(s = filename; *s ;s++) {
         if( !isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
@@ -377,49 +453,45 @@ int mysendfile(struct web_client *w, char *filename) {
         return 400;
     }
 
-    // access the file
+    // find the physical file on disk
     char webfilename[FILENAME_MAX + 1];
     snprintfz(webfilename, FILENAME_MAX, "%s/%s", netdata_configured_web_dir, filename);
 
-    // check if the file exists
-    struct stat stat;
-    if(lstat(webfilename, &stat) != 0) {
-        debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
-        w->response.data->contenttype = CT_TEXT_HTML;
-        buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
-        buffer_strcat_htmlescape(w->response.data, webfilename);
-        return 404;
-    }
+    struct stat statbuf;
+    int done = 0;
+    while(!done) {
+        // check if the file exists
+        if (lstat(webfilename, &statbuf) != 0) {
+            debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not found.", w->id, webfilename);
+            w->response.data->contenttype = CT_TEXT_HTML;
+            buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
+            buffer_strcat_htmlescape(w->response.data, webfilename);
+            return 404;
+        }
 
-    // check if the file is owned by expected user
-    if(stat.st_uid != web_files_uid()) {
-        error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, stat.st_uid, web_files_uid());
-        w->response.data->contenttype = CT_TEXT_HTML;
-        buffer_strcat(w->response.data, "Access to file is not permitted: ");
-        buffer_strcat_htmlescape(w->response.data, webfilename);
-        return 403;
-    }
+        if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
+            snprintfz(webfilename, FILENAME_MAX, "%s/%s/index.html", netdata_configured_web_dir, filename);
+            continue;
+        }
 
-    // check if the file is owned by expected group
-    if(stat.st_gid != web_files_gid()) {
-        error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, stat.st_gid, web_files_gid());
-        w->response.data->contenttype = CT_TEXT_HTML;
-        buffer_strcat(w->response.data, "Access to file is not permitted: ");
-        buffer_strcat_htmlescape(w->response.data, webfilename);
-        return 403;
-    }
+        if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
+            error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
+            return access_to_file_is_not_permitted(w, webfilename);
+        }
 
-    if((stat.st_mode & S_IFMT) == S_IFDIR) {
-        snprintfz(webfilename, FILENAME_MAX, "%s/index.html", filename);
-        return mysendfile(w, webfilename);
-    }
+        // check if the file is owned by expected user
+        if (statbuf.st_uid != web_files_uid()) {
+            error("%llu: File '%s' is owned by user %u (expected user %u). Access Denied.", w->id, webfilename, statbuf.st_uid, web_files_uid());
+            return access_to_file_is_not_permitted(w, webfilename);
+        }
 
-    if((stat.st_mode & S_IFMT) != S_IFREG) {
-        error("%llu: File '%s' is not a regular file. Access Denied.", w->id, webfilename);
-        w->response.data->contenttype = CT_TEXT_HTML;
-        buffer_strcat(w->response.data, "Access to file is not permitted: ");
-        buffer_strcat_htmlescape(w->response.data, webfilename);
-        return 403;
+        // check if the file is owned by expected group
+        if (statbuf.st_gid != web_files_gid()) {
+            error("%llu: File '%s' is owned by group %u (expected group %u). Access Denied.", w->id, webfilename, statbuf.st_gid, web_files_gid());
+            return access_to_file_is_not_permitted(w, webfilename);
+        }
+
+        done = 1;
     }
 
     // open the file
@@ -446,39 +518,18 @@ int mysendfile(struct web_client *w, char *filename) {
 
     sock_setnonblock(w->ifd);
 
-    // pick a Content-Type for the file
-         if(strstr(filename, ".html") != NULL)  w->response.data->contenttype = CT_TEXT_HTML;
-    else if(strstr(filename, ".js")   != NULL)  w->response.data->contenttype = CT_APPLICATION_X_JAVASCRIPT;
-    else if(strstr(filename, ".css")  != NULL)  w->response.data->contenttype = CT_TEXT_CSS;
-    else if(strstr(filename, ".xml")  != NULL)  w->response.data->contenttype = CT_TEXT_XML;
-    else if(strstr(filename, ".xsl")  != NULL)  w->response.data->contenttype = CT_TEXT_XSL;
-    else if(strstr(filename, ".txt")  != NULL)  w->response.data->contenttype = CT_TEXT_PLAIN;
-    else if(strstr(filename, ".svg")  != NULL)  w->response.data->contenttype = CT_IMAGE_SVG_XML;
-    else if(strstr(filename, ".ttf")  != NULL)  w->response.data->contenttype = CT_APPLICATION_X_FONT_TRUETYPE;
-    else if(strstr(filename, ".otf")  != NULL)  w->response.data->contenttype = CT_APPLICATION_X_FONT_OPENTYPE;
-    else if(strstr(filename, ".woff2")!= NULL)  w->response.data->contenttype = CT_APPLICATION_FONT_WOFF2;
-    else if(strstr(filename, ".woff") != NULL)  w->response.data->contenttype = CT_APPLICATION_FONT_WOFF;
-    else if(strstr(filename, ".eot")  != NULL)  w->response.data->contenttype = CT_APPLICATION_VND_MS_FONTOBJ;
-    else if(strstr(filename, ".png")  != NULL)  w->response.data->contenttype = CT_IMAGE_PNG;
-    else if(strstr(filename, ".jpg")  != NULL)  w->response.data->contenttype = CT_IMAGE_JPG;
-    else if(strstr(filename, ".jpeg") != NULL)  w->response.data->contenttype = CT_IMAGE_JPG;
-    else if(strstr(filename, ".gif")  != NULL)  w->response.data->contenttype = CT_IMAGE_GIF;
-    else if(strstr(filename, ".bmp")  != NULL)  w->response.data->contenttype = CT_IMAGE_BMP;
-    else if(strstr(filename, ".ico")  != NULL)  w->response.data->contenttype = CT_IMAGE_XICON;
-    else if(strstr(filename, ".icns") != NULL)  w->response.data->contenttype = CT_IMAGE_ICNS;
-    else w->response.data->contenttype = CT_APPLICATION_OCTET_STREAM;
-
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, stat.st_size, w->ifd, w->ofd);
+    w->response.data->contenttype = contenttype_for_filename(webfilename);
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%ld bytes, ifd %d, ofd %d).", w->id, webfilename, statbuf.st_size, w->ifd, w->ofd);
 
     w->mode = WEB_CLIENT_MODE_FILECOPY;
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
     buffer_flush(w->response.data);
-    w->response.rlen = stat.st_size;
+    w->response.rlen = (size_t)statbuf.st_size;
 #ifdef __APPLE__
-    w->response.data->date = stat.st_mtimespec.tv_sec;
+    w->response.data->date = statbuf.st_mtimespec.tv_sec;
 #else
-    w->response.data->date = stat.st_mtim.tv_sec;
+    w->response.data->date = statbuf.st_mtim.tv_sec;
 #endif /* __APPLE__ */
     buffer_cacheable(w->response.data);
 
@@ -848,7 +899,7 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 // > 0 : request is not supported
 // < 0 : request is incomplete - wait for more data
 
-typedef enum http_validation {
+typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
     HTTP_VALIDATION_INCOMPLETE

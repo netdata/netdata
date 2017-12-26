@@ -10,41 +10,42 @@
 static inline void rrddimvar_free_variables(RRDDIMVAR *rs) {
     RRDDIM *rd = rs->rrddim;
     RRDSET *st = rd->rrdset;
+    RRDHOST *host = st->rrdhost;
 
     // CHART VARIABLES FOR THIS DIMENSION
 
-    rrdvar_free(st->rrdhost, &st->rrdvar_root_index, rs->var_local_id);
+    rrdvar_free(host, &st->rrdvar_root_index, rs->var_local_id);
     rs->var_local_id = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdvar_root_index, rs->var_local_name);
+    rrdvar_free(host, &st->rrdvar_root_index, rs->var_local_name);
     rs->var_local_name = NULL;
 
     // FAMILY VARIABLES FOR THIS DIMENSION
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->rrdvar_root_index, rs->var_family_id);
+    rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rs->var_family_id);
     rs->var_family_id = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->rrdvar_root_index, rs->var_family_name);
+    rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rs->var_family_name);
     rs->var_family_name = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->rrdvar_root_index, rs->var_family_contextid);
+    rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rs->var_family_contextid);
     rs->var_family_contextid = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->rrdvar_root_index, rs->var_family_contextname);
+    rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rs->var_family_contextname);
     rs->var_family_contextname = NULL;
 
     // HOST VARIABLES FOR THIS DIMENSION
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rs->var_host_chartidid);
+    rrdvar_free(host, &host->rrdvar_root_index, rs->var_host_chartidid);
     rs->var_host_chartidid = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rs->var_host_chartidname);
+    rrdvar_free(host, &host->rrdvar_root_index, rs->var_host_chartidname);
     rs->var_host_chartidname = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rs->var_host_chartnameid);
+    rrdvar_free(host, &host->rrdvar_root_index, rs->var_host_chartnameid);
     rs->var_host_chartnameid = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rs->var_host_chartnamename);
+    rrdvar_free(host, &host->rrdvar_root_index, rs->var_host_chartnamename);
     rs->var_host_chartnamename = NULL;
 
     // KEYS
@@ -79,6 +80,7 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
 
     RRDDIM *rd = rs->rrddim;
     RRDSET *st = rd->rrdset;
+    RRDHOST *host = st->rrdhost;
 
     char buffer[RRDDIMVAR_ID_MAX + 1];
 
@@ -141,10 +143,10 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $chart-name.id
     // - $chart-name.name
 
-    rs->var_host_chartidid      = rrdvar_create_and_index("host", &st->rrdhost->rrdvar_root_index, rs->key_fullidid, rs->type, rs->value);
-    rs->var_host_chartidname    = rrdvar_create_and_index("host", &st->rrdhost->rrdvar_root_index, rs->key_fullidname, rs->type, rs->value);
-    rs->var_host_chartnameid    = rrdvar_create_and_index("host", &st->rrdhost->rrdvar_root_index, rs->key_fullnameid, rs->type, rs->value);
-    rs->var_host_chartnamename  = rrdvar_create_and_index("host", &st->rrdhost->rrdvar_root_index, rs->key_fullnamename, rs->type, rs->value);
+    rs->var_host_chartidid      = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullidid, rs->type, rs->value);
+    rs->var_host_chartidname    = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullidname, rs->type, rs->value);
+    rs->var_host_chartnameid    = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullnameid, rs->type, rs->value);
+    rs->var_host_chartnamename  = rrdvar_create_and_index("host", &host->rrdvar_root_index, rs->key_fullnamename, rs->type, rs->value);
 }
 
 RRDDIMVAR *rrddimvar_create(RRDDIM *rd, RRDVAR_TYPE type, const char *prefix, const char *suffix, void *value, RRDVAR_OPTIONS options) {

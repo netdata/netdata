@@ -2403,6 +2403,8 @@ var NETDATA = window.NETDATA || {};
         this.running = false;                       // boolean - true when the chart is being refreshed now
         this.enabled = true;                        // boolean - is the chart enabled for refresh?
 
+        this.force_update_every = null;             // number - overwrite the visualization update frequency of the chart
+
         that.tmp = {};
 
         // ============================================================================================================
@@ -2471,6 +2473,17 @@ var NETDATA = window.NETDATA || {};
             // the pixels per point requested by the user
             that.pixels_per_point = NETDATA.dataAttribute(that.element, 'pixels-per-point', 1);
             that.points = NETDATA.dataAttribute(that.element, 'points', null);
+
+            // the forced update_every
+            that.force_update_every = NETDATA.dataAttribute(that.element, 'update-every', null);
+            if(typeof that.force_update_every !== 'number' || that.force_update_every <= 1) {
+                if(that.force_update_every !== null)
+                    that.log('ignoring invalid value of property data-update-every');
+
+                that.force_update_every = null;
+            }
+            else
+                that.force_update_every *= 1000;
 
             // the dimensions requested by the user
             that.dimensions = NETDATA.dataAttribute(that.element, 'dimensions', null);
@@ -4450,7 +4463,7 @@ var NETDATA = window.NETDATA || {};
             if(NETDATA.globalPanAndZoom.isActive())
                 this.tm.last_autorefreshed = 0;
             else {
-                if(NETDATA.options.current.parallel_refresher === true && NETDATA.options.current.concurrent_refreshes === true)
+                if(NETDATA.options.current.parallel_refresher === true && NETDATA.options.current.concurrent_refreshes === true && typeof this.force_update_every !== 'number')
                     this.tm.last_autorefreshed = now - (now % this.data_update_every);
                 else
                     this.tm.last_autorefreshed = now;
@@ -4819,9 +4832,13 @@ var NETDATA = window.NETDATA || {};
                 return false;
             }
 
-            if(now - this.tm.last_autorefreshed >= this.data_update_every) {
+            var data_update_every = this.data_update_every;
+            if(typeof this.force_update_every === 'number')
+                data_update_every = this.force_update_every;
+
+            if(now - this.tm.last_autorefreshed >= data_update_every) {
                 if(this.debug === true)
-                    this.log('canBeAutoRefreshed(): It is time to update me.');
+                    this.log('canBeAutoRefreshed(): It is time to update me. Now: ' + now.toString() + ', last_autorefreshed: ' + this.tm.last_autorefreshed + ', data_update_every: ' + data_update_every + ', delta: ' + (now - this.tm.last_autorefreshed).toString());
 
                 return true;
             }

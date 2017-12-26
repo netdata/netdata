@@ -6,7 +6,7 @@
 #define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 // type of JSON generations
-#define DATASOURCE_INVALID -1
+#define DATASOURCE_INVALID (-1)
 #define DATASOURCE_JSON 0
 #define DATASOURCE_DATATABLE_JSON 1
 #define DATASOURCE_DATATABLE_JSONP 2
@@ -77,6 +77,6 @@ extern int rrdset2anything_api_v1(RRDSET *st, BUFFER *out, BUFFER *dimensions, u
 
 extern int rrdset2value_api_v1(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensions, long points
                             , long long after, long long before, int group_method, uint32_t options
-                            , time_t *db_before, time_t *db_after, int *value_is_null);
+                            , time_t *db_after, time_t *db_before, int *value_is_null);
 
 #endif /* NETDATA_RRD2JSON_H */
