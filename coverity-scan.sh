@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#!/usr/bin/env bash
 
 cpus=$(grep ^processor </proc/cpuinfo| wc -l)
 [ -z "${cpus}" ] && cpus=1
