@@ -5,14 +5,15 @@
 // RRDCALCTEMPLATE management
 
 void rrdcalctemplate_link_matching(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
     RRDCALCTEMPLATE *rt;
 
-    for(rt = st->rrdhost->templates; rt ; rt = rt->next) {
+    for(rt = host->templates; rt ; rt = rt->next) {
         if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
            && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
-            RRDCALC *rc = rrdcalc_create(st->rrdhost, rt, st->id);
+            RRDCALC *rc = rrdcalc_create(host, rt, st->id);
             if(unlikely(!rc))
-                info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, st->id, st->rrdhost->hostname);
+                info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, st->id, host->hostname);
 
 #ifdef NETDATA_INTERNAL_CHECKS
             else if(rc->rrdset != st)

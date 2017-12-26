@@ -32,4 +32,5 @@ shift
 	--library=posix \
 	--suppress="unusedFunction:*" \
 	--suppress="nullPointerRedundantCheck:*" \
+	--suppress="readdirCalled:*" \
 	"${file}" "${@}"

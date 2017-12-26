@@ -342,7 +342,7 @@ RRDHOST *rrdhost_find_or_create(
     else {
         host->health_enabled = health_enabled;
 
-        if(strcmp(host->hostname, hostname)) {
+        if(strcmp(host->hostname, hostname) != 0) {
             char *t = host->hostname;
             host->hostname = strdupz(hostname);
             host->hash_hostname = simple_hash(host->hostname);

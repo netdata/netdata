@@ -2,7 +2,7 @@
 
 // --------------------------------------------------------------------------------------------------------------------
 
-inline long double sum_and_count(long double *series, size_t entries, size_t *count) {
+inline long double sum_and_count(const long double *series, size_t entries, size_t *count) {
     if(unlikely(entries == 0)) {
         if(likely(count))
             *count = 0;
@@ -36,11 +36,11 @@ inline long double sum_and_count(long double *series, size_t entries, size_t *co
     return sum;
 }
 
-inline long double sum(long double *series, size_t entries) {
+inline long double sum(const long double *series, size_t entries) {
     return sum_and_count(series, entries, NULL);
 }
 
-inline long double average(long double *series, size_t entries) {
+inline long double average(const long double *series, size_t entries) {
     size_t count = 0;
     long double sum = sum_and_count(series, entries, &count);
 
@@ -52,7 +52,7 @@ inline long double average(long double *series, size_t entries) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-long double moving_average(long double *series, size_t entries, size_t period) {
+long double moving_average(const long double *series, size_t entries, size_t period) {
     if(unlikely(period <= 0))
         return 0.0;
 
@@ -109,13 +109,13 @@ inline void sort_series(long double *series, size_t entries) {
     qsort(series, entries, sizeof(long double), qsort_compare);
 }
 
-inline long double *copy_series(long double *series, size_t entries) {
+inline long double *copy_series(const long double *series, size_t entries) {
     long double *copy = mallocz(sizeof(long double) * entries);
     memcpy(copy, series, sizeof(long double) * entries);
     return copy;
 }
 
-long double median_on_sorted_series(long double *series, size_t entries) {
+long double median_on_sorted_series(const long double *series, size_t entries) {
     if(unlikely(entries == 0))
         return NAN;
 
@@ -137,7 +137,7 @@ long double median_on_sorted_series(long double *series, size_t entries) {
     return avg;
 }
 
-long double median(long double *series, size_t entries) {
+long double median(const long double *series, size_t entries) {
     if(unlikely(entries == 0))
         return NAN;
 
@@ -158,7 +158,7 @@ long double median(long double *series, size_t entries) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-long double moving_median(long double *series, size_t entries, size_t period) {
+long double moving_median(const long double *series, size_t entries, size_t period) {
     if(entries <= period)
         return median(series, entries);
 
@@ -177,7 +177,7 @@ long double moving_median(long double *series, size_t entries, size_t period) {
 // --------------------------------------------------------------------------------------------------------------------
 
 // http://stackoverflow.com/a/15150143/4525767
-long double running_median_estimate(long double *series, size_t entries) {
+long double running_median_estimate(const long double *series, size_t entries) {
     long double median = 0.0f;
     long double average = 0.0f;
     size_t i;
@@ -195,7 +195,7 @@ long double running_median_estimate(long double *series, size_t entries) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-long double standard_deviation(long double *series, size_t entries) {
+long double standard_deviation(const long double *series, size_t entries) {
     if(unlikely(entries < 1))
         return NAN;
 
@@ -243,7 +243,7 @@ long double standard_deviation(long double *series, size_t entries) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-long double single_exponential_smoothing(long double *series, size_t entries, long double alpha) {
+long double single_exponential_smoothing(const long double *series, size_t entries, long double alpha) {
     size_t i, count = 0;
     long double level = 0, sum = 0;
 
@@ -267,7 +267,7 @@ long double single_exponential_smoothing(long double *series, size_t entries, lo
 // --------------------------------------------------------------------------------------------------------------------
 
 // http://grisha.org/blog/2016/02/16/triple-exponential-smoothing-forecasting-part-ii/
-long double double_exponential_smoothing(long double *series, size_t entries, long double alpha, long double beta, long double *forecast) {
+long double double_exponential_smoothing(const long double *series, size_t entries, long double alpha, long double beta, long double *forecast) {
     size_t i, count = 0;
     long double level = series[0], trend, sum;
 
@@ -327,17 +327,17 @@ long double double_exponential_smoothing(long double *series, size_t entries, lo
  *   s[t] = γ (Y[t] / a[t]) + (1-γ) s[t-p]
  */
 static int __HoltWinters(
-        long double *series,
+        const long double *series,
         int          entries,      // start_time + h
 
         long double alpha,        // alpha parameter of Holt-Winters Filter.
         long double beta,         // beta  parameter of Holt-Winters Filter. If set to 0, the function will do exponential smoothing.
         long double gamma,        // gamma parameter used for the seasonal component. If set to 0, an non-seasonal model is fitted.
 
-        int *seasonal,
-        int *period,
-        long double *a,            // Start value for level (a[0]).
-        long double *b,            // Start value for trend (b[0]).
+        const int *seasonal,
+        const int *period,
+        const long double *a,      // Start value for level (a[0]).
+        const long double *b,      // Start value for trend (b[0]).
         long double *s,            // Vector of start values for the seasonal component (s_1[0] ... s_p[0])
 
         /* return values */
@@ -404,7 +404,7 @@ static int __HoltWinters(
     return 1;
 }
 
-long double holtwinters(long double *series, size_t entries, long double alpha, long double beta, long double gamma, long double *forecast) {
+long double holtwinters(const long double *series, size_t entries, long double alpha, long double beta, long double gamma, long double *forecast) {
     if(unlikely(isnan(alpha)))
         alpha = 0.3;
 

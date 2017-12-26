@@ -121,10 +121,10 @@ int become_user(const char *username, int pid_fd) {
 }
 
 #ifndef OOM_SCORE_ADJ_MAX
-#define OOM_SCORE_ADJ_MAX 1000
+#define OOM_SCORE_ADJ_MAX (1000)
 #endif
 #ifndef OOM_SCORE_ADJ_MIN
-#define OOM_SCORE_ADJ_MIN -1000
+#define OOM_SCORE_ADJ_MIN (-1000)
 #endif
 
 static void oom_score_adj(void) {

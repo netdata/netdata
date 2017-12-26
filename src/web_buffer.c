@@ -21,7 +21,7 @@ static inline void _buffer_overflow_check(BUFFER *b, const char *file, const cha
         b->len = b->size;
     }
 
-    if(b->buffer[b->size] != '\0' || strcmp(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF)) {
+    if(b->buffer[b->size] != '\0' || strcmp(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF) != 0) {
         error("BUFFER: detected overflow at line %lu, at function %s() of file '%s'.", line, function, file);
         buffer_overflow_init(b);
     }
