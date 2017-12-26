@@ -344,7 +344,7 @@ gid_t web_files_gid(void) {
     return(owner_gid);
 }
 
-static struct mime_type {
+static struct {
     const char *extension;
     uint32_t hash;
     uint8_t contenttype;
@@ -899,7 +899,7 @@ static inline char *http_header_parse(struct web_client *w, char *s) {
 // > 0 : request is not supported
 // < 0 : request is incomplete - wait for more data
 
-typedef enum http_validation {
+typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
     HTTP_VALIDATION_INCOMPLETE
