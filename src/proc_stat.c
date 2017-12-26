@@ -54,7 +54,7 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
         }
 
         ssize_t ret = read(f->fd, buf, 50);
-        if(unlikely(ret == -1)) {
+        if(unlikely(ret < 0)) {
             // cannot read that file
 
             error("Cannot read file '%s'", f->filename);
