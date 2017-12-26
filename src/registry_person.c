@@ -242,7 +242,7 @@ REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MA
             pu->machine = m;
         }
 
-        if(strcmp(pu->machine_name, name)) {
+        if(strcmp(pu->machine_name, name) != 0) {
             // the name of the PERSON_URL has changed !
             pu = registry_person_url_reallocate(p, m, u, name, namelen, when, pu);
         }

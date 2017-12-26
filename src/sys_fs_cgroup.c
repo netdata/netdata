@@ -1387,7 +1387,6 @@ static inline void find_all_cgroups() {
     }
 
     debug(D_CGROUP, "done searching for cgroups");
-    return;
 }
 
 // ----------------------------------------------------------------------------

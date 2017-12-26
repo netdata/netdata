@@ -34,7 +34,9 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
 }
 
 static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
-    debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, st->rrdhost->hostname);
+    RRDHOST *host = st->rrdhost;
+
+    debug(D_HEALTH, "Health linking alarm '%s.%s' to chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, host->hostname);
 
     rc->last_status_change = now_realtime_sec();
     rc->rrdset = st;
@@ -67,17 +69,17 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rc->name);
-    rc->hostid   = rrdvar_create_and_index("host", &st->rrdhost->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, &rc->value);
+    rc->hostid   = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, &rc->value);
 
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rc->name);
-    rc->hostname = rrdvar_create_and_index("host", &st->rrdhost->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, &rc->value);
+    rc->hostname = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, &rc->value);
 
     if(!rc->units) rc->units = strdupz(st->units);
 
     {
         time_t now = now_realtime_sec();
         health_alarm_log(
-                st->rrdhost,
+                host,
                 rc->id,
                 rc->next_event_id++,
                 now,
@@ -110,10 +112,11 @@ static inline int rrdcalc_is_matching_this_rrdset(RRDCALC *rc, RRDSET *st) {
 
 // this has to be called while the RRDHOST is locked
 inline void rrdsetcalc_link_matching(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
     // debug(D_HEALTH, "find matching alarms for chart '%s'", st->id);
 
     RRDCALC *rc;
-    for(rc = st->rrdhost->alarms; rc ; rc = rc->next) {
+    for(rc = host->alarms; rc ; rc = rc->next) {
         if(unlikely(rc->rrdset))
             continue;
 
@@ -132,10 +135,12 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
         return;
     }
 
+    RRDHOST *host = st->rrdhost;
+
     {
         time_t now = now_realtime_sec();
         health_alarm_log(
-                st->rrdhost,
+                host,
                 rc->id,
                 rc->next_event_id++,
                 now,
@@ -157,8 +162,6 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
         );
     }
 
-    RRDHOST *host = st->rrdhost;
-
     debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, host->hostname);
 
     // unlink it
@@ -173,16 +176,16 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
 
     rc->rrdset_prev = rc->rrdset_next = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdvar_root_index, rc->local);
+    rrdvar_free(host, &st->rrdvar_root_index, rc->local);
     rc->local = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdfamily->rrdvar_root_index, rc->family);
+    rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rc->family);
     rc->family = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rc->hostid);
+    rrdvar_free(host, &host->rrdvar_root_index, rc->hostid);
     rc->hostid = NULL;
 
-    rrdvar_free(st->rrdhost, &st->rrdhost->rrdvar_root_index, rc->hostname);
+    rrdvar_free(host, &host->rrdvar_root_index, rc->hostname);
     rc->hostname = NULL;
 
     rc->rrdset = NULL;

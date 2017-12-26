@@ -373,7 +373,7 @@ static inline int health_parse_db_lookup(
             *options |= RRDR_OPTION_NOT_ALIGNED;
         }
         else if(!strcasecmp(key, "of")) {
-            if(*s && strcasecmp(s, "all"))
+            if(*s && strcasecmp(s, "all") != 0)
                 *dimensions = strdupz(s);
             break;
         }
@@ -589,7 +589,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         else if(rc) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 if(rc->chart) {
-                    if(strcmp(rc->chart, value))
+                    if(strcmp(rc->chart, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rc->name, key, rc->chart, value, value);
 
@@ -653,7 +653,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rc->exec) {
-                    if(strcmp(rc->exec, value))
+                    if(strcmp(rc->exec, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rc->name, key, rc->exec, value, value);
 
@@ -663,7 +663,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rc->recipient) {
-                    if(strcmp(rc->recipient, value))
+                    if(strcmp(rc->recipient, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rc->name, key, rc->recipient, value, value);
 
@@ -673,7 +673,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rc->units) {
-                    if(strcmp(rc->units, value))
+                    if(strcmp(rc->units, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rc->name, key, rc->units, value, value);
 
@@ -684,7 +684,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 if(rc->info) {
-                    if(strcmp(rc->info, value))
+                    if(strcmp(rc->info, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rc->name, key, rc->info, value, value);
 
@@ -707,7 +707,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
         else if(rt) {
             if(hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
                 if(rt->context) {
-                    if(strcmp(rt->context, value))
+                    if(strcmp(rt->context, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rt->name, key, rt->context, value, value);
 
@@ -777,7 +777,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 if(rt->exec) {
-                    if(strcmp(rt->exec, value))
+                    if(strcmp(rt->exec, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rt->name, key, rt->exec, value, value);
 
@@ -787,7 +787,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
                 if(rt->recipient) {
-                    if(strcmp(rt->recipient, value))
+                    if(strcmp(rt->recipient, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rt->name, key, rt->recipient, value, value);
 
@@ -797,7 +797,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {
                 if(rt->units) {
-                    if(strcmp(rt->units, value))
+                    if(strcmp(rt->units, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rt->name, key, rt->units, value, value);
 
@@ -808,7 +808,7 @@ int health_readfile(RRDHOST *host, const char *path, const char *filename) {
             }
             else if(hash == hash_info && !strcasecmp(key, HEALTH_INFO_KEY)) {
                 if(rt->info) {
-                    if(strcmp(rt->info, value))
+                    if(strcmp(rt->info, value) != 0)
                         error("Health configuration at line %zu of file '%s/%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
                                 line, path, filename, rt->name, key, rt->info, value, value);
 

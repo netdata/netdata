@@ -110,8 +110,8 @@ static int appconfig_section_compare(void *a, void *b) {
     else return strcmp(((struct section *)a)->name, ((struct section *)b)->name);
 }
 
-#define appconfig_index_add(root, cfg) (struct section *)avl_insert_lock(&root->index, (avl *)(cfg))
-#define appconfig_index_del(root, cfg) (struct section *)avl_remove_lock(&root->index, (avl *)(cfg))
+#define appconfig_index_add(root, cfg) (struct section *)avl_insert_lock(&(root)->index, (avl *)(cfg))
+#define appconfig_index_del(root, cfg) (struct section *)avl_remove_lock(&(root)->index, (avl *)(cfg))
 
 static struct section *appconfig_index_find(struct config *root, const char *name, uint32_t hash) {
     struct section tmp;

@@ -13,5 +13,6 @@
     <suppressions>
         <suppression>nullPointerRedundantCheck</suppression>
         <suppression>unusedFunction</suppression>
+        <suppression>readdirCalled</suppression>
     </suppressions>
 </project>

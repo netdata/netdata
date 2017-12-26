@@ -17,7 +17,7 @@ int regenerate_guid(const char *guid, char *result) {
         uuid_unparse_lower(uuid, result);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        if(strcmp(guid, result))
+        if(strcmp(guid, result) != 0)
             info("GUID '%s' and re-generated GUID '%s' differ!", guid, result);
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
@@ -71,13 +71,6 @@ static inline char *registry_fix_url(char *url, size_t *len) {
     if(len) *len = l;
     return s;
 }
-
-
-// ----------------------------------------------------------------------------
-// forward definition of functions
-
-extern REGISTRY_PERSON *registry_request_access(char *person_guid, char *machine_guid, char *url, char *name, time_t when);
-extern REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);
 
 
 // ----------------------------------------------------------------------------
