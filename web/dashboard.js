@@ -4836,7 +4836,7 @@ var NETDATA = window.NETDATA || {};
 
             if(now - this.tm.last_autorefreshed >= data_update_every) {
                 if(this.debug === true)
-                    this.log('canBeAutoRefreshed(): It is time to update me.');
+                    this.log('canBeAutoRefreshed(): It is time to update me. Now: ' + now.toString() + ', last_autorefreshed: ' + this.tm.last_autorefreshed + ', data_update_every: ' + data_update_every + ', delta: ' + (now - this.tm.last_autorefreshed).toString());
 
                 return true;
             }
