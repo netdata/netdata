@@ -20,7 +20,6 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 priority = 60000
 retries = 60
-update_every = 5
 
 ORDER = ['pools_utilization', 'pools_active_leases', 'leases_total']
 
@@ -95,7 +94,7 @@ class Pool:
 
 class Lease:
     def __init__(self, address, ends, state):
-        self.address = ipaddress.ip_address(address=address)
+        self.address = ipaddress.ip_address(address=u'%s' % address)
         self.ends = ends
         self.state = state
 
@@ -170,7 +169,7 @@ class Service(SimpleService):
 
         for address in raw_leases:
             try:
-                new_lease = Lease(address=u'%s' % address, **raw_leases[address])
+                new_lease = Lease(address, **raw_leases[address])
             except ValueError:
                 continue
             else:
