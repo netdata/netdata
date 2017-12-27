@@ -126,6 +126,8 @@ int mypclose(FILE *fp, pid_t pid) {
     // close the pipe file pointer
     fclose(fp);
 
+    errno = 0;
+
     siginfo_t info;
     if(waitid(P_PID, (id_t) pid, &info, WEXITED) != -1) {
         switch(info.si_code) {
