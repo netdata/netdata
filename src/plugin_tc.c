@@ -829,9 +829,30 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
 }
 
 volatile pid_t tc_child_pid = 0;
-void *tc_main(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
+static void tc_main_cleanup(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
+
+        info("TC: cleaning up...");
+
+        if(tc_child_pid) {
+            info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
+            if(killpid(tc_child_pid, SIGTERM) != -1) {
+                siginfo_t info;
+
+                info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
+                waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
+                // info("TC: finished tc plugin child process pid %d.", tc_child_pid);
+            }
+
+            tc_child_pid = 0;
+        }
+    }
+}
+
+void *tc_main(void *ptr) {
     info("TC thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
@@ -863,10 +884,10 @@ void *tc_main(void *ptr) {
 
     snprintfz(buffer, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_plugins_dir);
     char *tc_script = config_get("plugin:tc", "script to run to get tc values", buffer);
-    
-    for(;1;) {
-        if(unlikely(netdata_exit)) break;
 
+    pthread_cleanup_push(tc_main_cleanup, ptr);
+
+    while(!netdata_exit) {
         FILE *fp;
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
@@ -1151,8 +1172,8 @@ void *tc_main(void *ptr) {
 
 cleanup:
     info("TC thread exiting");
+    pthread_cleanup_pop(1);
 
-    static_thread->enabled = 0;
     pthread_exit(NULL);
     return NULL;
 }

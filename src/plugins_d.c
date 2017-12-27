@@ -476,15 +476,36 @@ cleanup:
     return count;
 }
 
+static void pluginsd_worker_thread_cleanup(void *arg) {
+    struct plugind *cd = (struct plugind *)arg;
+
+    info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
+
+    if(cd->enabled && !cd->obsolete) {
+        cd->obsolete = 1;
+
+        if (cd->pid) {
+            siginfo_t info;
+            info("PLUGINSD: killing %s plugin child process pid %d", cd->id, cd->pid);
+            if (killpid(cd->pid, SIGTERM) != -1) {
+                info("PLUGINSD: waiting for %s plugin child process pid %d to exit...", cd->id, cd->pid);
+                waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
+                info("PLUGINSD: finished %s plugin child process pid %d.", cd->id, cd->pid);
+            }
+            cd->pid = 0;
+        }
+    }
+}
+
 void *pluginsd_worker_thread(void *arg) {
     struct plugind *cd = (struct plugind *)arg;
     cd->obsolete = 0;
 
     size_t count = 0;
 
-    for(;;) {
-        if(unlikely(netdata_exit)) break;
+    pthread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
 
+    while(!netdata_exit) {
         FILE *fp = mypopen(cd->cmd, &cd->pid);
         if(unlikely(!fp)) {
             error("Cannot popen(\"%s\", \"r\").", cd->cmd);
@@ -503,8 +524,7 @@ void *pluginsd_worker_thread(void *arg) {
         // get the return code
         int code = mypclose(fp, cd->pid);
 
-        if(unlikely(netdata_exit)) break;
-        else if(code != 0) {
+        if(code != 0) {
             // the plugin reports failure
 
             if(likely(!cd->successful_collections)) {
@@ -548,16 +568,33 @@ void *pluginsd_worker_thread(void *arg) {
         if(unlikely(!cd->enabled)) break;
     }
 
-    info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
-
-    cd->obsolete = 1;
+    pthread_cleanup_pop(1);
     pthread_exit(NULL);
     return NULL;
 }
 
-void *pluginsd_main(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+static void pluginsd_main_cleanup(void *data) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
 
+        info("PLUGINSD: cleaning up plugin threads...");
+        struct plugind *cd;
+
+        for (cd = pluginsd_root; cd; cd = cd->next) {
+            if (cd->enabled && !cd->obsolete) {
+                info("PLUGINSD: Calling pthread_cancel() on %s plugin thread", cd->id);
+                int ret;
+                if ((ret = pthread_cancel(cd->thread)) != 0)
+                    error("PLUGINSD: pthread_cancel() failed with code %d.", ret);
+            }
+        }
+
+        info("PLUGINSD: cleanup completed.");
+    }
+}
+
+void *pluginsd_main(void *ptr) {
     info("PLUGINS.D thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
@@ -574,9 +611,9 @@ void *pluginsd_main(void *ptr) {
     // so that we don't log broken directories on each loop
     int directory_errors[PLUGINSD_MAX_DIRECTORIES] =  { 0 };
 
-    for(;;) {
-        if(unlikely(netdata_exit)) break;
+    pthread_cleanup_push(pluginsd_main_cleanup, ptr);
 
+    while(!netdata_exit) {
         int idx;
         const char *directory_name;
 
@@ -668,31 +705,7 @@ void *pluginsd_main(void *ptr) {
         sleep((unsigned int) scan_frequency);
     }
 
-    info("PLUGINS.D thread exiting");
-
-    static_thread->enabled = 0;
+    pthread_cleanup_pop(1);
     pthread_exit(NULL);
     return NULL;
-}
-
-
-void pluginsd_stop_all_external_plugins() {
-    siginfo_t info;
-    struct plugind *cd;
-    for(cd = pluginsd_root ; cd ; cd = cd->next) {
-        if(cd->enabled && !cd->obsolete) {
-            info("Stopping %s plugin thread", cd->id);
-            pthread_cancel(cd->thread);
-
-            if(cd->pid) {
-                info("killing %s plugin child process pid %d", cd->id, cd->pid);
-                if(killpid(cd->pid, SIGTERM) != -1)
-                    waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
-
-                cd->pid = 0;
-            }
-
-            cd->obsolete = 1;
-        }
-    }
 }

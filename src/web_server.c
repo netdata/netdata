@@ -109,9 +109,40 @@ static inline void cleanup_web_clients(void) {
 
 #define CLEANUP_EVERY_EVENTS 100
 
-void *socket_listen_main_multi_threaded(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+static struct pollfd *socket_listen_main_multi_threaded_fds = NULL;
 
+static void socket_listen_main_multi_threaded_cleanup(void *data) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
+
+        info("LISTENER: multi-threaded web server cleaning up...");
+
+        info("LISTENER: releasing allocated memory...");
+        freez(socket_listen_main_multi_threaded_fds);
+
+        info("LISTENER: closing all sockets...");
+        listen_sockets_close(&api_sockets);
+
+        info("LISTENER: cleanup completed.");
+    }
+
+    struct web_client *w;
+    for(w = web_clients; w ; w = w->next) {
+        if(!web_client_check_obsolete(w)) {
+            WEB_CLIENT_IS_OBSOLETE(w);
+
+            info("LISTENER: Calling pthread_cancel() on web client %s, id %llu", w->client_ip, w->id);
+            int ret;
+            if ((ret = pthread_cancel(w->thread)) != 0)
+                error("LISTENER: pthread_cancel() failed with code %d, id %llu.", ret, w->id);
+            //else
+            //    info("LISTENER: web client thread %s cancelled, id %llu", w->client_ip, w->id);
+        }
+    }
+}
+
+void *socket_listen_main_multi_threaded(void *ptr) {
     web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
     info("Multi-threaded WEB SERVER thread created with task id %d", gettid());
 
@@ -127,22 +158,25 @@ void *socket_listen_main_multi_threaded(void *ptr) {
     if(!api_sockets.opened)
         fatal("LISTENER: No sockets to listen to.");
 
-    struct pollfd *fds = callocz(sizeof(struct pollfd), api_sockets.opened);
+    pthread_cleanup_push(socket_listen_main_multi_threaded_cleanup, ptr);
+
+    socket_listen_main_multi_threaded_fds = callocz(sizeof(struct pollfd), api_sockets.opened);
 
     size_t i;
     for(i = 0; i < api_sockets.opened ;i++) {
-        fds[i].fd = api_sockets.fds[i];
-        fds[i].events = POLLIN;
-        fds[i].revents = 0;
+        socket_listen_main_multi_threaded_fds[i].fd = api_sockets.fds[i];
+        socket_listen_main_multi_threaded_fds[i].events = POLLIN;
+        socket_listen_main_multi_threaded_fds[i].revents = 0;
 
         info("Listening on '%s'", (api_sockets.fds_names[i])?api_sockets.fds_names[i]:"UNKNOWN");
     }
 
     int timeout = 10 * 1000;
 
-    for(;;) {
+    while(!netdata_exit) {
+
         // debug(D_WEB_CLIENT, "LISTENER: Waiting...");
-        retval = poll(fds, api_sockets.opened, timeout);
+        retval = poll(socket_listen_main_multi_threaded_fds, api_sockets.opened, timeout);
 
         if(unlikely(retval == -1)) {
             error("LISTENER: poll() failed.");
@@ -156,13 +190,13 @@ void *socket_listen_main_multi_threaded(void *ptr) {
         }
 
         for(i = 0 ; i < api_sockets.opened ; i++) {
-            short int revents = fds[i].revents;
+            short int revents = socket_listen_main_multi_threaded_fds[i].revents;
 
             // check for new incoming connections
             if(revents & POLLIN || revents & POLLPRI) {
-                fds[i].revents = 0;
+                socket_listen_main_multi_threaded_fds[i].revents = 0;
 
-                w = web_client_create(fds[i].fd);
+                w = web_client_create(socket_listen_main_multi_threaded_fds[i].fd);
                 if(unlikely(!w)) {
                     // no need for error log - web_client_create already logged the error
                     continue;
@@ -192,12 +226,8 @@ void *socket_listen_main_multi_threaded(void *ptr) {
         }
     }
 
-    debug(D_WEB_CLIENT, "LISTENER: exit!");
-    listen_sockets_close(&api_sockets);
+    pthread_cleanup_pop(1);
 
-    freez(fds);
-
-    static_thread->enabled = 0;
     pthread_exit(NULL);
     return NULL;
 }
@@ -246,9 +276,22 @@ static inline int single_threaded_unlink_client(struct web_client *w, fd_set *if
     return 0;
 }
 
-void *socket_listen_main_single_threaded(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+static void socket_listen_main_single_threaded_cleanup(void *data) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
 
+        info("LISTENER: single-threaded web server cleaning up...");
+
+        info("LISTENER: closing all sockets...");
+        listen_sockets_close(&api_sockets);
+
+        info("LISTENER: cleanup completed.");
+        debug(D_WEB_CLIENT, "LISTENER: exit!");
+    }
+}
+
+void *socket_listen_main_single_threaded(void *ptr) {
     web_server_mode = WEB_SERVER_MODE_SINGLE_THREADED;
 
     info("Single-threaded WEB SERVER thread created with task id %d", gettid());
@@ -275,6 +318,8 @@ void *socket_listen_main_single_threaded(void *ptr) {
     FD_ZERO (&efds);
     int fdmax = 0;
 
+    pthread_cleanup_push(socket_listen_main_single_threaded_cleanup, ptr);
+
     for(i = 0; i < api_sockets.opened ; i++) {
         if (api_sockets.fds[i] < 0 || api_sockets.fds[i] >= (int)FD_SETSIZE)
             fatal("LISTENER: Listen socket %d is not ready, or invalid.", api_sockets.fds[i]);
@@ -287,7 +332,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
             fdmax = api_sockets.fds[i];
     }
 
-    for(;;) {
+    while(!netdata_exit) {
         debug(D_WEB_CLIENT_ACCESS, "LISTENER: single threaded web server waiting (fdmax = %d)...", fdmax);
 
         struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
@@ -370,10 +415,8 @@ void *socket_listen_main_single_threaded(void *ptr) {
         }
     }
 
-    debug(D_WEB_CLIENT, "LISTENER: exit!");
-    listen_sockets_close(&api_sockets);
+    pthread_cleanup_pop(1);
 
-    static_thread->enabled = 0;
     pthread_exit(NULL);
     return NULL;
 }

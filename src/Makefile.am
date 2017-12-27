@@ -70,6 +70,7 @@ netdata_SOURCES = \
 	health_json.c \
 	health_log.c \
 	inlined.h \
+	locks.c \
 	locks.h \
 	log.c \
 	log.h \
@@ -227,6 +228,7 @@ apps_plugin_SOURCES = \
 	clocks.c clocks.h \
 	common.c common.h \
 	inlined.h \
+	locks.c locks.h \
 	log.c log.h \
 	procfile.c procfile.h \
 	web_buffer.c web_buffer.h \
@@ -248,6 +250,7 @@ freeipmi_plugin_SOURCES = \
 	clocks.c clocks.h \
 	common.c common.h \
 	inlined.h \
+	locks.c locks.h \
 	log.c log.h \
 	procfile.c procfile.h \
 	$(NULL)
@@ -261,6 +264,7 @@ cgroup_network_SOURCES = \
 	clocks.c clocks.h \
     common.c common.h \
     inlined.h \
+	locks.c locks.h \
     log.c log.h \
 	procfile.c procfile.h \
 	popen.c popen.h \

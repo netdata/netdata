@@ -26,7 +26,7 @@ struct plugind {
     char fullfilename[FILENAME_MAX+1];  // with path
     char cmd[PLUGINSD_CMD_MAX+1];       // the command that it executes
 
-    pid_t pid;
+    volatile pid_t pid;
     pthread_t thread;
 
     size_t successful_collections;      // the number of times we have seen
@@ -36,8 +36,8 @@ struct plugind {
                                         // without collecting values
 
     int update_every;                   // the plugin default data collection frequency
-    volatile int obsolete;              // do not touch this structure after setting this to 1
-    volatile int enabled;               // if this is enabled or not
+    volatile sig_atomic_t obsolete;     // do not touch this structure after setting this to 1
+    volatile sig_atomic_t enabled;      // if this is enabled or not
 
     time_t started_t;
 
@@ -47,7 +47,6 @@ struct plugind {
 extern struct plugind *pluginsd_root;
 
 extern void *pluginsd_main(void *ptr);
-extern void pluginsd_stop_all_external_plugins(void);
 
 extern size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations);
 extern int pluginsd_split_words(char *str, char **words, int max_words);

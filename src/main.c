@@ -6,33 +6,28 @@ void netdata_cleanup_and_exit(int ret) {
     netdata_exit = 1;
 
     error_log_limit_unlimited();
-    info("netdata is preparing to exit...");
+    info("MAIN: netdata prepares to exit...");
 
-    // allow all the threads to cleanup by themselves
-    unsigned int w = (unsigned int)default_rrd_update_every + 2;
-    info("Giving %u secs to background threads to cleanup...", w);
-    sleep(w);
-
-    // kill all threads and childs
-    //info("Stopping all threads and child processes...");
-    //kill_childs();
+    // stop everything
+    info("MAIN: stopping all threads and child processes...");
+    cancel_main_threads();
 
     // cleanup the database (delete files not needed)
-    info("Cleaning up the database...");
+    info("MAIN: cleaning up the database...");
     rrdhost_cleanup_all();
 
     // free the database
-    //info("Freeing database memory...");
-    //rrdhost_free_all();
+    info("MAIN: freeing database memory...");
+    rrdhost_free_all();
 
     // unlink the pid
     if(pidfile[0]) {
-        info("Removing netdata PID file '%s'...", pidfile);
+        info("MAIN: removing netdata PID file '%s'...", pidfile);
         if(unlink(pidfile) != 0)
-            error("Cannot unlink pidfile '%s'.", pidfile);
+            error("MAIN: cannot unlink pidfile '%s'.", pidfile);
     }
 
-    info("All done - netdata is now exiting - bye bye...");
+    info("MAIN: all done - netdata is now exiting - bye bye...");
     exit(ret);
 }
 
@@ -182,50 +177,29 @@ int killpid(pid_t pid, int sig)
     return ret;
 }
 
-void kill_childs() {
+void cancel_main_threads() {
     error_log_limit_unlimited();
-
-    siginfo_t info;
-
-    struct web_client *w;
-    for(w = web_clients; w ; w = w->next) {
-        info("Stopping web client %s", w->client_ip);
-        int ret;
-        if((ret = pthread_cancel(w->thread)) != 0)
-            error("pthread_cancel() failed with code %d.", ret);
-
-        WEB_CLIENT_IS_OBSOLETE(w);
-    }
 
     int i;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled) {
-            info("Stopping %s thread", static_threads[i].name);
+            info("MAIN: Calling pthread_cancel() on %s thread", static_threads[i].name);
             int ret;
             if((ret = pthread_cancel(*static_threads[i].thread)) != 0)
-                error("pthread_cancel() failed with code %d.", ret);
+                error("MAIN: pthread_cancel() failed with code %d.", ret);
+            else
+                info("MAIN: thread %s cancelled", static_threads[i].name);
 
             static_threads[i].enabled = 0;
         }
     }
 
-    if(tc_child_pid) {
-        info("Killing tc-qos-helper process %d", tc_child_pid);
-        if(killpid(tc_child_pid, SIGTERM) != -1)
-            waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
-
-        tc_child_pid = 0;
-    }
-
-    // stop all running plugins
-    pluginsd_stop_all_external_plugins();
-
     // if, for any reason there is any child exited
     // catch it here
-    info("Cleaning up an other children");
+    info("MAIN: waiting for any unfinished child processes");
+    siginfo_t info;
     waitid(P_PID, 0, &info, WEXITED|WNOHANG);
-
-    info("All threads/childs stopped.");
+    info("MAIN: all threads/childs stopped.");
 }
 
 struct option_def option_definitions[] = {

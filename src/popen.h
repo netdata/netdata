@@ -4,7 +4,7 @@
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-extern FILE *mypopen(const char *command, pid_t *pidptr);
+extern FILE *mypopen(const char *command, volatile pid_t *pidptr);
 extern int mypclose(FILE *fp, pid_t pid);
 
 #endif /* NETDATA_POPEN_H */
