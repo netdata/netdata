@@ -252,7 +252,10 @@ static struct statsd {
     size_t histogram_increase_step;
     double histogram_percentile;
     char *histogram_percentile_str;
+
     int threads;
+    pthread_t *collection_threads;
+
     LISTEN_SOCKETS sockets;
 } statsd = {
         .enabled = 1,
@@ -320,6 +323,7 @@ static struct statsd {
         .histogram_percentile = 95.0,
         .histogram_increase_step = 10,
         .threads = 0,
+        .collection_threads = NULL,
         .sockets = {
                 .config_section  = CONFIG_SECTION_STATSD,
                 .default_bind_to = "udp:localhost tcp:localhost",
@@ -1969,13 +1973,22 @@ int statsd_listen_sockets_setup(void) {
 }
 
 void statsd_main_cleanup(void *data) {
-    pthread_t *threads = data;
+    (void)data;
 
-    int i;
-    for(i = 0; i < statsd.threads ;i++)
-        pthread_cancel(threads[i]);
+    info("STATSD: cleaning up...");
 
+    if(statsd.collection_threads) {
+        int i;
+        for (i = 0; i < statsd.threads; i++) {
+            info("STATSD: stopping data collection thread %d...", i);
+            pthread_cancel(statsd.collection_threads[i]);
+        }
+    }
+
+    info("STATSD: closing sockets...");
     listen_sockets_close(&statsd.sockets);
+
+    info("STATSD: cleanup completed.");
 }
 
 void *statsd_main(void *ptr) {
@@ -2079,18 +2092,17 @@ void *statsd_main(void *ptr) {
         pthread_exit(NULL);
     }
 
-    pthread_t threads[statsd.threads];
+    statsd.collection_threads = callocz((size_t)statsd.threads, sizeof(pthread_t));
     int i;
-
     for(i = 0; i < statsd.threads ;i++) {
-        if(pthread_create(&threads[i], NULL, statsd_collector_thread, &i))
+        if(pthread_create(&statsd.collection_threads[i], NULL, statsd_collector_thread, &i))
             error("STATSD: failed to create child thread.");
 
-        else if(pthread_detach(threads[i]))
+        else if(pthread_detach(statsd.collection_threads[i]))
             error("STATSD: cannot request detach of child thread.");
     }
 
-    pthread_cleanup_push(statsd_main_cleanup, &threads);
+    pthread_cleanup_push(statsd_main_cleanup, NULL);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd monitoring charts
