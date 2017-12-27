@@ -22,7 +22,7 @@ struct netdata_static_thread {
     char *config_section;
     char *config_name;
 
-    volatile int enabled;
+    volatile sig_atomic_t enabled;
 
     pthread_t *thread;
 
@@ -30,7 +30,7 @@ struct netdata_static_thread {
     void *(*start_routine) (void *);
 };
 
-extern void kill_childs(void);
+extern void cancel_main_threads(void);
 extern int killpid(pid_t pid, int signal);
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 

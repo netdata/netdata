@@ -43,7 +43,7 @@ static void mypopen_del(FILE *fp) {
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-FILE *mypopen(const char *command, pid_t *pidptr)
+FILE *mypopen(const char *command, volatile pid_t *pidptr)
 {
     int pipefd[2];
 

@@ -1968,32 +1968,33 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
 // --------------------------------------------------------------------------------------
 // statsd main thread
 
-int statsd_listen_sockets_setup(void) {
+static int statsd_listen_sockets_setup(void) {
     return listen_sockets_setup(&statsd.sockets);
 }
 
-void statsd_main_cleanup(void *data) {
-    (void)data;
+static void statsd_main_cleanup(void *data) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
 
-    info("STATSD: cleaning up...");
+        info("STATSD: cleaning up...");
 
-    if(statsd.collection_threads) {
-        int i;
-        for (i = 0; i < statsd.threads; i++) {
-            info("STATSD: stopping data collection thread %d...", i);
-            pthread_cancel(statsd.collection_threads[i]);
+        if (statsd.collection_threads) {
+            int i;
+            for (i = 0; i < statsd.threads; i++) {
+                info("STATSD: stopping data collection thread %d...", i);
+                pthread_cancel(statsd.collection_threads[i]);
+            }
         }
+
+        info("STATSD: closing sockets...");
+        listen_sockets_close(&statsd.sockets);
+
+        info("STATSD: cleanup completed.");
     }
-
-    info("STATSD: closing sockets...");
-    listen_sockets_close(&statsd.sockets);
-
-    info("STATSD: cleanup completed.");
 }
 
 void *statsd_main(void *ptr) {
-    (void)ptr;
-
     info("STATSD main thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
@@ -2102,7 +2103,7 @@ void *statsd_main(void *ptr) {
             error("STATSD: cannot request detach of child thread.");
     }
 
-    pthread_cleanup_push(statsd_main_cleanup, NULL);
+    pthread_cleanup_push(statsd_main_cleanup, ptr);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd monitoring charts
