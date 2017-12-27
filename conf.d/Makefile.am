@@ -29,6 +29,7 @@ dist_pythonconfig_DATA = \
     python.d/apache.conf \
     python.d/beanstalk.conf \
     python.d/bind_rndc.conf \
+    python.d/ceph.conf \
     python.d/chrony.conf \
     python.d/couchdb.conf \
     python.d/cpufreq.conf \
