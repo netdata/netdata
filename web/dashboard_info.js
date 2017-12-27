@@ -325,7 +325,6 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b><a href="https://couchdb.apache.org/">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
     },
 
-
     'beanstalk': {
         title: 'Beanstalkd',
         icon: '<i class="fas fa-tasks"></i>',
@@ -336,6 +335,12 @@ netdataDashboard.menu = {
         title: 'RabbitMQ',
         icon: '<i class="fas fa-comments"></i>',
         info: 'Performance data for the <b><a href="https://www.rabbitmq.com/">RabbitMQ</a></b> open-source message broker.'
+    },
+
+    'ceph': {
+        title: 'Ceph',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Provides statistics on the <b><a href="http://ceph.com/">ceph</a></b> server.'
     }
 };
 
@@ -1309,6 +1314,25 @@ netdataDashboard.context = {
     'beanstalk.pause': {
         info: 'Shows info on how long the tube has been paused for, and how long is left remaining on the pause.'
     },
+
+    // ------------------------------------------------------------------------
+    // ceph
+
+    'ceph.general': {
+        info: 'Shows cluster general info.'
+    },
+
+    'ceph.pool_usage': {
+        info: 'Shows info about pool usage.'
+    },
+
+    'ceph.pool_objects': {
+        info: 'Shows info about number of objects presents on a pool.'
+    },
+
+    'ceph.osd_usage': {
+        info: 'Shows info about osd usage'
+     },
 
     // ------------------------------------------------------------------------
     // web_log
