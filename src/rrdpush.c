@@ -449,6 +449,8 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 }
 
 void *rrdpush_sender_thread(void *ptr) {
+    netdata_thread_welcome_nolog("STREAM_SEND");
+
     RRDHOST *host = (RRDHOST *)ptr;
 
     if(!host->rrdpush_send_enabled || !host->rrdpush_send_destination || !*host->rrdpush_send_destination || !host->rrdpush_send_api_key || !*host->rrdpush_send_api_key) {
@@ -458,12 +460,6 @@ void *rrdpush_sender_thread(void *ptr) {
     }
 
     info("STREAM %s [send]: thread created (task id %d)", host->hostname, gettid());
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
-
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("STREAM %s [send]: cannot set pthread cancel type to DEFERRED.", host->hostname);
 
     int timeout = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
     int default_port = (int)appconfig_get_number(&stream_config, CONFIG_SECTION_STREAM, "default port", 19999);
@@ -596,9 +592,6 @@ void *rrdpush_sender_thread(void *ptr) {
                         // but the socket is in non-blocking mode
                         // so, we will not block at send()
 
-                        if (pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
-                            error("STREAM %s [send]: cannot set pthread cancel state to DISABLE.", host->hostname);
-
                         debug(D_STREAM, "STREAM: Getting exclusive lock on host...");
                         rrdpush_buffer_lock(host);
 
@@ -648,9 +641,6 @@ void *rrdpush_sender_thread(void *ptr) {
                         debug(D_STREAM, "STREAM: Releasing exclusive lock on host...");
                         rrdpush_buffer_unlock(host);
 
-                        if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-                            error("STREAM %s [send]: cannot set pthread cancel state to ENABLE.", host->hostname);
-
                         // END RRDPUSH LOCKED SESSION
                     }
                     else {
@@ -691,7 +681,6 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
     pthread_cleanup_pop(1);
-
     pthread_exit(NULL);
     return NULL;
 }
@@ -881,31 +870,49 @@ struct rrdpush_thread {
     int update_every;
 };
 
+static void rrdpush_receiver_thread_cleanup(void *ptr) {
+    static __thread int executed = 0;
+    if(!executed) {
+        executed = 1;
+        struct rrdpush_thread *rpt = (struct rrdpush_thread *) ptr;
+
+        info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
+
+        freez(rpt->key);
+        freez(rpt->hostname);
+        freez(rpt->registry_hostname);
+        freez(rpt->machine_guid);
+        freez(rpt->os);
+        freez(rpt->timezone);
+        freez(rpt->tags);
+        freez(rpt->client_ip);
+        freez(rpt->client_port);
+        freez(rpt);
+    }
+}
+
 static void *rrdpush_receiver_thread(void *ptr) {
-    struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
+    netdata_thread_welcome_nolog("STREAM_RECEIVE");
+    pthread_cleanup_push(rrdpush_receiver_thread_cleanup, ptr);
 
-    if (pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("STREAM %s [receive]: cannot set pthread cancel type to DEFERRED.", rpt->hostname);
+        struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
+        info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
-    if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("STREAM %s [receive]: cannot set pthread cancel state to ENABLE.", rpt->hostname);
+        rrdpush_receive(
+                rpt->fd
+                , rpt->key
+                , rpt->hostname
+                , rpt->registry_hostname
+                , rpt->machine_guid
+                , rpt->os
+                , rpt->timezone
+                , rpt->tags
+                , rpt->update_every
+                , rpt->client_ip
+                , rpt->client_port
+        );
 
-
-    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
-    rrdpush_receive(rpt->fd, rpt->key, rpt->hostname, rpt->registry_hostname, rpt->machine_guid, rpt->os, rpt->timezone, rpt->tags, rpt->update_every, rpt->client_ip, rpt->client_port);
-    info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
-
-    freez(rpt->key);
-    freez(rpt->hostname);
-    freez(rpt->registry_hostname);
-    freez(rpt->machine_guid);
-    freez(rpt->os);
-    freez(rpt->timezone);
-    freez(rpt->tags);
-    freez(rpt->client_ip);
-    freez(rpt->client_port);
-    freez(rpt);
-
+    pthread_cleanup_pop(1);
     pthread_exit(NULL);
     return NULL;
 }

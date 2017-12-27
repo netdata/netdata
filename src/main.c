@@ -6,28 +6,28 @@ void netdata_cleanup_and_exit(int ret) {
     netdata_exit = 1;
 
     error_log_limit_unlimited();
-    info("MAIN: netdata prepares to exit...");
+    info("EXIT: netdata prepares to exit...");
 
     // stop everything
-    info("MAIN: stopping all threads and child processes...");
+    info("EXIT: stopping master threads...");
     cancel_main_threads();
 
     // cleanup the database (delete files not needed)
-    info("MAIN: cleaning up the database...");
+    info("EXIT: cleaning up the database...");
     rrdhost_cleanup_all();
 
     // free the database
-    info("MAIN: freeing database memory...");
+    info("EXIT: freeing database memory...");
     rrdhost_free_all();
 
     // unlink the pid
     if(pidfile[0]) {
-        info("MAIN: removing netdata PID file '%s'...", pidfile);
+        info("EXIT: removing netdata PID file '%s'...", pidfile);
         if(unlink(pidfile) != 0)
-            error("MAIN: cannot unlink pidfile '%s'.", pidfile);
+            error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
 
-    info("MAIN: all done - netdata is now exiting - bye bye...");
+    info("EXIT: all done - netdata is now exiting - bye bye...");
     exit(ret);
 }
 
@@ -183,12 +183,12 @@ void cancel_main_threads() {
     int i;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled) {
-            info("MAIN: Calling pthread_cancel() on %s thread", static_threads[i].name);
+            info("EXIT: Stopping master thread: %s", static_threads[i].name);
             int ret;
             if((ret = pthread_cancel(*static_threads[i].thread)) != 0)
-                error("MAIN: pthread_cancel() failed with code %d.", ret);
-            else
-                info("MAIN: thread %s cancelled", static_threads[i].name);
+                error("EXIT: pthread_cancel() failed with code %d.", ret);
+            //else
+            //    info("MAIN: thread %s cancelled", static_threads[i].name);
 
             static_threads[i].enabled = 0;
         }
@@ -196,10 +196,10 @@ void cancel_main_threads() {
 
     // if, for any reason there is any child exited
     // catch it here
-    info("MAIN: waiting for any unfinished child processes");
+    info("EXIT: waiting for any unfinished child processes");
     siginfo_t info;
     waitid(P_PID, 0, &info, WEXITED|WNOHANG);
-    info("MAIN: all threads/childs stopped.");
+    info("EXIT: all threads/childs stopped.");
 }
 
 struct option_def option_definitions[] = {

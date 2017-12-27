@@ -828,14 +828,14 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
     while(i < max_words) words[i++] = NULL;
 }
 
-volatile pid_t tc_child_pid = 0;
+static pid_t tc_child_pid = 0;
 
 static void tc_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
-        info("TC: cleaning up...");
+        info("%s: cleaning up...", netdata_thread_tag());
 
         if(tc_child_pid) {
             info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
@@ -853,13 +853,8 @@ static void tc_main_cleanup(void *ptr) {
 }
 
 void *tc_main(void *ptr) {
-    info("TC thread created with task id %d", gettid());
-
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+    netdata_thread_welcome("TC");
+    pthread_cleanup_push(tc_main_cleanup, ptr);
 
     struct rusage thread;
 
@@ -884,8 +879,6 @@ void *tc_main(void *ptr) {
 
     snprintfz(buffer, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_plugins_dir);
     char *tc_script = config_get("plugin:tc", "script to run to get tc values", buffer);
-
-    pthread_cleanup_push(tc_main_cleanup, ptr);
 
     while(!netdata_exit) {
         FILE *fp;
@@ -986,14 +979,8 @@ void *tc_main(void *ptr) {
                 // debug(D_TC_LOOP, "END line");
 
                 if(likely(device)) {
-                    if(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
-                        error("Cannot set pthread cancel state to DISABLE.");
-
                     tc_device_commit(device);
                     // tc_device_free(device);
-
-                    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-                        error("Cannot set pthread cancel state to ENABLE.");
                 }
 
                 device = NULL;
@@ -1171,9 +1158,7 @@ void *tc_main(void *ptr) {
     }
 
 cleanup:
-    info("TC thread exiting");
     pthread_cleanup_pop(1);
-
     pthread_exit(NULL);
     return NULL;
 }

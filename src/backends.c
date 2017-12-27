@@ -498,22 +498,25 @@ inline uint32_t backend_parse_data_source(const char *source, uint32_t mode) {
     return mode;
 }
 
+static void backends_main_cleanup(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
+
+        info("%s: cleaning up...", netdata_thread_tag());
+    }
+}
+
 void *backends_main(void *ptr) {
+    netdata_thread_welcome("BACKEND");
+
     int default_port = 0;
     int sock = -1;
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, uint32_t) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
 
-    info("BACKEND: thread created with task id %d", gettid());
-
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("BACKEND: cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("BACKEND: cannot set pthread cancel state to ENABLE.");
+    pthread_cleanup_push(backends_main_cleanup, ptr);
 
     // ------------------------------------------------------------------------
     // collect configuration options
@@ -664,7 +667,7 @@ void *backends_main(void *ptr) {
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    for(;;) {
+    while(!netdata_exit) {
 
         // ------------------------------------------------------------------------
         // Wait for the next iteration point.
@@ -675,11 +678,6 @@ void *backends_main(void *ptr) {
 
         // ------------------------------------------------------------------------
         // add to the buffer the data we need to send to the backend
-
-        int pthreadoldcancelstate;
-
-        if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
-            error("BACKEND: cannot set pthread cancel state to DISABLE.");
 
         size_t count_hosts = 0;
         size_t count_charts_total = 0;
@@ -729,9 +727,6 @@ void *backends_main(void *ptr) {
         rrd_unlock();
 
         debug(D_BACKEND, "BACKEND: buffer has %zu bytes, added metrics for %zu dimensions, of %zu charts, from %zu hosts", buffer_strlen(b), count_dims_total, count_charts_total, count_hosts);
-
-        if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
-            error("BACKEND: cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
 
         // ------------------------------------------------------------------------
 
@@ -918,9 +913,7 @@ cleanup:
     buffer_free(b);
     buffer_free(response);
 
-    info("BACKEND: thread exiting");
-
-    static_thread->enabled = 0;
+    pthread_cleanup_pop(1);
     pthread_exit(NULL);
     return NULL;
 }

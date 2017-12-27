@@ -479,10 +479,10 @@ cleanup:
 static void pluginsd_worker_thread_cleanup(void *arg) {
     struct plugind *cd = (struct plugind *)arg;
 
-    info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
-
     if(cd->enabled && !cd->obsolete) {
         cd->obsolete = 1;
+
+        info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
 
         if (cd->pid) {
             siginfo_t info;
@@ -498,12 +498,13 @@ static void pluginsd_worker_thread_cleanup(void *arg) {
 }
 
 void *pluginsd_worker_thread(void *arg) {
-    struct plugind *cd = (struct plugind *)arg;
-    cd->obsolete = 0;
-
-    size_t count = 0;
-
+    netdata_thread_welcome_nolog("PLUGINSD_WORKER");
     pthread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
+
+    struct plugind *cd = (struct plugind *)arg;
+
+    cd->obsolete = 0;
+    size_t count = 0;
 
     while(!netdata_exit) {
         FILE *fp = mypopen(cd->cmd, &cd->pid);
@@ -578,30 +579,25 @@ static void pluginsd_main_cleanup(void *data) {
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
-        info("PLUGINSD: cleaning up plugin threads...");
-        struct plugind *cd;
+        info("%s: cleaning up...", netdata_thread_tag());
 
+        struct plugind *cd;
         for (cd = pluginsd_root; cd; cd = cd->next) {
             if (cd->enabled && !cd->obsolete) {
-                info("PLUGINSD: Calling pthread_cancel() on %s plugin thread", cd->id);
+                info("PLUGINSD: Stopping plugin thread: %s", cd->id);
                 int ret;
                 if ((ret = pthread_cancel(cd->thread)) != 0)
                     error("PLUGINSD: pthread_cancel() failed with code %d.", ret);
             }
         }
 
-        info("PLUGINSD: cleanup completed.");
+        info("%s: cleanup completed.", netdata_thread_tag());
     }
 }
 
 void *pluginsd_main(void *ptr) {
-    info("PLUGINS.D thread created with task id %d", gettid());
-
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+    netdata_thread_welcome("PLUGINSD");
+    pthread_cleanup_push(pluginsd_main_cleanup, ptr);
 
     int automatic_run = config_get_boolean(CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
     int scan_frequency = (int) config_get_number(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
@@ -610,8 +606,6 @@ void *pluginsd_main(void *ptr) {
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop
     int directory_errors[PLUGINSD_MAX_DIRECTORIES] =  { 0 };
-
-    pthread_cleanup_push(pluginsd_main_cleanup, ptr);
 
     while(!netdata_exit) {
         int idx;
