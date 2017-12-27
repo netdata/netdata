@@ -1,6 +1,30 @@
 #include "common.h"
 
 // ----------------------------------------------------------------------------
+// threads initialization
+
+static __thread char *netdata_thread_tag_name = NULL;
+
+const char *netdata_thread_tag(void) {
+    return ((netdata_thread_tag_name && *netdata_thread_tag_name)?netdata_thread_tag_name:"unknown");
+}
+
+void netdata_thread_welcome_nolog(char *tag) {
+    netdata_thread_tag_name = tag;
+
+    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
+        error("%s: cannot set pthread cancel type to DEFERRED.", netdata_thread_tag());
+
+    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
+        error("%s: cannot set pthread cancel state to ENABLE.", netdata_thread_tag());
+}
+
+void netdata_thread_welcome(char *tag) {
+    netdata_thread_welcome_nolog(tag);
+    info("%s: thread created with task id %d", netdata_thread_tag(), gettid());
+}
+
+// ----------------------------------------------------------------------------
 // automatic thread cancelability management, based on locks
 
 static __thread int netdata_thread_first_cancelability = 0;
@@ -10,7 +34,7 @@ static inline void netdata_thread_disable_cancelability(void) {
     int old;
     int ret = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old);
     if(ret != 0)
-        error("THREAD_CANCELABILITY: pthread_setcancelstate() returned error %d", ret);
+        error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d", netdata_thread_tag(), ret);
     else {
         if(!netdata_thread_lock_cancelability)
             netdata_thread_first_cancelability = old;
@@ -21,16 +45,16 @@ static inline void netdata_thread_disable_cancelability(void) {
 
 static inline void netdata_thread_enable_cancelability(void) {
     if(netdata_thread_lock_cancelability < 1) {
-        error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): oops! invalid thread cancelability count %d - results will be undefined - please report this!", netdata_thread_lock_cancelability);
+        error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): invalid thread cancelability count %d on thread %s - results will be undefined - please report this!", netdata_thread_lock_cancelability, netdata_thread_tag());
     }
     else if(netdata_thread_lock_cancelability == 1) {
         int old = 1;
         int ret = pthread_setcancelstate(netdata_thread_first_cancelability, &old);
         if(ret != 0)
-            error("THREAD_CANCELABILITY: pthread_setcancelstate() returned error %d", ret);
+            error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d", netdata_thread_tag(), ret);
         else {
             if(!old)
-                error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): oops! old thread cancelability was changed, expected ENABLED, found DISABLED - please report this!");
+                error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): old thread cancelability on thread %s was changed, expected ENABLED, found DISABLED - please report this!", netdata_thread_tag());
         }
 
         netdata_thread_lock_cancelability = 0;

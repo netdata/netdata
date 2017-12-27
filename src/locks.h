@@ -7,6 +7,10 @@ typedef pthread_mutex_t netdata_mutex_t;
 typedef pthread_rwlock_t netdata_rwlock_t;
 #define NETDATA_RWLOCK_INITIALIZER PTHREAD_RWLOCK_INITIALIZER
 
+extern void netdata_thread_welcome(char *tag);
+extern void netdata_thread_welcome_nolog(char *tag);
+extern const char *netdata_thread_tag(void);
+
 extern int __netdata_mutex_init(netdata_mutex_t *mutex);
 extern int __netdata_mutex_lock(netdata_mutex_t *mutex);
 extern int __netdata_mutex_trylock(netdata_mutex_t *mutex);

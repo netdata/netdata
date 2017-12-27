@@ -1758,22 +1758,23 @@ ssize_t web_client_receive(struct web_client *w)
 // 3. it generates HTTP responses
 // 4. it copies data from input to output if mode is FILECOPY
 
-void *web_client_main(void *ptr)
-{
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
+static void web_client_main_cleanup(void *ptr) {
+    struct web_client *w = ptr;
+    if(!web_client_check_obsolete(w)) {
+        WEB_CLIENT_IS_OBSOLETE(w);
+    }
+}
 
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+void *web_client_main(void *ptr) {
+    netdata_thread_welcome_nolog("WEB_CLIENT");
+    pthread_cleanup_push(web_client_main_cleanup, ptr);
 
     struct web_client *w = ptr;
     struct pollfd fds[2], *ifd, *ofd;
     int retval, timeout;
     nfds_t fdmax = 0;
 
-    for(;;) {
-        if(unlikely(netdata_exit)) break;
-
+    while(!netdata_exit) {
         if(unlikely(web_client_check_dead(w))) {
             debug(D_WEB_CLIENT, "%llu: client is dead.", w->id);
             break;
@@ -1897,8 +1898,7 @@ void *web_client_main(void *ptr)
     w->ifd = -1;
     w->ofd = -1;
 
-    WEB_CLIENT_IS_OBSOLETE(w);
-
+    pthread_cleanup_pop(1);
     pthread_exit(NULL);
     return NULL;
 }
