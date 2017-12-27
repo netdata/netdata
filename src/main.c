@@ -6,28 +6,33 @@ void netdata_cleanup_and_exit(int ret) {
     netdata_exit = 1;
 
     error_log_limit_unlimited();
+    info("netdata is preparing to exit...");
 
-    debug(D_EXIT, "Called: netdata_cleanup_and_exit()");
+    // allow all the threads to cleanup by themselves
+    unsigned int w = (unsigned int)default_rrd_update_every + 2;
+    info("Giving %u secs to background threads to cleanup...", w);
+    sleep(w);
 
-    // cleanup the database
+    // kill all threads and childs
+    //info("Stopping all threads and child processes...");
+    //kill_childs();
+
+    // cleanup the database (delete files not needed)
+    info("Cleaning up the database...");
     rrdhost_cleanup_all();
+
+    // free the database
+    //info("Freeing database memory...");
+    //rrdhost_free_all();
 
     // unlink the pid
     if(pidfile[0]) {
+        info("Removing netdata PID file '%s'...", pidfile);
         if(unlink(pidfile) != 0)
             error("Cannot unlink pidfile '%s'.", pidfile);
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    // kill all childs
-    //kill_childs();
-
-    // free database
-    sleep(2);
-    rrdhost_free_all();
-#endif
-
-    info("netdata exiting. Bye bye...");
+    info("All done - netdata is now exiting - bye bye...");
     exit(ret);
 }
 
@@ -177,8 +182,7 @@ int killpid(pid_t pid, int sig)
     return ret;
 }
 
-void kill_childs()
-{
+void kill_childs() {
     error_log_limit_unlimited();
 
     siginfo_t info;
@@ -186,9 +190,9 @@ void kill_childs()
     struct web_client *w;
     for(w = web_clients; w ; w = w->next) {
         info("Stopping web client %s", w->client_ip);
-        pthread_cancel(w->thread);
-        // it is detached
-        // pthread_join(w->thread, NULL);
+        int ret;
+        if((ret = pthread_cancel(w->thread)) != 0)
+            error("pthread_cancel() failed with code %d.", ret);
 
         WEB_CLIENT_IS_OBSOLETE(w);
     }
@@ -197,9 +201,9 @@ void kill_childs()
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled) {
             info("Stopping %s thread", static_threads[i].name);
-            pthread_cancel(*static_threads[i].thread);
-            // it is detached
-            // pthread_join(*static_threads[i].thread, NULL);
+            int ret;
+            if((ret = pthread_cancel(*static_threads[i].thread)) != 0)
+                error("pthread_cancel() failed with code %d.", ret);
 
             static_threads[i].enabled = 0;
         }
