@@ -193,7 +193,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
                 else
                     web_client_set_tcp(w);
 
-                if(netdata_thread_create(&w->thread, "WEB_CLIENT", NETDATA_THREAD_OPTION_DEFAULT, web_client_main, w) != 0)
+                if(netdata_thread_create(&w->thread, "WEB_CLIENT", NETDATA_THREAD_OPTION_DONT_LOG, web_client_main, w) != 0)
                     WEB_CLIENT_IS_OBSOLETE(w);
             }
         }

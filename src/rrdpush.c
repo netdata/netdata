@@ -582,6 +582,8 @@ void *rrdpush_sender_thread(void *ptr) {
                         // but the socket is in non-blocking mode
                         // so, we will not block at send()
 
+                        netdata_thread_disable_cancelability();
+
                         debug(D_STREAM, "STREAM: Getting exclusive lock on host...");
                         rrdpush_buffer_lock(host);
 
@@ -630,6 +632,8 @@ void *rrdpush_sender_thread(void *ptr) {
 
                         debug(D_STREAM, "STREAM: Releasing exclusive lock on host...");
                         rrdpush_buffer_unlock(host);
+
+                        netdata_thread_enable_cancelability();
 
                         // END RRDPUSH LOCKED SESSION
                     }

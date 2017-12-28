@@ -6,7 +6,7 @@
 static __thread int netdata_thread_first_cancelability = 0;
 static __thread int netdata_thread_lock_cancelability = 0;
 
-static inline void netdata_thread_disable_cancelability(void) {
+inline void netdata_thread_disable_cancelability(void) {
     int old;
     int ret = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old);
     if(ret != 0)
@@ -19,7 +19,7 @@ static inline void netdata_thread_disable_cancelability(void) {
     }
 }
 
-static inline void netdata_thread_enable_cancelability(void) {
+inline void netdata_thread_enable_cancelability(void) {
     if(netdata_thread_lock_cancelability < 1) {
         error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): invalid thread cancelability count %d on thread %s - results will be undefined - please report this!", netdata_thread_lock_cancelability, netdata_thread_tag());
     }

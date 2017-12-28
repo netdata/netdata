@@ -677,6 +677,8 @@ void *backends_main(void *ptr) {
         // ------------------------------------------------------------------------
         // add to the buffer the data we need to send to the backend
 
+        netdata_thread_disable_cancelability();
+
         size_t count_hosts = 0;
         size_t count_charts_total = 0;
         size_t count_dims_total = 0;
@@ -723,6 +725,8 @@ void *backends_main(void *ptr) {
             rrdhost_unlock(host);
         }
         rrd_unlock();
+
+        netdata_thread_enable_cancelability();
 
         debug(D_BACKEND, "BACKEND: buffer has %zu bytes, added metrics for %zu dimensions, of %zu charts, from %zu hosts", buffer_strlen(b), count_dims_total, count_charts_total, count_hosts);
 

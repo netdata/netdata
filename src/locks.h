@@ -33,6 +33,8 @@ extern int netdata_rwlock_unlock_debug( const char *file, const char *function, 
 extern int netdata_rwlock_tryrdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 extern int netdata_rwlock_trywrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock);
 
+extern void netdata_thread_disable_cancelability(void);
+extern void netdata_thread_enable_cancelability(void);
 
 #ifdef NETDATA_INTERNAL_CHECKS
 

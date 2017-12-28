@@ -978,8 +978,10 @@ void *tc_main(void *ptr) {
                 // debug(D_TC_LOOP, "END line");
 
                 if(likely(device)) {
+                    netdata_thread_disable_cancelability();
                     tc_device_commit(device);
                     // tc_device_free(device);
+                    netdata_thread_enable_cancelability();
                 }
 
                 device = NULL;
