@@ -17,7 +17,7 @@ typedef struct {
 static __thread NETDATA_THREAD *netdata_thread = NULL;
 
 const char *netdata_thread_tag(void) {
-    return ((netdata_thread && netdata_thread->tag && *netdata_thread->tag)?netdata_thread->tag:"unknown");
+    return ((netdata_thread && netdata_thread->tag && *netdata_thread->tag)?netdata_thread->tag:"MAIN");
 }
 
 // ----------------------------------------------------------------------------

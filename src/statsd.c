@@ -2085,8 +2085,11 @@ void *statsd_main(void *ptr) {
 
     statsd.collection_threads = callocz((size_t)statsd.threads, sizeof(netdata_thread_t));
     int i;
-    for(i = 0; i < statsd.threads ;i++)
-        netdata_thread_create(&statsd.collection_threads[i], "STATSD_COLLECTOR", NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &i);
+    for(i = 0; i < statsd.threads ;i++) {
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_COLLECTOR[%d]", i + 1);
+        netdata_thread_create(&statsd.collection_threads[i], tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &i);
+    }
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd monitoring charts

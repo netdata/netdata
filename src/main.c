@@ -6,19 +6,30 @@ void netdata_cleanup_and_exit(int ret) {
     netdata_exit = 1;
 
     error_log_limit_unlimited();
-    info("EXIT: netdata prepares to exit...");
+    info("EXIT: netdata prepares to exit with code %d...", ret);
 
-    // stop everything
-    info("EXIT: stopping master threads...");
-    cancel_main_threads();
+    if(ret) {
+        // this is bad - exiting due to a fatal condition
 
-    // cleanup the database (delete files not needed)
-    info("EXIT: cleaning up the database...");
-    rrdhost_cleanup_all();
+        // cleanup/save the database and exit
+        info("EXIT: cleaning up the database...");
+        rrdhost_cleanup_all();
+    }
+    else {
+        // exit cleanly
 
-    // free the database
-    info("EXIT: freeing database memory...");
-    rrdhost_free_all();
+        // stop everything
+        info("EXIT: stopping master threads...");
+        cancel_main_threads();
+
+        // cleanup the database (delete files not needed)
+        info("EXIT: cleaning up the database...");
+        rrdhost_cleanup_all();
+
+        // free the database
+        info("EXIT: freeing database memory...");
+        rrdhost_free_all();
+    }
 
     // unlink the pid
     if(pidfile[0]) {
@@ -36,36 +47,36 @@ struct netdata_static_thread static_threads[] = {
 #ifdef INTERNAL_PLUGIN_NFACCT
     // nfacct requires root access
     // so, we build it as an external plugin with setuid to root
-    {"PLUGIN_NFACCT",       CONFIG_SECTION_PLUGINS,  "nfacct",     1, NULL, NULL, nfacct_main},
+    {"PLUGIN[nfacct]",       CONFIG_SECTION_PLUGINS,  "nfacct",     1, NULL, NULL, nfacct_main},
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // debugging plugin
-    {"PLUGIN_CHECK",        CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
+    {"PLUGIN[check]",        CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
 #endif
 
 #if defined(__FreeBSD__)
     // FreeBSD internal plugins
-    {"PLUGIN_FREEBSD",      CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
+    {"PLUGIN[freebsd]",      CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
 #elif defined(__APPLE__)
     // macOS internal plugins
-    {"PLUGIN_MACOS",        CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
+    {"PLUGIN[macos]",        CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
 #else
     // linux internal plugins
-    {"PLUGIN_PROC",         CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
-    {"PLUGIN_DISKSPACE",    CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
-    {"PLUGIN_CGROUP",       CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
-    {"PLUGIN_TC",           CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
+    {"PLUGIN[proc]",         CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
+    {"PLUGIN[diskspace]",    CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
+    {"PLUGIN[cgroup]",       CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
+    {"PLUGIN[tc]",           CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
 #endif /* __FreeBSD__, __APPLE__*/
 
     // common plugins for all systems
-    {"PLUGIN_IDLEJITTER",   CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
+    {"PLUGIN[idlejitter]",   CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
     {"BACKENDS",            NULL,                    NULL,         1, NULL, NULL, backends_main},
     {"HEALTH",              NULL,                    NULL,         1, NULL, NULL, health_main},
     {"PLUGINSD",            NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
-    {"WEB_SERVER",          NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
-    {"WEB_SERVER_SINGLE_THREADED", NULL,             NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
-    {"STREAMING",           NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
+    {"WEB_SERVER[multi]",   NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
+    {"WEB_SERVER[single]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
+    {"STREAM",              NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
     {"STATSD",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
 
     {NULL,                  NULL,                    NULL,         0, NULL, NULL, NULL}
