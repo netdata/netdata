@@ -508,13 +508,13 @@ static void backends_main_cleanup(void *ptr) {
 }
 
 void *backends_main(void *ptr) {
+    netdata_thread_cleanup_push(backends_main_cleanup, ptr);
+
     int default_port = 0;
     int sock = -1;
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, uint32_t) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
-
-    netdata_thread_cleanup_push(backends_main_cleanup, ptr);
 
     // ------------------------------------------------------------------------
     // collect configuration options

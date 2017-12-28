@@ -16,7 +16,7 @@ typedef enum {
 
 typedef pthread_t netdata_thread_t;
 
-#define NETDATA_THREAD_TAG_MAX 50
+#define NETDATA_THREAD_TAG_MAX 100
 extern const char *netdata_thread_tag(void);
 
 extern size_t netdata_threads_init(void);
