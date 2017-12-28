@@ -1098,6 +1098,8 @@ void rrdset_done(RRDSET *st) {
             next_store_ut,          // the timestamp in microseconds, of the next entry to store in the db
             update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
 
+    netdata_thread_disable_cancelability();
+
     // a read lock is OK here
     rrdset_rdlock(st);
 
@@ -1540,4 +1542,6 @@ void rrdset_done(RRDSET *st) {
 */
 
     rrdset_unlock(st);
+
+    netdata_thread_enable_cancelability();
 }
