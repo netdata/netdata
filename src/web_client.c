@@ -1766,8 +1766,7 @@ static void web_client_main_cleanup(void *ptr) {
 }
 
 void *web_client_main(void *ptr) {
-    netdata_thread_welcome_nolog("WEB_CLIENT");
-    pthread_cleanup_push(web_client_main_cleanup, ptr);
+    netdata_thread_cleanup_push(web_client_main_cleanup, ptr);
 
     struct web_client *w = ptr;
     struct pollfd fds[2], *ifd, *ofd;
@@ -1898,7 +1897,6 @@ void *web_client_main(void *ptr) {
     w->ifd = -1;
     w->ofd = -1;
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

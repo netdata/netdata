@@ -290,7 +290,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
     rrdpush_buffer_lock(host);
     rrdhost_wrlock(host);
 
-    pthread_t thr = 0;
+    netdata_thread_t thr = 0;
 
     if(host->rrdpush_sender_spawn) {
         info("STREAM %s [send]: signaling sending thread to stop...", host->hostname);
@@ -303,9 +303,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
         thr = host->rrdpush_sender_thread;
 
         // signal it to cancel
-        int ret = pthread_cancel(host->rrdpush_sender_thread);
-        if(ret != 0)
-            error("STREAM %s [send]: pthread_cancel() returned error.", host->hostname);
+        netdata_thread_cancel(host->rrdpush_sender_thread);
     }
 
     rrdhost_unlock(host);
@@ -313,12 +311,8 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
 
     if(thr != 0) {
         info("STREAM %s [send]: waiting for the sending thread to stop...", host->hostname);
-
         void *result;
-        int ret = pthread_join(thr, &result);
-        if(ret != 0)
-            error("STREAM %s [send]: pthread_join() returned error.", host->hostname);
-
+        netdata_thread_join(thr, &result);
         info("STREAM %s [send]: sending thread has exited.", host->hostname);
     }
 }
@@ -436,8 +430,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     if(!host->rrdpush_sender_join) {
         info("STREAM %s [send]: sending thread detaches itself.", host->hostname);
-        if(pthread_detach(pthread_self()))
-            error("STREAM %s [send]: pthread_detach() failed.", host->hostname);
+        netdata_thread_detach(netdata_thread_self());
     }
 
     host->rrdpush_sender_spawn = 0;
@@ -449,13 +442,10 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 }
 
 void *rrdpush_sender_thread(void *ptr) {
-    netdata_thread_welcome_nolog("STREAM_SEND");
-
     RRDHOST *host = (RRDHOST *)ptr;
 
     if(!host->rrdpush_send_enabled || !host->rrdpush_send_destination || !*host->rrdpush_send_destination || !host->rrdpush_send_api_key || !*host->rrdpush_send_api_key) {
         error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.", host->hostname, gettid());
-        pthread_exit(NULL);
         return NULL;
     }
 
@@ -489,11 +479,11 @@ void *rrdpush_sender_thread(void *ptr) {
 
     size_t not_connected_loops = 0;
 
-    pthread_cleanup_push(rrdpush_sender_thread_cleanup_callback, host);
+    netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, host);
 
         for(; host->rrdpush_send_enabled && !netdata_exit ;) {
             // check for outstanding cancellation requests
-            pthread_testcancel();
+            netdata_thread_testcancel();
 
             // if we don't have socket open, lets wait a bit
             if(unlikely(host->rrdpush_sender_socket == -1)) {
@@ -680,8 +670,7 @@ void *rrdpush_sender_thread(void *ptr) {
             }
         }
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -892,8 +881,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 }
 
 static void *rrdpush_receiver_thread(void *ptr) {
-    netdata_thread_welcome_nolog("STREAM_RECEIVE");
-    pthread_cleanup_push(rrdpush_receiver_thread_cleanup, ptr);
+    netdata_thread_cleanup_push(rrdpush_receiver_thread_cleanup, ptr);
 
         struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
         info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
@@ -912,8 +900,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
                 , rpt->client_port
         );
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -921,7 +908,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     rrdhost_wrlock(host);
 
     if(!host->rrdpush_sender_spawn) {
-        if(pthread_create(&host->rrdpush_sender_thread, NULL, rrdpush_sender_thread, (void *) host))
+        if(netdata_thread_create(&host->rrdpush_sender_thread, "STREAM_SENDER", NETDATA_THREAD_OPTION_JOINABLE, rrdpush_sender_thread, (void *) host))
             error("STREAM %s [send]: failed to create new thread for client.", host->hostname);
         else
             host->rrdpush_sender_spawn = 1;
@@ -1055,15 +1042,12 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
-    pthread_t thread;
+    netdata_thread_t thread;
 
     debug(D_SYSTEM, "STREAM [receive from [%s]:%s]: starting receiving thread.", w->client_ip, w->client_port);
 
-    if(pthread_create(&thread, NULL, rrdpush_receiver_thread, (void *)rpt))
+    if(netdata_thread_create(&thread, "STREAM_RECEIVER", NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt))
         error("STREAM [receive from [%s]:%s]: failed to create new thread for client.", w->client_ip, w->client_port);
-
-    else if(pthread_detach(thread))
-        error("STREAM [receive from [%s]:%s]: cannot request detach newly created thread.", w->client_ip, w->client_port);
 
     // prevent the caller from closing the streaming socket
     if(w->ifd == w->ofd)

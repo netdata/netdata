@@ -338,8 +338,7 @@ static void diskspace_main_cleanup(void *ptr) {
 }
 
 void *proc_diskspace_main(void *ptr) {
-    netdata_thread_welcome("DISKSPACE");
-    pthread_cleanup_push(diskspace_main_cleanup, ptr);
+    netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 
     int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
 
@@ -456,7 +455,6 @@ void *proc_diskspace_main(void *ptr) {
         }
     }
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

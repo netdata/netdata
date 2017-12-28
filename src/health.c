@@ -348,10 +348,8 @@ static void health_main_cleanup(void *ptr) {
 }
 
 void *health_main(void *ptr) {
-    netdata_thread_welcome("HEALTH");
-
     BUFFER *wb = buffer_create(100);
-    pthread_cleanup_push(health_main_cleanup, ptr);
+    netdata_thread_cleanup_push(health_main_cleanup, ptr);
 
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
@@ -736,7 +734,6 @@ void *health_main(void *ptr) {
 
     buffer_free(wb);
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

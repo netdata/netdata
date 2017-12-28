@@ -24,7 +24,7 @@ struct netdata_static_thread {
 
     volatile sig_atomic_t enabled;
 
-    pthread_t *thread;
+    netdata_thread_t *thread;
 
     void (*init_routine) (void);
     void *(*start_routine) (void *);

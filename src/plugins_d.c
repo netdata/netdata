@@ -498,8 +498,7 @@ static void pluginsd_worker_thread_cleanup(void *arg) {
 }
 
 void *pluginsd_worker_thread(void *arg) {
-    netdata_thread_welcome_nolog("PLUGINSD_WORKER");
-    pthread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
+    netdata_thread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
 
     struct plugind *cd = (struct plugind *)arg;
 
@@ -513,14 +512,10 @@ void *pluginsd_worker_thread(void *arg) {
             break;
         }
 
-        info("PLUGINSD: '%s' running on pid %d", cd->fullfilename, cd->pid);
-
+        info("%s on tid %d: connected to '%s' running on pid %d", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid);
         count = pluginsd_process(localhost, cd, fp, 0);
-        error("PLUGINSD: plugin '%s' disconnected.", cd->fullfilename);
-
+        error("%s on tid %d: '%s' (pid %d) disconnected after %zu successful data collections (ENDs).", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, count);
         killpid(cd->pid, SIGTERM);
-
-        info("PLUGINSD: '%s' on pid %d stopped after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
 
         // get the return code
         int code = mypclose(fp, cd->pid);
@@ -530,18 +525,18 @@ void *pluginsd_worker_thread(void *arg) {
 
             if(likely(!cd->successful_collections)) {
                 // nothing collected - disable it
-                error("PLUGINSD: '%s' exited with error code %d. Disabling it.", cd->fullfilename, code);
+                error("%s on tid %d: '%s' (pid %d) exited with error code %d. Disabling it.", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, code);
                 cd->enabled = 0;
             }
             else {
                 // we have collected something
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). %s", cd->fullfilename, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
+                    error("%s on tid %d: '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {
-                    error("PLUGINSD: '%s' exited with error code %d, but has given useful output in the past (%zu times). We tried %zu times to restart it, but it failed to generate data. Disabling it.", cd->fullfilename, code, cd->successful_collections, cd->serial_failures);
+                    error("%s on tid %d: '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). We tried %zu times to restart it, but it failed to generate data. Disabling it.", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, code, cd->successful_collections, cd->serial_failures);
                     cd->enabled = 0;
                 }
             }
@@ -553,11 +548,11 @@ void *pluginsd_worker_thread(void *arg) {
                 // we have collected nothing so far
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("PLUGINSD: '%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.", cd->fullfilename, cd->pid, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
+                    error("%s on tid %d: '%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is now disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {
-                    error("PLUGINSD: '%s' (pid %d) does not generate useful output, although it reports success (exits with 0), but we have tried %zu times to collect something. Disabling it.", cd->fullfilename, cd->pid, cd->serial_failures);
+                    error("%s on tid %d: '%s' (pid %d) does not generate useful output, although it reports success (exits with 0), but we have tried %zu times to collect something. Disabling it.", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, cd->serial_failures);
                     cd->enabled = 0;
                 }
             }
@@ -569,8 +564,7 @@ void *pluginsd_worker_thread(void *arg) {
         if(unlikely(!cd->enabled)) break;
     }
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -585,9 +579,7 @@ static void pluginsd_main_cleanup(void *data) {
         for (cd = pluginsd_root; cd; cd = cd->next) {
             if (cd->enabled && !cd->obsolete) {
                 info("PLUGINSD: Stopping plugin thread: %s", cd->id);
-                int ret;
-                if ((ret = pthread_cancel(cd->thread)) != 0)
-                    error("PLUGINSD: pthread_cancel() failed with code %d.", ret);
+                netdata_thread_cancel(cd->thread);
             }
         }
 
@@ -596,8 +588,7 @@ static void pluginsd_main_cleanup(void *data) {
 }
 
 void *pluginsd_main(void *ptr) {
-    netdata_thread_welcome("PLUGINSD");
-    pthread_cleanup_push(pluginsd_main_cleanup, ptr);
+    netdata_thread_cleanup_push(pluginsd_main_cleanup, ptr);
 
     int automatic_run = config_get_boolean(CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
     int scan_frequency = (int) config_get_number(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
@@ -684,11 +675,7 @@ void *pluginsd_main(void *ptr) {
 
                     if(cd->enabled) {
                         // spawn a new thread for it
-                        if(unlikely(pthread_create(&cd->thread, NULL, pluginsd_worker_thread, cd) != 0))
-                            error("PLUGINSD: failed to create new thread for plugin '%s'.", cd->filename);
-
-                        else if(unlikely(pthread_detach(cd->thread) != 0))
-                            error("PLUGINSD: Cannot request detach of newly created thread for plugin '%s'.", cd->filename);
+                        netdata_thread_create(&cd->thread, "PLUGINSD_COLLECTOR", NETDATA_THREAD_OPTION_DEFAULT, pluginsd_worker_thread, cd);
                     }
                 }
             }
@@ -699,7 +686,6 @@ void *pluginsd_main(void *ptr) {
         sleep((unsigned int) scan_frequency);
     }
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

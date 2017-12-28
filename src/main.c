@@ -36,37 +36,37 @@ struct netdata_static_thread static_threads[] = {
 #ifdef INTERNAL_PLUGIN_NFACCT
     // nfacct requires root access
     // so, we build it as an external plugin with setuid to root
-    {"nfacct",              CONFIG_SECTION_PLUGINS,  "nfacct",     1, NULL, NULL, nfacct_main},
+    {"PLUGIN_NFACCT",       CONFIG_SECTION_PLUGINS,  "nfacct",     1, NULL, NULL, nfacct_main},
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // debugging plugin
-    {"check",               CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
+    {"PLUGIN_CHECK",        CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
 #endif
 
 #if defined(__FreeBSD__)
     // FreeBSD internal plugins
-    {"freebsd",             CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
+    {"PLUGIN_FREEBSD",      CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
 #elif defined(__APPLE__)
     // macOS internal plugins
-    {"macos",               CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
+    {"PLUGIN_MACOS",        CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
 #else
     // linux internal plugins
-    {"proc",                CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
-    {"diskspace",           CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
-    {"cgroups",             CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
-    {"tc",                  CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
+    {"PLUGIN_PROC",         CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
+    {"PLUGIN_DISKSPACE",    CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
+    {"PLUGIN_CGROUP",       CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
+    {"PLUGIN_TC",           CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
 #endif /* __FreeBSD__, __APPLE__*/
 
     // common plugins for all systems
-    {"idlejitter",          CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
-    {"backends",            NULL,                    NULL,         1, NULL, NULL, backends_main},
-    {"health",              NULL,                    NULL,         1, NULL, NULL, health_main},
-    {"plugins.d",           NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
-    {"web",                 NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
-    {"web-single-threaded", NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
-    {"push-metrics",        NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
-    {"statsd",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
+    {"PLUGIN_IDLEJITTER",   CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
+    {"BACKENDS",            NULL,                    NULL,         1, NULL, NULL, backends_main},
+    {"HEALTH",              NULL,                    NULL,         1, NULL, NULL, health_main},
+    {"PLUGINSD",            NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
+    {"WEB_SERVER",          NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
+    {"WEB_SERVER_SINGLE_THREADED", NULL,             NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
+    {"STREAMING",           NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
+    {"STATSD",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
 
     {NULL,                  NULL,                    NULL,         0, NULL, NULL, NULL}
 };
@@ -184,22 +184,10 @@ void cancel_main_threads() {
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled) {
             info("EXIT: Stopping master thread: %s", static_threads[i].name);
-            int ret;
-            if((ret = pthread_cancel(*static_threads[i].thread)) != 0)
-                error("EXIT: pthread_cancel() failed with code %d.", ret);
-            //else
-            //    info("MAIN: thread %s cancelled", static_threads[i].name);
-
+            netdata_thread_cancel(*static_threads[i].thread);
             static_threads[i].enabled = 0;
         }
     }
-
-    // if, for any reason there is any child exited
-    // catch it here
-    info("EXIT: waiting for any unfinished child processes");
-    siginfo_t info;
-    waitid(P_PID, 0, &info, WEXITED|WNOHANG);
-    info("EXIT: all threads/childs stopped.");
 }
 
 struct option_def option_definitions[] = {
@@ -606,8 +594,6 @@ int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
-    size_t wanted_stacksize = 0, stacksize = 0;
-    pthread_attr_t attr;
 
     // set the name for logging
     program_name = "netdata";
@@ -932,21 +918,8 @@ int main(int argc, char **argv) {
         // setup the signals we want to use
         signals_init();
 
-
-        // --------------------------------------------------------------------
-        // get the required stack size of the threads of netdata
-
-        i = pthread_attr_init(&attr);
-        if(i != 0)
-            fatal("pthread_attr_init() failed with code %d.", i);
-
-        i = pthread_attr_getstacksize(&attr, &stacksize);
-        if(i != 0)
-            fatal("pthread_attr_getstacksize() failed with code %d.", i);
-        else
-            debug(D_OPTIONS, "initial pthread stack size is %zu bytes", stacksize);
-
-        wanted_stacksize = (size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)stacksize);
+        // setup threads configs
+        netdata_threads_init();
 
 
         // --------------------------------------------------------------------
@@ -1011,18 +984,7 @@ int main(int argc, char **argv) {
     web_files_uid();
     web_files_gid();
 
-
-    // ------------------------------------------------------------------------
-    // set default pthread stack size - after we have forked
-
-    if(stacksize < wanted_stacksize) {
-        i = pthread_attr_setstacksize(&attr, wanted_stacksize);
-        if(i != 0)
-            fatal("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", wanted_stacksize, i);
-        else
-            debug(D_SYSTEM, "Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
-    }
-
+    netdata_threads_init_after_fork();
 
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
@@ -1045,15 +1007,9 @@ int main(int argc, char **argv) {
         struct netdata_static_thread *st = &static_threads[i];
 
         if(st->enabled) {
-            st->thread = mallocz(sizeof(pthread_t));
-
+            st->thread = mallocz(sizeof(netdata_thread_t));
             debug(D_SYSTEM, "Starting thread %s.", st->name);
-
-            if(pthread_create(st->thread, &attr, st->start_routine, st))
-                error("failed to create new thread for %s.", st->name);
-
-            else if(pthread_detach(*st->thread))
-                error("Cannot request detach of newly created %s thread.", st->name);
+            netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }

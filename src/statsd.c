@@ -254,7 +254,7 @@ static struct statsd {
     char *histogram_percentile_str;
 
     int threads;
-    pthread_t *collection_threads;
+    netdata_thread_t *collection_threads;
 
     LISTEN_SOCKETS sockets;
 } statsd = {
@@ -897,13 +897,11 @@ void statsd_collector_thread_cleanup(void *data) {
 }
 
 void *statsd_collector_thread(void *ptr) {
-    netdata_thread_welcome_nolog("STATSD_COLLECTOR");
-
     int id = *((int *)ptr);
     info("STATSD collector thread No %d created with task id %d", id + 1, gettid());
 
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
-    pthread_cleanup_push(statsd_collector_thread_cleanup, d);
+    netdata_thread_cleanup_push(statsd_collector_thread_cleanup, d);
 
 #ifdef HAVE_RECVMMSG
     d->type = STATSD_SOCKET_DATA_TYPE_UDP;
@@ -929,8 +927,7 @@ void *statsd_collector_thread(void *ptr) {
             , (void *)d
     );
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1982,7 +1979,7 @@ static void statsd_main_cleanup(void *data) {
             int i;
             for (i = 0; i < statsd.threads; i++) {
                 info("STATSD: stopping data collection thread %d...", i + 1);
-                pthread_cancel(statsd.collection_threads[i]);
+                netdata_thread_cancel(statsd.collection_threads[i]);
             }
         }
 
@@ -1994,8 +1991,7 @@ static void statsd_main_cleanup(void *data) {
 }
 
 void *statsd_main(void *ptr) {
-    netdata_thread_welcome("STATSD");
-    pthread_cleanup_push(statsd_main_cleanup, ptr);
+    netdata_thread_cleanup_push(statsd_main_cleanup, ptr);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd configuration
@@ -2084,18 +2080,13 @@ void *statsd_main(void *ptr) {
     statsd_listen_sockets_setup();
     if(!statsd.sockets.opened) {
         error("STATSD: No statsd sockets to listen to. statsd will be disabled.");
-        pthread_exit(NULL);
+        goto cleanup;
     }
 
-    statsd.collection_threads = callocz((size_t)statsd.threads, sizeof(pthread_t));
+    statsd.collection_threads = callocz((size_t)statsd.threads, sizeof(netdata_thread_t));
     int i;
-    for(i = 0; i < statsd.threads ;i++) {
-        if(pthread_create(&statsd.collection_threads[i], NULL, statsd_collector_thread, &i))
-            error("STATSD: failed to create child thread.");
-
-        else if(pthread_detach(statsd.collection_threads[i]))
-            error("STATSD: cannot request detach of child thread.");
-    }
+    for(i = 0; i < statsd.threads ;i++)
+        netdata_thread_create(&statsd.collection_threads[i], "STATSD_COLLECTOR", NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &i);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd monitoring charts
@@ -2286,7 +2277,7 @@ void *statsd_main(void *ptr) {
             break;
     }
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+cleanup:
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
