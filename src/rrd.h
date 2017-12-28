@@ -437,7 +437,7 @@ struct rrdhost {
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     volatile int rrdpush_sender_spawn:1;            // 1 when the sender thread has been spawn
-    pthread_t rrdpush_sender_thread;                // the sender thread
+    netdata_thread_t rrdpush_sender_thread;         // the sender thread
 
     volatile int rrdpush_sender_connected:1;        // 1 when the sender is ready to push metrics
     int rrdpush_sender_socket;                      // the fd of the socket to the remote host, or -1

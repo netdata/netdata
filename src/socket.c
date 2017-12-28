@@ -1158,7 +1158,7 @@ void poll_events(LISTEN_SOCKETS *sockets
 
     int timeout = -1; // wait forever
 
-    pthread_cleanup_push(poll_events_cleanup, &p);
+    netdata_thread_cleanup_push(poll_events_cleanup, &p);
 
     for(;;) {
         if(unlikely(netdata_exit)) break;
@@ -1293,6 +1293,6 @@ void poll_events(LISTEN_SOCKETS *sockets
         }
     }
 
-    pthread_cleanup_pop(1);
+    netdata_thread_cleanup_pop(1);
     debug(D_POLLFD, "POLLFD: LISTENER: cleanup completed");
 }

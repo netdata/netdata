@@ -64,7 +64,7 @@ set(NETDATA_LINUX_FILES
         src/sys_kernel_mm_ksm.c
         src/sys_fs_cgroup.c
         src/sys_fs_btrfs.c
-        )
+        src/threads.c src/threads.h)
 
 set(NETDATA_COMMON_FILES
         src/adaptive_resortable_list.c

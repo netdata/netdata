@@ -76,8 +76,7 @@ static void freebsd_main_cleanup(void *ptr) {
 }
 
 void *freebsd_main(void *ptr) {
-    netdata_thread_welcome("FREEBSD");
-    pthread_cleanup_push(freebsd_main_cleanup, ptr);
+    netdata_thread_cleanup_push(freebsd_main_cleanup, ptr);
 
     int vdo_cpu_netdata = config_get_boolean("plugin:freebsd", "netdata server resources", 1);
 
@@ -169,7 +168,6 @@ void *freebsd_main(void *ptr) {
         }
     }
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -12,8 +12,7 @@ static void checks_main_cleanup(void *ptr) {
 }
 
 void *checks_main(void *ptr) {
-    netdata_thread_welcome("CHECKS");
-    pthread_cleanup_push(checks_main_cleanup, ptr);
+    netdata_thread_cleanup_push(checks_main_cleanup, ptr);
 
     usec_t usec = 0, susec = localhost->rrd_update_every * USEC_PER_SEC, loop_usec = 0, total_susec = 0;
     struct timeval now, last, loop;
@@ -121,8 +120,7 @@ void *checks_main(void *ptr) {
         rrdset_done(check3);
     }
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 

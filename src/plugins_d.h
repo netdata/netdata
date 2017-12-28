@@ -27,7 +27,7 @@ struct plugind {
     char cmd[PLUGINSD_CMD_MAX+1];       // the command that it executes
 
     volatile pid_t pid;
-    pthread_t thread;
+    netdata_thread_t thread;
 
     size_t successful_collections;      // the number of times we have seen
                                         // values collected from this plugin

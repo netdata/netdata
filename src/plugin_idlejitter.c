@@ -12,8 +12,7 @@ static void cpuidlejitter_main_cleanup(void *ptr) {
 }
 
 void *cpuidlejitter_main(void *ptr) {
-    netdata_thread_welcome("IDLEJITTER");
-    pthread_cleanup_push(cpuidlejitter_main_cleanup, ptr);
+    netdata_thread_cleanup_push(cpuidlejitter_main_cleanup, ptr);
 
     usec_t sleep_ut = config_get_number("plugin:idlejitter", "loop time in ms", CPU_IDLEJITTER_SLEEP_TIME_MS) * USEC_PER_MS;
     if(sleep_ut <= 0) {
@@ -85,8 +84,7 @@ void *cpuidlejitter_main(void *ptr) {
         }
     }
 
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 

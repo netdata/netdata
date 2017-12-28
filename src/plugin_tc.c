@@ -853,8 +853,7 @@ static void tc_main_cleanup(void *ptr) {
 }
 
 void *tc_main(void *ptr) {
-    netdata_thread_welcome("TC");
-    pthread_cleanup_push(tc_main_cleanup, ptr);
+    netdata_thread_cleanup_push(tc_main_cleanup, ptr);
 
     struct rusage thread;
 
@@ -1158,7 +1157,6 @@ void *tc_main(void *ptr) {
     }
 
 cleanup:
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
