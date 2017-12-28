@@ -935,7 +935,7 @@ int rrdpush_receiver_permission_denied(struct web_client *w) {
 int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url) {
     (void)host;
 
-    info("STREAM [receive from [%s]:%s]: new client connection.", w->client_ip, w->client_port);
+    info("clients wants to STREAM metrics.");
 
     char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
     int update_every = default_rrd_update_every;
@@ -1051,13 +1051,13 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->update_every      = update_every;
     netdata_thread_t thread;
 
-    debug(D_SYSTEM, "STREAM [receive from [%s]:%s]: starting receiving thread.", w->client_ip, w->client_port);
+    debug(D_SYSTEM, "starting STREAM receive thread.");
 
     char tag[FILENAME_MAX + 1];
-    snprintfz(tag, FILENAME_MAX, "STREAM_RECEIVER[[%s]:%s]", w->client_ip, w->client_port);
+    snprintfz(tag, FILENAME_MAX, "STREAM_RECEIVER[%s,[%s]:%s]", rpt->hostname, w->client_ip, w->client_port);
 
     if(netdata_thread_create(&thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt))
-        error("STREAM [receive from [%s]:%s]: failed to create new thread for client.", w->client_ip, w->client_port);
+        error("Failed to create new STREAM receive thread for client.");
 
     // prevent the caller from closing the streaming socket
     if(w->ifd == w->ofd)
