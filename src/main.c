@@ -594,6 +594,7 @@ int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
+    size_t default_stacksize;
 
     // set the name for logging
     program_name = "netdata";
@@ -919,7 +920,7 @@ int main(int argc, char **argv) {
         signals_init();
 
         // setup threads configs
-        netdata_threads_init();
+        default_stacksize = netdata_threads_init();
 
 
         // --------------------------------------------------------------------
@@ -984,7 +985,7 @@ int main(int argc, char **argv) {
     web_files_uid();
     web_files_gid();
 
-    netdata_threads_init_after_fork();
+    netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.

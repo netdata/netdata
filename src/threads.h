@@ -18,8 +18,8 @@ typedef pthread_t netdata_thread_t;
 
 extern const char *netdata_thread_tag(void);
 
-extern void netdata_threads_init(void);
-extern void netdata_threads_init_after_fork(void);
+extern size_t netdata_threads_init(void);
+extern void netdata_threads_init_after_fork(size_t stacksize);
 
 extern int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine) (void *), void *arg);
 extern int netdata_thread_cancel(netdata_thread_t thread);
