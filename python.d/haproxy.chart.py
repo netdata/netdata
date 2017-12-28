@@ -254,8 +254,7 @@ class Service(UrlService, SocketService):
                 stat_data['_'.join(['backend', metric, idx])] = backend.get(metric) or 0
                 if metric.startswith('hrsp_'):
                     hrsp_total += int(backend.get(metric) or 0)
-            if hrsp_total:
-                stat_data['_'.join(['backend', 'hrsp_total', idx])] = hrsp_total
+            stat_data['_'.join(['backend', 'hrsp_total', idx])] = hrsp_total
         return stat_data
 
     def _get_info_data(self, regex):
