@@ -131,7 +131,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     clearerr(fp);
 
     if(unlikely(fileno(fp) == -1)) {
-        error("PLUGINSD: %s: file is not a valid stream.", cd->fullfilename);
+        error("file descriptor given is not a valid stream");
         goto cleanup;
     }
 
@@ -140,7 +140,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
         char *r = fgets(line, PLUGINSD_LINE_MAX, fp);
         if(unlikely(!r)) {
-            error("PLUGINSD: %s : read failed.", cd->fullfilename);
+            error("read failed");
             break;
         }
 
@@ -148,12 +148,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
         line[PLUGINSD_LINE_MAX] = '\0';
 
-        // debug(D_PLUGINSD, "PLUGINSD: %s: %s", cd->filename, line);
-
         int w = pluginsd_split_words(line, words, PLUGINSD_MAX_WORDS);
         char *s = words[0];
         if(unlikely(!s || !*s || !w)) {
-            // debug(D_PLUGINSD, "PLUGINSD: empty line");
             continue;
         }
 
@@ -164,7 +161,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *value = words[2];
 
             if(unlikely(!dimension || !*dimension)) {
-                error("PLUGINSD: '%s' is requesting a SET on chart '%s' of host '%s', without a dimension. Disabling it.", cd->fullfilename, st->id, host->hostname);
+                error("requested a SET on chart '%s' of host '%s', without a dimension. Disabling it.", st->id, host->hostname);
                 enabled = 0;
                 break;
             }
@@ -172,17 +169,18 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             if(unlikely(!value || !*value)) value = NULL;
 
             if(unlikely(!st)) {
-                error("PLUGINSD: '%s' is requesting a SET on dimension %s with value %s on host '%s', without a BEGIN. Disabling it.", cd->fullfilename, dimension, value?value:"<nothing>", host->hostname);
+                error("requested a SET on dimension %s with value %s on host '%s', without a BEGIN. Disabling it.", dimension, value?value:"<nothing>", host->hostname);
                 enabled = 0;
                 break;
             }
 
-            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) debug(D_PLUGINSD, "PLUGINSD: '%s' is setting dimension %s/%s to %s", cd->fullfilename, st->id, dimension, value?value:"<nothing>");
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                debug(D_PLUGINSD, "is setting dimension %s/%s to %s", st->id, dimension, value?value:"<nothing>");
 
             if(value) {
                 RRDDIM *rd = rrddim_find(st, dimension);
                 if(unlikely(!rd)) {
-                    error("PLUGINSD: '%s' is requesting a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.", cd->fullfilename, dimension, st->name, st->id, st->rrdhost->hostname);
+                    error("requested a SET to dimension with id '%s' on stats '%s' (%s) on host '%s', which does not exist. Disabling it.", dimension, st->name, st->id, st->rrdhost->hostname);
                     enabled = 0;
                     break;
                 }
@@ -195,14 +193,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *microseconds_txt = words[2];
 
             if(unlikely(!id)) {
-                error("PLUGINSD: '%s' is requesting a BEGIN without a chart id for host '%s'. Disabling it.", cd->fullfilename, host->hostname);
+                error("requested a BEGIN without a chart id for host '%s'. Disabling it.", host->hostname);
                 enabled = 0;
                 break;
             }
 
             st = rrdset_find(host, id);
             if(unlikely(!st)) {
-                error("PLUGINSD: '%s' is requesting a BEGIN on chart '%s', which does not exist on host '%s'. Disabling it.", cd->fullfilename, id, host->hostname);
+                error("requested a BEGIN on chart '%s', which does not exist on host '%s'. Disabling it.", id, host->hostname);
                 enabled = 0;
                 break;
             }
@@ -222,12 +220,13 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         }
         else if(likely(hash == END_HASH && !strcmp(s, PLUGINSD_KEYWORD_END))) {
             if(unlikely(!st)) {
-                error("PLUGINSD: '%s' is requesting an END, without a BEGIN on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
+                error("requested an END, without a BEGIN on host '%s'. Disabling it.", host->hostname);
                 enabled = 0;
                 break;
             }
 
-            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting an END on chart %s", cd->fullfilename, st->id);
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
+                debug(D_PLUGINSD, "requested an END on chart %s", st->id);
 
             rrdset_done(st);
             st = NULL;
@@ -259,7 +258,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
             // make sure we have the required variables
             if(unlikely(!type || !*type || !id || !*id)) {
-                error("PLUGINSD: '%s' is requesting a CHART, without a type.id, on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
+                error("requested a CHART, without a type.id, on host '%s'. Disabling it.", host->hostname);
                 enabled = 0;
                 break;
             }
@@ -295,7 +294,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             if(unlikely(!title)) title = "";
             if(unlikely(!units)) units = "unknown";
 
-            debug(D_PLUGINSD, "PLUGINSD: Creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d"
+            debug(D_PLUGINSD, "creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d"
                   , type, id
                   , name?name:""
                   , family?family:""
@@ -352,13 +351,13 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             char *options = words[6];
 
             if(unlikely(!id || !*id)) {
-                error("PLUGINSD: '%s' is requesting a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", cd->fullfilename, host->hostname, st?st->id:"UNSET");
+                error("requested a DIMENSION, without an id, host '%s' and chart '%s'. Disabling it.", host->hostname, st?st->id:"UNSET");
                 enabled = 0;
                 break;
             }
 
             if(unlikely(!st)) {
-                error("PLUGINSD: '%s' is requesting a DIMENSION, without a CHART, on host '%s'. Disabling it.", cd->fullfilename, host->hostname);
+                error("requested a DIMENSION, without a CHART, on host '%s'. Disabling it.", host->hostname);
                 enabled = 0;
                 break;
             }
@@ -374,7 +373,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             if(unlikely(!algorithm || !*algorithm)) algorithm = "absolute";
 
             if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-                debug(D_PLUGINSD, "PLUGINSD: Creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
+                debug(D_PLUGINSD, "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'"
                       , st->id
                       , id
                       , name?name:""
@@ -412,7 +411,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             }
 
             if(unlikely(!name || !*name)) {
-                error("PLUGINSD: '%s' is requesting a VARIABLE on host '%s', without a variable name. Disabling it.", cd->fullfilename, host->hostname);
+                error("requested a VARIABLE on host '%s', without a variable name. Disabling it.", host->hostname);
                 enabled = 0;
                 break;
             }
@@ -426,38 +425,38 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
                 if(unlikely(endptr && *endptr)) {
                     if(endptr == value)
-                        error("PLUGINSD: '%s': the value '%s' of VARIABLE '%s' on host '%s' cannot be parsed as a number", cd->fullfilename, value, name, host->hostname);
+                        error("the value '%s' of VARIABLE '%s' on host '%s' cannot be parsed as a number", value, name, host->hostname);
                     else
-                        error("PLUGINSD: '%s': the value '%s' of VARIABLE '%s' on host '%s' has leftovers: '%s'", cd->fullfilename, value, name, host->hostname, endptr);
+                        error("the value '%s' of VARIABLE '%s' on host '%s' has leftovers: '%s'", value, name, host->hostname, endptr);
                 }
 
                 if(global) {
                     RRDVAR *rv = rrdvar_custom_host_variable_create(host, name);
                     if (rv) rrdvar_custom_host_variable_set(host, rv, v);
-                    else error("PLUGINSD: '%s': cannot find/create HOST VARIABLE '%s' on host '%s'", cd->fullfilename, name, host->hostname);
+                    else error("cannot find/create HOST VARIABLE '%s' on host '%s'", name, host->hostname);
                 }
                 else if(st) {
                     RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(st, name);
                     if (rs) rrdsetvar_custom_chart_variable_set(rs, v);
-                    else error("PLUGINSD: '%s': cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", cd->fullfilename, name, host->hostname, st->id);
+                    else error("cannot find/create CHART VARIABLE '%s' on host '%s', chart '%s'", name, host->hostname, st->id);
                 }
                 else
-                    error("PLUGINSD: '%s': cannot find/create CHART VARIABLE '%s' on host '%s' without a chart", cd->fullfilename, name, host->hostname);
+                    error("cannot find/create CHART VARIABLE '%s' on host '%s' without a chart", name, host->hostname);
             }
             else
-                error("PLUGINSD: '%s': cannot set %s VARIABLE '%s' on host '%s' to an empty value", cd->fullfilename, (global)?"HOST":"CHART", name, host->hostname);
+                error("cannot set %s VARIABLE '%s' on host '%s' to an empty value", (global)?"HOST":"CHART", name, host->hostname);
         }
         else if(likely(hash == FLUSH_HASH && !strcmp(s, PLUGINSD_KEYWORD_FLUSH))) {
-            debug(D_PLUGINSD, "PLUGINSD: '%s' is requesting a FLUSH", cd->fullfilename);
+            debug(D_PLUGINSD, "requested a FLUSH");
             st = NULL;
         }
         else if(unlikely(hash == DISABLE_HASH && !strcmp(s, PLUGINSD_KEYWORD_DISABLE))) {
-            info("PLUGINSD: '%s' called DISABLE. Disabling it.", cd->fullfilename);
+            info("called DISABLE. Disabling it.");
             enabled = 0;
             break;
         }
         else {
-            error("PLUGINSD: '%s' is sending command '%s' which is not known by netdata, for host '%s'. Disabling it.", cd->fullfilename, s, host->hostname);
+            error("sent command '%s' which is not known by netdata, for host '%s'. Disabling it.", s, host->hostname);
             enabled = 0;
             break;
         }
@@ -482,15 +481,14 @@ static void pluginsd_worker_thread_cleanup(void *arg) {
     if(cd->enabled && !cd->obsolete) {
         cd->obsolete = 1;
 
-        info("PLUGINSD: '%s' thread exiting", cd->fullfilename);
+        info("data collection thread exiting");
 
         if (cd->pid) {
             siginfo_t info;
-            info("PLUGINSD: killing %s plugin child process pid %d", cd->id, cd->pid);
+            info("killing child process pid %d", cd->pid);
             if (killpid(cd->pid, SIGTERM) != -1) {
-                info("PLUGINSD: waiting for %s plugin child process pid %d to exit...", cd->id, cd->pid);
+                info("waiting for child process pid %d to exit...", cd->pid);
                 waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
-                info("PLUGINSD: finished %s plugin child process pid %d.", cd->id, cd->pid);
             }
             cd->pid = 0;
         }
@@ -512,9 +510,9 @@ void *pluginsd_worker_thread(void *arg) {
             break;
         }
 
-        info("%s on tid %d: connected to '%s' running on pid %d", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid);
+        info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
         count = pluginsd_process(localhost, cd, fp, 0);
-        error("%s on tid %d: '%s' (pid %d) disconnected after %zu successful data collections (ENDs).", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, count);
+        error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
         killpid(cd->pid, SIGTERM);
 
         // get the return code
@@ -525,18 +523,18 @@ void *pluginsd_worker_thread(void *arg) {
 
             if(likely(!cd->successful_collections)) {
                 // nothing collected - disable it
-                error("%s on tid %d: '%s' (pid %d) exited with error code %d. Disabling it.", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, code);
+                error("'%s' (pid %d) exited with error code %d. Disabling it.", cd->fullfilename, cd->pid, code);
                 cd->enabled = 0;
             }
             else {
                 // we have collected something
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("%s on tid %d: '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
+                    error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s", cd->fullfilename, cd->pid, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {
-                    error("%s on tid %d: '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). We tried %zu times to restart it, but it failed to generate data. Disabling it.", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, code, cd->successful_collections, cd->serial_failures);
+                    error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). We tried %zu times to restart it, but it failed to generate data. Disabling it.", cd->fullfilename, cd->pid, code, cd->successful_collections, cd->serial_failures);
                     cd->enabled = 0;
                 }
             }
@@ -548,11 +546,11 @@ void *pluginsd_worker_thread(void *arg) {
                 // we have collected nothing so far
 
                 if(likely(cd->serial_failures <= 10)) {
-                    error("%s on tid %d: '%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is now disabled.");
+                    error("'%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.", cd->fullfilename, cd->pid, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is now disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
                 else {
-                    error("%s on tid %d: '%s' (pid %d) does not generate useful output, although it reports success (exits with 0), but we have tried %zu times to collect something. Disabling it.", netdata_thread_tag(), gettid(), cd->fullfilename, cd->pid, cd->serial_failures);
+                    error("'%s' (pid %d) does not generate useful output, although it reports success (exits with 0), but we have tried %zu times to collect something. Disabling it.", cd->fullfilename, cd->pid, cd->serial_failures);
                     cd->enabled = 0;
                 }
             }
@@ -573,17 +571,17 @@ static void pluginsd_main_cleanup(void *data) {
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
-        info("%s: cleaning up...", netdata_thread_tag());
+        info("cleaning up...");
 
         struct plugind *cd;
         for (cd = pluginsd_root; cd; cd = cd->next) {
             if (cd->enabled && !cd->obsolete) {
-                info("PLUGINSD: Stopping plugin thread: %s", cd->id);
+                info("stopping plugin thread: %s", cd->id);
                 netdata_thread_cancel(cd->thread);
             }
         }
 
-        info("%s: cleanup completed.", netdata_thread_tag());
+        info("cleanup completed.");
     }
 }
 
@@ -610,7 +608,7 @@ void *pluginsd_main(void *ptr) {
             if(unlikely(!dir)) {
                 if(directory_errors[idx] != errno) {
                     directory_errors[idx] = errno;
-                    error("PLUGINSD: Cannot open plugins directory '%s'.", directory_name);
+                    error("cannot open plugins directory '%s'", directory_name);
                 }
                 continue;
             }
@@ -619,14 +617,14 @@ void *pluginsd_main(void *ptr) {
             while(likely((file = readdir(dir)))) {
                 if(unlikely(netdata_exit)) break;
 
-                debug(D_PLUGINSD, "PLUGINSD: Examining file '%s'", file->d_name);
+                debug(D_PLUGINSD, "examining file '%s'", file->d_name);
 
                 if(unlikely(strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0)) continue;
 
                 int len = (int) strlen(file->d_name);
                 if(unlikely(len <= (int)PLUGINSD_FILE_SUFFIX_LEN)) continue;
                 if(unlikely(strcmp(PLUGINSD_FILE_SUFFIX, &file->d_name[len - (int)PLUGINSD_FILE_SUFFIX_LEN]) != 0)) {
-                    debug(D_PLUGINSD, "PLUGINSD: File '%s' does not end in '%s'.", file->d_name, PLUGINSD_FILE_SUFFIX);
+                    debug(D_PLUGINSD, "file '%s' does not end in '%s'", file->d_name, PLUGINSD_FILE_SUFFIX);
                     continue;
                 }
 
@@ -635,7 +633,7 @@ void *pluginsd_main(void *ptr) {
                 int enabled = config_get_boolean(CONFIG_SECTION_PLUGINS, pluginname, automatic_run);
 
                 if(unlikely(!enabled)) {
-                    debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is not enabled", file->d_name);
+                    debug(D_PLUGINSD, "plugin '%s' is not enabled", file->d_name);
                     continue;
                 }
 
@@ -645,7 +643,7 @@ void *pluginsd_main(void *ptr) {
                     if(unlikely(strcmp(cd->filename, file->d_name) == 0)) break;
 
                 if(likely(cd && !cd->obsolete)) {
-                    debug(D_PLUGINSD, "PLUGINSD: plugin '%s' is already running", cd->filename);
+                    debug(D_PLUGINSD, "plugin '%s' is already running", cd->filename);
                     continue;
                 }
 
@@ -674,8 +672,10 @@ void *pluginsd_main(void *ptr) {
                     cd->obsolete = 1;
 
                     if(cd->enabled) {
+                        char tag[NETDATA_THREAD_TAG_MAX + 1];
+                        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "PLUGINSD[%s]", pluginname);
                         // spawn a new thread for it
-                        netdata_thread_create(&cd->thread, "PLUGINSD_COLLECTOR", NETDATA_THREAD_OPTION_DEFAULT, pluginsd_worker_thread, cd);
+                        netdata_thread_create(&cd->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, pluginsd_worker_thread, cd);
                     }
                 }
             }

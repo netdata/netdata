@@ -912,7 +912,10 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
     rrdhost_wrlock(host);
 
     if(!host->rrdpush_sender_spawn) {
-        if(netdata_thread_create(&host->rrdpush_sender_thread, "STREAM_SENDER", NETDATA_THREAD_OPTION_JOINABLE, rrdpush_sender_thread, (void *) host))
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_SENDER[%s]", host->hostname);
+
+        if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, rrdpush_sender_thread, (void *) host))
             error("STREAM %s [send]: failed to create new thread for client.", host->hostname);
         else
             host->rrdpush_sender_spawn = 1;
@@ -1050,7 +1053,10 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
     debug(D_SYSTEM, "STREAM [receive from [%s]:%s]: starting receiving thread.", w->client_ip, w->client_port);
 
-    if(netdata_thread_create(&thread, "STREAM_RECEIVER", NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt))
+    char tag[FILENAME_MAX + 1];
+    snprintfz(tag, FILENAME_MAX, "STREAM_RECEIVER[[%s]:%s]", w->client_ip, w->client_port);
+
+    if(netdata_thread_create(&thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt))
         error("STREAM [receive from [%s]:%s]: failed to create new thread for client.", w->client_ip, w->client_port);
 
     // prevent the caller from closing the streaming socket

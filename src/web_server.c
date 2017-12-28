@@ -193,7 +193,10 @@ void *socket_listen_main_multi_threaded(void *ptr) {
                 else
                     web_client_set_tcp(w);
 
-                if(netdata_thread_create(&w->thread, "WEB_CLIENT", NETDATA_THREAD_OPTION_DONT_LOG, web_client_main, w) != 0)
+                char tag[NETDATA_THREAD_TAG_MAX + 1];
+                snprintfz(tag, NETDATA_THREAD_TAG_MAX, "WEB_CLIENT[%llu,[%s]:%s]", w->id, w->client_ip, w->client_port);
+
+                if(netdata_thread_create(&w->thread, tag, NETDATA_THREAD_OPTION_DONT_LOG, web_client_main, w) != 0)
                     WEB_CLIENT_IS_OBSOLETE(w);
             }
         }
