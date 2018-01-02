@@ -122,6 +122,7 @@ dist_chartsconfig_DATA = \
     charts.d/apcupsd.conf \
     charts.d/cpufreq.conf \
     charts.d/exim.conf \
+    charts.d/libreswan.conf \
     charts.d/load_average.conf \
     charts.d/mysql.conf \
     charts.d/nut.conf \
