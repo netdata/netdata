@@ -460,6 +460,7 @@ declare -A configs_signatures=(
   ['ca0eb92bdd3de67582ea6db37462895f']='health.d/tcp_resets.conf'
   ['ca249db7a0637d55abb938d969f9b486']='python.d/postfix.conf'
   ['ca9e52b3ee3c71d3d042dc531753a1fd']='apps_groups.conf'
+  ['cad263c67f779029a663b620d6c34704']='charts.d/libreswan.conf'
   ['cb178b15427274d7def5b14bc4c09441']='health.d/net.conf'
   ['cb60badf376d246ad8ec9d3f524db430']='health.d/disks.conf'
   ['cb7f80cd2768c649d7448e01f8aa6579']='python.d.conf'
