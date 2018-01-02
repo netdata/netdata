@@ -155,7 +155,7 @@ struct web_client {
     size_t stats_received_bytes;
     size_t stats_sent_bytes;
 
-    pthread_t thread;               // the thread servicing this client
+    netdata_thread_t thread;               // the thread servicing this client
 
     struct web_client *prev;
     struct web_client *next;

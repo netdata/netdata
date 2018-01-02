@@ -43,7 +43,7 @@ static void mypopen_del(FILE *fp) {
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-FILE *mypopen(const char *command, pid_t *pidptr)
+FILE *mypopen(const char *command, volatile pid_t *pidptr)
 {
     int pipefd[2];
 
@@ -125,6 +125,8 @@ int mypclose(FILE *fp, pid_t pid) {
 
     // close the pipe file pointer
     fclose(fp);
+
+    errno = 0;
 
     siginfo_t info;
     if(waitid(P_PID, (id_t) pid, &info, WEXITED) != -1) {

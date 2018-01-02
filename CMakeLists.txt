@@ -63,7 +63,8 @@ set(NETDATA_LINUX_FILES
         src/proc_uptime.c
         src/sys_kernel_mm_ksm.c
         src/sys_fs_cgroup.c
-        src/sys_fs_btrfs.c)
+        src/sys_fs_btrfs.c
+        src/threads.c src/threads.h)
 
 set(NETDATA_COMMON_FILES
         src/adaptive_resortable_list.c
@@ -94,6 +95,7 @@ set(NETDATA_COMMON_FILES
         src/health_json.c
         src/health_log.c
         src/inlined.h
+        src/locks.c
         src/locks.h
         src/log.c
         src/log.h
@@ -189,6 +191,8 @@ set(APPS_PLUGIN_SOURCE_FILES
         src/clocks.c
         src/clocks.h
         src/inlined.h
+        src/locks.c
+        src/locks.h
         src/log.c
         src/log.h
         src/procfile.c
@@ -205,6 +209,8 @@ set(FREEIPMI_PLUGIN_SOURCE_FILES
         src/clocks.c
         src/clocks.h
         src/inlined.h
+        src/locks.c
+        src/locks.h
         src/log.c
         src/log.h
         src/procfile.c
@@ -219,6 +225,8 @@ set(CGROUP_NETWORK_SOURCE_FILES
         src/clocks.c
         src/clocks.h
         src/inlined.h
+        src/locks.c
+        src/locks.h
         src/log.c
         src/log.h
         src/procfile.c

@@ -1087,9 +1087,6 @@ void rrdset_done(RRDSET *st) {
 
     RRDDIM *rd;
 
-    int
-            pthreadoldcancelstate;  // store the old cancelable pthread state, to restore it at the end
-
     char
             store_this_entry = 1,   // boolean: 1 = store this entry, 0 = don't store this entry
             first_entry = 0;        // boolean: 1 = this is the first entry seen for this chart, 0 = all other entries
@@ -1101,8 +1098,7 @@ void rrdset_done(RRDSET *st) {
             next_store_ut,          // the timestamp in microseconds, of the next entry to store in the db
             update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
 
-    if(unlikely(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &pthreadoldcancelstate) != 0))
-        error("Cannot set pthread cancel state to DISABLE.");
+    netdata_thread_disable_cancelability();
 
     // a read lock is OK here
     rrdset_rdlock(st);
@@ -1547,6 +1543,5 @@ void rrdset_done(RRDSET *st) {
 
     rrdset_unlock(st);
 
-    if(unlikely(pthread_setcancelstate(pthreadoldcancelstate, NULL) != 0))
-        error("Cannot set pthread cancel state to RESTORE (%d).", pthreadoldcancelstate);
+    netdata_thread_enable_cancelability();
 }

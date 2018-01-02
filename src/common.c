@@ -1116,22 +1116,6 @@ int fd_is_valid(int fd) {
     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 
-pid_t gettid(void) {
-#ifdef __FreeBSD__
-    return (pid_t)pthread_getthreadid_np();
-#elif defined(__APPLE__)
-#if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
-    uint64_t curthreadid;
-    pthread_threadid_np(NULL, &curthreadid);
-    return (pid_t)curthreadid;
-#else /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-    return (pid_t)pthread_self;
-#endif /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-#else /* __APPLE__*/
-    return (pid_t)syscall(SYS_gettid);
-#endif /* __FreeBSD__, __APPLE__*/
-}
-
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
     char *s = fgets(buf, (int)buf_size, fp);
     if (!s) return NULL;

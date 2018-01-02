@@ -328,16 +328,17 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         m->collected++;
 }
 
-void *proc_diskspace_main(void *ptr) {
+static void diskspace_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
 
-    info("DISKSPACE thread created with task id %d", gettid());
+        info("%s: cleaning up...", netdata_thread_tag());
+    }
+}
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("DISKSPACE: Cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("DISKSPACE: Cannot set pthread cancel state to ENABLE.");
+void *proc_diskspace_main(void *ptr) {
+    netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 
     int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
 
@@ -357,7 +358,7 @@ void *proc_diskspace_main(void *ptr) {
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    for(;;) {
+    while(!netdata_exit) {
         duration = heartbeat_dt_usec(&hb);
         /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
@@ -454,9 +455,6 @@ void *proc_diskspace_main(void *ptr) {
         }
     }
 
-    info("DISKSPACE thread exiting");
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

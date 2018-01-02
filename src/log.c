@@ -246,7 +246,7 @@ void debug_int( const char *file, const char *function, const unsigned long line
     log_date(date, LOG_DATE_LENGTH);
 
     va_start( args, fmt );
-    printf("%s: %s DEBUG (%04lu@%-10.10s:%-15.15s): ", date, program_name, line, file, function);
+    printf("%s: %s DEBUG : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
     vprintf(fmt, args);
     va_end( args );
     putchar('\n');
@@ -282,8 +282,8 @@ void info_int( const char *file, const char *function, const unsigned long line,
     log_lock();
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: %s INFO : (%04lu@%-10.10s:%-15.15s): ", date, program_name, line, file, function);
-    else            fprintf(stderr, "%s: %s INFO : ", date, program_name);
+    if(debug_flags) fprintf(stderr, "%s: %s INFO  : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
+    else            fprintf(stderr, "%s: %s INFO  : %s : ", date, program_name, netdata_thread_tag());
     vfprintf( stderr, fmt, args );
     va_end( args );
 
@@ -338,8 +338,8 @@ void error_int( const char *prefix, const char *file, const char *function, cons
     log_lock();
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: %s %s: (%04lu@%-10.10s:%-15.15s): ", date, program_name, prefix, line, file, function);
-    else            fprintf(stderr, "%s: %s %s: ", date, program_name, prefix);
+    if(debug_flags) fprintf(stderr, "%s: %s %-5.5s : %s: (%04lu@%-10.10s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
+    else            fprintf(stderr, "%s: %s %-5.5s : %s: ", date, program_name, prefix, netdata_thread_tag());
     vfprintf( stderr, fmt, args );
     va_end( args );
 
@@ -369,8 +369,8 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     log_lock();
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: %s FATAL: (%04lu@%-10.10s:%-15.15s): ", date, program_name, line, file, function);
-    else            fprintf(stderr, "%s: %s FATAL: ", date, program_name);
+    if(debug_flags) fprintf(stderr, "%s: %s FATAL : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
+    else            fprintf(stderr, "%s: %s FATAL : %s :", date, program_name, netdata_thread_tag());
     vfprintf( stderr, fmt, args );
     va_end( args );
 

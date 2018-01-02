@@ -172,6 +172,7 @@
 
 #include "clocks.h"
 #include "log.h"
+#include "threads.h"
 #include "locks.h"
 #include "simple_pattern.h"
 #include "avl.h"
@@ -293,8 +294,6 @@ extern int memory_file_save(const char *filename, void *mem, size_t size);
 extern int fd_is_valid(int fd);
 
 extern int enable_ksm;
-
-extern pid_t gettid(void);
 
 extern int sleep_usec(usec_t usec);
 
