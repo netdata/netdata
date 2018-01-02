@@ -70,6 +70,7 @@ netdata_SOURCES = \
 	health_json.c \
 	health_log.c \
 	inlined.h \
+	locks.c \
 	locks.h \
 	log.c \
 	log.h \
@@ -127,6 +128,8 @@ netdata_SOURCES = \
 	statsd.h \
 	storage_number.c \
 	storage_number.h \
+	threads.c \
+	threads.h \
 	unit_test.c \
 	unit_test.h \
 	url.c \
@@ -223,13 +226,22 @@ netdata_LDADD = \
 
 apps_plugin_SOURCES = \
 	apps_plugin.c \
-	avl.c avl.h \
-	clocks.c clocks.h \
-	common.c common.h \
+	avl.c \
+	avl.h \
+	clocks.c \
+	clocks.h \
+	common.c \
+	common.h \
 	inlined.h \
+	locks.c \
+	locks.h \
 	log.c log.h \
-	procfile.c procfile.h \
-	web_buffer.c web_buffer.h \
+	procfile.c \
+	procfile.h \
+	threads.c \
+	threads.h \
+	web_buffer.c \
+	web_buffer.h \
 	$(NULL)
 
 if FREEBSD
@@ -245,11 +257,18 @@ apps_plugin_LDADD = \
 
 freeipmi_plugin_SOURCES = \
 	freeipmi_plugin.c \
-	clocks.c clocks.h \
-	common.c common.h \
+	clocks.c \
+	clocks.h \
+	common.c \
+	common.h \
 	inlined.h \
+	locks.c \
+	locks.h \
 	log.c log.h \
-	procfile.c procfile.h \
+	procfile.c \
+	procfile.h \
+	threads.c \
+	threads.h \
 	$(NULL)
 
 freeipmi_plugin_LDADD = \
@@ -258,13 +277,23 @@ freeipmi_plugin_LDADD = \
 
 cgroup_network_SOURCES = \
     cgroup-network.c \
-	clocks.c clocks.h \
-    common.c common.h \
+	clocks.c \
+	clocks.h \
+    common.c \
+    common.h \
     inlined.h \
-    log.c log.h \
-	procfile.c procfile.h \
-	popen.c popen.h \
-	signals.c signals.h \
+	locks.c \
+	locks.h \
+    log.c \
+    log.h \
+	procfile.c \
+	procfile.h \
+	popen.c \
+	popen.h \
+	signals.c \
+	signals.h \
+	threads.c \
+	threads.h \
     $(NULL)
 
 cgroup_network_LDADD = \

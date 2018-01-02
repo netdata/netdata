@@ -91,8 +91,6 @@ static inline void cleanup_web_clients(void) {
     for (w = web_clients; w;) {
         if (web_client_check_obsolete(w)) {
             debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
-            // pthread_cancel(w->thread);
-            // pthread_join(w->thread, NULL);
             w = web_client_free(w);
 #ifdef NETDATA_INTERNAL_CHECKS
             log_allocations();
@@ -104,45 +102,67 @@ static inline void cleanup_web_clients(void) {
 
 // 1. it accepts new incoming requests on our port
 // 2. creates a new web_client for each connection received
-// 3. spawns a new pthread to serve the client (this is optimal for keep-alive clients)
-// 4. cleans up old web_clients that their pthreads have been exited
+// 3. spawns a new netdata_thread to serve the client (this is optimal for keep-alive clients)
+// 4. cleans up old web_clients that their netdata_threads have been exited
 
 #define CLEANUP_EVERY_EVENTS 100
 
+static struct pollfd *socket_listen_main_multi_threaded_fds = NULL;
+
+static void socket_listen_main_multi_threaded_cleanup(void *data) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
+
+        info("%s: cleaning up...", netdata_thread_tag());
+
+        info("LISTENER: releasing allocated memory...");
+        freez(socket_listen_main_multi_threaded_fds);
+
+        info("LISTENER: closing all sockets...");
+        listen_sockets_close(&api_sockets);
+
+        info("LISTENER: cleanup completed.");
+    }
+
+    struct web_client *w;
+    for(w = web_clients; w ; w = w->next) {
+        if(!web_client_check_obsolete(w)) {
+            WEB_CLIENT_IS_OBSOLETE(w);
+            info("LISTENER: Stopping web client %s, id %llu", w->client_ip, w->id);
+            netdata_thread_cancel(w->thread);
+        }
+    }
+}
+
 void *socket_listen_main_multi_threaded(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    netdata_thread_cleanup_push(socket_listen_main_multi_threaded_cleanup, ptr);
 
     web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
-    info("Multi-threaded WEB SERVER thread created with task id %d", gettid());
 
     struct web_client *w;
     int retval, counter = 0;
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
-
     if(!api_sockets.opened)
         fatal("LISTENER: No sockets to listen to.");
 
-    struct pollfd *fds = callocz(sizeof(struct pollfd), api_sockets.opened);
+    socket_listen_main_multi_threaded_fds = callocz(sizeof(struct pollfd), api_sockets.opened);
 
     size_t i;
     for(i = 0; i < api_sockets.opened ;i++) {
-        fds[i].fd = api_sockets.fds[i];
-        fds[i].events = POLLIN;
-        fds[i].revents = 0;
+        socket_listen_main_multi_threaded_fds[i].fd = api_sockets.fds[i];
+        socket_listen_main_multi_threaded_fds[i].events = POLLIN;
+        socket_listen_main_multi_threaded_fds[i].revents = 0;
 
         info("Listening on '%s'", (api_sockets.fds_names[i])?api_sockets.fds_names[i]:"UNKNOWN");
     }
 
     int timeout = 10 * 1000;
 
-    for(;;) {
+    while(!netdata_exit) {
+
         // debug(D_WEB_CLIENT, "LISTENER: Waiting...");
-        retval = poll(fds, api_sockets.opened, timeout);
+        retval = poll(socket_listen_main_multi_threaded_fds, api_sockets.opened, timeout);
 
         if(unlikely(retval == -1)) {
             error("LISTENER: poll() failed.");
@@ -156,13 +176,13 @@ void *socket_listen_main_multi_threaded(void *ptr) {
         }
 
         for(i = 0 ; i < api_sockets.opened ; i++) {
-            short int revents = fds[i].revents;
+            short int revents = socket_listen_main_multi_threaded_fds[i].revents;
 
             // check for new incoming connections
             if(revents & POLLIN || revents & POLLPRI) {
-                fds[i].revents = 0;
+                socket_listen_main_multi_threaded_fds[i].revents = 0;
 
-                w = web_client_create(fds[i].fd);
+                w = web_client_create(socket_listen_main_multi_threaded_fds[i].fd);
                 if(unlikely(!w)) {
                     // no need for error log - web_client_create already logged the error
                     continue;
@@ -173,14 +193,11 @@ void *socket_listen_main_multi_threaded(void *ptr) {
                 else
                     web_client_set_tcp(w);
 
-                if(pthread_create(&w->thread, NULL, web_client_main, w) != 0) {
-                    error("%llu: failed to create new thread for web client.", w->id);
+                char tag[NETDATA_THREAD_TAG_MAX + 1];
+                snprintfz(tag, NETDATA_THREAD_TAG_MAX, "WEB_CLIENT[%llu,[%s]:%s]", w->id, w->client_ip, w->client_port);
+
+                if(netdata_thread_create(&w->thread, tag, NETDATA_THREAD_OPTION_DONT_LOG, web_client_main, w) != 0)
                     WEB_CLIENT_IS_OBSOLETE(w);
-                }
-                else if(pthread_detach(w->thread) != 0) {
-                    error("%llu: Cannot request detach of newly created web client thread.", w->id);
-                    WEB_CLIENT_IS_OBSOLETE(w);
-                }
             }
         }
 
@@ -192,13 +209,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
         }
     }
 
-    debug(D_WEB_CLIENT, "LISTENER: exit!");
-    listen_sockets_close(&api_sockets);
-
-    freez(fds);
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -246,21 +257,27 @@ static inline int single_threaded_unlink_client(struct web_client *w, fd_set *if
     return 0;
 }
 
+static void socket_listen_main_single_threaded_cleanup(void *data) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
+
+        info("%s: cleaning up...", netdata_thread_tag());
+
+        info("LISTENER: closing all sockets...");
+        listen_sockets_close(&api_sockets);
+
+        info("LISTENER: cleanup completed.");
+        debug(D_WEB_CLIENT, "LISTENER: exit!");
+    }
+}
+
 void *socket_listen_main_single_threaded(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-
+    netdata_thread_cleanup_push(socket_listen_main_single_threaded_cleanup, ptr);
     web_server_mode = WEB_SERVER_MODE_SINGLE_THREADED;
-
-    info("Single-threaded WEB SERVER thread created with task id %d", gettid());
 
     struct web_client *w;
     int retval;
-
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
 
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
@@ -287,7 +304,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
             fdmax = api_sockets.fds[i];
     }
 
-    for(;;) {
+    while(!netdata_exit) {
         debug(D_WEB_CLIENT_ACCESS, "LISTENER: single threaded web server waiting (fdmax = %d)...", fdmax);
 
         struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
@@ -370,11 +387,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
         }
     }
 
-    debug(D_WEB_CLIENT, "LISTENER: exit!");
-    listen_sockets_close(&api_sockets);
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -483,18 +496,19 @@ static int web_server_snd_callback(int fd, int socktype, void *data, short int *
     return 0;
 }
 
-void *socket_listen_main_single_threaded(void *ptr) {
+static void socket_listen_main_single_threaded_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
 
+        info("%s: cleaning up...", netdata_thread_tag());
+        listen_sockets_close(&api_sockets);
+    }
+}
+
+void *socket_listen_main_single_threaded(void *ptr) {
+    netdata_thread_cleanup_push(socket_listen_main_single_threaded_cleanup, ptr);
     web_server_mode = WEB_SERVER_MODE_SINGLE_THREADED;
-
-    info("Single-threaded WEB SERVER thread created with task id %d", gettid());
-
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
 
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
@@ -508,11 +522,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
                 , NULL
     );
 
-    debug(D_WEB_CLIENT, "LISTENER: exit!");
-    listen_sockets_close(&api_sockets);
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 #endif

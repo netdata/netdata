@@ -252,7 +252,10 @@ static struct statsd {
     size_t histogram_increase_step;
     double histogram_percentile;
     char *histogram_percentile_str;
+
     int threads;
+    netdata_thread_t *collection_threads;
+
     LISTEN_SOCKETS sockets;
 } statsd = {
         .enabled = 1,
@@ -320,6 +323,7 @@ static struct statsd {
         .histogram_percentile = 95.0,
         .histogram_increase_step = 10,
         .threads = 0,
+        .collection_threads = NULL,
         .sockets = {
                 .config_section  = CONFIG_SECTION_STATSD,
                 .default_bind_to = "udp:localhost tcp:localhost",
@@ -872,33 +876,32 @@ static int statsd_snd_callback(int fd, int socktype, void *data, short int *even
 // statsd child thread to collect metrics from network
 
 void statsd_collector_thread_cleanup(void *data) {
-    struct statsd_udp *d = data;
+    static __thread int executed = 0;
+    if(!executed) {
+        executed = 1;
+        info("%s: cleaning up...", netdata_thread_tag());
+
+        struct statsd_udp *d = data;
 
 #ifdef HAVE_RECVMMSG
-    size_t i;
-    for (i = 0; i < d->size; i++)
-        freez(d->iovecs[i].iov_base);
+        size_t i;
+        for (i = 0; i < d->size; i++)
+            freez(d->iovecs[i].iov_base);
 
-    freez(d->iovecs);
-    freez(d->msgs);
+        freez(d->iovecs);
+        freez(d->msgs);
 #endif
 
-    freez(d);
+        freez(d);
+    }
 }
 
 void *statsd_collector_thread(void *ptr) {
     int id = *((int *)ptr);
-
     info("STATSD collector thread No %d created with task id %d", id + 1, gettid());
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
-
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
-    pthread_cleanup_push(statsd_collector_thread_cleanup, d);
+    netdata_thread_cleanup_push(statsd_collector_thread_cleanup, d);
 
 #ifdef HAVE_RECVMMSG
     d->type = STATSD_SOCKET_DATA_TYPE_UDP;
@@ -924,10 +927,7 @@ void *statsd_collector_thread(void *ptr) {
             , (void *)d
     );
 
-    pthread_cleanup_pop(1);
-
-    debug(D_WEB_CLIENT, "STATSD: exit!");
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -1964,30 +1964,34 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
 // --------------------------------------------------------------------------------------
 // statsd main thread
 
-int statsd_listen_sockets_setup(void) {
+static int statsd_listen_sockets_setup(void) {
     return listen_sockets_setup(&statsd.sockets);
 }
 
-void statsd_main_cleanup(void *data) {
-    pthread_t *threads = data;
+static void statsd_main_cleanup(void *data) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
 
-    int i;
-    for(i = 0; i < statsd.threads ;i++)
-        pthread_cancel(threads[i]);
+        info("%s: cleaning up...", netdata_thread_tag());
 
-    listen_sockets_close(&statsd.sockets);
+        if (statsd.collection_threads) {
+            int i;
+            for (i = 0; i < statsd.threads; i++) {
+                info("STATSD: stopping data collection thread %d...", i + 1);
+                netdata_thread_cancel(statsd.collection_threads[i]);
+            }
+        }
+
+        info("STATSD: closing sockets...");
+        listen_sockets_close(&statsd.sockets);
+
+        info("STATSD: cleanup completed.");
+    }
 }
 
 void *statsd_main(void *ptr) {
-    (void)ptr;
-
-    info("STATSD main thread created with task id %d", gettid());
-
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("Cannot set pthread cancel type to DEFERRED.");
-
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("Cannot set pthread cancel state to ENABLE.");
+    netdata_thread_cleanup_push(statsd_main_cleanup, ptr);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd configuration
@@ -2076,21 +2080,16 @@ void *statsd_main(void *ptr) {
     statsd_listen_sockets_setup();
     if(!statsd.sockets.opened) {
         error("STATSD: No statsd sockets to listen to. statsd will be disabled.");
-        pthread_exit(NULL);
+        goto cleanup;
     }
 
-    pthread_t threads[statsd.threads];
+    statsd.collection_threads = callocz((size_t)statsd.threads, sizeof(netdata_thread_t));
     int i;
-
     for(i = 0; i < statsd.threads ;i++) {
-        if(pthread_create(&threads[i], NULL, statsd_collector_thread, &i))
-            error("STATSD: failed to create child thread.");
-
-        else if(pthread_detach(threads[i]))
-            error("STATSD: cannot request detach of child thread.");
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_COLLECTOR[%d]", i + 1);
+        netdata_thread_create(&statsd.collection_threads[i], tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &i);
     }
-
-    pthread_cleanup_push(statsd_main_cleanup, &threads);
 
     // ----------------------------------------------------------------------------------------------------------------
     // statsd monitoring charts
@@ -2281,8 +2280,7 @@ void *statsd_main(void *ptr) {
             break;
     }
 
-    pthread_cleanup_pop(1);
-
-    pthread_exit(NULL);
+cleanup:
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }

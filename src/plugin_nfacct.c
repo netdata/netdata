@@ -751,17 +751,25 @@ static void nfacct_send_metrics() {
 
 // ----------------------------------------------------------------------------
 
-void *nfacct_main(void *ptr) {
+static void nfacct_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    if(static_thread->enabled) {
+        static_thread->enabled = 0;
 
-    info("NETFILTER thread created with task id %d", gettid());
+        info("%s: cleaning up...", netdata_thread_tag());
 
-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("NETFILTER: Cannot set pthread cancel type to DEFERRED.");
+#ifdef DO_NFACCT
+        nfacct_cleanup();
+#endif
 
-    if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("NETFILTER: Cannot set pthread cancel state to ENABLE.");
+#ifdef DO_NFSTAT
+        nfstat_cleanup();
+#endif
+    }
+}
 
+void *nfacct_main(void *ptr) {
+    netdata_thread_cleanup_push(nfacct_main_cleanup, ptr);
 
     int update_every = (int)config_get_number("plugin:netfilter", "update every", localhost->rrd_update_every);
     if(update_every < localhost->rrd_update_every)
@@ -805,18 +813,7 @@ void *nfacct_main(void *ptr) {
 #endif
     }
 
-    info("NETFILTER thread exiting");
-
-#ifdef DO_NFACCT
-    nfacct_cleanup();
-#endif
-
-#ifdef DO_NFSTAT
-    nfstat_cleanup();
-#endif
-
-    static_thread->enabled = 0;
-    pthread_exit(NULL);
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 

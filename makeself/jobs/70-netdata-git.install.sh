@@ -9,6 +9,7 @@ then
     export CFLAGS="-static -O3"
 else
     export CFLAGS="-static -O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -D_FORTIFY_SOURCE=2 -DNETDATA_INTERNAL_CHECKS=1"
+#    export CFLAGS="-static -O1 -ggdb -Wall -Wextra -Wformat-signedness"
 fi
 
 if [ ! -z "${NETDATA_INSTALL_PATH}" -a -d "${NETDATA_INSTALL_PATH}/etc" ]

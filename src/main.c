@@ -6,28 +6,39 @@ void netdata_cleanup_and_exit(int ret) {
     netdata_exit = 1;
 
     error_log_limit_unlimited();
+    info("EXIT: netdata prepares to exit with code %d...", ret);
 
-    debug(D_EXIT, "Called: netdata_cleanup_and_exit()");
+    if(ret) {
+        // this is bad - exiting due to a fatal condition
 
-    // cleanup the database
-    rrdhost_cleanup_all();
+        // cleanup/save the database and exit
+        info("EXIT: cleaning up the database...");
+        rrdhost_cleanup_all();
+    }
+    else {
+        // exit cleanly
+
+        // stop everything
+        info("EXIT: stopping master threads...");
+        cancel_main_threads();
+
+        // cleanup the database (delete files not needed)
+        info("EXIT: cleaning up the database...");
+        rrdhost_cleanup_all();
+
+        // free the database
+        info("EXIT: freeing database memory...");
+        rrdhost_free_all();
+    }
 
     // unlink the pid
     if(pidfile[0]) {
+        info("EXIT: removing netdata PID file '%s'...", pidfile);
         if(unlink(pidfile) != 0)
-            error("Cannot unlink pidfile '%s'.", pidfile);
+            error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    // kill all childs
-    //kill_childs();
-
-    // free database
-    sleep(2);
-    rrdhost_free_all();
-#endif
-
-    info("netdata exiting. Bye bye...");
+    info("EXIT: all done - netdata is now exiting - bye bye...");
     exit(ret);
 }
 
@@ -36,37 +47,37 @@ struct netdata_static_thread static_threads[] = {
 #ifdef INTERNAL_PLUGIN_NFACCT
     // nfacct requires root access
     // so, we build it as an external plugin with setuid to root
-    {"nfacct",              CONFIG_SECTION_PLUGINS,  "nfacct",     1, NULL, NULL, nfacct_main},
+    {"PLUGIN[nfacct]",       CONFIG_SECTION_PLUGINS,  "nfacct",     1, NULL, NULL, nfacct_main},
 #endif
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // debugging plugin
-    {"check",               CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
+    {"PLUGIN[check]",        CONFIG_SECTION_PLUGINS,  "checks",     0, NULL, NULL, checks_main},
 #endif
 
 #if defined(__FreeBSD__)
     // FreeBSD internal plugins
-    {"freebsd",             CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
+    {"PLUGIN[freebsd]",      CONFIG_SECTION_PLUGINS,  "freebsd",    1, NULL, NULL, freebsd_main},
 #elif defined(__APPLE__)
     // macOS internal plugins
-    {"macos",               CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
+    {"PLUGIN[macos]",        CONFIG_SECTION_PLUGINS,  "macos",      1, NULL, NULL, macos_main},
 #else
     // linux internal plugins
-    {"proc",                CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
-    {"diskspace",           CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
-    {"cgroups",             CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
-    {"tc",                  CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
+    {"PLUGIN[proc]",         CONFIG_SECTION_PLUGINS,  "proc",       1, NULL, NULL, proc_main},
+    {"PLUGIN[diskspace]",    CONFIG_SECTION_PLUGINS,  "diskspace",  1, NULL, NULL, proc_diskspace_main},
+    {"PLUGIN[cgroup]",       CONFIG_SECTION_PLUGINS,  "cgroups",    1, NULL, NULL, cgroups_main},
+    {"PLUGIN[tc]",           CONFIG_SECTION_PLUGINS,  "tc",         1, NULL, NULL, tc_main},
 #endif /* __FreeBSD__, __APPLE__*/
 
     // common plugins for all systems
-    {"idlejitter",          CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
-    {"backends",            NULL,                    NULL,         1, NULL, NULL, backends_main},
-    {"health",              NULL,                    NULL,         1, NULL, NULL, health_main},
-    {"plugins.d",           NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
-    {"web",                 NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
-    {"web-single-threaded", NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
-    {"push-metrics",        NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
-    {"statsd",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
+    {"PLUGIN[idlejitter]",   CONFIG_SECTION_PLUGINS,  "idlejitter", 1, NULL, NULL, cpuidlejitter_main},
+    {"BACKENDS",            NULL,                    NULL,         1, NULL, NULL, backends_main},
+    {"HEALTH",              NULL,                    NULL,         1, NULL, NULL, health_main},
+    {"PLUGINSD",            NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
+    {"WEB_SERVER[multi]",   NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
+    {"WEB_SERVER[single]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
+    {"STREAM",              NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
+    {"STATSD",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
 
     {NULL,                  NULL,                    NULL,         0, NULL, NULL, NULL}
 };
@@ -177,51 +188,17 @@ int killpid(pid_t pid, int sig)
     return ret;
 }
 
-void kill_childs()
-{
+void cancel_main_threads() {
     error_log_limit_unlimited();
-
-    siginfo_t info;
-
-    struct web_client *w;
-    for(w = web_clients; w ; w = w->next) {
-        info("Stopping web client %s", w->client_ip);
-        pthread_cancel(w->thread);
-        // it is detached
-        // pthread_join(w->thread, NULL);
-
-        WEB_CLIENT_IS_OBSOLETE(w);
-    }
 
     int i;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled) {
-            info("Stopping %s thread", static_threads[i].name);
-            pthread_cancel(*static_threads[i].thread);
-            // it is detached
-            // pthread_join(*static_threads[i].thread, NULL);
-
+            info("EXIT: Stopping master thread: %s", static_threads[i].name);
+            netdata_thread_cancel(*static_threads[i].thread);
             static_threads[i].enabled = 0;
         }
     }
-
-    if(tc_child_pid) {
-        info("Killing tc-qos-helper process %d", tc_child_pid);
-        if(killpid(tc_child_pid, SIGTERM) != -1)
-            waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
-
-        tc_child_pid = 0;
-    }
-
-    // stop all running plugins
-    pluginsd_stop_all_external_plugins();
-
-    // if, for any reason there is any child exited
-    // catch it here
-    info("Cleaning up an other children");
-    waitid(P_PID, 0, &info, WEXITED|WNOHANG);
-
-    info("All threads/childs stopped.");
 }
 
 struct option_def option_definitions[] = {
@@ -628,8 +605,7 @@ int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
-    size_t wanted_stacksize = 0, stacksize = 0;
-    pthread_attr_t attr;
+    size_t default_stacksize;
 
     // set the name for logging
     program_name = "netdata";
@@ -954,21 +930,8 @@ int main(int argc, char **argv) {
         // setup the signals we want to use
         signals_init();
 
-
-        // --------------------------------------------------------------------
-        // get the required stack size of the threads of netdata
-
-        i = pthread_attr_init(&attr);
-        if(i != 0)
-            fatal("pthread_attr_init() failed with code %d.", i);
-
-        i = pthread_attr_getstacksize(&attr, &stacksize);
-        if(i != 0)
-            fatal("pthread_attr_getstacksize() failed with code %d.", i);
-        else
-            debug(D_OPTIONS, "initial pthread stack size is %zu bytes", stacksize);
-
-        wanted_stacksize = (size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)stacksize);
+        // setup threads configs
+        default_stacksize = netdata_threads_init();
 
 
         // --------------------------------------------------------------------
@@ -1033,18 +996,7 @@ int main(int argc, char **argv) {
     web_files_uid();
     web_files_gid();
 
-
-    // ------------------------------------------------------------------------
-    // set default pthread stack size - after we have forked
-
-    if(stacksize < wanted_stacksize) {
-        i = pthread_attr_setstacksize(&attr, wanted_stacksize);
-        if(i != 0)
-            fatal("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", wanted_stacksize, i);
-        else
-            debug(D_SYSTEM, "Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
-    }
-
+    netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
@@ -1067,15 +1019,9 @@ int main(int argc, char **argv) {
         struct netdata_static_thread *st = &static_threads[i];
 
         if(st->enabled) {
-            st->thread = mallocz(sizeof(pthread_t));
-
+            st->thread = mallocz(sizeof(netdata_thread_t));
             debug(D_SYSTEM, "Starting thread %s.", st->name);
-
-            if(pthread_create(st->thread, &attr, st->start_routine, st))
-                error("failed to create new thread for %s.", st->name);
-
-            else if(pthread_detach(*st->thread))
-                error("Cannot request detach of newly created %s thread.", st->name);
+            netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
