@@ -557,7 +557,7 @@ config_signature_matches() {
 
 # backup user configurations
 installer_backup_suffix="${PID}.${RANDOM}"
-for x in $(find -L "${NETDATA_PREFIX}/etc/netdata/" -name '*.conf' -type f)
+for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -name '*.conf' -type f)
 do
     if [ -f "${x}" ]
         then

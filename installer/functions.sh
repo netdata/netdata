@@ -142,6 +142,24 @@ service() {
 }
 
 # -----------------------------------------------------------------------------
+# portable pidof
+
+pidof_cmd="$(which_cmd pidof)"
+pidof() {
+    if [ ! -z "${pidof_cmd}" ]
+    then
+        ${pidof_cmd} "${@}"
+        return $?
+    else
+        ps -acxo pid,comm |\
+            sed "s/^ *//g" |\
+            grep netdata |\
+            cut -d ' ' -f 1
+        return $?
+    fi
+}
+
+# -----------------------------------------------------------------------------
 
 run_ok() {
     printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
