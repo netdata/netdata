@@ -615,13 +615,39 @@ static inline int connect_to_this_ip46(int protocol, int socktype, const char *h
                     error("Failed to set timeout on the socket to ip '%s' port '%s'", hostBfr, servBfr);
             }
 
+            errno = 0;
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
-                error("Failed to connect to '%s', port '%s'", hostBfr, servBfr);
-                close(fd);
-                fd = -1;
+                if(errno == EALREADY || errno == EINPROGRESS) {
+                    info("Waiting for connection to ip %s port %s to be established", hostBfr, servBfr);
+
+                    fd_set fds;
+                    FD_ZERO(&fds);
+                    FD_SET(0, &fds);
+                    int rc = select (1, NULL, &fds, NULL, timeout);
+
+                    if(rc > 0 && FD_ISSET(fd, &fds)) {
+                        info("connect() to ip %s port %s completed successfully", hostBfr, servBfr);
+                    }
+                    else if(rc == -1) {
+                        error("Failed to connect to '%s', port '%s'. select() returned %d", hostBfr, servBfr, rc);
+                        close(fd);
+                        fd = -1;
+                    }
+                    else {
+                        error("Timed out while connecting to '%s', port '%s'. select() returned %d", hostBfr, servBfr, rc);
+                        close(fd);
+                        fd = -1;
+                    }
+                }
+                else {
+                    error("Failed to connect to '%s', port '%s'", hostBfr, servBfr);
+                    close(fd);
+                    fd = -1;
+                }
             }
 
-            debug(D_CONNECT_TO, "Connected to '%s' on port '%s'.", hostBfr, servBfr);
+            if(fd != -1)
+                debug(D_CONNECT_TO, "Connected to '%s' on port '%s'.", hostBfr, servBfr);
         }
     }
 
