@@ -29,8 +29,8 @@ inline void netdata_thread_enable_cancelability(void) {
         if(ret != 0)
             error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d", netdata_thread_tag(), ret);
         else {
-            if(!old)
-                error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): old thread cancelability on thread %s was changed, expected ENABLED, found DISABLED - please report this!", netdata_thread_tag());
+            if(old != PTHREAD_CANCEL_DISABLE)
+                error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): old thread cancelability on thread %s was changed, expected DISABLED (%d), found %s (%d) - please report this!", netdata_thread_tag(), PTHREAD_CANCEL_DISABLE, (old == PTHREAD_CANCEL_ENABLE)?"ENABLED":"UNKNOWN", old);
         }
 
         netdata_thread_lock_cancelability = 0;
