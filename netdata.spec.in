@@ -10,10 +10,12 @@
 %bcond_without  systemd  # systemd
 %bcond_with     nfacct   # build with nfacct plugin
 %bcond_with     freeipmi # build with freeipmi plugin
+%bcond_with     netns    # build with netns support (cgroup-network)
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 %else
 %undefine	with_systemd
+%undefine	with_netns
 %endif
 
 %if %{with systemd}
@@ -194,11 +196,13 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0555,root,root) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
+%if %{with netns}
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
 %caps(cap_setuid=ep) %attr(4555,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network
 %attr(0555,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
+%endif
 
 %if %{with freeipmi}
 %caps(cap_setuid=ep) %attr(4555,root,root) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
@@ -227,10 +231,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 * Sun Dec 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.9.0-1
   Please check full changelog at github.
   https://github.com/firehol/netdata/releases
-* Mon Sep 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.8.0-1
+* Sun Sep 17 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.8.0-1
   This is mainly a bugfix release.
   Please check full changelog at github.
-* Mon Jul 16 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.7.0-1
+* Sun Jul 16 2017 Costa Tsaousis <costa@tsaousis.gr> - 1.7.0-1
 - netdata is now a fully featured statsd server
 - new installation options
 - metrics streaming and replication improvements
