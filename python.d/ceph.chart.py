@@ -73,18 +73,17 @@ class Service(SimpleService):
     def create_definitions(self):
         """
         Create dynamically charts options
-        set on YAML file
         :return: None
         """
         # Lines
-        for pool in self._get_df()['pools']:
+        for pool in sorted(self._get_df()['pools']):
             self.definitions['pool_usage']['lines'].append([pool['name'],
                                                             pool['name'],
                                                             'absolute'])
-            self.definitions['pool_objects']['lines'].append(["obj_{}".format(pool['name']),
+            self.definitions['pool_objects']['lines'].append(["obj_{0}".format(pool['name']),
                                                               pool['name'],
                                                               'absolute'])
-        for osd in self._get_osd_df()['nodes']:
+        for osd in sorted(self._get_osd_df()['nodes']):
             self.definitions['osd_usage']['lines'].append([osd['name'],
                                                            osd['name'],
                                                            'absolute'])
@@ -131,7 +130,7 @@ class Service(SimpleService):
         """
         pool_objects = {}
         for df in self._get_df()['pools']:
-            pool_objects["obj_{}".format(df['name'])] = df['stats']['objects']
+            pool_objects["obj_{0}".format(df['name'])] = df['stats']['objects']
         return pool_objects
 
     def _get_osd_usage(self):
