@@ -3,10 +3,10 @@
 # docker run -it --rm centos:6.9 /bin/sh
 # yum -y install rpm-build redhat-rpm-config yum-utils autoconf automake curl gcc git libmnl-devel libuuid-devel make pkgconfig zlib-devel
 
-set -e
+cd $(dirname $0)/../../ || exit 1
+source "installer/functions.sh" || exit 1
 
-cd $(dirname $0)/../../
-source "installer/functions.sh"
+set -e
 
 run ./autogen.sh
 run ./configure --enable-maintainer-mode
