@@ -1029,6 +1029,10 @@ send_twilio() {
 send_hipchat() {
     local authtoken="${1}" recipients="${2}" message="${3}" httpcode sent=0 room color sender msg_format notify
 
+    # remove <small></small> from the message
+    message="${message//<small>/}"
+    message="${message//<\/small>/}"
+
     if [ "${SEND_HIPCHAT}" = "YES" -a ! -z "${HIPCHAT_SERVER}" -a ! -z "${authtoken}" -a ! -z "${recipients}" -a ! -z "${message}" ]
     then
         # A label to be shown in addition to the sender's name
