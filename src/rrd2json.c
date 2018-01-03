@@ -306,7 +306,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if(rrdset_is_available_for_viewers(st)) {
+        if(backends_can_send_rrdset(BACKEND_SOURCE_DATA_AVERAGE, st)) {
             rrdset_rdlock(st);
 
             buffer_sprintf(wb, "%s\n"
