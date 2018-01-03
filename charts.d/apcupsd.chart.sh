@@ -6,8 +6,12 @@
 # GPL v3+
 #
 
-apcupsd_ip=127.0.0.1
-apcupsd_port=3551
+apcupsd_ip=
+apcupsd_port=
+
+declare -A apcupsd_sources=(
+    ["local"]="127.0.0.1:3551"
+)
 
 # how frequently to collect UPS data
 apcupsd_update_every=10
@@ -18,7 +22,7 @@ apcupsd_timeout=3
 apcupsd_priority=90000
 
 apcupsd_get() {
-	run -t $apcupsd_timeout apcaccess status "$1:$2"
+	run -t $apcupsd_timeout apcaccess status "$1"
 }
 
 apcupsd_check() {
@@ -29,52 +33,76 @@ apcupsd_check() {
 
 	require_cmd apcaccess || return 1
 
-	run apcupsd_get $apcupsd_ip $apcupsd_port >/dev/null
-	if [ $? -ne 0 ]
-		then
-		error "cannot get information for apcupsd server."
-		return 1
-	elif [ $(apcupsd_get $apcupsd_ip $apcupsd_port | awk '/^STATUS.*/{ print $3 }') != "ONLINE" ]
-		then
-		error "APC UPS not online."
-		return 1
+	# backwards compatibility
+	if [ "${apcupsd_ip}:${apcupsd_port}" != ":" ]
+	then
+	    apcupsd_sources["local"]="${apcupsd_ip}:${apcupsd_port}"
 	fi
+
+    local host working=0 failed=0
+    for host in "${!apcupsd_sources[@]}"
+    do
+        run apcupsd_get "${apcupsd_sources[${host}]}" >/dev/null
+        if [ $? -ne 0 ]
+        then
+            error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
+            failed=$((failed + 1))
+        elif [ $(apcupsd_get "${apcupsd_sources[${host}]}" | awk '/^STATUS.*/{ print $3 }') != "ONLINE" ]
+        then
+            error "APC UPS ${host} on ${apcupsd_sources[${host}]} is not online."
+            failed=$((failed + 1))
+        else
+            working=$((working + 1))
+        fi
+    done
+
+    if [ ${working} -eq 0 ]
+    then
+        error "No APC UPSes found available."
+        return 1
+    fi
 
 	return 0
 }
 
 apcupsd_create() {
-	# create the charts
-	cat <<EOF
-CHART apcupsd.charge '' "UPS Charge" "percentage" ups apcupsd.charge area $((apcupsd_priority + 1)) $apcupsd_update_every
+    local host src
+    for host in "${!apcupsd_sources[@]}"
+    do
+        src=${apcupsd_sources[${host}]}
+
+        # create the charts
+        cat <<EOF
+CHART apcupsd_${host}.charge '' "UPS Charge for ${host} on ${src}" "percentage" ups apcupsd.charge area $((apcupsd_priority + 1)) $apcupsd_update_every
 DIMENSION battery_charge charge absolute 1 100
 
-CHART apcupsd.battery_voltage '' "UPS Battery Voltage" "Volts" ups apcupsd.battery.voltage line $((apcupsd_priority + 3)) $apcupsd_update_every
+CHART apcupsd_${host}.battery_voltage '' "UPS Battery Voltage for ${host} on ${src}" "Volts" ups apcupsd.battery.voltage line $((apcupsd_priority + 3)) $apcupsd_update_every
 DIMENSION battery_voltage voltage absolute 1 100
 DIMENSION battery_voltage_nominal nominal absolute 1 100
 
-CHART apcupsd.input_voltage '' "UPS Input Voltage" "Volts" input apcupsd.input.voltage line $((apcupsd_priority + 4)) $apcupsd_update_every
+CHART apcupsd_${host}.input_voltage '' "UPS Input Voltage for ${host} on ${src}" "Volts" input apcupsd.input.voltage line $((apcupsd_priority + 4)) $apcupsd_update_every
 DIMENSION input_voltage voltage absolute 1 100
 DIMENSION input_voltage_min min absolute 1 100
 DIMENSION input_voltage_max max absolute 1 100
 
-CHART apcupsd.input_frequency '' "UPS Input Frequency" "Hz" input apcupsd.input.frequency line $((apcupsd_priority + 5)) $apcupsd_update_every
+CHART apcupsd_${host}.input_frequency '' "UPS Input Frequency for ${host} on ${src}" "Hz" input apcupsd.input.frequency line $((apcupsd_priority + 5)) $apcupsd_update_every
 DIMENSION input_frequency frequency absolute 1 100
 
-CHART apcupsd.output_voltage '' "UPS Output Voltage" "Volts" output apcupsd.output.voltage line $((apcupsd_priority + 6)) $apcupsd_update_every
+CHART apcupsd_${host}.output_voltage '' "UPS Output Voltage for ${host} on ${src}" "Volts" output apcupsd.output.voltage line $((apcupsd_priority + 6)) $apcupsd_update_every
 DIMENSION output_voltage voltage absolute 1 100
 DIMENSION output_voltage_nominal nominal absolute 1 100
 
-CHART apcupsd.load '' "UPS Load" "percentage" ups apcupsd.load area $((apcupsd_priority)) $apcupsd_update_every
+CHART apcupsd_${host}.load '' "UPS Load for ${host} on ${src}" "percentage" ups apcupsd.load area $((apcupsd_priority)) $apcupsd_update_every
 DIMENSION load load absolute 1 100
 
-CHART apcupsd.temp '' "UPS Temperature" "Celsius" ups apcupsd.temperature line $((apcupsd_priority + 7)) $apcupsd_update_every
+CHART apcupsd_${host}.temp '' "UPS Temperature for ${host} on ${src}" "Celsius" ups apcupsd.temperature line $((apcupsd_priority + 7)) $apcupsd_update_every
 DIMENSION temp temp absolute 1 100
 
-CHART apcupsd.time '' "UPS Time Remaining" "Minutes" ups apcupsd.time area $((apcupsd_priority + 2)) $apcupsd_update_every
+CHART apcupsd_${host}.time '' "UPS Time Remaining for ${host} on ${src}" "Minutes" ups apcupsd.time area $((apcupsd_priority + 2)) $apcupsd_update_every
 DIMENSION time time absolute 1 100
 
 EOF
+    done
 	return 0
 }
 
@@ -87,7 +115,10 @@ apcupsd_update() {
 	# for each dimension
 	# remember: KEEP IT SIMPLE AND SHORT
 
-	apcupsd_get $apcupsd_ip $apcupsd_port | awk "
+    local host working=0 failed=0
+    for host in "${!apcupsd_sources[@]}"
+    do
+    	apcupsd_get "${apcupsd_sources[${host}]}" | awk "
 
 BEGIN {
 	battery_charge = 0;
@@ -116,43 +147,52 @@ BEGIN {
 /^ITEMP.*/		{ temp = \$3 * 100 };
 /^TIMELEFT.*/		{ time = \$3 * 100 };
 END {
-	print \"BEGIN apcupsd.charge $1\";
+	print \"BEGIN apcupsd_${host}.charge $1\";
 	print \"SET battery_charge = \" battery_charge;
 	print \"END\"
 
-	print \"BEGIN apcupsd.battery_voltage $1\";
+	print \"BEGIN apcupsd_${host}.battery_voltage $1\";
 	print \"SET battery_voltage = \" battery_voltage;
 	print \"SET battery_voltage_nominal = \" battery_voltage_nominal;
 	print \"END\"
 
-	print \"BEGIN apcupsd.input_voltage $1\";
+	print \"BEGIN apcupsd_${host}.input_voltage $1\";
 	print \"SET input_voltage = \" input_voltage;
 	print \"SET input_voltage_min = \" input_voltage_min;
 	print \"SET input_voltage_max = \" input_voltage_max;
 	print \"END\"
 
-	print \"BEGIN apcupsd.input_frequency $1\";
+	print \"BEGIN apcupsd_${host}.input_frequency $1\";
 	print \"SET input_frequency = \" input_frequency;
 	print \"END\"
 
-	print \"BEGIN apcupsd.output_voltage $1\";
+	print \"BEGIN apcupsd_${host}.output_voltage $1\";
 	print \"SET output_voltage = \" output_voltage;
         print \"SET output_voltage_nominal = \" output_voltage_nominal;
 	print \"END\"
 
-	print \"BEGIN apcupsd.load $1\";
+	print \"BEGIN apcupsd_${host}.load $1\";
 	print \"SET load = \" load;
 	print \"END\"
 
-	print \"BEGIN apcupsd.temp $1\";
+	print \"BEGIN apcupsd_${host}.temp $1\";
 	print \"SET temp = \" temp;
 	print \"END\"
 
-	print \"BEGIN apcupsd.time $1\";
+	print \"BEGIN apcupsd_${host}.time $1\";
 	print \"SET time = \" time;
 	print \"END\"
 }"
-	[ $? -ne 0 ] && error "failed to get values" && return 1
+        if [ $? -ne 0 ]
+        then
+            failed=$((failed + 1))
+        	error "failed to get values for APC UPS ${host} on ${apcupsd_sources[${host}]}" && return 1
+        else
+            working=$((working + 1))
+        fi
+    done
+
+	[ $working -eq 0 ] && error "failed to get values from all APC UPSes" && return 1
 
 	return 0
 }
