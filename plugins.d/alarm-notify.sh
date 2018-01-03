@@ -16,6 +16,7 @@
 # Supported notification methods:
 #  - emails by @ktsaou
 #  - slack.com notifications by @ktsaou
+#  - alerta.io notifications by @kattunga
 #  - discordapp.com notifications by @lowfive
 #  - pushover.net notifications by @ktsaou
 #  - pushbullet.com push notifications by Tiago Peralta @tperalta82 #1070
@@ -219,6 +220,7 @@ sendmail=
 
 # enable / disable features
 SEND_SLACK="YES"
+SEND_ALERTA="YES"
 SEND_FLOCK="YES"
 SEND_DISCORD="YES"
 SEND_PUSHOVER="YES"
@@ -237,6 +239,12 @@ SEND_CUSTOM="YES"
 SLACK_WEBHOOK_URL=
 DEFAULT_RECIPIENT_SLACK=
 declare -A role_recipients_slack=()
+
+# alerta configs
+ALERTA_WEBHOOK_URL=
+ALERTA_API_KEY=
+DEFAULT_RECIPIENT_ALERTA=
+declare -A role_recipients_alerta=()
 
 # flock configs
 FLOCK_WEBHOOK_URL=
@@ -386,6 +394,7 @@ filter_recipient_by_criticality() {
 # find the recipients' addresses per method
 
 declare -A arr_slack=()
+declare -A arr_alerta=()
 declare -A arr_flock=()
 declare -A arr_discord=()
 declare -A arr_pushover=()
@@ -479,6 +488,14 @@ do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality slack "${r}" && arr_slack[${r/|*/}]="1"
     done
 
+    # alerta
+    a="${role_recipients_alerta[${x}]}"
+    [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_ALERTA}"
+    for r in ${a//,/ }
+    do
+        [ "${r}" != "disabled" ] && filter_recipient_by_criticality alerta "${r}" && arr_alerta[${r/|*/}]="1"
+    done
+
     # flock
     a="${role_recipients_flock[${x}]}"
     [ -z "${a}" ] && a="${DEFAULT_RECIPIENT_FLOCK}"
@@ -516,6 +533,10 @@ done
 # build the list of slack recipients (channels)
 to_slack="${!arr_slack[*]}"
 [ -z "${to_slack}" ] && SEND_SLACK="NO"
+
+# build the list of alerta recipients (channels)
+to_alerta="${!arr_alerta[*]}"
+[ -z "${to_alerta}" ] && SEND_ALERTA="NO"
 
 # build the list of flock recipients (channels)
 to_flock="${!arr_flock[*]}"
@@ -577,6 +598,9 @@ done
 # check slack
 [ -z "${SLACK_WEBHOOK_URL}" ] && SEND_SLACK="NO"
 
+# check alerta
+[ -z "${ALERTA_WEBHOOK_URL}" ] && SEND_ALERTA="NO"
+
 # check flock
 [ -z "${FLOCK_WEBHOOK_URL}" ] && SEND_FLOCK="NO"
 
@@ -624,6 +648,7 @@ fi
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
+        -o "${SEND_ALERTA}"      = "YES" \
         -o "${SEND_FLOCK}"       = "YES" \
         -o "${SEND_DISCORD}"     = "YES" \
         -o "${SEND_HIPCHAT}"     = "YES" \
@@ -644,6 +669,7 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+        SEND_ALERTA="NO"
         SEND_FLOCK="NO"
         SEND_DISCORD="NO"
         SEND_TWILIO="NO"
@@ -671,6 +697,7 @@ if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
     -a "${SEND_TELEGRAM}"       != "YES" \
     -a "${SEND_SLACK}"          != "YES" \
+    -a "${SEND_ALERTA}"         != "YES" \
     -a "${SEND_FLOCK}"          != "YES" \
     -a "${SEND_DISCORD}"        != "YES" \
     -a "${SEND_TWILIO}"         != "YES" \
@@ -1252,6 +1279,52 @@ EOF
 }
 
 # -----------------------------------------------------------------------------
+# alerta sender
+
+send_alerta() {
+    local webhook="${1}" channels="${2}" httpcode sent=0 channel severity content
+
+    [ "${SEND_ALERTA}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  severity="warning" ;;
+        CRITICAL) severity="critical" ;;
+        CLEAR)    severity="cleared" ;;
+        *)        severity="unknown" ;;
+    esac
+
+    info=$( echo -n ${info})
+
+    for channel in ${channels}
+    do
+        content="{"
+        content="$content \"environment\": \"${channel}\","
+        content="$content \"service\": [\"${host}\"],"
+        content="$content \"resource\": \"${host}\","
+        content="$content \"event\": \"${chart}.${name}\","
+        content="$content \"severity\": \"${severity}\","
+        content="$content \"value\": \"${alarm}\","
+        content="$content \"text\": \"${info}\""
+        content="$content }"
+
+
+        httpcode=$(docurl -X POST "${webhook}" -H "Content-Type: application/json" -H "Authorization: Key $ALERTA_API_KEY" -d "$content" )
+
+        if [[ "${httpcode}" = "200" || "${httpcode}" = "201" ]]
+        then
+            info "sent alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}'"
+            sent=$((sent + 1))
+        else
+            error "failed to send alerta notification for: ${host} ${chart}.${name} is ${status} to '${channel}', with HTTP error code ${httpcode}."
+        fi
+    done
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 # flock sender
 
 send_flock() {
@@ -1468,6 +1541,15 @@ raised_for_html=
 
 send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
+
+# -----------------------------------------------------------------------------
+# send the alerta notification
+
+# alerta aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_alerta "${ALERTA_WEBHOOK_URL}" "${to_alerta}"
+SENT_ALERTA=$?
 
 # -----------------------------------------------------------------------------
 # send the flock notification
@@ -1737,6 +1819,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_PUSHOVER}     -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
+    -o ${SENT_ALERTA}       -eq 0 \
     -o ${SENT_FLOCK}        -eq 0 \
     -o ${SENT_DISCORD}      -eq 0 \
     -o ${SENT_TWILIO}       -eq 0 \
