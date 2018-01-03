@@ -22,8 +22,8 @@ CHARTS = {
     'general': {
         'options': [None, 'Ceph General Options', 'KB', 'general', 'ceph.general', 'stacked'],
         'lines': [
-            ['general_available', 'avail', 'absolute', 1, 1024]
-            ['general_usage', 'used', 'absolute', 1, 1024],
+            ['general_available', 'avail', 'absolute', 1, 1024],
+            ['general_usage', 'used', 'absolute', 1, 1024]
         ]
     },
     'pool_usage': {
