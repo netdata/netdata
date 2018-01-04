@@ -33,7 +33,7 @@ netdataDashboard.menu = {
 
     'net': {
         title: 'Network Interfaces',
-        icon: '<i class="fas fa-share-alt"></i>',
+        icon: '<i class="fas fa-sitemap"></i>',
         info: 'Performance metrics for network interfaces.'
     },
 
