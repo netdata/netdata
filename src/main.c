@@ -191,14 +191,34 @@ int killpid(pid_t pid, int sig)
 void cancel_main_threads() {
     error_log_limit_unlimited();
 
-    int i;
+    int i, found = 0, max = 1 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled) {
             info("EXIT: Stopping master thread: %s", static_threads[i].name);
             netdata_thread_cancel(*static_threads[i].thread);
-            static_threads[i].enabled = 0;
+            found++;
         }
     }
+
+    while(found && max > 0) {
+        max -= step;
+        info("Waiting %d threads to finish...", found);
+        sleep_usec(step);
+        found = 0;
+        for (i = 0; static_threads[i].name != NULL ; i++) {
+            if (static_threads[i].enabled)
+                found++;
+        }
+    }
+
+    if(found) {
+        for (i = 0; static_threads[i].name != NULL ; i++) {
+            if (static_threads[i].enabled)
+                error("Master thread %s takes too long to exit. Giving up...", static_threads[i].name);
+        }
+    }
+    else
+        info("All threads finished.");
 }
 
 struct option_def option_definitions[] = {
