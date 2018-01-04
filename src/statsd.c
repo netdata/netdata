@@ -879,7 +879,7 @@ void statsd_collector_thread_cleanup(void *data) {
     static __thread int executed = 0;
     if(!executed) {
         executed = 1;
-        info("%s: cleaning up...", netdata_thread_tag());
+        info("cleaning up...");
 
         struct statsd_udp *d = data;
 
@@ -1973,7 +1973,7 @@ static void statsd_main_cleanup(void *data) {
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
-        info("%s: cleaning up...", netdata_thread_tag());
+        info("cleaning up...");
 
         if (statsd.collection_threads) {
             int i;
