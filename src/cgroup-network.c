@@ -14,7 +14,6 @@
 void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
-
 void health_reload(void) {};
 void rrdhost_save_all(void) {};
 
@@ -367,8 +366,11 @@ void detect_veth_interfaces(pid_t pid) {
     const char *prefix = getenv("NETDATA_HOST_PREFIX");
 
     host = read_proc_net_dev(prefix);
-    if(!host)
-        fatal("cannot read host interface list.");
+    if(!host) {
+        errno = 0;
+        error("cannot read host interface list.");
+        return;
+    }
 
     if(!eligible_ifaces(host)) {
         errno = 0;
@@ -487,7 +489,8 @@ int main(int argc, char **argv) {
 
         if(pid <= 0) {
             errno = 0;
-            fatal("Invalid pid %d given", (int) pid);
+            error("Invalid pid %d given", (int) pid);
+            return 2;
         }
 
         call_the_helper(argv[0], pid, NULL);
@@ -498,7 +501,7 @@ int main(int argc, char **argv) {
 
         if(pid <= 0 && !detected_devices) {
             errno = 0;
-            fatal("Invalid pid %d read from cgroup '%s'", (int) pid, argv[2]);
+            error("Cannot find a cgroup PID from cgroup '%s'", argv[2]);
         }
     }
     else
