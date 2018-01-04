@@ -14,7 +14,6 @@
 void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
-
 void health_reload(void) {};
 void rrdhost_save_all(void) {};
 
@@ -247,25 +246,18 @@ int switch_namespace(const char *prefix, pid_t pid) {
 #endif
 }
 
-pid_t read_pid_from_cgroup(const char *path) {
-    char buffer[FILENAME_MAX + 1];
-
-    snprintfz(buffer, FILENAME_MAX, "%s/cgroup.procs", path);
-    FILE *fp = fopen(buffer, "r");
+pid_t read_pid_from_cgroup_file(const char *filename) {
+    FILE *fp = fopen(filename, "r");
     if(!fp) {
-        error("Cannot read file '%s'.", buffer);
-        snprintfz(buffer, FILENAME_MAX, "%s/tasks", path);
-        fp = fopen(buffer, "r");
-    }
-
-    if(!fp) {
-        error("Cannot read file '%s'.", buffer);
+        error("Cannot read file '%s'.", filename);
         return 0;
     }
 
+    char buffer[100 + 1];
     pid_t pid = 0;
     char *s;
-    while((s = fgets(buffer, FILENAME_MAX, fp))) {
+    while((s = fgets(buffer, 100, fp))) {
+        buffer[100] = '\0';
         pid = atoi(s);
         if(pid > 0) break;
     }
@@ -274,6 +266,46 @@ pid_t read_pid_from_cgroup(const char *path) {
     return pid;
 }
 
+pid_t read_pid_from_cgroup_files(const char *path) {
+    char filename[FILENAME_MAX + 1];
+
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup.procs", path);
+    pid_t pid = read_pid_from_cgroup_file(filename);
+    if(pid > 0) return pid;
+
+    snprintfz(filename, FILENAME_MAX, "%s/tasks", path);
+    return read_pid_from_cgroup_file(filename);
+}
+
+pid_t read_pid_from_cgroup(const char *path) {
+    pid_t pid = read_pid_from_cgroup_files(path);
+    if (pid > 0) return pid;
+
+    DIR *dir = opendir(path);
+    if (!dir) {
+        error("cannot read directory '%s'", path);
+        return 0;
+    }
+
+    struct dirent *de = NULL;
+    while ((de = readdir(dir))) {
+        if (de->d_type == DT_DIR
+            && (
+                    (de->d_name[0] == '.' && de->d_name[1] == '\0')
+                    || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
+            ))
+            continue;
+
+        if (de->d_type == DT_DIR) {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "%s/%s", path, de->d_name);
+            pid = read_pid_from_cgroup(filename);
+            if(pid > 0) break;
+        }
+    }
+    closedir(dir);
+    return pid;
+}
 
 // ----------------------------------------------------------------------------
 // send the result to netdata
@@ -334,21 +366,36 @@ void detect_veth_interfaces(pid_t pid) {
     const char *prefix = getenv("NETDATA_HOST_PREFIX");
 
     host = read_proc_net_dev(prefix);
-    if(!host)
-        fatal("cannot read host interface list.");
+    if(!host) {
+        errno = 0;
+        error("cannot read host interface list.");
+        return;
+    }
 
-    if(!eligible_ifaces(host))
-        fatal("there are no double-linked host interfaces available.");
+    if(!eligible_ifaces(host)) {
+        errno = 0;
+        error("there are no double-linked host interfaces available.");
+        return;
+    }
 
-    if(switch_namespace(prefix, pid))
-        fatal("cannot switch to the namespace of pid %u", (unsigned int)pid);
+    if(switch_namespace(prefix, pid)) {
+        errno = 0;
+        error("cannot switch to the namespace of pid %u", (unsigned int) pid);
+        return;
+    }
 
     cgroup = read_proc_net_dev(NULL);
-    if(!cgroup)
-        fatal("cannot read cgroup interface list.");
+    if(!cgroup) {
+        errno = 0;
+        error("cannot read cgroup interface list.");
+        return;
+    }
 
-    if(!eligible_ifaces(cgroup))
-        fatal("there are not double-linked cgroup interfaces available.");
+    if(!eligible_ifaces(cgroup)) {
+        errno = 0;
+        error("there are not double-linked cgroup interfaces available.");
+        return;
+    }
 
     for(h = host; h ; h = h->next) {
         if(iface_is_eligible(h)) {
@@ -442,7 +489,8 @@ int main(int argc, char **argv) {
 
         if(pid <= 0) {
             errno = 0;
-            fatal("Invalid pid %d given", (int) pid);
+            error("Invalid pid %d given", (int) pid);
+            return 2;
         }
 
         call_the_helper(argv[0], pid, NULL);
@@ -453,7 +501,7 @@ int main(int argc, char **argv) {
 
         if(pid <= 0 && !detected_devices) {
             errno = 0;
-            fatal("Invalid pid %d read from cgroup '%s'", (int) pid, argv[2]);
+            error("Cannot find a cgroup PID from cgroup '%s'", argv[2]);
         }
     }
     else
@@ -462,5 +510,7 @@ int main(int argc, char **argv) {
     if(pid > 0)
         detect_veth_interfaces(pid);
 
-    return send_devices();
+    int found = send_devices();
+    if(found <= 0) return 1;
+    return 0;
 }
