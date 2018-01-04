@@ -114,22 +114,22 @@ static void socket_listen_main_multi_threaded_cleanup(void *data) {
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
-        info("%s: cleaning up...", netdata_thread_tag());
+        info("cleaning up...");
 
-        info("LISTENER: releasing allocated memory...");
+        info("releasing allocated memory...");
         freez(socket_listen_main_multi_threaded_fds);
 
-        info("LISTENER: closing all sockets...");
+        info("closing all sockets...");
         listen_sockets_close(&api_sockets);
 
-        info("LISTENER: cleanup completed.");
+        info("cleanup completed.");
     }
 
     struct web_client *w;
     for(w = web_clients; w ; w = w->next) {
         if(!web_client_check_obsolete(w)) {
             WEB_CLIENT_IS_OBSOLETE(w);
-            info("LISTENER: Stopping web client %s, id %llu", w->client_ip, w->id);
+            info("Stopping web client %s, id %llu", w->client_ip, w->id);
             netdata_thread_cancel(w->thread);
         }
     }
@@ -262,12 +262,12 @@ static void socket_listen_main_single_threaded_cleanup(void *data) {
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
-        info("%s: cleaning up...", netdata_thread_tag());
+        info("cleaning up...");
 
-        info("LISTENER: closing all sockets...");
+        info("closing all sockets...");
         listen_sockets_close(&api_sockets);
 
-        info("LISTENER: cleanup completed.");
+        info("cleanup completed.");
         debug(D_WEB_CLIENT, "LISTENER: exit!");
     }
 }
