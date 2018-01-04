@@ -216,7 +216,7 @@ opts=
 inner_opts=
 while [ ! -z "${1}" ]
 do
-    if [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" ]
+    if [ "${1}" = "--dont-wait" -o "${1}" = "--non-interactive" -o "${1}" = "--accept" ]
     then
         opts="${opts} --accept"
     elif [ "${1}" = "--dont-start-it" ]
