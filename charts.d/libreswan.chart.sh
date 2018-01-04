@@ -84,6 +84,13 @@ libreswan_check() {
 
 	require_cmd ipsec || return 1
 
+	# make sure it is libreswan
+	if [ -z "$(ipsec --version | grep -i libreswan)" ]
+	then
+	    error "ipsec command is not Libreswan. Disabling Libreswan plugin."
+	    return 1
+	fi
+
 	# check that we can collect data
 	libreswan_get || return 1
 
