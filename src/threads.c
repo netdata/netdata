@@ -98,7 +98,7 @@ static void thread_cleanup(void *ptr) {
     }
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
-        info("%s: thread with task id %d finished", netdata_thread_tag(), gettid());
+        info("thread with task id %d finished", gettid());
 
     freez((void *)netdata_thread->tag);
     netdata_thread->tag = NULL;
@@ -111,13 +111,13 @@ static void *thread_start(void *ptr) {
     netdata_thread = (NETDATA_THREAD *)ptr;
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_STARTUP))
-        info("%s: thread created with task id %d", netdata_thread_tag(), gettid());
+        info("thread created with task id %d", gettid());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
-        error("%s: cannot set pthread cancel type to DEFERRED.", netdata_thread_tag());
+        error("cannot set pthread cancel type to DEFERRED.");
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-        error("%s: cannot set pthread cancel state to ENABLE.", netdata_thread_tag());
+        error("cannot set pthread cancel state to ENABLE.");
 
     void *ret = NULL;
     pthread_cleanup_push(thread_cleanup, ptr);
@@ -137,13 +137,13 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
 
     int ret = pthread_create(thread, attr, thread_start, info);
     if(ret != 0)
-        error("%s: failed to create new thread for %s. pthread_create() failed with code %d", netdata_thread_tag(), tag, ret);
+        error("failed to create new thread for %s. pthread_create() failed with code %d", tag, ret);
 
     else {
         if (!(options & NETDATA_THREAD_OPTION_JOINABLE)) {
             int ret2 = pthread_detach(*thread);
             if (ret2 != 0)
-                error("%s: cannot request detach of newly created %s thread. pthread_detach() failed with code %d", netdata_thread_tag(), tag, ret2);
+                error("cannot request detach of newly created %s thread. pthread_detach() failed with code %d", tag, ret2);
         }
     }
 
@@ -156,7 +156,7 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
 int netdata_thread_cancel(netdata_thread_t thread) {
     int ret = pthread_cancel(thread);
     if(ret != 0)
-        error("%s: cannot cancel thread. pthread_cancel() failed with code %d.", netdata_thread_tag(), ret);
+        error("cannot cancel thread. pthread_cancel() failed with code %d.", ret);
 
     return ret;
 }
@@ -167,7 +167,7 @@ int netdata_thread_cancel(netdata_thread_t thread) {
 int netdata_thread_join(netdata_thread_t thread, void **retval) {
     int ret = pthread_join(thread, retval);
     if(ret != 0)
-        error("%s: cannot join thread. pthread_join() failed with code %d.", netdata_thread_tag(), ret);
+        error("cannot join thread. pthread_join() failed with code %d.", ret);
 
     return ret;
 }
@@ -175,7 +175,7 @@ int netdata_thread_join(netdata_thread_t thread, void **retval) {
 int netdata_thread_detach(pthread_t thread) {
     int ret = pthread_detach(thread);
     if(ret != 0)
-        error("%s: cannot detach thread. pthread_detach() failed with code %d.", netdata_thread_tag(), ret);
+        error("cannot detach thread. pthread_detach() failed with code %d.", ret);
 
     return ret;
 }

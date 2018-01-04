@@ -7,7 +7,7 @@ static void checks_main_cleanup(void *ptr) {
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
-        info("%s: cleaning up...", netdata_thread_tag());
+        info("cleaning up...");
     }
 }
 

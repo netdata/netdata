@@ -835,7 +835,7 @@ static void tc_main_cleanup(void *ptr) {
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
-        info("%s: cleaning up...", netdata_thread_tag());
+        info("cleaning up...");
 
         if(tc_child_pid) {
             info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
