@@ -304,7 +304,7 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
                     , "KB"
                     , "proc"
                     , "net/sockstat"
-                    , 2540
+                    , 4000
                     , update_every
                     , RRDSET_TYPE_AREA
             );

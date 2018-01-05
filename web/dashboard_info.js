@@ -689,6 +689,28 @@ netdataDashboard.context = {
         info: 'TCP connection aborts. <b>baddata</b> (<code>TCPAbortOnData</code>) happens while the connection is on <code>FIN_WAIT1</code> and the kernel receives a packet with a sequence number beyond the last one for this connection - the kernel responds with <code>RST</code> (closes the connection). <b>userclosed</b> (<code>TCPAbortOnClose</code>) happens when the kernel receives data on an already closed connection and responds with <code>RST</code>. <b>nomemory</b> (<code>TCPAbortOnMemory</code> happens when there are too many orphaned sockets (not attached to an fd) and the kernel has to drop a connection - sometimes it will send an <code>RST</code>, sometimes it won\'t. <b>timeout</b> (<code>TCPAbortOnTimeout</code>) happens when a connection times out. <b>linger</b> (<code>TCPAbortOnLinger</code>) happens when the kernel killed a socket that was already closed by the application and lingered around for long enough. <b>failed</b> (<code>TCPAbortFailed</code>) happens when the kernel attempted to send an <code>RST</code> but failed because there was no memory available.'
     },
 
+    'ipv4.tcpsock': {
+        info: 'The number of TCP connections (known as <code>CurrEstab</code>) with status <code>ESTABLISHED</code> or <code>CLOSE_WAIT</code>.'
+    },
+
+    'ipv4.tcpopens': {
+        info: '<b>active</b> or <code>ActiveOpens</code> is the number of <b>connections made</b> (i.e. connections that made a direct transition from <code>CLOSED</code> to <code>SYN-SENT</code>).'
+            + ' <b>passive</b> or <code>PassiveOpens</code> is the number of <b>connections received</b> (i.e. connections that made a direct transition from <code>LISTEN</code> to <code>SYN-RCVD</code>).'
+    },
+
+    'ipv4.tcperrors': {
+        info: '<code>InErrs</code> is the number of TCP segments received in error.'
+            + ' <code>InCsumErrors</code> is the number of TCP segments received with checksum errors.'
+            + ' <code>RetransSegs</code> is the number of TCP segments retransmitted.'
+    },
+
+    'ipv4.tcphandshake': {
+        info: '<code>EstabResets</code> is the number of established connections resets (i.e. connections that made a direct transition from <code>ESTABLISHED</code> to <code>CLOSED</code>).'
+            + ' <code>OutRsts</code> is the number of TCP segments sent, with the <code>RST</code> flag set.'
+            + ' <code>AttemptFails</code> is the number of times TCP connections made a direct transition from either <code>SYN-SENT</code> or <code>SYN-RCVD</code> to <code>CLOSED</code>, plus the number of times TCP connections made a direct transition from the <code>SYN-RCVD</code> to <code>LISTEN</code>.'
+            + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
+    },
+
     // ------------------------------------------------------------------------
     // APPS
 
