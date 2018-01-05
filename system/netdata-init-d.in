@@ -21,6 +21,68 @@ STOP_TIMEOUT="60"
 
 LOCKFILE=/var/lock/subsys/$DAEMON
 
+# Stop netdata processes
+# Usage: kill_netdata [-p pidfile] [ -d delay] {program}
+kill_netdata()
+{
+    local RC base pid pid_file= delay
+    RC=0; delay=3
+    if [ "$1" = "-p" ]; then
+	pid_file=$2
+	shift 2
+    fi
+    if [ "$1" = "-d" ]; then
+	delay=$2
+	shift 2
+    fi
+
+    # Save basename.
+    base=${1##*/}
+
+    # Find pid.
+    __pids_var_run "$1" "$pid_file"
+    RC=$?
+    if [ -z "$pid" ]; then
+	if [ -z "$pid_file" ]; then
+	    pid="$(__pids_pidof "$1")"
+	else
+	    [ "$RC" = "4" ] && { failure $"$base shutdown" ; return $RC ;}
+	fi
+    fi
+
+    # Kill it.
+    if [ -n "$pid" ] ; then
+	[ "$BOOTUP" = "verbose" -a -z "${LSB:-}" ] && echo -n "$base "
+	# TERM first, then KILL if not dead
+	if checkpid $pid; then
+	    kill -TERM $pid >/dev/null 2>&1
+	fi
+	for i in `seq $(($delay*10))`; do
+	    usleep 100000
+	    checkpid $pid || break
+	done
+	if checkpid $pid; then
+	    kill -KILL $pid >/dev/null 2>&1
+	    usleep 100000
+	fi
+	checkpid $pid
+	RC=$?
+	[ "$RC" -eq 0 ] && failure $"$base shutdown" || success $"$base shutdown"
+	RC=$((! $RC))
+    else
+	if [ -n "${LSB:-}" ]; then
+	    RC=7 # Program is not running
+	else
+	    failure $"$base shutdown"
+	    RC=0
+	fi
+    fi
+
+    # Remove pid file if any.
+    rm -f "${pid_file:-/var/run/$base.pid}"
+    return $RC
+}
+
 service_start()
 {
 	[ -x $DAEMON_PATH ] || exit 5
@@ -35,7 +97,7 @@ service_start()
 service_stop()
 {
 	printf "%-50s" "Stopping $DAEMON..."
-	killproc -p ${PIDFILE} -d ${STOP_TIMEOUT} $DAEMON
+	kill_netdata -p ${PIDFILE} -d ${STOP_TIMEOUT} $DAEMON
 	RETVAL=$?
 	echo
 	[ $RETVAL -eq 0 ] && rm -f ${PIDFILE} ${LOCKFILE}
