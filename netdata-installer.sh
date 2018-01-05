@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+uniquepath() {
+    local path=""
+    while read
+    do
+        if [[ ! "${path}" =~ (^|:)"${REPLY}"(:|$) ]]
+        then
+            [ ! -z "${path}" ] && path="${path}:"
+            path="${path}${REPLY}"
+        fi
+    done < <( echo "${PATH}" | tr ":" "\n" )
+
+    [ ! -z "${path}" ] && [[ "${PATH}" =~ /bin ]] && [[ "${PATH}" =~ /sbin ]] && export PATH="${path}"
+}
+uniquepath
 
 netdata_source_dir="$(pwd)"
 installer_dir="$(dirname "${0}")"
@@ -219,27 +233,27 @@ do
         shift 1
     elif [ "$1" = "--enable-plugin-freeipmi" ]
         then
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --enable-plugin-freeipmi"
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi"
         shift 1
     elif [ "$1" = "--disable-plugin-freeipmi" ]
         then
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --disable-plugin-freeipmi"
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi"
         shift 1
     elif [ "$1" = "--enable-plugin-nfacct" ]
         then
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --enable-plugin-nfacct"
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct"
         shift 1
     elif [ "$1" = "--disable-plugin-nfacct" ]
         then
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --disable-plugin-nfacct"
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct"
         shift 1
     elif [ "$1" = "--enable-lto" ]
         then
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --enable-lto"
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto"
         shift 1
     elif [ "$1" = "--disable-lto" ]
         then
-        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS} --disable-lto"
+        NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto"
         shift 1
     elif [ "$1" = "--help" -o "$1" = "-h" ]
         then
@@ -257,6 +271,9 @@ do
         exit 1
     fi
 done
+
+# replace multiple spaces with a single space
+NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//  / }"
 
 netdata_banner "real-time performance monitoring, done right!"
 cat <<BANNER1
