@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+uniquepath() {
+    local path=""
+    while read
+    do
+        if [[ ! "${path}" =~ (^|:)"${REPLY}"(:|$) ]]
+        then
+            [ ! -z "${path}" ] && path="${path}:"
+            path="${path}${REPLY}"
+        fi
+    done < <( echo "${PATH}" | tr ":" "\n" )
+
+    [ ! -z "${path}" ] && [[ "${PATH}" =~ /bin ]] && [[ "${PATH}" =~ /sbin ]] && export PATH="${path}"
+}
+uniquepath
 
 netdata_source_dir="$(pwd)"
 installer_dir="$(dirname "${0}")"
