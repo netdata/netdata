@@ -90,7 +90,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
     static procfile *ff = NULL;
     static int do_ip_packets = -1, do_ip_fragsout = -1, do_ip_fragsin = -1, do_ip_errors = -1,
-        do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1,
+        do_tcp_sockets = -1, do_tcp_packets = -1, do_tcp_errors = -1, do_tcp_handshake = -1, do_tcp_opens = -1,
         do_udp_packets = -1, do_udp_errors = -1, do_icmp_packets = -1, do_icmpmsg = -1, do_udplite_packets = -1;
     static uint32_t hash_ip = 0, hash_icmp = 0, hash_tcp = 0, hash_udp = 0, hash_icmpmsg = 0, hash_udplite = 0;
 
@@ -112,6 +112,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
         do_tcp_sockets      = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP connections", 1);
         do_tcp_packets      = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP packets", 1);
         do_tcp_errors       = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP errors", 1);
+        do_tcp_opens        = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP opens", 1);
         do_tcp_handshake    = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 TCP handshake issues", 1);
         do_udp_packets      = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 UDP packets", 1);
         do_udp_errors       = config_get_boolean("plugin:proc:/proc/net/snmp", "ipv4 UDP errors", 1);
@@ -723,7 +724,7 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                             , "packets/s"
                             , "proc"
                             , "net/snmp"
-                            , 2520
+                            , 2525
                             , update_every
                             , RRDSET_TYPE_LINE
                     );
@@ -743,12 +744,44 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
+            if(do_tcp_opens) {
+                static RRDSET *st = NULL;
+                static RRDDIM *rd_ActiveOpens = NULL,
+                              *rd_PassiveOpens = NULL;
+
+                if(unlikely(!st)) {
+                    st = rrdset_create_localhost(
+                            RRD_TYPE_NET_SNMP
+                            , "tcpopens"
+                            , NULL
+                            , "tcp"
+                            , NULL
+                            , "IPv4 TCP Opens"
+                            , "connections/s"
+                            , "proc"
+                            , "net/snmp"
+                            , 2502
+                            , update_every
+                            , RRDSET_TYPE_LINE
+                    );
+                    rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
+
+                    rd_ActiveOpens   = rrddim_add(st, "ActiveOpens",   "active", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_PassiveOpens  = rrddim_add(st, "PassiveOpens",  "passive", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                }
+                else rrdset_next(st);
+
+                rrddim_set_by_pointer(st, rd_ActiveOpens,   (collected_number)snmp_root.tcp_ActiveOpens);
+                rrddim_set_by_pointer(st, rd_PassiveOpens,  (collected_number)snmp_root.tcp_PassiveOpens);
+                rrdset_done(st);
+            }
+
+            // --------------------------------------------------------------------
+
             if(do_tcp_handshake) {
                 static RRDSET *st = NULL;
                 static RRDDIM *rd_EstabResets = NULL,
                               *rd_OutRsts = NULL,
-                              *rd_ActiveOpens = NULL,
-                              *rd_PassiveOpens = NULL,
                               *rd_AttemptFails = NULL,
                               *rd_TCPSynRetrans = NULL;
 
@@ -769,19 +802,15 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
                     );
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rd_EstabResets   = rrddim_add(st, "EstabResets",   NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_OutRsts       = rrddim_add(st, "OutRsts",       NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_ActiveOpens   = rrddim_add(st, "ActiveOpens",   NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_PassiveOpens  = rrddim_add(st, "PassiveOpens",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_AttemptFails  = rrddim_add(st, "AttemptFails",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_TCPSynRetrans = rrddim_add(st, "TCPSynRetrans", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_EstabResets   = rrddim_add(st, "EstabResets",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_OutRsts       = rrddim_add(st, "OutRsts",       NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_AttemptFails  = rrddim_add(st, "AttemptFails",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_TCPSynRetrans = rrddim_add(st, "TCPSynRetrans", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 else rrdset_next(st);
 
                 rrddim_set_by_pointer(st, rd_EstabResets,   (collected_number)snmp_root.tcp_EstabResets);
                 rrddim_set_by_pointer(st, rd_OutRsts,       (collected_number)snmp_root.tcp_OutRsts);
-                rrddim_set_by_pointer(st, rd_ActiveOpens,   (collected_number)snmp_root.tcp_ActiveOpens);
-                rrddim_set_by_pointer(st, rd_PassiveOpens,  (collected_number)snmp_root.tcp_PassiveOpens);
                 rrddim_set_by_pointer(st, rd_AttemptFails,  (collected_number)snmp_root.tcp_AttemptFails);
                 rrddim_set_by_pointer(st, rd_TCPSynRetrans, tcpext_TCPSynRetrans);
                 rrdset_done(st);
