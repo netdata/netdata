@@ -690,24 +690,24 @@ netdataDashboard.context = {
     },
 
     'ipv4.tcpsock': {
-        info: 'The number of TCP connections (known as <code>CurrEstab</code>) with status <code>ESTABLISHED</code> or <code>CLOSE_WAIT</code>.'
+        info: 'The number of established TCP connections (known as <code>CurrEstab</code>). This is a snapshot of the established connections at the time of measurement (i.e. a connection established and a connection disconnected within the same iteration will not affect this metric).'
     },
 
     'ipv4.tcpopens': {
-        info: '<b>active</b> or <code>ActiveOpens</code> is the number of <b>connections made</b> (i.e. connections that made a direct transition from <code>CLOSED</code> to <code>SYN-SENT</code>).'
-            + ' <b>passive</b> or <code>PassiveOpens</code> is the number of <b>connections received</b> (i.e. connections that made a direct transition from <code>LISTEN</code> to <code>SYN-RCVD</code>).'
+        info: '<b>active</b> or <code>ActiveOpens</code> is the number of outgoing TCP <b>connections attempted</b> by this host.'
+            + ' <b>passive</b> or <code>PassiveOpens</code> is the number of incoming TCP <b>connections accepted</b> by this host.'
     },
 
     'ipv4.tcperrors': {
-        info: '<code>InErrs</code> is the number of TCP segments received in error.'
-            + ' <code>InCsumErrors</code> is the number of TCP segments received with checksum errors.'
+        info: '<code>InErrs</code> is the number of TCP segments received in error (including header too small, checksum errors, sequence errors, bad packets - for both IPv4 and IPv6).'
+            + ' <code>InCsumErrors</code> is the number of TCP segments received with checksum errors (for both IPv4 and IPv6).'
             + ' <code>RetransSegs</code> is the number of TCP segments retransmitted.'
     },
 
     'ipv4.tcphandshake': {
-        info: '<code>EstabResets</code> is the number of established connections resets (i.e. connections that made a direct transition from <code>ESTABLISHED</code> to <code>CLOSED</code>).'
-            + ' <code>OutRsts</code> is the number of TCP segments sent, with the <code>RST</code> flag set.'
-            + ' <code>AttemptFails</code> is the number of times TCP connections made a direct transition from either <code>SYN-SENT</code> or <code>SYN-RCVD</code> to <code>CLOSED</code>, plus the number of times TCP connections made a direct transition from the <code>SYN-RCVD</code> to <code>LISTEN</code>.'
+        info: '<code>EstabResets</code> is the number of established connections resets (i.e. connections that made a direct transition from <code>ESTABLISHED</code> or <code>CLOSE_WAIT</code> to <code>CLOSED</code>).'
+            + ' <code>OutRsts</code> is the number of TCP segments sent, with the <code>RST</code> flag set (for both IPv4 and IPv6).'
+            + ' <code>AttemptFails</code> is the number of times TCP connections made a direct transition from either <code>SYN_SENT</code> or <code>SYN_RECV</code> to <code>CLOSED</code>, plus the number of times TCP connections made a direct transition from the <code>SYN_RECV</code> to <code>LISTEN</code>.'
             + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
     },
 
