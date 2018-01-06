@@ -33,7 +33,13 @@ then
 	exit 1
 fi
 
-run yum-builddep "${srpm}"
+#if which yum-builddep 2>/dev/null
+#then
+#    run yum-builddep "${srpm}"
+#elif which dnf 2>/dev/null
+#then
+#    [ "${UID}" = 0 ] && run dnf builddep "${srpm}"
+#fi
 
 run rpmbuild --rebuild "${srpm}"
 
