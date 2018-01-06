@@ -24,13 +24,13 @@ void *cpuidlejitter_main(void *ptr) {
             "system"
             , "idlejitter"
             , NULL
-            , "processes"
+            , "idlejitter"
             , NULL
             , "CPU Idle Jitter"
             , "microseconds lost/s"
             , "idlejitter"
             , NULL
-            , 9999
+            , 800
             , localhost->rrd_update_every
             , RRDSET_TYPE_AREA
     );
