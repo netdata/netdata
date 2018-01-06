@@ -711,6 +711,11 @@ netdataDashboard.context = {
             + ' <code>TCPSynRetrans</code> shows retries for new outbound TCP connections, which can indicate general connectivity issues or backlog on the remote host.'
     },
 
+    'ipv4.tcplistenissues': {
+        info: '<b>overflows</b> (or <code>ListenOverflows</code>) is the number of incoming connections that could not be handled because the receive queue of the application was full (for both IPv4 and IPv6).'
+            + ' <b>drops</b> (or <code>ListenDrops</code>) is the number of incoming connections that could not be handled, including SYN floods, overflows, out of memory, security issues, no route to destination, recemption of related ICMP messages, socket is broadcast or multicast (for both IPv4 and IPv6).'
+    }
+
     // ------------------------------------------------------------------------
     // APPS
 
