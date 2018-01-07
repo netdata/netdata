@@ -199,6 +199,7 @@ declare -A configs_signatures=(
   ['54c3934a03453453b8d7d0e8b84a7cd8']='health_alarm_notify.conf'
   ['55608bdd908a3806df1468f6ee318b2b']='health.d/qos.conf'
   ['5598b83e915e31f68027afe324a427cd']='apps_groups.conf'
+  ['55cc7e3fe365a77f8e92d01d7a428276']='health.d/ram.conf'
   ['565f11c38ae6bd5cc9d3c2adb542bc1b']='health.d/softnet.conf'
   ['5664a814f9351b55da76edd472169a73']='health_alarm_notify.conf'
   ['56b689031cdcf138064825f31474b37d']='apps_groups.conf'
