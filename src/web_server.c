@@ -523,7 +523,8 @@ static int web_server_snd_callback(int fd, int socktype, void *data, short int *
 }
 
 static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
-    (void)ptr;
+    int *running = (int *)ptr;
+    *running = 0;
 
     info("stopped after %zu connects, %zu disconnects, %zu receptions and %zu sends",
             web_server_static_connected,
@@ -534,7 +535,8 @@ static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
 }
 
 void *socket_listen_main_static_threaded_worker(void *ptr) {
-    (void)ptr;
+    int *running = (int *)ptr;
+    *running = 1;
 
     netdata_thread_cleanup_push(socket_listen_main_static_threaded_worker_cleanup, ptr);
 
@@ -553,6 +555,7 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
 
 static long long static_threaded_threads_count = 1;
 static netdata_thread_t *static_threaded_threads_ids = NULL;
+static volatile int *static_threaded_threads_running = NULL;
 
 static void socket_listen_main_static_threaded_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -561,11 +564,15 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
 
         int i;
         for(i = 1; i < static_threaded_threads_count; i++) {
-            info("stopping worker %d", i+1);
-            netdata_thread_cancel(static_threaded_threads_ids[i]);
+            if(static_threaded_threads_running[i]) {
+                info("stopping worker %d", i + 1);
+                netdata_thread_cancel(static_threaded_threads_ids[i]);
+            }
+            else
+                info("found stopped worker %d", i + 1);
         }
 
-        info("cleaning up...");
+        info("closing all web server sockets...");
         listen_sockets_close(&api_sockets);
     }
 }
@@ -586,6 +593,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
             if(static_threaded_threads_count < 1) static_threaded_threads_count = 1;
 
             static_threaded_threads_ids = callocz((size_t)static_threaded_threads_count, sizeof(netdata_thread_t));
+            static_threaded_threads_running = callocz((size_t)static_threaded_threads_count, sizeof(int));
 
             int i;
             for(i = 1; i < static_threaded_threads_count; i++) {
@@ -593,11 +601,11 @@ void *socket_listen_main_static_threaded(void *ptr) {
                 snprintfz(tag, 50, "WEB_SERVER[static%d]", i+1);
 
                 info("starting worker %d", i+1);
-                netdata_thread_create(&static_threaded_threads_ids[i], tag, NETDATA_THREAD_OPTION_DEFAULT, socket_listen_main_static_threaded_worker, NULL);
+                netdata_thread_create(&static_threaded_threads_ids[i], tag, NETDATA_THREAD_OPTION_DEFAULT, socket_listen_main_static_threaded_worker, (void *)&static_threaded_threads_running[i]);
             }
 
             // and the main one
-            socket_listen_main_static_threaded_worker(NULL);
+            socket_listen_main_static_threaded_worker((void *)&static_threaded_threads_running[0]);
 
     netdata_thread_cleanup_pop(1);
     return NULL;
