@@ -7,11 +7,12 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     static int do_ram = -1, do_swap = -1, do_hwcorrupt = -1, do_committed = -1, do_writeback = -1, do_kernel = -1, do_slab = -1;
 
     static ARL_BASE *arl_base = NULL;
-    static ARL_ENTRY *arl_hwcorrupted = NULL;
+    static ARL_ENTRY *arl_hwcorrupted = NULL, *arl_memavailable = NULL;
 
     static unsigned long long
             MemTotal = 0,
             MemFree = 0,
+            MemAvailable = 0,
             Buffers = 0,
             Cached = 0,
             //SwapCached = 0,
@@ -65,6 +66,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
         arl_base = arl_create("meminfo", NULL, 60);
         arl_expect(arl_base, "MemTotal", &MemTotal);
         arl_expect(arl_base, "MemFree", &MemFree);
+        arl_memavailable = arl_expect(arl_base, "MemAvailable", &MemAvailable);
         arl_expect(arl_base, "Buffers", &Buffers);
         arl_expect(arl_base, "Cached", &Cached);
         //arl_expect(arl_base, "SwapCached", &SwapCached);
@@ -138,38 +140,69 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     unsigned long long MemUsed = MemTotal - MemFree - Cached - Buffers;
 
     if(do_ram) {
-        static RRDSET *st_system_ram = NULL;
-        static RRDDIM *rd_free = NULL, *rd_used = NULL, *rd_cached = NULL, *rd_buffers = NULL;
+        {
+            static RRDSET *st_system_ram = NULL;
+            static RRDDIM *rd_free = NULL, *rd_used = NULL, *rd_cached = NULL, *rd_buffers = NULL;
 
-        if(unlikely(!st_system_ram)) {
-            st_system_ram = rrdset_create_localhost(
-                    "system"
-                    , "ram"
-                    , NULL
-                    , "ram"
-                    , NULL
-                    , "System RAM"
-                    , "MB"
-                    , "proc"
-                    , "meminfo"
-                    , 200
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-            );
+            if(unlikely(!st_system_ram)) {
+                st_system_ram = rrdset_create_localhost(
+                        "system"
+                        , "ram"
+                        , NULL
+                        , "ram"
+                        , NULL
+                        , "System RAM"
+                        , "MB"
+                        , "proc"
+                        , "meminfo"
+                        , 200
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
 
-            rd_free    = rrddim_add(st_system_ram, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rd_used    = rrddim_add(st_system_ram, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rd_cached  = rrddim_add(st_system_ram, "cached",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            rd_buffers = rrddim_add(st_system_ram, "buffers", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                rd_free    = rrddim_add(st_system_ram, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                rd_used    = rrddim_add(st_system_ram, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                rd_cached  = rrddim_add(st_system_ram, "cached",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                rd_buffers = rrddim_add(st_system_ram, "buffers", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(st_system_ram);
+
+            rrddim_set_by_pointer(st_system_ram, rd_free,    MemFree);
+            rrddim_set_by_pointer(st_system_ram, rd_used,    MemUsed);
+            rrddim_set_by_pointer(st_system_ram, rd_cached,  Cached);
+            rrddim_set_by_pointer(st_system_ram, rd_buffers, Buffers);
+
+            rrdset_done(st_system_ram);
         }
-        else rrdset_next(st_system_ram);
 
-        rrddim_set_by_pointer(st_system_ram, rd_free,    MemFree);
-        rrddim_set_by_pointer(st_system_ram, rd_used,    MemUsed);
-        rrddim_set_by_pointer(st_system_ram, rd_cached,  Cached);
-        rrddim_set_by_pointer(st_system_ram, rd_buffers, Buffers);
+        if(arl_memavailable->flags & ARL_ENTRY_FLAG_FOUND) {
+            static RRDSET *st_mem_available = NULL;
+            static RRDDIM *rd_avail = NULL;
 
-        rrdset_done(st_system_ram);
+            if(unlikely(!st_mem_available)) {
+                st_mem_available = rrdset_create_localhost(
+                        "mem"
+                        , "available"
+                        , NULL
+                        , "system"
+                        , NULL
+                        , "Available RAM for applications"
+                        , "MB"
+                        , "proc"
+                        , "meminfo"
+                        , 4000
+                        , update_every
+                        , RRDSET_TYPE_AREA
+                );
+
+                rd_avail   = rrddim_add(st_mem_available, "MemAvailable", "avail", 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else rrdset_next(st_mem_available);
+
+            rrddim_set_by_pointer(st_mem_available, rd_avail, MemAvailable);
+
+            rrdset_done(st_mem_available);
+        }
     }
 
     // --------------------------------------------------------------------
@@ -263,7 +296,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "MB"
                     , "proc"
                     , "meminfo"
-                    , 5000
+                    , 4005
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -296,7 +329,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "MB"
                     , "proc"
                     , "meminfo"
-                    , 4000
+                    , 5000
                     , update_every
                     , RRDSET_TYPE_LINE
             );
