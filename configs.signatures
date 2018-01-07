@@ -326,6 +326,7 @@ declare -A configs_signatures=(
   ['8d0552371a7c9725a04196fa560813d1']='health.d/cpu.conf'
   ['8d24873bb25c195026918f15626310ea']='health.d/softnet.conf'
   ['8dc0bd0a70b5117454bd5f5b98f91c2c']='health.d/disks.conf'
+  ['8dc6a32b8e2995cbdd527c621a72c4fb']='health.d/ram.conf'
   ['8ec636a4f96158044d2cec0fd1ff8452']='python.d/rabbitmq.conf'
   ['8f4f925c1e97dd164007495ec5135ffc']='health.d/fping.conf'
   ['8f7b734ea0f89abf8acbb47c50234477']='health.d/web_log.conf'
