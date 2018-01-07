@@ -168,7 +168,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , "page faults/s"
                     , "proc"
                     , "vmstat"
-                    , 500
+                    , 4010
                     , update_every
                     , RRDSET_TYPE_LINE
             );
