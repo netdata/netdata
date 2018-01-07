@@ -76,7 +76,7 @@ struct netdata_static_thread static_threads[] = {
     {"PLUGINSD",            NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
     {"WEB_SERVER[multi]",   NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
     {"WEB_SERVER[single]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
-    {"WEB_SERVER[static]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
+    {"WEB_SERVER[static1]", NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
     {"STREAM",              NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
     {"STATSD",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
 

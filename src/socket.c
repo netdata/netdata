@@ -1080,7 +1080,7 @@ static inline void poll_close_fd(struct poll *p, struct pollinfo *pi) {
         pi->del_callback(pf->fd, pi->socktype, pi->data);
     }
 
-    info("POLLFD: closing fd %d", pf->fd);
+    // info("POLLFD: closing fd %d", pf->fd);
     close(pf->fd);
     pf->fd = -1;
     pf->events = 0;
@@ -1282,7 +1282,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                                 }
                                 else {
                                     // accept ok
-                                    info("POLLFD: LISTENER: client '[%s]:%s' connected to '%s' on fd %d", client_ip, client_port, sockets->fds_names[i], nfd);
+                                    // info("POLLFD: LISTENER: client '[%s]:%s' connected to '%s' on fd %d", client_ip, client_port, sockets->fds_names[i], nfd);
                                     poll_add_fd(&p, nfd, SOCK_STREAM, POLLIN, POLLINFO_FLAG_CLIENT_SOCKET, client_ip, client_port);
 
                                     // it may have reallocated them, so refresh our pointers

@@ -120,10 +120,6 @@ struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const 
     w->origin[0] = '*';
     web_client_enable_wait_receive(w);
 
-    if(web_clients) web_clients->prev = w;
-    w->next = web_clients;
-    web_clients = w;
-
     web_client_connected();
     return(w);
 }
@@ -305,15 +301,19 @@ void web_client_reset(struct web_client *w) {
 }
 
 struct web_client *web_client_free(struct web_client *w) {
-    web_client_reset(w);
-
-    struct web_client *n = w->next;
-    if(w == web_clients) web_clients = n;
-
     debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
 
-    if(w->prev) w->prev->next = w->next;
-    if(w->next) w->next->prev = w->prev;
+    web_client_reset(w);
+
+    struct web_client *n = NULL;
+    if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
+        struct web_client *n = w->next;
+        if (w == web_clients) web_clients = n;
+
+        if(w->prev) w->prev->next = w->next;
+        if(w->next) w->next->prev = w->prev;
+    }
+
     buffer_free(w->response.header_output);
     buffer_free(w->response.header);
     buffer_free(w->response.data);
