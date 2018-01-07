@@ -79,6 +79,29 @@ int sock_enlarge_out(int fd) {
 
 
 // --------------------------------------------------------------------------------------------------------------------
+
+char *strdup_client_description(int family, const char *protocol, const char *ip, int port) {
+    char buffer[100 + 1];
+
+    switch(family) {
+        case AF_INET:
+            snprintfz(buffer, 100, "%s:%s:%d", protocol, ip, port);
+            break;
+
+        case AF_INET6:
+        default:
+            snprintfz(buffer, 100, "%s:[%s]:%d", protocol, ip, port);
+            break;
+
+        case AF_UNIX:
+            snprintfz(buffer, 100, "%s:%s", protocol, ip);
+            break;
+    }
+
+    return strdupz(buffer);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // listening sockets
 
 int create_listen_socket_unix(const char *path, int listen_backlog) {
@@ -231,25 +254,7 @@ static inline int listen_sockets_add(LISTEN_SOCKETS *sockets, int fd, int family
     sockets->fds[sockets->opened] = fd;
     sockets->fds_types[sockets->opened] = socktype;
     sockets->fds_families[sockets->opened] = family;
-
-    char buffer[100 + 1];
-
-    switch(family) {
-        case AF_INET:
-            snprintfz(buffer, 100, "%s:%s:%d", protocol, ip, port);
-            break;
-
-        case AF_INET6:
-        default:
-            snprintfz(buffer, 100, "%s:[%s]:%d", protocol, ip, port);
-            break;
-
-        case AF_UNIX:
-            snprintfz(buffer, 100, "%s:%s", protocol, ip);
-            break;
-    }
-
-    sockets->fds_names[sockets->opened] = strdupz(buffer);
+    sockets->fds_names[sockets->opened] = strdup_client_description(family, protocol, ip, port);
 
     sockets->opened++;
     return 0;
@@ -842,7 +847,7 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 // --------------------------------------------------------------------------------------------------------------------
 // accept4() replacement for systems that do not have one
 
-#ifndef HAVE_ACCEPT4
+//#ifndef HAVE_ACCEPT4
 int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
     int fd = accept(sock, addr, addrlen);
     int newflags = 0;
@@ -877,7 +882,7 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 
     return fd;
 }
-#endif
+//#endif
 
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -961,10 +966,15 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
 struct pollinfo {
     size_t slot;
-    char *client;
+    char *client_ip;
+    char *client_port;
     struct pollinfo *next;
     uint32_t flags;
     int socktype;
+
+    void  (*del_callback)(int fd, int socktype, void *data);
+    int   (*rcv_callback)(int fd, int socktype, void *data, short int *events);
+    int   (*snd_callback)(int fd, int socktype, void *data, short int *events);
 
     void *data;
 };
@@ -978,13 +988,13 @@ struct poll {
     struct pollinfo *inf;
     struct pollinfo *first_free;
 
-    void *(*add_callback)(int fd, int socktype, short int *events);
+    void *(*add_callback)(int fd, int socktype, short int *events, const char *client_ip, const char *client_port);
     void  (*del_callback)(int fd, int socktype, void *data);
     int   (*rcv_callback)(int fd, int socktype, void *data, short int *events);
     int   (*snd_callback)(int fd, int socktype, void *data, short int *events);
 };
 
-static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype, short int events, uint32_t flags) {
+static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype, short int events, uint32_t flags, const char *client_ip, const char *client_port) {
     debug(D_POLLFD, "POLLFD: ADD: request to add fd %d, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", fd, p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
     if(unlikely(fd < 0)) return NULL;
@@ -996,6 +1006,7 @@ static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype,
         p->fds = reallocz(p->fds, sizeof(struct pollfd) * new_slots);
         p->inf = reallocz(p->inf, sizeof(struct pollinfo) * new_slots);
 
+        // reset all the newly added slots
         ssize_t i;
         for(i = new_slots - 1; i >= (ssize_t)p->slots ; i--) {
             debug(D_POLLFD, "POLLFD: ADD: resetting new slot %zd", i);
@@ -1006,8 +1017,15 @@ static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype,
             p->inf[i].slot = (size_t)i;
             p->inf[i].flags = 0;
             p->inf[i].socktype = -1;
-            p->inf[i].client = NULL;
+            p->inf[i].client_ip = NULL;
+            p->inf[i].client_port = NULL;
+            p->inf[i].del_callback = p->del_callback;
+            p->inf[i].rcv_callback = p->rcv_callback;
+            p->inf[i].snd_callback = p->snd_callback;
             p->inf[i].data = NULL;
+
+            // link them so that the first free will be earlier in the array
+            // (we loop decrementing i)
             p->inf[i].next = p->first_free;
             p->first_free = &p->inf[i];
         }
@@ -1028,13 +1046,19 @@ static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype,
     pi->socktype = socktype;
     pi->flags = flags;
     pi->next = NULL;
+    pi->client_ip = strdupz(client_ip);
+    pi->client_port = strdupz(client_port);
+
+    pi->del_callback = p->del_callback;
+    pi->rcv_callback = p->rcv_callback;
+    pi->snd_callback = p->snd_callback;
 
     p->used++;
     if(unlikely(pi->slot > p->max))
         p->max = pi->slot;
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
-        pi->data = p->add_callback(fd, pi->socktype, &pf->events);
+        pi->data = p->add_callback(fd, pi->socktype, &pf->events, client_ip, client_port);
     }
 
     if(pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
@@ -1053,9 +1077,10 @@ static inline void poll_close_fd(struct poll *p, struct pollinfo *pi) {
     if(unlikely(pf->fd == -1)) return;
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
-        p->del_callback(pf->fd, pi->socktype, pi->data);
+        pi->del_callback(pf->fd, pi->socktype, pi->data);
     }
 
+    info("POLLFD: closing fd %d", pf->fd);
     close(pf->fd);
     pf->fd = -1;
     pf->events = 0;
@@ -1065,14 +1090,21 @@ static inline void poll_close_fd(struct poll *p, struct pollinfo *pi) {
     pi->flags = 0;
     pi->data = NULL;
 
-    freez(pi->client);
-    pi->client = NULL;
+    pi->del_callback = NULL;
+    pi->rcv_callback = NULL;
+    pi->snd_callback = NULL;
+
+    freez(pi->client_ip);
+    pi->client_ip = NULL;
+
+    freez(pi->client_port);
+    pi->client_port = NULL;
 
     pi->next = p->first_free;
     p->first_free = pi;
 
     p->used--;
-    if(p->max == pi->slot) {
+    if(unlikely(p->max == pi->slot)) {
         p->max = p->min;
         ssize_t i;
         for(i = (ssize_t)pi->slot; i > (ssize_t)p->min ;i--) {
@@ -1086,10 +1118,12 @@ static inline void poll_close_fd(struct poll *p, struct pollinfo *pi) {
     debug(D_POLLFD, "POLLFD: DEL: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 }
 
-static void *add_callback_default(int fd, int socktype, short int *events) {
+static void *add_callback_default(int fd, int socktype, short int *events, const char *client_ip, const char *client_port) {
     (void)fd;
     (void)socktype;
     (void)events;
+    (void)client_ip;
+    (void)client_port;
 
     return NULL;
 }
@@ -1138,7 +1172,7 @@ static int snd_callback_default(int fd, int socktype, void *data, short int *eve
     return 0;
 }
 
-void poll_events_cleanup(void *data) {
+static void poll_events_cleanup(void *data) {
     struct poll *p = (struct poll *)data;
 
     size_t i;
@@ -1152,7 +1186,7 @@ void poll_events_cleanup(void *data) {
 }
 
 void poll_events(LISTEN_SOCKETS *sockets
-        , void *(*add_callback)(int fd, int socktype, short int *events)
+        , void *(*add_callback)(int fd, int socktype, short int *events, const char *client_ip, const char *client_port)
         , void  (*del_callback)(int fd, int socktype, void *data)
         , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
         , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
@@ -1177,7 +1211,7 @@ void poll_events(LISTEN_SOCKETS *sockets
 
     size_t i;
     for(i = 0; i < sockets->opened ;i++) {
-        struct pollinfo *pi = poll_add_fd(&p, sockets->fds[i], sockets->fds_types[i], POLLIN, POLLINFO_FLAG_SERVER_SOCKET);
+        struct pollinfo *pi = poll_add_fd(&p, sockets->fds[i], sockets->fds_types[i], POLLIN, POLLINFO_FLAG_SERVER_SOCKET, (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN", "");
         pi->data = data;
         info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }
@@ -1207,7 +1241,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             struct pollfd *pf = &p.fds[i];
             struct pollinfo *pi = &p.inf[i];
             int fd = pf->fd;
-            short int revents = pf->revents;
+            short int events = pf->events, revents = pf->revents;
             pf->revents = 0;
 
             if(unlikely(fd == -1)) {
@@ -1215,7 +1249,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                 continue;
             }
 
-            debug(D_POLLFD, "POLLFD: LISTENER: processing events for slot %zu (events = %d, revents = %d)", i, pf->events, revents);
+            debug(D_POLLFD, "POLLFD: LISTENER: processing events for slot %zu (events = %d, revents = %d)", i, events, revents);
 
             if(revents & POLLIN || revents & POLLPRI) {
                 // receiving data
@@ -1236,7 +1270,7 @@ void poll_events(LISTEN_SOCKETS *sockets
 
                                 debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", i, fd);
                                 nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, NI_MAXHOST + 1, client_port, NI_MAXSERV + 1, access_list);
-                                if (nfd < 0) {
+                                if (unlikely(nfd < 0)) {
                                     // accept failed
 
                                     debug(D_POLLFD, "POLLFD: LISTENER: accept4() slot %zu (fd %d) failed.", i, fd);
@@ -1248,14 +1282,14 @@ void poll_events(LISTEN_SOCKETS *sockets
                                 }
                                 else {
                                     // accept ok
-                                    info("POLLFD: LISTENER: client '[%s]:%s' connected to '%s'", client_ip, client_port, sockets->fds_names[i]);
-                                    poll_add_fd(&p, nfd, SOCK_STREAM, POLLIN, POLLINFO_FLAG_CLIENT_SOCKET);
+                                    info("POLLFD: LISTENER: client '[%s]:%s' connected to '%s' on fd %d", client_ip, client_port, sockets->fds_names[i], nfd);
+                                    poll_add_fd(&p, nfd, SOCK_STREAM, POLLIN, POLLINFO_FLAG_CLIENT_SOCKET, client_ip, client_port);
 
-                                    // it may have realloced them, so refresh our pointers
+                                    // it may have reallocated them, so refresh our pointers
                                     pf = &p.fds[i];
                                     pi = &p.inf[i];
                                 }
-                            } while (nfd != -1);
+                            } while (nfd >= 0);
                             break;
                         }
 
@@ -1267,7 +1301,8 @@ void poll_events(LISTEN_SOCKETS *sockets
 
                             // FIXME: access_list is not applied to UDP
 
-                            p.rcv_callback(fd, pi->socktype, pi->data, &pf->events);
+                            pf->events = 0;
+                            pi->rcv_callback(fd, pi->socktype, pi->data, &pf->events);
                             break;
                         }
 
@@ -1282,7 +1317,8 @@ void poll_events(LISTEN_SOCKETS *sockets
                     // read data from client TCP socket
                     debug(D_POLLFD, "POLLFD: LISTENER: reading data from TCP client slot %zu (fd %d)", i, fd);
 
-                    if (p.rcv_callback(fd, pi->socktype, pi->data, &pf->events) == -1) {
+                    pf->events = 0;
+                    if (pi->rcv_callback(fd, pi->socktype, pi->data, &pf->events) == -1) {
                         poll_close_fd(&p, pi);
                         continue;
                     }
@@ -1293,26 +1329,30 @@ void poll_events(LISTEN_SOCKETS *sockets
                 // sending data
                 debug(D_POLLFD, "POLLFD: LISTENER: sending data to socket on slot %zu (fd %d)", i, fd);
 
-                if (p.snd_callback(fd, pi->socktype, pi->data, &pf->events) == -1) {
+                pf->events = 0;
+                if (pi->snd_callback(fd, pi->socktype, pi->data, &pf->events) == -1) {
                     poll_close_fd(&p, pi);
                     continue;
                 }
             }
 
             if(unlikely(revents & POLLERR)) {
-                error("POLLFD: LISTENER: processing POLLERR events for slot %zu (events = %d, revents = %d)", i, pf->events, revents);
+                error("POLLFD: LISTENER: processing POLLERR events for slot %zu fd %d (events = %d, revents = %d)", i, events, revents, fd);
+                pf->events = 0;
                 poll_close_fd(&p, pi);
                 continue;
             }
 
             if(unlikely(revents & POLLHUP)) {
-                error("POLLFD: LISTENER: processing POLLHUP events for slot %zu (events = %d, revents = %d)", i, pf->events, pf->revents);
+                error("POLLFD: LISTENER: processing POLLHUP events for slot %zu fd %d (events = %d, revents = %d)", i, events, revents, fd);
+                pf->events = 0;
                 poll_close_fd(&p, pi);
                 continue;
             }
 
             if(unlikely(revents & POLLNVAL)) {
-                error("POLLFD: LISTENER: processing POLLNVAP events for slot %zu (events = %d, revents = %d)", i, pf->events, revents);
+                error("POLLFD: LISTENER: processing POLLNVAL events for slot %zu fd %d (events = %d, revents = %d)", i, events, revents, fd);
+                pf->events = 0;
                 poll_close_fd(&p, pi);
                 continue;
             }

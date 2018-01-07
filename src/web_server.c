@@ -53,6 +53,8 @@ WEB_SERVER_MODE web_server_mode_id(const char *mode) {
         return WEB_SERVER_MODE_NONE;
     else if(!strcmp(mode, "single") || !strcmp(mode, "single-threaded"))
         return WEB_SERVER_MODE_SINGLE_THREADED;
+    else if(!strcmp(mode, "static") || !strcmp(mode, "static-threaded"))
+        return WEB_SERVER_MODE_STATIC_THREADED;
     else // if(!strcmp(mode, "multi") || !strcmp(mode, "multi-threaded"))
         return WEB_SERVER_MODE_MULTI_THREADED;
 }
@@ -64,6 +66,9 @@ const char *web_server_mode_name(WEB_SERVER_MODE id) {
 
         case WEB_SERVER_MODE_SINGLE_THREADED:
             return "single-threaded";
+
+        case WEB_SERVER_MODE_STATIC_THREADED:
+            return "static-threaded";
 
         default:
         case WEB_SERVER_MODE_MULTI_THREADED:
@@ -83,9 +88,9 @@ int api_listen_sockets_setup(void) {
 }
 
 // --------------------------------------------------------------------------------------
-// the main socket listener
+// the main socket listener - MULTI-THREADED
 
-static inline void cleanup_web_clients(void) {
+static inline void multi_threaded_cleanup_web_clients(void) {
     struct web_client *w;
 
     for (w = web_clients; w;) {
@@ -171,7 +176,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
         else if(unlikely(!retval)) {
             debug(D_WEB_CLIENT, "LISTENER: select() timeout.");
             counter = 0;
-            cleanup_web_clients();
+            multi_threaded_cleanup_web_clients();
             continue;
         }
 
@@ -182,9 +187,9 @@ void *socket_listen_main_multi_threaded(void *ptr) {
             if(revents & POLLIN || revents & POLLPRI) {
                 socket_listen_main_multi_threaded_fds[i].revents = 0;
 
-                w = web_client_create(socket_listen_main_multi_threaded_fds[i].fd);
+                w = web_client_create_on_listenfd(socket_listen_main_multi_threaded_fds[i].fd);
                 if(unlikely(!w)) {
-                    // no need for error log - web_client_create already logged the error
+                    // no need for error log - web_client_create_on_listenfd already logged the error
                     continue;
                 }
 
@@ -205,13 +210,16 @@ void *socket_listen_main_multi_threaded(void *ptr) {
         counter++;
         if(counter >= CLEANUP_EVERY_EVENTS) {
             counter = 0;
-            cleanup_web_clients();
+            multi_threaded_cleanup_web_clients();
         }
     }
 
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
+
+// --------------------------------------------------------------------------------------
+// the main socket listener - SINGLE-THREADED
 
 struct web_client *single_threaded_clients[FD_SETSIZE];
 
@@ -323,7 +331,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
             for(i = 0; i < api_sockets.opened ; i++) {
                 if (FD_ISSET(api_sockets.fds[i], &rifds)) {
                     debug(D_WEB_CLIENT_ACCESS, "LISTENER: new connection.");
-                    w = web_client_create(api_sockets.fds[i]);
+                    w = web_client_create_on_listenfd(api_sockets.fds[i]);
 
                     if(api_sockets.fds_families[i] == AF_UNIX)
                         web_client_set_unix(w);
@@ -391,17 +399,18 @@ void *socket_listen_main_single_threaded(void *ptr) {
     return NULL;
 }
 
+// --------------------------------------------------------------------------------------
+// the main socket listener - STATIC-THREADED
 
-#if 0
 // new TCP client connected
-static void *web_server_add_callback(int fd, int socktype, short int *events) {
+static void *web_server_add_callback(int fd, int socktype, short int *events, const char *client_ip, const char *client_port) {
     (void)fd;
     (void)socktype;
 
     *events = POLLIN;
 
     debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", fd);
-    struct web_client *w = web_client_create(fd);
+    struct web_client *w = web_client_create_on_fd(fd, client_ip, client_port);
 
     if(unlikely(socktype == AF_UNIX))
         web_client_set_unix(w);
@@ -418,23 +427,30 @@ static void web_server_del_callback(int fd, int socktype, void *data) {
 
     struct web_client *w = (struct web_client *)data;
 
-    if(w) {
+    if(likely(w)) {
         if(w->ofd == -1 || fd == w->ofd) {
             // we free the client, only if the closing fd
             // is the client socket
+
+            // prevent it from closing the file descriptors
+            w->ifd = w->ofd = -1;
+
             web_client_free(w);
         }
     }
+}
 
-    return;
+static inline int web_server_check_client_status(struct web_client *w) {
+    if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
+        return -1;
+
+    return 0;
 }
 
 // Receive data
 static int web_server_rcv_callback(int fd, int socktype, void *data, short int *events) {
     (void)fd;
     (void)socktype;
-
-    *events = 0;
 
     struct web_client *w = (struct web_client *)data;
 
@@ -466,10 +482,7 @@ static int web_server_rcv_callback(int fd, int socktype, void *data, short int *
     if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
         *events |= POLLOUT;
 
-    if(unlikely(*events == 0))
-        return -1;
-
-    return 0;
+    return web_server_check_client_status(w);
 }
 
 static int web_server_snd_callback(int fd, int socktype, void *data, short int *events) {
@@ -490,13 +503,10 @@ static int web_server_snd_callback(int fd, int socktype, void *data, short int *
     if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
         *events |= POLLOUT;
 
-    if(unlikely(*events == 0))
-        return -1;
-
-    return 0;
+    return web_server_check_client_status(w);
 }
 
-static void socket_listen_main_single_threaded_cleanup(void *ptr) {
+static void socket_listen_main_static_threaded_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     if(static_thread->enabled) {
         static_thread->enabled = 0;
@@ -506,9 +516,9 @@ static void socket_listen_main_single_threaded_cleanup(void *ptr) {
     }
 }
 
-void *socket_listen_main_single_threaded(void *ptr) {
-    netdata_thread_cleanup_push(socket_listen_main_single_threaded_cleanup, ptr);
-    web_server_mode = WEB_SERVER_MODE_SINGLE_THREADED;
+void *socket_listen_main_static_threaded(void *ptr) {
+    netdata_thread_cleanup_push(socket_listen_main_static_threaded_cleanup, ptr);
+    web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
@@ -525,4 +535,3 @@ void *socket_listen_main_single_threaded(void *ptr) {
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
-#endif

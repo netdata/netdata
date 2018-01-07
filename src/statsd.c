@@ -697,9 +697,12 @@ struct statsd_udp {
 #endif
 
 // new TCP client connected
-static void *statsd_add_callback(int fd, int socktype, short int *events) {
+static void *statsd_add_callback(int fd, int socktype, short int *events, const char *client_ip, const char *client_port) {
     (void)fd;
     (void)socktype;
+    (void)client_ip;
+    (void)client_port;
+
     *events = POLLIN;
 
     struct statsd_tcp *data = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);

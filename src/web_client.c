@@ -84,7 +84,51 @@ static void web_client_update_acl_matches(struct web_client *w) {
         w->acl |= WEB_CLIENT_ACL_BADGE;
 }
 
-struct web_client *web_client_create(int listener) {
+struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port) {
+    struct web_client *w;
+
+    w = callocz(1, sizeof(struct web_client));
+    w->id = ++web_clients_count;
+    w->mode = WEB_CLIENT_MODE_NORMAL;
+    w->ifd = fd;
+
+    strncpyz(w->client_ip, client_ip, sizeof(w->client_ip));
+    strncpyz(w->client_port, client_port, sizeof(w->client_port));
+
+    if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
+    if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
+
+    log_connection(w, "CONNECTED");
+
+    w->ofd = w->ifd;
+
+    {
+        int flag = 1;
+        if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
+            error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ofd);
+
+        flag = 1;
+        if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
+            error("%llu: Cannot set SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
+    }
+
+    web_client_update_acl_matches(w);
+
+    w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
+    w->response.header = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
+    w->response.header_output = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
+    w->origin[0] = '*';
+    web_client_enable_wait_receive(w);
+
+    if(web_clients) web_clients->prev = w;
+    w->next = web_clients;
+    web_clients = w;
+
+    web_client_connected();
+    return(w);
+}
+
+struct web_client *web_client_create_on_listenfd(int listener) {
     struct web_client *w;
 
     w = callocz(1, sizeof(struct web_client));
@@ -115,11 +159,11 @@ struct web_client *web_client_create(int listener) {
 
         int flag = 1;
         if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
-            error("%llu: failed to enable TCP_NODELAY on socket.", w->id);
+            error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ofd);
 
         flag = 1;
         if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
-            error("%llu: Cannot set SO_KEEPALIVE on socket.", w->id);
+            error("%llu: Cannot set SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
     }
 
     web_client_update_acl_matches(w);
