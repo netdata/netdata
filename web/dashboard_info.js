@@ -659,6 +659,10 @@ netdataDashboard.context = {
         info: 'Committed Memory, is the sum of all memory which has been allocated by processes.'
     },
 
+    'mem.available': {
+        info: 'Available Memory is estimated by the kernel, as the amount of RAM that can be used by userspace processes, without causing swapping.'
+    },
+
     'mem.writeback': {
         info: '<b>Dirty</b> is the amount of memory waiting to be written to disk. <b>Writeback</b> is how much memory is actively being written to disk.'
     },
