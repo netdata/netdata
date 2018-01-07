@@ -19,6 +19,8 @@ typedef struct listen_sockets {
     int fds_families[MAX_LISTEN_FDS];   // the family of the open sockets (AF_UNIX, AF_INET, AF_INET6)
 } LISTEN_SOCKETS;
 
+extern char *strdup_client_description(int family, const char *protocol, const char *ip, int port);
+
 extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
 extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
 
@@ -52,7 +54,7 @@ extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flag
 
 
 extern void poll_events(LISTEN_SOCKETS *sockets
-        , void *(*add_callback)(int fd, int socktype, short int *events)
+        , void *(*add_callback)(int fd, int socktype, short int *events, const char *client_ip, const char *client_port)
         , void  (*del_callback)(int fd, int socktype, void *data)
         , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
         , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)

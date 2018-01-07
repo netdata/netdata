@@ -76,6 +76,7 @@ struct netdata_static_thread static_threads[] = {
     {"PLUGINSD",            NULL,                    NULL,         1, NULL, NULL, pluginsd_main},
     {"WEB_SERVER[multi]",   NULL,                    NULL,         1, NULL, NULL, socket_listen_main_multi_threaded},
     {"WEB_SERVER[single]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_single_threaded},
+    {"WEB_SERVER[static]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
     {"STREAM",              NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
     {"STATSD",              NULL,                    NULL,         1, NULL, NULL, statsd_main},
 
@@ -87,6 +88,7 @@ void web_server_threading_selection(void) {
 
     int multi_threaded = (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED);
     int single_threaded = (web_server_mode == WEB_SERVER_MODE_SINGLE_THREADED);
+    int static_threaded = (web_server_mode == WEB_SERVER_MODE_STATIC_THREADED);
 
     int i;
     for (i = 0; static_threads[i].name; i++) {
@@ -95,6 +97,9 @@ void web_server_threading_selection(void) {
 
         if (static_threads[i].start_routine == socket_listen_main_single_threaded)
             static_threads[i].enabled = single_threaded;
+
+        if (static_threads[i].start_routine == socket_listen_main_static_threaded)
+            static_threads[i].enabled = static_threaded;
     }
 }
 

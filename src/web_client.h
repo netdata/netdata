@@ -174,7 +174,8 @@ extern uid_t web_files_gid(void);
 
 extern int web_client_permission_denied(struct web_client *w);
 
-extern struct web_client *web_client_create(int listener);
+extern struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port);
+extern struct web_client *web_client_create_on_listenfd(int listener);
 extern struct web_client *web_client_free(struct web_client *w);
 extern ssize_t web_client_send(struct web_client *w);
 extern ssize_t web_client_receive(struct web_client *w);

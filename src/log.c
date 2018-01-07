@@ -338,8 +338,8 @@ void error_int( const char *prefix, const char *file, const char *function, cons
     log_lock();
 
     va_start( args, fmt );
-    if(debug_flags) fprintf(stderr, "%s: %s %-5.5s : %s: (%04lu@%-10.10s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
-    else            fprintf(stderr, "%s: %s %-5.5s : %s: ", date, program_name, prefix, netdata_thread_tag());
+    if(debug_flags) fprintf(stderr, "%s: %s %-5.5s : %s : (%04lu@%-10.10s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
+    else            fprintf(stderr, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
     vfprintf( stderr, fmt, args );
     va_end( args );
 

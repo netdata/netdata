@@ -16,6 +16,7 @@
 
 typedef enum web_server_mode {
     WEB_SERVER_MODE_SINGLE_THREADED,
+    WEB_SERVER_MODE_STATIC_THREADED,
     WEB_SERVER_MODE_MULTI_THREADED,
     WEB_SERVER_MODE_NONE
 } WEB_SERVER_MODE;
@@ -27,6 +28,7 @@ extern const char *web_server_mode_name(WEB_SERVER_MODE id);
 
 extern void *socket_listen_main_multi_threaded(void *ptr);
 extern void *socket_listen_main_single_threaded(void *ptr);
+extern void *socket_listen_main_static_threaded(void *ptr);
 extern int api_listen_sockets_setup(void);
 
 #endif /* NETDATA_WEB_SERVER_H */

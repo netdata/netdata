@@ -289,7 +289,7 @@ procfile *procfile_readall(procfile *ff) {
         debug(D_PROCFILE, "Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         r = read(ff->fd, &ff->data[s], ff->size - s);
         if(unlikely(r == -1)) {
-            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot read from file '%s'", procfile_filename(ff));
+            if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             procfile_close(ff);
             return NULL;
         }
@@ -408,6 +408,8 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
         return NULL;
     }
 
+    // info("PROCFILE: opened '%s' on fd %d", filename, fd);
+
     size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_allocation : PROCFILE_INCREMENT_BUFFER;
     procfile *ff = mallocz(sizeof(procfile) + size);
 
@@ -431,7 +433,10 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
 procfile *procfile_reopen(procfile *ff, const char *filename, const char *separators, uint32_t flags) {
     if(unlikely(!ff)) return procfile_open(filename, separators, flags);
 
-    if(likely(ff->fd != -1)) close(ff->fd);
+    if(likely(ff->fd != -1)) {
+        // info("PROCFILE: closing fd %d", ff->fd);
+        close(ff->fd);
+    }
 
     ff->fd = open(filename, O_RDONLY, 0666);
     if(unlikely(ff->fd == -1)) {
@@ -439,9 +444,10 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
         return NULL;
     }
 
+    // info("PROCFILE: opened '%s' on fd %d", filename, ff->fd);
+
     //strncpyz(ff->filename, filename, FILENAME_MAX);
     ff->filename[0] = '\0';
-
     ff->flags = flags;
 
     // do not do the separators again if NULL is given
