@@ -965,6 +965,8 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 #define POLLINFO_FLAG_CLIENT_SOCKET 0x00000002
 
 struct pollinfo {
+    struct poll *p; // the parent
+
     size_t slot;
     char *client_ip;
     char *client_port;
@@ -1014,6 +1016,7 @@ static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype,
             p->fds[i].events = 0;
             p->fds[i].revents = 0;
 
+            p->inf[i].p = p;
             p->inf[i].slot = (size_t)i;
             p->inf[i].flags = 0;
             p->inf[i].socktype = -1;
@@ -1043,6 +1046,7 @@ static inline struct pollinfo *poll_add_fd(struct poll *p, int fd, int socktype,
     pf->events = events;
     pf->revents = 0;
 
+    pi->p = p;
     pi->socktype = socktype;
     pi->flags = flags;
     pi->next = NULL;

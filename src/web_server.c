@@ -405,17 +405,31 @@ void *socket_listen_main_single_threaded(void *ptr) {
 // --------------------------------------------------------------------------------------
 // the main socket listener - STATIC-THREADED
 
-static __thread size_t web_server_static_connected = 0,
-                       web_server_static_disconnected = 0,
-                       web_server_static_receptions = 0,
-                       web_server_static_sends = 0;
+struct web_server_static_threaded_worker {
+    netdata_thread_t thread;
+
+    int running;
+
+    volatile size_t connected;
+    volatile size_t disconnected;
+    volatile size_t receptions;
+    volatile size_t sends;
+    volatile size_t max_concurrent;
+};
+
+static long long static_threaded_workers_count = 1;
+static struct web_server_static_threaded_worker *static_workers_private_data = NULL;
+static __thread struct web_server_static_threaded_worker *worker_private = NULL;
 
 // new TCP client connected
 static void *web_server_add_callback(int fd, int socktype, short int *events, const char *client_ip, const char *client_port) {
     (void)fd;
     (void)socktype;
 
-    web_server_static_connected++;
+    worker_private->connected++;
+    size_t concurrent = worker_private->connected - worker_private->disconnected;
+    if(unlikely(concurrent > worker_private->max_concurrent))
+        worker_private->max_concurrent = concurrent;
 
     *events = POLLIN;
 
@@ -435,7 +449,7 @@ static void web_server_del_callback(int fd, int socktype, void *data) {
     (void)fd;
     (void)socktype;
 
-    web_server_static_disconnected++;
+    worker_private->disconnected++;
 
     struct web_client *w = (struct web_client *)data;
 
@@ -464,7 +478,7 @@ static int web_server_rcv_callback(int fd, int socktype, void *data, short int *
     (void)fd;
     (void)socktype;
 
-    web_server_static_receptions++;
+    worker_private->receptions++;
 
     struct web_client *w = (struct web_client *)data;
 
@@ -503,7 +517,7 @@ static int web_server_snd_callback(int fd, int socktype, void *data, short int *
     (void)fd;
     (void)socktype;
 
-    web_server_static_sends++;
+    worker_private->sends++;
 
     struct web_client *w = (struct web_client *)data;
 
@@ -523,20 +537,21 @@ static int web_server_snd_callback(int fd, int socktype, void *data, short int *
 }
 
 static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
-    int *running = (int *)ptr;
-    *running = 0;
+    worker_private = (struct web_server_static_threaded_worker *)ptr;
+    worker_private->running = 0;
 
-    info("stopped after %zu connects, %zu disconnects, %zu receptions and %zu sends",
-            web_server_static_connected,
-            web_server_static_disconnected,
-            web_server_static_receptions,
-            web_server_static_sends
+    info("stopped after %zu connects, %zu disconnects (max concurrent %zu), %zu receptions and %zu sends",
+            worker_private->connected,
+            worker_private->disconnected,
+            worker_private->max_concurrent,
+            worker_private->receptions,
+            worker_private->sends
     );
 }
 
 void *socket_listen_main_static_threaded_worker(void *ptr) {
-    int *running = (int *)ptr;
-    *running = 1;
+    worker_private = (struct web_server_static_threaded_worker *)ptr;
+    worker_private->running = 1;
 
     netdata_thread_cleanup_push(socket_listen_main_static_threaded_worker_cleanup, ptr);
 
@@ -553,20 +568,16 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
     return NULL;
 }
 
-static long long static_threaded_threads_count = 1;
-static netdata_thread_t *static_threaded_threads_ids = NULL;
-static volatile int *static_threaded_threads_running = NULL;
-
 static void socket_listen_main_static_threaded_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
         int i;
-        for(i = 1; i < static_threaded_threads_count; i++) {
-            if(static_threaded_threads_running[i]) {
+        for(i = 1; i < static_threaded_workers_count; i++) {
+            if(static_workers_private_data[i].running) {
                 info("stopping worker %d", i + 1);
-                netdata_thread_cancel(static_threaded_threads_ids[i]);
+                netdata_thread_cancel(static_workers_private_data[i].thread);
             }
             else
                 info("found stopped worker %d", i + 1);
@@ -589,23 +600,22 @@ void *socket_listen_main_static_threaded(void *ptr) {
             // so, if the machine has more CPUs, avoid using resources unnecessarily
             int def_thread_count = (processors > 6)?6:processors;
 
-            static_threaded_threads_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
-            if(static_threaded_threads_count < 1) static_threaded_threads_count = 1;
+            static_threaded_workers_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
+            if(static_threaded_workers_count < 1) static_threaded_workers_count = 1;
 
-            static_threaded_threads_ids = callocz((size_t)static_threaded_threads_count, sizeof(netdata_thread_t));
-            static_threaded_threads_running = callocz((size_t)static_threaded_threads_count, sizeof(int));
+            static_workers_private_data = callocz((size_t)static_threaded_workers_count, sizeof(struct web_server_static_threaded_worker));
 
             int i;
-            for(i = 1; i < static_threaded_threads_count; i++) {
+            for(i = 1; i < static_threaded_workers_count; i++) {
                 char tag[50 + 1];
                 snprintfz(tag, 50, "WEB_SERVER[static%d]", i+1);
 
                 info("starting worker %d", i+1);
-                netdata_thread_create(&static_threaded_threads_ids[i], tag, NETDATA_THREAD_OPTION_DEFAULT, socket_listen_main_static_threaded_worker, (void *)&static_threaded_threads_running[i]);
+                netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, socket_listen_main_static_threaded_worker, (void *)&static_workers_private_data[i]);
             }
 
             // and the main one
-            socket_listen_main_static_threaded_worker((void *)&static_threaded_threads_running[0]);
+            socket_listen_main_static_threaded_worker((void *)&static_workers_private_data[0]);
 
     netdata_thread_cleanup_pop(1);
     return NULL;
