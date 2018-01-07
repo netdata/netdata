@@ -20,8 +20,11 @@ static void log_allocations(void)
     mi = mallinfo();
     if(mi.uordblks > used) {
         int clients = 0;
-        struct web_client *w;
-        for(w = web_clients; w ; w = w->next) clients++;
+
+        if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
+            struct web_client *w;
+            for (w = web_clients; w; w = w->next) clients++;
+        }
 
         info("Allocated memory: used %d KB (+%d B), mmap %d KB (+%d B), heap %d KB (+%d B). %d web clients connected.",
             mi.uordblks / 1024,
@@ -402,10 +405,17 @@ void *socket_listen_main_single_threaded(void *ptr) {
 // --------------------------------------------------------------------------------------
 // the main socket listener - STATIC-THREADED
 
+static __thread size_t web_server_static_connected = 0,
+                       web_server_static_disconnected = 0,
+                       web_server_static_receptions = 0,
+                       web_server_static_sends = 0;
+
 // new TCP client connected
 static void *web_server_add_callback(int fd, int socktype, short int *events, const char *client_ip, const char *client_port) {
     (void)fd;
     (void)socktype;
+
+    web_server_static_connected++;
 
     *events = POLLIN;
 
@@ -424,6 +434,8 @@ static void *web_server_add_callback(int fd, int socktype, short int *events, co
 static void web_server_del_callback(int fd, int socktype, void *data) {
     (void)fd;
     (void)socktype;
+
+    web_server_static_disconnected++;
 
     struct web_client *w = (struct web_client *)data;
 
@@ -451,6 +463,8 @@ static inline int web_server_check_client_status(struct web_client *w) {
 static int web_server_rcv_callback(int fd, int socktype, void *data, short int *events) {
     (void)fd;
     (void)socktype;
+
+    web_server_static_receptions++;
 
     struct web_client *w = (struct web_client *)data;
 
@@ -489,6 +503,8 @@ static int web_server_snd_callback(int fd, int socktype, void *data, short int *
     (void)fd;
     (void)socktype;
 
+    web_server_static_sends++;
+
     struct web_client *w = (struct web_client *)data;
 
     if(unlikely(!web_client_has_wait_send(w)))
@@ -506,31 +522,82 @@ static int web_server_snd_callback(int fd, int socktype, void *data, short int *
     return web_server_check_client_status(w);
 }
 
+static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
+    (void)ptr;
+
+    info("stopped after %zu connects, %zu disconnects, %zu receptions and %zu sends",
+            web_server_static_connected,
+            web_server_static_disconnected,
+            web_server_static_receptions,
+            web_server_static_sends
+    );
+}
+
+void *socket_listen_main_static_threaded_worker(void *ptr) {
+    (void)ptr;
+
+    netdata_thread_cleanup_push(socket_listen_main_static_threaded_worker_cleanup, ptr);
+
+            poll_events(&api_sockets
+                        , web_server_add_callback
+                        , web_server_del_callback
+                        , web_server_rcv_callback
+                        , web_server_snd_callback
+                        , web_allow_connections_from
+                        , NULL
+            );
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
+}
+
+static long long static_threaded_threads_count = 1;
+static netdata_thread_t *static_threaded_threads_ids = NULL;
+
 static void socket_listen_main_static_threaded_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     if(static_thread->enabled) {
         static_thread->enabled = 0;
 
-        info("%s: cleaning up...", netdata_thread_tag());
+        int i;
+        for(i = 1; i < static_threaded_threads_count; i++) {
+            info("stopping worker %d", i+1);
+            netdata_thread_cancel(static_threaded_threads_ids[i]);
+        }
+
+        info("cleaning up...");
         listen_sockets_close(&api_sockets);
     }
 }
 
 void *socket_listen_main_static_threaded(void *ptr) {
     netdata_thread_cleanup_push(socket_listen_main_static_threaded_cleanup, ptr);
-    web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
+            web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
-    if(!api_sockets.opened)
-        fatal("LISTENER: no listen sockets available.");
+            if(!api_sockets.opened)
+                fatal("LISTENER: no listen sockets available.");
 
-    poll_events(&api_sockets
-                , web_server_add_callback
-                , web_server_del_callback
-                , web_server_rcv_callback
-                , web_server_snd_callback
-                , web_allow_connections_from
-                , NULL
-    );
+            // 6 threads is the optimal value
+            // since 6 are the parallel connections browsers will do
+            // so, if the machine has more CPUs, avoid using resources unnecessarily
+            int def_thread_count = (processors > 6)?6:processors;
+
+            static_threaded_threads_count = config_get_number(CONFIG_SECTION_WEB, "web server threads", def_thread_count);
+            if(static_threaded_threads_count < 1) static_threaded_threads_count = 1;
+
+            static_threaded_threads_ids = callocz((size_t)static_threaded_threads_count, sizeof(netdata_thread_t));
+
+            int i;
+            for(i = 1; i < static_threaded_threads_count; i++) {
+                char tag[50 + 1];
+                snprintfz(tag, 50, "WEB_SERVER[static%d]", i+1);
+
+                info("starting worker %d", i+1);
+                netdata_thread_create(&static_threaded_threads_ids[i], tag, NETDATA_THREAD_OPTION_DEFAULT, socket_listen_main_static_threaded_worker, NULL);
+            }
+
+            // and the main one
+            socket_listen_main_static_threaded_worker(NULL);
 
     netdata_thread_cleanup_pop(1);
     return NULL;
