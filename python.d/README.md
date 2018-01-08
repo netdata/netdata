@@ -337,11 +337,6 @@ It produces:
 **Requirements:**
 
 - `rados` python module
-- Add netdata user to ceph group
-```shell
-# useradd -g ceph netdata
-```
-
 - Granting read permissions to ceph group from keyring file
 ```shell
 # chmod 640 /etc/ceph/ceph.client.admin.keyring
