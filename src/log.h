@@ -38,6 +38,8 @@
 //#define DEBUG 0xffffffff
 #define DEBUG (0)
 
+extern int web_server_is_multithreaded;
+
 extern uint64_t debug_flags;
 
 extern const char *program_name;
