@@ -100,6 +100,7 @@ inline void global_statistics_copy(struct global_statistics *gs, uint8_t options
     gs->bytes_sent              = __atomic_fetch_add(&global_statistics.bytes_sent, 0, __ATOMIC_SEQ_CST);
     gs->content_size            = __atomic_fetch_add(&global_statistics.content_size, 0, __ATOMIC_SEQ_CST);
     gs->compressed_content_size = __atomic_fetch_add(&global_statistics.compressed_content_size, 0, __ATOMIC_SEQ_CST);
+    gs->web_client_count        = __atomic_fetch_add(&global_statistics.web_client_count, 0, __ATOMIC_SEQ_CST);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
