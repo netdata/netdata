@@ -1,5 +1,7 @@
 #include "common.h"
 
+int web_server_is_multithreaded = 1;
+
 const char *program_name = "";
 uint64_t debug_flags = DEBUG;
 

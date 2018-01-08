@@ -7,8 +7,7 @@ static LISTEN_SOCKETS api_sockets = {
         .backlog         = API_LISTEN_BACKLOG
 };
 
-WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
-int web_server_is_multithreaded = 1;
+WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
 // --------------------------------------------------------------------------------------
 
