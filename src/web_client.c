@@ -1778,7 +1778,10 @@ ssize_t web_client_receive(struct web_client *w)
             web_client_disable_wait_receive(w);
 
             debug(D_WEB_CLIENT, "%llu: Read the whole file.", w->id);
-            if(w->ifd != w->ofd) close(w->ifd);
+
+            if(w->ifd != w->ofd && web_server_mode != WEB_SERVER_MODE_STATIC_THREADED)
+                close(w->ifd);
+
             w->ifd = w->ofd;
         }
         else {

@@ -961,7 +961,18 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
 #define POLL_FDS_INCREASE_STEP 10
 
-static inline POLLINFO *poll_add_fd(POLLJOB *p, int fd, int socktype, short int events, uint32_t flags, const char *client_ip, const char *client_port) {
+inline POLLINFO *poll_add_fd(POLLJOB *p
+                             , int fd
+                             , int socktype
+                             , uint32_t flags
+                             , const char *client_ip
+                             , const char *client_port
+                             , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
+                             , void  (*del_callback)(POLLINFO *pi)
+                             , int   (*rcv_callback)(POLLINFO *pi, short int *events)
+                             , int   (*snd_callback)(POLLINFO *pi, short int *events)
+                             , void *data
+) {
     debug(D_POLLFD, "POLLFD: ADD: request to add fd %d, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", fd, p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
     if(unlikely(fd < 0)) return NULL;
@@ -1008,7 +1019,7 @@ static inline POLLINFO *poll_add_fd(POLLJOB *p, int fd, int socktype, short int 
 
     struct pollfd *pf = &p->fds[pi->slot];
     pf->fd = fd;
-    pf->events = events;
+    pf->events = POLLIN;
     pf->revents = 0;
 
     pi->fd = fd;
@@ -1019,16 +1030,16 @@ static inline POLLINFO *poll_add_fd(POLLJOB *p, int fd, int socktype, short int 
     pi->client_ip = strdupz(client_ip);
     pi->client_port = strdupz(client_port);
 
-    pi->del_callback = p->del_callback;
-    pi->rcv_callback = p->rcv_callback;
-    pi->snd_callback = p->snd_callback;
+    pi->del_callback = del_callback;
+    pi->rcv_callback = rcv_callback;
+    pi->snd_callback = snd_callback;
 
     p->used++;
     if(unlikely(pi->slot > p->max))
         p->max = pi->slot;
 
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
-        pi->data = p->add_callback(pi, &pf->events);
+        pi->data = add_callback(pi, &pf->events, data);
     }
 
     if(pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
@@ -1091,9 +1102,10 @@ static inline void poll_close_fd(POLLINFO *pi) {
     debug(D_POLLFD, "POLLFD: DEL: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 }
 
-void *poll_default_add_callback(POLLINFO *pi, short int *events) {
+void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)pi;
     (void)events;
+    (void)data;
 
     return NULL;
 }
@@ -1191,7 +1203,18 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                         else {
                             // accept ok
                             // info("POLLFD: LISTENER: client '[%s]:%s' connected to '%s' on fd %d", client_ip, client_port, sockets->fds_names[i], nfd);
-                            poll_add_fd(p, nfd, SOCK_STREAM, POLLIN, POLLINFO_FLAG_CLIENT_SOCKET, client_ip, client_port);
+                            poll_add_fd(p
+                                        , nfd
+                                        , SOCK_STREAM
+                                        , POLLINFO_FLAG_CLIENT_SOCKET
+                                        , client_ip
+                                        , client_port
+                                        , p->add_callback
+                                        , p->del_callback
+                                        , p->rcv_callback
+                                        , p->snd_callback
+                                        , NULL
+                            );
 
                             // it may have reallocated them, so refresh our pointers
                             pf = &p->fds[i];
@@ -1267,7 +1290,7 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 }
 
 void poll_events(LISTEN_SOCKETS *sockets
-        , void *(*add_callback)(POLLINFO *pi, short int *events)
+        , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
         , void  (*del_callback)(POLLINFO *pi)
         , int   (*rcv_callback)(POLLINFO *pi, short int *events)
         , int   (*snd_callback)(POLLINFO *pi, short int *events)
@@ -1294,7 +1317,20 @@ void poll_events(LISTEN_SOCKETS *sockets
 
     size_t i;
     for(i = 0; i < sockets->opened ;i++) {
-        POLLINFO *pi = poll_add_fd(&p, sockets->fds[i], sockets->fds_types[i], POLLIN, POLLINFO_FLAG_SERVER_SOCKET, (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN", "");
+
+        POLLINFO *pi = poll_add_fd(&p
+                                   , sockets->fds[i]
+                                   , sockets->fds_types[i]
+                                   , POLLINFO_FLAG_SERVER_SOCKET
+                                   , (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN"
+                                   , ""
+                                   , poll_default_add_callback
+                                   , poll_default_del_callback
+                                   , poll_default_rcv_callback
+                                   , poll_default_snd_callback
+                                   , NULL
+        );
+
         pi->data = data;
         info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }

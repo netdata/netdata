@@ -422,9 +422,11 @@ static struct web_server_static_threaded_worker *static_workers_private_data = N
 static __thread struct web_server_static_threaded_worker *worker_private = NULL;
 
 // new TCP client connected
-static void *web_server_add_callback(POLLINFO *pi, short int *events) {
+static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data) {
+    (void)data;
 
     worker_private->connected++;
+
     size_t concurrent = worker_private->connected - worker_private->disconnected;
     if(unlikely(concurrent > worker_private->max_concurrent))
         worker_private->max_concurrent = concurrent;
@@ -462,6 +464,48 @@ static void web_server_del_callback(POLLINFO *pi) {
     }
 }
 
+// ----------------------------------------------------------------------------
+// web server files
+
+struct web_file_pollinfo {
+    struct web_client *w;
+    POLLINFO *pi;
+};
+
+static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void *data) {
+    (void)pi;
+
+    info("ADDING FILE ON FD %d", pi->fd);
+    *events = POLLIN;
+    return data;
+}
+
+static void web_werver_file_del_callback(POLLINFO *pi) {
+    (void)pi;
+    info("DELETE FILE ON FD %d", pi->fd);
+    freez(pi->data);
+}
+
+static int web_server_file_rcv_callback(POLLINFO *pi, short int *events) {
+    *events = POLLIN;
+
+    info("READING FILE ON FD %d", pi->fd);
+
+    struct web_file_pollinfo *wfpi = (struct web_file_pollinfo *)pi->data;
+    if(unlikely(web_client_receive(wfpi->w) < 0))
+        return -1;
+
+    wfpi->pi->p->fds[wfpi->pi->slot].events |= POLLOUT;
+
+    if(unlikely(wfpi->w->ifd == wfpi->w->ofd))
+        return -1;
+
+    return 0;
+}
+
+// ----------------------------------------------------------------------------
+//
+
 static inline int web_server_check_client_status(struct web_client *w) {
     if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
         return -1;
@@ -482,20 +526,40 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     if(unlikely(web_client_receive(w) < 0))
         return -1;
 
+    debug(D_WEB_CLIENT, "%llu: Processing received data.", w->id);
+    web_client_process_request(w);
+
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
-        if(unlikely(w->ifd != -1 && w->ifd != fd)) {
+        info("FILECOPY %d", pi->fd);
+
+        if(unlikely(w->ifd != -1 && w->ifd != w->ofd && w->ifd != fd)) {
             // FIXME: we switched input fd
             // add a new socket to poll_events, with the same
+            info("DETECTED FILECOPY ON FD %d", pi->fd);
+
+            struct web_file_pollinfo *wfpi = callocz(1, sizeof(struct web_file_pollinfo));
+            wfpi->w = w;
+            wfpi->pi = pi;
+
+            poll_add_fd(pi->p
+                        , w->ifd
+                        , 0
+                        , POLLINFO_FLAG_CLIENT_SOCKET
+                        , "FILENAME"
+                        , ""
+                        , web_server_file_add_callback
+                        , web_werver_file_del_callback
+                        , web_server_file_rcv_callback
+                        , poll_default_snd_callback
+                        , (void *)wfpi
+            );
         }
         else if(unlikely(w->ifd == -1)) {
             // FIXME: we closed input fd
             // instruct poll_events() to close fd
+            info("INPUT CLOSED ON FD %d", pi->fd);
             return -1;
         }
-    }
-    else {
-        debug(D_WEB_CLIENT, "%llu: Processing received data.", w->id);
-        web_client_process_request(w);
     }
 
     if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
