@@ -55,13 +55,16 @@ static inline void log_unlock() {
 }
 
 int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) {
-    int f;
+    int f, devnull = 0;
 
-    if(!filename || !*filename || !strcmp(filename, "none"))
+    if(!filename || !*filename || !strcmp(filename, "none") ||  !strcmp(filename, "/dev/null")) {
         filename = "/dev/null";
+        devnull =1;
+    }
 
     if(!strcmp(filename, "syslog")) {
         filename = "/dev/null";
+        devnull = 1;
         syslog_init();
         if(enabled_syslog) *enabled_syslog = 1;
     }
@@ -70,8 +73,10 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
     // don't do anything if the user is willing
     // to have the standard one
     if(!strcmp(filename, "system")) {
-        if(fd != -1) return fd;
-        filename = "stdout";
+        if(fd != -1 && fp != &stdaccess)
+            return fd;
+
+        filename = "stderr";
     }
 
     if(!strcmp(filename, "stdout"))
@@ -86,6 +91,11 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
             error("Cannot open file '%s'. Leaving %d to its default.", filename, fd);
             return fd;
         }
+    }
+
+    if(devnull && fp == &stdaccess) {
+        fd = -1;
+        *fp = NULL;
     }
 
     // if there is a level-2 file pointer
@@ -397,7 +407,8 @@ void log_access( const char *fmt, ... ) {
     if(stdaccess) {
         static netdata_mutex_t access_mutex = NETDATA_MUTEX_INITIALIZER;
 
-        netdata_mutex_lock(&access_mutex);
+        if(web_server_is_multithreaded)
+            netdata_mutex_lock(&access_mutex);
 
         char date[LOG_DATE_LENGTH];
         log_date(date, LOG_DATE_LENGTH);
@@ -408,6 +419,7 @@ void log_access( const char *fmt, ... ) {
         va_end( args );
         fputc('\n', stdaccess);
 
-        netdata_mutex_unlock(&access_mutex);
+        if(web_server_is_multithreaded)
+            netdata_mutex_unlock(&access_mutex);
     }
 }
