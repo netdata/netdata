@@ -129,11 +129,11 @@ typedef enum web_client_acl {
 struct web_client {
     unsigned long long id;
 
-    WEB_CLIENT_FLAGS flags;             // status flags for the client
-    WEB_CLIENT_MODE mode;               // the operational mode of the client
-    WEB_CLIENT_ACL acl;                 // the access list of the client
+    WEB_CLIENT_FLAGS flags;         // status flags for the client
+    WEB_CLIENT_MODE mode;           // the operational mode of the client
+    WEB_CLIENT_ACL acl;             // the access list of the client
 
-    int tcp_cork;                       // 1 = we have a cork on the socket
+    int tcp_cork;                   // 1 = we have a cork on the socket
 
     int ifd;
     int ofd;
@@ -155,13 +155,16 @@ struct web_client {
     size_t stats_received_bytes;
     size_t stats_sent_bytes;
 
-    netdata_thread_t thread;               // the thread servicing this client
+    // STATIC-THREADED WEB SERVER MEMBERS
+    size_t pollinfo_slot;           // POLLINFO slot of the web client
+    size_t pollinfo_filecopy_slot;  // POLLINFO slot of the file read
 
-    struct web_client *prev;
-    struct web_client *next;
+    // MULTI-THREADED WEB SERVER MEMBERS
+    netdata_thread_t thread;        // the thread servicing this client
+    struct web_client *prev;        // maintain a linked list of web clients
+    struct web_client *next;        // for the web servers that need it
 };
 
-extern struct web_client *web_clients;
 extern SIMPLE_PATTERN *web_allow_connections_from;
 extern SIMPLE_PATTERN *web_allow_dashboard_from;
 extern SIMPLE_PATTERN *web_allow_registry_from;
@@ -176,9 +179,12 @@ extern int web_client_permission_denied(struct web_client *w);
 
 extern struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port);
 extern struct web_client *web_client_create_on_listenfd(int listener);
-extern struct web_client *web_client_free(struct web_client *w);
+extern void web_client_free(struct web_client *w);
+
 extern ssize_t web_client_send(struct web_client *w);
 extern ssize_t web_client_receive(struct web_client *w);
+extern ssize_t web_client_read_file(struct web_client *w);
+
 extern void web_client_process_request(struct web_client *w);
 extern void web_client_reset(struct web_client *w);
 

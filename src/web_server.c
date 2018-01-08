@@ -8,6 +8,9 @@ static LISTEN_SOCKETS api_sockets = {
 };
 
 WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
+int web_server_is_multithreaded = 1;
+
+// --------------------------------------------------------------------------------------
 
 #ifdef NETDATA_INTERNAL_CHECKS
 static void log_allocations(void)
@@ -19,21 +22,13 @@ static void log_allocations(void)
 
     mi = mallinfo();
     if(mi.uordblks > used) {
-        int clients = 0;
-
-        if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
-            struct web_client *w;
-            for (w = web_clients; w; w = w->next) clients++;
-        }
-
-        info("Allocated memory: used %d KB (+%d B), mmap %d KB (+%d B), heap %d KB (+%d B). %d web clients connected.",
+        info("Allocated memory: used %d KB (+%d B), mmap %d KB (+%d B), heap %d KB (+%d B).",
             mi.uordblks / 1024,
             mi.uordblks - used,
             mi.hblkhd / 1024,
             mi.hblkhd - mmap,
             mi.arena / 1024,
-            mi.arena - heap,
-            clients);
+            mi.arena - heap);
 
         used = mi.uordblks;
         heap = mi.arena;
@@ -93,13 +88,35 @@ int api_listen_sockets_setup(void) {
 // --------------------------------------------------------------------------------------
 // the main socket listener - MULTI-THREADED
 
+// maintain a linked list of web clients - for the web servers that need it
+static struct web_client *web_clients = NULL;
+
+static void web_client_link(struct web_client *w) {
+    if (web_clients) web_clients->prev = w;
+    w->next = web_clients;
+    web_clients = w;
+}
+
+static struct web_client *web_client_unlink(struct web_client *w) {
+    struct web_client *n = w->next;
+    if (w == web_clients) web_clients = n;
+
+    if(w->prev) w->prev->next = w->next;
+    if(w->next) w->next->prev = w->prev;
+
+    return n;
+}
+
 static inline void multi_threaded_cleanup_web_clients(void) {
     struct web_client *w;
 
     for (w = web_clients; w;) {
         if (web_client_check_obsolete(w)) {
             debug(D_WEB_CLIENT, "%llu: Removing client.", w->id);
-            w = web_client_free(w);
+            struct web_client *t = web_client_unlink(w);
+            web_client_free(w);
+            w = t;
+
 #ifdef NETDATA_INTERNAL_CHECKS
             log_allocations();
 #endif
@@ -147,6 +164,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
     netdata_thread_cleanup_push(socket_listen_main_multi_threaded_cleanup, ptr);
 
     web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
+    web_server_is_multithreaded = 1;
 
     struct web_client *w;
     int retval, counter = 0;
@@ -195,6 +213,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
                     // no need for error log - web_client_create_on_listenfd already logged the error
                     continue;
                 }
+                web_client_link(w);
 
                 if(api_sockets.fds_families[i] == AF_UNIX)
                     web_client_set_unix(w);
@@ -286,9 +305,9 @@ static void socket_listen_main_single_threaded_cleanup(void *data) {
 void *socket_listen_main_single_threaded(void *ptr) {
     netdata_thread_cleanup_push(socket_listen_main_single_threaded_cleanup, ptr);
     web_server_mode = WEB_SERVER_MODE_SINGLE_THREADED;
+    web_server_is_multithreaded = 0;
 
     struct web_client *w;
-    int retval;
 
     if(!api_sockets.opened)
         fatal("LISTENER: no listen sockets available.");
@@ -322,7 +341,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
         rifds = ifds;
         rofds = ofds;
         refds = efds;
-        retval = select(fdmax+1, &rifds, &rofds, &refds, &tv);
+        int retval = select(fdmax+1, &rifds, &rofds, &refds, &tv);
 
         if(unlikely(retval == -1)) {
             error("LISTENER: select() failed.");
@@ -335,6 +354,8 @@ void *socket_listen_main_single_threaded(void *ptr) {
                 if (FD_ISSET(api_sockets.fds[i], &rifds)) {
                     debug(D_WEB_CLIENT_ACCESS, "LISTENER: new connection.");
                     w = web_client_create_on_listenfd(api_sockets.fds[i]);
+                    if(unlikely(!w))
+                        continue;
 
                     if(api_sockets.fds_families[i] == AF_UNIX)
                         web_client_set_unix(w);
@@ -392,9 +413,6 @@ void *socket_listen_main_single_threaded(void *ptr) {
         }
         else {
             debug(D_WEB_CLIENT_ACCESS, "LISTENER: single threaded web server timeout.");
-#ifdef NETDATA_INTERNAL_CHECKS
-            log_allocations();
-#endif
         }
     }
 
@@ -415,13 +433,99 @@ struct web_server_static_threaded_worker {
     volatile size_t receptions;
     volatile size_t sends;
     volatile size_t max_concurrent;
+
+    volatile size_t files_read;
+    volatile size_t file_reads;
 };
 
 static long long static_threaded_workers_count = 1;
 static struct web_server_static_threaded_worker *static_workers_private_data = NULL;
 static __thread struct web_server_static_threaded_worker *worker_private = NULL;
 
-// new TCP client connected
+// ----------------------------------------------------------------------------
+
+static inline int web_server_check_client_status(struct web_client *w) {
+    if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
+        return -1;
+
+    return 0;
+}
+
+// ----------------------------------------------------------------------------
+// web server files
+
+static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void *data) {
+    struct web_client *w = (struct web_client *)data;
+
+    worker_private->files_read++;
+
+    debug(D_WEB_CLIENT, "%llu: ADDED FILE READ ON FD %d", w->id, pi->fd);
+    *events = POLLIN;
+    pi->data = w;
+    return w;
+}
+
+static void web_werver_file_del_callback(POLLINFO *pi) {
+    struct web_client *w = (struct web_client *)pi->data;
+    debug(D_WEB_CLIENT, "%llu: RELEASE FILE READ ON FD %d", w->id, pi->fd);
+
+    w->pollinfo_filecopy_slot = 0;
+
+    if(unlikely(!w->pollinfo_slot)) {
+        debug(D_WEB_CLIENT, "%llu: CROSS WEB CLIENT CLEANUP (iFD %d, oFD %d)", w->id, pi->fd, w->ofd);
+        web_client_free(w);
+    }
+}
+
+static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
+    struct web_client *w = (struct web_client *)pi->data;
+
+    // if there is no POLLINFO linked to this, it means the client disconnected
+    // stop the file reading too
+    if(unlikely(!w->pollinfo_slot)) {
+        debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON CLOSED WEB CLIENT", w->id, pi->fd);
+        return -1;
+    }
+
+    if(unlikely(w->mode != WEB_CLIENT_MODE_FILECOPY || w->ifd == w->ofd)) {
+        debug(D_WEB_CLIENT, "%llu: PREVENTED ATTEMPT TO READ FILE ON FD %d, ON NON-FILECOPY WEB CLIENT", w->id, pi->fd);
+        return -1;
+    }
+
+    debug(D_WEB_CLIENT, "%llu: READING FILE ON FD %d", w->id, pi->fd);
+
+    worker_private->file_reads++;
+    ssize_t ret = unlikely(web_client_read_file(w));
+
+    if(likely(web_client_has_wait_send(w))) {
+        POLLJOB *p = pi->p;                         // our POLLJOB
+        POLLINFO *wpi = &p->inf[w->pollinfo_slot];  // POLLINFO of the client socket
+
+        debug(D_WEB_CLIENT, "%llu: SIGNALING W TO SEND (iFD %d, oFD %d)", w->id, pi->fd, wpi->fd);
+        p->fds[wpi->slot].events |= POLLOUT;
+    }
+
+    if(unlikely(ret <= 0 || w->ifd == w->ofd)) {
+        debug(D_WEB_CLIENT, "%llu: DONE READING FILE ON FD %d", w->id, pi->fd);
+        return -1;
+    }
+
+    *events = POLLIN;
+    return 0;
+}
+
+static int web_server_file_write_callback(POLLINFO *pi, short int *events) {
+    (void)pi;
+    (void)events;
+
+    error("Writing to web files is not supported!");
+
+    return -1;
+}
+
+// ----------------------------------------------------------------------------
+// web server clients
+
 static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)data;
 
@@ -435,13 +539,15 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 
     debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", pi->fd);
     struct web_client *w = web_client_create_on_fd(pi->fd, pi->client_ip, pi->client_port);
+    w->pollinfo_slot = pi->slot;
 
     if(unlikely(pi->socktype == AF_UNIX))
         web_client_set_unix(w);
     else
         web_client_set_tcp(w);
 
-    return (void *)w;
+    debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
+    return w;
 }
 
 // TCP client disconnected
@@ -449,99 +555,41 @@ static void web_server_del_callback(POLLINFO *pi) {
     worker_private->disconnected++;
 
     struct web_client *w = (struct web_client *)pi->data;
-    int fd = pi->fd;
 
-    if(likely(w)) {
-        if(w->ofd == -1 || fd == w->ofd) {
-            // we free the client, only if the closing fd
-            // is the client socket
-
-            // prevent it from closing the file descriptors
-            w->ifd = w->ofd = -1;
-
-            web_client_free(w);
-        }
+    w->pollinfo_slot = 0;
+    if(unlikely(w->pollinfo_filecopy_slot)) {
+        POLLJOB *p = pi->p;                                  // our POLLJOB
+        POLLINFO *fpi = &p->inf[w->pollinfo_filecopy_slot];  // POLLINFO of the client socket
+        debug(D_WEB_CLIENT, "%llu: THE CLIENT WILL BE FRED BY READING FILE JOB ON FD %d", w->id, fpi->fd);
+    }
+    else {
+        debug(D_WEB_CLIENT, "%llu: CLOSING CLIENT FD %d", w->id, pi->fd);
+        web_client_free(w);
     }
 }
 
-// ----------------------------------------------------------------------------
-// web server files
-
-struct web_file_pollinfo {
-    struct web_client *w;
-    POLLINFO *pi;
-};
-
-static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void *data) {
-    (void)pi;
-
-    info("ADDING FILE ON FD %d", pi->fd);
-    *events = POLLIN;
-    return data;
-}
-
-static void web_werver_file_del_callback(POLLINFO *pi) {
-    (void)pi;
-    info("DELETE FILE ON FD %d", pi->fd);
-    freez(pi->data);
-}
-
-static int web_server_file_rcv_callback(POLLINFO *pi, short int *events) {
-    *events = POLLIN;
-
-    info("READING FILE ON FD %d", pi->fd);
-
-    struct web_file_pollinfo *wfpi = (struct web_file_pollinfo *)pi->data;
-    if(unlikely(web_client_receive(wfpi->w) < 0))
-        return -1;
-
-    wfpi->pi->p->fds[wfpi->pi->slot].events |= POLLOUT;
-
-    if(unlikely(wfpi->w->ifd == wfpi->w->ofd))
-        return -1;
-
-    return 0;
-}
-
-// ----------------------------------------------------------------------------
-//
-
-static inline int web_server_check_client_status(struct web_client *w) {
-    if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
-        return -1;
-
-    return 0;
-}
-
-// Receive data
 static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     worker_private->receptions++;
 
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
 
-    if(unlikely(!web_client_has_wait_receive(w)))
-        return -1;
-
     if(unlikely(web_client_receive(w) < 0))
         return -1;
 
-    debug(D_WEB_CLIENT, "%llu: Processing received data.", w->id);
+    debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
     web_client_process_request(w);
 
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
-        info("FILECOPY %d", pi->fd);
+        if(w->pollinfo_filecopy_slot == 0) {
+            debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
 
-        if(unlikely(w->ifd != -1 && w->ifd != w->ofd && w->ifd != fd)) {
-            // FIXME: we switched input fd
-            // add a new socket to poll_events, with the same
-            info("DETECTED FILECOPY ON FD %d", pi->fd);
+            if (unlikely(w->ifd != -1 && w->ifd != w->ofd && w->ifd != fd)) {
+                // add a new socket to poll_events, with the same
+                debug(D_WEB_CLIENT, "%llu: CREATING FILECOPY SLOT ON FD %d", w->id, pi->fd);
 
-            struct web_file_pollinfo *wfpi = callocz(1, sizeof(struct web_file_pollinfo));
-            wfpi->w = w;
-            wfpi->pi = pi;
-
-            poll_add_fd(pi->p
+                POLLINFO *fpi = poll_add_fd(
+                        pi->p
                         , w->ifd
                         , 0
                         , POLLINFO_FLAG_CLIENT_SOCKET
@@ -549,21 +597,19 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
                         , ""
                         , web_server_file_add_callback
                         , web_werver_file_del_callback
-                        , web_server_file_rcv_callback
-                        , poll_default_snd_callback
-                        , (void *)wfpi
-            );
-        }
-        else if(unlikely(w->ifd == -1)) {
-            // FIXME: we closed input fd
-            // instruct poll_events() to close fd
-            info("INPUT CLOSED ON FD %d", pi->fd);
-            return -1;
+                        , web_server_file_read_callback
+                        , web_server_file_write_callback
+                        , (void *) w
+                );
+
+                w->pollinfo_filecopy_slot = fpi->slot;
+            }
         }
     }
-
-    if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
-        *events |= POLLIN;
+    else {
+        if(unlikely(w->ifd == fd && web_client_has_wait_receive(w)))
+            *events |= POLLIN;
+    }
 
     if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
         *events |= POLLOUT;
@@ -577,8 +623,7 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
 
-    if(unlikely(!web_client_has_wait_send(w)))
-        return -1;
+    debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
     if(unlikely(web_client_send(w) < 0))
         return -1;
@@ -591,6 +636,10 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
 
     return web_server_check_client_status(w);
 }
+
+
+// ----------------------------------------------------------------------------
+// web server worker thread
 
 static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
     worker_private = (struct web_server_static_threaded_worker *)ptr;
@@ -623,6 +672,10 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
+
+
+// ----------------------------------------------------------------------------
+// web server main thread - also becomes a worker
 
 static void socket_listen_main_static_threaded_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
@@ -660,6 +713,8 @@ void *socket_listen_main_static_threaded(void *ptr) {
             if(static_threaded_workers_count < 1) static_threaded_workers_count = 1;
 
             static_workers_private_data = callocz((size_t)static_threaded_workers_count, sizeof(struct web_server_static_threaded_worker));
+
+            web_server_is_multithreaded = (static_threaded_workers_count > 1);
 
             int i;
             for(i = 1; i < static_threaded_workers_count; i++) {

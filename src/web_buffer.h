@@ -47,8 +47,6 @@ typedef struct web_buffer {
 #define buffer_strlen(wb) ((wb)->len)
 extern const char *buffer_tostring(BUFFER *wb);
 
-#define buffer_need_bytes(buffer, needed_free_size) do { if(unlikely((buffer)->size - (buffer)->len < (size_t)(needed_free_size))) buffer_increase((buffer), (size_t)(needed_free_size)); } while(0)
-
 #define buffer_flush(wb) wb->buffer[(wb)->len = 0] = '\0'
 extern void buffer_reset(BUFFER *wb);
 
@@ -74,5 +72,10 @@ extern char *print_number_llu_r(char *str, unsigned long long uvalue);
 extern char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 
 extern void buffer_print_llu(BUFFER *wb, unsigned long long uvalue);
+
+static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
+    if(unlikely(buffer->size - buffer->len < needed_free_size))
+        buffer_increase(buffer, needed_free_size);
+}
 
 #endif /* NETDATA_WEB_BUFFER_H */

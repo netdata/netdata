@@ -14,6 +14,8 @@ struct global_statistics {
     volatile uint64_t bytes_sent;
     volatile uint64_t content_size;
     volatile uint64_t compressed_content_size;
+
+    volatile uint64_t web_client_count;
 };
 
 extern volatile struct global_statistics global_statistics;
@@ -26,7 +28,7 @@ extern void finished_web_request_statistics(uint64_t dt,
                                      uint64_t content_size,
                                      uint64_t compressed_content_size);
 
-extern void web_client_connected(void);
+extern uint64_t web_client_connected(void);
 extern void web_client_disconnected(void);
 
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01

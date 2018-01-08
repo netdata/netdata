@@ -21,9 +21,6 @@ SIMPLE_PATTERN *web_allow_badges_from = NULL;
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 #endif /* NETDATA_WITH_ZLIB */
 
-struct web_client *web_clients = NULL;
-unsigned long long web_clients_count = 0;
-
 static inline int web_client_crock_socket(struct web_client *w) {
 #ifdef TCP_CORK
     if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
@@ -84,33 +81,14 @@ static void web_client_update_acl_matches(struct web_client *w) {
         w->acl |= WEB_CLIENT_ACL_BADGE;
 }
 
-struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port) {
-    struct web_client *w;
+static void web_client_fix_socket(struct web_client *w) {
+    int flag = 1;
+    if(setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
+        error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ofd);
 
-    w = callocz(1, sizeof(struct web_client));
-    w->id = ++web_clients_count;
-    w->mode = WEB_CLIENT_MODE_NORMAL;
-    w->ifd = fd;
-
-    strncpyz(w->client_ip, client_ip, sizeof(w->client_ip));
-    strncpyz(w->client_port, client_port, sizeof(w->client_port));
-
-    if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
-    if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
-
-    log_connection(w, "CONNECTED");
-
-    w->ofd = w->ifd;
-
-    {
-        int flag = 1;
-        if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
-            error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ofd);
-
-        flag = 1;
-        if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
-            error("%llu: Cannot set SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
-    }
+    flag = 1;
+    if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
+        error("%llu: Cannot set SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
 
     web_client_update_acl_matches(w);
 
@@ -121,6 +99,24 @@ struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const 
     web_client_enable_wait_receive(w);
 
     web_client_connected();
+    log_connection(w, "CONNECTED");
+}
+
+struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port) {
+    struct web_client *w;
+
+    w = callocz(1, sizeof(struct web_client));
+    w->id = web_client_connected();
+    w->mode = WEB_CLIENT_MODE_NORMAL;
+    w->ifd = w->ofd = fd;
+
+    strncpyz(w->client_ip, client_ip, sizeof(w->client_ip) - 1);
+    strncpyz(w->client_port, client_port, sizeof(w->client_port) - 1);
+
+    if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
+    if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
+
+    web_client_fix_socket(w);
     return(w);
 }
 
@@ -128,54 +124,28 @@ struct web_client *web_client_create_on_listenfd(int listener) {
     struct web_client *w;
 
     w = callocz(1, sizeof(struct web_client));
-    w->id = ++web_clients_count;
+    w->id = web_client_connected();
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
-    {
-        w->ifd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_allow_connections_from);
+    w->ifd = w->ofd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_allow_connections_from);
 
-        if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
-        if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
+    if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
+    if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
 
-        if (w->ifd == -1) {
-            if(errno == EPERM)
-                log_connection(w, "ACCESS DENIED");
-            else {
-                log_connection(w, "CONNECTION FAILED");
-                error("%llu: Failed to accept new incoming connection.", w->id);
-            }
-
-            freez(w);
-            return NULL;
+    if (w->ifd == -1) {
+        if(errno == EPERM)
+            log_connection(w, "ACCESS DENIED");
+        else {
+            log_connection(w, "CONNECTION FAILED");
+            error("%llu: Failed to accept new incoming connection.", w->id);
         }
-        else
-            log_connection(w, "CONNECTED");
 
-        w->ofd = w->ifd;
-
-        int flag = 1;
-        if(setsockopt(w->ofd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
-            error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ofd);
-
-        flag = 1;
-        if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
-            error("%llu: Cannot set SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
+        freez(w);
+        web_client_disconnected();
+        return NULL;
     }
 
-    web_client_update_acl_matches(w);
-
-    w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
-    w->response.header = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
-    w->response.header_output = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
-    w->origin[0] = '*';
-    web_client_enable_wait_receive(w);
-
-    if(web_clients) web_clients->prev = w;
-    w->next = web_clients;
-    web_clients = w;
-
-    web_client_connected();
-
+    web_client_fix_socket(w);
     return(w);
 }
 
@@ -253,7 +223,11 @@ void web_client_reset(struct web_client *w) {
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
         if(w->ifd != w->ofd) {
             debug(D_WEB_CLIENT, "%llu: Closing filecopy input file descriptor %d.", w->id, w->ifd);
-            if(w->ifd != -1) close(w->ifd);
+
+            if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
+                if (w->ifd != -1) close(w->ifd);
+            }
+
             w->ifd = w->ofd;
         }
     }
@@ -300,30 +274,27 @@ void web_client_reset(struct web_client *w) {
 #endif // NETDATA_WITH_ZLIB
 }
 
-struct web_client *web_client_free(struct web_client *w) {
+void web_client_free(struct web_client *w) {
     debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
 
     web_client_reset(w);
 
-    struct web_client *n = NULL;
-    if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
-        struct web_client *n = w->next;
-        if (w == web_clients) web_clients = n;
+    buffer_free(w->response.header_output);
+    w->response.header_output = NULL;
 
-        if(w->prev) w->prev->next = w->next;
-        if(w->next) w->next->prev = w->prev;
+    buffer_free(w->response.header);
+    w->response.header = NULL;
+
+    buffer_free(w->response.data);
+    w->response.data = NULL;
+
+    if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
+        if (w->ifd != -1) close(w->ifd);
+        if (w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
     }
 
-    buffer_free(w->response.header_output);
-    buffer_free(w->response.header);
-    buffer_free(w->response.data);
-    if(w->ifd != -1) close(w->ifd);
-    if(w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
     freez(w);
-
     web_client_disconnected();
-
-    return(n);
 }
 
 uid_t web_files_uid(void) {
@@ -569,6 +540,7 @@ int mysendfile(struct web_client *w, char *filename) {
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
     buffer_flush(w->response.data);
+    buffer_need_bytes(w->response.data, (size_t)statbuf.st_size);
     w->response.rlen = (size_t)statbuf.st_size;
 #ifdef __APPLE__
     w->response.data->date = statbuf.st_mtimespec.tv_sec;
@@ -1734,22 +1706,69 @@ ssize_t web_client_send(struct web_client *w) {
     return(bytes);
 }
 
+ssize_t web_client_read_file(struct web_client *w)
+{
+    if(unlikely(w->response.rlen > w->response.data->size))
+        buffer_need_bytes(w->response.data, w->response.rlen - w->response.data->size);
+
+    if(unlikely(w->response.rlen <= w->response.data->len))
+        return 0;
+
+    ssize_t left = w->response.rlen - w->response.data->len;
+    ssize_t bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
+    if(likely(bytes > 0)) {
+        size_t old = w->response.data->len;
+        w->response.data->len += bytes;
+        w->response.data->buffer[w->response.data->len] = '\0';
+
+        debug(D_WEB_CLIENT, "%llu: Read %zd bytes.", w->id, bytes);
+        debug(D_WEB_DATA, "%llu: Read data: '%s'.", w->id, &w->response.data->buffer[old]);
+
+        web_client_enable_wait_send(w);
+
+        if(w->response.rlen && w->response.data->len >= w->response.rlen)
+            web_client_disable_wait_receive(w);
+    }
+    else if(likely(bytes == 0)) {
+        debug(D_WEB_CLIENT, "%llu: Out of input file data.", w->id);
+
+        // if we cannot read, it means we have an error on input.
+        // if however, we are copying a file from ifd to ofd, we should not return an error.
+        // in this case, the error should be generated when the file has been sent to the client.
+
+        // we are copying data from ifd to ofd
+        // let it finish copying...
+        web_client_disable_wait_receive(w);
+
+        debug(D_WEB_CLIENT, "%llu: Read the whole file.", w->id);
+
+        if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
+            if (w->ifd != w->ofd) close(w->ifd);
+        }
+
+        w->ifd = w->ofd;
+    }
+    else {
+        debug(D_WEB_CLIENT, "%llu: read data failed.", w->id);
+        WEB_CLIENT_IS_DEAD(w);
+    }
+
+    return(bytes);
+}
+
 ssize_t web_client_receive(struct web_client *w)
 {
+    if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
+        return web_client_read_file(w);
+
     // do we have any space for more data?
     buffer_need_bytes(w->response.data, WEB_REQUEST_LENGTH);
 
     ssize_t left = w->response.data->size - w->response.data->len;
-    ssize_t bytes;
-
-    if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
-        bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
-    else
-        bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+    ssize_t bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
 
     if(likely(bytes > 0)) {
-        if(w->mode != WEB_CLIENT_MODE_FILECOPY)
-            w->stats_received_bytes += bytes;
+        w->stats_received_bytes += bytes;
 
         size_t old = w->response.data->len;
         w->response.data->len += bytes;
@@ -1757,37 +1776,6 @@ ssize_t web_client_receive(struct web_client *w)
 
         debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
         debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
-
-        if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
-            web_client_enable_wait_send(w);
-
-            if(w->response.rlen && w->response.data->len >= w->response.rlen)
-                web_client_disable_wait_receive(w);
-        }
-    }
-    else if(likely(bytes == 0)) {
-        debug(D_WEB_CLIENT, "%llu: Out of input data.", w->id);
-
-        // if we cannot read, it means we have an error on input.
-        // if however, we are copying a file from ifd to ofd, we should not return an error.
-        // in this case, the error should be generated when the file has been sent to the client.
-
-        if(w->mode == WEB_CLIENT_MODE_FILECOPY) {
-            // we are copying data from ifd to ofd
-            // let it finish copying...
-            web_client_disable_wait_receive(w);
-
-            debug(D_WEB_CLIENT, "%llu: Read the whole file.", w->id);
-
-            if(w->ifd != w->ofd && web_server_mode != WEB_SERVER_MODE_STATIC_THREADED)
-                close(w->ifd);
-
-            w->ifd = w->ofd;
-        }
-        else {
-            debug(D_WEB_CLIENT, "%llu: failed to receive data.", w->id);
-            WEB_CLIENT_IS_DEAD(w);
-        }
     }
     else {
         debug(D_WEB_CLIENT, "%llu: receive data failed.", w->id);
@@ -1797,9 +1785,8 @@ ssize_t web_client_receive(struct web_client *w)
     return(bytes);
 }
 
-
 // --------------------------------------------------------------------------------------
-// the thread of a single client
+// the thread of a single client - for the MULTI-THREADED web server
 
 // 1. waits for input and output, using async I/O
 // 2. it processes HTTP requests
