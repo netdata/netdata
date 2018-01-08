@@ -98,7 +98,6 @@ static void web_client_fix_socket(struct web_client *w) {
     w->origin[0] = '*';
     web_client_enable_wait_receive(w);
 
-    web_client_connected();
     log_connection(w, "CONNECTED");
 }
 
