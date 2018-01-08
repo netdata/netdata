@@ -96,7 +96,7 @@ typedef struct poll {
 
     SIMPLE_PATTERN *access_list;
 
-    void *(*add_callback)(POLLINFO *pi, short int *events);
+    void *(*add_callback)(POLLINFO *pi, short int *events, void *data);
     void  (*del_callback)(POLLINFO *pi);
     int   (*rcv_callback)(POLLINFO *pi, short int *events);
     int   (*snd_callback)(POLLINFO *pi, short int *events);
@@ -105,10 +105,23 @@ typedef struct poll {
 extern int poll_default_snd_callback(POLLINFO *pi, short int *events);
 extern int poll_default_rcv_callback(POLLINFO *pi, short int *events);
 extern void poll_default_del_callback(POLLINFO *pi);
-extern void *poll_default_add_callback(POLLINFO *pi, short int *events);
+extern void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data);
+
+extern POLLINFO *poll_add_fd(POLLJOB *p
+                             , int fd
+                             , int socktype
+                             , uint32_t flags
+                             , const char *client_ip
+                             , const char *client_port
+                             , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
+                             , void  (*del_callback)(POLLINFO *pi)
+                             , int   (*rcv_callback)(POLLINFO *pi, short int *events)
+                             , int   (*snd_callback)(POLLINFO *pi, short int *events)
+                             , void *data
+);
 
 extern void poll_events(LISTEN_SOCKETS *sockets
-        , void *(*add_callback)(POLLINFO *pi, short int *events)
+        , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
         , void  (*del_callback)(POLLINFO *pi)
         , int   (*rcv_callback)(POLLINFO *pi, short int *events)
         , int   (*snd_callback)(POLLINFO *pi, short int *events)

@@ -697,8 +697,9 @@ struct statsd_udp {
 #endif
 
 // new TCP client connected
-static void *statsd_add_callback(POLLINFO *pi, short int *events) {
+static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)pi;
+    (void)data;
 
     *events = POLLIN;
 
