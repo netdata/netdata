@@ -119,6 +119,7 @@ extern POLLINFO *poll_add_fd(POLLJOB *p
                              , int   (*snd_callback)(POLLINFO *pi, short int *events)
                              , void *data
 );
+extern void poll_close_fd(POLLINFO *pi);
 
 extern void poll_events(LISTEN_SOCKETS *sockets
         , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)

@@ -22,6 +22,7 @@ typedef enum web_server_mode {
 } WEB_SERVER_MODE;
 
 extern WEB_SERVER_MODE web_server_mode;
+extern int web_server_is_multithreaded;
 
 extern WEB_SERVER_MODE web_server_mode_id(const char *mode);
 extern const char *web_server_mode_name(WEB_SERVER_MODE id);

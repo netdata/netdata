@@ -1051,7 +1051,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     return pi;
 }
 
-static inline void poll_close_fd(POLLINFO *pi) {
+inline void poll_close_fd(POLLINFO *pi) {
     POLLJOB *p = pi->p;
 
     struct pollfd *pf = &p->fds[pi->slot];
