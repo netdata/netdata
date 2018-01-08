@@ -422,9 +422,7 @@ static struct web_server_static_threaded_worker *static_workers_private_data = N
 static __thread struct web_server_static_threaded_worker *worker_private = NULL;
 
 // new TCP client connected
-static void *web_server_add_callback(int fd, int socktype, short int *events, const char *client_ip, const char *client_port) {
-    (void)fd;
-    (void)socktype;
+static void *web_server_add_callback(POLLINFO *pi, short int *events) {
 
     worker_private->connected++;
     size_t concurrent = worker_private->connected - worker_private->disconnected;
@@ -433,10 +431,10 @@ static void *web_server_add_callback(int fd, int socktype, short int *events, co
 
     *events = POLLIN;
 
-    debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", fd);
-    struct web_client *w = web_client_create_on_fd(fd, client_ip, client_port);
+    debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", pi->fd);
+    struct web_client *w = web_client_create_on_fd(pi->fd, pi->client_ip, pi->client_port);
 
-    if(unlikely(socktype == AF_UNIX))
+    if(unlikely(pi->socktype == AF_UNIX))
         web_client_set_unix(w);
     else
         web_client_set_tcp(w);
@@ -445,13 +443,11 @@ static void *web_server_add_callback(int fd, int socktype, short int *events, co
 }
 
 // TCP client disconnected
-static void web_server_del_callback(int fd, int socktype, void *data) {
-    (void)fd;
-    (void)socktype;
-
+static void web_server_del_callback(POLLINFO *pi) {
     worker_private->disconnected++;
 
-    struct web_client *w = (struct web_client *)data;
+    struct web_client *w = (struct web_client *)pi->data;
+    int fd = pi->fd;
 
     if(likely(w)) {
         if(w->ofd == -1 || fd == w->ofd) {
@@ -474,13 +470,11 @@ static inline int web_server_check_client_status(struct web_client *w) {
 }
 
 // Receive data
-static int web_server_rcv_callback(int fd, int socktype, void *data, short int *events) {
-    (void)fd;
-    (void)socktype;
-
+static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     worker_private->receptions++;
 
-    struct web_client *w = (struct web_client *)data;
+    struct web_client *w = (struct web_client *)pi->data;
+    int fd = pi->fd;
 
     if(unlikely(!web_client_has_wait_receive(w)))
         return -1;
@@ -513,13 +507,11 @@ static int web_server_rcv_callback(int fd, int socktype, void *data, short int *
     return web_server_check_client_status(w);
 }
 
-static int web_server_snd_callback(int fd, int socktype, void *data, short int *events) {
-    (void)fd;
-    (void)socktype;
-
+static int web_server_snd_callback(POLLINFO *pi, short int *events) {
     worker_private->sends++;
 
-    struct web_client *w = (struct web_client *)data;
+    struct web_client *w = (struct web_client *)pi->data;
+    int fd = pi->fd;
 
     if(unlikely(!web_client_has_wait_send(w)))
         return -1;
