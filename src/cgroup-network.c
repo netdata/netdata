@@ -86,6 +86,19 @@ struct iface *read_proc_net_dev(const char *prefix) {
     return root;
 }
 
+void free_iface(struct iface *iface) {
+    freez((void *)iface->device);
+    freez(iface);
+}
+
+void free_host_ifaces(struct iface *iface) {
+    while(iface) {
+        struct iface *t = iface->next;
+        free_iface(iface);
+        iface = t;
+    }
+}
+
 int iface_is_eligible(struct iface *iface) {
     if(iface->iflink != iface->ifindex)
         return 1;
@@ -330,7 +343,7 @@ void add_device(const char *host, const char *guest) {
         if(f->host_device_hash == hash && strcmp(host, f->host_device) == 0) {
 
             if(guest && !f->guest_device)
-                f->guest_device = strdup(guest);
+                f->guest_device = strdupz(guest);
 
             return;
         }
@@ -375,26 +388,26 @@ void detect_veth_interfaces(pid_t pid) {
     if(!eligible_ifaces(host)) {
         errno = 0;
         error("there are no double-linked host interfaces available.");
-        return;
+        goto cleanup;
     }
 
     if(switch_namespace(prefix, pid)) {
         errno = 0;
         error("cannot switch to the namespace of pid %u", (unsigned int) pid);
-        return;
+        goto cleanup;
     }
 
     cgroup = read_proc_net_dev(NULL);
     if(!cgroup) {
         errno = 0;
         error("cannot read cgroup interface list.");
-        return;
+        goto cleanup;
     }
 
     if(!eligible_ifaces(cgroup)) {
         errno = 0;
         error("there are not double-linked cgroup interfaces available.");
-        return;
+        goto cleanup;
     }
 
     for(h = host; h ; h = h->next) {
@@ -406,6 +419,9 @@ void detect_veth_interfaces(pid_t pid) {
             }
         }
     }
+
+cleanup:
+    free_host_ifaces(host);
 }
 
 // ----------------------------------------------------------------------------

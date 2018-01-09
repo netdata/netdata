@@ -869,7 +869,8 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 #endif
 
     if (flags) {
-        errno = -EINVAL;
+        close(fd);
+        errno = EINVAL;
         return -1;
     }
 
