@@ -847,7 +847,7 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 // --------------------------------------------------------------------------------------------------------------------
 // accept4() replacement for systems that do not have one
 
-//#ifndef HAVE_ACCEPT4
+#ifndef HAVE_ACCEPT4
 int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
     int fd = accept(sock, addr, addrlen);
     int newflags = 0;
@@ -882,7 +882,7 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 
     return fd;
 }
-//#endif
+#endif
 
 
 // --------------------------------------------------------------------------------------------------------------------
