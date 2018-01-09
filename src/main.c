@@ -196,7 +196,7 @@ int killpid(pid_t pid, int sig)
 void cancel_main_threads() {
     error_log_limit_unlimited();
 
-    int i, found = 0, max = 1 * USEC_PER_SEC, step = 100000;
+    int i, found = 0, max = 5 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
         if(static_threads[i].enabled) {
             info("EXIT: Stopping master thread: %s", static_threads[i].name);
