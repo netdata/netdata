@@ -61,7 +61,7 @@ int open_log_file(int fd, FILE **fp, const char *filename, int *enabled_syslog) 
 
     if(!filename || !*filename || !strcmp(filename, "none") ||  !strcmp(filename, "/dev/null")) {
         filename = "/dev/null";
-        devnull =1;
+        devnull = 1;
     }
 
     if(!strcmp(filename, "syslog")) {
