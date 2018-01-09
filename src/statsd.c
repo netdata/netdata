@@ -1970,8 +1970,6 @@ static int statsd_listen_sockets_setup(void) {
 static void statsd_main_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
     if(static_thread->enabled) {
-        static_thread->enabled = 0;
-
         info("cleaning up...");
 
         if (statsd.collection_threads) {
@@ -1986,6 +1984,7 @@ static void statsd_main_cleanup(void *data) {
         listen_sockets_close(&statsd.sockets);
 
         info("STATSD: cleanup completed.");
+        static_thread->enabled = 0;
     }
 }
 

@@ -155,14 +155,17 @@ struct web_client {
     size_t stats_received_bytes;
     size_t stats_sent_bytes;
 
-    // STATIC-THREADED WEB SERVER MEMBERS
-    size_t pollinfo_slot;           // POLLINFO slot of the web client
-    size_t pollinfo_filecopy_slot;  // POLLINFO slot of the file read
+    // cache of web_client allocations
+    struct web_client *prev;        // maintain a linked list of web clients
+    struct web_client *next;        // for the web servers that need it
 
     // MULTI-THREADED WEB SERVER MEMBERS
     netdata_thread_t thread;        // the thread servicing this client
-    struct web_client *prev;        // maintain a linked list of web clients
-    struct web_client *next;        // for the web servers that need it
+    volatile int running;           // 1 when the thread runs, 0 otherwise
+
+    // STATIC-THREADED WEB SERVER MEMBERS
+    size_t pollinfo_slot;           // POLLINFO slot of the web client
+    size_t pollinfo_filecopy_slot;  // POLLINFO slot of the file read
 };
 
 extern SIMPLE_PATTERN *web_allow_connections_from;
@@ -179,14 +182,14 @@ extern int web_client_permission_denied(struct web_client *w);
 
 extern struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port);
 extern struct web_client *web_client_create_on_listenfd(int listener);
-extern void web_client_free(struct web_client *w);
+extern void web_client_release(struct web_client *w);
 
 extern ssize_t web_client_send(struct web_client *w);
 extern ssize_t web_client_receive(struct web_client *w);
 extern ssize_t web_client_read_file(struct web_client *w);
 
 extern void web_client_process_request(struct web_client *w);
-extern void web_client_reset(struct web_client *w);
+extern void web_client_request_done(struct web_client *w);
 
 extern void *web_client_main(void *ptr);
 
@@ -196,5 +199,8 @@ extern const char *group_method2string(int group);
 extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
 
 extern int mysendfile(struct web_client *w, char *filename);
+
+extern void web_client_multi_threaded_web_server_stop_all_threads(void);
+extern void web_client_cache_destroy(void);
 
 #endif

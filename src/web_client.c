@@ -92,21 +92,167 @@ static void web_client_initialize_connection(struct web_client *w) {
 
     web_client_update_acl_matches(w);
 
-    w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
-    w->response.header = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
-    w->response.header_output = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
-    w->origin[0] = '*';
+    w->origin[0] = '*'; w->origin[1] = '\0';
     web_client_enable_wait_receive(w);
 
     log_connection(w, "CONNECTED");
 }
 
+struct clients_cache {
+    struct web_client *used;
+    size_t used_count;
+
+    struct web_client *avail;
+    size_t avail_count;
+};
+
+__thread struct clients_cache web_clients_cache = {
+        .used = 0,
+        .used_count = 0,
+
+        .avail = 0,
+        .avail_count = 0
+};
+
+static void web_client_free(struct web_client *w) {
+    buffer_free(w->response.header_output);
+    buffer_free(w->response.header);
+    buffer_free(w->response.data);
+    freez(w);
+}
+
+void web_client_cache_destroy(void) {
+    struct web_client *w, *t;
+
+    w = web_clients_cache.used;
+    while(w) {
+        t = w;
+        w = w->next;
+        web_client_free(t);
+    }
+    web_clients_cache.used = NULL;
+    web_clients_cache.used_count = 0;
+
+    w = web_clients_cache.avail;
+    while(w) {
+        t = w;
+        w = w->next;
+        web_client_free(t);
+    }
+    web_clients_cache.avail = NULL;
+    web_clients_cache.avail_count = 0;
+}
+
+void web_client_multi_threaded_web_server_stop_all_threads(void) {
+    struct web_client *w;
+
+    int found = 1, max = 2 * USEC_PER_SEC, step = 50000;
+    for(w = web_clients_cache.used; w ; w = w->next) {
+        if(w->running) {
+            found++;
+            info("stopping web client %s, id %llu", w->client_ip, w->id);
+            netdata_thread_cancel(w->thread);
+        }
+    }
+
+    while(found && max > 0) {
+        max -= step;
+        info("Waiting %d web threads to finish...", found);
+        sleep_usec(step);
+        found = 0;
+        for(w = web_clients_cache.used; w ; w = w->next)
+            if(w->running) found++;
+    }
+
+    if(found)
+        error("%d web threads are taking too long to finish. Giving up.", found);
+}
+
+static void web_client_return_to_cache_or_free(struct web_client *w) {
+    // unlink it from the used;
+    if (w == web_clients_cache.used) web_clients_cache.used = w->next;
+    if(w->prev) w->prev->next = w->next;
+    if(w->next) w->next->prev = w->prev;
+    web_clients_cache.used_count--;
+
+    if(web_clients_cache.avail_count > 100) {
+        // we have too many of them - free it
+        web_client_free(w);
+    }
+    else {
+        // link it to the avail
+        if (web_clients_cache.avail) web_clients_cache.avail->prev = w;
+        w->next                 = web_clients_cache.avail;
+        w->prev                 = NULL;
+        web_clients_cache.avail = w;
+        web_clients_cache.avail_count++;
+    }
+}
+
+static struct web_client *web_client_get_from_cache_or_allocate() {
+    struct web_client *w = web_clients_cache.avail;
+
+    if(w) {
+        // unlink it from avail
+        if (w == web_clients_cache.avail) web_clients_cache.avail = w->next;
+        if(w->prev) w->prev->next = w->next;
+        if(w->next) w->next->prev = w->prev;
+        web_clients_cache.avail_count--;
+
+        // zero everything about it - but keep the buffers
+
+        BUFFER *b1 = w->response.data;
+        BUFFER *b2 = w->response.header;
+        BUFFER *b3 = w->response.header_output;
+
+        buffer_flush(b1);
+        buffer_flush(b2);
+        buffer_flush(b3);
+
+        memset(w, 0, sizeof(struct web_client));
+
+        w->response.data = b1;
+        w->response.header = b2;
+        w->response.header_output = b3;
+    }
+    else {
+        w = callocz(1, sizeof(struct web_client));
+        w->response.data = buffer_create(INITIAL_WEB_DATA_LENGTH);
+        w->response.header = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
+        w->response.header_output = buffer_create(HTTP_RESPONSE_HEADER_SIZE);
+    }
+
+    // link it to used web clients
+    if (web_clients_cache.used) web_clients_cache.used->prev = w;
+    w->next = web_clients_cache.used;
+    w->prev = NULL;
+    web_clients_cache.used = w;
+    web_clients_cache.used_count++;
+
+    // initialize it
+    w->id = web_client_connected();
+    w->mode = WEB_CLIENT_MODE_NORMAL;
+    return w;
+}
+
+void web_client_release(struct web_client *w) {
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
+
+    web_client_request_done(w);
+    web_client_disconnected();
+
+    if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
+        if (w->ifd != -1) close(w->ifd);
+        if (w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
+    }
+
+    web_client_return_to_cache_or_free(w);
+}
+
 struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port) {
     struct web_client *w;
 
-    w = callocz(1, sizeof(struct web_client));
-    w->id = web_client_connected();
-    w->mode = WEB_CLIENT_MODE_NORMAL;
+    w = web_client_get_from_cache_or_allocate();
     w->ifd = w->ofd = fd;
 
     strncpyz(w->client_ip, client_ip, sizeof(w->client_ip) - 1);
@@ -122,10 +268,7 @@ struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const 
 struct web_client *web_client_create_on_listenfd(int listener) {
     struct web_client *w;
 
-    w = callocz(1, sizeof(struct web_client));
-    w->id = web_client_connected();
-    w->mode = WEB_CLIENT_MODE_NORMAL;
-
+    w = web_client_get_from_cache_or_allocate();
     w->ifd = w->ofd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_allow_connections_from);
 
     if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
@@ -139,8 +282,7 @@ struct web_client *web_client_create_on_listenfd(int listener) {
             error("%llu: Failed to accept new incoming connection.", w->id);
         }
 
-        freez(w);
-        web_client_disconnected();
+        web_client_release(w);
         return NULL;
     }
 
@@ -148,7 +290,7 @@ struct web_client *web_client_create_on_listenfd(int listener) {
     return(w);
 }
 
-void web_client_reset(struct web_client *w) {
+void web_client_request_done(struct web_client *w) {
     web_client_uncrock_socket(w);
 
     debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
@@ -271,29 +413,6 @@ void web_client_reset(struct web_client *w) {
         w->response.zinitialized = 0;
     }
 #endif // NETDATA_WITH_ZLIB
-}
-
-void web_client_free(struct web_client *w) {
-    debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
-
-    web_client_reset(w);
-
-    buffer_free(w->response.header_output);
-    w->response.header_output = NULL;
-
-    buffer_free(w->response.header);
-    w->response.header = NULL;
-
-    buffer_free(w->response.data);
-    w->response.data = NULL;
-
-    if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
-        if (w->ifd != -1) close(w->ifd);
-        if (w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
-    }
-
-    freez(w);
-    web_client_disconnected();
 }
 
 uid_t web_files_uid(void) {
@@ -1453,7 +1572,7 @@ void web_client_process_request(struct web_client *w) {
                     if(len != w->response.data->rbytes)
                         error("%llu: sendfile() should copy %ld bytes, but copied %ld. Falling back to manual copy.", w->id, w->response.data->rbytes, len);
                     else
-                        web_client_reset(w);
+                        web_client_request_done(w);
                 }
                 */
             }
@@ -1571,7 +1690,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
         }
 
         // reset the client
-        web_client_reset(w);
+        web_client_request_done(w);
         debug(D_WEB_CLIENT, "%llu: Done sending all data on socket.", w->id);
         return t;
     }
@@ -1611,7 +1730,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
         // compress
         if(deflate(&w->response.zstream, flush) == Z_STREAM_ERROR) {
             error("%llu: Compression failed. Closing down client.", w->id);
-            web_client_reset(w);
+            web_client_request_done(w);
             return(-1);
         }
 
@@ -1682,7 +1801,7 @@ ssize_t web_client_send(struct web_client *w) {
             return 0;
         }
 
-        web_client_reset(w);
+        web_client_request_done(w);
         debug(D_WEB_CLIENT, "%llu: Done sending all data on socket. Waiting for next request on the same socket.", w->id);
         return 0;
     }
@@ -1794,15 +1913,20 @@ ssize_t web_client_receive(struct web_client *w)
 
 static void web_client_main_cleanup(void *ptr) {
     struct web_client *w = ptr;
+
     if(!web_client_check_obsolete(w)) {
         WEB_CLIENT_IS_OBSOLETE(w);
     }
+
+    w->running = 0;
 }
 
 void *web_client_main(void *ptr) {
     netdata_thread_cleanup_push(web_client_main_cleanup, ptr);
 
     struct web_client *w = ptr;
+    w->running = 1;
+
     struct pollfd fds[2], *ifd, *ofd;
     int retval, timeout;
     nfds_t fdmax = 0;
@@ -1915,7 +2039,7 @@ void *web_client_main(void *ptr) {
     if(w->mode != WEB_CLIENT_MODE_STREAM)
         log_connection(w, "DISCONNECTED");
 
-    web_client_reset(w);
+            web_client_request_done(w);
 
     debug(D_WEB_CLIENT, "%llu: done...", w->id);
 

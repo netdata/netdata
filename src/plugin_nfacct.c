@@ -754,8 +754,6 @@ static void nfacct_send_metrics() {
 static void nfacct_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     if(static_thread->enabled) {
-        static_thread->enabled = 0;
-
         info("cleaning up...");
 
 #ifdef DO_NFACCT
@@ -765,6 +763,8 @@ static void nfacct_main_cleanup(void *ptr) {
 #ifdef DO_NFSTAT
         nfstat_cleanup();
 #endif
+
+        static_thread->enabled = 0;
     }
 }
 
