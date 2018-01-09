@@ -81,14 +81,14 @@ static void web_client_update_acl_matches(struct web_client *w) {
         w->acl |= WEB_CLIENT_ACL_BADGE;
 }
 
-static void web_client_fix_socket(struct web_client *w) {
+static void web_client_initialize_connection(struct web_client *w) {
     int flag = 1;
     if(setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
-        error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ofd);
+        error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
 
     flag = 1;
     if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
-        error("%llu: Cannot set SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
+        error("%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
 
     web_client_update_acl_matches(w);
 
@@ -115,7 +115,7 @@ struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const 
     if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
     if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
 
-    web_client_fix_socket(w);
+    web_client_initialize_connection(w);
     return(w);
 }
 
@@ -144,7 +144,7 @@ struct web_client *web_client_create_on_listenfd(int listener) {
         return NULL;
     }
 
-    web_client_fix_socket(w);
+    web_client_initialize_connection(w);
     return(w);
 }
 
