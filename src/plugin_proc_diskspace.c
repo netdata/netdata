@@ -13,8 +13,8 @@ static inline void mountinfo_reload(int force) {
     time_t now = now_realtime_sec();
 
     if(force || now - last_loaded >= check_for_new_mountpoints_every) {
-        // mountinfo_free() can be called with NULL disk_mountinfo_root
-        mountinfo_free(disk_mountinfo_root);
+        // mountinfo_free_all() can be called with NULL disk_mountinfo_root
+        mountinfo_free_all(disk_mountinfo_root);
 
         // re-read mountinfo in case something changed
         disk_mountinfo_root = mountinfo_read(0);

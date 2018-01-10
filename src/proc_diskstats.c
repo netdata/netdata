@@ -249,8 +249,8 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     // mountinfo_find() can be called with NULL disk_mountinfo_root
     struct mountinfo *mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
     if(unlikely(!mi)) {
-        // mountinfo_free can be called with NULL
-        mountinfo_free(disk_mountinfo_root);
+        // mountinfo_free_all can be called with NULL
+        mountinfo_free_all(disk_mountinfo_root);
         disk_mountinfo_root = mountinfo_read(0);
         mi = mountinfo_find(disk_mountinfo_root, d->major, d->minor);
     }

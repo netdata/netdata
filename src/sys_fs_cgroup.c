@@ -225,7 +225,7 @@ void read_cgroup_plugin_configuration() {
                 ), NULL, SIMPLE_PATTERN_EXACT);
     }
 
-    mountinfo_free(root);
+    mountinfo_free_all(root);
 }
 
 // ----------------------------------------------------------------------------
