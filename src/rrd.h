@@ -9,6 +9,7 @@
 
 extern int default_rrd_update_every;
 extern int default_rrd_history_entries;
+extern int gap_when_lost_iterations_above;
 
 #define RRD_ID_LENGTH_MAX 200
 

@@ -1,8 +1,6 @@
 #define NETDATA_RRD_INTERNALS 1
 #include "common.h"
 
-#define RRD_DEFAULT_GAP_INTERPOLATIONS 1
-
 void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line) {
     debug(D_RRD_CALLS, "Checking read lock on chart '%s'", st->id);
 
@@ -661,8 +659,7 @@ RRDSET *rrdset_create_custom(
     st->last_collected_time.tv_usec = 0;
     st->counter_done = 0;
 
-    st->gap_when_lost_iterations_above = (int) (
-            config_get_number(st->config_section, "gap when lost iterations above", RRD_DEFAULT_GAP_INTERPOLATIONS) + 2);
+    st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
 
     st->last_accessed_time = 0;
     st->upstream_resync_time = 0;
