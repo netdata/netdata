@@ -6,7 +6,7 @@
 // 2. multi-threaded, based on poll() that spawns threads to handle the requests, based on select()
 // 3. static-threaded, based on poll() using a fixed number of threads (configured at netdata.conf)
 
-WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
+WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
 // --------------------------------------------------------------------------------------
 
@@ -954,8 +954,8 @@ static int web_server_file_read_callback(POLLINFO *pi, short int *events) {
     ssize_t ret = unlikely(web_client_read_file(w));
 
     if(likely(web_client_has_wait_send(w))) {
-        POLLJOB *p = pi->p;                         // our POLLJOB
-        POLLINFO *wpi = &p->inf[w->pollinfo_slot];  // POLLINFO of the client socket
+        POLLJOB *p = pi->p;                                        // our POLLJOB
+        POLLINFO *wpi = pollinfo_from_slot(p, w->pollinfo_slot);  // POLLINFO of the client socket
 
         debug(D_WEB_CLIENT, "%llu: SIGNALING W TO SEND (iFD %d, oFD %d)", w->id, pi->fd, wpi->fd);
         p->fds[wpi->slot].events |= POLLOUT;
@@ -1014,11 +1014,13 @@ static void web_server_del_callback(POLLINFO *pi) {
 
     w->pollinfo_slot = 0;
     if(unlikely(w->pollinfo_filecopy_slot)) {
-        POLLJOB *p = pi->p;                                  // our POLLJOB
-        POLLINFO *fpi = &p->inf[w->pollinfo_filecopy_slot];  // POLLINFO of the client socket
+        POLLINFO *fpi = pollinfo_from_slot(pi->p, w->pollinfo_filecopy_slot);  // POLLINFO of the client socket
         debug(D_WEB_CLIENT, "%llu: THE CLIENT WILL BE FRED BY READING FILE JOB ON FD %d", w->id, fpi->fd);
     }
     else {
+        if(web_client_flag_check(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET))
+            pi->flags |= POLLINFO_FLAG_DONT_CLOSE;
+
         debug(D_WEB_CLIENT, "%llu: CLOSING CLIENT FD %d", w->id, pi->fd);
         web_client_release(w);
     }
