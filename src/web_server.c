@@ -6,7 +6,7 @@
 // 2. multi-threaded, based on poll() that spawns threads to handle the requests, based on select()
 // 3. static-threaded, based on poll() using a fixed number of threads (configured at netdata.conf)
 
-WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_MULTI_THREADED;
+WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
 // --------------------------------------------------------------------------------------
 
