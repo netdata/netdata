@@ -58,9 +58,12 @@ extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flag
 
 #define POLLINFO_FLAG_SERVER_SOCKET 0x00000001
 #define POLLINFO_FLAG_CLIENT_SOCKET 0x00000002
+#define POLLINFO_FLAG_DONT_CLOSE    0x00000004
+
+typedef struct poll POLLJOB;
 
 typedef struct pollinfo {
-    struct poll *p; // the parent
+    POLLJOB *p; // the parent
     size_t slot;    // the slot id
 
     int fd;             // the file descriptor
@@ -85,7 +88,7 @@ typedef struct pollinfo {
     struct pollinfo *next;
 } POLLINFO;
 
-typedef struct poll {
+struct poll {
     size_t slots;
     size_t used;
     size_t min;
@@ -100,7 +103,9 @@ typedef struct poll {
     void  (*del_callback)(POLLINFO *pi);
     int   (*rcv_callback)(POLLINFO *pi, short int *events);
     int   (*snd_callback)(POLLINFO *pi, short int *events);
-} POLLJOB;
+};
+
+#define pollinfo_from_slot(p, slot) (&((p)->inf[(slot)]))
 
 extern int poll_default_snd_callback(POLLINFO *pi, short int *events);
 extern int poll_default_rcv_callback(POLLINFO *pi, short int *events);

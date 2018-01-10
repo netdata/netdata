@@ -1064,8 +1064,11 @@ inline void poll_close_fd(POLLINFO *pi) {
         pi->del_callback(pi);
     }
 
-    // info("POLLFD: closing fd %d", pf->fd);
-    close(pf->fd);
+    if(likely(!(pi->flags & POLLINFO_FLAG_DONT_CLOSE))) {
+        if(close(pf->fd) == -1)
+            error("Failed to close() poll_events() socket %d", pf->fd);
+    }
+
     pf->fd = -1;
     pf->events = 0;
     pf->revents = 0;

@@ -29,7 +29,9 @@ typedef enum web_client_flags {
     WEB_CLIENT_FLAG_TRACKING_REQUIRED = 1 << 6, // if set, we need to send cookies
 
     WEB_CLIENT_FLAG_TCP_CLIENT        = 1 << 7, // if set, the client is using a TCP socket
-    WEB_CLIENT_FLAG_UNIX_CLIENT       = 1 << 8  // if set, the client is using a UNIX socket
+    WEB_CLIENT_FLAG_UNIX_CLIENT       = 1 << 8, // if set, the client is using a UNIX socket
+
+    WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET = 1 << 9,  // don't close the socket when cleaning up (static-threaded web server)
 } WEB_CLIENT_FLAGS;
 
 //#ifdef HAVE_C___ATOMIC
