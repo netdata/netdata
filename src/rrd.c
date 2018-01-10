@@ -14,6 +14,7 @@ int rrd_delete_unupdated_dimensions = 0;
 int default_rrd_update_every = UPDATE_EVERY;
 int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
+int gap_when_lost_iterations_above = 1;
 
 
 // ----------------------------------------------------------------------------
