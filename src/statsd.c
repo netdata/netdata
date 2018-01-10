@@ -697,25 +697,24 @@ struct statsd_udp {
 #endif
 
 // new TCP client connected
-static void *statsd_add_callback(int fd, int socktype, short int *events) {
-    (void)fd;
-    (void)socktype;
+static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
+    (void)pi;
+    (void)data;
+
     *events = POLLIN;
 
-    struct statsd_tcp *data = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
-    data->type = STATSD_SOCKET_DATA_TYPE_TCP;
-    data->size = STATSD_TCP_BUFFER_SIZE - 1;
+    struct statsd_tcp *t = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
+    t->type = STATSD_SOCKET_DATA_TYPE_TCP;
+    t->size = STATSD_TCP_BUFFER_SIZE - 1;
 
-    return data;
+    return t;
 }
 
 // TCP client disconnected
-static void statsd_del_callback(int fd, int socktype, void *data) {
-    (void)fd;
-    (void)socktype;
+static void statsd_del_callback(POLLINFO *pi) {
+    struct statsd_tcp *t = pi->data;
 
-    if(data) {
-        struct statsd_tcp *t = data;
+    if(likely(t)) {
         if(t->type == STATSD_SOCKET_DATA_TYPE_TCP) {
             if(t->len != 0) {
                 statsd.socket_errors++;
@@ -726,17 +725,19 @@ static void statsd_del_callback(int fd, int socktype, void *data) {
         else
             error("STATSD: internal error: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
 
-        freez(data);
+        freez(t);
     }
 }
 
 // Receive data
-static int statsd_rcv_callback(int fd, int socktype, void *data, short int *events) {
+static int statsd_rcv_callback(POLLINFO *pi, short int *events) {
     *events = POLLIN;
 
-    switch(socktype) {
+    int fd = pi->fd;
+
+    switch(pi->socktype) {
         case SOCK_STREAM: {
-            struct statsd_tcp *d = (struct statsd_tcp *)data;
+            struct statsd_tcp *d = (struct statsd_tcp *)pi->data;
             if(unlikely(!d)) {
                 error("STATSD: internal error: expected TCP data pointer is NULL");
                 statsd.socket_errors++;
@@ -788,7 +789,7 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
         }
 
         case SOCK_DGRAM: {
-            struct statsd_udp *d = (struct statsd_udp *)data;
+            struct statsd_udp *d = (struct statsd_udp *)pi->data;
             if(unlikely(!d)) {
                 error("STATSD: internal error: expected UDP data pointer is NULL");
                 statsd.socket_errors++;
@@ -853,7 +854,7 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
         }
 
         default: {
-            error("STATSD: internal error: unknown socktype %d on socket %d", socktype, fd);
+            error("STATSD: internal error: unknown socktype %d on socket %d", pi->socktype, fd);
             statsd.socket_errors++;
             return -1;
         }
@@ -862,10 +863,8 @@ static int statsd_rcv_callback(int fd, int socktype, void *data, short int *even
     return 0;
 }
 
-static int statsd_snd_callback(int fd, int socktype, void *data, short int *events) {
-    (void)fd;
-    (void)socktype;
-    (void)data;
+static int statsd_snd_callback(POLLINFO *pi, short int *events) {
+    (void)pi;
     (void)events;
 
     error("STATSD: snd_callback() called, but we never requested to send data to statsd clients.");
@@ -1971,8 +1970,6 @@ static int statsd_listen_sockets_setup(void) {
 static void statsd_main_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
     if(static_thread->enabled) {
-        static_thread->enabled = 0;
-
         info("cleaning up...");
 
         if (statsd.collection_threads) {
@@ -1987,6 +1984,7 @@ static void statsd_main_cleanup(void *data) {
         listen_sockets_close(&statsd.sockets);
 
         info("STATSD: cleanup completed.");
+        static_thread->enabled = 0;
     }
 }
 

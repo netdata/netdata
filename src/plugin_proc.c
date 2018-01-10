@@ -67,9 +67,9 @@ static struct proc_module {
 static void proc_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     if(static_thread->enabled) {
-        static_thread->enabled = 0;
-
         info("cleaning up...");
+
+        static_thread->enabled = 0;
     }
 }
 

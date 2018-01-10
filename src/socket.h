@@ -19,6 +19,8 @@ typedef struct listen_sockets {
     int fds_families[MAX_LISTEN_FDS];   // the family of the open sockets (AF_UNIX, AF_INET, AF_INET6)
 } LISTEN_SOCKETS;
 
+extern char *strdup_client_description(int family, const char *protocol, const char *ip, int port);
+
 extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
 extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
 
@@ -51,11 +53,79 @@ extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flag
 #endif /* #ifndef HAVE_ACCEPT4 */
 
 
+// ----------------------------------------------------------------------------
+// poll() based listener
+
+#define POLLINFO_FLAG_SERVER_SOCKET 0x00000001
+#define POLLINFO_FLAG_CLIENT_SOCKET 0x00000002
+
+typedef struct pollinfo {
+    struct poll *p; // the parent
+    size_t slot;    // the slot id
+
+    int fd;             // the file descriptor
+    int socktype;       // the client socket type
+    char *client_ip;    // the connected client IP
+    char *client_port;  // the connected client port
+
+    uint32_t flags;     // internal flags
+
+    // callbacks for this socket
+    void  (*del_callback)(struct pollinfo *pi);
+    int   (*rcv_callback)(struct pollinfo *pi, short int *events);
+    int   (*snd_callback)(struct pollinfo *pi, short int *events);
+
+    // the user data
+    void *data;
+
+    // linking of free pollinfo structures
+    // for quickly finding the next available
+    // this is like a stack, it grows and shrinks
+    // (with gaps - lower empty slots are preferred)
+    struct pollinfo *next;
+} POLLINFO;
+
+typedef struct poll {
+    size_t slots;
+    size_t used;
+    size_t min;
+    size_t max;
+    struct pollfd *fds;
+    struct pollinfo *inf;
+    struct pollinfo *first_free;
+
+    SIMPLE_PATTERN *access_list;
+
+    void *(*add_callback)(POLLINFO *pi, short int *events, void *data);
+    void  (*del_callback)(POLLINFO *pi);
+    int   (*rcv_callback)(POLLINFO *pi, short int *events);
+    int   (*snd_callback)(POLLINFO *pi, short int *events);
+} POLLJOB;
+
+extern int poll_default_snd_callback(POLLINFO *pi, short int *events);
+extern int poll_default_rcv_callback(POLLINFO *pi, short int *events);
+extern void poll_default_del_callback(POLLINFO *pi);
+extern void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data);
+
+extern POLLINFO *poll_add_fd(POLLJOB *p
+                             , int fd
+                             , int socktype
+                             , uint32_t flags
+                             , const char *client_ip
+                             , const char *client_port
+                             , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
+                             , void  (*del_callback)(POLLINFO *pi)
+                             , int   (*rcv_callback)(POLLINFO *pi, short int *events)
+                             , int   (*snd_callback)(POLLINFO *pi, short int *events)
+                             , void *data
+);
+extern void poll_close_fd(POLLINFO *pi);
+
 extern void poll_events(LISTEN_SOCKETS *sockets
-        , void *(*add_callback)(int fd, int socktype, short int *events)
-        , void  (*del_callback)(int fd, int socktype, void *data)
-        , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
-        , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
+        , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
+        , void  (*del_callback)(POLLINFO *pi)
+        , int   (*rcv_callback)(POLLINFO *pi, short int *events)
+        , int   (*snd_callback)(POLLINFO *pi, short int *events)
         , SIMPLE_PATTERN *access_list
         , void *data
 );

@@ -532,14 +532,14 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 }
 
 static inline void cgroup_read_blkio(struct blkio *io) {
-    static procfile *ff = NULL;
-
     if(unlikely(io->enabled == CONFIG_BOOLEAN_AUTO && io->delay_counter > 0)) {
         io->delay_counter--;
         return;
     }
 
     if(likely(io->filename)) {
+        static procfile *ff = NULL;
+
         ff = procfile_reopen(ff, io->filename, NULL, PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) {
             io->updated = 0;
@@ -2677,9 +2677,9 @@ void update_cgroup_charts(int update_every) {
 static void cgroup_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     if(static_thread->enabled) {
-        static_thread->enabled = 0;
-
         info("cleaning up...");
+
+        static_thread->enabled = 0;
     }
 }
 

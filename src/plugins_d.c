@@ -569,8 +569,6 @@ void *pluginsd_worker_thread(void *arg) {
 static void pluginsd_main_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
     if(static_thread->enabled) {
-        static_thread->enabled = 0;
-
         info("cleaning up...");
 
         struct plugind *cd;
@@ -582,6 +580,7 @@ static void pluginsd_main_cleanup(void *data) {
         }
 
         info("cleanup completed.");
+        static_thread->enabled = 0;
     }
 }
 

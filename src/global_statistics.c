@@ -7,7 +7,8 @@ volatile struct global_statistics global_statistics = {
         .bytes_received = 0,
         .bytes_sent = 0,
         .content_size = 0,
-        .compressed_content_size = 0
+        .compressed_content_size = 0,
+        .web_client_count = 1
 };
 
 netdata_mutex_t global_statistics_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -38,7 +39,7 @@ void finished_web_request_statistics(uint64_t dt,
     __atomic_fetch_add(&global_statistics.compressed_content_size, compressed_content_size, __ATOMIC_SEQ_CST);
 #else
 #warning NOT using atomic operations - using locks for global statistics
-    if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
+    if (web_server_is_multithreaded)
         global_statistics_lock();
 
     if (dt > global_statistics.web_usec_max)
@@ -51,35 +52,39 @@ void finished_web_request_statistics(uint64_t dt,
     global_statistics.content_size += content_size;
     global_statistics.compressed_content_size += compressed_content_size;
 
-    if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
+    if (web_server_is_multithreaded)
         global_statistics_unlock();
 #endif
 }
 
-void web_client_connected(void) {
+uint64_t web_client_connected(void) {
 #if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
     __atomic_fetch_add(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
+    uint64_t id = __atomic_fetch_add(&global_statistics.web_client_count, 1, __ATOMIC_SEQ_CST);
 #else
-    if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
+    if (web_server_is_multithreaded)
         global_statistics_lock();
 
     global_statistics.connected_clients++;
+    uint64_t id = global_statistics.web_client_count++;
 
-    if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
+    if (web_server_is_multithreaded)
         global_statistics_unlock();
 #endif
+
+    return id;
 }
 
 void web_client_disconnected(void) {
 #if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
     __atomic_fetch_sub(&global_statistics.connected_clients, 1, __ATOMIC_SEQ_CST);
 #else
-    if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
+    if (web_server_is_multithreaded)
         global_statistics_lock();
 
     global_statistics.connected_clients--;
 
-    if (web_server_mode == WEB_SERVER_MODE_MULTI_THREADED)
+    if (web_server_is_multithreaded)
         global_statistics_unlock();
 #endif
 }
@@ -95,6 +100,7 @@ inline void global_statistics_copy(struct global_statistics *gs, uint8_t options
     gs->bytes_sent              = __atomic_fetch_add(&global_statistics.bytes_sent, 0, __ATOMIC_SEQ_CST);
     gs->content_size            = __atomic_fetch_add(&global_statistics.content_size, 0, __ATOMIC_SEQ_CST);
     gs->compressed_content_size = __atomic_fetch_add(&global_statistics.compressed_content_size, 0, __ATOMIC_SEQ_CST);
+    gs->web_client_count        = __atomic_fetch_add(&global_statistics.web_client_count, 0, __ATOMIC_SEQ_CST);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
