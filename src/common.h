@@ -116,6 +116,27 @@
 #endif
 
 // ----------------------------------------------------------------------------
+// netdata chart priorities
+
+// This is a work in progress - to scope is to collect here all chart priorities.
+// These should be based on the CONTEXT of the charts + the chart id when needed
+// - for each SECTION +1000 (or +X000 for big sections)
+// - for each FAMILY  +100
+// - for each CHART   +10
+
+// Memory Section - 1xxx
+#define NETDATA_CHART_PRIO_MEM_SYSTEM              1000
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE    1010
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED    1020
+#define NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS     1030
+#define NETDATA_CHART_PRIO_MEM_KERNEL              1100
+#define NETDATA_CHART_PRIO_MEM_SLAB                1200
+#define NETDATA_CHART_PRIO_MEM_KSM                 1300
+#define NETDATA_CHART_PRIO_MEM_NUMA                1400
+#define NETDATA_CHART_PRIO_MEM_HW                  1500
+
+
+// ----------------------------------------------------------------------------
 // netdata common definitions
 
 #if (SIZEOF_VOID_P == 8)
