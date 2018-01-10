@@ -1,11 +1,10 @@
 #include "common.h"
 
-static LISTEN_SOCKETS api_sockets = {
-        .config_section  = CONFIG_SECTION_WEB,
-        .default_bind_to = "*",
-        .default_port    = API_LISTEN_PORT,
-        .backlog         = API_LISTEN_BACKLOG
-};
+// this file includes 3 web servers:
+//
+// 1. single-threaded, based on select()
+// 2. multi-threaded, based on poll() that spawns threads to handle the requests, based on select()
+// 3. static-threaded, based on poll() using a fixed number of threads (configured at netdata.conf)
 
 WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
@@ -40,6 +39,14 @@ const char *web_server_mode_name(WEB_SERVER_MODE id) {
 }
 
 // --------------------------------------------------------------------------------------
+// API sockets
+
+static LISTEN_SOCKETS api_sockets = {
+        .config_section  = CONFIG_SECTION_WEB,
+        .default_bind_to = "*",
+        .default_port    = API_LISTEN_PORT,
+        .backlog         = API_LISTEN_BACKLOG
+};
 
 int api_listen_sockets_setup(void) {
     int socks = listen_sockets_setup(&api_sockets);
@@ -50,6 +57,479 @@ int api_listen_sockets_setup(void) {
     return socks;
 }
 
+
+// --------------------------------------------------------------------------------------
+// access lists
+
+SIMPLE_PATTERN *web_allow_connections_from = NULL;
+SIMPLE_PATTERN *web_allow_streaming_from = NULL;
+SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
+
+// WEB_CLIENT_ACL
+SIMPLE_PATTERN *web_allow_dashboard_from = NULL;
+SIMPLE_PATTERN *web_allow_registry_from = NULL;
+SIMPLE_PATTERN *web_allow_badges_from = NULL;
+
+static void web_client_update_acl_matches(struct web_client *w) {
+    w->acl = WEB_CLIENT_ACL_NONE;
+
+    if(!web_allow_dashboard_from || simple_pattern_matches(web_allow_dashboard_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_DASHBOARD;
+
+    if(!web_allow_registry_from || simple_pattern_matches(web_allow_registry_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_REGISTRY;
+
+    if(!web_allow_badges_from || simple_pattern_matches(web_allow_badges_from, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_BADGE;
+}
+
+
+// --------------------------------------------------------------------------------------
+
+static void log_connection(struct web_client *w, const char *msg) {
+    log_access("%llu: %d '[%s]:%s' '%s'", w->id, gettid(), w->client_ip, w->client_port, msg);
+}
+
+// ----------------------------------------------------------------------------
+// allocate and free web_clients
+
+static void web_client_zero(struct web_client *w) {
+    // zero everything about it - but keep the buffers
+
+    // remember the pointers to the buffers
+    BUFFER *b1 = w->response.data;
+    BUFFER *b2 = w->response.header;
+    BUFFER *b3 = w->response.header_output;
+
+    // empty the buffers
+    buffer_flush(b1);
+    buffer_flush(b2);
+    buffer_flush(b3);
+
+    // zero everything
+    memset(w, 0, sizeof(struct web_client));
+
+    // restore the pointers of the buffers
+    w->response.data = b1;
+    w->response.header = b2;
+    w->response.header_output = b3;
+}
+
+static void web_client_free(struct web_client *w) {
+    buffer_free(w->response.header_output);
+    buffer_free(w->response.header);
+    buffer_free(w->response.data);
+    freez(w);
+}
+
+static struct web_client *web_client_alloc(void) {
+    struct web_client *w = callocz(1, sizeof(struct web_client));
+    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+    return w;
+}
+
+// ----------------------------------------------------------------------------
+// web clients caching
+
+// When clients connect and disconnect, avoid allocating and releasing memory.
+// Instead, when new clients get connected, reuse any memory previously allocated
+// for serving web clients that are now disconnected.
+
+// The size of the cache is adaptive. It caches the structures of 2x
+// the number of currently connected clients.
+
+// Comments per server:
+// SINGLE-THREADED : 1 cache is maintained
+// MULTI-THREADED  : 1 cache is maintained
+// STATIC-THREADED : 1 cache for each thred of the web server
+
+struct clients_cache {
+    pid_t pid;
+
+    struct web_client *used;    // the structures of the currently connected clients
+    size_t used_count;          // the count the currently connected clients
+
+    struct web_client *avail;   // the cached structures, available for future clients
+    size_t avail_count;         // the number of cached structures
+
+    size_t reused;              // the number of re-uses
+    size_t allocated;           // the number of allocations
+};
+
+static __thread struct clients_cache web_clients_cache = {
+        .pid = 0,
+        .used = NULL,
+        .used_count = 0,
+        .avail = NULL,
+        .avail_count = 0,
+        .allocated = 0,
+        .reused = 0
+};
+
+static inline void web_client_cache_verify(int force) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    static __thread size_t count = 0;
+    count++;
+
+    if(unlikely(force || count > 1000)) {
+        count = 0;
+
+        struct web_client *w;
+        size_t used = 0, avail = 0;
+        for(w = web_clients_cache.used; w ; w = w->next) used++;
+        for(w = web_clients_cache.avail; w ; w = w->next) avail++;
+
+        info("web_client_cache has %zu (%zu) used and %zu (%zu) available clients, allocated %zu, reused %zu (hit %zu%%)."
+             , used, web_clients_cache.used_count
+             , avail, web_clients_cache.avail_count
+             , web_clients_cache.allocated
+             , web_clients_cache.reused
+             , (web_clients_cache.allocated + web_clients_cache.reused)?(web_clients_cache.reused * 100 / (web_clients_cache.allocated + web_clients_cache.reused)):0
+        );
+    }
+#else
+    if(unlikely(force)) {
+        info("web_client_cache has %zu used and %zu available clients, allocated %zu, reused %zu (hit %zu%%)."
+             , web_clients_cache.used_count
+             , web_clients_cache.avail_count
+             , web_clients_cache.allocated
+             , web_clients_cache.reused
+             , (web_clients_cache.allocated + web_clients_cache.reused)?(web_clients_cache.reused * 100 / (web_clients_cache.allocated + web_clients_cache.reused)):0
+            );
+    }
+#endif
+}
+
+// destroy the cache and free all the memory it uses
+static void web_client_cache_destroy(void) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(web_clients_cache.pid != 0 && web_clients_cache.pid != gettid()))
+        error("Oops! wrong thread accessing the cache. Expected %d, found %d", (int)web_clients_cache.pid, (int)gettid());
+
+    web_client_cache_verify(1);
+#endif
+
+    struct web_client *w, *t;
+
+    w = web_clients_cache.used;
+    while(w) {
+        t = w;
+        w = w->next;
+        web_client_free(t);
+    }
+    web_clients_cache.used = NULL;
+    web_clients_cache.used_count = 0;
+
+    w = web_clients_cache.avail;
+    while(w) {
+        t = w;
+        w = w->next;
+        web_client_free(t);
+    }
+    web_clients_cache.avail = NULL;
+    web_clients_cache.avail_count = 0;
+}
+
+static struct web_client *web_client_get_from_cache_or_allocate() {
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(web_clients_cache.pid == 0))
+        web_clients_cache.pid = gettid();
+
+    if(unlikely(web_clients_cache.pid != 0 && web_clients_cache.pid != gettid()))
+        error("Oops! wrong thread accessing the cache. Expected %d, found %d", (int)web_clients_cache.pid, (int)gettid());
+#endif
+
+    struct web_client *w = web_clients_cache.avail;
+
+    if(w) {
+        // get it from avail
+        if (w == web_clients_cache.avail) web_clients_cache.avail = w->next;
+        if(w->prev) w->prev->next = w->next;
+        if(w->next) w->next->prev = w->prev;
+        web_clients_cache.avail_count--;
+        web_client_zero(w);
+        web_clients_cache.reused++;
+    }
+    else {
+        // allocate it
+        w = web_client_alloc();
+        web_clients_cache.allocated++;
+    }
+
+    // link it to used web clients
+    if (web_clients_cache.used) web_clients_cache.used->prev = w;
+    w->next = web_clients_cache.used;
+    w->prev = NULL;
+    web_clients_cache.used = w;
+    web_clients_cache.used_count++;
+
+    // initialize it
+    w->id = web_client_connected();
+    w->mode = WEB_CLIENT_MODE_NORMAL;
+    return w;
+}
+
+static void web_client_release(struct web_client *w) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(web_clients_cache.pid != 0 && web_clients_cache.pid != gettid()))
+        error("Oops! wrong thread accessing the cache. Expected %d, found %d", (int)web_clients_cache.pid, (int)gettid());
+
+    if(unlikely(w->running))
+        error("%llu: releasing web client from %s port %s, but it still running.", w->id, w->client_ip, w->client_port);
+#endif
+
+    debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
+
+    web_client_request_done(w);
+    web_client_disconnected();
+
+    if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
+        if (w->ifd != -1) close(w->ifd);
+        if (w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
+    }
+
+    // unlink it from the used
+    if (w == web_clients_cache.used) web_clients_cache.used = w->next;
+    if(w->prev) w->prev->next = w->next;
+    if(w->next) w->next->prev = w->prev;
+    web_clients_cache.used_count--;
+
+    if(web_clients_cache.avail_count >= 2 * web_clients_cache.used_count) {
+        // we have too many of them - free it
+        web_client_free(w);
+    }
+    else {
+        // link it to the avail
+        if (web_clients_cache.avail) web_clients_cache.avail->prev = w;
+        w->next = web_clients_cache.avail;
+        w->prev = NULL;
+        web_clients_cache.avail = w;
+        web_clients_cache.avail_count++;
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+// high level web clients connection management
+
+static void web_client_initialize_connection(struct web_client *w) {
+    int flag = 1;
+    if(setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0)
+        error("%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
+
+    flag = 1;
+    if(setsockopt(w->ifd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0)
+        error("%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->ifd);
+
+    web_client_update_acl_matches(w);
+
+    w->origin[0] = '*'; w->origin[1] = '\0';
+    web_client_enable_wait_receive(w);
+
+    log_connection(w, "CONNECTED");
+
+    web_client_cache_verify(0);
+}
+
+static struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port) {
+    struct web_client *w;
+
+    w = web_client_get_from_cache_or_allocate();
+    w->ifd = w->ofd = fd;
+
+    strncpyz(w->client_ip, client_ip, sizeof(w->client_ip) - 1);
+    strncpyz(w->client_port, client_port, sizeof(w->client_port) - 1);
+
+    if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
+    if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
+
+    web_client_initialize_connection(w);
+    return(w);
+}
+
+static struct web_client *web_client_create_on_listenfd(int listener) {
+    struct web_client *w;
+
+    w = web_client_get_from_cache_or_allocate();
+    w->ifd = w->ofd = accept_socket(listener, SOCK_NONBLOCK, w->client_ip, sizeof(w->client_ip), w->client_port, sizeof(w->client_port), web_allow_connections_from);
+
+    if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
+    if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
+
+    if (w->ifd == -1) {
+        if(errno == EPERM)
+            log_connection(w, "ACCESS DENIED");
+        else {
+            log_connection(w, "CONNECTION FAILED");
+            error("%llu: Failed to accept new incoming connection.", w->id);
+        }
+
+        web_client_release(w);
+        return NULL;
+    }
+
+    web_client_initialize_connection(w);
+    return(w);
+}
+
+
+// --------------------------------------------------------------------------------------
+// the thread of a single client - for the MULTI-THREADED web server
+
+// 1. waits for input and output, using async I/O
+// 2. it processes HTTP requests
+// 3. it generates HTTP responses
+// 4. it copies data from input to output if mode is FILECOPY
+
+int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
+
+static void multi_threaded_web_client_worker_main_cleanup(void *ptr) {
+    struct web_client *w = ptr;
+    WEB_CLIENT_IS_DEAD(w);
+    w->running = 0;
+}
+
+static void *multi_threaded_web_client_worker_main(void *ptr) {
+    netdata_thread_cleanup_push(multi_threaded_web_client_worker_main_cleanup, ptr);
+
+            struct web_client *w = ptr;
+            w->running = 1;
+
+            struct pollfd fds[2], *ifd, *ofd;
+            int retval, timeout;
+            nfds_t fdmax = 0;
+
+            while(!netdata_exit) {
+                if(unlikely(web_client_check_dead(w))) {
+                    debug(D_WEB_CLIENT, "%llu: client is dead.", w->id);
+                    break;
+                }
+                else if(unlikely(!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))) {
+                    debug(D_WEB_CLIENT, "%llu: client is not set for neither receiving nor sending data.", w->id);
+                    break;
+                }
+
+                if(unlikely(w->ifd < 0 || w->ofd < 0)) {
+                    error("%llu: invalid file descriptor, ifd = %d, ofd = %d (required 0 <= fd", w->id, w->ifd, w->ofd);
+                    break;
+                }
+
+                if(w->ifd == w->ofd) {
+                    fds[0].fd = w->ifd;
+                    fds[0].events = 0;
+                    fds[0].revents = 0;
+
+                    if(web_client_has_wait_receive(w)) fds[0].events |= POLLIN;
+                    if(web_client_has_wait_send(w))    fds[0].events |= POLLOUT;
+
+                    fds[1].fd = -1;
+                    fds[1].events = 0;
+                    fds[1].revents = 0;
+
+                    ifd = ofd = &fds[0];
+
+                    fdmax = 1;
+                }
+                else {
+                    fds[0].fd = w->ifd;
+                    fds[0].events = 0;
+                    fds[0].revents = 0;
+                    if(web_client_has_wait_receive(w)) fds[0].events |= POLLIN;
+                    ifd = &fds[0];
+
+                    fds[1].fd = w->ofd;
+                    fds[1].events = 0;
+                    fds[1].revents = 0;
+                    if(web_client_has_wait_send(w))    fds[1].events |= POLLOUT;
+                    ofd = &fds[1];
+
+                    fdmax = 2;
+                }
+
+                debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, web_client_has_wait_receive(w)?"INPUT":"", web_client_has_wait_send(w)?"OUTPUT":"");
+                errno = 0;
+                timeout = web_client_timeout * 1000;
+                retval = poll(fds, fdmax, timeout);
+
+                if(unlikely(netdata_exit)) break;
+
+                if(unlikely(retval == -1)) {
+                    if(errno == EAGAIN || errno == EINTR) {
+                        debug(D_WEB_CLIENT, "%llu: EAGAIN received.", w->id);
+                        continue;
+                    }
+
+                    debug(D_WEB_CLIENT, "%llu: LISTENER: poll() failed (input fd = %d, output fd = %d). Closing client.", w->id, w->ifd, w->ofd);
+                    break;
+                }
+                else if(unlikely(!retval)) {
+                    debug(D_WEB_CLIENT, "%llu: Timeout while waiting socket async I/O for %s %s", w->id, web_client_has_wait_receive(w)?"INPUT":"", web_client_has_wait_send(w)?"OUTPUT":"");
+                    break;
+                }
+
+                if(unlikely(netdata_exit)) break;
+
+                int used = 0;
+                if(web_client_has_wait_send(w) && ofd->revents & POLLOUT) {
+                    used++;
+                    if(web_client_send(w) < 0) {
+                        debug(D_WEB_CLIENT, "%llu: Cannot send data to client. Closing client.", w->id);
+                        break;
+                    }
+                }
+
+                if(unlikely(netdata_exit)) break;
+
+                if(web_client_has_wait_receive(w) && (ifd->revents & POLLIN || ifd->revents & POLLPRI)) {
+                    used++;
+                    if(web_client_receive(w) < 0) {
+                        debug(D_WEB_CLIENT, "%llu: Cannot receive data from client. Closing client.", w->id);
+                        break;
+                    }
+
+                    if(w->mode == WEB_CLIENT_MODE_NORMAL) {
+                        debug(D_WEB_CLIENT, "%llu: Attempting to process received data.", w->id);
+                        web_client_process_request(w);
+
+                        // if the sockets are closed, may have transferred this client
+                        // to plugins.d
+                        if(unlikely(w->mode == WEB_CLIENT_MODE_STREAM))
+                            break;
+                    }
+                }
+
+                if(unlikely(!used)) {
+                    debug(D_WEB_CLIENT_ACCESS, "%llu: Received error on socket.", w->id);
+                    break;
+                }
+            }
+
+            if(w->mode != WEB_CLIENT_MODE_STREAM)
+                log_connection(w, "DISCONNECTED");
+
+            web_client_request_done(w);
+
+            debug(D_WEB_CLIENT, "%llu: done...", w->id);
+
+            // close the sockets/files now
+            // to free file descriptors
+            if(w->ifd == w->ofd) {
+                if(w->ifd != -1) close(w->ifd);
+            }
+            else {
+                if(w->ifd != -1) close(w->ifd);
+                if(w->ofd != -1) close(w->ofd);
+            }
+            w->ifd = -1;
+            w->ofd = -1;
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
+}
+
 // --------------------------------------------------------------------------------------
 // the main socket listener - MULTI-THREADED
 
@@ -57,6 +537,44 @@ int api_listen_sockets_setup(void) {
 // 2. creates a new web_client for each connection received
 // 3. spawns a new netdata_thread to serve the client (this is optimal for keep-alive clients)
 // 4. cleans up old web_clients that their netdata_threads have been exited
+
+static void web_client_multi_threaded_web_server_release_clients(void) {
+    struct web_client *w;
+    for(w = web_clients_cache.used; w ; ) {
+        if(unlikely(!w->running && web_client_check_dead(w))) {
+            struct web_client *t = w->next;
+            web_client_release(w);
+            w = t;
+        }
+        else
+            w = w->next;
+    }
+}
+
+static void web_client_multi_threaded_web_server_stop_all_threads(void) {
+    struct web_client *w;
+
+    int found = 1, max = 2 * USEC_PER_SEC, step = 50000;
+    for(w = web_clients_cache.used; w ; w = w->next) {
+        if(w->running) {
+            found++;
+            info("stopping web client %s, id %llu", w->client_ip, w->id);
+            netdata_thread_cancel(w->thread);
+        }
+    }
+
+    while(found && max > 0) {
+        max -= step;
+        info("Waiting %d web threads to finish...", found);
+        sleep_usec(step);
+        found = 0;
+        for(w = web_clients_cache.used; w ; w = w->next)
+            if(w->running) found++;
+    }
+
+    if(found)
+        error("%d web threads are taking too long to finish. Giving up.", found);
+}
 
 static struct pollfd *socket_listen_main_multi_threaded_fds = NULL;
 
@@ -83,6 +601,7 @@ static void socket_listen_main_multi_threaded_cleanup(void *data) {
     }
 }
 
+#define CLEANUP_EVERY_EVENTS 60
 void *socket_listen_main_multi_threaded(void *ptr) {
     netdata_thread_cleanup_push(socket_listen_main_multi_threaded_cleanup, ptr);
 
@@ -90,7 +609,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
     web_server_is_multithreaded = 1;
 
     struct web_client *w;
-    int retval;
+    int retval, counter = 0;
 
     if(!api_sockets.opened)
         fatal("LISTENER: No sockets to listen to.");
@@ -106,7 +625,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
         info("Listening on '%s'", (api_sockets.fds_names[i])?api_sockets.fds_names[i]:"UNKNOWN");
     }
 
-    int timeout = 10 * 1000;
+    int timeout = 1 * 1000;
 
     while(!netdata_exit) {
 
@@ -119,6 +638,7 @@ void *socket_listen_main_multi_threaded(void *ptr) {
         }
         else if(unlikely(!retval)) {
             debug(D_WEB_CLIENT, "LISTENER: poll() timeout.");
+            counter++;
             continue;
         }
 
@@ -143,9 +663,18 @@ void *socket_listen_main_multi_threaded(void *ptr) {
                 char tag[NETDATA_THREAD_TAG_MAX + 1];
                 snprintfz(tag, NETDATA_THREAD_TAG_MAX, "WEB_CLIENT[%llu,[%s]:%s]", w->id, w->client_ip, w->client_port);
 
-                if(netdata_thread_create(&w->thread, tag, NETDATA_THREAD_OPTION_DONT_LOG, web_client_main, w) != 0)
-                    WEB_CLIENT_IS_OBSOLETE(w);
+                w->running = 1;
+                if(netdata_thread_create(&w->thread, tag, NETDATA_THREAD_OPTION_DONT_LOG, multi_threaded_web_client_worker_main, w) != 0) {
+                    w->running = 0;
+                    web_client_release(w);
+                }
             }
+        }
+
+        counter++;
+        if(counter > CLEANUP_EVERY_EVENTS) {
+            counter = 0;
+            web_client_multi_threaded_web_server_release_clients();
         }
     }
 
@@ -153,14 +682,14 @@ void *socket_listen_main_multi_threaded(void *ptr) {
     return NULL;
 }
 
+
 // --------------------------------------------------------------------------------------
 // the main socket listener - SINGLE-THREADED
 
 struct web_client *single_threaded_clients[FD_SETSIZE];
 
 static inline int single_threaded_link_client(struct web_client *w, fd_set *ifds, fd_set *ofds, fd_set *efds, int *max) {
-    if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w)))) {
-        // error("refusing to link obsolete/dead client");
+    if(unlikely(web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w)))) {
         return 1;
     }
 
@@ -196,8 +725,7 @@ static inline int single_threaded_unlink_client(struct web_client *w, fd_set *if
     single_threaded_clients[w->ifd] = NULL;
     single_threaded_clients[w->ofd] = NULL;
 
-    if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w)))) {
-        // error("unlinked client is obsolete/dead");
+    if(unlikely(web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w)))) {
         return 1;
     }
 
@@ -347,6 +875,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
     return NULL;
 }
 
+
 // --------------------------------------------------------------------------------------
 // the main socket listener - STATIC-THREADED
 
@@ -372,7 +901,7 @@ static __thread struct web_server_static_threaded_worker *worker_private = NULL;
 // ----------------------------------------------------------------------------
 
 static inline int web_server_check_client_status(struct web_client *w) {
-    if(unlikely(web_client_check_obsolete(w) || web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
+    if(unlikely(web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
         return -1;
 
     return 0;
