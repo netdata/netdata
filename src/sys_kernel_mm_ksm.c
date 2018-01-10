@@ -104,7 +104,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , "MB"
                     , "proc"
                     , "/sys/kernel/mm/ksm"
-                    , 5000
+                    , NETDATA_CHART_PRIO_MEM_KSM
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -144,7 +144,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , "MB"
                     , "proc"
                     , "/sys/kernel/mm/ksm"
-                    , 5001
+                    , NETDATA_CHART_PRIO_MEM_KSM + 1
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -178,7 +178,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
                     , "percentage"
                     , "proc"
                     , "/sys/kernel/mm/ksm"
-                    , 5002
+                    , NETDATA_CHART_PRIO_MEM_KSM + 2
                     , update_every
                     , RRDSET_TYPE_LINE
             );
