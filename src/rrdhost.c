@@ -407,6 +407,9 @@ restart_after_removal:
 
 void rrd_init(char *hostname) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
+    gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
+    if(gap_when_lost_iterations_above < 1)
+        gap_when_lost_iterations_above = 1;
 
     health_init();
     registry_init();
