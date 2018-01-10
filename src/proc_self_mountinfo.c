@@ -103,20 +103,11 @@ struct mountinfo *mountinfo_find_by_filesystem_super_option(struct mountinfo *ro
     return NULL;
 }
 
-
-// free a linked list of mountinfo structures
-void mountinfo_free(struct mountinfo *mi) {
-    if(unlikely(!mi))
-        return;
-
-    if(likely(mi->next))
-        mountinfo_free(mi->next);
-
+static void mountinfo_free(struct mountinfo *mi) {
     freez(mi->root);
     freez(mi->mount_point);
     freez(mi->mount_options);
     freez(mi->persistent_id);
-
 /*
     if(mi->optional_fields_count) {
         int i;
@@ -129,6 +120,16 @@ void mountinfo_free(struct mountinfo *mi) {
     freez(mi->mount_source);
     freez(mi->super_options);
     freez(mi);
+}
+
+// free a linked list of mountinfo structures
+void mountinfo_free_all(struct mountinfo *mi) {
+    while(mi) {
+        struct mountinfo *t = mi;
+        mi = mi->next;
+
+        mountinfo_free(t);
+    }
 }
 
 static char *strdupz_decoding_octal(const char *string) {
