@@ -190,7 +190,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                         , "MB"
                         , "proc"
                         , "meminfo"
-                        , 4000
+                        , NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE
                         , update_every
                         , RRDSET_TYPE_AREA
                 );
@@ -263,7 +263,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "MB"
                     , "proc"
                     , "meminfo"
-                    , 9000
+                    , NETDATA_CHART_PRIO_MEM_HW
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -296,7 +296,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "MB"
                     , "proc"
                     , "meminfo"
-                    , 4005
+                    , NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED
                     , update_every
                     , RRDSET_TYPE_AREA
             );
@@ -329,7 +329,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "MB"
                     , "proc"
                     , "meminfo"
-                    , 5000
+                    , NETDATA_CHART_PRIO_MEM_KERNEL
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -369,7 +369,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "MB"
                     , "proc"
                     , "meminfo"
-                    , 6000
+                    , NETDATA_CHART_PRIO_MEM_KERNEL + 1
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
@@ -408,7 +408,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                     , "MB"
                     , "proc"
                     , "meminfo"
-                    , 6500
+                    , NETDATA_CHART_PRIO_MEM_SLAB
                     , update_every
                     , RRDSET_TYPE_STACKED
             );

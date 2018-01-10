@@ -168,7 +168,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , "page faults/s"
                     , "proc"
                     , "vmstat"
-                    , 4010
+                    , NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS
                     , update_every
                     , RRDSET_TYPE_LINE
             );
@@ -213,7 +213,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
                     , "events/s"
                     , "proc"
                     , "vmstat"
-                    , 800
+                    , NETDATA_CHART_PRIO_MEM_NUMA
                     , update_every
                     , RRDSET_TYPE_LINE
             );
