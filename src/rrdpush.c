@@ -1060,10 +1060,15 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         error("Failed to create new STREAM receive thread for client.");
 
     // prevent the caller from closing the streaming socket
-    if(w->ifd == w->ofd)
-        w->ifd = w->ofd = -1;
-    else
-        w->ifd = -1;
+    if(web_server_mode == WEB_SERVER_MODE_STATIC_THREADED) {
+        web_client_flag_set(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET);
+    }
+    else {
+        if(w->ifd == w->ofd)
+            w->ifd = w->ofd = -1;
+        else
+            w->ifd = -1;
+    }
 
     buffer_flush(w->response.data);
     return 200;
