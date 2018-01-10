@@ -833,8 +833,6 @@ static pid_t tc_child_pid = 0;
 static void tc_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     if(static_thread->enabled) {
-        static_thread->enabled = 0;
-
         info("cleaning up...");
 
         if(tc_child_pid) {
@@ -849,6 +847,8 @@ static void tc_main_cleanup(void *ptr) {
 
             tc_child_pid = 0;
         }
+
+        static_thread->enabled = 0;
     }
 }
 

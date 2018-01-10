@@ -1,9 +1,6 @@
 #ifndef NETDATA_WEB_CLIENT_H
 #define NETDATA_WEB_CLIENT_H 1
 
-#define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
-extern int web_client_timeout;
-
 #ifdef NETDATA_WITH_ZLIB
 extern int web_enable_gzip,
         web_gzip_level,
@@ -21,10 +18,6 @@ typedef enum web_client_mode {
 } WEB_CLIENT_MODE;
 
 typedef enum web_client_flags {
-    WEB_CLIENT_FLAG_OBSOLETE          = 1 << 0, // if set, the listener will remove this client
-    // after setting this, you should not touch
-    // this web_client
-
     WEB_CLIENT_FLAG_DEAD              = 1 << 1, // if set, this client is dead
 
     WEB_CLIENT_FLAG_KEEPALIVE         = 1 << 2, // if set, the web client will be re-used
@@ -48,9 +41,6 @@ typedef enum web_client_flags {
 #define web_client_flag_set(w, flag)   (w)->flags |= flag
 #define web_client_flag_clear(w, flag) (w)->flags &= ~flag
 //#endif
-
-#define WEB_CLIENT_IS_OBSOLETE(w) web_client_flag_set(w, WEB_CLIENT_FLAG_OBSOLETE)
-#define web_client_check_obsolete(w) web_client_flag_check(w, WEB_CLIENT_FLAG_OBSOLETE)
 
 #define WEB_CLIENT_IS_DEAD(w) web_client_flag_set(w, WEB_CLIENT_FLAG_DEAD)
 #define web_client_check_dead(w) web_client_flag_check(w, WEB_CLIENT_FLAG_DEAD)
@@ -81,11 +71,14 @@ typedef enum web_client_flags {
 
 #define web_client_is_corkable(w) web_client_flag_check(w, WEB_CLIENT_FLAG_TCP_CLIENT)
 
-#define URL_MAX 8192
-#define ZLIB_CHUNK  16384
-#define HTTP_RESPONSE_HEADER_SIZE 4096
-#define COOKIE_MAX 1024
-#define ORIGIN_MAX 1024
+#define NETDATA_WEB_REQUEST_URL_SIZE 8192
+#define NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE 16384
+#define NETDATA_WEB_RESPONSE_HEADER_SIZE 4096
+#define NETDATA_WEB_REQUEST_COOKIE_SIZE 1024
+#define NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE 1024
+#define NETDATA_WEB_RESPONSE_INITIAL_SIZE 16384
+#define NETDATA_WEB_REQUEST_RECEIVE_SIZE 16384
+#define NETDATA_WEB_REQUEST_MAX_SIZE 16384
 
 struct response {
     BUFFER *header;                 // our response header
@@ -100,7 +93,7 @@ struct response {
     int zoutput;                    // if set to 1, web_client_send() will send compressed data
 #ifdef NETDATA_WITH_ZLIB
     z_stream zstream;               // zlib stream for sending compressed output to client
-    Bytef zbuffer[ZLIB_CHUNK];      // temporary buffer for storing compressed output
+    Bytef zbuffer[NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE]; // temporary buffer for storing compressed output
     size_t zsent;                   // the compressed bytes we have sent to the client
     size_t zhave;                   // the compressed bytes that we have received from zlib
     int zinitialized:1;
@@ -129,11 +122,11 @@ typedef enum web_client_acl {
 struct web_client {
     unsigned long long id;
 
-    WEB_CLIENT_FLAGS flags;             // status flags for the client
-    WEB_CLIENT_MODE mode;               // the operational mode of the client
-    WEB_CLIENT_ACL acl;                 // the access list of the client
+    WEB_CLIENT_FLAGS flags;         // status flags for the client
+    WEB_CLIENT_MODE mode;           // the operational mode of the client
+    WEB_CLIENT_ACL acl;             // the access list of the client
 
-    int tcp_cork;                       // 1 = we have a cork on the socket
+    int tcp_cork;                   // 1 = we have a cork on the socket
 
     int ifd;
     int ofd;
@@ -141,47 +134,44 @@ struct web_client {
     char client_ip[NI_MAXHOST+1];
     char client_port[NI_MAXSERV+1];
 
-    char decoded_url[URL_MAX + 1];  // we decode the URL in this buffer
-    char last_url[URL_MAX+1];       // we keep a copy of the decoded URL here
+    char decoded_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];  // we decode the URL in this buffer
+    char last_url[NETDATA_WEB_REQUEST_URL_SIZE+1];       // we keep a copy of the decoded URL here
 
     struct timeval tv_in, tv_ready;
 
-    char cookie1[COOKIE_MAX+1];
-    char cookie2[COOKIE_MAX+1];
-    char origin[ORIGIN_MAX+1];
+    char cookie1[NETDATA_WEB_REQUEST_COOKIE_SIZE+1];
+    char cookie2[NETDATA_WEB_REQUEST_COOKIE_SIZE+1];
+    char origin[NETDATA_WEB_REQUEST_ORIGIN_HEADER_SIZE+1];
 
     struct response response;
 
     size_t stats_received_bytes;
     size_t stats_sent_bytes;
 
-    netdata_thread_t thread;               // the thread servicing this client
+    // cache of web_client allocations
+    struct web_client *prev;        // maintain a linked list of web clients
+    struct web_client *next;        // for the web servers that need it
 
-    struct web_client *prev;
-    struct web_client *next;
+    // MULTI-THREADED WEB SERVER MEMBERS
+    netdata_thread_t thread;        // the thread servicing this client
+    volatile int running;           // 1 when the thread runs, 0 otherwise
+
+    // STATIC-THREADED WEB SERVER MEMBERS
+    size_t pollinfo_slot;           // POLLINFO slot of the web client
+    size_t pollinfo_filecopy_slot;  // POLLINFO slot of the file read
 };
-
-extern struct web_client *web_clients;
-extern SIMPLE_PATTERN *web_allow_connections_from;
-extern SIMPLE_PATTERN *web_allow_dashboard_from;
-extern SIMPLE_PATTERN *web_allow_registry_from;
-extern SIMPLE_PATTERN *web_allow_badges_from;
-extern SIMPLE_PATTERN *web_allow_streaming_from;
-extern SIMPLE_PATTERN *web_allow_netdataconf_from;
 
 extern uid_t web_files_uid(void);
 extern uid_t web_files_gid(void);
 
 extern int web_client_permission_denied(struct web_client *w);
 
-extern struct web_client *web_client_create(int listener);
-extern struct web_client *web_client_free(struct web_client *w);
 extern ssize_t web_client_send(struct web_client *w);
 extern ssize_t web_client_receive(struct web_client *w);
-extern void web_client_process_request(struct web_client *w);
-extern void web_client_reset(struct web_client *w);
+extern ssize_t web_client_read_file(struct web_client *w);
 
-extern void *web_client_main(void *ptr);
+extern void web_client_process_request(struct web_client *w);
+extern void web_client_request_done(struct web_client *w);
 
 extern int web_client_api_request_v1_data_group(char *name, int def);
 extern const char *group_method2string(int group);
