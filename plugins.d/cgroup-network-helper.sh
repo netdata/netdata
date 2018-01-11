@@ -22,7 +22,10 @@
 
 # -----------------------------------------------------------------------------
 
-export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/sbin"
+# the system path is cleared by cgroup-network
+export PATH="/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+[ -x /etc/profile ] && source /etc/profile
+
 export LC_ALL=C
 
 PROGRAM_NAME="$(basename "${0}")"
@@ -72,7 +75,6 @@ debug() {
 
 [ -z "${NETDATA_PLUGINS_DIR}"  ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
 [ -z "${NETDATA_CONFIG_DIR}"   ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
-[ -z "${NETDATA_CACHE_DIR}"    ] && NETDATA_CACHE_DIR="$(dirname "${0}")/../../../../var/cache/netdata"
 
 # -----------------------------------------------------------------------------
 # parse the arguments
