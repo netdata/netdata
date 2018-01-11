@@ -207,6 +207,7 @@ declare -A configs_signatures=(
   ['57be306944cb09b7f024079728fd04b9']='apps_groups.conf'
   ['5829812db29598db5857c9f433e96fef']='python.d/apache.conf'
   ['5855dd70d71c8497e5591b0690162c9c']='health.d/tcp_resets.conf'
+  ['58660dfcc260f77deec94b328b3838e8']='health_alarm_notify.conf'
   ['58e835b7176865ec5a6f59f7aba832bf']='health.d/named.conf'
   ['598f9814966a9e2fe48e8218151d3fa6']='stream.conf'
   ['59dded33e3adfe622f36c557a4f4bed7']='health.d/net.conf'
