@@ -23,7 +23,7 @@
 # -----------------------------------------------------------------------------
 
 # the system path is cleared by cgroup-network
-[ -x /etc/profile ] && source /etc/profile
+[ -f /etc/profile ] && source /etc/profile
 
 export LC_ALL=C
 
