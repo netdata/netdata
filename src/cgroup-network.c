@@ -589,17 +589,16 @@ int main(int argc, char **argv) {
         call_the_helper(pid, NULL);
     }
     else if(!strcmp(argv[1], "--cgroup")) {
-        char pathname[FILENAME_MAX + 1];
-        snprintfz(pathname, FILENAME_MAX, "%s%s", host_prefix, argv[2]);
-        if(verify_path(pathname) == -1)
-            fatal("cgroup '%s' does not exist.", pathname);
+        char *cgroup = argv[2];
+        if(verify_path(cgroup) == -1)
+            fatal("cgroup '%s' does not exist.", cgroup);
 
-        pid = read_pid_from_cgroup(pathname);
-        call_the_helper(pid, pathname);
+        pid = read_pid_from_cgroup(cgroup);
+        call_the_helper(pid, cgroup);
 
         if(pid <= 0 && !detected_devices) {
             errno = 0;
-            error("Cannot find a cgroup PID from cgroup '%s'", pathname);
+            error("Cannot find a cgroup PID from cgroup '%s'", cgroup);
         }
     }
     else
