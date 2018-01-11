@@ -8,6 +8,20 @@
 #include <sched.h>
 #endif
 
+char *host_prefix = "";
+char *pluginsdir = "";
+char *configdir = "";
+
+char environment_variable1[FILENAME_MAX + 1] = "";
+char environment_variable2[FILENAME_MAX + 1] = "";
+char environment_variable3[FILENAME_MAX + 1] = "";
+char *environment[] = {
+        environment_variable1,
+        environment_variable2,
+        environment_variable3,
+        NULL
+};
+
 // ----------------------------------------------------------------------------
 // callback required by fatal()
 
@@ -17,6 +31,8 @@ void netdata_cleanup_and_exit(int ret) {
 void health_reload(void) {};
 void rrdhost_save_all(void) {};
 
+
+// ----------------------------------------------------------------------------
 
 struct iface {
     const char *device;
@@ -428,15 +444,7 @@ cleanup:
 // call the external helper
 
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
-void call_the_helper(const char *me, pid_t pid, const char *cgroup) {
-    const char *pluginsdir = getenv("NETDATA_PLUGINS_DIR");
-    char *m = NULL;
-
-    if(!pluginsdir || !*pluginsdir) {
-        m = strdupz(me);
-        pluginsdir = dirname(m);
-    }
-
+void call_the_helper(pid_t pid, const char *cgroup) {
     if(setresuid(0, 0, 0) == -1)
         error("setresuid(0, 0, 0) failed.");
 
@@ -449,7 +457,7 @@ void call_the_helper(const char *me, pid_t pid, const char *cgroup) {
     info("running: %s", buffer);
 
     pid_t cgroup_pid;
-    FILE *fp = mypopen(buffer, &cgroup_pid);
+    FILE *fp = mypopene(buffer, &cgroup_pid, environment);
     if(fp) {
         char *s;
         while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
@@ -472,8 +480,36 @@ void call_the_helper(const char *me, pid_t pid, const char *cgroup) {
     }
     else
         error("cannot execute cgroup-network helper script: %s", buffer);
+}
 
-    freez(m);
+int verify_path(const char *path) {
+    struct stat sb;
+
+    char c;
+    const char *s = path;
+    while((c = *s++)) {
+        if(c == '$' || c == '`') {
+            error("invalid character in path '%s'", path);
+            return -1;
+        }
+    }
+
+    if(path[0] != '/') {
+        error("only absolute path names are supported - invalid path '%s'", path);
+        return -1;
+    }
+
+    if (stat(path, &sb) == -1) {
+        error("cannot stat() path '%s'", path);
+        return -1;
+    }
+
+    if((sb.st_mode & S_IFMT) != S_IFDIR) {
+        error("path '%s' is not a directory", path);
+        return -1;
+    }
+
+    return 0;
 }
 
 
@@ -492,6 +528,47 @@ int main(int argc, char **argv) {
     program_version = VERSION;
     error_log_syslog = 0;
 
+
+    // ------------------------------------------------------------------------
+    // make sure NETDATA_HOST_PREFIX is safe
+
+    host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(!host_prefix || !*host_prefix)
+        host_prefix = "";
+
+    if(host_prefix[0] != '\0' && verify_path(host_prefix) == -1)
+        fatal("cannot find path NETDATA_HOST_PREFIX '%s'", host_prefix);
+
+    // ------------------------------------------------------------------------
+    // make sure NETDATA_CONFIG_DIR is safe
+
+    configdir = getenv("NETDATA_CONFIG_DIR");
+    if(!configdir || !*configdir) {
+        configdir = "";
+    }
+    else if(verify_path(configdir) == -1)
+        fatal("cannot find path NETDATA_CONFIG_DIR '%s'", configdir);
+
+    // ------------------------------------------------------------------------
+    // make sure NETDATA_PLUGINS_DIR is safe
+
+    pluginsdir = getenv("NETDATA_PLUGINS_DIR");
+    if(!pluginsdir || !*pluginsdir) {
+        char *me = strdupz(argv[0]);
+        pluginsdir = dirname(me);
+    }
+    else if(verify_path(pluginsdir) == -1)
+        fatal("cannot find path NETDATA_PLUGINS_DIR '%s'", pluginsdir);
+
+    // ------------------------------------------------------------------------
+    // build a safe environment for our script
+
+    snprintfz(environment_variable1, FILENAME_MAX, "NETDATA_HOST_PREFIX=%s", host_prefix);
+    snprintfz(environment_variable2, FILENAME_MAX, "NETDATA_PLUGINS_DIR=%s", pluginsdir);
+    snprintfz(environment_variable3, FILENAME_MAX, "NETDATA_CONFIG_DIR=%s", configdir);
+
+    // ------------------------------------------------------------------------
+
     if(argc == 2 && (!strcmp(argv[1], "version") || !strcmp(argv[1], "-version") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "-v") || !strcmp(argv[1], "-V"))) {
         fprintf(stderr, "cgroup-network %s\n", VERSION);
         exit(0);
@@ -509,15 +586,19 @@ int main(int argc, char **argv) {
             return 2;
         }
 
-        call_the_helper(argv[0], pid, NULL);
+        call_the_helper(pid, NULL);
     }
     else if(!strcmp(argv[1], "--cgroup")) {
-        pid = read_pid_from_cgroup(argv[2]);
-        call_the_helper(argv[0], pid, argv[2]);
+        char *cgroup = argv[2];
+        if(verify_path(cgroup) == -1)
+            fatal("cgroup '%s' does not exist.", cgroup);
+
+        pid = read_pid_from_cgroup(cgroup);
+        call_the_helper(pid, cgroup);
 
         if(pid <= 0 && !detected_devices) {
             errno = 0;
-            error("Cannot find a cgroup PID from cgroup '%s'", argv[2]);
+            error("Cannot find a cgroup PID from cgroup '%s'", cgroup);
         }
     }
     else

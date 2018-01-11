@@ -113,6 +113,42 @@ FILE *mypopen(const char *command, volatile pid_t *pidptr)
     exit(1);
 }
 
+FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
+    int pipefd[2];
+
+    if(pipe(pipefd) == -1)
+        return NULL;
+
+    int pid = fork();
+    if(pid == -1) {
+        close(pipefd[PIPE_READ]);
+        close(pipefd[PIPE_WRITE]);
+        return NULL;
+    }
+    if(pid != 0) {
+        // the parent
+        *pidptr = pid;
+        close(pipefd[PIPE_WRITE]);
+        FILE *fp = fdopen(pipefd[PIPE_READ], "r");
+        return(fp);
+    }
+    // the child
+
+    // close all files
+    int i;
+    for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i > 0; i--)
+        if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
+
+    // move the pipe to stdout
+    if(pipefd[PIPE_WRITE] != STDOUT_FILENO) {
+        dup2(pipefd[PIPE_WRITE], STDOUT_FILENO);
+        close(pipefd[PIPE_WRITE]);
+    }
+
+    execle("/bin/sh", "sh", "-c", command, NULL, env);
+    exit(1);
+}
+
 int mypclose(FILE *fp, pid_t pid) {
     debug(D_EXIT, "Request to mypclose() on pid %d", pid);
 
