@@ -1111,6 +1111,8 @@ void *poll_default_add_callback(POLLINFO *pi, short int *events, void *data) {
     (void)events;
     (void)data;
 
+    // error("POLLFD: internal error: poll_default_add_callback() called");
+
     return NULL;
 }
 
@@ -1120,7 +1122,7 @@ void poll_default_del_callback(POLLINFO *pi) {
 }
 
 int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
-    (void)events;
+    *events |= POLLIN;
 
     char buffer[1024 + 1];
 
@@ -1130,12 +1132,12 @@ int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
         if (rc < 0) {
             // read failed
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
-                error("POLLFD: recv() failed.");
+                error("POLLFD: poll_default_rcv_callback(): recv() failed with %zd.", rc);
                 return -1;
             }
         } else if (rc) {
             // data received
-            info("POLLFD: internal error: discarding %zd bytes received on socket %d", rc, pi->fd);
+            info("POLLFD: internal error: poll_default_rcv_callback() is discarding %zd bytes received on socket %d", rc, pi->fd);
         }
     } while (rc != -1);
 
@@ -1145,7 +1147,7 @@ int poll_default_rcv_callback(POLLINFO *pi, short int *events) {
 int poll_default_snd_callback(POLLINFO *pi, short int *events) {
     *events &= ~POLLOUT;
 
-    info("POLLFD: internal error: nothing to send on socket %d", pi->fd);
+    info("POLLFD: internal error: poll_default_snd_callback(): nothing to send on socket %d", pi->fd);
     return 0;
 }
 
@@ -1301,6 +1303,11 @@ void poll_events(LISTEN_SOCKETS *sockets
         , SIMPLE_PATTERN *access_list
         , void *data
 ) {
+    if(!sockets || !sockets->opened) {
+        error("POLLFD: internal error: no listening sockets are opened");
+        return;
+    }
+
     int retval;
 
     POLLJOB p = {
@@ -1328,10 +1335,10 @@ void poll_events(LISTEN_SOCKETS *sockets
                                    , POLLINFO_FLAG_SERVER_SOCKET
                                    , (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN"
                                    , ""
-                                   , poll_default_add_callback
-                                   , poll_default_del_callback
-                                   , poll_default_rcv_callback
-                                   , poll_default_snd_callback
+                                   , p.add_callback
+                                   , p.del_callback
+                                   , p.rcv_callback
+                                   , p.snd_callback
                                    , NULL
         );
 
@@ -1348,8 +1355,8 @@ void poll_events(LISTEN_SOCKETS *sockets
         retval = poll(p.fds, p.max + 1, timeout);
 
         if(unlikely(retval == -1)) {
-            error("POLLFD: LISTENER: poll() failed.");
-            continue;
+            error("POLLFD: LISTENER: poll() failed while waiting on %zu sockets.", p.max + 1);
+            break;
         }
         else if(unlikely(!retval)) {
             debug(D_POLLFD, "POLLFD: LISTENER: poll() timeout.");
