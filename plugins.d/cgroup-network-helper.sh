@@ -23,7 +23,6 @@
 # -----------------------------------------------------------------------------
 
 # the system path is cleared by cgroup-network
-export PATH="/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 [ -x /etc/profile ] && source /etc/profile
 
 export LC_ALL=C
