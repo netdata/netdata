@@ -1308,7 +1308,7 @@ send_alerta() {
         content="$content }"
 
 
-        httpcode=$(docurl -X POST "${webhook}" -H "Content-Type: application/json" -H "Authorization: Key $ALERTA_API_KEY" -d "$content" )
+        httpcode=$(docurl -X POST "${webhook}/alert" -H "Content-Type: application/json" -H "Authorization: Key $ALERTA_API_KEY" -d "$content" )
 
         if [[ "${httpcode}" = "200" || "${httpcode}" = "201" ]]
         then
