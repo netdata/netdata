@@ -904,6 +904,30 @@ void strreverse(char *begin, char *end) {
     }
 }
 
+char *strsep_on_1char(char **ptr, char c) {
+    if(unlikely(!ptr || !*ptr))
+        return NULL;
+
+    // remember the position we started
+    char *s = *ptr;
+
+    // skip separators in front
+    while(*s == c) s++;
+    char *ret = s;
+
+    // find the next separator
+    while(*s++) {
+        if(unlikely(*s == c)) {
+            *s++ = '\0';
+            *ptr = s;
+            return ret;
+        }
+    }
+
+    *ptr = NULL;
+    return ret;
+}
+
 char *mystrsep(char **ptr, char *s) {
     char *p = "";
     while (p && !p[0] && *ptr) p = strsep(ptr, s);

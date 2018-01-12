@@ -194,27 +194,29 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 
-%caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0555,root,root) %{_libexecdir}/%{name}/plugins.d/apps.plugin
+%caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
 %if %{with netns}
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
-%caps(cap_setuid=ep) %attr(4555,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network
-%attr(0555,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
+%caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
+%attr(0550,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 %endif
 
 %if %{with freeipmi}
-%caps(cap_setuid=ep) %attr(4555,root,root) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %endif
 
-%attr(0700,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
-%attr(0700,netdata,netdata) %dir %{_localstatedir}/log/%{name}
-%attr(0700,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/log/%{name}
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 
 %dir %{_datadir}/%{name}
 %dir %{_sysconfdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
+%dir %{_sysconfdir}/%{name}/charts.d
+%dir %{_sysconfdir}/%{name}/node.d
 
 %if %{with systemd}
 %{_unitdir}/netdata.service

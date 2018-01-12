@@ -12,15 +12,17 @@ char *host_prefix = "";
 char *pluginsdir = "";
 char *configdir = "";
 
-char environment_variable1[FILENAME_MAX + 1] = "";
-char environment_variable2[FILENAME_MAX + 1] = "";
-char environment_variable3[FILENAME_MAX + 1] = "";
+char environment_variable2[FILENAME_MAX + 50] = "";
+char environment_variable3[FILENAME_MAX + 50] = "";
+char environment_variable4[FILENAME_MAX + 50] = "";
 char *environment[] = {
-        environment_variable1,
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
         environment_variable2,
         environment_variable3,
+        environment_variable4,
         NULL
 };
+
 
 // ----------------------------------------------------------------------------
 // callback required by fatal()
@@ -488,7 +490,7 @@ int verify_path(const char *path) {
     char c;
     const char *s = path;
     while((c = *s++)) {
-        if(c == '$' || c == '`') {
+        if(c == '$' || c == '`' || c == '<' || c == '>') {
             error("invalid character in path '%s'", path);
             return -1;
         }
@@ -512,6 +514,39 @@ int verify_path(const char *path) {
     return 0;
 }
 
+/*
+char *fix_path_variable(void) {
+    const char *path = getenv("PATH");
+    if(!path || !*path) return 0;
+
+    char *p = strdupz(path);
+    char *safe_path = callocz(1, strlen(p) + strlen("PATH=") + 1);
+    strcpy(safe_path, "PATH=");
+
+    int added = 0;
+    char *ptr = p;
+    while(ptr && *ptr) {
+        char *s = strsep(&ptr, ":");
+        if(s && *s) {
+            if(verify_path(s) == -1) {
+                error("the PATH variable includes an invalid path '%s' - removed it.", s);
+            }
+            else {
+                info("the PATH variable includes a valid path '%s'.", s);
+                if(added) strcat(safe_path, ":");
+                strcat(safe_path, s);
+                added++;
+            }
+        }
+    }
+
+    info("unsafe PATH:      '%s'.", path);
+    info("  safe PATH: '%s'.", safe_path);
+
+    freez(p);
+    return safe_path;
+}
+*/
 
 // ----------------------------------------------------------------------------
 // main
@@ -563,9 +598,9 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // build a safe environment for our script
 
-    snprintfz(environment_variable1, FILENAME_MAX, "NETDATA_HOST_PREFIX=%s", host_prefix);
-    snprintfz(environment_variable2, FILENAME_MAX, "NETDATA_PLUGINS_DIR=%s", pluginsdir);
-    snprintfz(environment_variable3, FILENAME_MAX, "NETDATA_CONFIG_DIR=%s", configdir);
+    snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", host_prefix);
+    snprintfz(environment_variable3, sizeof(environment_variable3) - 1, "NETDATA_PLUGINS_DIR=%s", pluginsdir);
+    snprintfz(environment_variable4, sizeof(environment_variable4) - 1, "NETDATA_CONFIG_DIR=%s", configdir);
 
     // ------------------------------------------------------------------------
 
