@@ -16,7 +16,8 @@ update_every = 10
 priority = 60000
 retries = 60
 
-ORDER = ['general', 'pool_usage', 'pool_objects', 'pool_write_iops', 'pool_read_iops', 'osd_usage']
+ORDER = ['general', 'pool_usage', 'pool_objects', 'pool_write_iops', 
+         'pool_read_iops', 'osd_usage', 'osd_apply_latency','osd_commit_latency']
 
 CHARTS = {
     'general': {
@@ -45,7 +46,16 @@ CHARTS = {
     'osd_usage': {
         'options': [None, 'Ceph OSDs', 'KB', 'osd', 'ceph.osd_usage', 'line'],
         'lines': []
+    },
+    'osd_apply_latency': {
+        'options': [None, 'Ceph OSDs apply latency', 'milliseconds', 'pool', 'ceph.apply_latency', 'line'],
+        'lines': []
+    },
+    'osd_commit_latency': {
+        'options': [None, 'Ceph OSDs commit latency', 'milliseconds', 'pool', 'ceph.commit_latency', 'line'],
+        'lines': []
     }
+
 }
 
 
@@ -102,6 +112,12 @@ class Service(SimpleService):
             self.definitions['osd_usage']['lines'].append([osd['name'],
                                                            osd['name'],
                                                            'absolute'])
+            self.definitions['osd_apply_latency']['lines'].append(['apply_latency_{0}'.format(osd['name']),
+                                                                   osd['name'],
+                                                                   'absolute'])
+            self.definitions['osd_commit_latency']['lines'].append(['commit_latency_{0}'.format(osd['name']),
+                                                                    osd['name'],
+                                                                    'absolute'])
 
     def get_data(self):
         """
@@ -117,6 +133,7 @@ class Service(SimpleService):
                 data.update(self._get_pool_rw_io(pool))
             for osd in self._get_osd_df()['nodes']:
                 data.update(self._get_osd_usage(osd))
+            data.update(self._get_osd_latency())
             return data
         except (ValueError, AttributeError) as error:
             self.error(error)
@@ -164,6 +181,17 @@ class Service(SimpleService):
         """
         return {osd['name']: float(osd['kb_used'])}
 
+    def _get_osd_latency(self):
+        """
+        Get ceph osd apply and commit latency
+        :return: A osd dict with osd name's key with both apply and commit latency values
+        """
+        osd_latency = {}
+        for osd in self._get_osd_perf()['osd_perf_infos']:
+            osd_latency.update({'apply_latency_osd.{0}'.format(osd['id']): osd['perf_stats']['apply_latency_ms'],
+                                'commit_latency_osd.{0}'.format(osd['id']): osd['perf_stats']['commit_latency_ms']})
+        return osd_latency
+
     def _get_df(self):
         """
         Get ceph df output
@@ -181,6 +209,16 @@ class Service(SimpleService):
         """
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd df',
+            'format': 'json'
+        }), '')[1])
+
+    def _get_osd_perf(self):
+        """
+        Get ceph osd performance
+        :return: ceph osd perf --format json
+        """
+        return json.loads(self.cluster.mon_command(json.dumps({
+            'prefix': 'osd perf',
             'format': 'json'
         }), '')[1])
 
