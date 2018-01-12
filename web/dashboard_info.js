@@ -1337,8 +1337,17 @@ netdataDashboard.context = {
     'ceph.pool_rio': {
         info: 'Shows info about read operations on a pool.'
     },
+
     'ceph.osd_usage': {
         info: 'Shows info about osd usage.'
+    },
+
+    'ceph.apply_latency': {
+        info: 'Shows time for an operation to get applied to the backing filesystem.'
+    },
+
+    'ceph.commit_latency': {
+        info: 'Shows time for an operation to be applied on a OSD.'
     },
 
     // ------------------------------------------------------------------------
