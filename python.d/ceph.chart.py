@@ -16,7 +16,7 @@ update_every = 10
 priority = 60000
 retries = 60
 
-ORDER = ['general', 'pool_usage', 'pool_objects', 'osd_usage']
+ORDER = ['general', 'pool_usage', 'pool_objects', 'pool_write_iops', 'pool_read_iops', 'osd_usage']
 
 CHARTS = {
     'general': {
@@ -32,6 +32,14 @@ CHARTS = {
     },
     'pool_objects': {
         'options': [None, 'Ceph Pools', 'objects', 'pool', 'ceph.pool_objects', 'line'],
+        'lines': []
+    },
+    'pool_write_iops': {
+        'options': [None, 'Ceph Write Pool IOPS', 'KB', 'pool', 'ceph.pool_wio', 'line'],
+        'lines': []
+    },
+    'pool_read_iops': {
+        'options': [None, 'Ceph Read Pool IOPS', 'KB', 'pool', 'ceph.pool_rio', 'line'],
         'lines': []
     },
     'osd_usage': {
@@ -83,6 +91,13 @@ class Service(SimpleService):
             self.definitions['pool_objects']['lines'].append(["obj_{0}".format(pool['name']),
                                                               pool['name'],
                                                               'absolute'])
+            self.definitions['pool_write_iops']['lines'].append(['write_{0}'.format(pool['name']),
+                                                                 pool['name'],
+                                                                 'incremental'])
+            self.definitions['pool_read_iops']['lines'].append(['read_{0}'.format(pool['name']),
+                                                                pool['name'],
+                                                                'incremental'])
+
         for osd in sorted(self._get_osd_df()['nodes']):
             self.definitions['osd_usage']['lines'].append([osd['name'],
                                                            osd['name'],
@@ -99,6 +114,7 @@ class Service(SimpleService):
             for pool in self._get_df()['pools']:
                 data.update(self._get_pool_usage(pool))
                 data.update(self._get_pool_objects(pool))
+                data.update(self._get_pool_rw_io(pool))
             for osd in self._get_osd_df()['nodes']:
                 data.update(self._get_osd_usage(osd))
             return data
@@ -129,6 +145,17 @@ class Service(SimpleService):
         :return: A pool dict with pool name's key and object numbers
         """
         return {'obj_{0}'.format(pool['name']): pool['stats']['objects']}
+
+    def _get_pool_rw_io(self, pool):
+        """
+        Get read/write kb operations in a pool
+        :return: dict
+        """
+        ioctx = self.cluster.open_ioctx(pool['name'])
+        pool_status = ioctx.get_stats()
+        ioctx.close()
+        return {'read_{0}'.format(pool['name']): pool_status['num_rd_kb'],
+                'write_{0}'.format(pool['name']): pool_status['num_wr_kb']}
 
     def _get_osd_usage(self, osd):
         """

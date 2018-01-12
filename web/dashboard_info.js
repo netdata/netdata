@@ -1330,9 +1330,16 @@ netdataDashboard.context = {
         info: 'Shows info about number of objects presents on a pool.'
     },
 
+    'ceph.pool_wio': {
+        info: 'Shows info about write operations on a pool.'
+    },
+
+    'ceph.pool_rio': {
+        info: 'Shows info about read operations on a pool.'
+    },
     'ceph.osd_usage': {
-        info: 'Shows info about osd usage'
-     },
+        info: 'Shows info about osd usage.'
+    },
 
     // ------------------------------------------------------------------------
     // web_log
