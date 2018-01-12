@@ -1295,13 +1295,14 @@ send_alerta() {
 
     info=$( echo -n ${info})
 
+    # the "event" property must be unique and repetible between states to let alerta do automatic correlation using severity value
     for channel in ${channels}
     do
         content="{"
         content="$content \"environment\": \"${channel}\","
         content="$content \"service\": [\"${host}\"],"
         content="$content \"resource\": \"${host}\","
-        content="$content \"event\": \"${chart}.${name}\","
+        content="$content \"event\": \"${name}.${chart} (${family})\","
         content="$content \"severity\": \"${severity}\","
         content="$content \"value\": \"${alarm}\","
         content="$content \"text\": \"${info}\""
