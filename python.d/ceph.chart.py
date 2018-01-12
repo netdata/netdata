@@ -48,8 +48,6 @@ class Service(SimpleService):
         self.definitions = CHARTS
         self.config_file = self.configuration.get('config_file')
         self.keyring_file = self.configuration.get('keyring_file')
-        self.cluster = rados.Rados(conffile=self.config_file,
-                                   conf=dict(keyring=self.keyring_file))
 
     def check(self):
         """
@@ -63,8 +61,10 @@ class Service(SimpleService):
             self.error('config_file and/or keyring_file is not defined')
             return False
         try:
+            self.cluster = rados.Rados(conffile=self.config_file,
+                                       conf=dict(keyring=self.keyring_file))
             self.cluster.connect()
-        except Exception as error:
+        except rados.Error as error:
             self.error(error)
             return False
         self.create_definitions()
@@ -100,7 +100,8 @@ class Service(SimpleService):
             data.update(self._get_pool_objects())
             data.update(self._get_osd_usage())
             return data
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError) as error:
+            self.error(error)
             return None
 
     def _get_general(self):
