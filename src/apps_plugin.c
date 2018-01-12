@@ -2006,8 +2006,8 @@ static int compar_pid(const void *pid1, const void *pid2) {
 #endif
 
 static inline int collect_data_for_pid(pid_t pid, void *ptr) {
-    if(unlikely(pid < INIT_PID || pid > pid_max)) {
-        error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, INIT_PID, pid_max);
+    if(unlikely(pid < 0 || pid > pid_max)) {
+        error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
@@ -2090,7 +2090,7 @@ static int collect_data_for_all_processes(void) {
 #endif
 
     if(all_pids_count) {
-#ifndef __FreeBSD__
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         size_t slc = 0;
 #endif
         for(p = root_of_pids; p ; p = p->next) {
@@ -2107,7 +2107,7 @@ static int collect_data_for_all_processes(void) {
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         if(unlikely(slc != all_pids_count)) {
-            error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are more.", all_pids_count);
+            error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are %zu.", all_pids_count, slc);
             all_pids_count = slc;
         }
 
@@ -2130,7 +2130,7 @@ static int collect_data_for_all_processes(void) {
     }
 
 #ifdef __FreeBSD__
-    for (i = INIT_PID; i < procnum - INIT_PID; ++i) {
+    for (i = 0 ; i < procnum ; ++i) {
         pid_t pid = procbase[i].ki_pid;
         collect_data_for_pid(pid, &procbase[i]);
     }
@@ -2258,21 +2258,17 @@ static void apply_apps_groups_targets_inheritance(void) {
             if(unlikely(!p->sortlist && !p->children_count))
                 p->sortlist = sortlist++;
 
-            // if this process does not have any children
-            // and is not already merged
-            // and has a parent
-            // and its parent has children
-            // and the target of this process and its parent is the same, or the parent does not have a target
-            // and its parent is not init
-            // then, mark them as merged.
             if(unlikely(
-                    !p->children_count
-                    && !p->merged
-                    && p->parent
-                    && p->parent->children_count
+                    !p->children_count            // if this process does not have any children
+                    && !p->merged                 // and is not already merged
+                    && p->parent                  // and has a parent
+                    && p->parent->children_count  // and its parent has children
+                                                  // and the target of this process and its parent is the same,
+                                                  // or the parent does not have a target
                     && (p->target == p->parent->target || !p->parent->target)
-                    && p->ppid != INIT_PID
+                    && p->ppid != INIT_PID        // and its parent is not init
                 )) {
+                // mark it as merged
                 p->parent->children_count--;
                 p->merged = 1;
 
@@ -2295,6 +2291,10 @@ static void apply_apps_groups_targets_inheritance(void) {
     // init goes always to default target
     if(all_pids[INIT_PID])
         all_pids[INIT_PID]->target = apps_groups_default_target;
+
+    // pid 0 goes always to default target
+    if(all_pids[0])
+        all_pids[0]->target = apps_groups_default_target;
 
     // give a default target on all top level processes
     if(unlikely(debug)) loops++;
