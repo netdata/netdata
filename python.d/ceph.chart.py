@@ -96,9 +96,11 @@ class Service(SimpleService):
         try:
             data = {}
             data.update(self._get_general())
-            data.update(self._get_pool_usage())
-            data.update(self._get_pool_objects())
-            data.update(self._get_osd_usage())
+            for pool in self._get_df()['pools']:
+                data.update(self._get_pool_usage(pool))
+                data.update(self._get_pool_objects(pool))
+            for osd in self._get_osd_df()['nodes']:
+                data.update(self._get_osd_usage(osd))
             return data
         except (ValueError, AttributeError) as error:
             self.error(error)
@@ -114,35 +116,26 @@ class Service(SimpleService):
                 'general_available': info['total_avail_bytes']
                 }
 
-    def _get_pool_usage(self):
+    def _get_pool_usage(self, pool):
         """
         Process raw data into pool usage dict information
         :return: A pool dict with pool name's key and usage bytes' value
         """
-        pool_usage = {}
-        for df in self._get_df()['pools']:
-            pool_usage[df['name']] = df['stats']['kb_used']
-        return pool_usage
+        return {pool['name']: pool['stats']['kb_used']}
 
-    def _get_pool_objects(self):
+    def _get_pool_objects(self, pool):
         """
         Process raw data into pool usage dict information
         :return: A pool dict with pool name's key and object numbers
         """
-        pool_objects = {}
-        for df in self._get_df()['pools']:
-            pool_objects["obj_{0}".format(df['name'])] = df['stats']['objects']
-        return pool_objects
+        return {'obj_{0}'.format(pool['name']): pool['stats']['objects']}
 
-    def _get_osd_usage(self):
+    def _get_osd_usage(self, osd):
         """
         Process raw data into osd dict information to get osd usage
         :return: A osd dict with osd name's key and usage bytes' value
         """
-        osd_usage = {}
-        for osd in self._get_osd_df()['nodes']:
-            osd_usage[osd['name']] = float(osd['kb_used'])
-        return osd_usage
+        return {osd['name']: float(osd['kb_used'])}
 
     def _get_df(self):
         """
@@ -163,3 +156,4 @@ class Service(SimpleService):
             'prefix': 'osd df',
             'format': 'json'
         }), '')[1])
+
