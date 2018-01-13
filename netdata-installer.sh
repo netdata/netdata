@@ -63,9 +63,6 @@ umask 002
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
 
-processors=$(grep -c ^processor /proc/cpuinfo)
-[ $(( processors )) -lt 1 ] && processors=1
-
 # you can set CFLAGS before running installer
 CFLAGS="${CFLAGS--O2}"
 [ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
@@ -495,7 +492,7 @@ progress "Cleanup compilation directory"
 # -----------------------------------------------------------------------------
 progress "Compile netdata"
 
-run make -j${processors} || exit 1
+run make -j${SYSTEM_CPUS} || exit 1
 
 
 # -----------------------------------------------------------------------------
