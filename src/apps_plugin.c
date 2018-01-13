@@ -715,19 +715,35 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                 p->log_thrown |= log;
                 switch(log) {
                     case PID_LOG_IO:
+                        #ifdef __FreeBSD__
+                        error("Cannot fetch process %d I/O info (command '%s')", p->pid, p->comm);
+                        #else
                         error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        #endif
                         break;
 
                     case PID_LOG_STATM:
+                        #ifdef __FreeBSD__
+                        error("Cannot fetch process %d memory info (command '%s')", p->pid, p->comm);
+                        #else
                         error("Cannot process %s/proc/%d/statm (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        #endif
                         break;
 
                     case PID_LOG_CMDLINE:
+                        #ifdef __FreeBSD__
+                        error("Cannot fetch process %d command line (command '%s')", p->pid, p->comm);
+                        #else
                         error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        #endif
                         break;
 
                     case PID_LOG_FDS:
+                        #ifdef __FreeBSD__
+                        error("Cannot fetch process %d files (command '%s')", p->pid, p->comm);
+                        #else
                         error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        #endif
                         break;
 
                     case PID_LOG_STAT:
@@ -955,7 +971,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     pid_incremental_rate(stat, p->utime,   (kernel_uint_t)proc_info->ki_rusage.ru_utime.tv_sec * 100 + proc_info->ki_rusage.ru_utime.tv_usec / 10000);
     pid_incremental_rate(stat, p->stime,   (kernel_uint_t)proc_info->ki_rusage.ru_stime.tv_sec * 100 + proc_info->ki_rusage.ru_stime.tv_usec / 10000);
     pid_incremental_rate(stat, p->cutime,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_utime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_utime.tv_usec / 10000);
-    pid_incremental_rate(stat, p->cstime,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_stime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_utime.tv_usec / 10000);
+    pid_incremental_rate(stat, p->cstime,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_stime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_stime.tv_usec / 10000);
 
     p->num_threads      = proc_info->ki_numthreads;
 
@@ -2006,8 +2022,8 @@ static int compar_pid(const void *pid1, const void *pid2) {
 #endif
 
 static inline int collect_data_for_pid(pid_t pid, void *ptr) {
-    if(unlikely(pid < INIT_PID || pid > pid_max)) {
-        error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, INIT_PID, pid_max);
+    if(unlikely(pid < 0 || pid > pid_max)) {
+        error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
@@ -2069,28 +2085,46 @@ static int collect_data_for_all_processes(void) {
 
 #ifdef __FreeBSD__
     int i, procnum;
-    size_t procbase_size;
-    static struct kinfo_proc *procbase;
 
-    int mib[3];
+    static size_t procbase_size = 0;
+    static struct kinfo_proc *procbase = NULL;
 
-    mib[0] = CTL_KERN;
-    mib[1] = KERN_PROC;
-    mib[2] = KERN_PROC_PROC;
-    if (unlikely(sysctl(mib, 3, NULL, &procbase_size, NULL, 0))) {
+    size_t new_procbase_size;
+
+    int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
+    if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
         error("sysctl error: Can't get processes data size");
         return 0;
     }
-    procbase = reallocz(procbase, procbase_size);
-    if (unlikely(sysctl(mib, 3, procbase, &procbase_size, NULL, 0))) {
+
+    // give it some air for processes that may be started
+    // during this little time.
+    new_procbase_size += 100 * sizeof(struct kinfo_proc);
+
+    // increase the buffer if needed
+    if(new_procbase_size > procbase_size) {
+        procbase_size = new_procbase_size;
+        procbase = reallocz(procbase, procbase_size);
+    }
+
+    // sysctl() gets from new_procbase_size the buffer size
+    // and also returns to it the amount of data filled in
+    new_procbase_size = procbase_size;
+
+    // get the processes from the system
+    if (unlikely(sysctl(mib, 3, procbase, &new_procbase_size, NULL, 0))) {
         error("sysctl error: Can't get processes data");
         return 0;
     }
-    procnum = procbase_size / sizeof(struct kinfo_proc);
+
+    // based on the amount of data filled in
+    // calculate the number of processes we got
+    procnum = new_procbase_size / sizeof(struct kinfo_proc);
+
 #endif
 
     if(all_pids_count) {
-#ifndef __FreeBSD__
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         size_t slc = 0;
 #endif
         for(p = root_of_pids; p ; p = p->next) {
@@ -2107,7 +2141,7 @@ static int collect_data_for_all_processes(void) {
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         if(unlikely(slc != all_pids_count)) {
-            error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are more.", all_pids_count);
+            error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are %zu.", all_pids_count, slc);
             all_pids_count = slc;
         }
 
@@ -2130,7 +2164,7 @@ static int collect_data_for_all_processes(void) {
     }
 
 #ifdef __FreeBSD__
-    for (i = INIT_PID; i < procnum - INIT_PID; ++i) {
+    for (i = 0 ; i < procnum ; ++i) {
         pid_t pid = procbase[i].ki_pid;
         collect_data_for_pid(pid, &procbase[i]);
     }
@@ -2258,21 +2292,17 @@ static void apply_apps_groups_targets_inheritance(void) {
             if(unlikely(!p->sortlist && !p->children_count))
                 p->sortlist = sortlist++;
 
-            // if this process does not have any children
-            // and is not already merged
-            // and has a parent
-            // and its parent has children
-            // and the target of this process and its parent is the same, or the parent does not have a target
-            // and its parent is not init
-            // then, mark them as merged.
             if(unlikely(
-                    !p->children_count
-                    && !p->merged
-                    && p->parent
-                    && p->parent->children_count
+                    !p->children_count            // if this process does not have any children
+                    && !p->merged                 // and is not already merged
+                    && p->parent                  // and has a parent
+                    && p->parent->children_count  // and its parent has children
+                                                  // and the target of this process and its parent is the same,
+                                                  // or the parent does not have a target
                     && (p->target == p->parent->target || !p->parent->target)
-                    && p->ppid != INIT_PID
+                    && p->ppid != INIT_PID        // and its parent is not init
                 )) {
+                // mark it as merged
                 p->parent->children_count--;
                 p->merged = 1;
 
@@ -2295,6 +2325,10 @@ static void apply_apps_groups_targets_inheritance(void) {
     // init goes always to default target
     if(all_pids[INIT_PID])
         all_pids[INIT_PID]->target = apps_groups_default_target;
+
+    // pid 0 goes always to default target
+    if(all_pids[0])
+        all_pids[0]->target = apps_groups_default_target;
 
     // give a default target on all top level processes
     if(unlikely(debug)) loops++;

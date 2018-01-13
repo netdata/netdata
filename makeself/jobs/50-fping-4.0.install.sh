@@ -19,7 +19,7 @@ install:
 EOF
 
 run make clean
-run make -j${PROCESSORS}
+run make -j${SYSTEM_CPUS}
 run make install
 
 if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]

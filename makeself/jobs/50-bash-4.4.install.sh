@@ -34,7 +34,7 @@ run ./configure \
 		
 
 run make clean
-run make -j${PROCESSORS}
+run make -j${SYSTEM_CPUS}
 
 cat >examples/loadables/Makefile <<EOF
 all:
