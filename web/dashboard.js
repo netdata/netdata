@@ -2324,16 +2324,17 @@ var NETDATA = window.NETDATA || {};
             entries.forEach(function(entry) {
                 var state = NETDATA.chartState(entry.target);
 
+                var idx;
                 if(entry.intersectionRatio > 0) {
-                    var idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
-                    if(idx == -1)
+                    idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
+                    if(idx === -1)
                         NETDATA.intersectionObserver.visible_targets.push(state);
                     else if(state.__visibilityRatio === 0)
                         state.log("was not visible until now, but was already in visible_targets");
                 }
                 else {
-                    var idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
-                    if(idx > -1)
+                    idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
+                    if(idx !== -1)
                         NETDATA.intersectionObserver.visible_targets.splice(idx, 1);
                     else if(state.__visibilityRatio > 0)
                         state.log("was visible, but not found in visible_targets");
