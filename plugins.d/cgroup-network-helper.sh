@@ -70,12 +70,6 @@ debug() {
     fatal "BASH version 4 or later is required (this is ${BASH_VERSION})."
 
 # -----------------------------------------------------------------------------
-# defaults to allow running this script by hand
-
-[ -z "${NETDATA_PLUGINS_DIR}"  ] && NETDATA_PLUGINS_DIR="$(dirname "${0}")"
-[ -z "${NETDATA_CONFIG_DIR}"   ] && NETDATA_CONFIG_DIR="$(dirname "${0}")/../../../../etc/netdata"
-
-# -----------------------------------------------------------------------------
 # parse the arguments
 
 pid=
