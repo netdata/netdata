@@ -2069,24 +2069,42 @@ static int collect_data_for_all_processes(void) {
 
 #ifdef __FreeBSD__
     int i, procnum;
-    size_t procbase_size;
-    static struct kinfo_proc *procbase;
 
-    int mib[3];
+    static size_t procbase_size = 0;
+    static struct kinfo_proc *procbase = NULL;
 
-    mib[0] = CTL_KERN;
-    mib[1] = KERN_PROC;
-    mib[2] = KERN_PROC_PROC;
-    if (unlikely(sysctl(mib, 3, NULL, &procbase_size, NULL, 0))) {
+    size_t new_procbase_size;
+
+    int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
+    if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
         error("sysctl error: Can't get processes data size");
         return 0;
     }
-    procbase = reallocz(procbase, procbase_size);
-    if (unlikely(sysctl(mib, 3, procbase, &procbase_size, NULL, 0))) {
+
+    // give it some air for processes that may be started
+    // during this little time.
+    new_procbase_size += 100 * sizeof(struct kinfo_proc);
+
+    // increase the buffer if needed
+    if(new_procbase_size > procbase_size) {
+        procbase_size = new_procbase_size;
+        procbase = reallocz(procbase, procbase_size);
+    }
+
+    // sysctl() gets from new_procbase_size the buffer size
+    // and also returns to it the amount of data filled in
+    new_procbase_size = procbase_size;
+
+    // get the processes from the system
+    if (unlikely(sysctl(mib, 3, procbase, &new_procbase_size, NULL, 0))) {
         error("sysctl error: Can't get processes data");
         return 0;
     }
-    procnum = procbase_size / sizeof(struct kinfo_proc);
+
+    // based on the amount of data filled in
+    // calculate the number of processes we got
+    procnum = new_procbase_size / sizeof(struct kinfo_proc);
+
 #endif
 
     if(all_pids_count) {
