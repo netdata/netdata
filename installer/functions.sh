@@ -161,6 +161,22 @@ pidof() {
 
 # -----------------------------------------------------------------------------
 
+export SYSTEM_CPUS=1
+portable_find_processors() {
+    if [ -f "/proc/cpuinfo" ]
+    then
+        # linux
+        SYSTEM_CPUS=$(grep -c ^processor /proc/cpuinfo)
+    else
+        # freebsd
+        SYSTEM_CPUS=$(sysctl hw.ncpu 2>/dev/null | grep ^hw.ncpu | cut -d ' ' -f 2)
+    fi
+    [ -z "${SYSTEM_CPUS}" -o $(( SYSTEM_CPUS )) -lt 1 ] && SYSTEM_CPUS=1
+}
+portable_find_processors
+
+# -----------------------------------------------------------------------------
+
 run_ok() {
     printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
 }
