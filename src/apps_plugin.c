@@ -715,19 +715,35 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                 p->log_thrown |= log;
                 switch(log) {
                     case PID_LOG_IO:
+#ifdef __FreeBSD__
+                        error("Cannot fetch process %d I/O info (command '%s')", p->pid, p->comm);
+#else
                         error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+#endif
                         break;
 
                     case PID_LOG_STATM:
+#ifdef __FreeBSD__
+                        error("Cannot fetch process %d memory info (command '%s')", p->pid, p->comm);
+#else
                         error("Cannot process %s/proc/%d/statm (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+#endif
                         break;
 
                     case PID_LOG_CMDLINE:
+#ifdef __FreeBSD__
+                        error("Cannot fetch process %d command line (command '%s')", p->pid, p->comm);
+#else
                         error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+#endif
                         break;
 
                     case PID_LOG_FDS:
+#ifdef __FreeBSD__
+                        error("Cannot fetch process %d files (command '%s')", p->pid, p->comm);
+#else
                         error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+#endif
                         break;
 
                     case PID_LOG_STAT:
