@@ -9,17 +9,11 @@
 #endif
 
 char *host_prefix = "";
-char *pluginsdir = "";
-char *configdir = "";
 
 char environment_variable2[FILENAME_MAX + 50] = "";
-char environment_variable3[FILENAME_MAX + 50] = "";
-char environment_variable4[FILENAME_MAX + 50] = "";
 char *environment[] = {
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
         environment_variable2,
-        environment_variable3,
-        environment_variable4,
         NULL
 };
 
@@ -452,9 +446,9 @@ void call_the_helper(pid_t pid, const char *cgroup) {
 
     char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
     if(cgroup)
-        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s/cgroup-network-helper.sh --cgroup '%s'", pluginsdir, cgroup);
+        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --cgroup '%s'", cgroup);
     else
-        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec %s/cgroup-network-helper.sh --pid %d", pluginsdir, pid);
+        snprintfz(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --pid %d", pid);
 
     info("running: %s", buffer);
 
@@ -484,16 +478,47 @@ void call_the_helper(pid_t pid, const char *cgroup) {
         error("cannot execute cgroup-network helper script: %s", buffer);
 }
 
+int is_valid_path_symbol(char c) {
+    switch(c) {
+        case '/':   // path separators
+        case '\\':  // needed for virsh domains \x2d1\x2dname
+        case ' ':   // space
+        case '-':   // hyphen
+        case '_':   // underscore
+        case '.':   // dot
+        case ',':   // comma
+            return 1;
+
+        default:
+            return 0;
+    }
+}
+
+// we will pass this path a shell script running as root
+// so, we need to make sure the path will be valid
+// and will not include anything that could allow
+// the caller use shell expansion for gaining escalated
+// privileges.
 int verify_path(const char *path) {
     struct stat sb;
 
     char c;
     const char *s = path;
     while((c = *s++)) {
-        if(c == '$' || c == '`' || c == '<' || c == '>') {
+        if(!( isalnum(c) || is_valid_path_symbol(c) )) {
             error("invalid character in path '%s'", path);
             return -1;
         }
+    }
+
+    if(strstr(path, "\\") && !strstr(path, "\\x")) {
+        error("invalid escape sequence in path '%s'", path);
+        return 1;
+    }
+
+    if(strstr(path, "/../")) {
+        error("invalid parent path sequence detected in '%s'", path);
+        return 1;
     }
 
     if(path[0] != '/') {
@@ -572,35 +597,13 @@ int main(int argc, char **argv) {
         host_prefix = "";
 
     if(host_prefix[0] != '\0' && verify_path(host_prefix) == -1)
-        fatal("cannot find path NETDATA_HOST_PREFIX '%s'", host_prefix);
-
-    // ------------------------------------------------------------------------
-    // make sure NETDATA_CONFIG_DIR is safe
-
-    configdir = getenv("NETDATA_CONFIG_DIR");
-    if(!configdir || !*configdir) {
-        configdir = "";
-    }
-    else if(verify_path(configdir) == -1)
-        fatal("cannot find path NETDATA_CONFIG_DIR '%s'", configdir);
-
-    // ------------------------------------------------------------------------
-    // make sure NETDATA_PLUGINS_DIR is safe
-
-    pluginsdir = getenv("NETDATA_PLUGINS_DIR");
-    if(!pluginsdir || !*pluginsdir) {
-        char *me = strdupz(argv[0]);
-        pluginsdir = dirname(me);
-    }
-    else if(verify_path(pluginsdir) == -1)
-        fatal("cannot find path NETDATA_PLUGINS_DIR '%s'", pluginsdir);
+        fatal("invalid NETDATA_HOST_PREFIX '%s'", host_prefix);
 
     // ------------------------------------------------------------------------
     // build a safe environment for our script
 
+    // the first environment variable is a fixed PATH=
     snprintfz(environment_variable2, sizeof(environment_variable2) - 1, "NETDATA_HOST_PREFIX=%s", host_prefix);
-    snprintfz(environment_variable3, sizeof(environment_variable3) - 1, "NETDATA_PLUGINS_DIR=%s", pluginsdir);
-    snprintfz(environment_variable4, sizeof(environment_variable4) - 1, "NETDATA_CONFIG_DIR=%s", configdir);
 
     // ------------------------------------------------------------------------
 
@@ -626,7 +629,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[1], "--cgroup")) {
         char *cgroup = argv[2];
         if(verify_path(cgroup) == -1)
-            fatal("cgroup '%s' does not exist.", cgroup);
+            fatal("cgroup '%s' does not exist or is not valid.", cgroup);
 
         pid = read_pid_from_cgroup(cgroup);
         call_the_helper(pid, cgroup);
