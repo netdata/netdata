@@ -2327,8 +2327,12 @@ var NETDATA = window.NETDATA || {};
                 var idx;
                 if(entry.intersectionRatio > 0) {
                     idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
-                    if(idx === -1)
-                        NETDATA.intersectionObserver.visible_targets.push(state);
+                    if(idx === -1) {
+                        if(NETDATA.scrollUp === true)
+                            NETDATA.intersectionObserver.visible_targets.push(state);
+                        else
+                            NETDATA.intersectionObserver.visible_targets.unshift(state);
+                    }
                     else if(state.__visibilityRatio === 0)
                         state.log("was not visible until now, but was already in visible_targets");
                 }
