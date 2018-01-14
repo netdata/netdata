@@ -2000,17 +2000,22 @@ var NETDATA = window.NETDATA || {};
                 'GB': 1024 * 1024
             },
             'MB': {
+                'B': 1 / (1024 * 1024),
                 'KB': 1 / 1024,
                 'MB': 1,
                 'GB': 1024,
                 'TB': 1024 * 1024
             },
             'GB': {
+                'KB': 1 / (1024 * 1024),
                 'MB': 1 / 1024,
                 'GB': 1,
                 'TB': 1024
-            }
+            },
             /*
+            'milliseconds': {
+                'seconds': 1000
+            },
             'seconds': {
                 'milliseconds': 0.001,
                 'seconds': 1,
@@ -2024,57 +2029,104 @@ var NETDATA = window.NETDATA || {};
         convertibleUnits: {
             'Celsius': {
                 'Fahrenheit': {
-                    check: function() { return NETDATA.options.current.temperature === 'fahrenheit'; },
+                    check: function(max) { void(max); return NETDATA.options.current.temperature === 'fahrenheit'; },
                     convert: function(value) { return value * 9 / 5 + 32; }
                 }
             },
             'celsius': {
                 'fahrenheit': {
-                    check: function() { return NETDATA.options.current.temperature === 'fahrenheit'; },
+                    check: function(max) { void(max); return NETDATA.options.current.temperature === 'fahrenheit'; },
                     convert: function(value) { return value * 9 / 5 + 32; }
                 }
             },
             'seconds': {
                 'time': {
-                    check: function () { return NETDATA.options.current.seconds_as_time; },
-                    convert: function (seconds) {
-                        seconds = Math.abs(seconds);
+                    check: function (max) { void(max); return NETDATA.options.current.seconds_as_time; },
+                    convert: function(seconds) { return NETDATA.unitsConversion.seconds2time(seconds); }
+                }
+            },
+            'milliseconds': {
+                'milliseconds': {
+                    check: function (max) { return NETDATA.options.current.seconds_as_time && max < 1000; },
+                    convert: function(milliseconds) {
+                        tms = Math.round(milliseconds * 10);
+                        milliseconds = Math.floor(tms / 10);
 
-                        var days = Math.floor(seconds / 86400);
-                        seconds -= days * 86400;
+                        tms -= milliseconds * 10;
 
-                        var hours = Math.floor(seconds / 3600);
-                        seconds -= hours * 3600;
+                        return (milliseconds).toString() + '.' + tms.toString();
+                    }
+                },
+                'seconds': {
+                    check: function (max) { return NETDATA.options.current.seconds_as_time && max > 1000 && max < 60000; },
+                    convert: function(milliseconds) {
+                        milliseconds = Math.round(milliseconds);
 
-                        var minutes = Math.floor(seconds / 60);
-                        seconds -= minutes * 60;
+                        var seconds = Math.floor(milliseconds / 1000);
+                        milliseconds -= seconds * 1000;
 
-                        seconds = Math.round(seconds);
+                        milliseconds = Math.round(milliseconds / 10);
 
-                        var ms_txt = '';
-                        /*
-                        var ms = seconds - Math.floor(seconds);
-                        seconds -= ms;
-                        ms = Math.round(ms * 1000);
+                        return seconds.toString() + '.'
+                            + NETDATA.zeropad(milliseconds);
+                    }
+                },
+                'M:SS.ms': {
+                    check: function (max) { return NETDATA.options.current.seconds_as_time && max >= 60000; },
+                    convert: function(milliseconds) {
+                        milliseconds = Math.round(milliseconds);
 
-                        if(ms > 1) {
-                            if(ms < 10)
-                                ms_txt = '.00' + ms.toString();
-                            else if(ms < 100)
-                                ms_txt = '.0' + ms.toString();
-                            else
-                                ms_txt = '.' + ms.toString();
-                        }
-                        */
+                        var minutes = Math.floor(milliseconds / 60000);
+                        milliseconds -= minutes * 60000;
 
-                        return ((days > 0)?days.toString() + 'd:':'').toString()
-                            + NETDATA.zeropad(hours) + ':'
-                            + NETDATA.zeropad(minutes) + ':'
-                            + NETDATA.zeropad(seconds)
-                            + ms_txt;
+                        var seconds = Math.floor(milliseconds / 1000);
+                        milliseconds -= seconds * 1000;
+
+                        milliseconds = Math.round(milliseconds / 10);
+
+                        return minutes.toString() + ':'
+                            + NETDATA.zeropad(seconds) + '.'
+                            + NETDATA.zeropad(milliseconds);
                     }
                 }
             }
+        },
+
+        seconds2time: function(seconds) {
+            seconds = Math.abs(seconds);
+
+            var days = Math.floor(seconds / 86400);
+            seconds -= days * 86400;
+
+            var hours = Math.floor(seconds / 3600);
+            seconds -= hours * 3600;
+
+            var minutes = Math.floor(seconds / 60);
+            seconds -= minutes * 60;
+
+            seconds = Math.round(seconds);
+
+            var ms_txt = '';
+            /*
+            var ms = seconds - Math.floor(seconds);
+            seconds -= ms;
+            ms = Math.round(ms * 1000);
+
+            if(ms > 1) {
+                if(ms < 10)
+                    ms_txt = '.00' + ms.toString();
+                else if(ms < 100)
+                    ms_txt = '.0' + ms.toString();
+                else
+                    ms_txt = '.' + ms.toString();
+            }
+            */
+
+            return ((days > 0)?days.toString() + 'd:':'').toString()
+                + NETDATA.zeropad(hours) + ':'
+                + NETDATA.zeropad(minutes) + ':'
+                + NETDATA.zeropad(seconds)
+                + ms_txt;
         },
 
         // get a function that converts the units
@@ -2223,7 +2275,7 @@ var NETDATA = window.NETDATA || {};
                 if(desired_units === 'auto') {
                     for(x in this.convertibleUnits[units]) {
                         if (this.convertibleUnits[units].hasOwnProperty(x)) {
-                            if (this.convertibleUnits[units][x].check()) {
+                            if (this.convertibleUnits[units][x].check(max)) {
                                 //console.log('DEBUG: ' + uuid.toString() + ' converting ' + units.toString() + ' to: ' + x.toString());
                                 switch_units_callback(x);
                                 return this.convertibleUnits[units][x].convert;
