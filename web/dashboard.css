@@ -225,12 +225,18 @@ body {
     font-size: 10px;
     font-weight: normal;
     margin-top: 0px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .netdata-legend-title-time {
     font-size: 11px;
     font-weight: bold;
     margin-top: 0px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .netdata-legend-title-units {
@@ -241,6 +247,9 @@ body {
     vertical-align: top;
     font-weight: normal;
     margin-top: 0px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .netdata-legend-series {
