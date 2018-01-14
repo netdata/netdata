@@ -2066,7 +2066,7 @@ var NETDATA = window.NETDATA || {};
                     }
                 },
                 'seconds': {
-                    check: function (max) { return NETDATA.options.current.seconds_as_time && max > 1000 && max < 60000; },
+                    check: function (max) { return NETDATA.options.current.seconds_as_time && max >= 1000 && max < 60000; },
                     convert: function(milliseconds) {
                         milliseconds = Math.round(milliseconds);
 
