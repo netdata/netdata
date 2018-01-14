@@ -287,7 +287,7 @@ var NETDATA = window.NETDATA || {};
 
         pause: false,                   // when enabled we don't auto-refresh the charts
 
-        targets: null,                  // an array of all the state objects that are
+        targets: [],                    // an array of all the state objects that are
                                         // currently active (independently of their
                                         // viewport visibility)
 
@@ -374,7 +374,7 @@ var NETDATA = window.NETDATA || {};
 
             pan_and_zoom_data_padding: true, // fetch more data for the master chart when panning or zooming
 
-            update_only_visible: true,  // enable or disable visibility management
+            update_only_visible: true,  // enable or disable visibility management / used for printing
 
             parallel_refresher: (isSlowDevice() === false), // enable parallel refresh of charts
 
@@ -759,34 +759,26 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.onscroll_updater_timeout_id = undefined;
     NETDATA.onscroll_updater = function() {
-        if(NETDATA.options.targets === null) return;
-
-        //var start = Date.now();
-
-        // console.log('onscroll_updater() begin');
-
         NETDATA.globalSelectionSync.stop();
+
+        if(NETDATA.options.abort_ajax_on_scroll === true)
+            NETDATA.abort_all_refreshes();
 
         // when the user scrolls he sees that we have
         // hidden all the not-visible charts
         // using this little function we try to switch
         // the charts back to visible quickly
 
-        if(NETDATA.options.abort_ajax_on_scroll === true)
-            NETDATA.abort_all_refreshes();
+        if(NETDATA.intersectionObserver.enabled() === false) {
+            if (NETDATA.options.current.parallel_refresher === false) {
+                var targets = NETDATA.options.targets;
+                var len = targets.length;
 
-        if(NETDATA.options.current.parallel_refresher === false) {
-            var targets = NETDATA.options.targets;
-            var len = targets.length;
-
-            while (len--)
-               if(targets[len].running === false)
-                   targets[len].isVisible();
+                while (len--)
+                    if (targets[len].running === false)
+                        targets[len].isVisible();
+            }
         }
-
-        //var end = Date.now();
-        //var dt = end - start;
-        // console.log('count = ' + targets.length + ', average = ' + Math.round(dt / targets.length).toString() + ', dt = ' + dt);
 
         NETDATA.onscroll_end_delay();
     };
@@ -2207,10 +2199,11 @@ var NETDATA = window.NETDATA || {};
             this.last_t = 0;
 
             // find all slaves
+            var targets = NETDATA.intersectionObserver.targets();
             this.slaves = [];
-            var len = NETDATA.options.targets.length;
+            var len = targets.length;
             while(len--) {
-                var st = NETDATA.options.targets[len];
+                var st = targets[len];
                 if (this.state !== st && st.globalSelectionSyncIsEligible() === true)
                     this.slaves.push(st);
             }
@@ -2284,6 +2277,114 @@ var NETDATA = window.NETDATA || {};
             }
         }
     };
+
+    NETDATA.intersectionObserver = {
+        observer: null,
+        visible_targets: [],
+
+        options: {
+            root: null,
+            rootMargin: "0px",
+            threshold: null
+        },
+
+        enabled: function() {
+            return this.observer !== null;
+        },
+
+        globalReset: function() {
+            if(this.observer !== null) {
+                this.visible_targets = [];
+                this.observer.disconnect();
+                this.init();
+            }
+        },
+
+        targets: function() {
+            if(this.enabled() === true && this.visible_targets.length > 0)
+                return this.visible_targets;
+            else
+                return NETDATA.options.targets;
+        },
+
+        switchChartVisibility: function() {
+            var old = this.__visibilityRatioOld;
+
+            if(old !== this.__visibilityRatio) {
+                if (old === 0 && this.__visibilityRatio > 0)
+                    this.unhideChart();
+                else if (old > 0 && this.__visibilityRatio === 0)
+                    this.hideChart();
+
+                this.__visibilityRatioOld = this.__visibilityRatio;
+            }
+        },
+
+        handler: function(entries, observer) {
+            entries.forEach(function(entry) {
+                var state = NETDATA.chartState(entry.target);
+
+                var idx;
+                if(entry.intersectionRatio > 0) {
+                    idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
+                    if(idx === -1) {
+                        if(NETDATA.scrollUp === true)
+                            NETDATA.intersectionObserver.visible_targets.push(state);
+                        else
+                            NETDATA.intersectionObserver.visible_targets.unshift(state);
+                    }
+                    else if(state.__visibilityRatio === 0)
+                        state.log("was not visible until now, but was already in visible_targets");
+                }
+                else {
+                    idx = NETDATA.intersectionObserver.visible_targets.indexOf(state);
+                    if(idx !== -1)
+                        NETDATA.intersectionObserver.visible_targets.splice(idx, 1);
+                    else if(state.__visibilityRatio > 0)
+                        state.log("was visible, but not found in visible_targets");
+                }
+
+                state.__visibilityRatio = entry.intersectionRatio;
+
+                if(NETDATA.options.current.async_on_scroll === false) {
+                    if(window.requestIdleCallback)
+                        window.requestIdleCallback(function() {
+                            NETDATA.intersectionObserver.switchChartVisibility.call(state);
+                        }, {timeout: 100});
+                    else
+                        NETDATA.intersectionObserver.switchChartVisibility.call(state);
+                }
+            });
+        },
+
+        observe: function(state) {
+            if(this.enabled() === true) {
+                state.__visibilityRatioOld = 0;
+                state.__visibilityRatio = 0;
+                this.observer.observe(state.element);
+
+                state.isVisible = function() {
+                    if(NETDATA.options.current.update_only_visible === false)
+                        return true;
+
+                    NETDATA.intersectionObserver.switchChartVisibility.call(this);
+
+                    return this.__visibilityRatio > 0;
+                }
+            }
+        },
+
+        init: function() {
+            try {
+                this.observer = new IntersectionObserver(this.handler, this.options);
+            }
+            catch(e) {
+                console.log("IntersectionObserver is not supported on this browser");
+                this.observer = null;
+            }
+        }
+    };
+    NETDATA.intersectionObserver.init();
 
     // ----------------------------------------------------------------------------------------------------------------
     // Our state object, where all per-chart values are stored
@@ -2715,86 +2816,86 @@ var NETDATA = window.NETDATA || {};
         };
 
         // hide the chart, when it is not visible - called from isVisible()
-        var hideChart = function() {
+        this.hideChart = function() {
             // hide it, if it is not already hidden
             if(isHidden() === true) return;
 
-            if(that.chart_created === true) {
+            if(this.chart_created === true) {
                 if(NETDATA.options.current.show_help === true) {
-                    if(that.element_legend_childs.toolbox !== null) {
-                        if(that.debug === true)
-                            that.log('hideChart(): hidding legend popovers');
+                    if(this.element_legend_childs.toolbox !== null) {
+                        if(this.debug === true)
+                            this.log('hideChart(): hidding legend popovers');
 
-                        $(that.element_legend_childs.toolbox_left).popover('hide');
-                        $(that.element_legend_childs.toolbox_reset).popover('hide');
-                        $(that.element_legend_childs.toolbox_right).popover('hide');
-                        $(that.element_legend_childs.toolbox_zoomin).popover('hide');
-                        $(that.element_legend_childs.toolbox_zoomout).popover('hide');
+                        $(this.element_legend_childs.toolbox_left).popover('hide');
+                        $(this.element_legend_childs.toolbox_reset).popover('hide');
+                        $(this.element_legend_childs.toolbox_right).popover('hide');
+                        $(this.element_legend_childs.toolbox_zoomin).popover('hide');
+                        $(this.element_legend_childs.toolbox_zoomout).popover('hide');
                     }
 
-                    if(that.element_legend_childs.resize_handler !== null)
-                        $(that.element_legend_childs.resize_handler).popover('hide');
+                    if(this.element_legend_childs.resize_handler !== null)
+                        $(this.element_legend_childs.resize_handler).popover('hide');
 
-                    if(that.element_legend_childs.content !== null)
-                        $(that.element_legend_childs.content).popover('hide');
+                    if(this.element_legend_childs.content !== null)
+                        $(this.element_legend_childs.content).popover('hide');
                 }
 
                 if(NETDATA.options.current.destroy_on_hide === true) {
-                    if(that.debug === true)
-                        that.log('hideChart(): initializing chart');
+                    if(this.debug === true)
+                        this.log('hideChart(): initializing chart');
 
                     // we should destroy it
                     init('force');
                 }
                 else {
-                    if(that.debug === true)
-                        that.log('hideChart(): hiding chart');
+                    if(this.debug === true)
+                        this.log('hideChart(): hiding chart');
 
                     showRendering();
-                    that.element_chart.style.display = 'none';
-                    that.element.style.willChange = 'auto';
-                    if(that.element_legend !== null) that.element_legend.style.display = 'none';
-                    if(that.element_legend_childs.toolbox !== null) that.element_legend_childs.toolbox.style.display = 'none';
-                    if(that.element_legend_childs.resize_handler !== null) that.element_legend_childs.resize_handler.style.display = 'none';
+                    this.element_chart.style.display = 'none';
+                    this.element.style.willChange = 'auto';
+                    if(this.element_legend !== null) this.element_legend.style.display = 'none';
+                    if(this.element_legend_childs.toolbox !== null) this.element_legend_childs.toolbox.style.display = 'none';
+                    if(this.element_legend_childs.resize_handler !== null) this.element_legend_childs.resize_handler.style.display = 'none';
 
-                    that.tm.last_hidden = Date.now();
+                    this.tm.last_hidden = Date.now();
 
                     // de-allocate data
                     // This works, but I not sure there are no corner cases somewhere
                     // so it is commented - if the user has memory issues he can
                     // set Destroy on Hide for all charts
-                    // that.data = null;
+                    // this.data = null;
                 }
             }
 
-            that.tmp.___chartIsHidden___ = true;
+            this.tmp.___chartIsHidden___ = true;
         };
 
         // unhide the chart, when it is visible - called from isVisible()
-        var unhideChart = function() {
+        this.unhideChart = function() {
             if(isHidden() === false) return;
 
-            that.tmp.___chartIsHidden___ = undefined;
-            that.updates_since_last_unhide = 0;
+            this.tmp.___chartIsHidden___ = undefined;
+            this.updates_since_last_unhide = 0;
 
-            if(that.chart_created === false) {
-                if(that.debug === true)
-                    that.log('unhideChart(): initializing chart');
+            if(this.chart_created === false) {
+                if(this.debug === true)
+                    this.log('unhideChart(): initializing chart');
 
                 // we need to re-initialize it, to show our background
                 // logo in bootstrap tabs, until the chart loads
                 init('force');
             }
             else {
-                if(that.debug === true)
-                    that.log('unhideChart(): unhiding chart');
+                if(this.debug === true)
+                    this.log('unhideChart(): unhiding chart');
 
-                that.element.style.willChange = 'transform';
-                that.tm.last_unhidden = Date.now();
-                that.element_chart.style.display = '';
-                if(that.element_legend !== null) that.element_legend.style.display = '';
-                if(that.element_legend_childs.toolbox !== null) that.element_legend_childs.toolbox.style.display = '';
-                if(that.element_legend_childs.resize_handler !== null) that.element_legend_childs.resize_handler.style.display = '';
+                this.element.style.willChange = 'transform';
+                this.tm.last_unhidden = Date.now();
+                this.element_chart.style.display = '';
+                if(this.element_legend !== null) this.element_legend.style.display = '';
+                if(this.element_legend_childs.toolbox !== null) this.element_legend_childs.toolbox.style.display = '';
+                if(this.element_legend_childs.resize_handler !== null) this.element_legend_childs.resize_handler.style.display = '';
                 resizeChart();
                 hideMessage();
             }
@@ -2803,6 +2904,9 @@ var NETDATA = window.NETDATA || {};
         var canBeRendered = function(uncached_visibility) {
             if(that.debug === true)
                 that.log('canBeRendered() called');
+
+            if(NETDATA.options.current.update_only_visible === false)
+                return true;
 
             var ret = (
                 (
@@ -4719,8 +4823,8 @@ var NETDATA = window.NETDATA || {};
                 || typeof this.tmp.___isVisible___ === 'undefined'
                 || this.tm.last_visible_check <= NETDATA.options.last_page_scroll) {
                 this.tmp.___isVisible___ = __isVisible();
-                if (this.tmp.___isVisible___ === true) unhideChart();
-                else hideChart();
+                if (this.tmp.___isVisible___ === true) this.unhideChart();
+                else this.hideChart();
             }
 
             if(this.debug === true)
@@ -5164,6 +5268,8 @@ var NETDATA = window.NETDATA || {};
     // this is purely sequential charts refresher
     // it is meant to be autonomous
     NETDATA.chartRefresherNoParallel = function(index, callback) {
+        var targets = NETDATA.intersectionObserver.targets();
+
         if(NETDATA.options.debug.main_loop === true)
             console.log('NETDATA.chartRefresherNoParallel(' + index + ')');
 
@@ -5173,7 +5279,7 @@ var NETDATA = window.NETDATA || {};
             NETDATA.parseDom(callback);
             return;
         }
-        if(index >= NETDATA.options.targets.length) {
+        if(index >= targets.length) {
             if(NETDATA.options.debug.main_loop === true)
                 console.log('waiting to restart main loop...');
 
@@ -5181,7 +5287,7 @@ var NETDATA = window.NETDATA || {};
             callback();
         }
         else {
-            var state = NETDATA.options.targets[index];
+            var state = targets[index];
 
             if(NETDATA.options.auto_refresher_fast_weight < NETDATA.options.current.fast_render_timeframe) {
                 if(NETDATA.options.debug.main_loop === true)
@@ -5314,7 +5420,7 @@ var NETDATA = window.NETDATA || {};
 
         if(NETDATA.globalSelectionSync.active() === false) {
             var parallel = [];
-            var targets = NETDATA.options.targets;
+            var targets = NETDATA.intersectionObserver.targets();
             var len = targets.length;
             var state;
             while(len--) {
@@ -5374,12 +5480,15 @@ var NETDATA = window.NETDATA || {};
         if(NETDATA.options.debug.main_loop === true)
             console.log('DOM updated - there are ' + targets.length + ' charts on page.');
 
+        NETDATA.intersectionObserver.globalReset();
         NETDATA.options.targets = [];
         var len = targets.length;
         while(len--) {
             // the initialization will take care of sizing
             // and the "loading..." message
-            NETDATA.options.targets.push(NETDATA.chartState(targets[len]));
+            var state = NETDATA.chartState(targets[len]);
+            NETDATA.options.targets.push(state);
+            NETDATA.intersectionObserver.observe(state);
         }
 
         if(NETDATA.globalChartUnderlay.isActive() === true)
@@ -5454,13 +5563,14 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.globalReset = function() {
+        NETDATA.intersectionObserver.globalReset();
         NETDATA.globalSelectionSync.globalReset();
         NETDATA.globalPanAndZoom.globalReset();
         NETDATA.chartRegistry.globalReset();
         NETDATA.commonMin.globalReset();
         NETDATA.commonMax.globalReset();
         NETDATA.unitsConversion.globalReset();
-        NETDATA.options.targets = null;
+        NETDATA.options.targets = [];
         NETDATA.parseDom();
         NETDATA.unpause();
     };
