@@ -1249,6 +1249,116 @@ var NETDATA = window.NETDATA || {};
         }
     };
 
+    NETDATA.commonColors = {
+        keys: {},
+
+        globalReset: function() {
+            this.keys = {};
+        },
+
+        get: function(state, label) {
+            var ret = this.refill(state);
+
+            if(typeof ret.assigned[label] === 'undefined')
+                ret.assigned[label] = ret.available.shift();
+
+            return ret.assigned[label];
+        },
+
+        refill: function(state) {
+            var ret, len;
+
+            if(typeof state.tmp.__commonColors === 'undefined')
+                ret = this.prepare(state);
+            else {
+                ret = this.keys[state.tmp.__commonColors];
+                if(typeof ret === 'undefined')
+                    ret = this.prepare(state);
+            }
+
+            if(ret.available.length === 0) {
+                if(ret.copy_theme === true || ret.custom.length === 0) {
+                    // copy the theme colors
+                    len = NETDATA.themes.current.colors.length;
+                    while (len--)
+                        ret.available.unshift(NETDATA.themes.current.colors[len]);
+                }
+
+                // copy the custom colors
+                len = ret.custom.length;
+                while (len--)
+                    ret.available.unshift(ret.custom[len]);
+            }
+
+            state.colors_assigned = ret.assigned;
+            state.colors_available = ret.available;
+            state.colors_custom = ret.custom;
+
+            return ret;
+        },
+
+        __read_custom_colors: function(state, ret) {
+            // add the user supplied colors
+            var c = NETDATA.dataAttribute(state.element, 'colors', undefined);
+            if (typeof c === 'string' && c.length > 0) {
+                c = c.split(' ');
+                var len = c.length;
+
+                if (len > 0 && c[len - 1] === 'ONLY') {
+                    len--;
+                    ret.copy_theme = false;
+                }
+
+                while (len--)
+                    ret.custom.unshift(c[len]);
+            }
+        },
+
+        prepare: function(state) {
+            var has_custom_colors = false;
+
+            if(typeof state.tmp.__commonColors === 'undefined') {
+                var defname = state.chart.context;
+
+                // if this chart has data-colors=""
+                // we should use the chart uuid as the default key (private palette)
+                // (data-common-colors="NAME" will be used anyways)
+                var c = NETDATA.dataAttribute(state.element, 'colors', undefined);
+                if (typeof c === 'string' && c.length > 0) {
+                    defname = state.uuid;
+                    has_custom_colors = true;
+                }
+
+                // get the commonColors setting
+                state.tmp.__commonColors = NETDATA.dataAttribute(state.element, 'common-colors', defname);
+            }
+
+            var name = state.tmp.__commonColors;
+            var ret = this.keys[name];
+
+            if(typeof ret === 'undefined') {
+                // add our commonMax
+                this.keys[name] = {
+                    assigned: {},       // name-value of dimensions and their colors
+                    available: [],      // an array of colors available to be used
+                    custom: [],         // the array of colors defined by the user
+                    charts: {},         // the charts linked to this
+                    copy_theme: true
+                };
+                ret = this.keys[name];
+            }
+
+            if(typeof ret.charts[state.uuid] === 'undefined') {
+                ret.charts[state.uuid] = state;
+
+                if(has_custom_colors === true)
+                    this.__read_custom_colors(state, ret);
+            }
+
+            return ret;
+        },
+    };
+
     // ----------------------------------------------------------------------------------------------------------------
     // Chart Registry
 
@@ -2634,7 +2744,7 @@ var NETDATA = window.NETDATA || {};
 
             // color management
             that.colors = null;
-            that.colors_assigned = {};
+            that.colors_assigned = null;
             that.colors_available = null;
             that.colors_custom = null;
 
@@ -3715,87 +3825,19 @@ var NETDATA = window.NETDATA || {};
 
         // this should be called just ONCE per dimension per chart
         this.__chartDimensionColor = function(label) {
-            this.chartPrepareColorPalette();
+            var c = NETDATA.commonColors.get(this, label);
 
-            if(typeof this.colors_assigned[label] === 'undefined') {
+            // it is important to maintain a list of colors
+            // for this chart only, since the chart library
+            // uses this to assign colors to dimensions in the same
+            // order the dimension are given to it
+            this.colors.push(c);
 
-                if(this.colors_available.length === 0) {
-                    var len;
-                    var copy_standard = true;
-
-                    // copy the custom colors
-                    if(this.colors_custom !== null) {
-                        len = this.colors_custom.length;
-                        if(len > 0 && this.colors_custom[len - 1] === 'ONLY') {
-                            len--;
-                            copy_standard = false;
-                        }
-
-                        while (len--)
-                            this.colors_available.unshift(this.colors_custom[len]);
-                    }
-
-                    if(copy_standard === true) {
-                        // copy the standard palette colors
-                        len = NETDATA.themes.current.colors.length;
-                        while (len--)
-                            this.colors_available.unshift(NETDATA.themes.current.colors[len]);
-                    }
-                }
-
-                // assign a color to this dimension
-                this.colors_assigned[label] = this.colors_available.shift();
-
-                if(this.debug === true)
-                    this.log('label "' + label + '" got color "' + this.colors_assigned[label]);
-            }
-            else {
-                if(this.debug === true)
-                    this.log('label "' + label + '" already has color "' + this.colors_assigned[label] + '"');
-            }
-
-            this.colors.push(this.colors_assigned[label]);
-            return this.colors_assigned[label];
+            return c;
         };
 
         this.chartPrepareColorPalette = function() {
-            var len;
-
-            if(this.colors_custom !== null) return;
-
-            if(this.debug === true)
-                this.log("Preparing chart color palette");
-
-            this.colors = [];
-            this.colors_available = [];
-            this.colors_custom = [];
-
-            // add the standard colors
-            len = NETDATA.themes.current.colors.length;
-            while(len--)
-                this.colors_available.unshift(NETDATA.themes.current.colors[len]);
-
-            // add the user supplied colors
-            var c = NETDATA.dataAttribute(this.element, 'colors', undefined);
-            // this.log('read colors: ' + c);
-            if(typeof c === 'string' && c.length > 0) {
-                c = c.split(' ');
-                len = c.length;
-                while(len--) {
-                    if(this.debug === true)
-                        this.log("Adding custom color " + c[len].toString() + " to palette");
-
-                    this.colors_custom.unshift(c[len]);
-                    this.colors_available.unshift(c[len]);
-                }
-            }
-
-            if(this.debug === true) {
-                this.log("colors_custom:");
-                this.log(this.colors_custom);
-                this.log("colors_available:");
-                this.log(this.colors_available);
-            }
+            NETDATA.commonColors.refill(this);
         };
 
         // get the ordered list of chart colors
@@ -3910,16 +3952,19 @@ var NETDATA = window.NETDATA || {};
                 }
                 return;
             }
+
             if(this.colors === null) {
                 // this is the first time we update the chart
                 // let's assign colors to all dimensions
                 if(this.library.track_colors() === true) {
+                    this.colors = [];
                     keys = Object.keys(this.chart.dimensions);
                     len = keys.length;
                     for(i = 0; i < len ;i++)
-                        this.__chartDimensionColor(this.chart.dimensions[keys[i]].name);
+                        NETDATA.commonColors.get(this, this.chart.dimensions[keys[i]].name);
                 }
             }
+
             // we will re-generate the colors for the chart
             // based on the dimensions this result has data for
             this.colors = [];
@@ -5577,6 +5622,7 @@ var NETDATA = window.NETDATA || {};
         NETDATA.chartRegistry.globalReset();
         NETDATA.commonMin.globalReset();
         NETDATA.commonMax.globalReset();
+        NETDATA.commonColors.globalReset();
         NETDATA.unitsConversion.globalReset();
         NETDATA.options.targets = [];
         NETDATA.parseDom();
