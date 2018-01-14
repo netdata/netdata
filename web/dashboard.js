@@ -6005,6 +6005,11 @@ var NETDATA = window.NETDATA || {};
             options.isZoomedIgnoreProgrammaticZoom = true;
         }
 
+        if(NETDATA.chartLibraries.dygraph.isLogScale(state) === true) {
+            if(Array.isArray(options.valueRange) && options.valueRange[0] <= 0)
+                options.valueRange[0] = null;
+        }
+
         dygraph.updateOptions(options);
 
         var redraw = false;
@@ -6034,7 +6039,7 @@ var NETDATA = window.NETDATA || {};
 
         var chart_type = NETDATA.dataAttribute(state.element, 'dygraph-type', state.chart.chart_type);
         if(chart_type === 'stacked' && data.dimensions === 1) chart_type = 'area';
-        if(chart_type === 'stacked' && this.isLogScale(state) === true) chart_type = 'area';
+        if(chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state) === true) chart_type = 'area';
 
         var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state) === true)?3:4;
 
@@ -6057,7 +6062,7 @@ var NETDATA = window.NETDATA || {};
             labelsDivStyles:        NETDATA.dataAttribute(state.element, 'dygraph-labelsdivstyles', { 'fontSize':'1px' }),
             labelsDivWidth:         NETDATA.dataAttribute(state.element, 'dygraph-labelsdivwidth', state.chartWidth() - 70),
             labelsSeparateLines:    NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsseparatelines', true),
-            labelsShowZeroValues:   (this.isLogScale(state) === true)?false:NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
+            labelsShowZeroValues:   (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?false:NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
             labelsKMB:              false,
             labelsKMG2:             false,
             showLabelsOnHighlight:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-showlabelsonhighlight', true),
@@ -6086,7 +6091,7 @@ var NETDATA = window.NETDATA || {};
                                     // Draw points at the edges of gaps in the data.
                                     // This improves visibility of small data segments or other data irregularities.
             drawGapEdgePoints:      NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawgapedgepoints', true),
-            connectSeparatedPoints: (this.isLogScale(state) === true)?false:NETDATA.dataAttributeBoolean(state.element, 'dygraph-connectseparatedpoints', false),
+            connectSeparatedPoints: (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?false:NETDATA.dataAttributeBoolean(state.element, 'dygraph-connectseparatedpoints', false),
             pointSize:              NETDATA.dataAttribute(state.element, 'dygraph-pointsize', 1),
 
                                     // enabling this makes the chart with little square lines
@@ -6121,7 +6126,7 @@ var NETDATA = window.NETDATA || {};
             highlightSeriesBackgroundAlpha: NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesbackgroundalpha', null), // TOO SLOW: (chart_type === 'stacked')?0.7:0.5,
             pointClickCallback:     NETDATA.dataAttribute(state.element, 'dygraph-pointclickcallback', undefined),
             visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
-            logscale:               (this.isLogScale(state) === true)?'y':undefined,
+            logscale:               (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?'y':undefined,
 
             axes: {
                 x: {
@@ -6134,7 +6139,7 @@ var NETDATA = window.NETDATA || {};
                     }
                 },
                 y: {
-                    logscale: (this.isLogScale(state) === true)?true:undefined,
+                    logscale: (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?true:undefined,
                     pixelsPerLabel: NETDATA.dataAttribute(state.element, 'dygraph-ypixelsperlabel', 15),
                     axisLabelWidth: NETDATA.dataAttribute(state.element, 'dygraph-yaxislabelwidth', 50),
                     axisLabelFormatter: function (y) {
@@ -6697,6 +6702,11 @@ var NETDATA = window.NETDATA || {};
                 }
             }
         };
+
+        if(NETDATA.chartLibraries.dygraph.isLogScale(state) === true) {
+            if(Array.isArray(state.tmp.dygraph_options.valueRange) && state.tmp.dygraph_options.valueRange[0] <= 0)
+                state.tmp.dygraph_options.valueRange[0] = null;
+        }
 
         if(NETDATA.chartLibraries.dygraph.isSparkline(state) === true) {
             state.tmp.dygraph_options.drawGrid = false;
