@@ -3721,18 +3721,26 @@ var NETDATA = window.NETDATA || {};
 
                 if(this.colors_available.length === 0) {
                     var len;
+                    var copy_standard = true;
 
                     // copy the custom colors
                     if(this.colors_custom !== null) {
                         len = this.colors_custom.length;
+                        if(len > 0 && this.colors_custom[len - 1] === 'ONLY') {
+                            len--;
+                            copy_standard = false;
+                        }
+
                         while (len--)
                             this.colors_available.unshift(this.colors_custom[len]);
                     }
 
-                    // copy the standard palette colors
-                    len = NETDATA.themes.current.colors.length;
-                    while(len--)
-                        this.colors_available.unshift(NETDATA.themes.current.colors[len]);
+                    if(copy_standard === true) {
+                        // copy the standard palette colors
+                        len = NETDATA.themes.current.colors.length;
+                        while (len--)
+                            this.colors_available.unshift(NETDATA.themes.current.colors[len]);
+                    }
                 }
 
                 // assign a color to this dimension
