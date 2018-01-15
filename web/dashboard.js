@@ -51,6 +51,8 @@
  *                                                  (default: null) */
 /*global netdataAlarmsRecipients     *//* array,    an array of alarm recipients to show notifications for
  *                                                  (default: null) */
+/*global netdataIntersectionObserver *//* boolean,  enable or disable the use of intersection observer
+ *                                                  (default: true) */
 
 // ----------------------------------------------------------------------------
 // global namespace
@@ -2545,13 +2547,18 @@ var NETDATA = window.NETDATA || {};
         },
 
         init: function() {
-            try {
-                this.observer = new IntersectionObserver(this.handler, this.options);
+            if(typeof netdataIntersectionObserver === 'undefined' || netdataIntersectionObserver === true) {
+                try {
+                    this.observer = new IntersectionObserver(this.handler, this.options);
+                }
+                catch (e) {
+                    console.log("IntersectionObserver is not supported on this browser");
+                    this.observer = null;
+                }
             }
-            catch(e) {
-                console.log("IntersectionObserver is not supported on this browser");
-                this.observer = null;
-            }
+            //else {
+            //    console.log("IntersectionObserver is disabled");
+            //}
         }
     };
     NETDATA.intersectionObserver.init();
@@ -3068,6 +3075,15 @@ var NETDATA = window.NETDATA || {};
                 if(this.element_legend_childs.resize_handler !== null) this.element_legend_childs.resize_handler.style.display = '';
                 resizeChart();
                 hideMessage();
+            }
+
+            if(this.__redraw_on_unhide === true) {
+
+                if(this.debug === true)
+                    this.log("redrawing chart on unhide");
+
+                this.__redraw_on_unhide = undefined;
+                this.redrawChart();
             }
         };
 
@@ -4666,8 +4682,17 @@ var NETDATA = window.NETDATA || {};
                 if(callChartLibraryCreateSafely(data) === false)
                     return;
             }
-            hideMessage();
-            this.legendShowLatestValues();
+            if(this.isVisible() === true) {
+                hideMessage();
+                this.legendShowLatestValues();
+            }
+            else {
+                this.__redraw_on_unhide = true;
+
+                if(this.debug === true)
+                    this.log("drawn while not visible")
+            }
+
             if(this.selected === true)
                 NETDATA.globalSelectionSync.stop();
 
