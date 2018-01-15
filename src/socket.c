@@ -1277,7 +1277,7 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 
 #ifdef NETDATA_INTERNAL_CHECKS
             // this is common - it is used for web server file copies
-            if(!(pf->events & (POLLIN|POLLOUT))) {
+            if(unlikely(!(pf->events & (POLLIN|POLLOUT)))) {
                 error("POLLFD: LISTENER: after reading, client slot %zu (fd %d) from '%s:%s' was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
                 //poll_close_fd(pi);
                 //return;
@@ -1299,11 +1299,14 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
             return;
         }
 
+#ifdef NETDATA_INTERNAL_CHECKS
+        // this is common - it is used for streaming
         if(unlikely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET && !(pf->events & (POLLIN|POLLOUT)))) {
-            error("POLLFD: LISTENER: after sending, client slot %zu (fd %d) from '%s:%s' was left without expecting input or output - closing it. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
-            poll_close_fd(pi);
-            return;
+            error("POLLFD: LISTENER: after sending, client slot %zu (fd %d) from '%s:%s' was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
+            //poll_close_fd(pi);
+            //return;
         }
+#endif
     }
 
     if(unlikely(revents & POLLERR)) {
@@ -1409,7 +1412,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
         }
 
-        if(now - last_check > p.checks_every) {
+        if(unlikely(now - last_check > p.checks_every)) {
             last_check = now;
 
             // security checks
