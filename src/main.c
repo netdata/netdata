@@ -3,28 +3,23 @@
 extern void *cgroups_main(void *ptr);
 
 void netdata_cleanup_and_exit(int ret) {
-    netdata_exit = 1;
+    // enabling this, is wrong
+    // because the threads will be cancelled while cleaning up
+    // netdata_exit = 1;
 
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
-    if(ret) {
-        // this is bad - exiting due to a fatal condition
+    // cleanup/save the database and exit
+    info("EXIT: cleaning up the database...");
+    rrdhost_cleanup_all();
 
-        // cleanup/save the database and exit
-        info("EXIT: cleaning up the database...");
-        rrdhost_cleanup_all();
-    }
-    else {
+    if(!ret) {
         // exit cleanly
 
         // stop everything
         info("EXIT: stopping master threads...");
         cancel_main_threads();
-
-        // cleanup the database (delete files not needed)
-        info("EXIT: cleaning up the database...");
-        rrdhost_cleanup_all();
 
         // free the database
         info("EXIT: freeing database memory...");
@@ -104,7 +99,8 @@ void web_server_threading_selection(void) {
 }
 
 void web_server_config_options(void) {
-    web_client_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS);
+    web_client_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", web_client_timeout);
+    web_client_first_request_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
 
     respect_web_browser_do_not_track_policy = config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
     web_x_frame_options = config_get(CONFIG_SECTION_WEB, "x-frame-options response header", "");
@@ -198,7 +194,7 @@ void cancel_main_threads() {
 
     int i, found = 0, max = 5 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
-        if(static_threads[i].enabled) {
+        if(static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
             info("EXIT: Stopping master thread: %s", static_threads[i].name);
             netdata_thread_cancel(*static_threads[i].thread);
             found++;
@@ -211,14 +207,14 @@ void cancel_main_threads() {
         sleep_usec(step);
         found = 0;
         for (i = 0; static_threads[i].name != NULL ; i++) {
-            if (static_threads[i].enabled)
+            if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
                 found++;
         }
     }
 
     if(found) {
         for (i = 0; static_threads[i].name != NULL ; i++) {
-            if (static_threads[i].enabled)
+            if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
                 error("Master thread %s takes too long to exit. Giving up...", static_threads[i].name);
         }
     }

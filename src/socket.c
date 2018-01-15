@@ -1035,6 +1035,14 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     pi->rcv_callback = rcv_callback;
     pi->snd_callback = snd_callback;
 
+    pi->connected_t = now_boottime_sec();
+    pi->last_received_t = 0;
+    pi->last_sent_t = 0;
+    pi->last_sent_t = 0;
+    pi->recv_count = 0;
+    pi->send_count = 0;
+
+    netdata_thread_disable_cancelability();
     p->used++;
     if(unlikely(pi->slot > p->max))
         p->max = pi->slot;
@@ -1046,6 +1054,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     if(pi->flags & POLLINFO_FLAG_SERVER_SOCKET) {
         p->min = pi->slot;
     }
+    netdata_thread_enable_cancelability();
 
     debug(D_POLLFD, "POLLFD: ADD: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 
@@ -1060,13 +1069,15 @@ inline void poll_close_fd(POLLINFO *pi) {
 
     if(unlikely(pf->fd == -1)) return;
 
+    netdata_thread_disable_cancelability();
+
     if(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET) {
         pi->del_callback(pi);
-    }
 
-    if(likely(!(pi->flags & POLLINFO_FLAG_DONT_CLOSE))) {
-        if(close(pf->fd) == -1)
-            error("Failed to close() poll_events() socket %d", pf->fd);
+        if(likely(!(pi->flags & POLLINFO_FLAG_DONT_CLOSE))) {
+            if(close(pf->fd) == -1)
+                error("Failed to close() poll_events() socket %d", pf->fd);
+        }
     }
 
     pf->fd = -1;
@@ -1102,6 +1113,7 @@ inline void poll_close_fd(POLLINFO *pi) {
             }
         }
     }
+    netdata_thread_enable_cancelability();
 
     debug(D_POLLFD, "POLLFD: DEL: completed, slots = %zu, used = %zu, min = %zu, max = %zu, next free = %zd", p->slots, p->used, p->min, p->max, p->first_free?(ssize_t)p->first_free->slot:(ssize_t)-1);
 }
@@ -1164,7 +1176,7 @@ static void poll_events_cleanup(void *data) {
     freez(p->inf);
 }
 
-static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, short int revents) {
+static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, short int revents, time_t now) {
     short int events = pf->events;
     int fd = pf->fd;
     pf->revents = 0;
@@ -1179,6 +1191,9 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 
     if(revents & POLLIN || revents & POLLPRI) {
         // receiving data
+
+        pi->last_received_t = now;
+        pi->recv_count++;
 
         if(likely(pi->flags & POLLINFO_FLAG_SERVER_SOCKET)) {
             // new connection
@@ -1259,6 +1274,15 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                 poll_close_fd(pi);
                 return;
             }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+            // this is common - it is used for web server file copies
+            if(unlikely(!(pf->events & (POLLIN|POLLOUT)))) {
+                error("POLLFD: LISTENER: after reading, client slot %zu (fd %d) from '%s:%s' was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
+                //poll_close_fd(pi);
+                //return;
+            }
+#endif
         }
     }
 
@@ -1266,11 +1290,23 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
         // sending data
         debug(D_POLLFD, "POLLFD: LISTENER: sending data to socket on slot %zu (fd %d)", i, fd);
 
+        pi->last_sent_t = now;
+        pi->send_count++;
+
         pf->events = 0;
         if (pi->snd_callback(pi, &pf->events) == -1) {
             poll_close_fd(pi);
             return;
         }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        // this is common - it is used for streaming
+        if(unlikely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET && !(pf->events & (POLLIN|POLLOUT)))) {
+            error("POLLFD: LISTENER: after sending, client slot %zu (fd %d) from '%s:%s' was left without expecting input or output. ", i, fd, pi->client_ip?pi->client_ip:"<undefined-ip>", pi->client_port?pi->client_port:"<undefined-port>");
+            //poll_close_fd(pi);
+            //return;
+        }
+#endif
     }
 
     if(unlikely(revents & POLLERR)) {
@@ -1318,6 +1354,10 @@ void poll_events(LISTEN_SOCKETS *sockets
             .inf = NULL,
             .first_free = NULL,
 
+            .complete_request_timeout = web_client_first_request_timeout,
+            .idle_timeout = web_client_timeout,
+            .checks_every = (web_client_timeout / 3) + 1,
+
             .access_list = access_list,
 
             .add_callback = add_callback?add_callback:poll_default_add_callback,
@@ -1346,13 +1386,15 @@ void poll_events(LISTEN_SOCKETS *sockets
         info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }
 
-    int timeout = -1; // wait forever
+    int timeout = 1; // wait forever
+    time_t last_check = now_boottime_sec();
 
     netdata_thread_cleanup_push(poll_events_cleanup, &p);
 
     while(!netdata_exit) {
         debug(D_POLLFD, "POLLFD: LISTENER: Waiting on %zu sockets...", p.max + 1);
         retval = poll(p.fds, p.max + 1, timeout);
+        time_t now = now_boottime_sec();
 
         if(unlikely(retval == -1)) {
             error("POLLFD: LISTENER: poll() failed while waiting on %zu sockets.", p.max + 1);
@@ -1360,16 +1402,46 @@ void poll_events(LISTEN_SOCKETS *sockets
         }
         else if(unlikely(!retval)) {
             debug(D_POLLFD, "POLLFD: LISTENER: poll() timeout.");
-            continue;
+        }
+        else {
+            for (i = 0; i <= p.max; i++) {
+                struct pollfd *pf     = &p.fds[i];
+                short int     revents = pf->revents;
+                if (unlikely(revents))
+                    poll_events_process(&p, &p.inf[i], pf, revents, now);
+            }
         }
 
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(now - last_check > p.checks_every)) {
+            last_check = now;
 
-        for(i = 0 ; i <= p.max ; i++) {
-            struct pollfd *pf = &p.fds[i];
-            short int revents = pf->revents;
-            if(unlikely(revents))
-                poll_events_process(&p, &p.inf[i], pf, revents);
+            // security checks
+            for(i = 0; i <= p.max; i++) {
+                POLLINFO *pi = &p.inf[i];
+
+                if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
+                    if (unlikely(pi->send_count == 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
+                        info("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' has not sent a complete request in %zu seconds - closing it. "
+                              , i
+                              , pi->fd
+                              , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+                              , pi->client_port ? pi->client_port : "<undefined-port>"
+                              , (size_t) p.complete_request_timeout
+                        );
+                        poll_close_fd(pi);
+                    }
+                    else if(unlikely(pi->recv_count && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
+                        info("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' is idle for more than %zu seconds - closing it. "
+                              , i
+                              , pi->fd
+                              , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+                              , pi->client_port ? pi->client_port : "<undefined-port>"
+                              , (size_t) p.idle_timeout
+                        );
+                        poll_close_fd(pi);
+                    }
+                }
+            }
         }
     }
 

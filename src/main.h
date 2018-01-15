@@ -1,6 +1,10 @@
 #ifndef NETDATA_MAIN_H
 #define NETDATA_MAIN_H 1
 
+#define NETDATA_MAIN_THREAD_RUNNING   CONFIG_BOOLEAN_YES
+#define NETDATA_MAIN_THREAD_EXITING  (CONFIG_BOOLEAN_YES + 1)
+#define NETDATA_MAIN_THREAD_EXITED    CONFIG_BOOLEAN_NO
+
 /**
  * This struct contains information about command line options.
  */

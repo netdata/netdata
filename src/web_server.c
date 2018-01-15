@@ -211,6 +211,8 @@ static void web_client_cache_destroy(void) {
     web_client_cache_verify(1);
 #endif
 
+    netdata_thread_disable_cancelability();
+
     struct web_client *w, *t;
 
     w = web_clients_cache.used;
@@ -230,6 +232,8 @@ static void web_client_cache_destroy(void) {
     }
     web_clients_cache.avail = NULL;
     web_clients_cache.avail_count = 0;
+
+    netdata_thread_enable_cancelability();
 }
 
 static struct web_client *web_client_get_from_cache_or_allocate() {
@@ -241,6 +245,8 @@ static struct web_client *web_client_get_from_cache_or_allocate() {
     if(unlikely(web_clients_cache.pid != 0 && web_clients_cache.pid != gettid()))
         error("Oops! wrong thread accessing the cache. Expected %d, found %d", (int)web_clients_cache.pid, (int)gettid());
 #endif
+
+    netdata_thread_disable_cancelability();
 
     struct web_client *w = web_clients_cache.avail;
 
@@ -269,6 +275,9 @@ static struct web_client *web_client_get_from_cache_or_allocate() {
     // initialize it
     w->id = web_client_connected();
     w->mode = WEB_CLIENT_MODE_NORMAL;
+
+    netdata_thread_enable_cancelability();
+
     return w;
 }
 
@@ -283,12 +292,16 @@ static void web_client_release(struct web_client *w) {
 
     debug(D_WEB_CLIENT_ACCESS, "%llu: Closing web client from %s port %s.", w->id, w->client_ip, w->client_port);
 
+    log_connection(w, "DISCONNECTED");
     web_client_request_done(w);
     web_client_disconnected();
+
+    netdata_thread_disable_cancelability();
 
     if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
         if (w->ifd != -1) close(w->ifd);
         if (w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
+        w->ifd = w->ofd = -1;
     }
 
     // unlink it from the used
@@ -309,6 +322,8 @@ static void web_client_release(struct web_client *w) {
         web_clients_cache.avail = w;
         web_clients_cache.avail_count++;
     }
+
+    netdata_thread_enable_cancelability();
 }
 
 
@@ -385,6 +400,7 @@ static struct web_client *web_client_create_on_listenfd(int listener) {
 // 4. it copies data from input to output if mode is FILECOPY
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
+int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
 
 static void multi_threaded_web_client_worker_main_cleanup(void *ptr) {
     struct web_client *w = ptr;
@@ -580,25 +596,24 @@ static struct pollfd *socket_listen_main_multi_threaded_fds = NULL;
 
 static void socket_listen_main_multi_threaded_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
-    if(static_thread->enabled) {
-        static_thread->enabled = 0;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-        info("cleaning up...");
+    info("cleaning up...");
 
-        info("releasing allocated memory...");
-        freez(socket_listen_main_multi_threaded_fds);
+    info("releasing allocated memory...");
+    freez(socket_listen_main_multi_threaded_fds);
 
-        info("closing all sockets...");
-        listen_sockets_close(&api_sockets);
+    info("closing all sockets...");
+    listen_sockets_close(&api_sockets);
 
-        info("stopping all running web server threads...");
-        web_client_multi_threaded_web_server_stop_all_threads();
+    info("stopping all running web server threads...");
+    web_client_multi_threaded_web_server_stop_all_threads();
 
-        info("freeing web clients cache...");
-        web_client_cache_destroy();
+    info("freeing web clients cache...");
+    web_client_cache_destroy();
 
-        info("cleanup completed.");
-    }
+    info("cleanup completed.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 #define CLEANUP_EVERY_EVENTS 60
@@ -734,20 +749,16 @@ static inline int single_threaded_unlink_client(struct web_client *w, fd_set *if
 
 static void socket_listen_main_single_threaded_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
-    if(static_thread->enabled) {
-        static_thread->enabled = 0;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-        info("cleaning up...");
+    info("closing all sockets...");
+    listen_sockets_close(&api_sockets);
 
-        info("closing all sockets...");
-        listen_sockets_close(&api_sockets);
+    info("freeing web clients cache...");
+    web_client_cache_destroy();
 
-        info("freeing web clients cache...");
-        web_client_cache_destroy();
-
-        info("cleanup completed.");
-        debug(D_WEB_CLIENT, "LISTENER: exit!");
-    }
+    info("cleanup completed.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *socket_listen_main_single_threaded(void *ptr) {
@@ -1141,41 +1152,42 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
 
 static void socket_listen_main_static_threaded_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    if(static_thread->enabled) {
-        int i, found = 0, max = 2 * USEC_PER_SEC, step = 50000;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    int i, found = 0, max = 2 * USEC_PER_SEC, step = 50000;
+
+    // we start from 1, - 0 is self
+    for(i = 1; i < static_threaded_workers_count; i++) {
+        if(static_workers_private_data[i].running) {
+            found++;
+            info("stopping worker %d", i + 1);
+            netdata_thread_cancel(static_workers_private_data[i].thread);
+        }
+        else
+            info("found stopped worker %d", i + 1);
+    }
+
+    while(found && max > 0) {
+        max -= step;
+        info("Waiting %d static web threads to finish...", found);
+        sleep_usec(step);
+        found = 0;
 
         // we start from 1, - 0 is self
         for(i = 1; i < static_threaded_workers_count; i++) {
-            if(static_workers_private_data[i].running) {
+            if (static_workers_private_data[i].running)
                 found++;
-                info("stopping worker %d", i + 1);
-                netdata_thread_cancel(static_workers_private_data[i].thread);
-            }
-            else
-                info("found stopped worker %d", i + 1);
         }
-
-        while(found && max > 0) {
-            max -= step;
-            info("Waiting %d static web threads to finish...", found);
-            sleep_usec(step);
-            found = 0;
-
-            // we start from 1, - 0 is self
-            for(i = 1; i < static_threaded_workers_count; i++) {
-                if (static_workers_private_data[i].running)
-                    found++;
-            }
-        }
-
-        if(found)
-            error("%d static web threads are taking too long to finish. Giving up.", found);
-
-        info("closing all web server sockets...");
-        listen_sockets_close(&api_sockets);
-
-        static_thread->enabled = 0;
     }
+
+    if(found)
+        error("%d static web threads are taking too long to finish. Giving up.", found);
+
+    info("closing all web server sockets...");
+    listen_sockets_close(&api_sockets);
+
+    info("all static web threads stopped.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *socket_listen_main_static_threaded(void *ptr) {

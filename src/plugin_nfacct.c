@@ -753,19 +753,18 @@ static void nfacct_send_metrics() {
 
 static void nfacct_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    if(static_thread->enabled) {
-        info("cleaning up...");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    info("cleaning up...");
 
 #ifdef DO_NFACCT
-        nfacct_cleanup();
+    nfacct_cleanup();
 #endif
 
 #ifdef DO_NFSTAT
-        nfstat_cleanup();
+    nfstat_cleanup();
 #endif
 
-        static_thread->enabled = 0;
-    }
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *nfacct_main(void *ptr) {
