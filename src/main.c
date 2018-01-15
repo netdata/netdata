@@ -3,28 +3,23 @@
 extern void *cgroups_main(void *ptr);
 
 void netdata_cleanup_and_exit(int ret) {
-    netdata_exit = 1;
+    // enabling this, is wrong
+    // because the threads will be cancelled while cleaning up
+    // netdata_exit = 1;
 
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
-    if(ret) {
-        // this is bad - exiting due to a fatal condition
+    // cleanup/save the database and exit
+    info("EXIT: cleaning up the database...");
+    rrdhost_cleanup_all();
 
-        // cleanup/save the database and exit
-        info("EXIT: cleaning up the database...");
-        rrdhost_cleanup_all();
-    }
-    else {
+    if(!ret) {
         // exit cleanly
 
         // stop everything
         info("EXIT: stopping master threads...");
         cancel_main_threads();
-
-        // cleanup the database (delete files not needed)
-        info("EXIT: cleaning up the database...");
-        rrdhost_cleanup_all();
 
         // free the database
         info("EXIT: freeing database memory...");
@@ -198,7 +193,7 @@ void cancel_main_threads() {
 
     int i, found = 0, max = 5 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
-        if(static_threads[i].enabled) {
+        if(static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
             info("EXIT: Stopping master thread: %s", static_threads[i].name);
             netdata_thread_cancel(*static_threads[i].thread);
             found++;
@@ -211,14 +206,14 @@ void cancel_main_threads() {
         sleep_usec(step);
         found = 0;
         for (i = 0; static_threads[i].name != NULL ; i++) {
-            if (static_threads[i].enabled)
+            if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
                 found++;
         }
     }
 
     if(found) {
         for (i = 0; static_threads[i].name != NULL ; i++) {
-            if (static_threads[i].enabled)
+            if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
                 error("Master thread %s takes too long to exit. Giving up...", static_threads[i].name);
         }
     }
