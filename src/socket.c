@@ -1410,14 +1410,15 @@ void poll_events(LISTEN_SOCKETS *sockets
         }
 
         if(now - last_check > p.checks_every) {
+            last_check = now;
+
             // security checks
             for(i = 0; i <= p.max; i++) {
                 POLLINFO *pi = &p.inf[i];
 
                 if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
                     if (unlikely(pi->send_count == 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
-                        errno = 0;
-                        error("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' has not sent a complete request in %zu seconds - closing it. "
+                        info("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' has not sent a complete request in %zu seconds - closing it. "
                               , i
                               , pi->fd
                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
@@ -1427,8 +1428,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                         poll_close_fd(pi);
                     }
                     else if(unlikely(pi->recv_count && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
-                        errno = 0;
-                        error("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' is idle for more than %zu seconds - closing it. "
+                        info("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' is idle for more than %zu seconds - closing it. "
                               , i
                               , pi->fd
                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
