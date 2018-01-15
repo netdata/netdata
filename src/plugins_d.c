@@ -568,20 +568,19 @@ void *pluginsd_worker_thread(void *arg) {
 
 static void pluginsd_main_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
-    if(static_thread->enabled) {
-        info("cleaning up...");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    info("cleaning up...");
 
-        struct plugind *cd;
-        for (cd = pluginsd_root; cd; cd = cd->next) {
-            if (cd->enabled && !cd->obsolete) {
-                info("stopping plugin thread: %s", cd->id);
-                netdata_thread_cancel(cd->thread);
-            }
+    struct plugind *cd;
+    for (cd = pluginsd_root; cd; cd = cd->next) {
+        if (cd->enabled && !cd->obsolete) {
+            info("stopping plugin thread: %s", cd->id);
+            netdata_thread_cancel(cd->thread);
         }
-
-        info("cleanup completed.");
-        static_thread->enabled = 0;
     }
+
+    info("cleanup completed.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *pluginsd_main(void *ptr) {

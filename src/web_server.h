@@ -38,7 +38,9 @@ extern void *socket_listen_main_single_threaded(void *ptr);
 extern void *socket_listen_main_static_threaded(void *ptr);
 extern int api_listen_sockets_setup(void);
 
+#define DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST 60
 #define DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS 60
 extern int web_client_timeout;
+extern int web_client_first_request_timeout;
 
 #endif /* NETDATA_WEB_SERVER_H */

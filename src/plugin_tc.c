@@ -832,24 +832,24 @@ static pid_t tc_child_pid = 0;
 
 static void tc_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    if(static_thread->enabled) {
-        info("cleaning up...");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-        if(tc_child_pid) {
-            info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
-            if(killpid(tc_child_pid, SIGTERM) != -1) {
-                siginfo_t info;
+    info("cleaning up...");
 
-                info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
-                waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
-                // info("TC: finished tc plugin child process pid %d.", tc_child_pid);
-            }
+    if(tc_child_pid) {
+        info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
+        if(killpid(tc_child_pid, SIGTERM) != -1) {
+            siginfo_t info;
 
-            tc_child_pid = 0;
+            info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
+            waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
+            // info("TC: finished tc plugin child process pid %d.", tc_child_pid);
         }
 
-        static_thread->enabled = 0;
+        tc_child_pid = 0;
     }
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *tc_main(void *ptr) {
