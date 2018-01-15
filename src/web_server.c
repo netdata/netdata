@@ -400,6 +400,7 @@ static struct web_client *web_client_create_on_listenfd(int listener) {
 // 4. it copies data from input to output if mode is FILECOPY
 
 int web_client_timeout = DEFAULT_DISCONNECT_IDLE_WEB_CLIENTS_AFTER_SECONDS;
+int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQUEST;
 
 static void multi_threaded_web_client_worker_main_cleanup(void *ptr) {
     struct web_client *w = ptr;

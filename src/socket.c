@@ -1351,7 +1351,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             .inf = NULL,
             .first_free = NULL,
 
-            .complete_request_timeout = 30,
+            .complete_request_timeout = web_client_first_request_timeout,
             .idle_timeout = web_client_timeout,
             .checks_every = (web_client_timeout / 3) + 1,
 
