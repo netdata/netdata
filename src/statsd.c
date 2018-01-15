@@ -254,6 +254,7 @@ static struct statsd {
     char *histogram_percentile_str;
 
     int threads;
+    int *collection_threads_status;
     netdata_thread_t *collection_threads;
 
     LISTEN_SOCKETS sockets;
@@ -323,6 +324,7 @@ static struct statsd {
         .histogram_percentile = 95.0,
         .histogram_increase_step = 10,
         .threads = 0,
+        .collection_threads_status = NULL,
         .collection_threads = NULL,
         .sockets = {
                 .config_section  = CONFIG_SECTION_STATSD,
@@ -684,6 +686,7 @@ struct statsd_tcp {
 
 #ifdef HAVE_RECVMMSG
 struct statsd_udp {
+    int *running;
     STATSD_SOCKET_DATA_TYPE type;
     size_t size;
     struct iovec *iovecs;
@@ -691,6 +694,7 @@ struct statsd_udp {
 };
 #else
 struct statsd_udp {
+    int *running;
     STATSD_SOCKET_DATA_TYPE type;
     char buffer[STATSD_UDP_BUFFER_SIZE];
 };
@@ -875,31 +879,32 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
 // statsd child thread to collect metrics from network
 
 void statsd_collector_thread_cleanup(void *data) {
-    static __thread int executed = 0;
-    if(!executed) {
-        executed = 1;
-        info("cleaning up...");
+    struct statsd_udp *d = data;
+    *d->running = 0;
 
-        struct statsd_udp *d = data;
+    info("cleaning up...");
 
 #ifdef HAVE_RECVMMSG
-        size_t i;
-        for (i = 0; i < d->size; i++)
-            freez(d->iovecs[i].iov_base);
+    size_t i;
+    for (i = 0; i < d->size; i++)
+        freez(d->iovecs[i].iov_base);
 
-        freez(d->iovecs);
-        freez(d->msgs);
+    freez(d->iovecs);
+    freez(d->msgs);
 #endif
 
-        freez(d);
-    }
+    freez(d);
 }
 
 void *statsd_collector_thread(void *ptr) {
-    int id = *((int *)ptr);
-    info("STATSD collector thread No %d created with task id %d", id + 1, gettid());
+    int *running = (int *)ptr;
+    *running = 1;
+
+    info("STATSD collector thread started with taskid %d", gettid());
 
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
+    d->running = running;
+
     netdata_thread_cleanup_push(statsd_collector_thread_cleanup, d);
 
 #ifdef HAVE_RECVMMSG
@@ -1969,23 +1974,27 @@ static int statsd_listen_sockets_setup(void) {
 
 static void statsd_main_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
-    if(static_thread->enabled) {
-        info("cleaning up...");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    info("cleaning up...");
 
-        if (statsd.collection_threads) {
-            int i;
-            for (i = 0; i < statsd.threads; i++) {
+    if (statsd.collection_threads && statsd.collection_threads_status) {
+        int i;
+        for (i = 0; i < statsd.threads; i++) {
+            if(statsd.collection_threads_status[i]) {
                 info("STATSD: stopping data collection thread %d...", i + 1);
                 netdata_thread_cancel(statsd.collection_threads[i]);
             }
+            else {
+                info("STATSD: data collection thread %d found stopped.", i + 1);
+            }
         }
-
-        info("STATSD: closing sockets...");
-        listen_sockets_close(&statsd.sockets);
-
-        info("STATSD: cleanup completed.");
-        static_thread->enabled = 0;
     }
+
+    info("STATSD: closing sockets...");
+    listen_sockets_close(&statsd.sockets);
+
+    info("STATSD: cleanup completed.");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *statsd_main(void *ptr) {
@@ -2081,12 +2090,14 @@ void *statsd_main(void *ptr) {
         goto cleanup;
     }
 
+    statsd.collection_threads_status = callocz((size_t)statsd.threads, sizeof(int));
     statsd.collection_threads = callocz((size_t)statsd.threads, sizeof(netdata_thread_t));
+
     int i;
     for(i = 0; i < statsd.threads ;i++) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_COLLECTOR[%d]", i + 1);
-        netdata_thread_create(&statsd.collection_threads[i], tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &i);
+        netdata_thread_create(&statsd.collection_threads[i], tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);
     }
 
     // ----------------------------------------------------------------------------------------------------------------

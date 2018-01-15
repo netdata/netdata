@@ -63,15 +63,22 @@ extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flag
 typedef struct poll POLLJOB;
 
 typedef struct pollinfo {
-    POLLJOB *p; // the parent
-    size_t slot;    // the slot id
+    POLLJOB *p;             // the parent
+    size_t slot;            // the slot id
 
-    int fd;             // the file descriptor
-    int socktype;       // the client socket type
-    char *client_ip;    // the connected client IP
-    char *client_port;  // the connected client port
+    int fd;                 // the file descriptor
+    int socktype;           // the client socket type
+    char *client_ip;        // the connected client IP
+    char *client_port;      // the connected client port
 
-    uint32_t flags;     // internal flags
+    time_t connected_t;     // the time the socket connected
+    time_t last_received_t; // the time the socket last received data
+    time_t last_sent_t;     // the time the socket last sent data
+
+    size_t recv_count;      // the number of times the socket was ready for inbound traffic
+    size_t send_count;      // the number of times the socket was ready for outbound traffic
+
+    uint32_t flags;         // internal flags
 
     // callbacks for this socket
     void  (*del_callback)(struct pollinfo *pi);
@@ -93,6 +100,11 @@ struct poll {
     size_t used;
     size_t min;
     size_t max;
+
+    time_t complete_request_timeout;
+    time_t idle_timeout;
+    time_t checks_every;
+
     struct pollfd *fds;
     struct pollinfo *inf;
     struct pollinfo *first_free;

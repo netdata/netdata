@@ -68,11 +68,11 @@ static struct freebsd_module {
 
 static void freebsd_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    if(static_thread->enabled) {
-        info("cleaning up...");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-        static_thread->enabled = 0;
-    }
+    info("cleaning up...");
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *freebsd_main(void *ptr) {
@@ -82,7 +82,7 @@ void *freebsd_main(void *ptr) {
 
     // initialize FreeBSD plugin
     if (freebsd_plugin_init())
-        netdata_exit = 1;
+        netdata_cleanup_and_exit(1);
 
     // check the enabled status for each module
     int i;

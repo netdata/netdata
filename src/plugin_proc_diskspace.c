@@ -330,11 +330,11 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
 static void diskspace_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    if(static_thread->enabled) {
-        info("cleaning up...");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-        static_thread->enabled = 0;
-    }
+    info("cleaning up...");
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *proc_diskspace_main(void *ptr) {
