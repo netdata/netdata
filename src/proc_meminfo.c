@@ -137,7 +137,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     // http://stackoverflow.com/questions/3019748/how-to-reliably-measure-available-memory-in-linux
-    unsigned long long MemUsed = MemTotal - MemFree - Cached - Buffers;
+    unsigned long long MemCached = Cached + Slab;
+    unsigned long long MemUsed = MemTotal - MemFree - MemCached - Buffers;
 
     if(do_ram) {
         {
@@ -169,7 +170,7 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
             rrddim_set_by_pointer(st_system_ram, rd_free,    MemFree);
             rrddim_set_by_pointer(st_system_ram, rd_used,    MemUsed);
-            rrddim_set_by_pointer(st_system_ram, rd_cached,  Cached);
+            rrddim_set_by_pointer(st_system_ram, rd_cached,  MemCached);
             rrddim_set_by_pointer(st_system_ram, rd_buffers, Buffers);
 
             rrdset_done(st_system_ram);
