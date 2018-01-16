@@ -18,7 +18,7 @@ TimeoutStopSec=60
 
 # Allow netdata to mlock() up to 32MB of RAM to prevent swapping
 # the part of the RRD database that is currently uses.
-# netdata attempts to lock 8KB per chart and up to 8KB per dimension.
+# netdata attempts to lock 8KB per chart and up to 8KB per dimension (on x86/x64).
 # Failure to mlock() is harmless, but may slow down netdata
 # (i.e. show gaps on the charts when the system is heavily swapping)
 LimitMEMLOCK=32768000

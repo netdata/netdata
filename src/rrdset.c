@@ -258,13 +258,15 @@ void rrdset_reset(RRDSET *st) {
 // RRDSET - helpers for rrdset_create()
 
 inline long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries) {
-    if(unlikely(entries < 5)) entries = 5;
+    (void)mode;
+
+    long page = sysconf(_SC_PAGESIZE);
+    long min = (page - (sizeof(RRDDIM) % page)) / sizeof(storage_number);
+    if(min < 5) min += page;
+
+    if(unlikely(entries < min)) entries = min;
     if(unlikely(entries > RRD_HISTORY_ENTRIES_MAX)) entries = RRD_HISTORY_ENTRIES_MAX;
 
-    if(unlikely(mode == RRD_MEMORY_MODE_NONE || mode == RRD_MEMORY_MODE_ALLOC))
-        return entries;
-
-    long page = (size_t)sysconf(_SC_PAGESIZE);
     long size = sizeof(RRDDIM) + entries * sizeof(storage_number);
     if(unlikely(size % page)) {
         size -= (size % page);
@@ -302,7 +304,7 @@ static int rrd_mlock(const void *addr, size_t len, const char *msg) {
     if(ret == -1) {
         if(!err) {
             err = 1;
-            error("Cannot munlock() %s with size %zu. Try increasing LimitMEMLOCK=BYTES in netdata.service or ulimit -l KBYTES.", msg, len);
+            error("MLOCK: Cannot munlock() %s with size %zu. Try increasing LimitMEMLOCK=BYTES in netdata.service or ulimit -l KBYTES.", msg, len);
         }
     }
     else {
@@ -320,7 +322,7 @@ static int rrd_munlock(const void *addr, size_t len, const char *msg) {
     if(ret == -1) {
         if(!err) {
             err = 1;
-            error("Cannot munlock() %s with size %zu", msg, len);
+            error("MLOCK: Cannot munlock() %s with size %zu", msg, len);
         }
     }
     else {
@@ -334,18 +336,15 @@ static int rrd_msync(void *addr, size_t len, int flags, const char *msg) {
     int ret = msync(addr, len, flags);
 
     if(ret == -1)
-        error("Cannot msync() %s with size %zu.", msg, len);
+        error("MLOCK: Cannot msync() %s with size %zu.", msg, len);
 
     return ret;
 }
 
 static void rrdset_map_unlock(RRDSET *st) {
-    int sync = 0;
-    if(likely(st->rrd_memory_mode == RRD_MEMORY_MODE_MAP))
-        sync = 1;
-
     rrdset_check_rdlock(st);
 
+    int sync = (st->rrd_memory_mode == RRD_MEMORY_MODE_MAP);
     size_t page = (size_t)sysconf(_SC_PAGESIZE);
 
     rrd_munlock(st, sizeof(RRDSET), "RRDSET");
@@ -353,13 +352,19 @@ static void rrdset_map_unlock(RRDSET *st) {
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        rrd_munlock(rd, sizeof(RRDDIM), "RRDDIM");
-        if(sync) rrd_msync(rd, sizeof(RRDDIM), MS_SYNC, "RRDDIM");
-
         if(st->mlock_at > 0) {
+            rrd_munlock(rd, sizeof(RRDDIM), "RRDDIM");
+            if(sync) rrd_msync(rd, sizeof(RRDDIM), MS_SYNC, "RRDDIM PAGE");
+
             char *ptr = (char *)rd;
             rrd_munlock(&ptr[st->mlock_at], page, "METRIC DATA");
             if(sync) rrd_msync(&ptr[st->mlock_at], page, MS_ASYNC, "METRIC DATA");
+        }
+        else {
+            size_t size = sizeof(RRDDIM) + page;
+            size -= size % page;
+            rrd_munlock(rd, size, "RRDDIM PAGE");
+            if(sync) rrd_msync(rd, size, MS_SYNC, "RRDDIM AND METRIC DATA");
         }
     }
 }
@@ -384,7 +389,7 @@ static void rrdset_map_mlock(RRDSET *st, int force) {
     size_t wanted_mlock_at = current_offset - (current_offset % page);
 
     if(force || wanted_mlock_at != st->mlock_at) {
-        info("mlock(): rrdset '%s', current_offset %zu, wanted_offset %zu, locked offset %zu, page size %zu", st->id, current_offset, wanted_mlock_at, st->mlock_at, page);
+        info("MLOCK: rrdset '%s', current_offset %zu, wanted_offset %zu, locked offset %zu, page size %zu", st->id, current_offset, wanted_mlock_at, st->mlock_at, page);
 
         rrdset_map_unlock(st);
 
@@ -393,10 +398,16 @@ static void rrdset_map_mlock(RRDSET *st, int force) {
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
-            rrd_mlock(rd, sizeof(RRDDIM), "RRDDIM");
             if(st->mlock_at > 0) {
+                rrd_mlock(rd, sizeof(RRDDIM), "RRDDIM");
+
                 char *ptr = (char *)rd;
                 rrd_mlock(&ptr[st->mlock_at], page, "METRIC DATA");
+            }
+            else {
+                size_t size = sizeof(RRDDIM) + page;
+                size -= size % page;
+                rrd_mlock(rd, size, "RRDDIM AND METRIC DATA");
             }
         }
     }
@@ -613,15 +624,11 @@ RRDSET *rrdset_create_custom(
     // ------------------------------------------------------------------------
     // get the options from the config, we need to create it
 
-    long rentries = config_get_number(config_section, "history", history_entries);
+    int enabled = config_get_boolean(config_section, "enabled", 1);
+
+    long rentries = config_get_number(config_section, "history", (enabled)?history_entries:5);
     long entries = align_entries_to_pagesize(memory_mode, rentries);
     if(entries != rentries) entries = config_set_number(config_section, "history", entries);
-
-    if(memory_mode == RRD_MEMORY_MODE_NONE && entries != rentries)
-        entries = config_set_number(config_section, "history", 10);
-
-    int enabled = config_get_boolean(config_section, "enabled", 1);
-    if(!enabled) entries = 5;
 
     unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
