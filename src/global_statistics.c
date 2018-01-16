@@ -576,7 +576,7 @@ void global_statistics_charts(void) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_current   = rrddim_add(st_msynced_count, "synced", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_current   = rrddim_add(st_msynced_count, "synced", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         else
             rrdset_next(st_msynced_count);
@@ -607,7 +607,7 @@ void global_statistics_charts(void) {
                     , RRDSET_TYPE_AREA
             );
 
-            rd_current   = rrddim_add(st_msynced_bytes, "synced", NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_current   = rrddim_add(st_msynced_bytes, "synced", NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
         }
         else
             rrdset_next(st_msynced_bytes);

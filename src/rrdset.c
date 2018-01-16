@@ -369,7 +369,7 @@ static void rrdset_map_unlock(RRDSET *st) {
     }
 }
 
-size_t rrd_relock_every = 60;
+size_t rrd_relock_every = 3600;
 size_t *rrd_relock_slots = NULL;
 static volatile uint64_t reloc_distribution = 0;
 
@@ -378,8 +378,11 @@ static size_t get_mlock_slot(size_t size) {
 
     netdata_mutex_lock(&mutex);
 
-    if(!rrd_relock_slots)
+    if(!rrd_relock_slots) {
+        rrd_relock_every = (size_t)sysconf(_SC_PAGESIZE) / sizeof(storage_number);
+        rrd_relock_every = (size_t)config_get_number(CONFIG_SECTION_GLOBAL, "sync to disk every", rrd_relock_every);
         rrd_relock_slots = callocz(rrd_relock_every, sizeof(size_t));
+    }
 
     size_t min = rrd_relock_slots[0];
     size_t min_slot = 0;
@@ -919,7 +922,7 @@ inline void rrdset_next_usec(RRDSET *st, usec_t microseconds) {
         }
         else if(unlikely((usec_t)since_last_usec > (usec_t)(st->update_every * 10 * USEC_PER_SEC))) {
             // oops! the database is too far behind
-            info("RRD database for chart '%s' on host '%s' is %0.5Lf secs in the past. Adjusting it to current time.", st->id, st->rrdhost->hostname, (long double)since_last_usec / USEC_PER_SEC);
+            info("RRD database for chart '%s' on host '%s' is %0.5Lf secs in the past.", st->id, st->rrdhost->hostname, (long double)since_last_usec / USEC_PER_SEC);
 
             microseconds = (usec_t)since_last_usec;
         }

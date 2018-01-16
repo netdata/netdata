@@ -19,6 +19,8 @@ extern int gap_when_lost_iterations_above;
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
 
+typedef struct rrdhost RRDHOST;
+
 // ----------------------------------------------------------------------------
 // chart types
 
@@ -325,7 +327,7 @@ struct rrdset {
     total_number last_collected_total;              // used internally to calculate percentages
 
     RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
-    struct rrdhost *rrdhost;                        // pointer to RRDHOST this chart belongs to
+    RRDHOST *rrdhost;                        // pointer to RRDHOST this chart belongs to
 
     struct rrdset *next;                            // linking of rrdsets
 
@@ -513,7 +515,6 @@ struct rrdhost {
 
     struct rrdhost *next;
 };
-typedef struct rrdhost RRDHOST;
 extern RRDHOST *localhost;
 
 #define rrdhost_rdlock(host) netdata_rwlock_rdlock(&((host)->rrdhost_rwlock))
