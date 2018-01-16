@@ -16,6 +16,15 @@ struct global_statistics {
     volatile uint64_t compressed_content_size;
 
     volatile uint64_t web_client_count;
+
+    volatile uint64_t memory_locked_current_count;
+    volatile uint64_t memory_locked_current_bytes;
+    volatile uint64_t memory_locked_count;
+    volatile uint64_t memory_locked_bytes;
+    volatile uint64_t memory_unlocked_count;
+    volatile uint64_t memory_unlocked_bytes;
+    volatile uint64_t memory_synced_count;
+    volatile uint64_t memory_synced_bytes;
 };
 
 extern volatile struct global_statistics global_statistics;
@@ -34,5 +43,9 @@ extern void web_client_disconnected(void);
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 extern void global_statistics_copy(struct global_statistics *gs, uint8_t options);
 extern void global_statistics_charts(void);
+
+extern void global_statistics_mlock_locked(size_t bytes);
+extern void global_statistics_mlock_unlocked(size_t bytes);
+extern void global_statistics_mlock_msync(size_t bytes);
 
 #endif /* NETDATA_GLOBAL_STATISTICS_H */

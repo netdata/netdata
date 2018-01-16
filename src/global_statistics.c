@@ -8,7 +8,16 @@ volatile struct global_statistics global_statistics = {
         .bytes_sent = 0,
         .content_size = 0,
         .compressed_content_size = 0,
-        .web_client_count = 1
+        .web_client_count = 1,
+
+        .memory_locked_current_count = 0,
+        .memory_locked_current_bytes = 0,
+        .memory_locked_count = 0,
+        .memory_locked_bytes = 0,
+        .memory_unlocked_count = 0,
+        .memory_unlocked_bytes = 0,
+        .memory_synced_count = 0,
+        .memory_synced_bytes = 0
 };
 
 netdata_mutex_t global_statistics_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -89,6 +98,60 @@ void web_client_disconnected(void) {
 #endif
 }
 
+void global_statistics_mlock_locked(size_t bytes) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&global_statistics.memory_locked_count, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.memory_locked_bytes, bytes, __ATOMIC_SEQ_CST);
+
+    __atomic_fetch_add(&global_statistics.memory_locked_current_count, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.memory_locked_current_bytes, bytes, __ATOMIC_SEQ_CST);
+#else
+    global_statistics_lock();
+
+    global_statistics.memory_locked_count++;
+    global_statistics.memory_locked_bytes += bytes;
+
+    global_statistics.memory_locked_current_count++;
+    global_statistics.memory_locked_current_bytes += bytes;
+
+    global_statistics_unlock();
+#endif
+}
+
+void global_statistics_mlock_unlocked(size_t bytes) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&global_statistics.memory_unlocked_count, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.memory_unlocked_bytes, bytes, __ATOMIC_SEQ_CST);
+
+    __atomic_fetch_sub(&global_statistics.memory_locked_current_count, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_sub(&global_statistics.memory_locked_current_bytes, bytes, __ATOMIC_SEQ_CST);
+#else
+    global_statistics_lock();
+
+    global_statistics.memory_unlocked_count++;
+    global_statistics.memory_unlocked_bytes += bytes;
+
+    global_statistics.memory_locked_current_count--;
+    global_statistics.memory_locked_current_bytes -= bytes;
+
+    global_statistics_unlock();
+#endif
+}
+
+void global_statistics_mlock_msync(size_t bytes) {
+#if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
+    __atomic_fetch_add(&global_statistics.memory_synced_count, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&global_statistics.memory_synced_bytes, bytes, __ATOMIC_SEQ_CST);
+#else
+    global_statistics_lock();
+
+    global_statistics.memory_synced_count++;
+    global_statistics.memory_synced_bytes += bytes;
+
+    global_statistics_unlock();
+#endif
+}
+
 
 inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
 #if defined(HAVE_C___ATOMIC) && !defined(NETDATA_NO_ATOMIC_INSTRUCTIONS)
@@ -101,6 +164,15 @@ inline void global_statistics_copy(struct global_statistics *gs, uint8_t options
     gs->content_size            = __atomic_fetch_add(&global_statistics.content_size, 0, __ATOMIC_SEQ_CST);
     gs->compressed_content_size = __atomic_fetch_add(&global_statistics.compressed_content_size, 0, __ATOMIC_SEQ_CST);
     gs->web_client_count        = __atomic_fetch_add(&global_statistics.web_client_count, 0, __ATOMIC_SEQ_CST);
+
+    gs->memory_locked_current_count = __atomic_fetch_add(&global_statistics.memory_locked_current_count, 0, __ATOMIC_SEQ_CST);
+    gs->memory_locked_current_bytes = __atomic_fetch_add(&global_statistics.memory_locked_current_bytes, 0, __ATOMIC_SEQ_CST);
+    gs->memory_locked_count         = __atomic_fetch_add(&global_statistics.memory_locked_count,         0, __ATOMIC_SEQ_CST);
+    gs->memory_locked_bytes         = __atomic_fetch_add(&global_statistics.memory_locked_bytes,         0, __ATOMIC_SEQ_CST);
+    gs->memory_unlocked_count       = __atomic_fetch_add(&global_statistics.memory_unlocked_count,       0, __ATOMIC_SEQ_CST);
+    gs->memory_unlocked_bytes       = __atomic_fetch_add(&global_statistics.memory_unlocked_bytes,       0, __ATOMIC_SEQ_CST);
+    gs->memory_synced_count         = __atomic_fetch_add(&global_statistics.memory_synced_count,         0, __ATOMIC_SEQ_CST);
+    gs->memory_synced_bytes         = __atomic_fetch_add(&global_statistics.memory_synced_bytes,         0, __ATOMIC_SEQ_CST);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
@@ -410,5 +482,137 @@ void global_statistics_charts(void) {
             rrddim_set_by_pointer(st_compression, rd_savings, compression_ratio);
 
         rrdset_done(st_compression);
+    }
+
+    // ----------------------------------------------------------------
+
+    {
+        static RRDSET *st_mlocked_count = NULL;
+        static RRDDIM *rd_current = NULL, *rd_locked = NULL, *rd_unlocked = NULL;
+
+        if (unlikely(!st_mlocked_count)) {
+            st_mlocked_count = rrdset_create_localhost(
+                    "netdata"
+                    , "mlock_count"
+                    , NULL
+                    , "mlock"
+                    , NULL
+                    , "NetData Memory Locks Count"
+                    , "blocks"
+                    , "netdata"
+                    , "stats"
+                    , 130600
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_locked    = rrddim_add(st_mlocked_count, "locked_now",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_unlocked  = rrddim_add(st_mlocked_count, "unlocked_now",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_current   = rrddim_add(st_mlocked_count, "active",        NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(st_mlocked_count);
+
+        rrddim_set_by_pointer(st_mlocked_count, rd_locked,   (collected_number) gs.memory_locked_count);
+        rrddim_set_by_pointer(st_mlocked_count, rd_unlocked, (collected_number) gs.memory_unlocked_count);
+        rrddim_set_by_pointer(st_mlocked_count, rd_current,  (collected_number) gs.memory_locked_current_count);
+        rrdset_done(st_mlocked_count);
+    }
+
+    // ----------------------------------------------------------------
+
+    {
+        static RRDSET *st_mlocked_bytes = NULL;
+        static RRDDIM *rd_current = NULL, *rd_locked = NULL, *rd_unlocked = NULL;
+
+        if (unlikely(!st_mlocked_bytes)) {
+            st_mlocked_bytes = rrdset_create_localhost(
+                    "netdata"
+                    , "mlock_bytes"
+                    , NULL
+                    , "mlock"
+                    , NULL
+                    , "NetData Memory Locks Size"
+                    , "KB"
+                    , "netdata"
+                    , "stats"
+                    , 130601
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_locked    = rrddim_add(st_mlocked_bytes, "locked_now",    NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
+            rd_unlocked  = rrddim_add(st_mlocked_bytes, "unlocked_now",  NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
+            rd_current   = rrddim_add(st_mlocked_bytes, "active",        NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(st_mlocked_bytes);
+
+        rrddim_set_by_pointer(st_mlocked_bytes, rd_locked,   (collected_number) gs.memory_locked_bytes);
+        rrddim_set_by_pointer(st_mlocked_bytes, rd_unlocked, (collected_number) gs.memory_unlocked_bytes);
+        rrddim_set_by_pointer(st_mlocked_bytes, rd_current,  (collected_number) gs.memory_locked_current_bytes);
+        rrdset_done(st_mlocked_bytes);
+    }
+
+    // ----------------------------------------------------------------
+
+    if(gs.memory_synced_count) {
+        static RRDSET *st_msynced_count = NULL;
+        static RRDDIM *rd_current = NULL;
+
+        if (unlikely(!st_msynced_count)) {
+            st_msynced_count = rrdset_create_localhost(
+                    "netdata"
+                    , "msync_count"
+                    , NULL
+                    , "mlock"
+                    , NULL
+                    , "NetData Memory Blocks Synced to Disk"
+                    , "blocks"
+                    , "netdata"
+                    , "stats"
+                    , 130603
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_current   = rrddim_add(st_msynced_count, "synced", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(st_msynced_count);
+
+        rrddim_set_by_pointer(st_msynced_count, rd_current,  (collected_number) gs.memory_synced_count);
+        rrdset_done(st_msynced_count);
+    }
+
+    // ----------------------------------------------------------------
+
+    if(gs.memory_synced_bytes) {
+        static RRDSET *st_msynced_bytes = NULL;
+        static RRDDIM *rd_current = NULL;
+
+        if (unlikely(!st_msynced_bytes)) {
+            st_msynced_bytes = rrdset_create_localhost(
+                    "netdata"
+                    , "msync_bytes"
+                    , NULL
+                    , "mlock"
+                    , NULL
+                    , "NetData Memory Size Synced to Disk"
+                    , "KB"
+                    , "netdata"
+                    , "stats"
+                    , 130604
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_current   = rrddim_add(st_msynced_bytes, "synced", NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(st_msynced_bytes);
+
+        rrddim_set_by_pointer(st_msynced_bytes, rd_current,  (collected_number) gs.memory_synced_bytes);
+        rrdset_done(st_msynced_bytes);
     }
 }

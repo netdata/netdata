@@ -300,15 +300,13 @@ static int rrd_mlock(const void *addr, size_t len, const char *msg) {
     static __thread size_t err = 0;
 
     int ret = mlock(addr, len);
+    global_statistics_mlock_locked(len);
 
     if(ret == -1) {
         if(!err) {
             err = 1;
-            error("MLOCK: Cannot munlock() %s with size %zu. Try increasing LimitMEMLOCK=BYTES in netdata.service or ulimit -l KBYTES.", msg, len);
+            error("MLOCK: Cannot mlock() %s with size %zu. Try increasing LimitMEMLOCK=BYTES in netdata.service or ulimit -l KBYTES.", msg, len);
         }
-    }
-    else {
-        err = 0;
     }
 
     return ret;
@@ -318,6 +316,7 @@ static int rrd_munlock(const void *addr, size_t len, const char *msg) {
     static __thread size_t err = 0;
 
     int ret = mlock(addr, len);
+    global_statistics_mlock_unlocked(len);
 
     if(ret == -1) {
         if(!err) {
@@ -325,20 +324,19 @@ static int rrd_munlock(const void *addr, size_t len, const char *msg) {
             error("MLOCK: Cannot munlock() %s with size %zu", msg, len);
         }
     }
-    else {
-        err = 0;
-    }
 
     return ret;
 }
 
 static int rrd_msync(void *addr, size_t len, int flags, const char *msg) {
-    info("MLOCK: syncing %zu bytes to disk, with option %s", len, (flags == MS_ASYNC)?"MS_ASYNC":"MS_SYNC");
+    // info("MLOCK: syncing %zu bytes to disk, with option %s", len, (flags == MS_ASYNC)?"MS_ASYNC":"MS_SYNC");
 
     int ret = msync(addr, len, flags);
 
     if(ret == -1)
         error("MLOCK: Cannot msync() %s with size %zu.", msg, len);
+    else
+        global_statistics_mlock_msync(len);
 
     return ret;
 }
@@ -371,8 +369,35 @@ static void rrdset_map_unlock(RRDSET *st) {
     }
 }
 
-uint64_t rrd_relock_every = 10 * 60;
+size_t rrd_relock_every = 60;
+size_t *rrd_relock_slots = NULL;
 static volatile uint64_t reloc_distribution = 0;
+
+static size_t get_mlock_slot(size_t size) {
+    static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+
+    netdata_mutex_lock(&mutex);
+
+    if(!rrd_relock_slots)
+        rrd_relock_slots = callocz(rrd_relock_every, sizeof(size_t));
+
+    size_t min = rrd_relock_slots[0];
+    size_t min_slot = 0;
+
+    size_t i;
+    for(i = 1; i < rrd_relock_every ; i++) {
+        if (rrd_relock_slots[i] < min) {
+            min_slot = i;
+            min      = rrd_relock_slots[min_slot];
+        }
+    }
+
+    rrd_relock_slots[min_slot] += size;
+
+    netdata_mutex_unlock(&mutex);
+
+    return min_slot;
+}
 
 static void rrdset_map_mlock(RRDSET *st) {
     // there are 3 regions to be locked
@@ -395,17 +420,21 @@ static void rrdset_map_mlock(RRDSET *st) {
 
     time_t now = now_boottime_sec();
 
+    RRDDIM *rd;
+
     int unlock = 1;
     if(!st->last_mlock_time) {
-        unlock = 0;
-        uint64_t dt = __atomic_fetch_add(&reloc_distribution, 1, __ATOMIC_SEQ_CST);
-        dt = dt % rrd_relock_every;
+        int dims = 0;
+        rrddim_foreach_read(rd, st) dims++;
 
+        unlock = 0;
+        size_t dt = get_mlock_slot(sizeof(RRDSET) + dims * (page + sizeof(RRDDIM)));
         st->last_mlock_time = ((now - (now % rrd_relock_every) + (unsigned int)dt) - (unsigned int)rrd_relock_every);
+        info("MYDT = %llu, time = %zu", (unsigned long long)dt, (size_t)st->last_mlock_time);
     }
 
     if(unlikely((now - st->last_mlock_time) > (int)rrd_relock_every)) {
-        info("MLOCK: rrdset '%s', last mlocked %zu secs ago, current_offset %zu, wanted_offset %zu, locked offset %zu, page size %zu", st->id, (size_t)(now - st->last_mlock_time), current_offset, wanted_mlock_at, st->last_mlock_offset, page);
+        // info("MLOCK: rrdset '%s', last mlocked %zu secs ago, current_offset %zu, wanted_offset %zu, locked offset %zu, page size %zu", st->id, (size_t)(now - st->last_mlock_time), current_offset, wanted_mlock_at, st->last_mlock_offset, page);
         st->last_mlock_time += ((now - st->last_mlock_time) / rrd_relock_every) + rrd_relock_every;
 
         if(unlock)
@@ -414,7 +443,6 @@ static void rrdset_map_mlock(RRDSET *st) {
         st->last_mlock_offset = wanted_mlock_at;
         rrd_mlock(st, sizeof(RRDSET), "RRDSET");
 
-        RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
             if(st->last_mlock_offset > 0) {
                 rrd_mlock(rd, sizeof(RRDDIM), "RRDDIM");
@@ -751,7 +779,6 @@ RRDSET *rrdset_create_custom(
     st->update_every = update_every;
     st->last_mlock_offset = 0;
     st->last_mlock_time = 0;
-    rrdset_map_mlock(st);
 
     if(st->current_entry >= st->entries) st->current_entry = 0;
 
