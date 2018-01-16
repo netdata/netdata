@@ -292,6 +292,117 @@ static inline void last_updated_time_align(RRDSET *st) {
 }
 
 // ----------------------------------------------------------------------------
+// mlock()
+
+static int rrd_mlock(const void *addr, size_t len, const char *msg) {
+    static __thread size_t err = 0;
+
+    int ret = mlock(addr, len);
+
+    if(ret == -1) {
+        if(!err) {
+            err = 1;
+            error("Cannot munlock() %s with size %zu. Try increasing LimitMEMLOCK=BYTES in netdata.service or ulimit -l KBYTES.", msg, len);
+        }
+    }
+    else {
+        err = 0;
+    }
+
+    return ret;
+}
+
+static int rrd_munlock(const void *addr, size_t len, const char *msg) {
+    static __thread size_t err = 0;
+
+    int ret = mlock(addr, len);
+
+    if(ret == -1) {
+        if(!err) {
+            err = 1;
+            error("Cannot munlock() %s with size %zu", msg, len);
+        }
+    }
+    else {
+        err = 0;
+    }
+
+    return ret;
+}
+
+static int rrd_msync(void *addr, size_t len, int flags, const char *msg) {
+    int ret = msync(addr, len, flags);
+
+    if(ret == -1)
+        error("Cannot msync() %s with size %zu.", msg, len);
+
+    return ret;
+}
+
+static void rrdset_map_unlock(RRDSET *st) {
+    int sync = 0;
+    if(likely(st->rrd_memory_mode == RRD_MEMORY_MODE_MAP))
+        sync = 1;
+
+    rrdset_check_rdlock(st);
+
+    size_t page = (size_t)sysconf(_SC_PAGESIZE);
+
+    rrd_munlock(st, sizeof(RRDSET), "RRDSET");
+    if(sync) rrd_msync(st, sizeof(RRDSET), MS_SYNC, "RRDSET");
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        rrd_munlock(rd, sizeof(RRDDIM), "RRDDIM");
+        if(sync) rrd_msync(rd, sizeof(RRDDIM), MS_SYNC, "RRDDIM");
+
+        if(st->mlock_at > 0) {
+            char *ptr = (char *)rd;
+            rrd_munlock(&ptr[st->mlock_at], page, "METRIC DATA");
+            if(sync) rrd_msync(&ptr[st->mlock_at], page, MS_ASYNC, "METRIC DATA");
+        }
+    }
+}
+
+static void rrdset_map_mlock(RRDSET *st, int force) {
+    // there are 3 regions to be locked
+    // 1. the rrdset
+    // 2. the rrddim header
+    // 3. the rrddim data
+
+    // to decide what we need to do,
+    //   i. find the region to be locked (point 3 above)
+    //  ii. if it is different than the current
+    // iii. unlock the last locks - if any
+    //  iv. msync
+    //   v. lock the new region
+
+    rrdset_check_rdlock(st);
+
+    size_t page = (size_t)sysconf(_SC_PAGESIZE);
+    size_t current_offset = (st->current_entry * sizeof(storage_number)) + offsetof(RRDDIM, values);
+    size_t wanted_mlock_at = current_offset - (current_offset % page);
+
+    if(force || wanted_mlock_at != st->mlock_at) {
+        info("mlock(): rrdset '%s', current_offset %zu, wanted_offset %zu, locked offset %zu, page size %zu", st->id, current_offset, wanted_mlock_at, st->mlock_at, page);
+
+        rrdset_map_unlock(st);
+
+        st->mlock_at = wanted_mlock_at;
+        rrd_mlock(st, sizeof(RRDSET), "RRDSET");
+
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            rrd_mlock(rd, sizeof(RRDDIM), "RRDDIM");
+            if(st->mlock_at > 0) {
+                char *ptr = (char *)rd;
+                rrd_mlock(&ptr[st->mlock_at], page, "METRIC DATA");
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
 // RRDSET - free a chart
 
 void rrdset_free(RRDSET *st) {
@@ -301,6 +412,8 @@ void rrdset_free(RRDSET *st) {
 
     rrdhost_check_wrlock(host);  // make sure we have a write lock on the host
     rrdset_wrlock(st);                  // lock this RRDSET
+
+    rrdset_map_unlock(st);
 
     // info("Removing chart '%s' ('%s')", st->id, st->name);
 
@@ -611,6 +724,8 @@ RRDSET *rrdset_create_custom(
     st->memsize = size;
     st->entries = entries;
     st->update_every = update_every;
+    st->mlock_at = 0;
+    rrdset_map_mlock(st, 1);
 
     if(st->current_entry >= st->entries) st->current_entry = 0;
 
@@ -1538,6 +1653,7 @@ void rrdset_done(RRDSET *st) {
     }
 */
 
+    rrdset_map_mlock(st, 0);
     rrdset_unlock(st);
 
     netdata_thread_enable_cancelability();

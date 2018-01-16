@@ -277,7 +277,7 @@ struct rrdset {
     long entries;                                   // total number of entries in the data set
 
     long current_entry;                             // the entry that is currently being updated
-                                                    // it goes around in a round-robin fashion
+                                                    // it goes around in a loop
 
     uint32_t flags;                                 // configuration flags
 
@@ -290,7 +290,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // members for temporary data we need for calculations
 
-    RRD_MEMORY_MODE rrd_memory_mode;                // if set to 1, this is memory mapped
+    RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this chart
 
     char *cache_dir;                                // the directory to store dimensions
     char cache_filename[FILENAME_MAX+1];            // the filename to store this set
@@ -306,7 +306,9 @@ struct rrdset {
     char *plugin_name;                              // the name of the plugin that generated this
     char *module_name;                              // the name of the plugin module that generated this
 
-    size_t unused[6];
+    size_t mlock_at;                                // the offset address of the last mlock
+
+    size_t unused[5];
 
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons
