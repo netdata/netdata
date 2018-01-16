@@ -334,7 +334,7 @@ static int rrd_munlock(const void *addr, size_t len, const char *msg) {
 
 static int rrd_msync(void *addr, size_t len, int flags, const char *msg) {
     info("MLOCK: syncing %zu bytes to disk, with option %s", len, (flags == MS_ASYNC)?"MS_ASYNC":"MS_SYNC");
-    
+
     int ret = msync(addr, len, flags);
 
     if(ret == -1)
@@ -354,13 +354,13 @@ static void rrdset_map_unlock(RRDSET *st) {
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        if(st->mlock_at > 0) {
+        if(st->last_mlock_offset > 0) {
             rrd_munlock(rd, sizeof(RRDDIM), "RRDDIM");
             if(sync) rrd_msync(rd, sizeof(RRDDIM), MS_SYNC, "RRDDIM PAGE");
 
             char *ptr = (char *)rd;
-            rrd_munlock(&ptr[st->mlock_at], page, "METRIC DATA");
-            if(sync) rrd_msync(&ptr[st->mlock_at], page, MS_ASYNC, "METRIC DATA");
+            rrd_munlock(&ptr[st->last_mlock_offset], page, "METRIC DATA");
+            if(sync) rrd_msync(&ptr[st->last_mlock_offset], page, MS_ASYNC, "METRIC DATA");
         }
         else {
             size_t size = sizeof(RRDDIM) + page;
@@ -371,7 +371,9 @@ static void rrdset_map_unlock(RRDSET *st) {
     }
 }
 
-static void rrdset_map_mlock(RRDSET *st, int force) {
+long rrd_relock_every = 60;
+
+static void rrdset_map_mlock(RRDSET *st) {
     // there are 3 regions to be locked
     // 1. the rrdset
     // 2. the rrddim header
@@ -390,21 +392,35 @@ static void rrdset_map_mlock(RRDSET *st, int force) {
     size_t current_offset = (st->current_entry * sizeof(storage_number)) + offsetof(RRDDIM, values);
     size_t wanted_mlock_at = current_offset - (current_offset % page);
 
-    if(force || wanted_mlock_at != st->mlock_at) {
-        info("MLOCK: rrdset '%s', current_offset %zu, wanted_offset %zu, locked offset %zu, page size %zu", st->id, current_offset, wanted_mlock_at, st->mlock_at, page);
+    time_t now = now_boottime_sec();
 
-        rrdset_map_unlock(st);
+    int unlock = 1;
+    if(!st->last_mlock_time) {
+        unlock = 0;
+        static unsigned long long reloc_distribution = 0;
+        unsigned long long dt = __atomic_fetch_add(&reloc_distribution, 1, __ATOMIC_SEQ_CST);
 
-        st->mlock_at = wanted_mlock_at;
+        dt = dt % rrd_relock_every;
+        st->last_mlock_time = ((now - (now % rrd_relock_every) + (unsigned int)dt) - rrd_relock_every);
+    }
+
+    if(unlikely((now - st->last_mlock_time) > rrd_relock_every)) {
+        info("MLOCK: rrdset '%s', last mlocked %zu secs ago, current_offset %zu, wanted_offset %zu, locked offset %zu, page size %zu", st->id, (size_t)(now - st->last_mlock_time), current_offset, wanted_mlock_at, st->last_mlock_offset, page);
+        st->last_mlock_time = now;
+
+        if(unlock)
+            rrdset_map_unlock(st);
+
+        st->last_mlock_offset = wanted_mlock_at;
         rrd_mlock(st, sizeof(RRDSET), "RRDSET");
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
-            if(st->mlock_at > 0) {
+            if(st->last_mlock_offset > 0) {
                 rrd_mlock(rd, sizeof(RRDDIM), "RRDDIM");
 
                 char *ptr = (char *)rd;
-                rrd_mlock(&ptr[st->mlock_at], page, "METRIC DATA");
+                rrd_mlock(&ptr[st->last_mlock_offset], page, "METRIC DATA");
             }
             else {
                 size_t size = sizeof(RRDDIM) + page;
@@ -733,8 +749,9 @@ RRDSET *rrdset_create_custom(
     st->memsize = size;
     st->entries = entries;
     st->update_every = update_every;
-    st->mlock_at = 0;
-    rrdset_map_mlock(st, 1);
+    st->last_mlock_offset = 0;
+    st->last_mlock_time = 0;
+    rrdset_map_mlock(st);
 
     if(st->current_entry >= st->entries) st->current_entry = 0;
 
@@ -1662,7 +1679,7 @@ void rrdset_done(RRDSET *st) {
     }
 */
 
-    rrdset_map_mlock(st, 0);
+    rrdset_map_mlock(st);
     rrdset_unlock(st);
 
     netdata_thread_enable_cancelability();

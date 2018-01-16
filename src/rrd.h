@@ -306,9 +306,10 @@ struct rrdset {
     char *plugin_name;                              // the name of the plugin that generated this
     char *module_name;                              // the name of the plugin module that generated this
 
-    size_t mlock_at;                                // the offset address of the last mlock
+    size_t last_mlock_offset;                       // the offset address of the last mlock
+    time_t last_mlock_time;
 
-    size_t unused[5];
+    size_t unused[4];
 
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons
