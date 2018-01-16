@@ -104,7 +104,9 @@ typedef struct rrdfamily RRDFAMILY;
 typedef enum rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
     RRDDIM_FLAG_HIDDEN                          = 1 << 0,  // this dimension will not be offered to callers
-    RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = 1 << 1   // do not offer RESET or OVERFLOW info to callers
+    RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS = 1 << 1,  // do not offer RESET or OVERFLOW info to callers
+    RRDDIM_FLAG_MLOCKED_HEADER                  = 1 << 2,  // when set, we have an mlock() on this header
+    RRDDIM_FLAG_MLOCKED_DATA                    = 1 << 3   // when set, we have an mlock() on this data
 } RRDDIM_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -232,7 +234,8 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_EXPOSED_UPSTREAM = 1 << 6, // if set, we have sent this chart to netdata master (streaming)
     RRDSET_FLAG_STORE_FIRST      = 1 << 7, // if set, do not eliminate the first collection during interpolation
     RRDSET_FLAG_HETEROGENEOUS    = 1 << 8, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMEGENEOUS_CHECK= 1 << 9  // if set, the chart should be checked to determine if the dimensions as homogeneous
+    RRDSET_FLAG_HOMEGENEOUS_CHECK= 1 << 9, // if set, the chart should be checked to determine if the dimensions as homogeneous
+    RRDSET_FLAG_MLOCKED          = 1 << 10 // we have an mlock() on the header
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC

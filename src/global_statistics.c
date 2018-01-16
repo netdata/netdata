@@ -488,16 +488,16 @@ void global_statistics_charts(void) {
 
     {
         static RRDSET *st_mlocked_count = NULL;
-        static RRDDIM *rd_current = NULL, *rd_locked = NULL, *rd_unlocked = NULL;
+        static RRDDIM *rd_current = NULL;
 
         if (unlikely(!st_mlocked_count)) {
             st_mlocked_count = rrdset_create_localhost(
                     "netdata"
-                    , "mlock_count"
+                    , "mlock_current_count"
                     , NULL
                     , "mlock"
                     , NULL
-                    , "NetData Memory Locks Count"
+                    , "NetData Current Memory Locks"
                     , "blocks"
                     , "netdata"
                     , "stats"
@@ -506,15 +506,11 @@ void global_statistics_charts(void) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_locked    = rrddim_add(st_mlocked_count, "locked_now",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_unlocked  = rrddim_add(st_mlocked_count, "unlocked_now",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_current   = rrddim_add(st_mlocked_count, "active",        NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_current   = rrddim_add(st_mlocked_count, "active", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         else
             rrdset_next(st_mlocked_count);
 
-        rrddim_set_by_pointer(st_mlocked_count, rd_locked,   (collected_number) gs.memory_locked_count);
-        rrddim_set_by_pointer(st_mlocked_count, rd_unlocked, (collected_number) gs.memory_unlocked_count);
         rrddim_set_by_pointer(st_mlocked_count, rd_current,  (collected_number) gs.memory_locked_current_count);
         rrdset_done(st_mlocked_count);
     }
@@ -523,27 +519,90 @@ void global_statistics_charts(void) {
 
     {
         static RRDSET *st_mlocked_bytes = NULL;
-        static RRDDIM *rd_current = NULL, *rd_locked = NULL, *rd_unlocked = NULL;
+        static RRDDIM *rd_current = NULL;
 
         if (unlikely(!st_mlocked_bytes)) {
             st_mlocked_bytes = rrdset_create_localhost(
                     "netdata"
-                    , "mlock_bytes"
+                    , "mlock_current_bytes"
                     , NULL
                     , "mlock"
                     , NULL
-                    , "NetData Memory Locks Size"
+                    , "NetData Memory Locked"
                     , "KB"
                     , "netdata"
                     , "stats"
-                    , 130601
+                    , 130605
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_AREA
             );
 
-            rd_locked    = rrddim_add(st_mlocked_bytes, "locked_now",    NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
-            rd_unlocked  = rrddim_add(st_mlocked_bytes, "unlocked_now",  NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
-            rd_current   = rrddim_add(st_mlocked_bytes, "active",        NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            rd_current = rrddim_add(st_mlocked_bytes, "active", NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            rrdset_next(st_mlocked_bytes);
+
+        rrddim_set_by_pointer(st_mlocked_bytes, rd_current,  (collected_number) gs.memory_locked_current_bytes);
+        rrdset_done(st_mlocked_bytes);
+    }
+
+    // ----------------------------------------------------------------
+
+    {
+        static RRDSET *st_mlocked_count = NULL;
+        static RRDDIM *rd_locked = NULL, *rd_unlocked = NULL;
+
+        if (unlikely(!st_mlocked_count)) {
+            st_mlocked_count = rrdset_create_localhost(
+                    "netdata"
+                    , "mlock_change_count"
+                    , NULL
+                    , "mlock"
+                    , NULL
+                    , "NetData Memory Locks Changes"
+                    , "blocks"
+                    , "netdata"
+                    , "stats"
+                    , 130610
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_locked    = rrddim_add(st_mlocked_count, "locked",    NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_unlocked  = rrddim_add(st_mlocked_count, "unlocked",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        else
+            rrdset_next(st_mlocked_count);
+
+        rrddim_set_by_pointer(st_mlocked_count, rd_locked,   (collected_number) gs.memory_locked_count);
+        rrddim_set_by_pointer(st_mlocked_count, rd_unlocked, (collected_number) gs.memory_unlocked_count);
+        rrdset_done(st_mlocked_count);
+    }
+
+    // ----------------------------------------------------------------
+
+    {
+        static RRDSET *st_mlocked_bytes = NULL;
+        static RRDDIM *rd_locked = NULL, *rd_unlocked = NULL;
+
+        if (unlikely(!st_mlocked_bytes)) {
+            st_mlocked_bytes = rrdset_create_localhost(
+                    "netdata"
+                    , "mlock_change_bytes"
+                    , NULL
+                    , "mlock"
+                    , NULL
+                    , "NetData Memory Locks Size Changes"
+                    , "KB"
+                    , "netdata"
+                    , "stats"
+                    , 130615
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_AREA
+            );
+
+            rd_locked    = rrddim_add(st_mlocked_bytes, "locked",    NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
+            rd_unlocked  = rrddim_add(st_mlocked_bytes, "unlocked",  NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
         }
         else
             rrdset_next(st_mlocked_bytes);
@@ -571,7 +630,7 @@ void global_statistics_charts(void) {
                     , "blocks"
                     , "netdata"
                     , "stats"
-                    , 130603
+                    , 130620
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
             );
@@ -602,7 +661,7 @@ void global_statistics_charts(void) {
                     , "KB"
                     , "netdata"
                     , "stats"
-                    , 130604
+                    , 130625
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_AREA
             );

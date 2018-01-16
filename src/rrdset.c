@@ -300,9 +300,10 @@ static int rrd_mlock(const void *addr, size_t len, const char *msg) {
     static __thread size_t err = 0;
 
     int ret = mlock(addr, len);
-    global_statistics_mlock_locked(len);
 
-    if(ret == -1) {
+    if(ret == 0)
+        global_statistics_mlock_locked(len);
+    else {
         if(!err) {
             err = 1;
             error("MLOCK: Cannot mlock() %s with size %zu. Try increasing LimitMEMLOCK=BYTES in netdata.service or ulimit -l KBYTES.", msg, len);
@@ -316,9 +317,10 @@ static int rrd_munlock(const void *addr, size_t len, const char *msg) {
     static __thread size_t err = 0;
 
     int ret = mlock(addr, len);
-    global_statistics_mlock_unlocked(len);
 
-    if(ret == -1) {
+    if(ret == 0)
+        global_statistics_mlock_unlocked(len);
+    else {
         if(!err) {
             err = 1;
             error("MLOCK: Cannot munlock() %s with size %zu", msg, len);
@@ -347,23 +349,40 @@ static void rrdset_map_unlock(RRDSET *st) {
     int sync = (st->rrd_memory_mode == RRD_MEMORY_MODE_MAP);
     size_t page = (size_t)sysconf(_SC_PAGESIZE);
 
-    rrd_munlock(st, sizeof(RRDSET), "RRDSET");
+    if(rrdset_flag_check(st, RRDSET_FLAG_MLOCKED)) {
+        if(rrd_munlock(st, sizeof(RRDSET), "RRDSET") == 0)
+            rrdset_flag_clear(st, RRDSET_FLAG_MLOCKED);
+    }
+
     if(sync) rrd_msync(st, sizeof(RRDSET), MS_SYNC, "RRDSET");
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(st->last_mlock_offset > 0) {
-            rrd_munlock(rd, sizeof(RRDDIM), "RRDDIM");
+
+            if(rrddim_flag_check(rd, RRDDIM_FLAG_MLOCKED_HEADER)) {
+                if(rrd_munlock(rd, sizeof(RRDDIM), "RRDDIM") == 0)
+                    rrddim_flag_clear(rd, RRDDIM_FLAG_MLOCKED_HEADER);
+            }
+
             if(sync) rrd_msync(rd, sizeof(RRDDIM), MS_SYNC, "RRDDIM PAGE");
 
             char *ptr = (char *)rd;
-            rrd_munlock(&ptr[st->last_mlock_offset], page, "METRIC DATA");
+            if(rrddim_flag_check(rd, RRDDIM_FLAG_MLOCKED_DATA)) {
+                if(rrd_munlock(&ptr[st->last_mlock_offset], page, "METRIC DATA") == 0)
+                    rrddim_flag_clear(rd, RRDDIM_FLAG_MLOCKED_DATA);
+            }
             if(sync) rrd_msync(&ptr[st->last_mlock_offset], page, MS_SYNC, "METRIC DATA");
         }
         else {
             size_t size = sizeof(RRDDIM) + page;
             size -= size % page;
-            rrd_munlock(rd, size, "RRDDIM PAGE");
+
+            if(rrddim_flag_check(rd, RRDDIM_FLAG_MLOCKED_HEADER)) {
+                if(rrd_munlock(rd, size, "RRDDIM AND METRIC DATA") == 0)
+                    rrddim_flag_clear(rd, RRDDIM_FLAG_MLOCKED_HEADER);
+            }
+
             if(sync) rrd_msync(rd, size, MS_SYNC, "RRDDIM AND METRIC DATA");
         }
     }
@@ -444,19 +463,23 @@ static void rrdset_map_mlock(RRDSET *st) {
             rrdset_map_unlock(st);
 
         st->last_mlock_offset = wanted_mlock_at;
-        rrd_mlock(st, sizeof(RRDSET), "RRDSET");
+        if(rrd_mlock(st, sizeof(RRDSET), "RRDSET") == 0)
+            rrdset_flag_set(st, RRDSET_FLAG_MLOCKED);
 
         rrddim_foreach_read(rd, st) {
             if(st->last_mlock_offset > 0) {
-                rrd_mlock(rd, sizeof(RRDDIM), "RRDDIM");
+                if(rrd_mlock(rd, sizeof(RRDDIM), "RRDDIM") == 0)
+                    rrddim_flag_set(rd, RRDDIM_FLAG_MLOCKED_HEADER);
 
                 char *ptr = (char *)rd;
-                rrd_mlock(&ptr[st->last_mlock_offset], page, "METRIC DATA");
+                if(rrd_mlock(&ptr[st->last_mlock_offset], page, "METRIC DATA") == 0)
+                    rrddim_flag_set(rd, RRDDIM_FLAG_MLOCKED_DATA);
             }
             else {
                 size_t size = sizeof(RRDDIM) + page;
                 size -= size % page;
-                rrd_mlock(rd, size, "RRDDIM AND METRIC DATA");
+                if(rrd_mlock(rd, size, "RRDDIM AND METRIC DATA") == 0)
+                    rrddim_flag_set(rd, RRDDIM_FLAG_MLOCKED_HEADER);
             }
         }
     }
