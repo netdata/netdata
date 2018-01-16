@@ -333,6 +333,8 @@ static int rrd_munlock(const void *addr, size_t len, const char *msg) {
 }
 
 static int rrd_msync(void *addr, size_t len, int flags, const char *msg) {
+    info("MLOCK: syncing %zu bytes to disk, with option %s", len, (flags == MS_ASYNC)?"MS_ASYNC":"MS_SYNC");
+    
     int ret = msync(addr, len, flags);
 
     if(ret == -1)
