@@ -371,7 +371,8 @@ static void rrdset_map_unlock(RRDSET *st) {
     }
 }
 
-long rrd_relock_every = 10 * 60;
+uint64_t rrd_relock_every = 10 * 60;
+static volatile uint64_t reloc_distribution = 0;
 
 static void rrdset_map_mlock(RRDSET *st) {
     // there are 3 regions to be locked
@@ -397,16 +398,15 @@ static void rrdset_map_mlock(RRDSET *st) {
     int unlock = 1;
     if(!st->last_mlock_time) {
         unlock = 0;
-        static unsigned long long reloc_distribution = 0;
-        unsigned long long dt = __atomic_fetch_add(&reloc_distribution, 1, __ATOMIC_SEQ_CST);
-
+        uint64_t dt = __atomic_fetch_add(&reloc_distribution, 1, __ATOMIC_SEQ_CST);
         dt = dt % rrd_relock_every;
-        st->last_mlock_time = ((now - (now % rrd_relock_every) + (unsigned int)dt) - rrd_relock_every);
+
+        st->last_mlock_time = ((now - (now % rrd_relock_every) + (unsigned int)dt) - (unsigned int)rrd_relock_every);
     }
 
-    if(unlikely((now - st->last_mlock_time) > rrd_relock_every)) {
+    if(unlikely((now - st->last_mlock_time) > (int)rrd_relock_every)) {
         info("MLOCK: rrdset '%s', last mlocked %zu secs ago, current_offset %zu, wanted_offset %zu, locked offset %zu, page size %zu", st->id, (size_t)(now - st->last_mlock_time), current_offset, wanted_mlock_at, st->last_mlock_offset, page);
-        st->last_mlock_time = now;
+        st->last_mlock_time += ((now - st->last_mlock_time) / rrd_relock_every) + rrd_relock_every;
 
         if(unlock)
             rrdset_map_unlock(st);
