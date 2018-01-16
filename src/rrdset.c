@@ -350,17 +350,17 @@ static void rrdset_map_unlock(RRDSET *st) {
     size_t page = (size_t)sysconf(_SC_PAGESIZE);
 
     rrd_munlock(st, sizeof(RRDSET), "RRDSET");
-    if(sync) rrd_msync(st, sizeof(RRDSET), MS_ASYNC, "RRDSET");
+    if(sync) rrd_msync(st, sizeof(RRDSET), MS_SYNC, "RRDSET");
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(st->last_mlock_offset > 0) {
             rrd_munlock(rd, sizeof(RRDDIM), "RRDDIM");
-            if(sync) rrd_msync(rd, sizeof(RRDDIM), MS_ASYNC, "RRDDIM PAGE");
+            if(sync) rrd_msync(rd, sizeof(RRDDIM), MS_SYNC, "RRDDIM PAGE");
 
             char *ptr = (char *)rd;
             rrd_munlock(&ptr[st->last_mlock_offset], page, "METRIC DATA");
-            if(sync) rrd_msync(&ptr[st->last_mlock_offset], page, MS_ASYNC, "METRIC DATA");
+            if(sync) rrd_msync(&ptr[st->last_mlock_offset], page, MS_SYNC, "METRIC DATA");
         }
         else {
             size_t size = sizeof(RRDDIM) + page;
