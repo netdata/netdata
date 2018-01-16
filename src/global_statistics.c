@@ -486,7 +486,7 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    {
+    if(gs.memory_locked_count || gs.memory_unlocked_count) {
         static RRDSET *st_mlocked_count = NULL;
         static RRDDIM *rd_current = NULL;
 
@@ -517,7 +517,7 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    {
+    if(gs.memory_locked_bytes || gs.memory_unlocked_bytes) {
         static RRDSET *st_mlocked_bytes = NULL;
         static RRDDIM *rd_current = NULL;
 
@@ -548,7 +548,7 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    {
+    if(gs.memory_locked_count || gs.memory_unlocked_count) {
         static RRDSET *st_mlocked_count = NULL;
         static RRDDIM *rd_locked = NULL, *rd_unlocked = NULL;
 
@@ -581,7 +581,7 @@ void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    {
+    if(gs.memory_locked_bytes || gs.memory_unlocked_bytes) {
         static RRDSET *st_mlocked_bytes = NULL;
         static RRDDIM *rd_locked = NULL, *rd_unlocked = NULL;
 
@@ -609,7 +609,6 @@ void global_statistics_charts(void) {
 
         rrddim_set_by_pointer(st_mlocked_bytes, rd_locked,   (collected_number) gs.memory_locked_bytes);
         rrddim_set_by_pointer(st_mlocked_bytes, rd_unlocked, (collected_number) gs.memory_unlocked_bytes);
-        rrddim_set_by_pointer(st_mlocked_bytes, rd_current,  (collected_number) gs.memory_locked_current_bytes);
         rrdset_done(st_mlocked_bytes);
     }
 
