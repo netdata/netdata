@@ -371,7 +371,7 @@ static void rrdset_map_unlock(RRDSET *st) {
     }
 }
 
-long rrd_relock_every = 60;
+long rrd_relock_every = 10 * 60;
 
 static void rrdset_map_mlock(RRDSET *st) {
     // there are 3 regions to be locked
