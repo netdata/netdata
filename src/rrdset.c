@@ -346,7 +346,7 @@ static int rrd_msync(void *addr, size_t len, int flags, const char *msg) {
 static void rrdset_map_unlock(RRDSET *st) {
     rrdset_check_rdlock(st);
 
-    int sync = (st->rrd_memory_mode == RRD_MEMORY_MODE_MAP);
+    //int sync = (st->rrd_memory_mode == RRD_MEMORY_MODE_MAP);
     size_t page = (size_t)sysconf(_SC_PAGESIZE);
 
     if(rrdset_flag_check(st, RRDSET_FLAG_MLOCKED)) {
@@ -354,7 +354,7 @@ static void rrdset_map_unlock(RRDSET *st) {
             rrdset_flag_clear(st, RRDSET_FLAG_MLOCKED);
     }
 
-    if(sync) rrd_msync(st, sizeof(RRDSET), MS_SYNC, "RRDSET");
+    //if(sync) rrd_msync(st, sizeof(RRDSET), MS_SYNC, "RRDSET");
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
@@ -365,14 +365,14 @@ static void rrdset_map_unlock(RRDSET *st) {
                     rrddim_flag_clear(rd, RRDDIM_FLAG_MLOCKED_HEADER);
             }
 
-            if(sync) rrd_msync(rd, sizeof(RRDDIM), MS_SYNC, "RRDDIM PAGE");
+            //if(sync) rrd_msync(rd, sizeof(RRDDIM), MS_SYNC, "RRDDIM PAGE");
 
             char *ptr = (char *)rd;
             if(rrddim_flag_check(rd, RRDDIM_FLAG_MLOCKED_DATA)) {
                 if(rrd_munlock(&ptr[st->last_mlock_offset], page, "METRIC DATA") == 0)
                     rrddim_flag_clear(rd, RRDDIM_FLAG_MLOCKED_DATA);
             }
-            if(sync) rrd_msync(&ptr[st->last_mlock_offset], page, MS_SYNC, "METRIC DATA");
+            //if(sync) rrd_msync(&ptr[st->last_mlock_offset], page, MS_SYNC, "METRIC DATA");
         }
         else {
             size_t size = sizeof(RRDDIM) + page;
@@ -383,7 +383,7 @@ static void rrdset_map_unlock(RRDSET *st) {
                     rrddim_flag_clear(rd, RRDDIM_FLAG_MLOCKED_HEADER);
             }
 
-            if(sync) rrd_msync(rd, size, MS_SYNC, "RRDDIM AND METRIC DATA");
+            //if(sync) rrd_msync(rd, size, MS_SYNC, "RRDDIM AND METRIC DATA");
         }
     }
 }
