@@ -1386,14 +1386,14 @@ void poll_events(LISTEN_SOCKETS *sockets
         info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }
 
-    int timeout = 1000; // in milliseconds
+    int timeout_ms = 1000; // in milliseconds
     time_t last_check = now_boottime_sec();
 
     netdata_thread_cleanup_push(poll_events_cleanup, &p);
 
     while(!netdata_exit) {
         debug(D_POLLFD, "POLLFD: LISTENER: Waiting on %zu sockets...", p.max + 1);
-        retval = poll(p.fds, p.max + 1, timeout);
+        retval = poll(p.fds, p.max + 1, timeout_ms);
         time_t now = now_boottime_sec();
 
         if(unlikely(retval == -1)) {
