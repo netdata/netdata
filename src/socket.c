@@ -1386,7 +1386,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         info("POLLFD: LISTENER: listening on '%s'", (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN");
     }
 
-    int timeout = 1; // wait forever
+    int timeout = 1000; // in milliseconds
     time_t last_check = now_boottime_sec();
 
     netdata_thread_cleanup_push(poll_events_cleanup, &p);
