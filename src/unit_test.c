@@ -1,5 +1,41 @@
 #include "common.h"
 
+static int check_number_printing(void) {
+    struct {
+        calculated_number n;
+        const char *correct;
+    } values[] = {
+            { .n = 0, .correct = "0" },
+            { .n = 0.0000001,   .correct = "0.0000001" },
+            { .n = 0.00000009,  .correct = "0.0000001" },
+            { .n = 0.000000001, .correct = "0" },
+            { .n = 99.99999999999999999, .correct = "100" },
+            { .n = -99.99999999999999999, .correct = "-100" },
+            { .n = 123.4567890123456789, .correct = "123.456789" },
+            { .n = 9999.9999999, .correct = "9999.9999999" },
+            { .n = -9999.9999999, .correct = "-9999.9999999" },
+            { .n = 0, .correct = NULL },
+    };
+
+    char netdata[50], system[50];
+    int i, failed = 0;
+    for(i = 0; values[i].correct ; i++) {
+        print_calculated_number(netdata, values[i].n);
+        snprintfz(system, 49, "%0.12Lf", values[i].n);
+
+        int ok = 1;
+        if(strcmp(netdata, values[i].correct) != 0) {
+            ok = 0;
+            failed++;
+        }
+
+        fprintf(stderr, "'%s' (system) printed as '%s' (netdata): %s\n", system, netdata, ok?"OK":"FAILED");
+    }
+
+    if(failed) return 1;
+    return 0;
+}
+
 static int check_rrdcalc_comparisons(void) {
     RRDCALC_STATUS a, b;
 
@@ -1163,6 +1199,9 @@ static int test_variable_renames(void) {
 
 int run_all_mockup_tests(void)
 {
+    if(check_number_printing())
+        return 1;
+
     if(check_rrdcalc_comparisons())
         return 1;
 
