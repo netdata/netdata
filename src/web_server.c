@@ -415,7 +415,7 @@ static void *multi_threaded_web_client_worker_main(void *ptr) {
             w->running = 1;
 
             struct pollfd fds[2], *ifd, *ofd;
-            int retval, timeout;
+            int retval, timeout_ms;
             nfds_t fdmax = 0;
 
             while(!netdata_exit) {
@@ -467,8 +467,8 @@ static void *multi_threaded_web_client_worker_main(void *ptr) {
 
                 debug(D_WEB_CLIENT, "%llu: Waiting socket async I/O for %s %s", w->id, web_client_has_wait_receive(w)?"INPUT":"", web_client_has_wait_send(w)?"OUTPUT":"");
                 errno = 0;
-                timeout = web_client_timeout * 1000;
-                retval = poll(fds, fdmax, timeout);
+                timeout_ms = web_client_timeout * 1000;
+                retval = poll(fds, fdmax, timeout_ms);
 
                 if(unlikely(netdata_exit)) break;
 
@@ -640,12 +640,12 @@ void *socket_listen_main_multi_threaded(void *ptr) {
         info("Listening on '%s'", (api_sockets.fds_names[i])?api_sockets.fds_names[i]:"UNKNOWN");
     }
 
-    int timeout = 1 * 1000;
+    int timeout_ms = 1 * 1000;
 
     while(!netdata_exit) {
 
         // debug(D_WEB_CLIENT, "LISTENER: Waiting...");
-        retval = poll(socket_listen_main_multi_threaded_fds, api_sockets.opened, timeout);
+        retval = poll(socket_listen_main_multi_threaded_fds, api_sockets.opened, timeout_ms);
 
         if(unlikely(retval == -1)) {
             error("LISTENER: poll() failed.");
