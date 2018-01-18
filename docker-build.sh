@@ -11,7 +11,7 @@ DEBIAN_FRONTEND=noninteractive
 # install dependencies for build
 
 apt-get -qq update
-apt-get -y install zlib1g-dev uuid-dev libmnl-dev gcc make curl git autoconf autogen automake pkg-config netcat-openbsd jq
+apt-get -y install zlib1g-dev uuid-dev libmnl-dev gcc make curl git autoconf autogen automake pkg-config netcat-openbsd jq heirloom-mailx mailutils
 apt-get -y install autoconf-archive lm-sensors nodejs python python-mysqldb python-yaml
 
 # use the provided installer
@@ -23,7 +23,7 @@ apt-get -y install autoconf-archive lm-sensors nodejs python python-mysqldb pyth
 cd /
 rm -rf /netdata.git
 
-dpkg -P zlib1g-dev uuid-dev libmnl-dev gcc make git autoconf autogen automake pkg-config
+dpkg -P zlib1g-dev uuid-dev libmnl-dev gcc git autoconf autogen automake pkg-config
 apt-get -y autoremove
 apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
