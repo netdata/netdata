@@ -98,6 +98,7 @@ dist_healthconfig_DATA = \
     health.d/net.conf \
     health.d/netfilter.conf \
     health.d/nginx.conf \
+    health.d/nginx_plus.conf \
     health.d/postgres.conf \
     health.d/qos.conf \
     health.d/ram.conf \
