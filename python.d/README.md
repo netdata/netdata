@@ -1338,11 +1338,11 @@ For every upstream:
 5. **Peers Connections Usage** in percent
  * peer name (dimension per peer)
  
-6. **All Peers Traffic** in kilobits/s
+6. **All Peers Traffic** in KB
  * received
  * sent
  
-7. **Peer Traffic** in kilobits/s (for every peer)
+7. **Peer Traffic** in KB/s (for every peer)
  * received
  * sent
  
@@ -1359,6 +1359,15 @@ For every upstream:
 11. **Peers Total Downtime** in seconds
  * peer name (dimension per peer)
 
+For every cache:
+
+1. **Traffic** in KB
+ * served
+ * written
+ * bypass
+ 
+2. **Memory Usage** in percent
+ * usage
  
 ### configuration
 
