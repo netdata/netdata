@@ -5,6 +5,7 @@
 import re
 
 from collections import defaultdict
+from copy import deepcopy
 from json import loads
 
 try:
@@ -423,8 +424,8 @@ class WebUpstreamPeer:
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.order = ORDER
-        self.definitions = CHARTS
+        self.order = list(ORDER)
+        self.definitions = deepcopy(CHARTS)
         self.objects = dict()
 
     def check(self):
