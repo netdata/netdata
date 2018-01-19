@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: apache netdata python.d module
+# Description: nginx_plus netdata python.d module
 # Author: Ilya Mashchenko (l2isbad)
 
 import re
