@@ -178,7 +178,7 @@ def web_upstream_charts(wu):
     for peer in wu:
         charts['web_upstream_{0}_{1}_responses'.format(wu.name, peer.id)] = {
             'options': [None, 'Peer "{0}" Responses'.format(peer.real_server), 'responses/s', family,
-                        'nginx_plus.web_upstream_peer_responses'.format(wu.name), 'stacked'],
+                        'nginx_plus.web_upstream_peer_responses', 'stacked'],
             'lines': [
                 ['_'.join([wu.name, peer.server, 'responses_2xx']), '2xx', 'incremental'],
                 ['_'.join([wu.name, peer.server, 'responses_5xx']), '5xx', 'incremental'],
@@ -210,7 +210,7 @@ def web_upstream_charts(wu):
     for peer in wu:
         charts['web_upstream_{0}_{1}_net'.format(wu.name, peer.id)] = {
             'options': [None, 'Peer "{0}" Traffic'.format(peer.real_server), 'kilobits/s', family,
-                        'nginx_plus.web_upstream_peer_traffic'.format(wu.name), 'area'],
+                        'nginx_plus.web_upstream_peer_traffic', 'area'],
             'lines': [
                 ['{0}_{1}_received'.format(wu.name, peer.server), 'received', 'incremental', 1, 1000],
                 ['{0}_{1}_sent'.format(wu.name, peer.server), 'sent', 'incremental', -1, 1000]
