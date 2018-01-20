@@ -1,0 +1,46 @@
+#!/bin/sh
+
+. /etc/rc.subr
+
+name=netdata
+rcvar=netdata_enable
+
+pidfile="@localstatedir_POST@/run/netdata.pid"
+
+command="@sbindir_POST@/netdata"
+command_args="-P ${pidfile}"
+
+required_files="@sysconfdir_POST@/netdata/netdata.conf"
+
+start_precmd="netdata_prestart"
+stop_postcmd="netdata_poststop"
+
+extra_commands="reloadhealth savedb"
+
+reloadhealth_cmd="netdata_reloadhealth"
+savedb_cmd="netdata_savedb"
+
+netdata_prestart()
+{
+	return 0
+}
+
+netdata_poststop()
+{
+	return 0
+}
+
+netdata_reloadhealth()
+{
+    kill -USR2 `cat ${pidfile}`
+    return 0
+}
+
+netdata_savedb()
+{
+    kill -USR1 `cat ${pidfile}`
+    return 0
+}
+
+load_rc_config $name
+run_rc_command "$1"

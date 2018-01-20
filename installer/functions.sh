@@ -502,9 +502,15 @@ NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
 
 install_netdata_service() {
+    local uname="$(uname 2>/dev/null)"
+
     if [ "${UID}" -eq 0 ]
     then
-        if issystemd
+        if [ "${uname}" = "FreeBSD" ]
+        then
+            run cp system/netdata-freebsd /etc/rc.d/netdata && \
+                return 0
+        elif issystemd
         then
             # systemd is running on this system
             NETDATA_START_CMD="systemctl start netdata"
