@@ -16,12 +16,12 @@ KSM_NAME_VALUE values[] = {
         [PAGES_SHARING]  = { "/sys/kernel/mm/ksm/pages_sharing",  0ULL },
         [PAGES_UNSHARED] = { "/sys/kernel/mm/ksm/pages_unshared", 0ULL },
         [PAGES_VOLATILE] = { "/sys/kernel/mm/ksm/pages_volatile", 0ULL },
-        [PAGES_TO_SCAN]  = { "/sys/kernel/mm/ksm/pages_to_scan",  0ULL },
+        // [PAGES_TO_SCAN]  = { "/sys/kernel/mm/ksm/pages_to_scan",  0ULL },
 };
 
 int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     (void)dt;
-    static procfile *ff_pages_shared = NULL, *ff_pages_sharing = NULL, *ff_pages_unshared = NULL, *ff_pages_volatile = NULL, *ff_pages_to_scan = NULL;
+    static procfile *ff_pages_shared = NULL, *ff_pages_sharing = NULL, *ff_pages_unshared = NULL, *ff_pages_volatile = NULL/*, *ff_pages_to_scan = NULL*/;
     static unsigned long page_size = 0;
 
     if(unlikely(page_size == 0))
@@ -51,16 +51,16 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
         ff_pages_volatile = procfile_open(values[PAGES_VOLATILE].filename, " \t:", PROCFILE_FLAG_DEFAULT);
     }
 
-    if(unlikely(!ff_pages_to_scan)) {
-        snprintfz(values[PAGES_TO_SCAN].filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/kernel/mm/ksm/pages_to_scan");
-        snprintfz(values[PAGES_TO_SCAN].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_to_scan", values[PAGES_TO_SCAN].filename));
-        ff_pages_to_scan = procfile_open(values[PAGES_TO_SCAN].filename, " \t:", PROCFILE_FLAG_DEFAULT);
-    }
+    //if(unlikely(!ff_pages_to_scan)) {
+    //    snprintfz(values[PAGES_TO_SCAN].filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/kernel/mm/ksm/pages_to_scan");
+    //    snprintfz(values[PAGES_TO_SCAN].filename, FILENAME_MAX, "%s", config_get("plugin:proc:/sys/kernel/mm/ksm", "/sys/kernel/mm/ksm/pages_to_scan", values[PAGES_TO_SCAN].filename));
+    //    ff_pages_to_scan = procfile_open(values[PAGES_TO_SCAN].filename, " \t:", PROCFILE_FLAG_DEFAULT);
+    //}
 
-    if(unlikely(!ff_pages_shared || !ff_pages_sharing || !ff_pages_unshared || !ff_pages_volatile || !ff_pages_to_scan))
+    if(unlikely(!ff_pages_shared || !ff_pages_sharing || !ff_pages_unshared || !ff_pages_volatile /*|| !ff_pages_to_scan */))
         return 1;
 
-    unsigned long long pages_shared = 0, pages_sharing = 0, pages_unshared = 0, pages_volatile = 0, pages_to_scan = 0, offered = 0, saved = 0;
+    unsigned long long pages_shared = 0, pages_sharing = 0, pages_unshared = 0, pages_volatile = 0, /*pages_to_scan = 0,*/ offered = 0, saved = 0;
 
     ff_pages_shared = procfile_readall(ff_pages_shared);
     if(unlikely(!ff_pages_shared)) return 0; // we return 0, so that we will retry to open it next time
@@ -78,20 +78,20 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     if(unlikely(!ff_pages_volatile)) return 0; // we return 0, so that we will retry to open it next time
     pages_volatile = str2ull(procfile_lineword(ff_pages_volatile, 0, 0));
 
-    ff_pages_to_scan = procfile_readall(ff_pages_to_scan);
-    if(unlikely(!ff_pages_to_scan)) return 0; // we return 0, so that we will retry to open it next time
-    pages_to_scan = str2ull(procfile_lineword(ff_pages_to_scan, 0, 0));
+    //ff_pages_to_scan = procfile_readall(ff_pages_to_scan);
+    //if(unlikely(!ff_pages_to_scan)) return 0; // we return 0, so that we will retry to open it next time
+    //pages_to_scan = str2ull(procfile_lineword(ff_pages_to_scan, 0, 0));
 
     offered = pages_sharing + pages_shared + pages_unshared + pages_volatile;
     saved = pages_sharing;
 
-    if(unlikely(!offered || !pages_to_scan)) return 0;
+    if(unlikely(!offered /*|| !pages_to_scan*/)) return 0;
 
     // --------------------------------------------------------------------
 
     {
         static RRDSET *st_mem_ksm = NULL;
-        static RRDDIM *rd_shared = NULL, *rd_unshared = NULL, *rd_sharing = NULL, *rd_volatile = NULL, *rd_to_scan = NULL;
+        static RRDDIM *rd_shared = NULL, *rd_unshared = NULL, *rd_sharing = NULL, *rd_volatile = NULL/*, *rd_to_scan = NULL*/;
 
         if (unlikely(!st_mem_ksm)) {
             st_mem_ksm = rrdset_create_localhost(
@@ -113,7 +113,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
             rd_unshared = rrddim_add(st_mem_ksm, "unshared", NULL,     -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_sharing  = rrddim_add(st_mem_ksm, "sharing",  NULL,      1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_volatile = rrddim_add(st_mem_ksm, "volatile", NULL,     -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-            rd_to_scan  = rrddim_add(st_mem_ksm, "to_scan", "to scan", -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            //rd_to_scan  = rrddim_add(st_mem_ksm, "to_scan", "to scan", -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
         }
         else
             rrdset_next(st_mem_ksm);
@@ -122,7 +122,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st_mem_ksm, rd_unshared, pages_unshared * page_size);
         rrddim_set_by_pointer(st_mem_ksm, rd_sharing,  pages_sharing  * page_size);
         rrddim_set_by_pointer(st_mem_ksm, rd_volatile, pages_volatile * page_size);
-        rrddim_set_by_pointer(st_mem_ksm, rd_to_scan,  pages_to_scan  * page_size);
+        //rrddim_set_by_pointer(st_mem_ksm, rd_to_scan,  pages_to_scan  * page_size);
 
         rrdset_done(st_mem_ksm);
     }
