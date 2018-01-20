@@ -767,32 +767,35 @@ if [ ${UID} -eq 0 ]
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
 
-    setcap_ret=1
-    if ! iscontainer
-        then
-        if [ ! -z "${setcap}" ]
+    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]
+    then
+        setcap_ret=1
+        if ! iscontainer
             then
+            if [ ! -z "${setcap}" ]
+                then
+                run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+                run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+                run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+                setcap_ret=$?
+            fi
+
+            if [ ${setcap_ret} -eq 0 ]
+                then
+                # if we managed to setcap
+                # but we fail to execute apps.plugin
+                # trigger setuid to root
+                "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -t >/dev/null 2>&1
+                setcap_ret=$?
+            fi
+        fi
+
+        if [ ${setcap_ret} -ne 0 ]
+            then
+            # fix apps.plugin to be setuid to root
             run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-            run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-            run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-            setcap_ret=$?
+            run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
         fi
-
-        if [ ${setcap_ret} -eq 0 ]
-            then
-            # if we managed to setcap
-            # but we fail to execute apps.plugin
-            # trigger setuid to root
-            "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -t >/dev/null 2>&1
-            setcap_ret=$?
-        fi
-    fi
-
-    if [ ${setcap_ret} -ne 0 ]
-        then
-        # fix apps.plugin to be setuid to root
-        run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-        run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
     fi
 
     if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin" ]
@@ -929,12 +932,14 @@ https://github.com/firehol/netdata/wiki/Installation
 VERMSG
 fi
 
-# -----------------------------------------------------------------------------
-progress "Check apps.plugin"
+if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]
+then
+    # -----------------------------------------------------------------------------
+    progress "Check apps.plugin"
 
-if [ "${UID}" -ne 0 ]
-    then
-    cat <<SETUID_WARNING
+    if [ "${UID}" -ne 0 ]
+        then
+        cat <<SETUID_WARNING
 
 ${TPUT_BOLD}apps.plugin needs privileges${TPUT_RESET}
 
@@ -958,6 +963,7 @@ running processes. It cannot be instructed from the netdata daemon to perform
 any task, so it is pretty safe to do this.
 
 SETUID_WARNING
+    fi
 fi
 
 # -----------------------------------------------------------------------------

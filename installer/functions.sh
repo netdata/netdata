@@ -506,10 +506,20 @@ install_netdata_service() {
 
     if [ "${UID}" -eq 0 ]
     then
-        if [ "${uname}" = "FreeBSD" ]
+        if [ "${uname}" = "Darwin" ]
         then
+
+            echo >&2 "hm... I don't know how to install a startup script for MacOS X"
+            return 1
+
+        elif [ "${uname}" = "FreeBSD" ]
+        then
+
             run cp system/netdata-freebsd /etc/rc.d/netdata && \
+                NETDATA_START_CMD="service netdata start" && \
+                NETDATA_STOP_CMD="service netdata stop" && \
                 return 0
+
         elif issystemd
         then
             # systemd is running on this system
