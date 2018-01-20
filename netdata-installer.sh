@@ -869,11 +869,13 @@ else
     download_netdata_conf "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
 fi
 
-# -----------------------------------------------------------------------------
-progress "Check KSM (kernel memory deduper)"
+if [ "$(uname)" = "Linux" ]
+then
+    # -------------------------------------------------------------------------
+    progress "Check KSM (kernel memory deduper)"
 
-ksm_is_available_but_disabled() {
-    cat <<KSM1
+    ksm_is_available_but_disabled() {
+        cat <<KSM1
 
 ${TPUT_BOLD}Memory de-duplication instructions${TPUT_RESET}
 
@@ -888,10 +890,10 @@ To enable it run:
 If you enable it, you will save 40-60% of netdata memory.
 
 KSM1
-}
+    }
 
-ksm_is_not_available() {
-    cat <<KSM2
+    ksm_is_not_available() {
+        cat <<KSM2
 
 ${TPUT_BOLD}Memory de-duplication not present in your kernel${TPUT_RESET}
 
@@ -903,17 +905,19 @@ To enable it, you need a kernel built with CONFIG_KSM=y
 If you can have it, you will save 40-60% of netdata memory.
 
 KSM2
-}
+    }
 
-if [ -f "/sys/kernel/mm/ksm/run" ]
-    then
-    if [ $(cat "/sys/kernel/mm/ksm/run") != "1" ]
+    if [ -f "/sys/kernel/mm/ksm/run" ]
         then
-        ksm_is_available_but_disabled
+        if [ $(cat "/sys/kernel/mm/ksm/run") != "1" ]
+            then
+            ksm_is_available_but_disabled
+        fi
+    else
+        ksm_is_not_available
     fi
-else
-    ksm_is_not_available
 fi
+
 
 # -----------------------------------------------------------------------------
 progress "Check version.txt"
