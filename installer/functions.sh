@@ -502,9 +502,25 @@ NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
 
 install_netdata_service() {
+    local uname="$(uname 2>/dev/null)"
+
     if [ "${UID}" -eq 0 ]
     then
-        if issystemd
+        if [ "${uname}" = "Darwin" ]
+        then
+
+            echo >&2 "hm... I don't know how to install a startup script for MacOS X"
+            return 1
+
+        elif [ "${uname}" = "FreeBSD" ]
+        then
+
+            run cp system/netdata-freebsd /etc/rc.d/netdata && \
+                NETDATA_START_CMD="service netdata start" && \
+                NETDATA_STOP_CMD="service netdata stop" && \
+                return 0
+
+        elif issystemd
         then
             # systemd is running on this system
             NETDATA_START_CMD="systemctl start netdata"
@@ -592,7 +608,7 @@ stop_netdata_on_pid() {
     return 0
 }
 
-stop_all_netdata() {
+netdata_pids() {
     local p myns ns
 
     myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
@@ -608,8 +624,16 @@ stop_all_netdata() {
 
         if [ -z "${myns}" -o -z "${ns}" -o "${myns}" = "${ns}" ]
             then
-            stop_netdata_on_pid ${p}
+            pidisnetdata ${p} && echo "${p}"
         fi
+    done
+}
+
+stop_all_netdata() {
+    local p
+    for p in $(netdata_pids)
+    do
+        stop_netdata_on_pid ${p}
     done
 }
 
@@ -630,10 +654,22 @@ restart_netdata() {
         stop_all_netdata
         service netdata restart && started=1
 
+        if [ ${started} -eq 1 -a -z "$(netdata_pids)" ]
+        then
+            echo >&2 "Ooops! it seems netdata is not started."
+            started=0
+        fi
+
         if [ ${started} -eq 0 ]
         then
             service netdata start && started=1
         fi
+    fi
+
+    if [ ${started} -eq 1 -a -z "$(netdata_pids)" ]
+    then
+        echo >&2 "Hm... it seems netdata is still not started."
+        started=0
     fi
 
     if [ ${started} -eq 0 ]
