@@ -32,13 +32,15 @@ netdata_poststop()
 
 netdata_reloadhealth()
 {
-    kill -USR2 `cat ${pidfile}`
+    p=`cat ${pidfile}`
+    kill -USR2 ${p} && echo "Sent USR2 (reload health) to pid ${p}"
     return 0
 }
 
 netdata_savedb()
 {
-    kill -USR1 `cat ${pidfile}`
+    p=`cat ${pidfile}`
+    kill -USR2 ${p} && echo "Sent USR1 (save db) to pid ${p}"
     return 0
 }
 
