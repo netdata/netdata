@@ -466,12 +466,8 @@ class Service(UrlService):
         data = parse_json(response, METRICS['SERVER'])
         data['ssl_memory_usage'] = data['slabs_SSL_pages_used'] / float(data['slabs_SSL_pages_free']) * 1e4
 
-        for obj_name in self.objects:
-            try:
-                obj = self.objects[obj_name]
-            except KeyError:
-                continue
-            else:
+        for obj in self.objects.values():
+            if obj.real_name in response[obj.key]:
                 data.update(obj.get_data(response))
 
         return data
