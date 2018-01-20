@@ -397,7 +397,7 @@ netdataDashboard.submenu = {
     },
 
     'mem.ksm': {
-        title: 'Memory Deduper',
+        title: 'deduper (ksm)',
         info: 'Kernel Same-page Merging (KSM) performance monitoring, read from several files in <code>/sys/kernel/mm/ksm/</code>. KSM is a memory-saving de-duplication feature in the Linux kernel (since version 2.6.32). The KSM daemon ksmd periodically scans those areas of user memory which have been registered with it, looking for pages of identical content which can be replaced by a single write-protected page (which is automatically copied if a process later wants to update its content). KSM was originally developed for use with KVM (where it was known as Kernel Shared Memory), to fit more virtual machines into physical memory, by sharing the data common between them.  But it can be useful to any application which generates many instances of the same data.'
     },
 
@@ -410,17 +410,17 @@ netdataDashboard.submenu = {
     },
 
     'netfilter.conntrack': {
-        title: 'Connection Tracker',
+        title: 'connection tracker',
         info: 'Netfilter Connection Tracker performance metrics. The connection tracker keeps track of all connections of the machine, inbound and outbound. It works by keeping a database with all open connections, tracking network and address translation and connection expectations.'
     },
 
     'netfilter.nfacct': {
-        title: 'Bandwidth Accounting',
+        title: 'bandwidth accounting',
         info: 'The following information is read using the <code>nfacct.plugin</code>.'
     },
 
     'netfilter.synproxy': {
-        title: 'DDoS Protection',
+        title: 'DDoS protection',
         info: 'DDoS protection performance metrics. <a href="https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY" target="_blank">SYNPROXY</a> is a TCP SYN packets proxy. It is used to protect any TCP server (like a web server) from SYN floods and similar DDoS attacks. It is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections. It can be used for any kind of TCP traffic (even encrypted), since it does not interfere with the content itself.'
     },
 
@@ -450,31 +450,31 @@ netdataDashboard.submenu = {
     },
 
     'go_expvar.memstats': {
-        title: 'Memory statistics',
+        title: 'memory statistics',
         info: 'Go runtime memory statistics. See <a href="https://golang.org/pkg/runtime/#MemStats" target="_blank">runtime.MemStats</a> documentation for more info about each chart and the values.'
     },
 
     'couchdb.dbactivity': {
-        title: 'DB activity',
+        title: 'db activity',
         info: 'Overall database reads and writes for the entire server. This includes any external HTTP traffic, as well as internal replication traffic performed in a cluster to ensure node consistency.'
     },
 
     'couchdb.httptraffic': {
-        title: 'HTTP traffic breakdown',
+        title: 'http traffic breakdown',
         info: 'All HTTP traffic, broken down by type of request (<tt>GET</tt>, <tt>PUT</tt>, <tt>POST</tt>, etc.) and response status code (<tt>200</tt>, <tt>201</tt>, <tt>4xx</tt>, etc.)<br/><br/>Any <tt>5xx</tt> errors here indicate a likely CouchDB bug; check the logfile for further information.'
     },
 
     'couchdb.ops': {
-        title: 'Server operations'
+        title: 'server operations'
     },
 
     'couchdb.perdbstats': {
-        title: 'Per-DB statistics',
+        title: 'per db statistics',
         info: 'Statistics per database. This includes <a href="http://docs.couchdb.org/en/latest/api/database/common.html#get--db">3 size graphs per database</a>: active (the size of live data in the database), external (the uncompressed size of the database contents), and file (the size of the file on disk, exclusive of any views and indexes). It also includes the number of documents and number of deleted documents per database.'
     },
 
     'couchdb.erlang': {
-        title: 'Erlang statistics',
+        title: 'erlang statistics',
         info: 'Detailed information about the status of the Erlang VM that hosts CouchDB. These are intended for advanced users only. High values of the peak message queue (>10e6) generally indicate an overload condition.'
     }
 };
