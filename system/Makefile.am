@@ -8,6 +8,7 @@ CLEANFILES = \
 	netdata.service \
 	netdata-init-d \
 	netdata-lsb \
+	netdata-freebsd \
 	$(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -20,6 +21,7 @@ nodist_noinst_DATA = \
 	netdata.service \
 	netdata-init-d \
 	netdata-lsb \
+	netdata-freebsd \
 	$(NULL)
 
 dist_noinst_DATA = \
@@ -28,5 +30,6 @@ dist_noinst_DATA = \
 	netdata.service.in \
 	netdata-init-d.in \
 	netdata-lsb.in \
+	netdata-freebsd.in \
 	netdata.conf \
 	$(NULL)
