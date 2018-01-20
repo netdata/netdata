@@ -2008,7 +2008,7 @@ static inline void link_all_processes_to_their_parents(void) {
 // to avoid filling up all disk space
 // if debug is enabled, all errors are printed
 
-#ifndef __FreeBSD__
+#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static int compar_pid(const void *pid1, const void *pid2) {
 
     struct pid_stat *p1 = all_pids[*((pid_t *)pid1)];
