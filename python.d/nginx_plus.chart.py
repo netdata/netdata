@@ -440,10 +440,14 @@ class Service(UrlService):
         raw_data = self._get_raw_data()
         if not raw_data:
             return None
-        response = loads(raw_data)
+
+        try:
+            response = loads(raw_data)
+        except ValueError:
+            return None
 
         for obj_cls in [WebZone, WebUpstream, Cache]:
-            for obj_name in response[obj_cls.key]:
+            for obj_name in response.get(obj_cls.key, list()):
                 obj = obj_cls(name=obj_name, response=response)
                 self.objects[obj.real_name] = obj
                 charts = obj_cls.charts(obj)
@@ -451,7 +455,7 @@ class Service(UrlService):
                     self.order.append(chart)
                     self.definitions[chart] = charts[chart]
 
-        return True
+        return bool(self.objects)
 
     def _get_data(self):
         """
