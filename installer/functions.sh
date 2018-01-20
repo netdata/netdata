@@ -592,7 +592,7 @@ stop_netdata_on_pid() {
     return 0
 }
 
-stop_all_netdata() {
+netdata_pids() {
     local p myns ns
 
     myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
@@ -608,8 +608,16 @@ stop_all_netdata() {
 
         if [ -z "${myns}" -o -z "${ns}" -o "${myns}" = "${ns}" ]
             then
-            stop_netdata_on_pid ${p}
+            pidisnetdata ${p} && echo "${p}"
         fi
+    done
+}
+
+stop_all_netdata() {
+    local p
+    for p in $(netdata_pids)
+    do
+        stop_netdata_on_pid ${p}
     done
 }
 
@@ -630,10 +638,22 @@ restart_netdata() {
         stop_all_netdata
         service netdata restart && started=1
 
+        if [ ${started} -eq 1 -a -z "$(netdata_pids)" ]
+        then
+            echo >&2 "Ooops! it seems netdata is not started."
+            started=0
+        fi
+
         if [ ${started} -eq 0 ]
         then
             service netdata start && started=1
         fi
+    fi
+
+    if [ ${started} -eq 1 -a -z "$(netdata_pids)" ]
+    then
+        echo >&2 "Hm... it seems netdata is still not started."
+        started=0
     fi
 
     if [ ${started} -eq 0 ]
