@@ -746,7 +746,7 @@ do
         run mkdir -p "${x}" || exit 1
     fi
 
-    run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${x}"
+    run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
     #run find "${x}" -type f -exec chmod 0660 {} \;
     #run find "${x}" -type d -exec chmod 0770 {} \;
 done
