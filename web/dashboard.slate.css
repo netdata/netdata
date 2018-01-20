@@ -480,7 +480,7 @@ code {
     float: left;
     left: 0;
     width: 64%;
-    margin-left: 18%;
+    margin-left: 18% !important;
     text-align: center;
     color: #676b70;
     font-weight: bold;
@@ -492,7 +492,7 @@ code {
     float: left;
     left: 0;
     width: 60%;
-    margin-left: 20%;
+    margin-left: 20% !important;
     text-align: center;
     color: #676b70;
     font-weight: normal;

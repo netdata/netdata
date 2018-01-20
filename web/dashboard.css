@@ -462,7 +462,7 @@ body {
     float: left;
     left: 0;
     width: 64%;
-    margin-left: 18%;
+    margin-left: 18% !important;
     text-align: center;
     color: #999999;
     font-weight: bold;
@@ -474,7 +474,7 @@ body {
     float: left;
     left: 0;
     width: 60%;
-    margin-left: 20%;
+    margin-left: 20% !important;
     text-align: center;
     color: #999999;
     font-weight: normal;

@@ -677,14 +677,22 @@ config_option() {
 if [ "${UID}" = "0" ]
     then
     NETDATA_USER="$( config_option "global" "run as user" "netdata" )"
+    NETDATA_GROUP="${NETDATA_USER}"
+    ROOT_USER="root"
 else
     NETDATA_USER="${USER}"
+    NETDATA_GROUP="$(id -g -n ${NETDATA_USER})"
+    ROOT_USER="${NETDATA_USER}"
 fi
-NETDATA_GROUP="${NETDATA_USER}"
 
 # the owners of the web files
 NETDATA_WEB_USER="$(  config_option "web" "web files owner" "${NETDATA_USER}" )"
-NETDATA_WEB_GROUP="$( config_option "web" "web files group" "${NETDATA_WEB_USER}" )"
+if [ "${UID}" = "0" -a "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]
+then
+    NETDATA_GROUP="$(id -g -n ${NETDATA_WEB_USER})"
+    [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_WEB_USER}"
+fi
+NETDATA_WEB_GROUP="$( config_option "web" "web files group" "${NETDATA_GROUP}" )"
 
 # port
 defport=19999
@@ -698,6 +706,27 @@ NETDATA_LOG_DIR="$( config_option "global" "log directory" "${NETDATA_PREFIX}/va
 NETDATA_CONF_DIR="$( config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 
+cat <<OPTIONSEOF
+
+    Permissions
+    - netdata user     : ${NETDATA_USER}
+    - netdata group    : ${NETDATA_GROUP}
+    - web files user   : ${NETDATA_WEB_USER}
+    - web files group  : ${NETDATA_WEB_GROUP}
+    - root user        : ${ROOT_USER}
+
+    Directories
+    - netdata conf dir : ${NETDATA_CONF_DIR}
+    - netdata log dir  : ${NETDATA_LOG_DIR}
+    - netdata run dir  : ${NETDATA_RUN_DIR}
+    - netdata lib dir  : ${NETDATA_LIB_DIR}
+    - netdata web dir  : ${NETDATA_WEB_DIR}
+    - netdata cache dir: ${NETDATA_CACHE_DIR}
+
+    Other
+    - netdata port     : ${NETDATA_PORT}
+
+OPTIONSEOF
 
 # -----------------------------------------------------------------------------
 progress "Fix permissions of netdata directories (using user '${NETDATA_USER}')"
@@ -718,7 +747,7 @@ do
         run mkdir -p "${NETDATA_CONF_DIR}/${x}" || exit 1
     fi
 done
-run chown -R "root:${NETDATA_GROUP}" "${NETDATA_CONF_DIR}"
+run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_CONF_DIR}"
 run find "${NETDATA_CONF_DIR}" -type f -exec chmod 0640 {} \;
 run find "${NETDATA_CONF_DIR}" -type d -exec chmod 0755 {} \;
 
@@ -743,7 +772,7 @@ do
         run mkdir -p "${x}" || exit 1
     fi
 
-    run chown -R "${NETDATA_USER}:${NETDATA_USER}" "${x}"
+    run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
     #run find "${x}" -type f -exec chmod 0660 {} \;
     #run find "${x}" -type d -exec chmod 0770 {} \;
 done
@@ -767,32 +796,35 @@ if [ ${UID} -eq 0 ]
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
     run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
 
-    setcap_ret=1
-    if ! iscontainer
-        then
-        if [ ! -z "${setcap}" ]
+    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]
+    then
+        setcap_ret=1
+        if ! iscontainer
             then
+            if [ ! -z "${setcap}" ]
+                then
+                run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+                run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+                run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+                setcap_ret=$?
+            fi
+
+            if [ ${setcap_ret} -eq 0 ]
+                then
+                # if we managed to setcap
+                # but we fail to execute apps.plugin
+                # trigger setuid to root
+                "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -t >/dev/null 2>&1
+                setcap_ret=$?
+            fi
+        fi
+
+        if [ ${setcap_ret} -ne 0 ]
+            then
+            # fix apps.plugin to be setuid to root
             run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-            run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-            run setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-            setcap_ret=$?
+            run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
         fi
-
-        if [ ${setcap_ret} -eq 0 ]
-            then
-            # if we managed to setcap
-            # but we fail to execute apps.plugin
-            # trigger setuid to root
-            "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" -t >/dev/null 2>&1
-            setcap_ret=$?
-        fi
-    fi
-
-    if [ ${setcap_ret} -ne 0 ]
-        then
-        # fix apps.plugin to be setuid to root
-        run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
-        run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
     fi
 
     if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin" ]
@@ -863,11 +895,13 @@ else
     download_netdata_conf "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
 fi
 
-# -----------------------------------------------------------------------------
-progress "Check KSM (kernel memory deduper)"
+if [ "$(uname)" = "Linux" ]
+then
+    # -------------------------------------------------------------------------
+    progress "Check KSM (kernel memory deduper)"
 
-ksm_is_available_but_disabled() {
-    cat <<KSM1
+    ksm_is_available_but_disabled() {
+        cat <<KSM1
 
 ${TPUT_BOLD}Memory de-duplication instructions${TPUT_RESET}
 
@@ -882,10 +916,10 @@ To enable it run:
 If you enable it, you will save 40-60% of netdata memory.
 
 KSM1
-}
+    }
 
-ksm_is_not_available() {
-    cat <<KSM2
+    ksm_is_not_available() {
+        cat <<KSM2
 
 ${TPUT_BOLD}Memory de-duplication not present in your kernel${TPUT_RESET}
 
@@ -897,17 +931,19 @@ To enable it, you need a kernel built with CONFIG_KSM=y
 If you can have it, you will save 40-60% of netdata memory.
 
 KSM2
-}
+    }
 
-if [ -f "/sys/kernel/mm/ksm/run" ]
-    then
-    if [ $(cat "/sys/kernel/mm/ksm/run") != "1" ]
+    if [ -f "/sys/kernel/mm/ksm/run" ]
         then
-        ksm_is_available_but_disabled
+        if [ $(cat "/sys/kernel/mm/ksm/run") != "1" ]
+            then
+            ksm_is_available_but_disabled
+        fi
+    else
+        ksm_is_not_available
     fi
-else
-    ksm_is_not_available
 fi
+
 
 # -----------------------------------------------------------------------------
 progress "Check version.txt"
@@ -929,12 +965,14 @@ https://github.com/firehol/netdata/wiki/Installation
 VERMSG
 fi
 
-# -----------------------------------------------------------------------------
-progress "Check apps.plugin"
+if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]
+then
+    # -----------------------------------------------------------------------------
+    progress "Check apps.plugin"
 
-if [ "${UID}" -ne 0 ]
-    then
-    cat <<SETUID_WARNING
+    if [ "${UID}" -ne 0 ]
+        then
+        cat <<SETUID_WARNING
 
 ${TPUT_BOLD}apps.plugin needs privileges${TPUT_RESET}
 
@@ -958,6 +996,7 @@ running processes. It cannot be instructed from the netdata daemon to perform
 any task, so it is pretty safe to do this.
 
 SETUID_WARNING
+    fi
 fi
 
 # -----------------------------------------------------------------------------
