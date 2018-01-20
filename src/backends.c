@@ -447,6 +447,7 @@ static inline int process_json_response(BUFFER *b) {
 // the backend thread
 
 static SIMPLE_PATTERN *charts_pattern = NULL;
+static SIMPLE_PATTERN *hosts_pattern = NULL;
 
 inline int backends_can_send_rrdset(uint32_t options, RRDSET *st) {
     RRDHOST *host = st->rrdhost;
@@ -535,6 +536,7 @@ void *backends_main(void *ptr) {
     backend_send_names      = config_get_boolean(CONFIG_SECTION_BACKEND, "send names instead of ids", backend_send_names);
 
     charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    hosts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
 
 
     // ------------------------------------------------------------------------
@@ -686,6 +688,21 @@ void *backends_main(void *ptr) {
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
+            if(unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_BACKEND_SEND|RRDHOST_FLAG_BACKEND_DONT_SEND))) {
+                char *name = (host == localhost)?"localhost":host->hostname;
+                if (!hosts_pattern || simple_pattern_matches(hosts_pattern, name)) {
+                    rrdhost_flag_set(host, RRDHOST_FLAG_BACKEND_SEND);
+                    info("enabled backend for host '%s'", name);
+                }
+                else {
+                    rrdhost_flag_set(host, RRDHOST_FLAG_BACKEND_DONT_SEND);
+                    info("disabled backend for host '%s'", name);
+                }
+            }
+
+            if(unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_BACKEND_SEND)))
+                continue;
+
             rrdhost_rdlock(host);
 
             count_hosts++;

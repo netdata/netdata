@@ -19,6 +19,8 @@ extern int gap_when_lost_iterations_above;
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
 
+typedef struct rrdhost RRDHOST;
+
 // ----------------------------------------------------------------------------
 // chart types
 
@@ -234,7 +236,7 @@ typedef enum rrdset_flags {
 } RRDSET_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
-#define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & flag)
+#define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~flag, __ATOMIC_SEQ_CST)
 #else
@@ -322,7 +324,7 @@ struct rrdset {
     total_number last_collected_total;              // used internally to calculate percentages
 
     RRDFAMILY *rrdfamily;                           // pointer to RRDFAMILY this chart belongs to
-    struct rrdhost *rrdhost;                        // pointer to RRDHOST this chart belongs to
+    RRDHOST *rrdhost;                               // pointer to RRDHOST this chart belongs to
 
     struct rrdset *next;                            // linking of rrdsets
 
@@ -376,11 +378,13 @@ typedef struct rrdset RRDSET;
 typedef enum rrdhost_flags {
     RRDHOST_FLAG_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
     RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = 1 << 1, // delete files of obsolete charts
-    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2  // delete the entire host when orphan
+    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2, // delete the entire host when orphan
+    RRDHOST_FLAG_BACKEND_SEND           = 1 << 3, // send it to backends
+    RRDHOST_FLAG_BACKEND_DONT_SEND      = 1 << 4, // don't send it to backends
 } RRDHOST_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
-#define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & flag)
+#define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdhost_flag_set(host, flag)   __atomic_or_fetch(&((host)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdhost_flag_clear(host, flag) __atomic_and_fetch(&((host)->flags), ~flag, __ATOMIC_SEQ_CST)
 #else
@@ -510,7 +514,6 @@ struct rrdhost {
 
     struct rrdhost *next;
 };
-typedef struct rrdhost RRDHOST;
 extern RRDHOST *localhost;
 
 #define rrdhost_rdlock(host) netdata_rwlock_rdlock(&((host)->rrdhost_rwlock))
