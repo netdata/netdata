@@ -83,7 +83,7 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
     pages_to_scan = str2ull(procfile_lineword(ff_pages_to_scan, 0, 0));
 
     offered = pages_sharing + pages_shared + pages_unshared + pages_volatile;
-    saved = pages_sharing - pages_shared;
+    saved = pages_sharing;
 
     if(unlikely(!offered || !pages_to_scan)) return 0;
 
