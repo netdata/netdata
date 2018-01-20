@@ -678,9 +678,11 @@ if [ "${UID}" = "0" ]
     then
     NETDATA_USER="$( config_option "global" "run as user" "netdata" )"
     NETDATA_GROUP="${NETDATA_USER}"
+    ROOT_USER="root"
 else
     NETDATA_USER="${USER}"
     NETDATA_GROUP="$(id -g -n ${NETDATA_USER})"
+    ROOT_USER="${NETDATA_USER}"
 fi
 
 # the owners of the web files
@@ -719,7 +721,7 @@ do
         run mkdir -p "${NETDATA_CONF_DIR}/${x}" || exit 1
     fi
 done
-run chown -R "root:${NETDATA_GROUP}" "${NETDATA_CONF_DIR}"
+run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_CONF_DIR}"
 run find "${NETDATA_CONF_DIR}" -type f -exec chmod 0640 {} \;
 run find "${NETDATA_CONF_DIR}" -type d -exec chmod 0755 {} \;
 
