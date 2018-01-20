@@ -687,7 +687,11 @@ fi
 
 # the owners of the web files
 NETDATA_WEB_USER="$(  config_option "web" "web files owner" "${NETDATA_USER}" )"
-[ "${UID}" = "0" -a "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ] && NETDATA_GROUP="${NETDATA_WEB_USER}"
+if [ "${UID}" = "0" -a "${NETDATA_USER}" != "${NETDATA_WEB_USER}" ]
+then
+    NETDATA_GROUP="$(id -g -n ${NETDATA_WEB_USER})"
+    [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_WEB_USER}"
+fi
 NETDATA_WEB_GROUP="$( config_option "web" "web files group" "${NETDATA_GROUP}" )"
 
 # port
@@ -702,6 +706,27 @@ NETDATA_LOG_DIR="$( config_option "global" "log directory" "${NETDATA_PREFIX}/va
 NETDATA_CONF_DIR="$( config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata" )"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 
+cat <<OPTIONSEOF
+
+    Permissions
+    - netdata user     : ${NETDATA_USER}
+    - netdata group    : ${NETDATA_GROUP}
+    - web files user   : ${NETDATA_WEB_USER}
+    - web files group  : ${NETDATA_WEB_GROUP}
+    - root user        : ${ROOT_USER}
+
+    Directories
+    - netdata conf dir : ${NETDATA_CONF_DIR}
+    - netdata log dir  : ${NETDATA_LOG_DIR}
+    - netdata run dir  : ${NETDATA_RUN_DIR}
+    - netdata lib dir  : ${NETDATA_LIB_DIR}
+    - netdata web dir  : ${NETDATA_WEB_DIR}
+    - netdata cache dir: ${NETDATA_CACHE_DIR}
+
+    Other
+    - netdata port     : ${NETDATA_PORT}
+
+OPTIONSEOF
 
 # -----------------------------------------------------------------------------
 progress "Fix permissions of netdata directories (using user '${NETDATA_USER}')"
