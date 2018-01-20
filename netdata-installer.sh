@@ -677,10 +677,11 @@ config_option() {
 if [ "${UID}" = "0" ]
     then
     NETDATA_USER="$( config_option "global" "run as user" "netdata" )"
+    NETDATA_GROUP="${NETDATA_USER}"
 else
     NETDATA_USER="${USER}"
+    NETDATA_GROUP="$(id -g -n ${NETDATA_USER})"
 fi
-NETDATA_GROUP="${NETDATA_USER}"
 
 # the owners of the web files
 NETDATA_WEB_USER="$(  config_option "web" "web files owner" "${NETDATA_USER}" )"
