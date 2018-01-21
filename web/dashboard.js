@@ -51,6 +51,12 @@
  *                                                  (default: null) */
 /*global netdataAlarmsRecipients     *//* array,    an array of alarm recipients to show notifications for
  *                                                  (default: null) */
+/*global netdataAlarmsRemember       *//* boolen,   keep our position in the alarm log at browser local storage
+ *                                                  (default: true) */
+/*global netdataAlarmsActiveCallback *//* function, a hook for the alarm logs
+ *                                                  (default: undefined) */
+/*global netdataAlarmsNotifCallback  *//* function, a hook for alarm notifications
+ *                                                  (default: undefined) */
 /*global netdataIntersectionObserver *//* boolean,  enable or disable the use of intersection observer
  *                                                  (default: true) */
 
@@ -8243,6 +8249,8 @@ var NETDATA = window.NETDATA || {};
         ms_between_notifications: 500,  // firefox moves the alarms off-screen (above, outside the top of the screen)
                                         // if alarms are shown faster than: one per 500ms
 
+        update_every: 10000,            // the time in ms between alarm checks
+
         notifications: false,           // when true, the browser supports notifications (may not be granted though)
         last_notification_id: 0,        // the id of the last alarm_log we have raised an alarm for
         first_notification_id: 0,       // the id of the first alarm_log entry for this session
@@ -8251,8 +8259,47 @@ var NETDATA = window.NETDATA || {};
 
         server: null,                   // the server to connect to for fetching alarms
         current: null,                  // the list of raised alarms - updated in the background
-        callback: null,                 // a callback function to call every time the list of raised alarms is refreshed
+
+        // a callback function to call every time the list of raised alarms is refreshed
+        callback: (typeof netdataAlarmsActiveCallback === 'function')?netdataAlarmsActiveCallback:null,
+
+        // a callback function to call every time a notification is shown
+        // the return value is used to decide if the notification will be shown
+        notificationCallback: (typeof netdataAlarmsNotifCallback === 'function')?netdataAlarmsNotifCallback:null,
+
         recipients: null,               // the list (array) of recipients to show alarms for, or null
+
+        recipientMatches: function(to_string, wanted_array) {
+            if(typeof wanted_array === 'undefined' || wanted_array === null || Array.isArray(wanted_array) === false)
+                return true;
+
+            var r = ' ' + to_string.toString() + ' ';
+            var len = wanted_array.length;
+            while(len--) {
+                if(r.indexOf(' ' + wanted_array[len] + ' ') >= 0)
+                    return true;
+            }
+
+            return false;
+        },
+
+        activeForRecipients: function() {
+            var active = {};
+            var data = NETDATA.alarms.current;
+
+            if(typeof data === 'undefined' || data === null)
+                return active;
+
+            for(var x in data.alarms) {
+                if(!data.alarms.hasOwnProperty(x)) continue;
+
+                var alarm = data.alarms[x];
+                if((alarm.status === 'WARNING' || alarm.status === 'CRITICAL') && NETDATA.alarms.recipientMatches(alarm.recipient, NETDATA.alarms.recipients))
+                    active[x] = alarm;
+            }
+
+            return active;
+        },
 
         notify: function(entry) {
             // console.log('alarm ' + entry.unique_id);
@@ -8333,17 +8380,8 @@ var NETDATA = window.NETDATA || {};
             }
 
             // filter recipients
-            if(show === true && NETDATA.alarms.recipients !== null) {
-                show = false;
-                var r = ' ' + entry.recipient + ' ';
-                var len = NETDATA.alarms.recipients.length;
-                while(len--) {
-                    if(r.indexOf(' ' + NETDATA.alarms.recipients[len] + ' ') >= 0) {
-                        show = true;
-                        break;
-                    }
-                }
-            }
+            if(show === true)
+                show = NETDATA.alarms.recipientMatches(entry.recipient, NETDATA.alarms.recipients);
 
             /*
             // cleanup old notifications with the same alarm_id as this one
@@ -8365,28 +8403,33 @@ var NETDATA = window.NETDATA || {};
             */
 
             if(show === true) {
-                setTimeout(function() {
-                    // show this notification
-                    // console.log('new notification: ' + title);
-                    var n = new Notification(title, {
-                        body: entry.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + status + ': ' + entry.info,
-                        tag: tag,
-                        requireInteraction: interaction,
-                        icon: NETDATA.serverStatic + icon,
-                        data: data
-                    });
+                if(typeof NETDATA.alarms.notificationCallback === 'function')
+                    show = NETDATA.alarms.notificationCallback(entry);
 
-                    n.onclick = function(event) {
-                        event.preventDefault();
-                        NETDATA.alarms.onclick(event.target.data);
-                    };
+                if(show === true) {
+                    setTimeout(function() {
+                        // show this notification
+                        // console.log('new notification: ' + title);
+                        var n = new Notification(title, {
+                            body: entry.hostname + ' - ' + entry.chart + ' (' + entry.family + ') - ' + status + ': ' + entry.info,
+                            tag: tag,
+                            requireInteraction: interaction,
+                            icon: NETDATA.serverStatic + icon,
+                            data: data
+                        });
 
-                    // console.log(n);
-                    // NETDATA.alarms.notifications_shown.push(n);
-                    // console.log(entry);
-                }, NETDATA.alarms.ms_penalty);
+                        n.onclick = function(event) {
+                            event.preventDefault();
+                            NETDATA.alarms.onclick(event.target.data);
+                        };
 
-                NETDATA.alarms.ms_penalty += NETDATA.alarms.ms_between_notifications;
+                        // console.log(n);
+                        // NETDATA.alarms.notifications_shown.push(n);
+                        // console.log(entry);
+                    }, NETDATA.alarms.ms_penalty);
+
+                    NETDATA.alarms.ms_penalty += NETDATA.alarms.ms_between_notifications;
+                }
             }
         },
 
@@ -8447,7 +8490,9 @@ var NETDATA = window.NETDATA || {};
                 }
 
                 NETDATA.alarms.last_notification_id = data[0].unique_id;
-                NETDATA.localStorageSet('last_notification_id', NETDATA.alarms.last_notification_id, null);
+
+                if(typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember === true)
+                    NETDATA.localStorageSet('last_notification_id', NETDATA.alarms.last_notification_id, null);
                 // console.log('last notification id = ' + NETDATA.alarms.last_notification_id);
             })
         },
@@ -8456,12 +8501,12 @@ var NETDATA = window.NETDATA || {};
             // returns true if we should fire 1+ notifications
 
             if(NETDATA.alarms.notifications !== true) {
-                // console.log('notifications not available');
+                // console.log('web notifications are not available');
                 return false;
             }
 
             if(Notification.permission !== 'granted') {
-                // console.log('notifications not granted');
+                // console.log('web notifications are not granted');
                 return false;
             }
 
@@ -8525,7 +8570,7 @@ var NETDATA = window.NETDATA || {};
                     if(data.status === false) return;
                 }
 
-                setTimeout(NETDATA.alarms.update_forever, 10000);
+                setTimeout(NETDATA.alarms.update_forever, NETDATA.alarms.update_every);
             });
         },
 
@@ -8556,8 +8601,10 @@ var NETDATA = window.NETDATA || {};
         init: function() {
             NETDATA.alarms.server = NETDATA.fixHost(NETDATA.serverDefault);
 
-            NETDATA.alarms.last_notification_id =
-                NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
+            if(typeof netdataAlarmsRemember === 'undefined' || netdataAlarmsRemember === true) {
+                NETDATA.alarms.last_notification_id =
+                    NETDATA.localStorageGet('last_notification_id', NETDATA.alarms.last_notification_id, null);
+            }
 
             if(NETDATA.alarms.onclick === null)
                 NETDATA.alarms.onclick = NETDATA.alarms.scrollToAlarm;
