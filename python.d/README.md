@@ -1542,11 +1542,14 @@ Following charts are drawn:
 
 6. **Erlang processes**
  * used processes
+ 
+7.  **Erlang run queue**
+ * Depth of Erlang run queue
 
-7. **Memory**
+8. **Memory**
  * free memory in megabytes
 
-8. **Disk Space**
+9. **Disk Space**
  * free disk space in gigabytes
 
 ### configuration
