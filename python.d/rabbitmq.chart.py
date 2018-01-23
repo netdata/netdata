@@ -74,10 +74,10 @@ CHARTS = {
             ['proc_used', 'used', 'absolute']
         ]},
     'erlang_run_queue': {
-        'options': [None, 'Erlang Run Queue', 'run_queue', 'overview',
+        'options': [None, 'Erlang Run Queue', 'processes', 'overview',
                     'rabbitmq.erlang_run_queue', 'line'],
         'lines': [
-            ['run_queue',' runqueue', 'absolute']
+            ['length',' length', 'absolute']
         ]},
     'global_counts': {
         'options': [None, 'Global Counts', 'counts', 'overview',
