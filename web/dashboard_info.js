@@ -1732,7 +1732,7 @@ netdataDashboard.context = {
     // height: the ratio of the chart height relative to the default
 
     'rabbitmq.queued_messages': {
-        info: 'Overall total of ready and unacknowledged queued messages.  Messages that are delivered immediately are not counted here.',
+        info: 'Overall total of ready and unacknowledged queued messages.  Messages that are delivered immediately are not counted here.'
     },
 
     'rabbitmq.message_rates': {
