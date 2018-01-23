@@ -324,12 +324,18 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for <b><a href="https://couchdb.apache.org/">CouchDB</a></b>, the open-source, JSON document-based database with an HTTP API and multi-master replication.'
     },
-    
-    
+
+
     'beanstalk': {
         title: 'Beanstalkd',
         icon: '<i class="fas fa-tasks"></i>',
         info: 'Provides statistics on the <b><a href="http://kr.github.io/beanstalkd/">beanstalkd</a></b> server and any tubes available on that server using data pulled from beanstalkc'
+    },
+
+    'rabbitmq': {
+        title: 'RabbitMQ',
+        icon: '<i class="fas fa-comments"></i>',
+        info: 'Performance data for the <b><a href="https://www.rabbitmq.com/">RabbitMQ</a></b> open-source message broker.'
     }
 };
 
@@ -1246,7 +1252,7 @@ netdataDashboard.context = {
             }
         ]
     },
-    
+
     // ------------------------------------------------------------------------
     // beanstalkd
     // system charts
@@ -1714,5 +1720,57 @@ netdataDashboard.context = {
 
     'btrfs.system': {
         info: 'Logical disk usage for BTRFS system. System chunks store information aobut the allocation of other chunks. The disk space reported here is the usable allocation (i.e. after any striping or replication). The values reported here should be relatively small compared to Data and Metadata, and will scale with the volume size and overall space usage.'
+    },
+
+    // ------------------------------------------------------------------------
+    // RabbitMQ
+
+    // info: the text above the charts
+    // heads: the representation of the chart at the top the subsection (second level menu)
+    // mainheads: the representation of the chart at the top of the section (first level menu)
+    // colors: the dimension colors of the chart (the default colors are appended)
+    // height: the ratio of the chart height relative to the default
+
+    'rabbitmq.queued_messages': {
+        info: 'Overall total of ready and unacknowledged queued messages.  Messages that are delivered immediately are not counted here.',
+    },
+
+    'rabbitmq.message_rates': {
+        info: 'Overall messaging rates including acknowledgements, delieveries, redeliveries, and publishes.'
+    },
+
+    'rabbitmq.global_counts': {
+        info: 'Overall totals for channels, consumers, connections, queues and exchanges.'
+    },
+
+    'rabbitmq.file_descriptors': {
+        info: 'Total number of used filed descriptors. See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-file-handle-limit" target="_blank">Open File Limits</a></code> for further details.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.sockets': {
+        info: 'Total number of used socket descriptors.  Each used socket also counts as a used file descriptor.  See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-file-handle-limit" target="_blank">Open File Limits</a></code> for further details.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.processes': {
+        info: 'Total number of processes running within the Erlang VM.  This is not the same as the number of processes running on the host.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.erlang_run_queue': {
+        info: 'Number of Erlang processes the Erlang schedulers have queued to run.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.memory': {
+        info: 'Total amount of memory used by the RabbitMQ.  This is a complex statistic that can be further analyzed in the management UI.  See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-ram" target="_blank">Memory</a></code> for further details.',
+        colors: NETDATA.colors[3]
+    },
+
+    'rabbitmq.disk_space': {
+        info: 'Total amount of disk space consumed by the message store(s).  See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-disk-space" target=_"blank">Disk Space Limits</a></code> for further details.',
+        colors: NETDATA.colors[3]
     }
+    // ------------------------------------------------------------------------
 };
