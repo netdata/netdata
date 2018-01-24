@@ -48,11 +48,11 @@ CHARTS = {
         'lines': []
     },
     'osd_apply_latency': {
-        'options': [None, 'Ceph OSDs apply latency', 'milliseconds', 'pool', 'ceph.apply_latency', 'line'],
+        'options': [None, 'Ceph OSDs apply latency', 'milliseconds', 'osd', 'ceph.apply_latency', 'line'],
         'lines': []
     },
     'osd_commit_latency': {
-        'options': [None, 'Ceph OSDs commit latency', 'milliseconds', 'pool', 'ceph.commit_latency', 'line'],
+        'options': [None, 'Ceph OSDs commit latency', 'milliseconds', 'osd', 'ceph.commit_latency', 'line'],
         'lines': []
     }
 
@@ -171,8 +171,8 @@ class Service(SimpleService):
         ioctx = self.cluster.open_ioctx(pool['name'])
         pool_status = ioctx.get_stats()
         ioctx.close()
-        return {'read_{0}'.format(pool['name']): pool_status['num_rd_kb'],
-                'write_{0}'.format(pool['name']): pool_status['num_wr_kb']}
+        return {'read_{0}'.format(pool['name']): int(pool_status['num_rd_kb']),
+                'write_{0}'.format(pool['name']): int(pool_status['num_wr_kb'])}
 
     def _get_osd_usage(self, osd):
         """
