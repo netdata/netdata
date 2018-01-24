@@ -2,8 +2,9 @@
 # Description: mdstat netdata python.d module
 # Author: l2isbad
 
+import re
+
 from collections import defaultdict
-from re import compile as re_compile
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -11,28 +12,99 @@ priority = 60000
 retries = 60
 update_every = 1
 
+ORDER = ['mdstat_health']
+CHARTS = {
+    'mdstat_health': {
+        'options': [None, 'Faulty Devices In MD', 'failed disks', 'health', 'md.health', 'line'],
+        'lines': list()
+    }
+}
+
 OPERATIONS = ('check', 'resync', 'reshape', 'recovery', 'finish', 'speed')
+
+RE_DISKS = re.compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+\['
+                      r'(?P<total_disks>[0-9]+)/'
+                      r'(?P<inuse_disks>[0-9]+)\]')
+
+RE_STATUS = re.compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+ '
+                       r'(?P<operation>[a-z]+) =[ ]{1,2}'
+                       r'(?P<operation_status>[0-9.]+).+finish='
+                       r'(?P<finish>([0-9.]+))min speed='
+                       r'(?P<speed>[0-9]+)')
+
+
+def md_charts(md):
+    order = ['{0}_disks'.format(md.name),
+             '{0}_operation'.format(md.name),
+             '{0}_finish'.format(md.name),
+             '{0}_speed'.format(md.name)
+             ]
+
+    charts = dict()
+    charts[order[0]] = {
+        'options': [None, 'Disks Stats', 'disks', md.name, 'md.disks', 'stacked'],
+        'lines': [
+            ['{0}_total_disks'.format(md.name), 'total', 'absolute'],
+            ['{0}_inuse_disks'.format(md.name), 'inuse', 'absolute']
+        ]
+    }
+
+    charts['_'.join([md.name, 'operation'])] = {
+        'options': [None, 'Current Status', 'percent', md.name, 'md.status', 'line'],
+        'lines': [
+            ['{0}_resync'.format(md.name), 'resync', 'absolute', 1, 100],
+            ['{0}_recovery'.format(md.name), 'recovery', 'absolute', 1, 100],
+            ['{0}_reshape'.format(md.name), 'reshape', 'absolute', 1, 100],
+            ['{0}_check'.format(md.name), 'check', 'absolute', 1, 100]
+        ]
+    }
+
+    charts['_'.join([md.name, 'finish'])] = {
+        'options': [None, 'Approximate Time Until Finish', 'seconds', md.name, 'md.rate', 'line'],
+        'lines': [
+            ['{0}_finish'.format(md.name), 'finish in', 'absolute', 1, 1000]
+        ]
+    }
+
+    charts['_'.join([md.name, 'speed'])] = {
+        'options': [None, 'Operation Speed', 'KB/s', md.name, 'md.rate', 'line'],
+        'lines': [
+            ['{0}_speed'.format(md.name), 'speed', 'absolute', 1, 1000]
+        ]
+    }
+
+    return order, charts
+
+
+class MD:
+    def __init__(self, name, stats):
+        self.name = name
+        self.stats = stats
+
+    def __eq__(self, other):
+        return self.name == other
+
+    def update_stats(self, stats):
+        self.stats = stats
+
+    def data(self):
+        stats = dict(('_'.join([self.name, k]), v) for k, v in self.stats.items())
+        stats['{0}_health'.format(self.name)] = int(self.stats['total_disks']) - int(self.stats['inuse_disks'])
+        return stats
 
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
-        self.regex = dict(disks=re_compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+\['
-                                           r'(?P<total_disks>[0-9]+)/'
-                                           r'(?P<inuse_disks>[0-9]+)\]'),
-                          status=re_compile(r' (?P<array>[a-zA-Z_0-9]+) : active .+ '
-                                            r'(?P<operation>[a-z]+) =[ ]{1,2}'
-                                            r'(?P<operation_status>[0-9.]+).+finish='
-                                            r'(?P<finish>([0-9.]+))min speed='
-                                            r'(?P<speed>[0-9]+)'))
+        self.order = ORDER
+        self.definitions = CHARTS
+        self.mds = dict()
 
     def check(self):
-        arrays = find_arrays(self._get_raw_data(), self.regex)
+        arrays = find_arrays(self._get_raw_data())
         if not arrays:
             self.error('Failed to read data from /proc/mdstat or there is no active arrays')
             return None
-
-        self.order, self.definitions = create_charts(arrays.keys())
         return True
 
     @staticmethod
@@ -47,25 +119,44 @@ class Service(SimpleService):
         except (OSError, IOError):
             return None
 
-    def _get_data(self):
+    def get_data(self):
         """
         Parse data from _get_raw_data()
         :return: dict
         """
-        raw_data = self._get_raw_data()
-        arrays = find_arrays(raw_data, self.regex)
+        arrays = find_arrays(self._get_raw_data())
         if not arrays:
             return None
 
-        to_netdata = dict()
+        data = dict()
         for array, values in arrays.items():
-            for key, value in values.items():
-                to_netdata['_'.join([array, key])] = value
 
-        return to_netdata
+            if array not in self.mds:
+                md = MD(array, values)
+                self.mds[md.name] = md
+                self.create_new_array_charts(md)
+            else:
+                md = self.mds[array]
+                md.update_stats(values)
+
+            data.update(md.data())
+
+        return data
+
+    def create_new_array_charts(self, md):
+        order, charts = md_charts(md)
+
+        self.charts['mdstat_health'].add_dimension(['{0}_health'.format(md.name), md.name])
+        for chart_name in order:
+            params = [chart_name] + charts[chart_name]['options']
+            dimensions = charts[chart_name]['lines']
+
+            new_chart = self.charts.add_chart(params)
+            for dimension in dimensions:
+                new_chart.add_dimension(dimension)
 
 
-def find_arrays(raw_data, regex):
+def find_arrays(raw_data):
     if raw_data is None:
         return None
     data = defaultdict(str)
@@ -79,49 +170,23 @@ def find_arrays(raw_data, regex):
 
     arrays = dict()
     for value in data.values():
-        match = regex['disks'].search(value)
+        match = RE_DISKS.search(value)
         if not match:
             continue
 
         match = match.groupdict()
         array = match.pop('array')
         arrays[array] = match
-        arrays[array]['health'] = int(match['total_disks']) - int(match['inuse_disks'])
         for operation in OPERATIONS:
             arrays[array][operation] = 0
 
-        match = regex['status'].search(value)
+        match = RE_STATUS.search(value)
         if match:
             match = match.groupdict()
             if match['operation'] in OPERATIONS:
+                arrays[array]['operation'] = match['operation']
                 arrays[array][match['operation']] = float(match['operation_status']) * 100
-                arrays[array]['finish'] = float(match['finish']) * 100
-                arrays[array]['speed'] = float(match['speed']) / 1000 * 100
+                arrays[array]['finish'] = float(match['finish']) * 1000 * 60
+                arrays[array]['speed'] = float(match['speed']) * 1000
 
     return arrays or None
-
-
-def create_charts(arrays):
-    order = ['mdstat_health']
-    definitions = dict(mdstat_health={'options': [None, 'Faulty devices in MD', 'failed disks',
-                                                  'health', 'md.health', 'line'],
-                                      'lines': []})
-    for md in arrays:
-        order.append(md)
-        order.append(md + '_status')
-        order.append(md + '_rate')
-        definitions['mdstat_health']['lines'].append([md + '_health', md, 'absolute'])
-        definitions[md] = {'options': [None, '%s disks stats' % md, 'disks', md, 'md.disks', 'stacked'],
-                           'lines': [[md + '_total_disks', 'total', 'absolute'],
-                                     [md + '_inuse_disks', 'inuse', 'absolute']]}
-        definitions[md + '_status'] = {'options': [None, '%s current status' % md,
-                                                   'percent', md, 'md.status', 'line'],
-                                       'lines': [[md + '_resync', 'resync', 'absolute', 1, 100],
-                                                 [md + '_recovery', 'recovery', 'absolute', 1, 100],
-                                                 [md + '_reshape', 'reshape', 'absolute', 1, 100],
-                                                 [md + '_check', 'check', 'absolute', 1, 100]]}
-        definitions[md + '_rate'] = {'options': [None, '%s operation status' % md,
-                                                 'rate', md, 'md.rate', 'line'],
-                                     'lines': [[md + '_finish', 'finish min', 'absolute', 1, 100],
-                                               [md + '_speed', 'MB/s', 'absolute', -1, 100]]}
-    return order, definitions
