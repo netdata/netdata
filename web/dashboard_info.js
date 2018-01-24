@@ -1318,8 +1318,12 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // ceph
 
-    'ceph.general': {
-        info: 'Shows cluster general info.'
+    'ceph.general_usage': {
+        info: 'Shows cluster general size info.'
+    },
+
+    'ceph.general_objects': {
+        info: 'Shows cluster general objects.'
     },
 
     'ceph.pool_usage': {

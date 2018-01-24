@@ -16,15 +16,22 @@ update_every = 10
 priority = 60000
 retries = 60
 
-ORDER = ['general', 'pool_usage', 'pool_objects', 'pool_write_iops', 
-         'pool_read_iops', 'osd_usage', 'osd_apply_latency','osd_commit_latency']
+ORDER = ['general_usage', 'general_objects', 'pool_usage',
+         'pool_objects', 'pool_write_iops', 'pool_read_iops',
+         'osd_usage', 'osd_apply_latency', 'osd_commit_latency']
 
 CHARTS = {
-    'general': {
-        'options': [None, 'Ceph General Options', 'KB', 'general', 'ceph.general', 'stacked'],
+    'general_usage': {
+        'options': [None, 'Ceph General Space', 'KB', 'general', 'ceph.general_usage', 'stacked'],
         'lines': [
             ['general_available', 'avail', 'absolute', 1, 1024],
             ['general_usage', 'used', 'absolute', 1, 1024]
+        ]
+    },
+    'general_objects': {
+        'options': [None, 'Ceph General Objects', 'objects', 'general', 'ceph.general_objects', 'line'],
+        'lines': [
+            ['general_objects', 'cluster', 'absolute']
         ]
     },
     'pool_usage': {
@@ -144,9 +151,14 @@ class Service(SimpleService):
         Get ceph's general usage
         :return: dict
         """
-        info = self._get_df()['stats']
-        return {'general_usage': info['total_used_bytes'],
-                'general_available': info['total_avail_bytes']
+        df = self._get_df()
+        general_objects = 0
+        for pool in df['pools']:
+            general_objects = general_objects + pool['stats']['objects']
+
+        return {'general_usage': df['stats']['total_used_bytes'],
+                'general_available': df['stats']['total_avail_bytes'],
+                'general_objects': general_objects
                 }
 
     def _get_pool_usage(self, pool):
