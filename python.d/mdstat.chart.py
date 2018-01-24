@@ -81,9 +81,6 @@ class MD:
         self.name = name
         self.stats = stats
 
-    def __eq__(self, other):
-        return self.name == other
-
     def update_stats(self, stats):
         self.stats = stats
 
