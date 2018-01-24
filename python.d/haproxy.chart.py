@@ -45,27 +45,27 @@ CHARTS = {
         'lines': [
         ]},
     'fhrsp_1xx': {
-        'options': [None, "HTTP responses with 1xx code", "responses", 'frontend', 'haproxy_f.hrsp_1xx', 'line'],
+        'options': [None, "HTTP responses with 1xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_1xx', 'line'],
         'lines': [
         ]},
     'fhrsp_2xx': {
-        'options': [None, "HTTP responses with 2xx code", "responses", 'frontend', 'haproxy_f.hrsp_2xx', 'line'],
+        'options': [None, "HTTP responses with 2xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_2xx', 'line'],
         'lines': [
         ]},
     'fhrsp_3xx': {
-        'options': [None, "HTTP responses with 3xx code", "responses", 'frontend', 'haproxy_f.hrsp_3xx', 'line'],
+        'options': [None, "HTTP responses with 3xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_3xx', 'line'],
         'lines': [
         ]},
     'fhrsp_4xx': {
-        'options': [None, "HTTP responses with 4xx code", "responses", 'frontend', 'haproxy_f.hrsp_4xx', 'line'],
+        'options': [None, "HTTP responses with 4xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_4xx', 'line'],
         'lines': [
         ]},
     'fhrsp_5xx': {
-        'options': [None, "HTTP responses with 5xx code", "responses", 'frontend', 'haproxy_f.hrsp_5xx', 'line'],
+        'options': [None, "HTTP responses with 5xx code", "responses/s", 'frontend', 'haproxy_f.hrsp_5xx', 'line'],
         'lines': [
         ]},
     'fhrsp_other': {
-        'options': [None, "HTTP responses with other codes (protocol error)", "responses", 'frontend', 'haproxy_f.hrsp_other', 'line'],
+        'options': [None, "HTTP responses with other codes (protocol error)", "responses/s", 'frontend', 'haproxy_f.hrsp_other', 'line'],
         'lines': [
         ]},
     'fhrsp_total': {
@@ -89,32 +89,32 @@ CHARTS = {
         'lines': [
         ]},
     'bhrsp_1xx': {
-        'options': [None, "HTTP responses with 1xx code", "responses", 'backend', 'haproxy_b.hrsp_1xx', 'line'],
+        'options': [None, "HTTP responses with 1xx code", "responses/s", 'backend', 'haproxy_b.hrsp_1xx', 'line'],
         'lines': [
         ]},
     'bhrsp_2xx': {
-        'options': [None, "HTTP responses with 2xx code", "responses", 'backend', 'haproxy_b.hrsp_2xx', 'line'],
+        'options': [None, "HTTP responses with 2xx code", "responses/s", 'backend', 'haproxy_b.hrsp_2xx', 'line'],
         'lines': [
         ]},
     'bhrsp_3xx': {
-        'options': [None, "HTTP responses with 3xx code", "responses", 'backend', 'haproxy_b.hrsp_3xx', 'line'],
+        'options': [None, "HTTP responses with 3xx code", "responses/s", 'backend', 'haproxy_b.hrsp_3xx', 'line'],
         'lines': [
         ]},
     'bhrsp_4xx': {
-        'options': [None, "HTTP responses with 4xx code", "responses", 'backend', 'haproxy_b.hrsp_4xx', 'line'],
+        'options': [None, "HTTP responses with 4xx code", "responses/s", 'backend', 'haproxy_b.hrsp_4xx', 'line'],
         'lines': [
         ]},
     'bhrsp_5xx': {
-        'options': [None, "HTTP responses with 5xx code", "responses", 'backend', 'haproxy_b.hrsp_5xx', 'line'],
+        'options': [None, "HTTP responses with 5xx code", "responses/s", 'backend', 'haproxy_b.hrsp_5xx', 'line'],
         'lines': [
         ]},
     'bhrsp_other': {
-        'options': [None, "HTTP responses with other codes (protocol error)", "responses", 'backend',
+        'options': [None, "HTTP responses with other codes (protocol error)", "responses/s", 'backend',
                     'haproxy_b.hrsp_other', 'line'],
         'lines': [
         ]},
     'bhrsp_total': {
-        'options': [None, "HTTP responses (total)", "responses", 'backend', 'haproxy_b.hrsp_total', 'line'],
+        'options': [None, "HTTP responses (total)", "responses/s", 'backend', 'haproxy_b.hrsp_total', 'line'],
         'lines': [
         ]},
     'bqtime': {
