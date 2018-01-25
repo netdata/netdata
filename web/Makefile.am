@@ -45,8 +45,9 @@ dist_weblib_DATA = \
 	lib/bootstrap-table-export-1.11.0.min.js \
 	lib/bootstrap-toggle-2.2.2.min.js \
 	lib/clipboard-polyfill-be05dad.js \
-	lib/c3-0.4.11.min.js \
-	lib/d3-3.5.17.min.js \
+	lib/c3-0.4.18.min.js \
+	lib/d3-4.12.2.min.js \
+	lib/d3pie-0.2.1-netdata-1.js \
 	lib/dygraph-combined-dd74404.js \
 	lib/dygraph-smooth-plotter-dd74404.js \
 	lib/fontawesome-all-5.0.1.min.js \
@@ -71,7 +72,7 @@ dist_webcss_DATA = \
 	css/bootstrap-slate-flat-3.3.7.css \
 	css/bootstrap-slider-10.0.0.min.css \
 	css/bootstrap-toggle-2.2.2.min.css \
-	css/c3-0.4.11.min.css \
+	css/c3-0.4.18.min.css \
 	$(NULL)
 
 webfontsdir=$(webdir)/fonts
