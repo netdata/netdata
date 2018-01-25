@@ -643,6 +643,64 @@ So, to avoid flashing the charts, we destroy and re-create the charts on each up
     <small>rendered in <span id="time803">X</span> ms</small>
 </div>
 
+
+    <hr>
+    <h1>d3pie Charts</h1>
+
+    <div style="width: 33%; display: inline-block;">
+        <div data-netdata="acquiring.responses_by_errorcode"
+             data-dimensions="!*.0000|*"
+             data-append-options="match-ids|unaligned"
+             data-method="sum"
+             data-units="trns / hour"
+             data-update-every="30"
+             data-host="https://jira.viva.gr/netdata/"
+             data-chart-library="d3pie"
+             data-d3pie-pieinnerradius="70%"
+             data-d3pie-pieouterradius="90%"
+             data-d3pie-smallsegmentgrouping-value="0.5"
+             data-d3pie-smallsegmentgrouping-enabled="true"
+             data-d3pie-labels-inner-hidewhenlessthanpercentage="3"
+             data-title="Rejected Transactions Reasons"
+             data-width="100%"
+             data-height="300px"
+             data-after="-3600"
+             data-points="1"
+             data-decimal-digits="0"
+             data-dt-element-name="time901"
+        ></div>
+        <br/>
+        <small>rendered in <span id="time901">X</span> ms</small>
+    </div>
+
+    <div style="width: 33%; display: inline-block;">
+        <div data-netdata="apps.cpu"
+             data-chart-library="d3dpie"
+             data-width="100%"
+             data-height="250px"
+             data-after="-60"
+             data-points="60"
+             data-debug="false"
+             data-decimal-digits="0"
+             data-dt-element-name="time902"
+        ></div>
+        <br/>
+        <small>rendered in <span id="time902">X</span> ms</small>
+    </div>
+
+    <div style="width: 33%; display: inline-block;">
+        <div data-netdata="apps.cpu"
+             data-width="100%"
+             data-height="300px"
+             data-after="-60"
+             data-points="60"
+             data-debug="false"
+             data-decimal-digits="0"
+             data-dt-element-name="time902"
+        ></div>
+        <br/>
+        <small>rendered in <span id="time902">X</span> ms</small>
+    </div>
 </div> <!-- 1st container -->
 </body>
 </html>
