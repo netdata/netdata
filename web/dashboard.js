@@ -7190,7 +7190,7 @@ var NETDATA = window.NETDATA || {};
             var value = data.result.data[index][label];
             var color = colors[i - 1];
 
-            if(value != null && value > 0) {
+            if(value !== null && value > 0) {
                 content.push({
                     label: label,
                     value: value,
