@@ -1326,6 +1326,14 @@ netdataDashboard.context = {
         info: 'Shows cluster general objects.'
     },
 
+    'ceph.general_bytes': {
+        info: 'Shows cluster general read/write data per second.'
+    },
+
+    'ceph.general_operations': {
+        info: 'Shows cluster general read/write operations per second.'
+    },
+
     'ceph.pool_usage': {
         info: 'Shows info about pool usage.'
     },
@@ -1347,11 +1355,11 @@ netdataDashboard.context = {
     },
 
     'ceph.apply_latency': {
-        info: 'Shows time for an operation to get applied to the backing filesystem.'
+        info: 'Time taken to flush an update to disks.'
     },
 
     'ceph.commit_latency': {
-        info: 'Shows time for an operation to be applied on a OSD.'
+        info: 'Time taken to commit an operation to the journal.'
     },
 
     // ------------------------------------------------------------------------
