@@ -434,6 +434,10 @@ static inline void statsd_reset_metric(STATSD_METRIC *m) {
     m->count = 0;
 }
 
+static inline int value_is_zinit(const char *value) {
+    return (*value == 'z' && *++value == 'i' && *++value == 'n' && *++value == 'i' && *++value == 't' && *++value == '\0');
+}
+
 static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
     if(unlikely(!value || !*value)) {
         error("STATSD: metric '%s' of type gauge, with empty value is ignored.", m->name);
@@ -445,13 +449,18 @@ static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, con
         statsd_reset_metric(m);
     }
 
-    if(unlikely(*value == '+' || *value == '-'))
-        m->gauge.value += statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
-    else
-        m->gauge.value = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
+    if(unlikely(value_is_zinit(value))) {
+        // magic loading of metric, without affecting anything
+    }
+    else {
+        if (unlikely(*value == '+' || *value == '-'))
+            m->gauge.value += statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
+        else
+            m->gauge.value = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
 
-    m->events++;
-    m->count++;
+        m->events++;
+        m->count++;
+    }
 }
 
 static inline void statsd_process_counter(STATSD_METRIC *m, const char *value, const char *sampling) {
@@ -459,10 +468,15 @@ static inline void statsd_process_counter(STATSD_METRIC *m, const char *value, c
 
     if(unlikely(m->reset)) statsd_reset_metric(m);
 
-    m->counter.value += llrintl((long double)statsd_parse_int(value, 1) / statsd_parse_float(sampling, 1.0));
+    if(unlikely(value_is_zinit(value))) {
+        // magic loading of metric, without affecting anything
+    }
+    else {
+        m->counter.value += llrintl((long double) statsd_parse_int(value, 1) / statsd_parse_float(sampling, 1.0));
 
-    m->events++;
-    m->count++;
+        m->events++;
+        m->count++;
+    }
 }
 
 static inline void statsd_process_meter(STATSD_METRIC *m, const char *value, const char *sampling) {
@@ -481,17 +495,22 @@ static inline void statsd_process_histogram(STATSD_METRIC *m, const char *value,
         statsd_reset_metric(m);
     }
 
-    if(unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
-        netdata_mutex_lock(&m->histogram.ext->mutex);
-        m->histogram.ext->size += statsd.histogram_increase_step;
-        m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(long double) * m->histogram.ext->size);
-        netdata_mutex_unlock(&m->histogram.ext->mutex);
+    if(unlikely(value_is_zinit(value))) {
+        // magic loading of metric, without affecting anything
     }
+    else {
+        if (unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
+            netdata_mutex_lock(&m->histogram.ext->mutex);
+            m->histogram.ext->size += statsd.histogram_increase_step;
+            m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(long double) * m->histogram.ext->size);
+            netdata_mutex_unlock(&m->histogram.ext->mutex);
+        }
 
-    m->histogram.ext->values[m->histogram.ext->used++] = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
+        m->histogram.ext->values[m->histogram.ext->used++] = statsd_parse_float(value, 1.0) / statsd_parse_float(sampling, 1.0);
 
-    m->events++;
-    m->count++;
+        m->events++;
+        m->count++;
+    }
 }
 
 static inline void statsd_process_timer(STATSD_METRIC *m, const char *value, const char *sampling) {
@@ -518,19 +537,24 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
         statsd_reset_metric(m);
     }
 
-    if(unlikely(!m->set.dict)) {
-        m->set.dict = dictionary_create(STATSD_DICTIONARY_OPTIONS|DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
+    if (unlikely(!m->set.dict)) {
+        m->set.dict   = dictionary_create(STATSD_DICTIONARY_OPTIONS | DICTIONARY_FLAG_VALUE_LINK_DONT_CLONE);
         m->set.unique = 0;
     }
 
-    void *t = dictionary_get(m->set.dict, value);
-    if(unlikely(!t)) {
-        dictionary_set(m->set.dict, value, NULL, 1);
-        m->set.unique++;
+    if(unlikely(value_is_zinit(value))) {
+        // magic loading of metric, without affecting anything
     }
+    else {
+        void *t = dictionary_get(m->set.dict, value);
+        if (unlikely(!t)) {
+            dictionary_set(m->set.dict, value, NULL, 1);
+            m->set.unique++;
+        }
 
-    m->events++;
-    m->count++;
+        m->events++;
+        m->count++;
+    }
 }
 
 
