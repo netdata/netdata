@@ -47,6 +47,7 @@ dist_weblib_DATA = \
 	lib/clipboard-polyfill-be05dad.js \
 	lib/c3-0.4.11.min.js \
 	lib/d3-3.5.17.min.js \
+	lib/d3pie-0.2.1.min.js \
 	lib/dygraph-combined-dd74404.js \
 	lib/dygraph-smooth-plotter-dd74404.js \
 	lib/fontawesome-all-5.0.1.min.js \
