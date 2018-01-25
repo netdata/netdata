@@ -450,6 +450,37 @@ code {
     height: auto !important;
 }
 
+.d3dpieChart {
+    border-radius: 5px 5px 0 0;
+    padding-top: 0px;
+    margin: 0px auto 0;
+    height: 100%;
+    background-color: #fff;
+}
+.d3dpieChart svg {
+    width: 100% !important;
+    height: 100%;
+}
+.d3dpieChart path.slice {
+    stroke-width: 2px;
+}
+.d3dpieChart .slice {
+    stroke: white;
+    stroke-width: 2px;
+}
+.d3dpieChart .slice:hover{
+    opacity: .5;
+}
+.d3dpieChart .labels text{
+    background-color: #333;
+    width: 200px;
+}
+.d3dpieChart polyline{
+    stroke: #333;
+    stroke-width: 1px;
+    fill: none;
+}
+
 .easyPieChart {
     position: relative;
     text-align: center;
