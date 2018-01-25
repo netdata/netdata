@@ -21,8 +21,6 @@
  *                                                  (default: false) */
 /*global netdataNoD3pie              *//* boolean,  disable d3pie charts
  *                                                  (default: false) */
-/*global netdataNoD3dpie             *//* boolean,  disable d3dpie charts
- *                                                  (default: false) */
 /*global netdataNoBootstrap          *//* boolean,  disable bootstrap - disables help too
  *                                                  (default: false) */
 /*global netdataDontStart            *//* boolean,  do not start the thread to process the charts
@@ -164,7 +162,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.raphael_js          = NETDATA.serverStatic + 'lib/raphael-2.2.4-min.js';
     NETDATA.c3_js               = NETDATA.serverStatic + 'lib/c3-0.4.18.min.js';
     NETDATA.c3_css              = NETDATA.serverStatic + 'css/c3-0.4.18.min.css';
-    NETDATA.d3pie_js            = NETDATA.serverStatic + 'lib/d3pie-0.2.1.min.js';
+    NETDATA.d3pie_js            = NETDATA.serverStatic + 'lib/d3pie-0.2.1-netdata-1.js';
     NETDATA.d3_js               = NETDATA.serverStatic + 'lib/d3-4.12.2.min.js';
     NETDATA.morris_js           = NETDATA.serverStatic + 'lib/morris-0.5.1.min.js';
     NETDATA.morris_css          = NETDATA.serverStatic + 'css/morris-0.5.1.css';
@@ -187,7 +185,20 @@ var NETDATA = window.NETDATA || {};
             easypiechart_scale: '#dfe0e0',
             gauge_pointer: '#C0C0C0',
             gauge_stroke: '#F0F0F0',
-            gauge_gradient: false
+            gauge_gradient: false,
+            d3pie: {
+                title: '#333333',
+                subtitle: '#666666',
+                footer: '#888888',
+                other: '#aaaaaa',
+                mainlabel: '#333333',
+                percentage: '#dddddd',
+                value: '#cccc44',
+                tooltip_bg: '#000000',
+                tooltip_fg: '#efefef',
+                segment_stroke: "#ffffff",
+                gradient_color: '#000000'
+            }
         },
         slate: {
             bootstrap_css: NETDATA.serverStatic + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
@@ -210,7 +221,20 @@ var NETDATA = window.NETDATA || {};
             easypiechart_scale: '#373b40',
             gauge_pointer: '#474b50',
             gauge_stroke: '#373b40',
-            gauge_gradient: false
+            gauge_gradient: false,
+            d3pie: {
+                title: '#C8C8C8',
+                subtitle: '#283236',
+                footer: '#283236',
+                other: '#283236',
+                mainlabel: '#C8C8C8',
+                percentage: '#dddddd',
+                value: '#cccc44',
+                tooltip_bg: '#272b30',
+                tooltip_fg: '#C8C8C8',
+                segment_stroke: "#283236",
+                gradient_color: '#000000'
+            }
         }
     };
 
@@ -7166,19 +7190,62 @@ var NETDATA = window.NETDATA || {};
             var value = data.result.data[index][label];
             var color = colors[i - 1];
 
-            content.push({
-                label: label,
-                value: value,
-                color: color
-            });
+            if(value != null && value > 0) {
+                content.push({
+                    label: label,
+                    value: value,
+                    color: color
+                });
+            }
         }
+
+        if(content.length === 0)
+            content.push({
+                label: 'no data',
+                value: 100,
+                color: '#666666'
+            });
 
         return content;
     };
 
-    NETDATA.d3pieChartUpdate = function(state, data) {
-        var content = NETDATA.d3pieSetContent(state, data, 0);
+    NETDATA.d3pieSetSelection = function(state, t) {
+        if(state.timeIsVisible(t) !== true)
+            return NETDATA.d3pieClearSelection(state, true);
 
+        var slot = state.calculateRowForTime(t);
+        slot = state.data.result.data.length - slot - 1;
+
+        if(slot < 0 || slot >= state.data.result.length)
+            return NETDATA.d3pieClearSelection(state, true);
+
+        if(state.tmp.d3pie_timer === undefined) {
+            state.tmp.d3pie_timer = NETDATA.timeout.set(function() {
+                state.tmp.d3pie_timer = undefined;
+                NETDATA.d3pieChange(state, NETDATA.d3pieSetContent(state, state.data, slot));
+            }, 0);
+        }
+
+        return true;
+    };
+
+    NETDATA.d3pieClearSelection = function(state, force) {
+        if(typeof state.tmp.d3pie_timer !== 'undefined') {
+            NETDATA.timeout.clear(state.tmp.d3pie_timer);
+            state.tmp.d3pie_timer = undefined;
+        }
+
+        if(state.isAutoRefreshable() === true && state.data !== null && force !== true) {
+            NETDATA.d3pieChange(state, NETDATA.d3pieSetContent(state, state.data, 0));
+        }
+        else {
+            NETDATA.d3pieChange(state, [ { label: 'no data', value: 1, color: '#666666' } ]);
+        }
+
+        return true;
+    };
+
+    NETDATA.d3pieChange = function(state, content) {
         var subtitle = NETDATA.dataAttribute(state.element, 'd3pie-subtitle', state.units_current);
         if(subtitle !== state.d3pie_subtitle) {
             state.d3pie_subtitle = subtitle;
@@ -7186,7 +7253,13 @@ var NETDATA = window.NETDATA || {};
         }
 
         state.d3pie_instance.updateProp("data.content", content);
+
         return true;
+    };
+
+    NETDATA.d3pieChartUpdate = function(state, data) {
+        var content = NETDATA.d3pieSetContent(state, data, 0);
+        return NETDATA.d3pieChange(state, content);
     };
 
     NETDATA.d3pieChartCreate = function(state, data) {
@@ -7201,13 +7274,13 @@ var NETDATA = window.NETDATA || {};
             header: {
                 title: {
                     text: NETDATA.dataAttribute(state.element, 'd3pie-title', state.title),
-                    color: NETDATA.dataAttribute(state.element, 'd3pie-title-color', "#333333"),
+                    color: NETDATA.dataAttribute(state.element, 'd3pie-title-color', NETDATA.themes.current.d3pie.title),
                     fontSize: NETDATA.dataAttribute(state.element, 'd3pie-title-fontsize', 14),
                     font: NETDATA.dataAttribute(state.element, 'd3pie-title-font', "arial")
                 },
                 subtitle: {
                     text: state.d3pie_subtitle,
-                    color: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-color', "#666666"),
+                    color: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-color', NETDATA.themes.current.d3pie.subtitle),
                     fontSize: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-fontsize', 11),
                     font: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-font', "arial")
                 },
@@ -7215,7 +7288,7 @@ var NETDATA = window.NETDATA || {};
             },
             footer: {
                 text: NETDATA.dataAttribute(state.element, 'd3pie-footer', ''),
-                color: NETDATA.dataAttribute(state.element, 'd3pie-footer-color', "#999999"),
+                color: NETDATA.dataAttribute(state.element, 'd3pie-footer-color', NETDATA.themes.current.d3pie.footer),
                 fontSize: NETDATA.dataAttribute(state.element, 'd3pie-footer-fontsize', 10),
                 font: NETDATA.dataAttribute(state.element, 'd3pie-footer-font', "arial"),
                 location: NETDATA.dataAttribute(state.element, 'd3pie-footer-location', "bottom-left")
@@ -7230,12 +7303,12 @@ var NETDATA = window.NETDATA || {};
                 // none, random, value-asc, value-desc, label-asc, label-desc
                 sortOrder: NETDATA.dataAttribute(state.element, 'd3pie-sortorder', "value-desc"),
                 smallSegmentGrouping: {
-                    enabled: NETDATA.dataAttributeBoolean(state.element, "d3pie-smallsegmentgrouping-enabled", true),
+                    enabled: NETDATA.dataAttributeBoolean(state.element, "d3pie-smallsegmentgrouping-enabled", false),
                     value: NETDATA.dataAttribute(state.element, 'd3pie-smallsegmentgrouping-value', 1),
                     // percentage, value
                     valueType: NETDATA.dataAttribute(state.element, 'd3pie-smallsegmentgrouping-valuetype', "percentage"),
                     label: NETDATA.dataAttribute(state.element, 'd3pie-smallsegmentgrouping-label', "other"),
-                    color: NETDATA.dataAttribute(state.element, 'd3pie-smallsegmentgrouping-color', "#cccccc")
+                    color: NETDATA.dataAttribute(state.element, 'd3pie-smallsegmentgrouping-color', NETDATA.themes.current.d3pie.other)
                 },
 
                 // REQUIRED! This is where you enter your pie data; it needs to be an array of objects
@@ -7252,21 +7325,21 @@ var NETDATA = window.NETDATA || {};
                 inner: {
                     // label, value, percentage, label-value1, label-value2, label-percentage1, label-percentage2
                     format: NETDATA.dataAttribute(state.element, 'd3pie-labels-inner-format', "percentage"),
-                    hideWhenLessThanPercentage: NETDATA.dataAttribute(state.element, 'd3pie-labels-inner-hidewhenlessthanpercentage', null)
+                    hideWhenLessThanPercentage: NETDATA.dataAttribute(state.element, 'd3pie-labels-inner-hidewhenlessthanpercentage', 2)
                 },
                 mainLabel: {
-                    color: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-color', "#333333"),
+                    color: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-color', NETDATA.themes.current.d3pie.mainlabel),
                     font: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-font', "arial"),
                     fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-fontsize', 10)
                 },
                 percentage: {
-                    color: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-color', "#dddddd"),
+                    color: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-color', NETDATA.themes.current.d3pie.percentage),
                     font: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-font', "arial"),
                     fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-fontsize', 10),
                     decimalPlaces: 0
                 },
                 value: {
-                    color: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-color', "#cccc44"),
+                    color: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-color', NETDATA.themes.current.d3pie.value),
                     font: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-font', "arial"),
                     fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-fontsize', 10)
                 },
@@ -7305,9 +7378,9 @@ var NETDATA = window.NETDATA || {};
                 placeholderParser: null,
                 styles: {
                     fadeInSpeed: 250,
-                    backgroundColor: "#000000",
+                    backgroundColor: NETDATA.themes.current.d3pie.tooltip_bg,
                     backgroundOpacity: 0.5,
-                    color: "#efefef",
+                    color: NETDATA.themes.current.d3pie.tooltip_fg,
                     borderRadius: 2,
                     font: "arial",
                     fontSize: 10,
@@ -7316,14 +7389,14 @@ var NETDATA = window.NETDATA || {};
             },
             misc: {
                 colors: {
-                    background: null, // transparent
+                    background: 'transparent', // transparent or color #
                     // segments: state.chartColors(),
-                    segmentStroke: NETDATA.dataAttribute(state.element, 'd3pie-misc-colors-segmentstroke', "#ffffff")
+                    segmentStroke: NETDATA.dataAttribute(state.element, 'd3pie-misc-colors-segmentstroke', NETDATA.themes.current.d3pie.segment_stroke)
                 },
                 gradient: {
                     enabled: NETDATA.dataAttributeBoolean(state.element, 'd3pie-misc-gradient-enabled', false),
                     percentage: NETDATA.dataAttribute(state.element, 'd3pie-misc-colors-percentage', 95),
-                    color: NETDATA.dataAttribute(state.element, 'd3pie-misc-colors-segmentstroke', "#000000")
+                    color: NETDATA.dataAttribute(state.element, 'd3pie-misc-gradient-color', NETDATA.themes.current.d3pie.gradient_color)
                 },
                 canvasPadding: {
                     top: 5,
@@ -7335,7 +7408,7 @@ var NETDATA = window.NETDATA || {};
                     x: 0,
                     y: 0
                 },
-                cssPrefix: null
+                cssPrefix: NETDATA.dataAttribute(state.element, 'd3pie-cssprefix', null)
             },
             callbacks: {
                 onload: null,
@@ -7348,377 +7421,6 @@ var NETDATA = window.NETDATA || {};
         state.d3pie_instance = new d3pie(state.element_chart, state.d3pie_options);
 
         // console.log(state.d3pie_instance);
-
-        return true;
-    };
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // d3dpie
-
-    NETDATA.d3dpieInitialize = function(callback) {
-        if(typeof netdataNod3dpie === 'undefined' || !netdataNod3dpie) {
-
-            // d3dpie requires D3
-            if(!NETDATA.chartLibraries.d3.initialized) {
-                if(NETDATA.chartLibraries.d3.enabled) {
-                    NETDATA.d3Initialize(function() {
-                        NETDATA.d3dpieInitialize(callback);
-                    });
-                }
-                else {
-                    NETDATA.chartLibraries.d3dpie.enabled = false;
-                    if(typeof callback === "function")
-                        return callback();
-                }
-            }
-            else {
-                NETDATA.registerChartLibrary('d3dpie', "lib/d3dpie.js");
-                if(typeof callback === "function")
-                    return callback();
-            }
-        }
-        else {
-            NETDATA.chartLibraries.d3dpie.enabled = false;
-            if(typeof callback === "function")
-                return callback();
-        }
-    };
-
-    NETDATA.d3dpieSetContent = function(state, data, index) {
-        state.legendFormatValueDecimalsFromMinMax(
-            data.min,
-            data.max
-        );
-
-        var content = [];
-        var colors = state.chartColors();
-        var len = data.result.labels.length;
-        var sum = 0;
-        for(var i = 1; i < len ; i++) {
-            var label = data.result.labels[i];
-            var value = data.result.data[index][label];
-            var color = colors[i - 1];
-
-            sum += value;
-
-            content.push({
-                label: label,
-                value: value,
-                color: color
-            });
-        }
-
-        len = content.length;
-        for(i = 0; i < len ; i++) {
-            content[i].percent = content[i].value * 100 / sum;
-        }
-
-        return content;
-    };
-
-    NETDATA.d3dpieChange = function(d3dpie, data, duration) {
-        var svg = d3dpie.svg;
-        var width = d3dpie.width;
-        var height = d3dpie.height;
-        var radius = d3dpie.radius;
-        var pie = d3dpie.pie;
-        var arc = d3dpie.arc;
-        var outerArc = d3dpie.outerArc;
-        var key = d3dpie.key;
-
-        function mergeWithFirstEqualZero(first, second) {
-            var secondSet = d3.set();
-            second.forEach(function (d) {
-                secondSet.add(d.label);
-            });
-
-            var onlyFirst = first
-                .filter(function (d) {
-                    return !secondSet.has(d.label)
-                })
-                .map(function (d) {
-                    return {label: d.label, value: 0};
-                });
-            return d3.merge([second, onlyFirst])
-                .sort(function (a, b) {
-                    return d3.ascending(a.label, b.label);
-                });
-        }
-
-        var data0 = svg.select(".slices").selectAll("path.slice")
-            .data().map(function (d) {
-                return d.data
-            });
-        if (data0.length === 0) data0 = data;
-        var was = mergeWithFirstEqualZero(data, data0);
-        var is = mergeWithFirstEqualZero(data0, data);
-
-        /* ------- SLICE ARCS -------*/
-
-        var slice = svg.select(".slices").selectAll("path.slice")
-            .data(pie(was), key);
-
-        slice.enter()
-            .insert("path")
-            .attr("class", "slice")
-            .style("fill", function (d) {
-                return d.data.color;
-            })
-            .each(function (d) {
-                this._current = d;
-            });
-
-        slice = svg.select(".slices").selectAll("path.slice")
-            .data(pie(is), key);
-
-        slice
-            .transition().duration(duration)
-            .attrTween("d", function (d) {
-                var interpolate = d3.interpolate(this._current, d);
-                var _this = this;
-                return function (t) {
-                    _this._current = interpolate(t);
-                    return arc(_this._current);
-                };
-            });
-
-        slice = svg.select(".slices").selectAll("path.slice")
-            .data(pie(data), key);
-
-        slice
-            .exit().transition().delay(duration).duration(0)
-            .remove();
-
-        /* ------- TEXT LABELS -------*/
-
-        var text = svg.select(".labels").selectAll("text")
-            .data(pie(was), key);
-
-        text.enter()
-            .append("text")
-            .attr("dy", ".35em")
-            .style("opacity", 0)
-            .text(function (d) {
-                return d.data.label;
-            })
-            .each(function (d) {
-                this._current = d;
-            });
-
-        function midAngle(d) {
-            return d.startAngle + (d.endAngle - d.startAngle) / 2;
-        }
-
-        var slotsLeft = {}, slotsRight = {};
-        var setLeft = {}, setRight = {};
-        var fontSize = 14;
-
-        function verticalAlign(d, pos) {
-            if(d.data.value === 0)
-                return;
-
-            var slots = (pos[0] < 0)?slotsLeft:slotsRight;
-            var set = (pos[0] < 0)?setLeft:setRight;
-
-            if(typeof(set[d.data.label]) !== 'undefined') {
-                pos[1] = set[d.data.label];
-                return;
-            }
-
-            var y = Math.round(pos[1]);
-            y -= y % fontSize;
-            var idx = Math.round(y / fontSize);
-
-            for(var i = 0; i < 10 ;i++) {
-                if (typeof(slots[idx + i]) === 'undefined') {
-                    //console.log(d.data.label + ': x = ' + pos[0].toString() + ', y = ' + y.toString() + ', idx = ' + idx.toString() + ', found i = ', i.toString() + ', new y = ' + ((idx + i) * fontSize).toString());
-                    slots[idx + i] = 1;
-                    y = (idx + i) * fontSize;
-                    break;
-                }
-                else if (typeof(slots[idx - i]) === 'undefined') {
-                    //console.log(d.data.label + ': x = ' + pos[0].toString() + ', y = ' + y.toString() + ', idx = ' + idx.toString() + ', found i = ', (-i).toString() + ', new y = ' + ((idx - i) * fontSize).toString());
-                    slots[idx - i] = 1;
-                    y = (idx - i) * fontSize;
-                    break;
-                }
-            }
-
-            pos[1] = y;
-            set[d.data.label] = y;
-        }
-
-        text = svg.select(".labels").selectAll("text")
-            .data(pie(is), key);
-
-        text.transition().duration(duration)
-            .style("opacity", function (d) {
-                return (d.data.value === 0) ? 0 : 1;
-            })
-            .attrTween("transform", function (d) {
-                var interpolate = d3.interpolate(this._current, d);
-                var _this = this;
-                return function (t) {
-                    var d2 = interpolate(t);
-                    _this._current = d2;
-                    var pos = outerArc.centroid(d2);
-                    pos[0] = radius * (midAngle(d2) < Math.PI ? 1 : -1);
-                    verticalAlign(d2, pos);
-                    return "translate(" + pos + ")";
-                };
-            })
-            .styleTween("text-anchor", function (d) {
-                var interpolate = d3.interpolate(this._current, d);
-                return function (t) {
-                    var d2 = interpolate(t);
-                    return midAngle(d2) < Math.PI ? "start" : "end";
-                };
-            });
-
-        text = svg.select(".labels").selectAll("text")
-            .data(pie(data), key);
-
-        text
-            .exit().transition().delay(duration)
-            .remove();
-
-        /* ------- SLICE TO TEXT POLYLINES -------*/
-
-        var polyline = svg.select(".lines").selectAll("polyline")
-            .data(pie(was), key);
-
-        polyline.enter()
-            .append("polyline")
-            .style("opacity", 0)
-            .each(function (d) {
-                this._current = d;
-            });
-
-        polyline = svg.select(".lines").selectAll("polyline")
-            .data(pie(is), key);
-
-        polyline.transition().duration(duration)
-            .style("opacity", function (d) {
-                return (d.data.value === 0) ? 0 : 1;
-            })
-            .attrTween("points", function (d) {
-                // this._current = this._current;
-                var interpolate = d3.interpolate(this._current, d);
-                var _this = this;
-                return function (t) {
-                    var d2 = interpolate(t);
-                    _this._current = d2;
-                    var pos = outerArc.centroid(d2);
-                    pos[0] = radius * 0.95 * (midAngle(d2) < Math.PI ? 1 : -1);
-                    verticalAlign(d2, pos);
-
-                    var pos2 = outerArc.centroid(d2);
-                    verticalAlign(d2, pos2);
-                    return [arc.centroid(d2), pos2, pos];
-                };
-            });
-
-        polyline = svg.select(".lines").selectAll("polyline")
-            .data(pie(data), key);
-
-        polyline
-            .exit().transition().delay(duration)
-            .remove();
-    };
-
-    NETDATA.d3dpieSetSelection = function(state, t) {
-        if(state.timeIsVisible(t) !== true)
-            return NETDATA.d3dpieClearSelection(state, true);
-
-        var slot = state.calculateRowForTime(t);
-        slot = state.data.result.data.length - slot - 1;
-
-        if(slot < 0 || slot >= state.data.result.length)
-            return NETDATA.d3dpieClearSelection(state, true);
-
-        if(state.tmp.d3pie_timer === undefined) {
-            state.tmp.d3pie_timer = NETDATA.timeout.set(function() {
-                state.tmp.d3pie_timer = undefined;
-                NETDATA.d3dpieChange(state.d3dpie_instance, NETDATA.d3dpieSetContent(state, state.data, slot), 0);
-            }, 0);
-        }
-
-        return true;
-    };
-
-    NETDATA.d3dpieClearSelection = function(state, force) {
-        if(typeof state.tmp.d3dpie_timer !== 'undefined') {
-            NETDATA.timeout.clear(state.tmp.d3dpie_timer);
-            state.tmp.d3dpie_timer = undefined;
-        }
-
-        if(state.isAutoRefreshable() === true && state.data !== null && force !== true) {
-            NETDATA.d3dpieChartUpdate(state, state.data);
-        }
-        else {
-            // FIXME: we should show empty chart here
-            NETDATA.d3dpieChange(state.d3dpie_instance, NETDATA.d3dpieSetContent(state, state.data, 0), 0);
-        }
-
-        return true;
-    };
-
-    NETDATA.d3dpieChartUpdate = function(state, data) {
-        NETDATA.d3dpieChange(state.d3dpie_instance, NETDATA.d3dpieSetContent(state, data, 0), 500);
-        return true;
-    };
-
-    NETDATA.d3dpieChartCreate = function(state, data) {
-        state.element_chart.className = 'd3dpieChart';
-
-        var svg = d3.select(state.element_chart)
-            .append("svg")
-            .append("g");
-
-        svg.append("g")
-            .attr("class", "slices");
-
-        svg.append("g")
-            .attr("class", "labels");
-
-        svg
-            .append("g")
-            .attr("class", "lines");
-
-        var width = state.chartWidth(),
-            height = state.chartHeight(),
-            radius = Math.min(width,height) / 2;
-
-        var pie = d3.pie()
-            .sort(null)
-            .value(function(d) {
-                return d.value;
-            });
-
-        var arc = d3.arc()
-            .outerRadius(radius * 0.9)
-            .innerRadius(radius * 0.6);
-
-        var outerArc = d3.arc()
-            .innerRadius(radius * 0.7)
-            .outerRadius(radius * 0.9);
-
-        svg.attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
-
-        var key = function(d) { return d.data.label; };
-
-        state.d3dpie_instance = {
-            svg: svg,
-            width: width,
-            height: height,
-            radius: radius,
-            pie: pie,
-            arc: arc,
-            outerArc: outerArc,
-            key: key
-        };
-
-        NETDATA.d3dpieChange(state.d3dpie_instance, NETDATA.d3dpieSetContent(state, data, 0), 500);
 
         return true;
     };
@@ -8691,27 +8393,8 @@ var NETDATA = window.NETDATA || {};
             create: NETDATA.d3pieChartCreate,
             update: NETDATA.d3pieChartUpdate,
             resize: null,
-            setSelection: undefined, // function(state, t) { void(state); return true; },
-            clearSelection: undefined, // function(state) { void(state); return true; },
-            toolboxPanAndZoom: null,
-            initialized: false,
-            enabled: true,
-            format: function(state) { void(state); return 'json'; },
-            options: function(state) { void(state); return 'objectrows|ms'; },
-            legend: function(state) { void(state); return null; },
-            autoresize: function(state) { void(state); return false; },
-            max_updates_to_recreate: function(state) { void(state); return 5000; },
-            track_colors: function(state) { void(state); return false; },
-            pixels_per_point: function(state) { void(state); return 15; },
-            container_class: function(state) { void(state); return 'netdata-container'; }
-        },
-        "d3dpie": {
-            initialize: NETDATA.d3dpieInitialize,
-            create: NETDATA.d3dpieChartCreate,
-            update: NETDATA.d3dpieChartUpdate,
-            resize: null,
-            setSelection: NETDATA.d3dpieSetSelection,
-            clearSelection: NETDATA.d3dpieClearSelection,
+            setSelection: NETDATA.d3pieSetSelection,
+            clearSelection: NETDATA.d3pieClearSelection,
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
