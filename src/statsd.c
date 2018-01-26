@@ -435,7 +435,7 @@ static inline void statsd_reset_metric(STATSD_METRIC *m) {
 }
 
 static inline int value_is_zinit(const char *value) {
-    return (*value == 'z' && *++value == 'i' && *++value == 'n' && *++value == 'i' && *++value == 't' && *++value == '\0');
+    return (value && *value == 'z' && *++value == 'i' && *++value == 'n' && *++value == 'i' && *++value == 't' && *++value == '\0');
 }
 
 static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, const char *sampling) {
