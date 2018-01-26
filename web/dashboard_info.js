@@ -1334,6 +1334,10 @@ netdataDashboard.context = {
         info: 'Shows cluster general read/write operations per second.'
     },
 
+    'ceph.general_latency': {
+        info: 'Shows cluster general apply/commit latency.'
+    },
+
     'ceph.pool_usage': {
         info: 'Shows info about pool usage.'
     },
