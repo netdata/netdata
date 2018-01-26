@@ -1346,12 +1346,20 @@ netdataDashboard.context = {
         info: 'Shows info about number of objects presents on a pool.'
     },
 
-    'ceph.pool_wio': {
-        info: 'Shows info about write operations on a pool.'
+    'ceph.pool_read_bytes': {
+        info: 'Shows info about read data per second on a pool.'
     },
 
-    'ceph.pool_rio': {
-        info: 'Shows info about read operations on a pool.'
+    'ceph.pool_write_bytes': {
+        info: 'Shows info about write data per second on a pool.'
+    },
+
+    'ceph.pool_read_objects': {
+        info: 'Shows info about read objects per second on a pool.'
+    },
+
+    'ceph.pool_write_objects': {
+        info: 'Shows info about write objects per second on a pool.'
     },
 
     'ceph.osd_usage': {

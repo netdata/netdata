@@ -17,8 +17,9 @@ priority = 60000
 retries = 60
 
 ORDER = ['general_usage', 'general_objects', 'general_bytes', 'general_operations',
-         'general_latency', 'pool_usage', 'pool_objects', 'pool_read_iops',
-         'pool_write_iops', 'osd_usage', 'osd_apply_latency', 'osd_commit_latency']
+         'general_latency', 'pool_usage', 'pool_objects', 'pool_read_bytes',
+         'pool_write_bytes', 'pool_read_operations', 'pool_write_operations', 'osd_usage',
+         'osd_apply_latency', 'osd_commit_latency']
 
 CHARTS = {
     'general_usage': {
@@ -66,12 +67,20 @@ CHARTS = {
         'options': [None, 'Ceph Pools', 'objects', 'pool', 'ceph.pool_objects', 'line'],
         'lines': []
     },
-    'pool_write_iops': {
-        'options': [None, 'Ceph Write Pool IOPS', 'KB', 'pool', 'ceph.pool_wio', 'area'],
+    'pool_read_bytes': {
+        'options': [None, 'Ceph Read Pool Data/s', 'KB', 'pool', 'ceph.pool_read_bytes', 'area'],
         'lines': []
     },
-    'pool_read_iops': {
-        'options': [None, 'Ceph Read Pool IOPS', 'KB', 'pool', 'ceph.pool_rio', 'area'],
+    'pool_write_bytes': {
+        'options': [None, 'Ceph Write Pool Data/s', 'KB', 'pool', 'ceph.pool_write_bytes', 'area'],
+        'lines': []
+    },
+    'pool_read_operations': {
+        'options': [None, 'Ceph Read Pool Operations/s', 'operations', 'pool', 'ceph.pool_read_operations', 'area'],
+        'lines': []
+    },
+    'pool_write_operations': {
+        'options': [None, 'Ceph Write Pool Operations/s', 'operations', 'pool', 'ceph.pool_write_operations', 'area'],
         'lines': []
     },
     'osd_usage': {
@@ -124,7 +133,7 @@ class Service(SimpleService):
         Create dynamically charts options
         :return: None
         """
-        # Lines
+        # Pool lines
         for pool in sorted(self._get_df()['pools']):
             self.definitions['pool_usage']['lines'].append([pool['name'],
                                                             pool['name'],
@@ -132,13 +141,20 @@ class Service(SimpleService):
             self.definitions['pool_objects']['lines'].append(["obj_{0}".format(pool['name']),
                                                               pool['name'],
                                                               'absolute'])
-            self.definitions['pool_read_iops']['lines'].append(['read_{0}'.format(pool['name']),
+            self.definitions['pool_read_bytes']['lines'].append(['read_{0}'.format(pool['name']),
                                                                 pool['name'],
-                                                                'incremental'])
-            self.definitions['pool_write_iops']['lines'].append(['write_{0}'.format(pool['name']),
+                                                                'absolute', 1, 1024])
+            self.definitions['pool_write_bytes']['lines'].append(['write_{0}'.format(pool['name']),
                                                                  pool['name'],
-                                                                 'incremental'])
+                                                                 'absolute', 1, 1024])
+            self.definitions['pool_read_operations']['lines'].append(['read_operations_{0}'.format(pool['name']),
+                                                                pool['name'],
+                                                                'absolute'])
+            self.definitions['pool_write_operations']['lines'].append(['write_operations_{0}'.format(pool['name']),
+                                                                 pool['name'],
+                                                                 'absolute'])
 
+        # OSD lines
         for osd in sorted(self._get_osd_df()['nodes']):
             self.definitions['osd_usage']['lines'].append([osd['name'],
                                                            osd['name'],
@@ -157,12 +173,17 @@ class Service(SimpleService):
         """
         try:
             data = {}
-            data.update(self._get_general())
-            for pool in self._get_df()['pools']:
+            df = self._get_df()
+            osd_df = self._get_osd_df()
+            osd_perf = self._get_osd_perf()
+            pool_stats = self._get_osd_pool_stats()
+            data.update(self._get_general(df, osd_perf, pool_stats))
+            for pool in df['pools']:
                 data.update(self._get_pool_usage(pool))
                 data.update(self._get_pool_objects(pool))
-                data.update(self._get_pool_rw_io(pool))
-            for osd in self._get_osd_df()['nodes']:
+            for pool_io in pool_stats:
+                data.update(self._get_pool_rw(pool_io))
+            for osd in osd_df['nodes']:
                 data.update(self._get_osd_usage(osd))
             data.update(self._get_osd_latency())
             return data
@@ -170,15 +191,11 @@ class Service(SimpleService):
             self.error(error)
             return None
 
-    def _get_general(self):
+    def _get_general(self, df, osd_perf, pool_stats):
         """
         Get ceph's general usage
         :return: dict
         """
-        df = self._get_df()
-        pool_stats = self._get_osd_pool_stats()
-        osd_perf = self._get_osd_perf()
-
         general_objects = 0
         read_bytes_sec = 0
         write_bytes_sec = 0
@@ -223,16 +240,16 @@ class Service(SimpleService):
         """
         return {'obj_{0}'.format(pool['name']): pool['stats']['objects']}
 
-    def _get_pool_rw_io(self, pool):
+    def _get_pool_rw(self, pool):
         """
-        Get read/write kb operations in a pool
-        :return: dict
+        Get read/write kb and operations in a pool
+        :return: A pool dict with both read/write bytes and operations.
         """
-        ioctx = self.cluster.open_ioctx(pool['name'])
-        pool_status = ioctx.get_stats()
-        ioctx.close()
-        return {'read_{0}'.format(pool['name']): int(pool_status['num_rd_kb']),
-                'write_{0}'.format(pool['name']): int(pool_status['num_wr_kb'])}
+        return {'read_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('read_bytes_sec', 0)),
+                'write_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('write_bytes_sec', 0)),
+                'read_operations_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('read_op_per_sec', 0)),
+                'write_operations_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('write_op_per_sec', 0))
+                }
 
     def _get_osd_usage(self, osd):
         """
