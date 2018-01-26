@@ -17,8 +17,8 @@ priority = 60000
 retries = 60
 
 ORDER = ['general_usage', 'general_objects', 'general_bytes', 'general_operations',
-         'pool_usage', 'pool_objects', 'pool_write_iops', 'pool_read_iops',
-         'osd_usage', 'osd_apply_latency', 'osd_commit_latency']
+         'general_latency', 'pool_usage', 'pool_objects', 'pool_read_iops',
+         'pool_write_iops', 'osd_usage', 'osd_apply_latency', 'osd_commit_latency']
 
 CHARTS = {
     'general_usage': {
@@ -48,6 +48,14 @@ CHARTS = {
         'lines': [
             ['general_read_operations', 'read', 'absolute', 1],
             ['general_write_operations', 'write', 'absolute', -1]
+        ]
+    },
+    'general_latency': {
+        'options': [None, 'Ceph General Apply/Commit latency', 'milliseconds', 'general', 'ceph.general_latency',
+                    'area'],
+        'lines': [
+            ['general_apply_latency', 'apply', 'absolute'],
+            ['general_commit_latency', 'commit', 'absolute']
         ]
     },
     'pool_usage': {
@@ -124,12 +132,12 @@ class Service(SimpleService):
             self.definitions['pool_objects']['lines'].append(["obj_{0}".format(pool['name']),
                                                               pool['name'],
                                                               'absolute'])
-            self.definitions['pool_write_iops']['lines'].append(['write_{0}'.format(pool['name']),
-                                                                 pool['name'],
-                                                                 'incremental'])
             self.definitions['pool_read_iops']['lines'].append(['read_{0}'.format(pool['name']),
                                                                 pool['name'],
                                                                 'incremental'])
+            self.definitions['pool_write_iops']['lines'].append(['write_{0}'.format(pool['name']),
+                                                                 pool['name'],
+                                                                 'incremental'])
 
         for osd in sorted(self._get_osd_df()['nodes']):
             self.definitions['osd_usage']['lines'].append([osd['name'],
@@ -169,11 +177,15 @@ class Service(SimpleService):
         """
         df = self._get_df()
         pool_stats = self._get_osd_pool_stats()
+        osd_perf = self._get_osd_perf()
+
         general_objects = 0
         read_bytes_sec = 0
         write_bytes_sec = 0
         read_op_per_sec = 0
         write_op_per_sec = 0
+        apply_latency = 0
+        commit_latency = 0
 
         for pool in df['pools']:
             general_objects = general_objects + pool['stats']['objects']
@@ -182,6 +194,9 @@ class Service(SimpleService):
             write_bytes_sec = write_bytes_sec + pool_rw_io_b['client_io_rate'].get('write_bytes_sec', 0)
             read_op_per_sec = read_op_per_sec + pool_rw_io_b['client_io_rate'].get('read_op_per_sec', 0)
             write_op_per_sec = write_op_per_sec + pool_rw_io_b['client_io_rate'].get('write_op_per_sec', 0)
+        for perf in osd_perf['osd_perf_infos']:
+            apply_latency = apply_latency + perf['perf_stats']['apply_latency_ms']
+            commit_latency = commit_latency + perf['perf_stats']['commit_latency_ms']
 
         return {'general_usage': df['stats']['total_used_bytes'],
                 'general_available': df['stats']['total_avail_bytes'],
@@ -189,7 +204,9 @@ class Service(SimpleService):
                 'general_read_bytes': read_bytes_sec,
                 'general_write_bytes': write_bytes_sec,
                 'general_read_operations': read_op_per_sec,
-                'general_write_operations': write_op_per_sec
+                'general_write_operations': write_op_per_sec,
+                'general_apply_latency': apply_latency,
+                'general_commit_latency': commit_latency
                 }
 
     def _get_pool_usage(self, pool):
