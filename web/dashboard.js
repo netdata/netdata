@@ -7420,6 +7420,9 @@ var NETDATA = window.NETDATA || {};
 
         state.d3pie_instance = new d3pie(state.element_chart, state.d3pie_options);
 
+        // FIXME: temporary fix because the first update does not render the pie
+        NETDATA.d3pieChartUpdate(state, data);
+
         // console.log(state.d3pie_instance);
 
         return true;
