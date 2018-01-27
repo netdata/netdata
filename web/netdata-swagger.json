@@ -133,6 +133,16 @@
                         "allowEmptyValue": false
                     },
                     {
+                        "name": "gpoints",
+                        "in": "query",
+                        "description": "The grouping number of points. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gpoints=60 will turn them to per-minute).",
+                        "required": false,
+                        "type": "number",
+                        "format": "integer",
+                        "allowEmptyValue": false,
+                        "default": 0
+                    },
+                    {
                         "name": "format",
                         "in": "query",
                         "description": "The format of the data to be returned.",

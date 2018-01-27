@@ -1413,7 +1413,7 @@ static RRDR *rrdr_create(RRDSET *st, long n)
     return r;
 }
 
-RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int group_method, int aligned)
+RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int group_method, long group_points, int aligned)
 {
     int debug = rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?1:0;
     int absolute_period_requested = -1;
@@ -1476,20 +1476,30 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
     if(duration <= 0 || available_points <= 0)
         return rrdr_create(st, 1);
 
-    // check the wanted points
-    if(points < 0) points = -points;
-    if(points > available_points) points = available_points;
-    if(points == 0) points = available_points;
+    // check the number of wanted points in the result
+    if(unlikely(points < 0)) points = -points;
+    if(unlikely(points > available_points)) points = available_points;
+    if(unlikely(points == 0)) points = available_points;
 
-    // calculate proper grouping of source data
+    // calculate the desired grouping of source data points
     long group = available_points / points;
-    if(group <= 0) group = 1;
+    if(unlikely(group <= 0)) group = 1;
+    if(unlikely(available_points % points > points / 2)) group++; // rounding to the closest integer
 
-    // round group to the closest integer
-    if(available_points % points > points / 2) group++;
+    // group_points enforces a certain grouping multiple
+    calculated_number group_sum_divisor = 1.0;
+    if(likely(group_points < 1)) group_points = 1;
+    else {
+        if (unlikely(group_points > available_points)) group_points = available_points; // group_points is above all the available points
+        if (unlikely(group < group_points)) group = group_points; // do not allow grouping below the desired one
+        if (unlikely(group > group_points && (group % group_points) > 0)) // make sure group is multiple of group_points
+            group += group_points - (group % group_points);
 
-    time_t after_new  = (aligned) ? (after  - (after  % (group * st->update_every))) : after;
-    time_t before_new = (aligned) ? (before - (before % (group * st->update_every))) : before;
+        group_sum_divisor = group / group_points;
+    }
+
+    time_t after_new  = after  - (after  % ( ((aligned)?group:group_points) * st->update_every ));
+    time_t before_new = before - (before % ( ((aligned)?group:group_points) * st->update_every ));
     long points_new   = (before_new - after_new) / st->update_every / group;
 
     // find the starting and ending slots in our round robin db
@@ -1497,27 +1507,35 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
             stop_at_slot  = rrdset_time2slot(st, after_new);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(after_new < first_entry_t) {
-        error("after_new %u is too small, minimum %u", (uint32_t)after_new, (uint32_t)first_entry_t);
-    }
-    if(after_new > last_entry_t) {
-        error("after_new %u is too big, maximum %u", (uint32_t)after_new, (uint32_t)last_entry_t);
-    }
-    if(before_new < first_entry_t) {
-        error("before_new %u is too small, minimum %u", (uint32_t)before_new, (uint32_t)first_entry_t);
-    }
-    if(before_new > last_entry_t) {
-        error("before_new %u is too big, maximum %u", (uint32_t)before_new, (uint32_t)last_entry_t);
-    }
-    if(start_at_slot < 0 || start_at_slot >= st->entries) {
-        error("start_at_slot is invalid %ld, expected 0 to %ld", start_at_slot, st->entries - 1);
-    }
-    if(stop_at_slot < 0 || stop_at_slot >= st->entries) {
-        error("stop_at_slot is invalid %ld, expected 0 to %ld", stop_at_slot, st->entries - 1);
-    }
-    if(points_new > (before_new - after_new) / group / st->update_every + 1) {
-        error("points_new %ld is more than points %ld", points_new, (before_new - after_new) / group / st->update_every + 1);
-    }
+    if(after_new < first_entry_t)
+        error("INTERNAL CHECK: after_new %u is too small, minimum %u", (uint32_t)after_new, (uint32_t)first_entry_t);
+
+    if(after_new > last_entry_t)
+        error("INTERNAL CHECK: after_new %u is too big, maximum %u", (uint32_t)after_new, (uint32_t)last_entry_t);
+
+    if(before_new < first_entry_t)
+        error("INTERNAL CHECK: before_new %u is too small, minimum %u", (uint32_t)before_new, (uint32_t)first_entry_t);
+
+    if(before_new > last_entry_t)
+        error("INTERNAL CHECK: before_new %u is too big, maximum %u", (uint32_t)before_new, (uint32_t)last_entry_t);
+
+    if(start_at_slot < 0 || start_at_slot >= st->entries)
+        error("INTERNAL CHECK: start_at_slot is invalid %ld, expected 0 to %ld", start_at_slot, st->entries - 1);
+
+    if(stop_at_slot < 0 || stop_at_slot >= st->entries)
+        error("INTERNAL CHECK: stop_at_slot is invalid %ld, expected 0 to %ld", stop_at_slot, st->entries - 1);
+
+    if(points_new > (before_new - after_new) / group / st->update_every + 1)
+        error("INTERNAL CHECK: points_new %ld is more than points %ld", points_new, (before_new - after_new) / group / st->update_every + 1);
+
+    if(group < group_points)
+        error("INTERNAL CHECK: group %ld is less than the desired group points %ld", group, group_points);
+
+    if(group > group_points && group % group_points)
+        error("INTERNAL CHECK: group %ld is not a multiple of the desired group points %ld", group, group_points);
+
+    if(group_points > 1 && group_points * group_sum_divisor != group)
+        error("INTERNAL CHECK: group_sum_divisor " CALCULATED_NUMBER_FORMAT " * group_points %ld, is not equal to group %ld", group_sum_divisor, group_points, group);
 #endif
 
     //info("RRD2RRDR(): %s: wanted %ld points, got %ld - group=%ld, wanted duration=%u, got %u - wanted %ld - %ld, got %ld - %ld", st->id, points, points_new, group, before - after, before_new - after_new, after, before, after_new, before_new);
@@ -1542,13 +1560,13 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
     RRDR *r = rrdr_create(st, points);
     if(!r) {
 #ifdef NETDATA_INTERNAL_CHECKS
-        error("Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after, (uint32_t)before, (uint32_t)duration, points);
+        error("INTERNAL CHECK: Cannot create RRDR for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after, (uint32_t)before, (uint32_t)duration, points);
 #endif
         return NULL;
     }
     if(!r->d) {
 #ifdef NETDATA_INTERNAL_CHECKS
-        error("Returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after, (uint32_t)before, (uint32_t)duration, points);
+        error("INTERNAL CHECK: Returning empty RRDR (no dimensions in RRDSET) for %s, after=%u, before=%u, duration=%u, points=%ld", st->id, (uint32_t)after, (uint32_t)before, (uint32_t)duration, points);
 #endif
         return r;
     }
@@ -1565,7 +1583,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
     // -------------------------------------------------------------------------
     // checks for debugging
 
-    if(debug) debug(D_RRD_STATS, "INFO %s first_t: %u, last_t: %u, all_duration: %u, after: %u, before: %u, duration: %u, points: %ld, group: %ld"
+    if(debug) debug(D_RRD_STATS, "INFO %s first_t: %u, last_t: %u, all_duration: %u, after: %u, before: %u, duration: %u, points: %ld, group: %ld, group_points: %ld"
             , st->id
             , (uint32_t)first_entry_t
             , (uint32_t)last_entry_t
@@ -1575,6 +1593,7 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
             , (uint32_t)duration
             , points
             , group
+            , group_points
             );
 
 
@@ -1746,7 +1765,11 @@ RRDR *rrd2rrdr(RRDSET *st, long points, long long after, long long before, int g
                         default:
                         case GROUP_AVERAGE:
                         case GROUP_UNDEFINED:
-                            cn[c] = group_values[c] / group_counts[c];
+                            if(unlikely(group_points != 1))
+                                cn[c] = group_values[c] / group_sum_divisor;
+                            else
+                                cn[c] = group_values[c] / group_counts[c];
+
                             group_values[c] = 0;
                             break;
                     }
@@ -1781,12 +1804,13 @@ int rrdset2value_api_v1(
         , long long after
         , long long before
         , int group_method
+        , long group_points
         , uint32_t options
         , time_t *db_after
         , time_t *db_before
         , int *value_is_null
 ) {
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, !(options & RRDR_OPTION_NOT_ALIGNED));
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_points, !(options & RRDR_OPTION_NOT_ALIGNED));
     if(!r) {
         if(value_is_null) *value_is_null = 1;
         return 500;
@@ -1831,12 +1855,13 @@ int rrdset2anything_api_v1(
         , long long after
         , long long before
         , int group_method
+        , long group_points
         , uint32_t options
         , time_t *latest_timestamp
 ) {
     st->last_accessed_time = now_realtime_sec();
 
-    RRDR *r = rrd2rrdr(st, points, after, before, group_method, !(options & RRDR_OPTION_NOT_ALIGNED));
+    RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_points, !(options & RRDR_OPTION_NOT_ALIGNED));
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return 500;

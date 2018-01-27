@@ -558,7 +558,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
             ret = rrdset2value_api_v1(st, w->response.data, &n, (dimensions) ? buffer_tostring(dimensions) : NULL
-                                      , points, after, before, group, options, NULL, &latest_timestamp, &value_is_null);
+                                      , points, after, before, group, 0, options, NULL, &latest_timestamp, &value_is_null);
 
         // if the value cannot be calculated, show empty badge
         if (ret != 200) {
@@ -611,6 +611,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart = NULL
     , *before_str = NULL
     , *after_str = NULL
+    , *group_points_str = NULL
     , *points_str = NULL;
 
     int group = GROUP_AVERAGE;
@@ -639,6 +640,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
+        else if(!strcmp(name, "gpoints")) group_points_str = value;
         else if(!strcmp(name, "group")) {
             group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
         }
@@ -705,6 +707,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):0;
     int       points = (points_str && *points_str)?str2i(points_str):0;
+    long      group_points = (group_points_str && *group_points_str)?str2l(group_points_str):0;
 
     debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', format '%u', options '0x%08x'"
           , w->id
@@ -743,8 +746,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, options
-                                 , &last_timestamp_in_data);
+    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_points
+                                 , options, &last_timestamp_in_data);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)
