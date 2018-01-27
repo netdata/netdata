@@ -72,11 +72,11 @@ extern void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb);
 extern void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb);
 
 extern int rrdset2anything_api_v1(RRDSET *st, BUFFER *out, BUFFER *dimensions, uint32_t format, long points
-                            , long long after, long long before, int group_method, uint32_t options
+                            , long long after, long long before, int group_method, long group_points, uint32_t options
                             , time_t *latest_timestamp);
 
 extern int rrdset2value_api_v1(RRDSET *st, BUFFER *wb, calculated_number *n, const char *dimensions, long points
-                            , long long after, long long before, int group_method, uint32_t options
+                            , long long after, long long before, int group_method, long group_points, uint32_t options
                             , time_t *db_after, time_t *db_before, int *value_is_null);
 
 #endif /* NETDATA_RRD2JSON_H */
