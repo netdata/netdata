@@ -5,6 +5,7 @@
 #include <config.h>
 #endif
 
+
 // ----------------------------------------------------------------------------
 // system include files for all netdata C programs
 
@@ -99,6 +100,7 @@
 
 #ifdef STORAGE_WITH_MATH
 #include <math.h>
+#include <float.h>
 #endif
 
 #if defined(HAVE_INTTYPES_H)

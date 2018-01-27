@@ -55,12 +55,12 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     }
 
     if(!isnan(rc->green) && isnan(st->green)) {
-        debug(D_HEALTH, "Health alarm '%s.%s' green threshold set from %Lf to %Lf.", rc->rrdset->id, rc->name, rc->rrdset->green, rc->green);
+        debug(D_HEALTH, "Health alarm '%s.%s' green threshold set from " CALCULATED_NUMBER_FORMAT_AUTO " to " CALCULATED_NUMBER_FORMAT_AUTO ".", rc->rrdset->id, rc->name, rc->rrdset->green, rc->green);
         st->green = rc->green;
     }
 
     if(!isnan(rc->red) && isnan(st->red)) {
-        debug(D_HEALTH, "Health alarm '%s.%s' red threshold set from %Lf to %Lf.", rc->rrdset->id, rc->name, rc->rrdset->red, rc->red);
+        debug(D_HEALTH, "Health alarm '%s.%s' red threshold set from " CALCULATED_NUMBER_FORMAT_AUTO " to " CALCULATED_NUMBER_FORMAT_AUTO ".", rc->rrdset->id, rc->name, rc->rrdset->red, rc->red);
         st->red = rc->red;
     }
 
@@ -351,7 +351,7 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
             error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, rt->name, rt->critical->source);
     }
 
-    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green %Lf, red %Lf, lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
+    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
             (rc->chart)?rc->chart:"NOCHART",
             rc->name,
             (rc->exec)?rc->exec:"DEFAULT",
