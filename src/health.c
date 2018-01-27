@@ -428,6 +428,7 @@ void *health_main(void *ptr) {
                                                   , rc->after
                                                   , rc->before
                                                   , rc->group
+                                                  , 0
                                                   , rc->options
                                                   , &rc->db_after
                                                   , &rc->db_before
