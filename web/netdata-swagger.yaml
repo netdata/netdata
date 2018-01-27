@@ -95,9 +95,9 @@ paths:
           enum: [ 'min', 'max', 'average', 'sum', 'incremental-sum' ]
           default: 'average'
           allowEmptyValue: false
-        - name: gpoints
+        - name: gtime
           in: query
-          description: 'The grouping number of points. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gpoints=60 will turn them to per-minute).'
+          description: 'The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).'
           required: false
           type: number
           format: integer
