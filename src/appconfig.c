@@ -297,10 +297,10 @@ long long appconfig_get_number(struct config *root, const char *section, const c
     return strtoll(s, NULL, 0);
 }
 
-long double appconfig_get_float(struct config *root, const char *section, const char *name, long double value)
+LONG_DOUBLE appconfig_get_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
 {
     char buffer[100], *s;
-    sprintf(buffer, "%0.5Lf", value);
+    sprintf(buffer, "%0.5" LONG_DOUBLE_MODIFIER, value);
 
     s = appconfig_get(root, section, name, buffer);
     if(!s) return value;
@@ -407,10 +407,10 @@ long long appconfig_set_number(struct config *root, const char *section, const c
     return value;
 }
 
-long double appconfig_set_float(struct config *root, const char *section, const char *name, long double value)
+LONG_DOUBLE appconfig_set_float(struct config *root, const char *section, const char *name, LONG_DOUBLE value)
 {
     char buffer[100];
-    sprintf(buffer, "%0.5Lf", value);
+    sprintf(buffer, "%0.5" LONG_DOUBLE_MODIFIER, value);
 
     appconfig_set(root, section, name, buffer);
 

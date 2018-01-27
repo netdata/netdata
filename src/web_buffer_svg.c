@@ -386,16 +386,16 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
         }
 
         if(isgreaterequal(abs, 1000)) {
-            len = snprintfz(value_string, value_string_len, "%0.0Lf", (long double) value);
+            len = snprintfz(value_string, value_string_len, "%0.0" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
             trim_zeros = 0;
         }
-        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1Lf", (long double) value);
-        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2Lf", (long double) value);
-        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2Lf", (long double) value);
-        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4Lf", (long double) value);
-        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5Lf", (long double) value);
-        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6Lf", (long double) value);
-        else                                 len = snprintfz(value_string, value_string_len, "%0.7Lf", (long double) value);
+        else if(isgreaterequal(abs, 10))     len = snprintfz(value_string, value_string_len, "%0.1" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 1))      len = snprintfz(value_string, value_string_len, "%0.2" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.1))    len = snprintfz(value_string, value_string_len, "%0.2" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.01))   len = snprintfz(value_string, value_string_len, "%0.4" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.001))  len = snprintfz(value_string, value_string_len, "%0.5" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else if(isgreaterequal(abs, 0.0001)) len = snprintfz(value_string, value_string_len, "%0.6" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
+        else                                 len = snprintfz(value_string, value_string_len, "%0.7" LONG_DOUBLE_MODIFIER, (LONG_DOUBLE) value);
 
         if(unlikely(trim_zeros)) {
             int l;
@@ -422,7 +422,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
     }
     else {
         if(precision > 50) precision = 50;
-        snprintfz(value_string, value_string_len, "%0.*Lf%s%s", precision, (long double) value, separator, units);
+        snprintfz(value_string, value_string_len, "%0.*" LONG_DOUBLE_MODIFIER "%s%s", precision, (LONG_DOUBLE) value, separator, units);
     }
 
     return value_string;

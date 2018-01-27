@@ -145,7 +145,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *exec      = (ae->exec)      ? ae->exec      : host->health_default_exec;
     const char *recipient = (ae->recipient) ? ae->recipient : host->health_default_recipient;
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '%0.0Lf' '%0.0Lf' '%s' '%u' '%u' '%s' '%s' '%s' '%s'",
+    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s'",
               exec,
               recipient,
               host->registry_hostname,
@@ -192,7 +192,7 @@ done:
 }
 
 static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
-    debug(D_HEALTH, "Health alarm '%s.%s' = %0.2Lf - changed status from %s to %s",
+    debug(D_HEALTH, "Health alarm '%s.%s' = " CALCULATED_NUMBER_FORMAT_AUTO " - changed status from %s to %s",
          ae->chart?ae->chart:"NOCHART", ae->name,
          ae->new_value,
          rrdcalc_status2string(ae->old_status),

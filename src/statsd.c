@@ -36,7 +36,7 @@
 // data specific to each metric type
 
 typedef struct statsd_metric_gauge {
-    long double value;
+    LONG_DOUBLE value;
 } STATSD_METRIC_GAUGE;
 
 typedef struct statsd_metric_counter { // counter and meter
@@ -65,7 +65,7 @@ typedef struct statsd_histogram_extensions {
 
     size_t size;
     size_t used;
-    long double *values;   // dynamic array of values collected
+    LONG_DOUBLE *values;   // dynamic array of values collected
 } STATSD_METRIC_HISTOGRAM_EXTENSIONS;
 
 typedef struct statsd_metric_histogram { // histogram and timer
@@ -395,8 +395,8 @@ static inline STATSD_METRIC *statsd_find_or_add_metric(STATSD_INDEX *index, cons
 // --------------------------------------------------------------------------------------------------------------------
 // statsd parsing numbers
 
-static inline long double statsd_parse_float(const char *v, long double def) {
-    long double value;
+static inline LONG_DOUBLE statsd_parse_float(const char *v, LONG_DOUBLE def) {
+    LONG_DOUBLE value;
 
     if(likely(v && *v)) {
         char *e = NULL;
@@ -472,7 +472,7 @@ static inline void statsd_process_counter(STATSD_METRIC *m, const char *value, c
         // magic loading of metric, without affecting anything
     }
     else {
-        m->counter.value += llrintl((long double) statsd_parse_int(value, 1) / statsd_parse_float(sampling, 1.0));
+        m->counter.value += llrintl((LONG_DOUBLE) statsd_parse_int(value, 1) / statsd_parse_float(sampling, 1.0));
 
         m->events++;
         m->count++;
@@ -502,7 +502,7 @@ static inline void statsd_process_histogram(STATSD_METRIC *m, const char *value,
         if (unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
             netdata_mutex_lock(&m->histogram.ext->mutex);
             m->histogram.ext->size += statsd.histogram_increase_step;
-            m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(long double) * m->histogram.ext->size);
+            m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(LONG_DOUBLE) * m->histogram.ext->size);
             netdata_mutex_unlock(&m->histogram.ext->mutex);
         }
 
@@ -1650,7 +1650,7 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
     int updated = 0;
     if(m->count && !m->reset && m->histogram.ext->used > 0) {
         size_t len = m->histogram.ext->used;
-        long double *series = m->histogram.ext->values;
+        LONG_DOUBLE *series = m->histogram.ext->values;
         sort_series(series, len);
 
         m->histogram.ext->last_min = (collected_number)roundl(series[0] * statsd.decimal_detail);
