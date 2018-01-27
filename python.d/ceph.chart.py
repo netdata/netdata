@@ -206,13 +206,13 @@ class Service(SimpleService):
         commit_latency = 0
 
         for pool_rw_io_b in pool_stats:
-            read_bytes_sec = read_bytes_sec + pool_rw_io_b['client_io_rate'].get('read_bytes_sec', 0)
-            write_bytes_sec = write_bytes_sec + pool_rw_io_b['client_io_rate'].get('write_bytes_sec', 0)
-            read_op_per_sec = read_op_per_sec + pool_rw_io_b['client_io_rate'].get('read_op_per_sec', 0)
-            write_op_per_sec = write_op_per_sec + pool_rw_io_b['client_io_rate'].get('write_op_per_sec', 0)
+            read_bytes_sec += pool_rw_io_b['client_io_rate'].get('read_bytes_sec', 0)
+            write_bytes_sec += pool_rw_io_b['client_io_rate'].get('write_bytes_sec', 0)
+            read_op_per_sec += pool_rw_io_b['client_io_rate'].get('read_op_per_sec', 0)
+            write_op_per_sec += pool_rw_io_b['client_io_rate'].get('write_op_per_sec', 0)
         for perf in osd_perf['osd_perf_infos']:
-            apply_latency = apply_latency + perf['perf_stats']['apply_latency_ms']
-            commit_latency = commit_latency + perf['perf_stats']['commit_latency_ms']
+            apply_latency += perf['perf_stats']['apply_latency_ms']
+            commit_latency += perf['perf_stats']['commit_latency_ms']
 
         return {'general_usage': int(status['kb_used']),
                 'general_available': int(status['kb_avail']),
@@ -225,21 +225,24 @@ class Service(SimpleService):
                 'general_commit_latency': commit_latency
                 }
 
-    def _get_pool_usage(self, pool):
+    @staticmethod
+    def _get_pool_usage(pool):
         """
         Process raw data into pool usage dict information
         :return: A pool dict with pool name's key and usage bytes' value
         """
         return {pool['name']: pool['stats']['kb_used']}
 
-    def _get_pool_objects(self, pool):
+    @staticmethod
+    def _get_pool_objects(pool):
         """
         Process raw data into pool usage dict information
         :return: A pool dict with pool name's key and object numbers
         """
         return {'obj_{0}'.format(pool['name']): pool['stats']['objects']}
 
-    def _get_pool_rw(self, pool):
+    @staticmethod
+    def _get_pool_rw(pool):
         """
         Get read/write kb and operations in a pool
         :return: A pool dict with both read/write bytes and operations.
@@ -250,14 +253,16 @@ class Service(SimpleService):
                 'write_operations_{0}'.format(pool['pool_name']): int(pool['client_io_rate'].get('write_op_per_sec', 0))
                 }
 
-    def _get_osd_usage(self, osd):
+    @staticmethod
+    def _get_osd_usage(osd):
         """
         Process raw data into osd dict information to get osd usage
         :return: A osd dict with osd name's key and usage bytes' value
         """
         return {osd['name']: float(osd['kb_used'])}
 
-    def _get_osd_latency(self, osd):
+    @staticmethod
+    def _get_osd_latency(osd):
         """
         Get ceph osd apply and commit latency
         :return: A osd dict with osd name's key with both apply and commit latency values
