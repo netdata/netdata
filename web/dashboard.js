@@ -6072,8 +6072,14 @@ var NETDATA = window.NETDATA || {};
                 colors: state.chartColors(),
                 labels: data.result.labels,
                 labelsDivWidth: state.chartWidth() - 70,
+                includeZero: state.tmp.dygraph_include_zero,
                 visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
         };
+
+        if(state.tmp.dygraph_chart_type === 'stacked') {
+            if(options.includeZero === true && state.dimensions_visibility.countSelected() < options.visibility.length)
+                options.includeZero = 0;
+        }
 
         if(!NETDATA.chartLibraries.dygraph.isSparkline(state)) {
             options.ylabel = state.units_current; // (state.units_desired === 'auto')?"":state.units_current;
@@ -6157,15 +6163,17 @@ var NETDATA = window.NETDATA || {};
         if(NETDATA.options.debug.dygraph === true || state.debug === true)
             state.log('dygraphChartCreate()');
 
-        var chart_type = NETDATA.dataAttribute(state.element, 'dygraph-type', state.chart.chart_type);
-        if(chart_type === 'stacked' && data.dimensions === 1) chart_type = 'area';
-        if(chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state) === true) chart_type = 'area';
+        state.tmp.dygraph_chart_type = NETDATA.dataAttribute(state.element, 'dygraph-type', state.chart.chart_type);
+        if(state.tmp.dygraph_chart_type === 'stacked' && data.dimensions === 1) state.tmp.dygraph_chart_type = 'area';
+        if(state.tmp.dygraph_chart_type === 'stacked' && NETDATA.chartLibraries.dygraph.isLogScale(state) === true) state.tmp.dygraph_chart_type = 'area';
 
         var highlightCircleSize = (NETDATA.chartLibraries.dygraph.isSparkline(state) === true)?3:4;
 
         var smooth = (NETDATA.dygraph.smooth === true)
-            ?(NETDATA.dataAttributeBoolean(state.element, 'dygraph-smooth', (chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
+            ?(NETDATA.dataAttributeBoolean(state.element, 'dygraph-smooth', (state.tmp.dygraph_chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
             :false;
+
+        state.tmp.dygraph_include_zero = NETDATA.dataAttribute(state.element, 'dygraph-includezero', (state.tmp.dygraph_chart_type === 'stacked'));
 
         state.tmp.dygraph_options = {
             colors:                 NETDATA.dataAttribute(state.element, 'dygraph-colors', state.chartColors()),
@@ -6187,7 +6195,7 @@ var NETDATA = window.NETDATA || {};
             labelsKMG2:             false,
             showLabelsOnHighlight:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-showlabelsonhighlight', true),
             hideOverlayOnMouseOut:  NETDATA.dataAttributeBoolean(state.element, 'dygraph-hideoverlayonmouseout', true),
-            includeZero:            NETDATA.dataAttribute(state.element, 'dygraph-includezero', (chart_type === 'stacked')),
+            includeZero:            state.tmp.dygraph_include_zero,
             xRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-xrangepad', 0),
             yRangePad:              NETDATA.dataAttribute(state.element, 'dygraph-yrangepad', 1),
             valueRange:             NETDATA.dataAttribute(state.element, 'dygraph-valuerange', [ null, null ]),
@@ -6199,7 +6207,7 @@ var NETDATA = window.NETDATA || {};
 
                                     // The width of the lines connecting data points.
                                     // This can be used to increase the contrast or some graphs.
-            strokeWidth:            NETDATA.dataAttribute(state.element, 'dygraph-strokewidth', ((chart_type === 'stacked')?0.1:((smooth === true)?1.5:0.7))),
+            strokeWidth:            NETDATA.dataAttribute(state.element, 'dygraph-strokewidth', ((state.tmp.dygraph_chart_type === 'stacked')?0.1:((smooth === true)?1.5:0.7))),
             strokePattern:          NETDATA.dataAttribute(state.element, 'dygraph-strokepattern', undefined),
 
                                     // The size of the dot to draw on each point in pixels (see drawPoints).
@@ -6220,14 +6228,14 @@ var NETDATA = window.NETDATA || {};
                                     // Draw a border around graph lines to make crossing lines more easily
                                     // distinguishable. Useful for graphs with many lines.
             strokeBorderColor:      NETDATA.dataAttribute(state.element, 'dygraph-strokebordercolor', NETDATA.themes.current.background),
-            strokeBorderWidth:      NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (chart_type === 'stacked')?0.0:0.0),
-            fillGraph:              NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (chart_type === 'area' || chart_type === 'stacked')),
+            strokeBorderWidth:      NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (state.tmp.dygraph_chart_type === 'stacked')?0.0:0.0),
+            fillGraph:              NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (state.tmp.dygraph_chart_type === 'area' || state.tmp.dygraph_chart_type === 'stacked')),
             fillAlpha:              NETDATA.dataAttribute(state.element, 'dygraph-fillalpha',
-                                    ((chart_type === 'stacked')
+                                    ((state.tmp.dygraph_chart_type === 'stacked')
                                         ?NETDATA.options.current.color_fill_opacity_stacked
                                         :NETDATA.options.current.color_fill_opacity_area)
                                     ),
-            stackedGraph:           NETDATA.dataAttribute(state.element, 'dygraph-stackedgraph', (chart_type === 'stacked')),
+            stackedGraph:           NETDATA.dataAttribute(state.element, 'dygraph-stackedgraph', (state.tmp.dygraph_chart_type === 'stacked')),
             stackedGraphNaNFill:    NETDATA.dataAttribute(state.element, 'dygraph-stackedgraphnanfill', 'none'),
             drawAxis:               NETDATA.dataAttributeBoolean(state.element, 'dygraph-drawaxis', true),
             axisLabelFontSize:      NETDATA.dataAttribute(state.element, 'dygraph-axislabelfontsize', 10),
@@ -6243,7 +6251,7 @@ var NETDATA = window.NETDATA || {};
             valueFormatter:         NETDATA.dataAttribute(state.element, 'dygraph-valueformatter', undefined),
             highlightCircleSize:    NETDATA.dataAttribute(state.element, 'dygraph-highlightcirclesize', highlightCircleSize),
             highlightSeriesOpts:    NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesopts', null), // TOO SLOW: { strokeWidth: 1.5 },
-            highlightSeriesBackgroundAlpha: NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesbackgroundalpha', null), // TOO SLOW: (chart_type === 'stacked')?0.7:0.5,
+            highlightSeriesBackgroundAlpha: NETDATA.dataAttribute(state.element, 'dygraph-highlightseriesbackgroundalpha', null), // TOO SLOW: (state.tmp.dygraph_chart_type === 'stacked')?0.7:0.5,
             pointClickCallback:     NETDATA.dataAttribute(state.element, 'dygraph-pointclickcallback', undefined),
             visibility:             state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
             logscale:               (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?'y':undefined,
