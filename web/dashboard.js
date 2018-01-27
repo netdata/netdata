@@ -2778,6 +2778,7 @@ var NETDATA = window.NETDATA || {};
 
             // string - the grouping method requested by the user
             that.method = NETDATA.dataAttribute(that.element, 'method', NETDATA.chartDefaults.method);
+            that.gtime = NETDATA.dataAttribute(that.element, 'gtime', 0);
 
             // the time-range requested by the user
             that.after = NETDATA.dataAttribute(that.element, 'after', NETDATA.chartDefaults.after);
@@ -4607,6 +4608,7 @@ var NETDATA = window.NETDATA || {};
             this.data_url += "&format="  + this.library.format();
             this.data_url += "&points="  + (data_points).toString();
             this.data_url += "&group="   + this.method;
+            this.data_url += "&gtime="   + this.gtime;
             this.data_url += "&options=" + this.chartURLOptions();
 
             if(after)
