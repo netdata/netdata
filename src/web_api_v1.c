@@ -611,7 +611,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart = NULL
     , *before_str = NULL
     , *after_str = NULL
-    , *group_points_str = NULL
+    , *group_time_str = NULL
     , *points_str = NULL;
 
     int group = GROUP_AVERAGE;
@@ -640,7 +640,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
-        else if(!strcmp(name, "gpoints")) group_points_str = value;
+        else if(!strcmp(name, "gtime")) group_time_str = value;
         else if(!strcmp(name, "group")) {
             group = web_client_api_request_v1_data_group(value, GROUP_AVERAGE);
         }
@@ -707,7 +707,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):0;
     int       points = (points_str && *points_str)?str2i(points_str):0;
-    long      group_points = (group_points_str && *group_points_str)?str2l(group_points_str):0;
+    long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
 
     debug(D_WEB_CLIENT, "%llu: API command 'data' for chart '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', format '%u', options '0x%08x'"
           , w->id
@@ -746,7 +746,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, "(");
     }
 
-    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_points
+    ret = rrdset2anything_api_v1(st, w->response.data, dimensions, format, points, after, before, group, group_time
                                  , options, &last_timestamp_in_data);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
