@@ -247,7 +247,7 @@ static int single_variable2json(void *entry, void *data) {
     if(unlikely(isnan(value) || isinf(value)))
         buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rv->name);
     else
-        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5Lf", helper->counter?",":"", rv->name, (long double)value);
+        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" LONG_DOUBLE_MODIFIER, helper->counter?",":"", rv->name, (LONG_DOUBLE)value);
 
     helper->counter++;
 

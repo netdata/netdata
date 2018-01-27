@@ -175,7 +175,7 @@ int print_calculated_number(char *str, calculated_number value) {
     calculated_number integral, fractional;
 
 #ifdef STORAGE_WITH_MATH
-    fractional = modfl(value, &integral) * 10000000.0;
+    fractional = calculated_number_modf(value, &integral) * 10000000.0;
 #else
     fractional = ((unsigned long long)(value * 10000000ULL) % 10000000ULL);
 #endif

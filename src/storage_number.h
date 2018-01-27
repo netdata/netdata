@@ -1,8 +1,36 @@
 #ifndef NETDATA_STORAGE_NUMBER_H
 #define NETDATA_STORAGE_NUMBER_H
 
+#ifdef NETDATA_WITHOUT_LONG_DOUBLE
+
+#define powl pow
+#define modfl modf
+#define llrintl llrint
+#define roundl round
+#define sqrtl sqrt
+#define copysignl copysign
+#define strtold strtod
+
+typedef double calculated_number;
+#define CALCULATED_NUMBER_FORMAT "%0.7f"
+#define CALCULATED_NUMBER_FORMAT_ZERO "%0.0f"
+#define CALCULATED_NUMBER_FORMAT_AUTO "%f"
+
+#define LONG_DOUBLE_MODIFIER "f"
+typedef double LONG_DOUBLE;
+
+#else
+
 typedef long double calculated_number;
 #define CALCULATED_NUMBER_FORMAT "%0.7Lf"
+#define CALCULATED_NUMBER_FORMAT_ZERO "%0.0Lf"
+#define CALCULATED_NUMBER_FORMAT_AUTO "%Lf"
+
+#define LONG_DOUBLE_MODIFIER "Lf"
+typedef long double LONG_DOUBLE;
+
+#endif
+
 //typedef long long calculated_number;
 //#define CALCULATED_NUMBER_FORMAT "%lld"
 
@@ -14,6 +42,7 @@ typedef long double collected_number;
 #define COLLECTED_NUMBER_FORMAT "%0.7Lf"
 */
 
+#define calculated_number_modf(x, y) modfl(x, y)
 #define calculated_number_llrint(x) llrintl(x)
 #define calculated_number_round(x) roundl(x)
 #define calculated_number_fabs(x) fabsl(x)
