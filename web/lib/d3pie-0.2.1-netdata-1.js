@@ -42,12 +42,14 @@ var defaultSettings = {
 			text:     "",
 			color:    "#333333",
 			fontSize: 18,
+			fontWeight: "bold",
 			font:     "arial"
 		},
 		subtitle: {
 			text:     "",
 			color:    "#666666",
 			fontSize: 14,
+			fontWeight: "bold",
 			font:     "arial"
 		},
 		location: "top-center",
@@ -57,6 +59,7 @@ var defaultSettings = {
 		text: 	  "",
 		color:    "#666666",
 		fontSize: 14,
+		fontWeight: "bold",
 		font:     "arial",
 		location: "left"
 	},
@@ -95,16 +98,19 @@ var defaultSettings = {
 		mainLabel: {
 			color: "#333333",
 			font: "arial",
+			fontWeight: "normal",
 			fontSize: 10
 		},
 		percentage: {
 			color: "#dddddd",
 			font: "arial",
+			fontWeight: "bold",
 			fontSize: 10,
 			decimalPlaces: 0
 		},
 		value: {
 			color: "#cccc44",
+			fontWeight: "bold",
 			font: "arial",
 			fontSize: 10
 		},
@@ -121,31 +127,32 @@ var defaultSettings = {
 	},
 	effects: {
 		load: {
-			effect: "default",
+			effect: "none", // "default", commented in the code
 			speed: 1000
 		},
 		pullOutSegmentOnClick: {
-			effect: "bounce",
+			effect: "none", // "bounce", commented in the code
 			speed: 300,
 			size: 10
 		},
-		highlightSegmentOnMouseover: true,
+		highlightSegmentOnMouseover: false,
 		highlightLuminosity: -0.2
 	},
 	tooltips: {
 		enabled: false,
 		type: "placeholder", // caption|placeholder
-    string: "",
-    placeholderParser: null,
+		string: "",
+		placeholderParser: null,
 		styles: {
-      fadeInSpeed: 250,
-			backgroundColor: "#000000",
-      backgroundOpacity: 0.5,
-			color: "#efefef",
-      borderRadius: 2,
-      font: "arial",
-      fontSize: 10,
-      padding: 4
+		fadeInSpeed: 250,
+		backgroundColor: "#000000",
+		backgroundOpacity: 0.5,
+		color: "#efefef",
+		borderRadius: 2,
+		font: "arial",
+		fontWeight: "bold",
+		fontSize: 10,
+		padding: 4
 		}
 	},
 	misc: {
@@ -265,9 +272,8 @@ var helpers = {
 		return svg;
 	},
 
+/*
 	whenIdExists: function(id, callback) {
-		callback();
-		/*
 		var inc = 1;
 		var giveupIterationCount = 1000;
 
@@ -281,12 +287,9 @@ var helpers = {
 			}
 			inc++;
 		}, 1);
-		*/
 	},
 
 	whenElementsExist: function(els, callback) {
-		callback();
-		/*
 		var inc = 1;
 		var giveupIterationCount = 1000;
 
@@ -307,8 +310,8 @@ var helpers = {
 			}
 			inc++;
 		}, 1);
-		*/
 	},
+*/
 
 	shuffleArray: function(array) {
 		var currentIndex = array.length, tmpVal, randomIndex;
@@ -838,7 +841,10 @@ var labels = {
 				})
 				.style("font-size", settings.mainLabel.fontSize + "px")
 				.style("font-family", settings.mainLabel.font)
-				.style("fill", settings.mainLabel.color);
+				.style("font-weight", settings.mainLabel.fontWeight)
+				.style("fill", function(d, i) {
+					return (settings.mainLabel.color === "segment") ? pie.options.colors[i] : settings.mainLabel.color;
+				});
 		}
 
 		// 2. Add the percentage label
@@ -861,6 +867,7 @@ var labels = {
 				})
 				.style("font-size", settings.percentage.fontSize + "px")
 				.style("font-family", settings.percentage.font)
+				.style("font-weight", settings.percentage.fontWeight)
 				.style("fill", settings.percentage.color);
 		}
 
@@ -878,6 +885,7 @@ var labels = {
 				})
 				.style("font-size", settings.value.fontSize + "px")
 				.style("font-family", settings.value.font)
+				.style("font-weight", settings.value.fontWeight)
 				.style("fill", settings.value.color);
 		}
 	},
@@ -1066,7 +1074,7 @@ var labels = {
 	fadeInLabelsAndLines: function(pie) {
 
 		// fade in the labels when the load effect is complete - or immediately if there's no load effect
-		var loadSpeed = (pie.options.effects.load.effect === "default") ? pie.options.effects.load.speed : 1;
+		//var loadSpeed = (pie.options.effects.load.effect === "default") ? pie.options.effects.load.speed : 1;
 		//setTimeout(function() {
 			var labelFadeInTime = (pie.options.effects.load.effect === "default") ? 400 : 1; // 400 is hardcoded for the present
 
@@ -1332,10 +1340,10 @@ var segments = {
 			.attr("class", pie.cssPrefix + "arc");
 
 		// if we're not fading in the pie, just set the load speed to 0
-		var loadSpeed = loadEffects.speed;
-		if (loadEffects.effect === "none") {
-			loadSpeed = 0;
-		}
+		//var loadSpeed = loadEffects.speed;
+		//if (loadEffects.effect === "none") {
+		//	loadSpeed = 0;
+		//}
 
 		g.append("path")
 			.attr("id", function(d, i) { return pie.cssPrefix + "segment" + i; })
@@ -1352,12 +1360,14 @@ var segments = {
 			//.ease(d3.easeCubicInOut)
 			//.duration(loadSpeed)
 			.attr("data-index", function(d, i) { return i; })
-			.attr("d", pie.arc);
-/*			function(b) {
-				//var i = d3.interpolate({ value: 0 }, b);
+			.attr("d", arc);
+/*
+			.attrTween("d", function(b) {
+				var i = d3.interpolate({ value: 0 }, b);
 				return function(t) {
-					console.log(b);
-					return pie.arc(i(t));
+					var ret = pie.arc(i(t));
+					console.log(ret);
+					return ret;
 				};
 			});
 */
@@ -1498,9 +1508,9 @@ var segments = {
 		segments.maybeCloseOpenSegment();
 
 		d3.select(segment)
-			//.transition()
-			//.ease(segments.effectMap[pie.options.effects.pullOutSegmentOnClick.effect])
-			//.duration(pie.options.effects.pullOutSegmentOnClick.speed)
+			.transition()
+			.ease(segments.effectMap[pie.options.effects.pullOutSegmentOnClick.effect])
+			.duration(pie.options.effects.pullOutSegmentOnClick.speed)
 			.attr("transform", function(d, i) {
 				var c = pie.arc.centroid(d),
 					x = c[0],
@@ -1518,15 +1528,15 @@ var segments = {
 	},
 
     maybeCloseOpenSegment: function() {
-        if (d3.selectAll("." + pie.cssPrefix + "expanded").size() > 0) {
+        if (typeof pie !== 'undefined' && d3.selectAll("." + pie.cssPrefix + "expanded").size() > 0) {
             segments.closeSegment(pie, d3.select("." + pie.cssPrefix + "expanded").node());
         }
 	},
 
 	closeSegment: function(pie, segment) {
 		d3.select(segment)
-			//.transition()
-			//.duration(400)
+			.transition()
+			.duration(400)
 			.attr("transform", "translate(0,0)")
 			.on("end", function(d, i) {
 				d3.select(segment).attr("class", "");
@@ -1612,6 +1622,7 @@ var text = {
 			})
 			.attr("fill", function(d) { return d.color; })
 			.style("font-size", function(d) { return d.fontSize + "px"; })
+			.style("font-weight", function(d) { return d.fontWeight; })
 			.style("font-family", function(d) { return d.font; });
 	},
 
@@ -1674,6 +1685,7 @@ var text = {
 			})
 			.attr("fill", function(d) { return d.color; })
 			.style("font-size", function(d) { return d.fontSize + "px"; })
+			.style("font-weight", function(d) { return d.fontWeight; })
 			.style("font-family", function(d) { return d.font; });
 	},
 
@@ -1718,6 +1730,7 @@ var text = {
 			})
 			.attr("fill", function(d) { return d.color; })
 			.style("font-size", function(d) { return d.fontSize + "px"; })
+			.style("font-weight", function(d) { return d.fontWeight; })
 			.style("font-family", function(d) { return d.font; });
 	},
 
@@ -1792,6 +1805,7 @@ var tt = {
         .append("text")
         .attr("fill", function(d) { return pie.options.tooltips.styles.color; })
         .style("font-size", function(d) { return pie.options.tooltips.styles.fontSize; })
+        .style("font-weight", function(d) { return pie.options.tooltips.styles.fontWeight; })
         .style("font-family", function(d) { return pie.options.tooltips.styles.font; })
         .text(function(d, i) {
             var caption = pie.options.tooltips.string;
@@ -2088,12 +2102,12 @@ var tt = {
 
 		// the footer never moves. Put it in place now
 		var self = this;
-		helpers.whenIdExists(this.cssPrefix + "footer", function() {
+		//helpers.whenIdExists(this.cssPrefix + "footer", function() {
 			text.positionFooter(self);
 			var d3 = helpers.getDimensions(self.cssPrefix + "footer");
 			self.textComponents.footer.h = d3.h;
 			self.textComponents.footer.w = d3.w;
-		});
+		//});
 
 		// now create the pie chart and position everything accordingly
 		var reqEls = [];
@@ -2101,7 +2115,7 @@ var tt = {
 		if (this.textComponents.subtitle.exists) { reqEls.push(this.cssPrefix + "subtitle"); }
 		if (this.textComponents.footer.exists)   { reqEls.push(this.cssPrefix + "footer"); }
 
-		helpers.whenElementsExist(reqEls, function() {
+		//helpers.whenElementsExist(reqEls, function() {
 			if (self.textComponents.title.exists) {
 				var d1 = helpers.getDimensions(self.cssPrefix + "title");
 				self.textComponents.title.h = d1.h;
@@ -2171,7 +2185,7 @@ var tt = {
 			}
 
 			segments.addSegmentEventHandlers(self);
-		});
+		//});
 	};
 
 	var _getPercentage = function(value, total, decimalPlaces) {
