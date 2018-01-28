@@ -193,7 +193,7 @@ var NETDATA = window.NETDATA || {};
                 other: '#aaaaaa',
                 mainlabel: '#333333',
                 percentage: '#dddddd',
-                value: '#cccc44',
+                value: '#aaaa22',
                 tooltip_bg: '#000000',
                 tooltip_fg: '#efefef',
                 segment_stroke: "#ffffff",
@@ -7219,6 +7219,24 @@ var NETDATA = window.NETDATA || {};
         return content;
     };
 
+    NETDATA.d3pieDateRange = function(state, data, index) {
+        var dt = Math.round((data.before - data.after + 1) / data.points);
+        var dt_str = NETDATA.seconds4human(dt);
+
+        var before = data.result.data[index].time;
+        var after = before - (dt * 1000);
+
+        var d1 = NETDATA.dateTime.localeDateString(after);
+        var t1 = NETDATA.dateTime.localeTimeString(after);
+        var d2 = NETDATA.dateTime.localeDateString(before);
+        var t2 = NETDATA.dateTime.localeTimeString(before);
+
+        if(d1 === d2)
+            return d1 + ' ' + t1 + ' to ' + t2 + ', ' + dt_str;
+
+        return d1 + ' ' + t1 + ' to ' + d2 + ' ' + t2 + ', ' + dt_str;
+    };
+
     NETDATA.d3pieSetSelection = function(state, t) {
         if(state.timeIsVisible(t) !== true)
             return NETDATA.d3pieClearSelection(state, true);
@@ -7232,7 +7250,7 @@ var NETDATA = window.NETDATA || {};
         if(state.tmp.d3pie_timer === undefined) {
             state.tmp.d3pie_timer = NETDATA.timeout.set(function() {
                 state.tmp.d3pie_timer = undefined;
-                NETDATA.d3pieChange(state, NETDATA.d3pieSetContent(state, state.data, slot));
+                NETDATA.d3pieChange(state, NETDATA.d3pieSetContent(state, state.data, slot), NETDATA.d3pieDateRange(state, state.data, slot));
             }, 0);
         }
 
@@ -7246,30 +7264,32 @@ var NETDATA = window.NETDATA || {};
         }
 
         if(state.isAutoRefreshable() === true && state.data !== null && force !== true) {
-            NETDATA.d3pieChange(state, NETDATA.d3pieSetContent(state, state.data, 0));
+            NETDATA.d3pieChartUpdate(state, state.data);
         }
         else {
-            NETDATA.d3pieChange(state, [ { label: 'no data', value: 1, color: '#666666' } ]);
+            NETDATA.d3pieChange(state, [ { label: 'no data', value: 1, color: '#666666' } ], 'no data available');
         }
 
         return true;
     };
 
-    NETDATA.d3pieChange = function(state, content) {
-        var subtitle = NETDATA.dataAttribute(state.element, 'd3pie-subtitle', state.units_current);
-        if(subtitle !== state.d3pie_subtitle) {
-            state.d3pie_subtitle = subtitle;
-            state.d3pie_instance.updateProp("header.subtitle.text", state.d3pie_subtitle);
-        }
+    NETDATA.d3pieChange = function(state, content, footer) {
+        state.d3pie_options.data.content = content;
 
-        state.d3pie_instance.updateProp("data.content", content);
+        if(state.d3pie_forced_subtitle === null)
+            state.d3pie_options.header.subtitle.text = state.units_current;
+
+        if(state.d3pie_forced_footer === null)
+            state.d3pie_options.footer.text = footer;
+
+        state.d3pie_instance.destroy();
+        state.d3pie_instance = new d3pie(state.element_chart, state.d3pie_options);
 
         return true;
     };
 
     NETDATA.d3pieChartUpdate = function(state, data) {
-        var content = NETDATA.d3pieSetContent(state, data, 0);
-        return NETDATA.d3pieChange(state, content);
+        return NETDATA.d3pieChange(state, NETDATA.d3pieSetContent(state, data, 0), NETDATA.d3pieDateRange(state, data, 0));
     };
 
     NETDATA.d3pieChartCreate = function(state, data) {
@@ -7278,35 +7298,41 @@ var NETDATA = window.NETDATA || {};
         // console.log('id = ' + state.element_chart.id);
 
         var content = NETDATA.d3pieSetContent(state, data, 0);
-        state.d3pie_subtitle = NETDATA.dataAttribute(state.element, 'd3pie-subtitle', state.units_current);
+
+        state.d3pie_forced_title = NETDATA.dataAttribute(state.element, 'd3pie-title', null);
+        state.d3pie_forced_subtitle = NETDATA.dataAttribute(state.element, 'd3pie-subtitle', null);
+        state.d3pie_forced_footer = NETDATA.dataAttribute(state.element, 'd3pie-footer', null);
 
         state.d3pie_options = {
             header: {
                 title: {
-                    text: NETDATA.dataAttribute(state.element, 'd3pie-title', state.title),
+                    text: (state.d3pie_forced_title !== null) ? state.d3pie_forced_title : state.title,
                     color: NETDATA.dataAttribute(state.element, 'd3pie-title-color', NETDATA.themes.current.d3pie.title),
-                    fontSize: NETDATA.dataAttribute(state.element, 'd3pie-title-fontsize', 14),
+                    fontSize: NETDATA.dataAttribute(state.element, 'd3pie-title-fontsize', 12),
+                    fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-title-fontweight', "bold"),
                     font: NETDATA.dataAttribute(state.element, 'd3pie-title-font', "arial")
                 },
                 subtitle: {
-                    text: state.d3pie_subtitle,
+                    text: (state.d3pie_forced_subtitle !== null) ? state.d3pie_forced_subtitle : state.units_current,
                     color: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-color', NETDATA.themes.current.d3pie.subtitle),
-                    fontSize: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-fontsize', 11),
+                    fontSize: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-fontsize', 10),
+                    fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-fontweight', "normal"),
                     font: NETDATA.dataAttribute(state.element, 'd3pie-subtitle-font', "arial")
                 },
                 titleSubtitlePadding: 1
             },
             footer: {
-                text: NETDATA.dataAttribute(state.element, 'd3pie-footer', ''),
+                text: (state.d3pie_forced_footer !== null) ? state.d3pie_forced_footer : NETDATA.d3pieDateRange(state, data, 0),
                 color: NETDATA.dataAttribute(state.element, 'd3pie-footer-color', NETDATA.themes.current.d3pie.footer),
-                fontSize: NETDATA.dataAttribute(state.element, 'd3pie-footer-fontsize', 10),
+                fontSize: NETDATA.dataAttribute(state.element, 'd3pie-footer-fontsize', 9),
+                fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-footer-fontweight', "bold"),
                 font: NETDATA.dataAttribute(state.element, 'd3pie-footer-font', "arial"),
-                location: NETDATA.dataAttribute(state.element, 'd3pie-footer-location', "bottom-left")
+                location: NETDATA.dataAttribute(state.element, 'd3pie-footer-location', "bottom-center") // bottom-left, bottom-center, bottom-right
             },
             size: {
                 canvasHeight: state.chartHeight(),
                 canvasWidth: state.chartWidth(),
-                pieInnerRadius: NETDATA.dataAttribute(state.element, 'd3pie-pieinnerradius', "0%"),
+                pieInnerRadius: NETDATA.dataAttribute(state.element, 'd3pie-pieinnerradius', "45%"),
                 pieOuterRadius: NETDATA.dataAttribute(state.element, 'd3pie-pieouterradius', "80%")
             },
             data: {
@@ -7330,7 +7356,7 @@ var NETDATA = window.NETDATA || {};
                     // label, value, percentage, label-value1, label-value2, label-percentage1, label-percentage2
                     format: NETDATA.dataAttribute(state.element, 'd3pie-labels-outer-format', "label-value1"),
                     hideWhenLessThanPercentage: NETDATA.dataAttribute(state.element, 'd3pie-labels-outer-hidewhenlessthanpercentage', null),
-                    pieDistance: 20
+                    pieDistance: NETDATA.dataAttribute(state.element, 'd3pie-labels-outer-piedistance', 15)
                 },
                 inner: {
                     // label, value, percentage, label-value1, label-value2, label-percentage1, label-percentage2
@@ -7338,25 +7364,32 @@ var NETDATA = window.NETDATA || {};
                     hideWhenLessThanPercentage: NETDATA.dataAttribute(state.element, 'd3pie-labels-inner-hidewhenlessthanpercentage', 2)
                 },
                 mainLabel: {
-                    color: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-color', NETDATA.themes.current.d3pie.mainlabel),
+                    color: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-color', NETDATA.themes.current.d3pie.mainlabel), // or 'segment' for dynamic color
                     font: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-font', "arial"),
-                    fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-fontsize', 10)
+                    fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-fontsize', 10),
+                    fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-labels-mainLabel-fontweight', "normal")
                 },
                 percentage: {
                     color: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-color', NETDATA.themes.current.d3pie.percentage),
                     font: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-font', "arial"),
                     fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-fontsize', 10),
+                    fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-labels-percentage-fontweight', "bold"),
                     decimalPlaces: 0
                 },
                 value: {
                     color: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-color', NETDATA.themes.current.d3pie.value),
                     font: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-font', "arial"),
-                    fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-fontsize', 10)
+                    fontSize: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-fontsize', 10),
+                    fontWeight: NETDATA.dataAttribute(state.element, 'd3pie-labels-value-fontweight', "bold")
                 },
                 lines: {
                     enabled: NETDATA.dataAttributeBoolean(state.element, 'd3pie-labels-lines-enabled', true),
                     style: NETDATA.dataAttribute(state.element, 'd3pie-labels-lines-style', "curved"),
                     color: NETDATA.dataAttribute(state.element, 'd3pie-labels-lines-color', "segment") // "segment" or a hex color
+                },
+                truncation: {
+                    enabled: NETDATA.dataAttributeBoolean(state.element, 'd3pie-labels-truncation-enabled', false),
+                    truncateLength: NETDATA.dataAttribute(state.element, 'd3pie-labels-truncation-truncatelength', 30)
                 },
                 formatter: function(context) {
                     // console.log(context);
@@ -7371,21 +7404,21 @@ var NETDATA = window.NETDATA || {};
             effects: {
                 load: {
                     effect: "none", // none / default
-                    speed: 0
+                    speed: 0 // commented in the d3pie code to speed it up
                 },
                 pullOutSegmentOnClick: {
-                    effect: "none", // none / linear / bounce / elastic / back
-                    speed: 300,
-                    size: 10
+                    effect: "bounce", // none / linear / bounce / elastic / back
+                    speed: 400,
+                    size: 5
                 },
-                highlightSegmentOnMouseover: false,
-                highlightLuminosity: 1
+                highlightSegmentOnMouseover: true,
+                highlightLuminosity: -0.2
             },
             tooltips: {
                 enabled: false,
                 type: "placeholder", // caption|placeholder
                 string: "",
-                placeholderParser: null,
+                placeholderParser: null, // function
                 styles: {
                     fadeInSpeed: 250,
                     backgroundColor: NETDATA.themes.current.d3pie.tooltip_bg,
@@ -7393,7 +7426,7 @@ var NETDATA = window.NETDATA || {};
                     color: NETDATA.themes.current.d3pie.tooltip_fg,
                     borderRadius: 2,
                     font: "arial",
-                    fontSize: 10,
+                    fontSize: 12,
                     padding: 4
                 }
             },
@@ -7429,12 +7462,6 @@ var NETDATA = window.NETDATA || {};
         };
 
         state.d3pie_instance = new d3pie(state.element_chart, state.d3pie_options);
-
-        // FIXME: temporary fix because the first update does not render the pie
-        NETDATA.d3pieChartUpdate(state, data);
-
-        // console.log(state.d3pie_instance);
-
         return true;
     };
 
