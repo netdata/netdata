@@ -68,7 +68,7 @@ describe("fronius chart creation", function () {
         expect(result.type).toBe(netdata.chartTypes.area);
         expect(result.family).toBe("autonomy");
         expect(result.context).toBe("fronius.autonomy");
-        expect(Object.keys(result.dimensions).length).toBe(2);
+        expect(Object.keys(result.dimensions).length).toBe(3);
         expect(result.dimensions[subject.autonomyId].name).toBe("autonomy");
         expect(result.dimensions[subject.consumptionSelfId].name).toBe("self_consumption");
     });
