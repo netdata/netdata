@@ -61,6 +61,8 @@
  *                                                  (default: undefined) */
 /*global netdataIntersectionObserver *//* boolean,  enable or disable the use of intersection observer
  *                                                  (default: true) */
+/*global netdataCheckXSS             *//* boolean,  enable or disable checking for XSS issues
+ *                                                  (default: false) */
 
 // ----------------------------------------------------------------------------
 // global namespace
@@ -97,6 +99,94 @@ var NETDATA = window.NETDATA || {};
             .replace(/\)/g, '_')
             .replace(/\./g, '_')
             .replace(/\//g, '_');
+    };
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // XSS checks
+
+    NETDATA.xss = {
+        enabled: (typeof netdataCheckXSS === 'undefined')?false:netdataCheckXSS,
+
+        string: function (s) {
+            if (typeof s === 'string' || typeof s === 'number' || typeof s === 'boolean')
+                return s.toString()
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '#27;');
+
+            return '';
+        },
+
+        object: function(name, obj, ignore_regex) {
+            if(obj === null) return obj;
+
+            var type = typeof(obj);
+            if(type === 'undefined' || type === 'number') return obj;
+
+            if(typeof ignore_regex !== 'undefined') {
+                if(ignore_regex.test(name) === true) {
+                    // console.log('XSS: ignoring "' + name + '"');
+                    return obj;
+                }
+            }
+
+            if(type === 'object' && Array.isArray(obj))
+                type = 'array';
+
+            var ret, i, len;
+            switch (type) {
+                case 'string':
+                    ret = this.string(obj);
+                    if(ret !== obj) console.log('XSS protection changed string ' + name + ' from "' + obj + '" to "' + ret + '"');
+                    return ret;
+
+                case 'object':
+                    for(i in obj) {
+                        if(obj.hasOwnProperty(i) === false) continue;
+                        if(this.string(i) !== i) {
+                            console.log('XSS protection removed invalid object member "' + name + '.' + i + '"');
+                            delete obj[i];
+                        }
+                        else
+                            obj[i] = this.object(name + '.' + i, obj[i], ignore_regex);
+                    }
+                    return obj;
+
+                case 'array':
+                    len = obj.length;
+                    while(len--)
+                        obj[len] = this.object(name + '[' + len + ']', obj[len], ignore_regex);
+
+                    return obj;
+
+                default:
+                    return obj;
+            }
+        },
+
+        checkOptional: function(name, obj, ignore_pattern) {
+            if(this.enabled === true) {
+                var regex;
+                if(typeof ignore_pattern !== 'undefined')
+                    regex = new RegExp(ignore_pattern);
+
+                //console.log('XSS: checking "' + name + '"...');
+                return this.object(name, obj, regex);
+            }
+            return obj;
+        },
+
+        checkAlways: function(name, obj, ignore_pattern) {
+            //console.log('XSS: checking "' + name + '"...');
+
+            var regex;
+            if(typeof ignore_pattern === 'string')
+                regex = new RegExp(ignore_pattern);
+
+            return this.object(name, obj, regex);
+        }
     };
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -1469,6 +1559,7 @@ var NETDATA = window.NETDATA || {};
                     xhrFields: {withCredentials: true} // required for the cookie
                 })
                     .done(function (data) {
+                        data = NETDATA.xss.checkOptional('/api/v1/charts', data);
                         got_data(host, data, callback);
                     })
                     .fail(function () {
@@ -5191,6 +5282,8 @@ var NETDATA = window.NETDATA || {};
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(chart) {
+                    chart = NETDATA.xss.checkOptional('/api/v1/chart', chart);
+
                     chart.url = that.chart_url;
                     that.__defaultsFromDownloadedChart(chart);
                     NETDATA.chartRegistry.add(that.host, that.id, chart);
@@ -8919,6 +9012,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkOptional('/api/v1/alarms', data, '.*\.(calc|calc_parsed|warn|warn_parsed|crit|crit_parsed)$');
+
                     if(NETDATA.alarms.first_notification_id === 0 && typeof data.latest_alarm_log_unique_id === 'number')
                         NETDATA.alarms.first_notification_id = data.latest_alarm_log_unique_id;
 
@@ -8970,6 +9065,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkOptional('/api/v1/alarm_log', data);
+
                     if(typeof callback === 'function')
                         return callback(data);
                 })
@@ -9106,6 +9203,8 @@ var NETDATA = window.NETDATA || {};
                         data = null;
                     }
 
+                    data = NETDATA.xss.checkOptional('/api/v1/registry?action=hello', data);
+
                     if(typeof callback === 'function')
                         return callback(data);
                 })
@@ -9134,6 +9233,8 @@ var NETDATA = window.NETDATA || {};
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(data) {
+                    data = NETDATA.xss.checkAlways('/api/v1/registry?action=access', data);
+
                     var redirect = null;
                     if(typeof data.registry === 'string')
                         redirect = data.registry;
@@ -9182,6 +9283,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkAlways('/api/v1/registry?action=delete', data);
+
                     if(typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(411, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
@@ -9211,6 +9314,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkAlways('/api/v1/registry?action=search', data);
+
                     if(typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(417, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
@@ -9240,6 +9345,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkAlways('/api/v1/registry?action=switch', data);
+
                     if(typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(413, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
