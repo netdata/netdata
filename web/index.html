@@ -674,6 +674,7 @@
                 if(urlOptions.server !== null && urlOptions.server !== '') {
                     netdataServerStatic = document.location.origin.toString() + document.location.pathname.toString();
                     netdataServer = urlOptions.server;
+                    netdataCheckXSS = true;
                 }
                 else
                     urlOptions.server = null;
@@ -3278,12 +3279,14 @@
 
 
         function loadSnapshotPreflightFile(file) {
+            var filename = NETDATA.xss.string(file.name);
             var fr = new FileReader();
             fr.onload = function(e) {
-                document.getElementById('loadSnapshotFilename').innerHTML = file.name;
+                document.getElementById('loadSnapshotFilename').innerHTML = filename;
                 var result = null;
                 try {
-                    result = JSON.parse(e.target.result);
+                    result = NETDATA.xss.checkAlways('snapshot', JSON.parse(e.target.result), '^(snapshot\.info|snapshot\.data)$');
+
                     //console.log(result);
                     var date_after = new Date(result.after_ms);
                     var date_before = new Date(result.before_ms);
@@ -3300,7 +3303,7 @@
                     if (typeof result.data_size === 'undefined')
                         result.data_size = 0;
 
-                    document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + file.name + '</code>';
+                    document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + filename + '</code>';
                     document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
                     document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
@@ -4666,6 +4669,7 @@
                     </p>
                 </div>
                 <div class="modal-footer">
+                    <span style="display: inline-block; padding-right: 20px;">Snapshot files contain both data and javascript code. Make sure <b>you trust the files</b> you import!</span>
                     <a id="loadSnapshotImport" href="#" onclick="loadSnapshot(); return false;" type="button" class="btn btn-success disabled">Import</a>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
@@ -5625,6 +5629,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20180127-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20180128-2"></script>
 </body>
 </html>
