@@ -237,6 +237,7 @@ describe("fronius parsing for autonomy", function () {
 
     it("should return 0 for solarConsumption if PV is null", function () {
         site.P_PV = null;
+        site.P_Load = -1000;
         var result = subject.parseAutonomyChart(service, site).dimensions[2];
 
         expect(result.name).toBe(subject.solarConsumptionId);
