@@ -111,7 +111,6 @@ var NETDATA = window.NETDATA || {};
         string: function (s) {
             if (typeof s === 'string' || typeof s === 'number' || typeof s === 'boolean')
                 return s.toString()
-                    .replace(/&/g, '&amp;')
                     .replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;')
                     .replace(/"/g, '&quot;')
