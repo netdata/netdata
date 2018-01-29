@@ -3206,6 +3206,7 @@
             $('#loadSnapshotImport').addClass('disabled');
 
             if(tmpSnapshotData === null) {
+                loadSnapshotPreflightEmpty();
                 loadSnapshotModalLog('danger', 'no data have been loaded');
                 return;
             }
@@ -3272,7 +3273,11 @@
                         urlOptions.highlight = false;
                     }
 
+                    netdataCheckXSS = false; // disable the modal - this does not affect XSS checks, since dashboard.js is already loaded
+                    NETDATA.xss.enabled = true;             // we should not do any remote requests, but if we do, check them
+                    NETDATA.xss.enabled_for_data = true;    // check also snapshot data - that have been excluded from the initial check, due to compression
                     initializeDynamicDashboard();
+                    loadSnapshotPreflightEmpty();
                 });
             });
         };
@@ -4318,6 +4323,13 @@
                 NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], netdataSnapshotData.after_ms, netdataSnapshotData.before_ms);
             }
 
+            if(typeof netdataCheckXSS !== 'undefined' && netdataCheckXSS === true) {
+                setTimeout(function() {
+                    document.getElementById('netdataXssModalServer').innerText = netdataServer;
+                    $('#xssModal').modal('show');
+                }, 1000);
+            }
+
             // var netdataEnded = performance.now();
             // console.log('start up time: ' + (netdataEnded - netdataStarted).toString() + ' ms');
         }
@@ -4574,6 +4586,39 @@
                         <i class="fas fa-copyright"></i> Copyright (c) 2015,2016 hhurz, <a href="http://rawgit.com/hhurz/tableExport.jquery.plugin/master/tableExport.js" target="_blank">MIT License</a>
 
                     </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="xssModal" tabindex="-1" role="dialog" aria-labelledby="xssModalLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="xssModalLabel">XSS Protection</h4>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        This dashboard is now rendering data of server:
+                    </p>
+                    <p style="font-size: 1.25em;">
+                        <code id="netdataXssModalServer"></code>
+                    </p>
+                    <p>
+                        To protect your privacy, the dashboard is <b>checking all data transferred</b> for cross site scripting (XSS).
+                        This is CPU intensive, so your browser might be a bit slower.
+                    </p>
+                    <p>
+                        If you <b>trust</b> the remote server, you can disable XSS protection, to speed it up.
+                        <br/>
+                        If you <b>don't trust</b> the remote server, you better keep it on. The dashboard will be a bit slower,
+                        but better be safe, than sorry...
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" onclick="NETDATA.xss.enabled = true; NETDATA.xss.enabled_for_data = true; return false;" type="button" class="btn btn-success" data-dismiss="modal">Keep protecting me</a>
+                    <a href="#" onclick="NETDATA.xss.enabled = false; NETDATA.xss.enabled_for_data = false; return false;" type="button" class="btn btn-danger" data-dismiss="modal">I don't need this, the server is mine</a>
                 </div>
             </div>
         </div>
