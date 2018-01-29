@@ -168,20 +168,20 @@ var NETDATA = window.NETDATA || {};
 
         checkOptional: function(name, obj, ignore_regex) {
             if(this.enabled === true) {
-                console.log('XSS: checking optional "' + name + '"...');
+                //console.log('XSS: checking optional "' + name + '"...');
                 return this.object(name, obj, ignore_regex);
             }
             return obj;
         },
 
         checkAlways: function(name, obj, ignore_regex) {
-            console.log('XSS: checking always "' + name + '"...');
+            //console.log('XSS: checking always "' + name + '"...');
             return this.object(name, obj, ignore_regex);
         },
 
         checkData: function(name, obj, ignore_regex) {
             if(this.enabled_for_data === true) {
-                console.log('XSS: checking data "' + name + '"...');
+                //console.log('XSS: checking data "' + name + '"...');
                 return this.object(name, obj, ignore_regex);
             }
             return obj;
