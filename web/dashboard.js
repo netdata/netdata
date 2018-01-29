@@ -106,6 +106,7 @@ var NETDATA = window.NETDATA || {};
 
     NETDATA.xss = {
         enabled: (typeof netdataCheckXSS === 'undefined')?false:netdataCheckXSS,
+        enabled_for_data: (typeof netdataCheckXSS === 'undefined')?false:netdataCheckXSS,
 
         string: function (s) {
             if (typeof s === 'string' || typeof s === 'number' || typeof s === 'boolean')
@@ -168,15 +169,23 @@ var NETDATA = window.NETDATA || {};
 
         checkOptional: function(name, obj, ignore_regex) {
             if(this.enabled === true) {
-                // console.log('XSS: checking "' + name + '"...');
+                console.log('XSS: checking optional "' + name + '"...');
                 return this.object(name, obj, ignore_regex);
             }
             return obj;
         },
 
         checkAlways: function(name, obj, ignore_regex) {
-            // console.log('XSS: checking "' + name + '"...');
+            console.log('XSS: checking always "' + name + '"...');
             return this.object(name, obj, ignore_regex);
+        },
+
+        checkData: function(name, obj, ignore_regex) {
+            if(this.enabled_for_data === true) {
+                console.log('XSS: checking data "' + name + '"...');
+                return this.object(name, obj, ignore_regex);
+            }
+            return obj;
         }
     };
 
@@ -4977,7 +4986,7 @@ var NETDATA = window.NETDATA || {};
                 var data = this.getSnapshotData(key);
                 if (data !== null) {
                     ok = true;
-                    data = NETDATA.xss.checkAlways('/api/v1/data', data, this.library.xssRegexIgnore);
+                    data = NETDATA.xss.checkData('/api/v1/data', data, this.library.xssRegexIgnore);
                     this.updateChartWithData(data);
                 }
                 else {
@@ -5009,7 +5018,7 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
             .done(function(data) {
-                data = NETDATA.xss.checkOptional('/api/v1/data', data, that.library.xssRegexIgnore);
+                data = NETDATA.xss.checkData('/api/v1/data', data, that.library.xssRegexIgnore);
 
                 that.xhr = undefined;
                 that.retries_on_data_failures = 0;
