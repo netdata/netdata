@@ -3285,7 +3285,7 @@
                 document.getElementById('loadSnapshotFilename').innerHTML = filename;
                 var result = null;
                 try {
-                    result = NETDATA.xss.checkAlways('snapshot', JSON.parse(e.target.result), '^(snapshot\.info|snapshot\.data)$');
+                    result = NETDATA.xss.checkAlways('snapshot', JSON.parse(e.target.result), /^(snapshot\.info|snapshot\.data)$/);
 
                     //console.log(result);
                     var date_after = new Date(result.after_ms);
@@ -5629,6 +5629,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20180128-2"></script>
+    <script type="text/javascript" src="dashboard.js?v20180129-1"></script>
 </body>
 </html>
