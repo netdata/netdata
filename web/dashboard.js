@@ -166,26 +166,17 @@ var NETDATA = window.NETDATA || {};
             }
         },
 
-        checkOptional: function(name, obj, ignore_pattern) {
+        checkOptional: function(name, obj, ignore_regex) {
             if(this.enabled === true) {
-                var regex;
-                if(typeof ignore_pattern !== 'undefined')
-                    regex = new RegExp(ignore_pattern);
-
-                //console.log('XSS: checking "' + name + '"...');
-                return this.object(name, obj, regex);
+                // console.log('XSS: checking "' + name + '"...');
+                return this.object(name, obj, ignore_regex);
             }
             return obj;
         },
 
-        checkAlways: function(name, obj, ignore_pattern) {
-            //console.log('XSS: checking "' + name + '"...');
-
-            var regex;
-            if(typeof ignore_pattern === 'string')
-                regex = new RegExp(ignore_pattern);
-
-            return this.object(name, obj, regex);
+        checkAlways: function(name, obj, ignore_regex) {
+            // console.log('XSS: checking "' + name + '"...');
+            return this.object(name, obj, ignore_regex);
         }
     };
 
@@ -4986,6 +4977,7 @@ var NETDATA = window.NETDATA || {};
                 var data = this.getSnapshotData(key);
                 if (data !== null) {
                     ok = true;
+                    data = NETDATA.xss.checkAlways('/api/v1/data', data, this.library.xssRegexIgnore);
                     this.updateChartWithData(data);
                 }
                 else {
@@ -5017,6 +5009,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
             .done(function(data) {
+                data = NETDATA.xss.checkOptional('/api/v1/data', data, that.library.xssRegexIgnore);
+
                 that.xhr = undefined;
                 that.retries_on_data_failures = 0;
                 ok = true;
@@ -8373,6 +8367,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: NETDATA.dygraphToolboxPanAndZoom,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { return 'ms|flip' + (this.isLogScale(state)?'|abs':'').toString(); },
             legend: function(state) {
@@ -8417,6 +8412,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'array'; },
             options: function(state) { void(state); return 'flip|abs'; },
             legend: function(state) { void(state); return null; },
@@ -8436,6 +8432,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'ssvcomma'; },
             options: function(state) { void(state); return 'null2zero|flip|abs'; },
             legend: function(state) { void(state); return null; },
@@ -8455,6 +8452,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { void(state); return 'objectrows|ms'; },
             legend: function(state) { void(state); return null; },
@@ -8474,6 +8472,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.rows$'),
             format: function(state) { void(state); return 'datatable'; },
             options: function(state) { void(state); return ''; },
             legend: function(state) { void(state); return null; },
@@ -8493,6 +8492,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { void(state); return ''; },
             legend: function(state) { void(state); return null; },
@@ -8512,6 +8512,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'csvjsonarray'; },
             options: function(state) { void(state); return 'milliseconds'; },
             legend: function(state) { void(state); return null; },
@@ -8531,6 +8532,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { void(state); return 'objectrows|ms'; },
             legend: function(state) { void(state); return null; },
@@ -8550,6 +8552,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { void(state); return ''; },
             legend: function(state) { void(state); return null; },
@@ -8569,6 +8572,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'array'; },
             options: function(state) { void(state); return 'absolute'; },
             legend: function(state) { void(state); return null; },
@@ -8589,6 +8593,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'array'; },
             options: function(state) { void(state); return 'absolute'; },
             legend: function(state) { void(state); return null; },
@@ -9012,7 +9017,7 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
-                    data = NETDATA.xss.checkOptional('/api/v1/alarms', data, '.*\.(calc|calc_parsed|warn|warn_parsed|crit|crit_parsed)$');
+                    data = NETDATA.xss.checkOptional('/api/v1/alarms', data /*, '.*\.(calc|calc_parsed|warn|warn_parsed|crit|crit_parsed)$' */);
 
                     if(NETDATA.alarms.first_notification_id === 0 && typeof data.latest_alarm_log_unique_id === 'number')
                         NETDATA.alarms.first_notification_id = data.latest_alarm_log_unique_id;
@@ -9198,12 +9203,12 @@ var NETDATA = window.NETDATA || {};
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(data) {
+                    data = NETDATA.xss.checkOptional('/api/v1/registry?action=hello', data);
+
                     if(typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(408, host + ' response: ' + JSON.stringify(data));
                         data = null;
                     }
-
-                    data = NETDATA.xss.checkOptional('/api/v1/registry?action=hello', data);
 
                     if(typeof callback === 'function')
                         return callback(data);
