@@ -259,9 +259,9 @@ var fronius = {
         var selfConsumption = site.rel_SelfConsumption;
         var solarConsumption = 0;
         var load = Math.abs(site.P_Load);
-        var power= Math.max(site.P_PV, 0);
-        if (load >= power) solarConsumption = 100;
-        else if (power <= 0) solarConsumption = 0;
+        var power = Math.max(site.P_PV, 0);
+        if (power <= 0) solarConsumption = 0;
+        else if (load >= power) solarConsumption = 100;
         else solarConsumption = 100 / power * load;
         return this.getChart(this.getSiteAutonomyChart(service, "autonomy"),
             [
