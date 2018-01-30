@@ -329,9 +329,12 @@ This module monitors the ceph cluster usage and consuption data of a server.
 
 It produces:
 
-* cluster disk statistics
+* Cluster statistics (usage, available, latency, objects, read/write rate)
 * OSD usage
-* pool usage
+* OSD latency
+* Pool usage
+* Pool read/write operations
+* Pool read/write rate
 * number of objects per pool
 
 **Requirements:**
