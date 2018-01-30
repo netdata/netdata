@@ -340,7 +340,7 @@ netdataDashboard.menu = {
     'ceph': {
         title: 'Ceph',
         icon: '<i class="fas fa-database"></i>',
-        info: 'Provides statistics on the <b><a href="http://ceph.com/">ceph</a></b> server.'
+        info: 'Provides statistics on the <b><a href="http://ceph.com/">ceph</a></b> cluster server, the open-source distributed storage system.'
     }
 };
 
@@ -1319,59 +1319,59 @@ netdataDashboard.context = {
     // ceph
 
     'ceph.general_usage': {
-        info: 'Shows cluster general size info.'
+        info: 'The usage and available space in all ceph cluster.'
     },
 
     'ceph.general_objects': {
-        info: 'Shows cluster general objects.'
+        info: 'Total number of objects storage on ceph cluster.'
     },
 
     'ceph.general_bytes': {
-        info: 'Shows cluster general read/write data per second.'
+        info: 'Cluster read and write data per second.'
     },
 
     'ceph.general_operations': {
-        info: 'Shows cluster general read/write operations per second.'
+        info: 'Number of read and write operations per second.'
     },
 
     'ceph.general_latency': {
-        info: 'Shows cluster general apply/commit latency.'
+        info: 'Total of apply and commit latency in all OSDs. The apply latency is the total time taken to flush an update to disk. The commit latency is the total time taken to commit an operation to the journal.'
     },
 
     'ceph.pool_usage': {
-        info: 'Shows info about pool usage.'
+        info: 'The usage space in each pool.'
     },
 
     'ceph.pool_objects': {
-        info: 'Shows info about number of objects presents on a pool.'
+        info: 'Number of objects presents in each pool.'
     },
 
     'ceph.pool_read_bytes': {
-        info: 'Shows info about read data per second on a pool.'
+        info: 'The rate of read data per second in each pool.'
     },
 
     'ceph.pool_write_bytes': {
-        info: 'Shows info about write data per second on a pool.'
+        info: 'The rate of write data per second in each pool.'
     },
 
     'ceph.pool_read_objects': {
-        info: 'Shows info about read objects per second on a pool.'
+        info: 'Number of read objects per second in each pool.'
     },
 
     'ceph.pool_write_objects': {
-        info: 'Shows info about write objects per second on a pool.'
+        info: 'Number of write objects per second in each pool.'
     },
 
     'ceph.osd_usage': {
-        info: 'Shows info about osd usage.'
+        info: 'The usage space in each OSD.'
     },
 
     'ceph.apply_latency': {
-        info: 'Time taken to flush an update to disks.'
+        info: 'Time taken to flush an update in each OSD.'
     },
 
     'ceph.commit_latency': {
-        info: 'Time taken to commit an operation to the journal.'
+        info: 'Time taken to commit an operation to the journal in each OSD.'
     },
 
     // ------------------------------------------------------------------------
