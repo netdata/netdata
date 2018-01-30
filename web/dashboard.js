@@ -7303,6 +7303,7 @@ var NETDATA = window.NETDATA || {};
                 color: '#666666'
             });
 
+        state.tmp.d3pie_last_slot = index;
         return content;
     };
 
@@ -7334,6 +7335,11 @@ var NETDATA = window.NETDATA || {};
         if(slot < 0 || slot >= state.data.result.length)
             return NETDATA.d3pieClearSelection(state, true);
 
+        if(state.tmp.d3pie_last_slot === slot) {
+            // we already show this slot, don't do anything
+            return true;
+        }
+
         if(state.tmp.d3pie_timer === undefined) {
             state.tmp.d3pie_timer = NETDATA.timeout.set(function() {
                 state.tmp.d3pie_timer = undefined;
@@ -7354,7 +7360,10 @@ var NETDATA = window.NETDATA || {};
             NETDATA.d3pieChartUpdate(state, state.data);
         }
         else {
-            NETDATA.d3pieChange(state, [ { label: 'no data', value: 1, color: '#666666' } ], 'no data available');
+            if(state.tmp.d3pie_last_slot !== -1) {
+                state.tmp.d3pie_last_slot = -1;
+                NETDATA.d3pieChange(state, [{label: 'no data', value: 1, color: '#666666'}], 'no data available');
+            }
         }
 
         return true;
