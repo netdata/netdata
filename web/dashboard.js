@@ -7303,7 +7303,7 @@ var NETDATA = window.NETDATA || {};
                 color: '#666666'
             });
 
-        state.tmp.d3pie_last_slot = 0;
+        state.tmp.d3pie_last_slot = index;
         return content;
     };
 
