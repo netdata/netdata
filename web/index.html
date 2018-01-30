@@ -674,6 +674,7 @@
                 if(urlOptions.server !== null && urlOptions.server !== '') {
                     netdataServerStatic = document.location.origin.toString() + document.location.pathname.toString();
                     netdataServer = urlOptions.server;
+                    netdataCheckXSS = true;
                 }
                 else
                     urlOptions.server = null;
@@ -2811,9 +2812,63 @@
             }
         }
 
+        // an object to keep initilization configuration
+        // needed due to the async nature of the XSS modal
+        var initializeConfig = {
+            url: null,
+            custom_info: true,
+        };
+
+        function loadCustomDashboardInfo(url, callback) {
+            loadJs(url, function () {
+                $.extend(true, netdataDashboard, customDashboard);
+                callback();
+            });
+        }
+
+        function initializeChartsAndCustomInfo() {
+            NETDATA.alarms.callback = alarmsCallback;
+
+            // download all the charts the server knows
+            NETDATA.chartRegistry.downloadAll(initializeConfig.url, function(data) {
+                if(data !== null) {
+                    if (initializeConfig.custom_info === true && typeof data.custom_info !== 'undefined' && data.custom_info !== "" && netdataSnapshotData === null) {
+                        //console.log('loading custom dashboard decorations from server ' + initializeConfig.url);
+                        loadCustomDashboardInfo(NETDATA.serverDefault + data.custom_info, function () {
+                            initializeDynamicDashboardWithData(data);
+                        });
+                    }
+                    else {
+                        //console.log('not loading custom dashboard decorations from server ' + initializeConfig.url);
+                        initializeDynamicDashboardWithData(data);
+                    }
+                }
+            });
+        }
+
+        function xssModalDisableXss() {
+            //console.log('disabling xss checks');
+            NETDATA.xss.enabled = false;
+            NETDATA.xss.enabled_for_data = false;
+            initializeConfig.custom_info = true;
+            initializeChartsAndCustomInfo();
+            return false;
+        }
+
+        function xssModalKeepXss() {
+            //console.log('keeping xss checks');
+            NETDATA.xss.enabled = true;
+            NETDATA.xss.enabled_for_data = true;
+            initializeConfig.custom_info = false;
+            initializeChartsAndCustomInfo();
+            return false;
+        }
+
         function initializeDynamicDashboard(netdata_url) {
             if(typeof netdata_url === 'undefined' || netdata_url === null)
                 netdata_url = NETDATA.serverDefault;
+
+            initializeConfig.url = netdata_url;
 
             // initialize clickable alarms
             NETDATA.alarms.chart_div_offset = -50;
@@ -2821,22 +2876,14 @@
             NETDATA.alarms.chart_div_animation_duration = 0;
 
             NETDATA.pause(function() {
-                NETDATA.alarms.callback = alarmsCallback;
-
-                // download all the charts the server knows
-                NETDATA.chartRegistry.downloadAll(netdata_url, function(data) {
-                    if(data !== null) {
-                        if(typeof data.custom_info !== 'undefined' && data.custom_info !== "" && netdataSnapshotData === null) {
-                            loadJs(NETDATA.serverDefault + data.custom_info, function () {
-                                $.extend(true, netdataDashboard, customDashboard);
-                                initializeDynamicDashboardWithData(data);
-                            });
-                        }
-                        else {
-                            initializeDynamicDashboardWithData(data);
-                        }
-                    }
-                });
+                if(typeof netdataCheckXSS !== 'undefined' && netdataCheckXSS === true) {
+                    //$("#loadOverlay").css("display","none");
+                    document.getElementById('netdataXssModalServer').innerText = initializeConfig.url;
+                    $('#xssModal').modal('show');
+                }
+                else {
+                    initializeChartsAndCustomInfo();
+                }
             });
         }
 
@@ -3205,6 +3252,7 @@
             $('#loadSnapshotImport').addClass('disabled');
 
             if(tmpSnapshotData === null) {
+                loadSnapshotPreflightEmpty();
                 loadSnapshotModalLog('danger', 'no data have been loaded');
                 return;
             }
@@ -3271,6 +3319,10 @@
                         urlOptions.highlight = false;
                     }
 
+                    netdataCheckXSS = false; // disable the modal - this does not affect XSS checks, since dashboard.js is already loaded
+                    NETDATA.xss.enabled = true;             // we should not do any remote requests, but if we do, check them
+                    NETDATA.xss.enabled_for_data = true;    // check also snapshot data - that have been excluded from the initial check, due to compression
+                    loadSnapshotPreflightEmpty();
                     initializeDynamicDashboard();
                 });
             });
@@ -3278,12 +3330,14 @@
 
 
         function loadSnapshotPreflightFile(file) {
+            var filename = NETDATA.xss.string(file.name);
             var fr = new FileReader();
             fr.onload = function(e) {
-                document.getElementById('loadSnapshotFilename').innerHTML = file.name;
+                document.getElementById('loadSnapshotFilename').innerHTML = filename;
                 var result = null;
                 try {
-                    result = JSON.parse(e.target.result);
+                    result = NETDATA.xss.checkAlways('snapshot', JSON.parse(e.target.result), /^(snapshot\.info|snapshot\.data)$/);
+
                     //console.log(result);
                     var date_after = new Date(result.after_ms);
                     var date_before = new Date(result.before_ms);
@@ -3300,7 +3354,7 @@
                     if (typeof result.data_size === 'undefined')
                         result.data_size = 0;
 
-                    document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + file.name + '</code>';
+                    document.getElementById('loadSnapshotFilename').innerHTML = '<code>' + filename + '</code>';
                     document.getElementById('loadSnapshotHostname').innerHTML = '<b>' + result.hostname + '</b>, netdata version: <b>' + result.netdata_version.toString() + '</b>';
                     document.getElementById('loadSnapshotURL').innerHTML = result.url;
                     document.getElementById('loadSnapshotCharts').innerHTML = result.charts.charts_count.toString() + ' charts, ' + result.charts.dimensions_count.toString() + ' dimensions, ' + result.data_points.toString() + ' points per dimension, ' + Math.round(result.duration_ms / result.data_points).toString() + ' ms per point';
@@ -3332,6 +3386,7 @@
             document.getElementById('loadSnapshotInfo').innerHTML = '';
             document.getElementById('loadSnapshotTimeRange').innerHTML = '';
             document.getElementById('loadSnapshotComments').innerHTML = '';
+            loadSnapshotModalLog('success', 'Browse for a snapshot file (or drag it and drop it here), then click <b>Import</b> to render it.');
             $('#loadSnapshotImport').addClass('disabled');
         };
 
@@ -4576,6 +4631,40 @@
         </div>
     </div>
 
+    <div class="modal fade" id="xssModal" tabindex="-1" role="dialog" aria-labelledby="xssModalLabel" data-keyboard="false" data-backdrop="static" style="z-index: 3000">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="xssModalLabel">XSS Protection</h4>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        This dashboard is about to render data from server:
+                    </p>
+                    <p style="font-size: 1.25em;">
+                        <code id="netdataXssModalServer"></code>
+                    </p>
+                    <p>
+                        To protect your privacy, the dashboard will <b>check all data transferred</b> for cross site scripting (XSS).
+                        <br/>This is CPU intensive, so your browser might be a bit slower.
+                    </p>
+                    <p>
+                        If you <b>trust</b> the remote server, you can disable XSS protection.<br/>
+                        In this case, any remote dashboard decoration code (javascript) will also run.
+                    </p>
+                    <p>
+                        If you <b>don't trust</b> the remote server, you should keep the protection on.<br/>
+                        The dashboard will run slower and remote dashboard decoration code will not run, but better be safe than sorry...
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" onclick="return xssModalKeepXss();" type="button" class="btn btn-success" data-dismiss="modal">Keep protecting me</a>
+                    <a href="#" onclick="return xssModalDisableXss();" type="button" class="btn btn-danger" data-dismiss="modal">I don't need this, the server is mine</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="printPreflightModal" tabindex="-1" role="dialog" aria-labelledby="printPreflightModalLabel">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
@@ -4666,6 +4755,7 @@
                     </p>
                 </div>
                 <div class="modal-footer">
+                    <span style="display: inline-block; padding-right: 20px;">Snapshot files contain both data and javascript code. Make sure <b>you trust the files</b> you import!</span>
                     <a id="loadSnapshotImport" href="#" onclick="loadSnapshot(); return false;" type="button" class="btn btn-success disabled">Import</a>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
                 </div>
@@ -5625,6 +5715,6 @@
         </div>
     </div>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
-    <script type="text/javascript" src="dashboard.js?v20180127-1"></script>
+    <script type="text/javascript" src="dashboard.js?v20180129-1"></script>
 </body>
 </html>

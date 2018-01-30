@@ -2,8 +2,12 @@
 #include "common.h"
 
 static inline void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
-    if(value && *value)
-        buffer_sprintf(wb, "%s\"%s\":\"%s\"%s", prefix, label, value, suffix);
+    if(value && *value) {
+        buffer_sprintf(wb, "%s\"%s\":\"", prefix, label);
+        buffer_strcat_htmlescape(wb, value);
+        buffer_strcat(wb, "\"");
+        buffer_strcat(wb, suffix);
+    }
     else
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
@@ -27,7 +31,6 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                     "\t\t\"exec_code\": %d,\n"
                     "\t\t\"source\": \"%s\",\n"
                     "\t\t\"units\": \"%s\",\n"
-                    "\t\t\"info\": \"%s\",\n"
                     "\t\t\"when\": %lu,\n"
                     "\t\t\"duration\": %lu,\n"
                     "\t\t\"non_clear_duration\": %lu,\n"
@@ -55,7 +58,6 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    , ae->exec_code
                    , ae->source
                    , ae->units?ae->units:""
-                   , ae->info?ae->info:""
                    , (unsigned long)ae->when
                    , (unsigned long)ae->duration
                    , (unsigned long)ae->non_clear_duration
@@ -68,6 +70,8 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    , ae->new_value_string
                    , ae->old_value_string
     );
+
+    health_string2json(wb, "\t\t", "info", ae->info?ae->info:"", ",\n");
 
     if(unlikely(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION)) {
         buffer_strcat(wb, "\t\t\"no_clear_notification\": true,\n");

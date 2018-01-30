@@ -61,6 +61,8 @@
  *                                                  (default: undefined) */
 /*global netdataIntersectionObserver *//* boolean,  enable or disable the use of intersection observer
  *                                                  (default: true) */
+/*global netdataCheckXSS             *//* boolean,  enable or disable checking for XSS issues
+ *                                                  (default: false) */
 
 // ----------------------------------------------------------------------------
 // global namespace
@@ -97,6 +99,85 @@ var NETDATA = window.NETDATA || {};
             .replace(/\)/g, '_')
             .replace(/\./g, '_')
             .replace(/\//g, '_');
+    };
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // XSS checks
+
+    NETDATA.xss = {
+        enabled: (typeof netdataCheckXSS === 'undefined')?false:netdataCheckXSS,
+        enabled_for_data: (typeof netdataCheckXSS === 'undefined')?false:netdataCheckXSS,
+
+        string: function (s) {
+            return s.toString()
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '#27;');
+        },
+
+        object: function(name, obj, ignore_regex) {
+            if(typeof ignore_regex !== 'undefined' && ignore_regex.test(name) === true) {
+                // console.log('XSS: ignoring "' + name + '"');
+                return obj;
+            }
+
+            switch (typeof(obj)) {
+                case 'string':
+                    var ret = this.string(obj);
+                    if(ret !== obj) console.log('XSS protection changed string ' + name + ' from "' + obj + '" to "' + ret + '"');
+                    return ret;
+
+                case 'object':
+                    if(obj === null) return obj;
+
+                    if(Array.isArray(obj) === true) {
+                        // console.log('checking array "' + name + '"');
+
+                        var len = obj.length;
+                        while(len--)
+                            obj[len] = this.object(name + '[' + len + ']', obj[len], ignore_regex);
+                    }
+                    else {
+                        // console.log('checking object "' + name + '"');
+
+                        for(var i in obj) {
+                            if(obj.hasOwnProperty(i) === false) continue;
+                            if(this.string(i) !== i) {
+                                console.log('XSS protection removed invalid object member "' + name + '.' + i + '"');
+                                delete obj[i];
+                            }
+                            else
+                                obj[i] = this.object(name + '.' + i, obj[i], ignore_regex);
+                        }
+                    }
+                    return obj;
+
+                default:
+                    return obj;
+            }
+        },
+
+        checkOptional: function(name, obj, ignore_regex) {
+            if(this.enabled === true) {
+                //console.log('XSS: checking optional "' + name + '"...');
+                return this.object(name, obj, ignore_regex);
+            }
+            return obj;
+        },
+
+        checkAlways: function(name, obj, ignore_regex) {
+            //console.log('XSS: checking always "' + name + '"...');
+            return this.object(name, obj, ignore_regex);
+        },
+
+        checkData: function(name, obj, ignore_regex) {
+            if(this.enabled_for_data === true) {
+                //console.log('XSS: checking data "' + name + '"...');
+                return this.object(name, obj, ignore_regex);
+            }
+            return obj;
+        }
     };
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -1469,6 +1550,7 @@ var NETDATA = window.NETDATA || {};
                     xhrFields: {withCredentials: true} // required for the cookie
                 })
                     .done(function (data) {
+                        data = NETDATA.xss.checkOptional('/api/v1/charts', data);
                         got_data(host, data, callback);
                     })
                     .fail(function () {
@@ -4895,6 +4977,7 @@ var NETDATA = window.NETDATA || {};
                 var data = this.getSnapshotData(key);
                 if (data !== null) {
                     ok = true;
+                    data = NETDATA.xss.checkData('/api/v1/data', data, this.library.xssRegexIgnore);
                     this.updateChartWithData(data);
                 }
                 else {
@@ -4926,6 +5009,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
             .done(function(data) {
+                data = NETDATA.xss.checkData('/api/v1/data', data, that.library.xssRegexIgnore);
+
                 that.xhr = undefined;
                 that.retries_on_data_failures = 0;
                 ok = true;
@@ -5191,6 +5276,8 @@ var NETDATA = window.NETDATA || {};
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(chart) {
+                    chart = NETDATA.xss.checkOptional('/api/v1/chart', chart);
+
                     chart.url = that.chart_url;
                     that.__defaultsFromDownloadedChart(chart);
                     NETDATA.chartRegistry.add(that.host, that.id, chart);
@@ -8280,6 +8367,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: NETDATA.dygraphToolboxPanAndZoom,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { return 'ms|flip' + (this.isLogScale(state)?'|abs':'').toString(); },
             legend: function(state) {
@@ -8324,6 +8412,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'array'; },
             options: function(state) { void(state); return 'flip|abs'; },
             legend: function(state) { void(state); return null; },
@@ -8343,6 +8432,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'ssvcomma'; },
             options: function(state) { void(state); return 'null2zero|flip|abs'; },
             legend: function(state) { void(state); return null; },
@@ -8362,6 +8452,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { void(state); return 'objectrows|ms'; },
             legend: function(state) { void(state); return null; },
@@ -8381,6 +8472,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.rows$'),
             format: function(state) { void(state); return 'datatable'; },
             options: function(state) { void(state); return ''; },
             legend: function(state) { void(state); return null; },
@@ -8400,6 +8492,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { void(state); return ''; },
             legend: function(state) { void(state); return null; },
@@ -8419,6 +8512,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'csvjsonarray'; },
             options: function(state) { void(state); return 'milliseconds'; },
             legend: function(state) { void(state); return null; },
@@ -8438,6 +8532,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { void(state); return 'objectrows|ms'; },
             legend: function(state) { void(state); return null; },
@@ -8457,6 +8552,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result.data$'),
             format: function(state) { void(state); return 'json'; },
             options: function(state) { void(state); return ''; },
             legend: function(state) { void(state); return null; },
@@ -8476,6 +8572,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'array'; },
             options: function(state) { void(state); return 'absolute'; },
             legend: function(state) { void(state); return null; },
@@ -8496,6 +8593,7 @@ var NETDATA = window.NETDATA || {};
             toolboxPanAndZoom: null,
             initialized: false,
             enabled: true,
+            xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
             format: function(state) { void(state); return 'array'; },
             options: function(state) { void(state); return 'absolute'; },
             legend: function(state) { void(state); return null; },
@@ -8919,6 +9017,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkOptional('/api/v1/alarms', data /*, '.*\.(calc|calc_parsed|warn|warn_parsed|crit|crit_parsed)$' */);
+
                     if(NETDATA.alarms.first_notification_id === 0 && typeof data.latest_alarm_log_unique_id === 'number')
                         NETDATA.alarms.first_notification_id = data.latest_alarm_log_unique_id;
 
@@ -8970,6 +9070,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkOptional('/api/v1/alarm_log', data);
+
                     if(typeof callback === 'function')
                         return callback(data);
                 })
@@ -9101,6 +9203,8 @@ var NETDATA = window.NETDATA || {};
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(data) {
+                    data = NETDATA.xss.checkOptional('/api/v1/registry?action=hello', data);
+
                     if(typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(408, host + ' response: ' + JSON.stringify(data));
                         data = null;
@@ -9134,6 +9238,8 @@ var NETDATA = window.NETDATA || {};
                     xhrFields: { withCredentials: true } // required for the cookie
                 })
                 .done(function(data) {
+                    data = NETDATA.xss.checkAlways('/api/v1/registry?action=access', data);
+
                     var redirect = null;
                     if(typeof data.registry === 'string')
                         redirect = data.registry;
@@ -9182,6 +9288,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkAlways('/api/v1/registry?action=delete', data);
+
                     if(typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(411, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
@@ -9211,6 +9319,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkAlways('/api/v1/registry?action=search', data);
+
                     if(typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(417, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
@@ -9240,6 +9350,8 @@ var NETDATA = window.NETDATA || {};
                 xhrFields: { withCredentials: true } // required for the cookie
             })
                 .done(function(data) {
+                    data = NETDATA.xss.checkAlways('/api/v1/registry?action=switch', data);
+
                     if(typeof data.status !== 'string' || data.status !== 'ok') {
                         NETDATA.error(413, NETDATA.registry.server + ' responded with: ' + JSON.stringify(data));
                         data = null;
