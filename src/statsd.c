@@ -1957,10 +1957,23 @@ static inline void statsd_update_all_app_charts(void) {
     // debug(D_STATSD, "completed update of app charts");
 }
 
+const char *statsd_metric_type_string(STATSD_METRIC_TYPE type) {
+    switch(type) {
+        case STATSD_METRIC_TYPE_COUNTER: return "counter";
+        case STATSD_METRIC_TYPE_GAUGE: return "gauge";
+        case STATSD_METRIC_TYPE_HISTOGRAM: return "histogram";
+        case STATSD_METRIC_TYPE_METER: return "meter";
+        case STATSD_METRIC_TYPE_SET: return "set";
+        case STATSD_METRIC_TYPE_TIMER: return "timer";
+        default: return "unknown";
+    }
+}
+
 static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_metric)(STATSD_METRIC *)) {
     STATSD_METRIC *m;
     for(m = index->first; m ; m = m->next) {
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_CHECKED_IN_APPS))) {
+            log_access("NEW STATSD METRIC '%s': '%s'", statsd_metric_type_string(m->type), m->name);
             check_if_metric_is_for_app(index, m);
             m->options |= STATSD_METRIC_OPTION_CHECKED_IN_APPS;
         }
