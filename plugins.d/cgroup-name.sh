@@ -94,6 +94,23 @@ function docker_get_name_api {
     return 0
 }
 
+function docker_get_name {
+    local id="${1}"
+    if hash docker 2>/dev/null
+        then
+        docker_get_name_classic "${id}"
+    else
+        docker_get_name_api "${id}" || docker_get_name_classic "${id}"
+    fi
+    if [ -z "${NAME}" ]
+        then
+        warning "cannot find the name of docker container '${id}'"
+        NAME="${id:0:12}"
+    else
+        info "docker container '${id}' is named '${NAME}'"
+    fi
+}
+
 if [ -z "${NAME}" ]
     then
     if [[ "${CGROUP}" =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]
@@ -105,19 +122,22 @@ if [ -z "${NAME}" ]
 
         if [ ! -z "${DOCKERID}" -a \( ${#DOCKERID} -eq 64 -o ${#DOCKERID} -eq 12 \) ]
             then
-            if hash docker 2>/dev/null
-                then
-                docker_get_name_classic ${DOCKERID}
-            else
-                docker_get_name_api ${DOCKERID} || docker_get_name_classic ${DOCKERID}
-            fi
-            if [ -z "${NAME}" ]
-                then
-                warning "cannot find the name of docker container '${DOCKERID}'"
-                NAME="${DOCKERID:0:12}"
-            else
-                info "docker container '${DOCKERID}' is named '${NAME}'"
-            fi
+            docker_get_name "${DOCKERID}"
+        else
+            error "a docker id cannot be extracted from docker cgroup '${CGROUP}'."
+        fi
+    elif [[ "${CGROUP}" =~ ^.*kubepods[_/].*[_/]pod[a-fA-F0-9-]+[_/][a-fA-F0-9]+$ ]]
+        then
+        # kubernetes
+
+        DOCKERID="$( echo "${CGROUP}" | sed "s|^.*kubepods[_/].*[_/]pod[a-fA-F0-9-]\+[_/]\([a-fA-F0-9]\+\)$|\1|" )"
+        # echo "DOCKERID=${DOCKERID}"
+
+        if [ ! -z "${DOCKERID}" -a \( ${#DOCKERID} -eq 64 -o ${#DOCKERID} -eq 12 \) ]
+            then
+            docker_get_name "${DOCKERID}"
+        else
+            error "a docker id cannot be extracted from kubernetes cgroup '${CGROUP}'."
         fi
     elif [[ "${CGROUP}" =~ machine.slice_machine.*-qemu ]]
         then
