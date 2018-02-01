@@ -272,47 +272,6 @@ var helpers = {
 		return svg;
 	},
 
-/*
-	whenIdExists: function(id, callback) {
-		var inc = 1;
-		var giveupIterationCount = 1000;
-
-		var interval = setInterval(function() {
-			if (document.getElementById(id)) {
-				clearInterval(interval);
-				callback();
-			}
-			if (inc > giveupIterationCount) {
-				clearInterval(interval);
-			}
-			inc++;
-		}, 1);
-	},
-
-	whenElementsExist: function(els, callback) {
-		var inc = 1;
-		var giveupIterationCount = 1000;
-
-		var interval = setInterval(function() {
-			var allExist = true;
-			for (var i=0; i<els.length; i++) {
-				if (!document.getElementById(els[i])) {
-					allExist = false;
-					break;
-				}
-			}
-			if (allExist) {
-				clearInterval(interval);
-				callback();
-			}
-			if (inc > giveupIterationCount) {
-				clearInterval(interval);
-			}
-			inc++;
-		}, 1);
-	},
-*/
-
 	shuffleArray: function(array) {
 		var currentIndex = array.length, tmpVal, randomIndex;
 
@@ -1600,9 +1559,7 @@ var text = {
 	offscreenCoord: -10000,
 
 	addTitle: function(pie) {
-
-
-		var title = pie.svg.selectAll("." + pie.cssPrefix + "title")
+		pie.__title = pie.svg.selectAll("." + pie.cssPrefix + "title")
 			.data([pie.options.header.title])
 			.enter()
 			.append("text")
@@ -1640,8 +1597,8 @@ var text = {
 			x = ((canvasWidth - canvasPadding.right) / 2) + canvasPadding.left;
 		}
 
-    // add whatever offset has been added by user
-    x += pie.options.misc.pieCenterOffset.x;
+    	// add whatever offset has been added by user
+    	x += pie.options.misc.pieCenterOffset.x;
 
 		var y = canvasPadding.top + textComponents.title.h;
 
@@ -1657,7 +1614,7 @@ var text = {
 			}
 		}
 
-		pie.svg.select("#" + pie.cssPrefix + "title")
+		pie.__title
 			.attr("x", x)
 			.attr("y", y);
 	},
@@ -1665,7 +1622,7 @@ var text = {
 	addSubtitle: function(pie) {
 		var headerLocation = pie.options.header.location;
 
-		pie.svg.selectAll("." + pie.cssPrefix + "subtitle")
+		pie.__subtitle = pie.svg.selectAll("." + pie.cssPrefix + "subtitle")
 			.data([pie.options.header.subtitle])
 			.enter()
 			.append("text")
@@ -1700,17 +1657,18 @@ var text = {
 			x = ((canvasWidth - canvasPadding.right) / 2) + canvasPadding.left;
 		}
 
-    // add whatever offset has been added by user
-    x += pie.options.misc.pieCenterOffset.x;
+    	// add whatever offset has been added by user
+    	x += pie.options.misc.pieCenterOffset.x;
 
 		var y = text.getHeaderHeight(pie);
-		pie.svg.select("#" + pie.cssPrefix + "subtitle")
+
+		pie.__subtitle
 			.attr("x", x)
 			.attr("y", y);
 	},
 
 	addFooter: function(pie) {
-		pie.svg.selectAll("." + pie.cssPrefix + "footer")
+		pie.__footer = pie.svg.selectAll("." + pie.cssPrefix + "footer")
 			.data([pie.options.footer])
 			.enter()
 			.append("text")
@@ -1750,7 +1708,7 @@ var text = {
 			x = canvasWidth / 2; // TODO - shouldn't this also take into account padding?
 		}
 
-		pie.svg.select("#" + pie.cssPrefix + "footer")
+		pie.__footer
 			.attr("x", x)
 			.attr("y", canvasHeight - canvasPadding.bottom);
 	},
@@ -2092,54 +2050,43 @@ var tt = {
 		this.outerLabelGroupData = [];
 
 		// add the key text components offscreen (title, subtitle, footer). We need to know their widths/heights for later computation
-		if (this.textComponents.title.exists) {
-			text.addTitle(this);
-		}
-		if (this.textComponents.subtitle.exists) {
-			text.addSubtitle(this);
-		}
+		if (this.textComponents.title.exists) text.addTitle(this);
+		if (this.textComponents.subtitle.exists) text.addSubtitle(this);
 		text.addFooter(this);
 
 		// the footer never moves. Put it in place now
 		var self = this;
-		//helpers.whenIdExists(this.cssPrefix + "footer", function() {
-			text.positionFooter(self);
-			var d3 = helpers.getDimensions(self.cssPrefix + "footer");
-			self.textComponents.footer.h = d3.h;
-			self.textComponents.footer.w = d3.w;
-		//});
+		text.positionFooter(self);
+		var d3 = helpers.getDimensions(self.cssPrefix + "footer");
+		self.textComponents.footer.h = d3.h;
+		self.textComponents.footer.w = d3.w;
 
-		// now create the pie chart and position everything accordingly
-		var reqEls = [];
-		if (this.textComponents.title.exists)    { reqEls.push(this.cssPrefix + "title"); }
-		if (this.textComponents.subtitle.exists) { reqEls.push(this.cssPrefix + "subtitle"); }
-		if (this.textComponents.footer.exists)   { reqEls.push(this.cssPrefix + "footer"); }
+		if (self.textComponents.title.exists) {
+			var d1 = helpers.getDimensions(self.cssPrefix + "title");
+			self.textComponents.title.h = d1.h;
+			self.textComponents.title.w = d1.w;
+		}
 
-		//helpers.whenElementsExist(reqEls, function() {
+		if (self.textComponents.subtitle.exists) {
+			var d2 = helpers.getDimensions(self.cssPrefix + "subtitle");
+			self.textComponents.subtitle.h = d2.h;
+			self.textComponents.subtitle.w = d2.w;
+		}
+
+		// now compute the full header height
+		if (self.textComponents.title.exists || self.textComponents.subtitle.exists) {
+			var headerHeight = 0;
 			if (self.textComponents.title.exists) {
-				var d1 = helpers.getDimensions(self.cssPrefix + "title");
-				self.textComponents.title.h = d1.h;
-				self.textComponents.title.w = d1.w;
+				headerHeight += self.textComponents.title.h;
+				if (self.textComponents.subtitle.exists) {
+					headerHeight += self.options.header.titleSubtitlePadding;
+				}
 			}
 			if (self.textComponents.subtitle.exists) {
-				var d2 = helpers.getDimensions(self.cssPrefix + "subtitle");
-				self.textComponents.subtitle.h = d2.h;
-				self.textComponents.subtitle.w = d2.w;
+				headerHeight += self.textComponents.subtitle.h;
 			}
-			// now compute the full header height
-			if (self.textComponents.title.exists || self.textComponents.subtitle.exists) {
-				var headerHeight = 0;
-				if (self.textComponents.title.exists) {
-					headerHeight += self.textComponents.title.h;
-					if (self.textComponents.subtitle.exists) {
-						headerHeight += self.options.header.titleSubtitlePadding;
-					}
-				}
-				if (self.textComponents.subtitle.exists) {
-					headerHeight += self.textComponents.subtitle.h;
-				}
-				self.textComponents.headerHeight = headerHeight;
-			}
+			self.textComponents.headerHeight = headerHeight;
+		}
 
 			// at this point, all main text component dimensions have been calculated
 			math.computePieRadius(self);
