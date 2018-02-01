@@ -243,7 +243,7 @@ var NETDATA = window.NETDATA || {};
     NETDATA.raphael_js          = NETDATA.serverStatic + 'lib/raphael-2.2.4-min.js';
     NETDATA.c3_js               = NETDATA.serverStatic + 'lib/c3-0.4.18.min.js';
     NETDATA.c3_css              = NETDATA.serverStatic + 'css/c3-0.4.18.min.css';
-    NETDATA.d3pie_js            = NETDATA.serverStatic + 'lib/d3pie-0.2.1-netdata-1.js';
+    NETDATA.d3pie_js            = NETDATA.serverStatic + 'lib/d3pie-0.2.1-netdata-2.js';
     NETDATA.d3_js               = NETDATA.serverStatic + 'lib/d3-4.12.2.min.js';
     NETDATA.morris_js           = NETDATA.serverStatic + 'lib/morris-0.5.1.min.js';
     NETDATA.morris_css          = NETDATA.serverStatic + 'css/morris-0.5.1.css';
@@ -7370,17 +7370,20 @@ var NETDATA = window.NETDATA || {};
     };
 
     NETDATA.d3pieChange = function(state, content, footer) {
-        state.d3pie_options.data.content = content;
+        if(state.d3pie_forced_subtitle === null) {
+            //state.d3pie_instance.updateProp("header.subtitle.text", state.units_current);
+            state.d3pie_instance.options.header.subtitle.text = state.units_current;
+        }
 
-        if(state.d3pie_forced_subtitle === null)
-            state.d3pie_options.header.subtitle.text = state.units_current;
+        if(state.d3pie_forced_footer === null) {
+            //state.d3pie_instance.updateProp("footer.text", footer);
+            state.d3pie_instance.options.footer.text = footer;
+        }
 
-        if(state.d3pie_forced_footer === null)
-            state.d3pie_options.footer.text = footer;
-
+        //state.d3pie_instance.updateProp("data.content", content);
+        state.d3pie_instance.options.data.content = content;
         state.d3pie_instance.destroy();
-        state.d3pie_instance = new d3pie(state.element_chart, state.d3pie_options);
-
+        state.d3pie_instance.recreate();
         return true;
     };
 
