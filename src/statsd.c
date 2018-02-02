@@ -1044,22 +1044,22 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
     return dim;
 }
 
-int statsd_readfile(const char *path, const char *filename) {
+static int statsd_readfile(const char *path, const char *filename, STATSD_APP *app, STATSD_APP_CHART *chart, DICTIONARY *dict) {
     debug(D_STATSD, "STATSD configuration reading file '%s/%s'", path, filename);
 
-    char buffer[STATSD_CONF_LINE_MAX + 1];
+    char *buffer = mallocz(STATSD_CONF_LINE_MAX + 1);
 
-    FILE *fp = NULL;
-    snprintfz(buffer, STATSD_CONF_LINE_MAX, "%s/%s", path, filename);
-    fp = fopen(buffer, "r");
+    if(filename[0] == '/')
+        strncpyz(buffer, filename, STATSD_CONF_LINE_MAX);
+    else
+        snprintfz(buffer, STATSD_CONF_LINE_MAX, "%s/%s", path, filename);
+
+    FILE *fp = fopen(buffer, "r");
     if(!fp) {
         error("STATSD: cannot open file '%s'.", buffer);
+        freez(buffer);
         return -1;
     }
-
-    STATSD_APP *app = NULL;
-    STATSD_APP_CHART *chart = NULL;
-    DICTIONARY *dict = NULL;
 
     size_t line = 0;
     char *s;
@@ -1072,7 +1072,18 @@ int statsd_readfile(const char *path, const char *filename) {
             debug(D_STATSD, "STATSD: ignoring line %zu of file '%s/%s', it is empty.", line, path, filename);
             continue;
         }
+
         debug(D_STATSD, "STATSD: processing line %zu of file '%s/%s': %s", line, path, filename, buffer);
+
+        if(*s == 'i' && strncmp(s, "include", 7) == 0) {
+            s = trim(&s[7]);
+            if(s && *s)
+                statsd_readfile(path, s, app, chart, dict);
+            else
+                error("STATSD: ignoring line %zu of file '%s/%s', include filename is empty", line, path, s);
+
+            continue;
+        }
 
         int len = (int) strlen(s);
         if (*s == '[' && s[len - 1] == ']') {
@@ -1296,6 +1307,7 @@ int statsd_readfile(const char *path, const char *filename) {
         }
     }
 
+    freez(buffer);
     fclose(fp);
     return 0;
 }
@@ -1336,7 +1348,7 @@ static void statsd_readdir(const char *path) {
 
         else if((de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN) &&
                 len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
-            statsd_readfile(path, de->d_name);
+            statsd_readfile(path, de->d_name, NULL, NULL, NULL);
         }
 
         else debug(D_STATSD, "STATSD: ignoring file '%s'", de->d_name);
