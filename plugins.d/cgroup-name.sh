@@ -139,6 +139,12 @@ if [ -z "${NAME}" ]
         else
             error "a docker id cannot be extracted from kubernetes cgroup '${CGROUP}'."
         fi
+    elif [[ "${CGROUP}" =~ machine.slice[_/].*\.service ]]
+        then
+        # systemd-nspawn
+
+        NAME="$(echo ${CGROUP} | sed 's/.*machine.slice[_\/]\(.*\)\.service/\1/g')"
+
     elif [[ "${CGROUP}" =~ machine.slice_machine.*-qemu ]]
         then
         # libvirtd / qemu virtual machines
