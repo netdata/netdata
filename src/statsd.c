@@ -1045,10 +1045,15 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
 }
 
 static int statsd_readfile(const char *path, const char *filename, STATSD_APP *app, STATSD_APP_CHART *chart, DICTIONARY *dict) {
-    debug(D_STATSD, "STATSD configuration reading file '%s/%s'", path, filename);
+    info("STATSD configuration reading file '%s/%s'", path, filename);
 
     char *buffer = mallocz(STATSD_CONF_LINE_MAX + 1);
-    snprintfz(buffer, STATSD_CONF_LINE_MAX, "%s/%s", path, filename);
+
+    if(filename[0] == '/')
+        strncpyz(buffer, filename, STATSD_CONF_LINE_MAX);
+    else
+        snprintfz(buffer, STATSD_CONF_LINE_MAX, "%s/%s", path, filename);
+
     FILE *fp = fopen(buffer, "r");
     if(!fp) {
         error("STATSD: cannot open file '%s'.", buffer);
