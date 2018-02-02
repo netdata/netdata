@@ -213,7 +213,8 @@ void read_cgroup_plugin_configuration() {
                     " *docker* "
                     " *lxc* "
                     " *qemu* "
-                    " *.libvirt-qemu "                    //  #3010
+                    " *kubepods* "                        // #3396
+                    " *.libvirt-qemu "                    // #3010
                     " * "
             ), NULL, SIMPLE_PATTERN_EXACT);
 
@@ -839,9 +840,9 @@ static inline void cgroup_get_chart_name(struct cgroup *cg) {
     pid_t cgroup_pid;
     char buffer[CGROUP_CHARTID_LINE_MAX + 1];
 
-    snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s'", cgroups_rename_script, cg->chart_id);
+    snprintfz(buffer, CGROUP_CHARTID_LINE_MAX, "exec %s '%s' '%s'", cgroups_rename_script, cg->chart_id, cg->id);
 
-    debug(D_CGROUP, "executing command '%s' for cgroup '%s'", buffer, cg->id);
+    debug(D_CGROUP, "executing command \"%s\" for cgroup '%s'", buffer, cg->id);
     FILE *fp = mypopen(buffer, &cgroup_pid);
     if(fp) {
         // debug(D_CGROUP, "reading from command '%s' for cgroup '%s'", buffer, cg->id);
