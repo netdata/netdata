@@ -605,4 +605,5 @@ declare -A configs_signatures=(
   ['fe478efe2e721724edb1fe2ef1addf93']='health_alarm_notify.conf'
   ['feb8bcf828aa2529a7ee4a140feeb12d']='health.d/net.conf'
   ['ff1b3d8ae8b2149c711d8da9b7a9c4bd']='health_alarm_notify.conf'
+  ['ff940c5396f16d05deb5c5859832ee48']='health.d/swap.conf'
 )
