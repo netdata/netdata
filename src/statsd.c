@@ -1045,7 +1045,7 @@ static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
 }
 
 static int statsd_readfile(const char *path, const char *filename, STATSD_APP *app, STATSD_APP_CHART *chart, DICTIONARY *dict) {
-    info("STATSD configuration reading file '%s/%s'", path, filename);
+    debug(D_STATSD, "STATSD configuration reading file '%s/%s'", path, filename);
 
     char *buffer = mallocz(STATSD_CONF_LINE_MAX + 1);
 
