@@ -1140,6 +1140,8 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                         , web_server_snd_callback
                         , web_allow_connections_from
                         , NULL
+                        , web_client_first_request_timeout
+                        , web_client_timeout
             );
 
     netdata_thread_cleanup_pop(1);

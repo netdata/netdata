@@ -229,6 +229,9 @@ static struct statsd {
     STATSD_INDEX sets;
     size_t unknown_types;
     size_t socket_errors;
+    size_t tcp_socket_connects;
+    size_t tcp_socket_disconnects;
+    size_t tcp_socket_connected;
     size_t tcp_socket_reads;
     size_t tcp_packets_received;
     size_t tcp_bytes_read;
@@ -240,6 +243,7 @@ static struct statsd {
     int update_every;
     SIMPLE_PATTERN *charts_for;
 
+    size_t tcp_idle_timeout;
     size_t decimal_detail;
     size_t private_charts;
     size_t max_private_charts;
@@ -319,6 +323,8 @@ static struct statsd {
                 .first = NULL,
                 STATSD_FIRST_PTR_MUTEX_INIT
         },
+
+        .tcp_idle_timeout = 600,
 
         .apps = NULL,
         .histogram_percentile = 95.0,
@@ -734,6 +740,8 @@ static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
     struct statsd_tcp *t = (struct statsd_tcp *)callocz(sizeof(struct statsd_tcp) + STATSD_TCP_BUFFER_SIZE, 1);
     t->type = STATSD_SOCKET_DATA_TYPE_TCP;
     t->size = STATSD_TCP_BUFFER_SIZE - 1;
+    statsd.tcp_socket_connects++;
+    statsd.tcp_socket_connected++;
 
     return t;
 }
@@ -749,6 +757,8 @@ static void statsd_del_callback(POLLINFO *pi) {
                 error("STATSD: client is probably sending unterminated metrics. Closed socket left with '%s'. Trying to process it.", t->buffer);
                 statsd_process(t->buffer, t->len, 0);
             }
+            statsd.tcp_socket_disconnects++;
+            statsd.tcp_socket_connected--;
         }
         else
             error("STATSD: internal error: received socket data type is %d, but expected %d", (int)t->type, (int)STATSD_SOCKET_DATA_TYPE_TCP);
@@ -953,6 +963,8 @@ void *statsd_collector_thread(void *ptr) {
             , statsd_snd_callback
             , NULL
             , (void *)d
+            , 0                        // tcp request timeout, 0 = disabled
+            , statsd.tcp_idle_timeout  // tcp idle timeout, 0 = disabled
     );
 
     netdata_thread_cleanup_pop(1);
@@ -2071,6 +2083,7 @@ void *statsd_main(void *ptr) {
     statsd.private_charts_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_STATSD, "private charts memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
     statsd.private_charts_rrd_history_entries = (int)config_get_number(CONFIG_SECTION_STATSD, "private charts history", default_rrd_history_entries);
     statsd.decimal_detail = (size_t)config_get_number(CONFIG_SECTION_STATSD, "decimal detail", (long long int)statsd.decimal_detail);
+    statsd.tcp_idle_timeout = (size_t) config_get_number(CONFIG_SECTION_STATSD, "disconnect idle tcp clients after seconds", (long long int)statsd.tcp_idle_timeout);
 
     statsd.histogram_percentile = (double)config_get_float(CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
     if(isless(statsd.histogram_percentile, 0) || isgreater(statsd.histogram_percentile, 100)) {
@@ -2247,6 +2260,39 @@ void *statsd_main(void *ptr) {
     RRDDIM *rd_packets_tcp = rrddim_add(st_packets, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     RRDDIM *rd_packets_udp = rrddim_add(st_packets, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
+    RRDSET *st_tcp_connects = rrdset_create_localhost(
+            "netdata"
+            , "tcp_connects"
+            , NULL
+            , "statsd"
+            , NULL
+            , "statsd server TCP connects and disconnects"
+            , "events"
+            , "netdata"
+            , "stats"
+            , 132005
+            , statsd.update_every
+            , RRDSET_TYPE_LINE
+    );
+    RRDDIM *rd_tcp_connects = rrddim_add(st_tcp_connects, "connects", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_tcp_disconnects = rrddim_add(st_tcp_connects, "disconnects", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    RRDSET *st_tcp_connected = rrdset_create_localhost(
+            "netdata"
+            , "tcp_connected"
+            , NULL
+            , "statsd"
+            , NULL
+            , "statsd server TCP connected sockets"
+            , "connected"
+            , "netdata"
+            , "stats"
+            , 132006
+            , statsd.update_every
+            , RRDSET_TYPE_LINE
+    );
+    RRDDIM *rd_tcp_connected = rrddim_add(st_tcp_connected, "connected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
     RRDSET *st_pcharts = rrdset_create_localhost(
             "netdata"
             , "private_charts"
@@ -2263,18 +2309,14 @@ void *statsd_main(void *ptr) {
     );
     RRDDIM *rd_pcharts = rrddim_add(st_pcharts, "charts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-
-    // ----------------------------------------------------------------------------------------------------------------
+            // ----------------------------------------------------------------------------------------------------------------
     // statsd thread to turn metrics into charts
 
     usec_t step = statsd.update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    for(;;) {
+    while(!netdata_exit) {
         usec_t hb_dt = heartbeat_next(&hb, step);
-
-        if(unlikely(netdata_exit))
-            break;
 
         statsd_flush_index_metrics(&statsd.gauges,     statsd_flush_gauge);
         statsd_flush_index_metrics(&statsd.counters,   statsd_flush_counter);
@@ -2294,48 +2336,51 @@ void *statsd_main(void *ptr) {
             rrdset_next(st_reads);
             rrdset_next(st_bytes);
             rrdset_next(st_packets);
+            rrdset_next(st_tcp_connects);
+            rrdset_next(st_tcp_connected);
             rrdset_next(st_pcharts);
         }
 
-        rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,     (collected_number)statsd.gauges.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_counter,   (collected_number)statsd.counters.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_timer,     (collected_number)statsd.timers.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_meter,     (collected_number)statsd.meters.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_histogram, (collected_number)statsd.histograms.metrics);
-        rrddim_set_by_pointer(st_metrics, rd_metrics_set,       (collected_number)statsd.sets.metrics);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)statsd.gauges.metrics);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_counter,      (collected_number)statsd.counters.metrics);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_timer,        (collected_number)statsd.timers.metrics);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_meter,        (collected_number)statsd.meters.metrics);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_histogram,    (collected_number)statsd.histograms.metrics);
+        rrddim_set_by_pointer(st_metrics, rd_metrics_set,          (collected_number)statsd.sets.metrics);
 
-        rrddim_set_by_pointer(st_events,  rd_events_gauge,       (collected_number)statsd.gauges.events);
-        rrddim_set_by_pointer(st_events,  rd_events_counter,     (collected_number)statsd.counters.events);
-        rrddim_set_by_pointer(st_events,  rd_events_timer,       (collected_number)statsd.timers.events);
-        rrddim_set_by_pointer(st_events,  rd_events_meter,       (collected_number)statsd.meters.events);
-        rrddim_set_by_pointer(st_events,  rd_events_histogram,   (collected_number)statsd.histograms.events);
-        rrddim_set_by_pointer(st_events,  rd_events_set,         (collected_number)statsd.sets.events);
-        rrddim_set_by_pointer(st_events,  rd_events_unknown,     (collected_number)statsd.unknown_types);
-        rrddim_set_by_pointer(st_events,  rd_events_errors,      (collected_number)statsd.socket_errors);
+        rrddim_set_by_pointer(st_events,  rd_events_gauge,         (collected_number)statsd.gauges.events);
+        rrddim_set_by_pointer(st_events,  rd_events_counter,       (collected_number)statsd.counters.events);
+        rrddim_set_by_pointer(st_events,  rd_events_timer,         (collected_number)statsd.timers.events);
+        rrddim_set_by_pointer(st_events,  rd_events_meter,         (collected_number)statsd.meters.events);
+        rrddim_set_by_pointer(st_events,  rd_events_histogram,     (collected_number)statsd.histograms.events);
+        rrddim_set_by_pointer(st_events,  rd_events_set,           (collected_number)statsd.sets.events);
+        rrddim_set_by_pointer(st_events,  rd_events_unknown,       (collected_number)statsd.unknown_types);
+        rrddim_set_by_pointer(st_events,  rd_events_errors,        (collected_number)statsd.socket_errors);
 
-        rrddim_set_by_pointer(st_reads,   rd_reads_tcp,          (collected_number)statsd.tcp_socket_reads);
-        rrddim_set_by_pointer(st_reads,   rd_reads_udp,          (collected_number)statsd.udp_socket_reads);
+        rrddim_set_by_pointer(st_reads,   rd_reads_tcp,            (collected_number)statsd.tcp_socket_reads);
+        rrddim_set_by_pointer(st_reads,   rd_reads_udp,            (collected_number)statsd.udp_socket_reads);
 
-        rrddim_set_by_pointer(st_bytes,   rd_bytes_tcp,          (collected_number)statsd.tcp_bytes_read);
-        rrddim_set_by_pointer(st_bytes,   rd_bytes_udp,          (collected_number)statsd.udp_bytes_read);
+        rrddim_set_by_pointer(st_bytes,   rd_bytes_tcp,            (collected_number)statsd.tcp_bytes_read);
+        rrddim_set_by_pointer(st_bytes,   rd_bytes_udp,            (collected_number)statsd.udp_bytes_read);
 
-        rrddim_set_by_pointer(st_packets, rd_packets_tcp,        (collected_number)statsd.tcp_packets_received);
-        rrddim_set_by_pointer(st_packets, rd_packets_udp,        (collected_number)statsd.udp_packets_received);
+        rrddim_set_by_pointer(st_packets, rd_packets_tcp,          (collected_number)statsd.tcp_packets_received);
+        rrddim_set_by_pointer(st_packets, rd_packets_udp,          (collected_number)statsd.udp_packets_received);
 
-        rrddim_set_by_pointer(st_pcharts, rd_pcharts,           (collected_number)statsd.private_charts);
+        rrddim_set_by_pointer(st_tcp_connects, rd_tcp_connects,    (collected_number)statsd.tcp_socket_connects);
+        rrddim_set_by_pointer(st_tcp_connects, rd_tcp_disconnects, (collected_number)statsd.tcp_socket_disconnects);
 
-        if(unlikely(netdata_exit))
-            break;
+        rrddim_set_by_pointer(st_tcp_connected, rd_tcp_connected,  (collected_number)statsd.tcp_socket_connected);
+
+        rrddim_set_by_pointer(st_pcharts, rd_pcharts,              (collected_number)statsd.private_charts);
 
         rrdset_done(st_metrics);
         rrdset_done(st_events);
         rrdset_done(st_reads);
         rrdset_done(st_bytes);
         rrdset_done(st_packets);
+        rrdset_done(st_tcp_connects);
+        rrdset_done(st_tcp_connected);
         rrdset_done(st_pcharts);
-
-        if(unlikely(netdata_exit))
-            break;
     }
 
 cleanup:
