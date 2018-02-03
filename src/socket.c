@@ -1338,6 +1338,8 @@ void poll_events(LISTEN_SOCKETS *sockets
         , int   (*snd_callback)(POLLINFO *pi, short int *events)
         , SIMPLE_PATTERN *access_list
         , void *data
+        , time_t tcp_request_timeout
+        , time_t tcp_idle_timeout
 ) {
     if(!sockets || !sockets->opened) {
         error("POLLFD: internal error: no listening sockets are opened");
@@ -1354,9 +1356,9 @@ void poll_events(LISTEN_SOCKETS *sockets
             .inf = NULL,
             .first_free = NULL,
 
-            .complete_request_timeout = web_client_first_request_timeout,
-            .idle_timeout = web_client_timeout,
-            .checks_every = (web_client_timeout / 3) + 1,
+            .complete_request_timeout = tcp_request_timeout,
+            .idle_timeout = tcp_idle_timeout,
+            .checks_every = (tcp_idle_timeout / 3) + 1,
 
             .access_list = access_list,
 
@@ -1412,7 +1414,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
         }
 
-        if(unlikely(now - last_check > p.checks_every)) {
+        if(unlikely(p.checks_every > 0 && now - last_check > p.checks_every)) {
             last_check = now;
 
             // security checks
@@ -1420,7 +1422,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                 POLLINFO *pi = &p.inf[i];
 
                 if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
-                    if (unlikely(pi->send_count == 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
+                    if (unlikely(pi->send_count == 0 && p.complete_request_timeout > 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
                         info("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' has not sent a complete request in %zu seconds - closing it. "
                               , i
                               , pi->fd
@@ -1430,7 +1432,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                         );
                         poll_close_fd(pi);
                     }
-                    else if(unlikely(pi->recv_count && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
+                    else if(unlikely(pi->recv_count && p.idle_timeout > 0 && now - ((pi->last_received_t > pi->last_sent_t) ? pi->last_received_t : pi->last_sent_t) >= p.idle_timeout )) {
                         info("POLLFD: LISTENER: client slot %zu (fd %d) from '%s:%s' is idle for more than %zu seconds - closing it. "
                               , i
                               , pi->fd
