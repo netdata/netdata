@@ -145,6 +145,8 @@ extern void poll_events(LISTEN_SOCKETS *sockets
         , int   (*snd_callback)(POLLINFO *pi, short int *events)
         , SIMPLE_PATTERN *access_list
         , void *data
+        , time_t tcp_request_timeout
+        , time_t tcp_idle_timeout
 );
 
 #endif //NETDATA_SOCKET_H
