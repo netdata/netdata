@@ -300,16 +300,20 @@ var helpers = {
 		}
 	},
 
-	getDimensions: function(id) {
-		var el = document.getElementById(id);
+	getDimensions: function(el) {
+		if(typeof el === 'string')
+			el = document.getElementById(el);
+
 		var w = 0, h = 0;
 		if (el) {
 			var dimensions = el.getBBox();
 			w = dimensions.width;
 			h = dimensions.height;
-		} else {
+		}
+		else {
 			console.log("error: getDimensions() " + id + " not found.");
 		}
+
 		return { w: w, h: h };
 	},
 
@@ -766,7 +770,7 @@ var labels = {
 		var outerLabel = pie.svg.insert("g", "." + pie.cssPrefix + "labels-" + section)
 			.attr("class", pie.cssPrefix + "labels-" + section);
 
-		var labelGroup = outerLabel.selectAll("." + pie.cssPrefix + "labelGroup-" + section)
+        var labelGroup = pie.__labels[section] = outerLabel.selectAll("." + pie.cssPrefix + "labelGroup-" + section)
 			.data(pie.options.data.content)
 			.enter()
 			.append("g")
@@ -856,7 +860,7 @@ var labels = {
 		labels["dimensions-" + section] = [];
 
 		// get the latest widths, heights
-		var labelGroups = d3.selectAll("." + pie.cssPrefix + "labelGroup-" + section);
+		var labelGroups = pie.__labels[section];
 		labelGroups.each(function(d, i) {
 			var mainLabel  = d3.select(this).selectAll("." + pie.cssPrefix + "segmentMainLabel-" + section);
 			var percentage = d3.select(this).selectAll("." + pie.cssPrefix + "segmentPercentage-" + section);
@@ -894,7 +898,7 @@ var labels = {
 
 	computeLabelLinePositions: function(pie) {
 		pie.lineCoordGroups = [];
-		d3.selectAll("." + pie.cssPrefix + "labelGroup-outer")
+        pie.__labels.outer
 			.each(function(d, i) { return labels.computeLinePosition(pie, i); });
 	},
 
@@ -964,7 +968,7 @@ var labels = {
 	addLabelLines: function(pie) {
 		var lineGroups = pie.svg.insert("g", "." + pie.cssPrefix + "pieChart") // meaning, BEFORE .pieChart
 			.attr("class", pie.cssPrefix + "lineGroups")
-			.style("opacity", 0);
+            .style("opacity", 1);
 
 		var lineGroup = lineGroups.selectAll("." + pie.cssPrefix + "lineGroup")
 			.data(pie.lineCoordGroups)
@@ -992,12 +996,14 @@ var labels = {
 	},
 
 	positionLabelGroups: function(pie, section) {
-    if (pie.options.labels[section].format === "none") {
-      return;
-    }
+    	if (pie.options.labels[section].format === "none")
+      		return;
 
-		d3.selectAll("." + pie.cssPrefix + "labelGroup-" + section)
-			.style("opacity", 0)
+        pie.__labels[section]
+            .style("opacity", function(d, i) {
+                var percentage = pie.options.labels[section].hideWhenLessThanPercentage;
+                return (percentage !== null && d.percentage < percentage) ? 0 : 1;
+            })
 			.attr("transform", function(d, i) {
 				var x, y;
 				if (section === "outer") {
@@ -1029,45 +1035,6 @@ var labels = {
 			});
 	},
 
-
-	fadeInLabelsAndLines: function(pie) {
-
-		// fade in the labels when the load effect is complete - or immediately if there's no load effect
-		//var loadSpeed = (pie.options.effects.load.effect === "default") ? pie.options.effects.load.speed : 1;
-		//setTimeout(function() {
-			var labelFadeInTime = (pie.options.effects.load.effect === "default") ? 400 : 1; // 400 is hardcoded for the present
-
-			d3.selectAll("." + pie.cssPrefix + "labelGroup-outer")
-				//.transition()
-				//.duration(labelFadeInTime)
-				.style("opacity", function(d, i) {
-					var percentage = pie.options.labels.outer.hideWhenLessThanPercentage;
-					return (percentage !== null && d.percentage < percentage) ? 0 : 1;
-				});
-
-			d3.selectAll("." + pie.cssPrefix + "labelGroup-inner")
-				//.transition()
-				//.duration(labelFadeInTime)
-				.style("opacity", function(d, i) {
-					var percentage = pie.options.labels.inner.hideWhenLessThanPercentage;
-					return (percentage !== null && d.percentage < percentage) ? 0 : 1;
-				});
-
-			d3.selectAll("g." + pie.cssPrefix + "lineGroups")
-				//.transition()
-				//.duration(labelFadeInTime)
-				.style("opacity", 1);
-
-			// once everything's done loading, trigger the onload callback if defined
-			if (helpers.isFunction(pie.options.callbacks.onload)) {
-				//setTimeout(function() {
-					try {
-						pie.options.callbacks.onload();
-					} catch (e) { }
-				//}, labelFadeInTime);
-			}
-		//}, loadSpeed);
-	},
 
 	getIncludes: function(val) {
 		var addMainLabel  = false;
@@ -1111,7 +1078,7 @@ var labels = {
 	computeOuterLabelCoords: function(pie) {
 
 		// 1. figure out the ideal positions for the outer labels
-		pie.svg.selectAll("." + pie.cssPrefix + "labelGroup-outer")
+        pie.__labels.outer
 			.each(function(d, i) {
 				return labels.getIdealOuterLabelPositions(pie, i);
 			});
@@ -1359,7 +1326,8 @@ var segments = {
 	},
 
 	addSegmentEventHandlers: function(pie) {
-		var arc = d3.selectAll("." + pie.cssPrefix + "arc,." + pie.cssPrefix + "labelGroup-inner,." + pie.cssPrefix + "labelGroup-outer");
+		var arc = d3.selectAll("." + pie.cssPrefix + "arc");
+		arc = arc.merge(pie.__labels.inner.merge(pie.__labels.outer));
 
 		arc.on("click", function() {
 			var currentEl = d3.select(this);
@@ -2088,51 +2056,57 @@ var tt = {
 			self.textComponents.headerHeight = headerHeight;
 		}
 
-			// at this point, all main text component dimensions have been calculated
-			math.computePieRadius(self);
+		// at this point, all main text component dimensions have been calculated
+		math.computePieRadius(self);
 
-			// this value is used all over the place for placing things and calculating locations. We figure it out ONCE
-			// and store it as part of the object
-			math.calculatePieCenter(self);
+		// this value is used all over the place for placing things and calculating locations. We figure it out ONCE
+		// and store it as part of the object
+		math.calculatePieCenter(self);
 
-			// position the title and subtitle
-			text.positionTitle(self);
-			text.positionSubtitle(self);
+		// position the title and subtitle
+		text.positionTitle(self);
+		text.positionSubtitle(self);
 
-			// now create the pie chart segments, and gradients if the user desired
-			if (self.options.misc.gradient.enabled) {
-				segments.addGradients(self);
-			}
-			segments.create(self); // also creates this.arc
-			labels.add(self, "inner", self.options.labels.inner.format);
-			labels.add(self, "outer", self.options.labels.outer.format);
+		// now create the pie chart segments, and gradients if the user desired
+		if (self.options.misc.gradient.enabled) {
+			segments.addGradients(self);
+		}
+		segments.create(self); // also creates this.arc
 
-			// position the label elements relatively within their individual group (label, percentage, value)
-			labels.positionLabelElements(self, "inner", self.options.labels.inner.format);
-			labels.positionLabelElements(self, "outer", self.options.labels.outer.format);
-			labels.computeOuterLabelCoords(self);
+		self.__labels = {};
+		labels.add(self, "inner", self.options.labels.inner.format);
+		labels.add(self, "outer", self.options.labels.outer.format);
 
-			// this is (and should be) dumb. It just places the outer groups at their calculated, collision-free positions
-			labels.positionLabelGroups(self, "outer");
+		// position the label elements relatively within their individual group (label, percentage, value)
+		labels.positionLabelElements(self, "inner", self.options.labels.inner.format);
+		labels.positionLabelElements(self, "outer", self.options.labels.outer.format);
+		labels.computeOuterLabelCoords(self);
 
-			// we use the label line positions for many other calculations, so ALWAYS compute them
-			labels.computeLabelLinePositions(self);
+		// this is (and should be) dumb. It just places the outer groups at their calculated, collision-free positions
+		labels.positionLabelGroups(self, "outer");
 
-			// only add them if they're actually enabled
-			if (self.options.labels.lines.enabled && self.options.labels.outer.format !== "none") {
-				labels.addLabelLines(self);
-			}
+		// we use the label line positions for many other calculations, so ALWAYS compute them
+		labels.computeLabelLinePositions(self);
 
-			labels.positionLabelGroups(self, "inner");
-			labels.fadeInLabelsAndLines(self);
+		// only add them if they're actually enabled
+		if (self.options.labels.lines.enabled && self.options.labels.outer.format !== "none") {
+			labels.addLabelLines(self);
+		}
 
-			// add and position the tooltips
-			if (self.options.tooltips.enabled) {
-				tt.addTooltips(self);
-			}
+		labels.positionLabelGroups(self, "inner");
 
-			segments.addSegmentEventHandlers(self);
-		//});
+		if (helpers.isFunction(self.options.callbacks.onload)) {
+			try {
+				self.options.callbacks.onload();
+			} catch (e) { }
+		}
+
+		// add and position the tooltips
+		if (self.options.tooltips.enabled) {
+			tt.addTooltips(self);
+		}
+
+		segments.addSegmentEventHandlers(self);
 	};
 
 	var _getPercentage = function(value, total, decimalPlaces) {
