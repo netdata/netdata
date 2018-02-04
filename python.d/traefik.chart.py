@@ -12,31 +12,20 @@ priority = 60000
 retries = 10
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['uptime', 'average_response_time', 'total_response_time', 'requests', 'response_statuses', 'response_class', 'detailed_response_codes']
+ORDER = [
+    'response_statuses',
+    'response_codes',
+    'detailed_response_codes',
+    'requests',
+    'total_response_time',
+    'average_response_time',
+    'average_response_time_per_iteration',
+    'uptime'
+]
 
 CHARTS = {
-    'uptime': {
-        'options': [None, 'Uptime', 'seconds', 'uptime', 'traefik.uptime', 'line'],
-        'lines': [
-            ['uptime_sec', None, 'absolute']
-        ]},
-    'average_response_time': {
-        'options': [None, 'Average response time', 'milliseconds', 'average response time', 'traefik.average_response_time', 'line'],
-        'lines': [
-            ['average_response_time_sec', None, 'incremental', 1000000, 1000]
-        ]},
-    'total_response_time': {
-        'options': [None, 'Total Response Time', 'seconds', 'total response time', 'traefik.total_response_time', 'line'],
-        'lines': [
-            ['total_response_time_sec', None, 'absolute', 1, 1]
-        ]},
-    'requests': {
-        'options': [None, 'Requests', 'requests/s', 'requests', 'traefik.requests', 'line'],
-        'lines': [
-            ['total_count', 'requests', 'incremental']
-        ]},
     'response_statuses': {
-        'options': [None, 'Response Statuses', 'requests/s', 'responses', 'traefik.response_statuses', 'stacked'],
+        'options': [None, 'Response statuses', 'requests/s', 'responses', 'traefik.response_statuses', 'stacked'],
         'lines': [
             ['successful_requests', 'success', 'incremental'],
             ['redirects', 'redirect', 'incremental'],
@@ -44,8 +33,8 @@ CHARTS = {
             ['bad_requests', 'bad', 'incremental'],
             ['other_requests', 'other', 'incremental']
         ]},
-    'response_class': {
-        'options': [None, 'Responses by class', 'requests/s', 'responses', 'traefik.response_class', 'stacked'],
+    'response_codes': {
+        'options': [None, 'Responses by codes', 'requests/s', 'responses', 'traefik.response_codes', 'stacked'],
         'lines': [
             ['1xx', None, 'incremental'],
             ['2xx', None, 'incremental'],
@@ -55,9 +44,34 @@ CHARTS = {
             ['unmatched', None, 'incremental']
         ]},
     'detailed_response_codes': {
-        'options': [None, 'Detailed Response Codes', 'requests/s', 'responses', 'traefik.detailed_response_codes', 'stacked'],
+        'options': [None, 'Detailed response codes', 'requests/s', 'responses', 'traefik.detailed_response_codes', 'stacked'],
         'lines': [
             ['None', None, 'incremental']
+        ]},
+    'requests': {
+        'options': [None, 'Requests', 'requests/s', 'requests', 'traefik.requests', 'line'],
+        'lines': [
+            ['total_count', 'requests', 'incremental']
+        ]},
+    'total_response_time': {
+        'options': [None, 'Total response time', 'seconds', 'timings', 'traefik.total_response_time', 'line'],
+        'lines': [
+            ['total_response_time_sec', None, 'absolute', 1, 1]
+        ]},
+    'average_response_time': {
+        'options': [None, 'Average response time', 'milliseconds', 'timings', 'traefik.average_response_time', 'line'],
+        'lines': [
+            ['average_response_time_sec', None, 'incremental', 1000000, 1000]
+        ]},
+    'average_response_time_per_iteration': {
+        'options': [None, 'Average response time per iteration', 'milliseconds', 'timings', 'traefik.average_response_time_per_iteration', 'line'],
+        'lines': [
+            ['average_response_time_per_iteration_sec', None, 'incremental', 1, 1000]
+        ]},
+    'uptime': {
+        'options': [None, 'Uptime', 'seconds', 'uptime', 'traefik.uptime', 'line'],
+        'lines': [
+            ['uptime_sec', None, 'absolute']
         ]}
     }
 
@@ -75,7 +89,10 @@ class Service(UrlService):
         self.url = self.configuration.get('url', 'http://localhost:8080/health')
         self.order = ORDER
         self.definitions = CHARTS
-        self.data = {'None': 0}
+        self.data = {
+            'None': 0,
+            'average_response_time_per_iteration_sec': 0
+        }
 
     def check(self):
         if not (self.url):
@@ -109,6 +126,9 @@ class Service(UrlService):
         self.get_data_per_code(raw_data=data)
 
         to_netdata = fetch_data_(raw_data=data, metrics=HEALTH_STATS)
+        to_netdata.update(self.data)
+
+        self.data['average_response_time_per_iteration_sec'] = (data['total_response_time_sec'] * 1000000) / data['total_count']
         to_netdata.update(self.data)
 
         return to_netdata or None
