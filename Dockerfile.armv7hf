@@ -1,7 +1,7 @@
 # author  : titpetric
 # original: https://github.com/titpetric/netdata
 
-FROM resin/armv7hf-debian:jessie
+FROM resin/armv7hf-debian:stretch
 
 RUN [ "cross-build-start"]
 
