@@ -1,7 +1,7 @@
 # author  : titpetric
 # original: https://github.com/titpetric/netdata
 
-FROM resin/armv7hf-debian:stretch
+FROM resin/aarch64-debian:stretch
 
 RUN [ "cross-build-start"]
 
