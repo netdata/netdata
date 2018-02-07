@@ -985,6 +985,59 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // POSTGRESQL
+
+
+    'postgres.db_stat_blks': {
+        info: 'Blocks reads from disk or cache.<ul>' +
+        '<li><strong>blks_read:</strong> number of disk blocks read in this database.</li>' +
+        '<li><strong>blks_hit:</strong> number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system&#39;s file system cache)</li>' +
+        '</ul>'
+    },
+    'postgres.db_stat_tuple_write': {
+        info: '<ul><li>Number of rows inserted/updated/deleted.</li>' +
+        '<li><strong>conflicts:</strong> number of queries canceled due to conflicts with recovery in this database. (Conflicts occur only on standby servers; see <a href="https://www.postgresql.org/docs/10/static/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW" target="_blank">pg_stat_database_conflicts</a> for details.)</li>' +
+        '</ul>'
+    },
+    'postgres.db_stat_temp_bytes': {
+        info: 'Temporary files can be created on disk for sorts, hashes, and temporary query results.'
+    },
+    'postgres.db_stat_temp_files': {
+        info: '<ul>' +
+        '<li><strong>files:</strong> number of temporary files created by queries. All temporary files are counted, regardless of why the temporary file was created (e.g., sorting or hashing).</li>' +
+        '</ul>'
+    },
+    'postgres.archive_wal': {
+         info: 'WAL archiving.<ul>' +
+        '<li><strong>total:</strong> total files.</li>' +
+        '<li><strong>ready:</strong> WAL waiting to be archived.</li>' +
+        '<li><strong>done:</strong> WAL successfully archived' +
+        'Ready WAL can indicate archive_command is in error, see <a href="https://www.postgresql.org/docs/current/static/continuous-archiving.html" target="_blank">Continuous Archiving and Point-in-Time Recovery</a>.</li>' +
+        '</ul>'
+    },
+    'postgres.checkpointer': {
+        info: 'Number of checkpoints.<ul>' +
+        '<li><strong>scheduled:</strong> when checkpoint_timeout is reached.</li>' +
+        '<li><strong>requested:</strong> when max_wal_size is reached.</li>' +
+        '</ul>' +
+        'For more information see <a href="https://www.postgresql.org/docs/current/static/wal-configuration.html" target="_blank">WAL Configuration</a>.'
+    },
+    'postgres.autovacuum': {
+        info: 'PostgreSQL databases require periodic maintenance known as vacuuming. For many installations, it is sufficient to let vacuuming be performed by the autovacuum daemon.' +
+        'For more information see <a href="https://www.postgresql.org/docs/current/static/routine-vacuuming.html#AUTOVACUUM" target="_blank">The Autovacuum Daemon</a>.'
+    },
+    'postgres.standby_delta': {
+        info: 'Streaming replication delta.<ul>' +
+        '<li><strong>sent_delta:</strong> replication delta sent to standby.</li>' +
+        '<li><strong>write_delta:</strong> replication delta written to disk by this standby.</li>' +
+        '<li><strong>flush_delta:</strong> replication delta flushed to disk by this standby server.</li>' +
+        '<li><strong>replay_delta:</strong> replication delta replayed into the database on this standby server.</li>' +
+        '</ul>' +
+        'For more information see <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#SYNCHRONOUS-REPLICATION" target="_blank">Synchronous Replication</a>.'
+    },
+
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
