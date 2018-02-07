@@ -27,6 +27,7 @@
 #  - messagebird.com notifications by @tech_no_logical #1453
 #  - hipchat notifications by @ktsaou #1561
 #  - custom notifications by @ktsaou
+#  - opsgenie notifications by @Mitrofanov
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -234,6 +235,12 @@ SEND_PUSHBULLET="YES"
 SEND_KAFKA="YES"
 SEND_PD="YES"
 SEND_CUSTOM="YES"
+SEND_OPSGENIE="YES"
+
+#opsgenie config
+OPSGENIE_WEBHOOK_URL=
+OPSGENIE_API_KEY=
+declare -A role_recipients_opsgenie=()
 
 # slack configs
 SLACK_WEBHOOK_URL=
@@ -601,6 +608,9 @@ done
 # check alerta
 [ -z "${ALERTA_WEBHOOK_URL}" ] && SEND_ALERTA="NO"
 
+# check opsgenie
+[ -z "${OPSGENIE_WEBHOOK_URL}" ] && SEND_OPSGENIE="NO"
+
 # check flock
 [ -z "${FLOCK_WEBHOOK_URL}" ] && SEND_FLOCK="NO"
 
@@ -648,6 +658,7 @@ fi
 if [ \( \
            "${SEND_PUSHOVER}"    = "YES" \
         -o "${SEND_SLACK}"       = "YES" \
+        -o "${SEND_OPSGENIE}"    = "YES" \
         -o "${SEND_ALERTA}"      = "YES" \
         -o "${SEND_FLOCK}"       = "YES" \
         -o "${SEND_DISCORD}"     = "YES" \
@@ -669,6 +680,7 @@ if [ \( \
         SEND_PUSHBULLET="NO"
         SEND_TELEGRAM="NO"
         SEND_SLACK="NO"
+        SEND_OPSGENIE="NO"
         SEND_ALERTA="NO"
         SEND_FLOCK="NO"
         SEND_DISCORD="NO"
@@ -696,6 +708,7 @@ fi
 if [   "${SEND_EMAIL}"          != "YES" \
     -a "${SEND_PUSHOVER}"       != "YES" \
     -a "${SEND_TELEGRAM}"       != "YES" \
+    -a "${SEND_OPSGENIE}"       != "YES" \
     -a "${SEND_SLACK}"          != "YES" \
     -a "${SEND_ALERTA}"         != "YES" \
     -a "${SEND_FLOCK}"          != "YES" \
@@ -1278,6 +1291,56 @@ EOF
     return 1
 }
 
+
+# -----------------------------------------------------------------------------
+# opsgenie sender
+
+send_opsgenie() {
+    local webhook="${1}" httpcode sent=0 channel severity content
+
+    [ "${SEND_OPSGENIE}" != "YES" ] && return 1
+
+    case "${status}" in
+        WARNING)  severity="P3" ;;
+        CRITICAL) severity="P1" ;;
+        CLEAR)    severity="cleared" ;;
+        *)        severity="P3" ;;
+    esac
+
+    info=$( echo -n ${info})
+
+    # the "event" property must be unique and repetible between states to let alerta do automatic correlation using severity value
+    content="{"
+    content="$content \"message\": \"${alarm}\"",
+    content="$content \"description\": \"${info}\"",
+    content="$content \"priority\": \"${severity}\","
+    content="$content \"source\": \"${host}\","
+    content="$content \"entity\": \"${name}.${chart} (${family})\""
+    content="$content }"
+    
+    if [[ "${severity}" = "cleared" ]]
+    then
+        info "Issue cleared, will not create Opsgenie alarm"
+        return 0
+    fi
+
+    httpcode=$(docurl -X POST "${webhook}" -H "Content-Type: application/json" -H "Authorization: GenieKey $OPSGENIE_API_KEY" -d "$content" );
+    
+    if [[ "${httpcode}" = "200" || "${httpcode}" = "202" ]]
+    then
+        info "sent opsgenie notification for: ${host} ${chart}.${name} is ${status}"
+        sent=$((sent + 1))
+    else
+        error "failed to send opsgenie notification for: ${host} ${chart}.${name} is ${status} , with HTTP error code ${httpcode}."
+    fi
+    
+
+    [ ${sent} -gt 0 ] && return 0
+
+    return 1
+}
+
+
 # -----------------------------------------------------------------------------
 # alerta sender
 
@@ -1542,6 +1605,15 @@ raised_for_html=
 
 send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
+
+# -----------------------------------------------------------------------------
+# send the opsgenie notification
+
+# alerta aggregates posts from the same username
+# so we use "${host} ${status}" as the bot username, to make them diff
+
+send_opsgenie "${OPSGENIE_WEBHOOK_URL}" 
+SENT_OPSGENIE=$?
 
 # -----------------------------------------------------------------------------
 # send the alerta notification
@@ -1821,6 +1893,7 @@ if [   ${SENT_EMAIL}        -eq 0 \
     -o ${SENT_TELEGRAM}     -eq 0 \
     -o ${SENT_SLACK}        -eq 0 \
     -o ${SENT_ALERTA}       -eq 0 \
+    -o ${SENT_OPSGENIE}     -eq 0 \
     -o ${SENT_FLOCK}        -eq 0 \
     -o ${SENT_DISCORD}      -eq 0 \
     -o ${SENT_TWILIO}       -eq 0 \
