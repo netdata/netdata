@@ -400,7 +400,6 @@ filter_recipient_by_criticality() {
 # -----------------------------------------------------------------------------
 # find the recipients' addresses per method
 
-declare -A arr_opsgenie=()
 declare -A arr_slack=()
 declare -A arr_alerta=()
 declare -A arr_flock=()
@@ -502,14 +501,6 @@ do
     for r in ${a//,/ }
     do
         [ "${r}" != "disabled" ] && filter_recipient_by_criticality alerta "${r}" && arr_alerta[${r/|*/}]="1"
-    done
-
-    # opsgenie
-    a="${role_recipients_opsgenie[${x}]}"
-    [ -z "${a}" ] 
-    for r in ${a//,/ }
-    do
-        [ "${r}" != "disabled" ] && filter_recipient_by_criticality opsgenie "${r}" && arr_opsgenie[${r/|*/}]="1"
     done
 
     # flock
