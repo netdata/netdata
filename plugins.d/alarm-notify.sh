@@ -240,7 +240,6 @@ SEND_OPSGENIE="YES"
 #opsgenie config
 OPSGENIE_WEBHOOK_URL=
 OPSGENIE_API_KEY=
-declare -A role_recipients_opsgenie=()
 
 # slack configs
 SLACK_WEBHOOK_URL=
