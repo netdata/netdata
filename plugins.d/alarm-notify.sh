@@ -1310,7 +1310,7 @@ send_opsgenie() {
 
     # the "event" property must be unique and repetible between states to let alerta do automatic correlation using severity value
     content="{"
-    content="$content \"message\": \"${alarm}\"",
+    content="$content \"message\": \"Netdata alarm: ${alarm} on ${host}\"",
     content="$content \"description\": \"${info}\"",
     content="$content \"priority\": \"${severity}\","
     content="$content \"source\": \"${host}\","
