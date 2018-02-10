@@ -406,6 +406,10 @@ code {
 .dygraph-ylabel {
 }
 
+.dygraph-axis-label-x {
+    overflow-x: hidden;
+}
+
 .dygraph-axis-label {
     color: #6c7075;
 }
