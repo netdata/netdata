@@ -48,8 +48,8 @@ dist_weblib_DATA = \
 	lib/c3-0.4.18.min.js \
 	lib/d3-4.12.2.min.js \
 	lib/d3pie-0.2.1-netdata-3.js \
-	lib/dygraph-combined-dd74404.js \
-	lib/dygraph-smooth-plotter-dd74404.js \
+	lib/dygraph-c91c859.min.js \
+	lib/dygraph-smooth-plotter-c91c859.js \
 	lib/fontawesome-all-5.0.1.min.js \
 	lib/gauge-1.3.2.min.js \
 	lib/jquery-2.2.4.min.js \
