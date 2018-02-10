@@ -238,8 +238,8 @@ var NETDATA = window.NETDATA || {};
     NETDATA.sparkline_js        = NETDATA.serverStatic + 'lib/jquery.sparkline-2.1.2.min.js';
     NETDATA.easypiechart_js     = NETDATA.serverStatic + 'lib/jquery.easypiechart-97b5824.min.js';
     NETDATA.gauge_js            = NETDATA.serverStatic + 'lib/gauge-1.3.2.min.js';
-    NETDATA.dygraph_js          = NETDATA.serverStatic + 'lib/dygraph-combined-dd74404.js';
-    NETDATA.dygraph_smooth_js   = NETDATA.serverStatic + 'lib/dygraph-smooth-plotter-dd74404.js';
+    NETDATA.dygraph_js          = NETDATA.serverStatic + 'lib/dygraph-c91c859.min.js';
+    NETDATA.dygraph_smooth_js   = NETDATA.serverStatic + 'lib/dygraph-smooth-plotter-c91c859.js';
     NETDATA.raphael_js          = NETDATA.serverStatic + 'lib/raphael-2.2.4-min.js';
     NETDATA.c3_js               = NETDATA.serverStatic + 'lib/c3-0.4.18.min.js';
     NETDATA.c3_css              = NETDATA.serverStatic + 'css/c3-0.4.18.min.css';
@@ -6160,7 +6160,7 @@ var NETDATA = window.NETDATA || {};
                 file: data.result.data,
                 colors: state.chartColors(),
                 labels: data.result.labels,
-                labelsDivWidth: state.chartWidth() - 70,
+                //labelsDivWidth: state.chartWidth() - 70,
                 includeZero: state.tmp.dygraph_include_zero,
                 visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
         };
@@ -6179,7 +6179,7 @@ var NETDATA = window.NETDATA || {};
                 state.log('dygraphChartUpdate() forced zoom update');
 
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
-            options.isZoomedIgnoreProgrammaticZoom = true;
+            //options.isZoomedIgnoreProgrammaticZoom = true;
             state.tmp.dygraph_force_zoom = false;
         }
         else if(state.current.name !== 'auto') {
@@ -6191,7 +6191,7 @@ var NETDATA = window.NETDATA || {};
                 state.log('dygraphChartUpdate() strict update');
 
             options.dateWindow = (state.requested_padding !== null)?[ state.view_after, state.view_before ]:null;
-            options.isZoomedIgnoreProgrammaticZoom = true;
+            //options.isZoomedIgnoreProgrammaticZoom = true;
         }
 
         options.valueRange = state.tmp.dygraph_options.valueRange;
@@ -6217,7 +6217,7 @@ var NETDATA = window.NETDATA || {};
         if(netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
             // pan and zoom on snapshots
             options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
-            options.isZoomedIgnoreProgrammaticZoom = true;
+            //options.isZoomedIgnoreProgrammaticZoom = true;
         }
 
         if(NETDATA.chartLibraries.dygraph.isLogScale(state) === true) {
@@ -6276,8 +6276,8 @@ var NETDATA = window.NETDATA || {};
             legend:                 NETDATA.dataAttribute(state.element, 'dygraph-legend', 'always'), // we need this to get selection events
             labels:                 data.result.labels,
             labelsDiv:              NETDATA.dataAttribute(state.element, 'dygraph-labelsdiv', state.element_legend_childs.hidden),
-            labelsDivStyles:        NETDATA.dataAttribute(state.element, 'dygraph-labelsdivstyles', { 'fontSize':'1px' }),
-            labelsDivWidth:         NETDATA.dataAttribute(state.element, 'dygraph-labelsdivwidth', state.chartWidth() - 70),
+            //labelsDivStyles:        NETDATA.dataAttribute(state.element, 'dygraph-labelsdivstyles', { 'fontSize':'1px' }),
+            //labelsDivWidth:         NETDATA.dataAttribute(state.element, 'dygraph-labelsdivwidth', state.chartWidth() - 70),
             labelsSeparateLines:    NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsseparatelines', true),
             labelsShowZeroValues:   (NETDATA.chartLibraries.dygraph.isLogScale(state) === true)?false:NETDATA.dataAttributeBoolean(state.element, 'dygraph-labelsshowzerovalues', true),
             labelsKMB:              false,
@@ -6931,8 +6931,8 @@ var NETDATA = window.NETDATA || {};
             state.tmp.dygraph_options.title = undefined;
             state.tmp.dygraph_options.ylabel = undefined;
             state.tmp.dygraph_options.yLabelWidth = 0;
-            state.tmp.dygraph_options.labelsDivWidth = 120;
-            state.tmp.dygraph_options.labelsDivStyles.width = '120px';
+            //state.tmp.dygraph_options.labelsDivWidth = 120;
+            //state.tmp.dygraph_options.labelsDivStyles.width = '120px';
             state.tmp.dygraph_options.labelsSeparateLines = true;
             state.tmp.dygraph_options.rightGap = 0;
             state.tmp.dygraph_options.yRangePad = 1;
@@ -6949,7 +6949,7 @@ var NETDATA = window.NETDATA || {};
         if(netdataSnapshotData !== null && NETDATA.globalPanAndZoom.isActive() === true && NETDATA.globalPanAndZoom.isMaster(state) === false) {
             // pan and zoom on snapshots
             state.tmp.dygraph_options.dateWindow = [ NETDATA.globalPanAndZoom.force_after_ms, NETDATA.globalPanAndZoom.force_before_ms ];
-            state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
+            //state.tmp.dygraph_options.isZoomedIgnoreProgrammaticZoom = true;
         }
 
         state.tmp.dygraph_instance = new Dygraph(state.element_chart,
