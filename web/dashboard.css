@@ -392,6 +392,10 @@ body {
 .dygraph-ylabel {
 }
 
+.dygraph-axis-label-x {
+    overflow-x: hidden;
+}
+
 .dygraph-label-rotate-left {
     text-align: center;
     /* See http://caniuse.com/#feat=transforms2d */
