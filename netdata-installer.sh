@@ -1170,6 +1170,15 @@ if [ $? -eq 0 -a "${NETDATA_ADDED_TO_SQUID}" = "1" ]
     echo "   gpasswd -d netdata squid"
 fi
 
+getent group ceph > /dev/null
+if [ $? -eq 0 -a "${NETDATA_ADDED_TO_CEPH}" = "1" ]
+    then
+    echo
+    echo "You may also want to remove the netdata user from the squid group"
+    echo "by running:"
+    echo "   gpasswd -d netdata ceph"
+fi
+
 UNINSTALL
 chmod 750 netdata-uninstaller.sh
 

@@ -798,6 +798,7 @@ NETDATA_ADDED_TO_ADM=0
 NETDATA_ADDED_TO_NSD=0
 NETDATA_ADDED_TO_PROXY=0
 NETDATA_ADDED_TO_SQUID=0
+NETDATA_ADDED_TO_CEPH=0
 add_netdata_user_and_group() {
     if [ ${UID} -eq 0 ]
         then
@@ -811,6 +812,7 @@ add_netdata_user_and_group() {
         portable_add_user_to_group nsd      netdata && NETDATA_ADDED_TO_NSD=1
         portable_add_user_to_group proxy    netdata && NETDATA_ADDED_TO_PROXY=1
         portable_add_user_to_group squid    netdata && NETDATA_ADDED_TO_SQUID=1
+        portable_add_user_to_group ceph     netdata && NETDATA_ADDED_TO_CEPH=1
         return 0
     fi
 

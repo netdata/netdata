@@ -16,6 +16,7 @@ dist_python_DATA = \
     apache.chart.py \
     beanstalk.chart.py \
     bind_rndc.chart.py \
+    ceph.chart.py \
     chrony.chart.py \
     couchdb.chart.py \
     cpufreq.chart.py \
@@ -195,4 +196,3 @@ dist_python_urllib3_securetransport_DATA = \
     python_modules/urllib3/contrib/_securetransport/bindings.py \
     python_modules/urllib3/contrib/_securetransport/low_level.py \
     $(NULL)
-
