@@ -165,6 +165,7 @@ void read_cgroup_plugin_configuration() {
                     " !*.mount "
                     " !*.partition "
                     " !*.service "
+                    " !*.socket "
                     " !*.slice "
                     " !*.swap "
                     " !*.user "
@@ -205,6 +206,7 @@ void read_cgroup_plugin_configuration() {
             config_get("plugin:cgroups", "run script to rename cgroups matching",
                     " !/ "
                     " !*.mount "
+                    " !*.socket "
                     " !*.partition "
                     " machine.slice/*.service "            // #3367 systemd-nspawn
                     " !*.service "
