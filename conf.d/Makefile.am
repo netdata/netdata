@@ -29,6 +29,7 @@ dist_pythonconfig_DATA = \
     python.d/apache.conf \
     python.d/beanstalk.conf \
     python.d/bind_rndc.conf \
+    python.d/ceph.conf \
     python.d/chrony.conf \
     python.d/couchdb.conf \
     python.d/cpufreq.conf \
@@ -77,6 +78,7 @@ dist_healthconfig_DATA = \
     health.d/beanstalkd.conf \
     health.d/bind_rndc.conf \
     health.d/btrfs.conf \
+    health.d/ceph.conf \
     health.d/cpu.conf \
     health.d/couchdb.conf \
     health.d/disks.conf \

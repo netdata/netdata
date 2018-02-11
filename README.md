@@ -285,6 +285,9 @@ This is a list of what it currently monitors:
 - **statsd**<br/>
   [netdata is a fully featured statsd server](https://github.com/firehol/netdata/wiki/statsd)
 
+- **ceph**<br/>
+  OSD usage, Pool usage, number of objects, etc.
+
 And you can extend it, by writing plugins that collect data from any source, using any computer language.
 
 ---
