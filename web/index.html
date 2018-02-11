@@ -3032,7 +3032,7 @@
 
 
         function printPreflight() {
-            var url = document.location.origin + document.location.search + '#' + urlOptions.genHash() + ';mode=print';
+            var url = document.location.origin.toString() + document.location.pathname.toString() + document.location.search.toString() + urlOptions.genHash() + ';mode=print';
             var width = 990;
             var height = screen.height * 90 / 100;
             //console.log(url);
