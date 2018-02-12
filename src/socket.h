@@ -105,6 +105,9 @@ struct poll {
     time_t idle_timeout;
     time_t checks_every;
 
+    time_t timer_milliseconds;
+    void *timer_data;
+
     struct pollfd *fds;
     struct pollinfo *inf;
     struct pollinfo *first_free;
@@ -115,6 +118,7 @@ struct poll {
     void  (*del_callback)(POLLINFO *pi);
     int   (*rcv_callback)(POLLINFO *pi, short int *events);
     int   (*snd_callback)(POLLINFO *pi, short int *events);
+    void  (*tmr_callback)(void *timer_data);
 };
 
 #define pollinfo_from_slot(p, slot) (&((p)->inf[(slot)]))
@@ -143,10 +147,13 @@ extern void poll_events(LISTEN_SOCKETS *sockets
         , void  (*del_callback)(POLLINFO *pi)
         , int   (*rcv_callback)(POLLINFO *pi, short int *events)
         , int   (*snd_callback)(POLLINFO *pi, short int *events)
+        , void  (*tmr_callback)(void *timer_data)
         , SIMPLE_PATTERN *access_list
         , void *data
-        , time_t tcp_request_timeout
-        , time_t tcp_idle_timeout
+        , time_t tcp_request_timeout_seconds
+        , time_t tcp_idle_timeout_seconds
+        , time_t timer_milliseconds
+        , void *timer_data
 );
 
 #endif //NETDATA_SOCKET_H
