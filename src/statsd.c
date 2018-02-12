@@ -220,6 +220,15 @@ typedef struct statsd_app {
 // --------------------------------------------------------------------------------------------------------------------
 // global statsd data
 
+struct collection_thread_status {
+    int status;
+    netdata_thread_t thread;
+    struct rusage rusage;
+    RRDSET *st_cpu;
+    RRDDIM *rd_user;
+    RRDDIM *rd_system;
+};
+
 static struct statsd {
     STATSD_INDEX gauges;
     STATSD_INDEX counters;
@@ -258,8 +267,7 @@ static struct statsd {
     char *histogram_percentile_str;
 
     int threads;
-    int *collection_threads_status;
-    netdata_thread_t *collection_threads;
+    struct collection_thread_status *collection_threads_status;
 
     LISTEN_SOCKETS sockets;
 } statsd = {
@@ -331,7 +339,6 @@ static struct statsd {
         .histogram_increase_step = 10,
         .threads = 0,
         .collection_threads_status = NULL,
-        .collection_threads = NULL,
         .sockets = {
                 .config_section  = CONFIG_SECTION_STATSD,
                 .default_bind_to = "udp:localhost tcp:localhost",
@@ -909,6 +916,11 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
     return -1;
 }
 
+static void statsd_timer_callback(void *timer_data) {
+    struct collection_thread_status *status = timer_data;
+    getrusage(RUSAGE_THREAD, &status->rusage);
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // statsd child thread to collect metrics from network
 
@@ -931,13 +943,13 @@ void statsd_collector_thread_cleanup(void *data) {
 }
 
 void *statsd_collector_thread(void *ptr) {
-    int *running = (int *)ptr;
-    *running = 1;
+    struct collection_thread_status *status = ptr;
+    status->status = 1;
 
     info("STATSD collector thread started with taskid %d", gettid());
 
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
-    d->running = running;
+    d->running = &status->status;
 
     netdata_thread_cleanup_push(statsd_collector_thread_cleanup, d);
 
@@ -961,10 +973,13 @@ void *statsd_collector_thread(void *ptr) {
             , statsd_del_callback
             , statsd_rcv_callback
             , statsd_snd_callback
+            , statsd_timer_callback
             , NULL
             , (void *)d
             , 0                        // tcp request timeout, 0 = disabled
             , statsd.tcp_idle_timeout  // tcp idle timeout, 0 = disabled
+            , statsd.update_every * 1000
+            , ptr // timer_data
     );
 
     netdata_thread_cleanup_pop(1);
@@ -2038,12 +2053,12 @@ static void statsd_main_cleanup(void *data) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     info("cleaning up...");
 
-    if (statsd.collection_threads && statsd.collection_threads_status) {
+    if (statsd.collection_threads_status) {
         int i;
         for (i = 0; i < statsd.threads; i++) {
-            if(statsd.collection_threads_status[i]) {
+            if(statsd.collection_threads_status[i].status) {
                 info("STATSD: stopping data collection thread %d...", i + 1);
-                netdata_thread_cancel(statsd.collection_threads[i]);
+                netdata_thread_cancel(statsd.collection_threads_status[i].thread);
             }
             else {
                 info("STATSD: data collection thread %d found stopped.", i + 1);
@@ -2152,14 +2167,13 @@ void *statsd_main(void *ptr) {
         goto cleanup;
     }
 
-    statsd.collection_threads_status = callocz((size_t)statsd.threads, sizeof(int));
-    statsd.collection_threads = callocz((size_t)statsd.threads, sizeof(netdata_thread_t));
+    statsd.collection_threads_status = callocz((size_t)statsd.threads, sizeof(struct collection_thread_status));
 
     int i;
     for(i = 0; i < statsd.threads ;i++) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_COLLECTOR[%d]", i + 1);
-        netdata_thread_create(&statsd.collection_threads[i], tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);
+        netdata_thread_create(&statsd.collection_threads_status[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);
     }
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -2173,9 +2187,9 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Metrics in the netdata statsd database"
             , "metrics"
-            , "netdata"
+            , "statsd"
             , "stats"
-            , 132000
+            , 132010
             , statsd.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -2194,9 +2208,9 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Events processed by the netdata statsd server"
             , "events/s"
-            , "netdata"
+            , "statsd"
             , "stats"
-            , 132001
+            , 132011
             , statsd.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -2217,9 +2231,9 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Read operations made by the netdata statsd server"
             , "reads/s"
-            , "netdata"
+            , "statsd"
             , "stats"
-            , 132002
+            , 132012
             , statsd.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -2236,7 +2250,7 @@ void *statsd_main(void *ptr) {
             , "kilobits/s"
             , "netdata"
             , "stats"
-            , 132003
+            , 132013
             , statsd.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -2253,7 +2267,7 @@ void *statsd_main(void *ptr) {
             , "packets/s"
             , "netdata"
             , "stats"
-            , 132004
+            , 132014
             , statsd.update_every
             , RRDSET_TYPE_STACKED
     );
@@ -2268,9 +2282,9 @@ void *statsd_main(void *ptr) {
             , NULL
             , "statsd server TCP connects and disconnects"
             , "events"
-            , "netdata"
+            , "statsd"
             , "stats"
-            , 132005
+            , 132015
             , statsd.update_every
             , RRDSET_TYPE_LINE
     );
@@ -2285,9 +2299,9 @@ void *statsd_main(void *ptr) {
             , NULL
             , "statsd server TCP connected sockets"
             , "connected"
-            , "netdata"
+            , "statsd"
             , "stats"
-            , 132006
+            , 132016
             , statsd.update_every
             , RRDSET_TYPE_LINE
     );
@@ -2301,13 +2315,58 @@ void *statsd_main(void *ptr) {
             , NULL
             , "Private metric charts created by the netdata statsd server"
             , "charts"
-            , "netdata"
+            , "statsd"
             , "stats"
-            , 132010
+            , 132020
             , statsd.update_every
             , RRDSET_TYPE_AREA
     );
     RRDDIM *rd_pcharts = rrddim_add(st_pcharts, "charts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDSET *stcpu_thread = rrdset_create_localhost(
+            "netdata"
+            , "plugin_statsd_charting_cpu"
+            , NULL
+            , "statsd"
+            , "netdata.statsd_cpu"
+            , "NetData statsd charting thread CPU usage"
+            , "milliseconds/s"
+            , "statsd"
+            , "stats"
+            , 132001
+            , statsd.update_every
+            , RRDSET_TYPE_STACKED
+    );
+
+    RRDDIM *rd_user   = rrddim_add(stcpu_thread, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+    RRDDIM *rd_system = rrddim_add(stcpu_thread, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+    struct rusage thread;
+
+    for(i = 0; i < statsd.threads ;i++) {
+        char id[100 + 1];
+        char title[100 + 1];
+
+        snprintfz(id, 100, "plugin_statsd_collector%d_cpu", i + 1);
+        snprintfz(title, 100, "NetData statsd collector thread No %d CPU usage", i + 1);
+
+        statsd.collection_threads_status[i].st_cpu = rrdset_create_localhost(
+                "netdata"
+                , id
+                , NULL
+                , "statsd"
+                , "netdata.statsd_cpu"
+                , title
+                , "milliseconds/s"
+                , "statsd"
+                , "stats"
+                , 132002 + i
+                , statsd.update_every
+                , RRDSET_TYPE_STACKED
+        );
+
+        statsd.collection_threads_status[i].rd_user   = rrddim_add(statsd.collection_threads_status[i].st_cpu, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        statsd.collection_threads_status[i].rd_system = rrddim_add(statsd.collection_threads_status[i].st_cpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+    }
 
             // ----------------------------------------------------------------------------------------------------------------
     // statsd thread to turn metrics into charts
@@ -2327,10 +2386,12 @@ void *statsd_main(void *ptr) {
 
         statsd_update_all_app_charts();
 
+        getrusage(RUSAGE_THREAD, &thread);
+
         if(unlikely(netdata_exit))
             break;
 
-        if(hb_dt) {
+        if(likely(hb_dt)) {
             rrdset_next(st_metrics);
             rrdset_next(st_events);
             rrdset_next(st_reads);
@@ -2339,6 +2400,9 @@ void *statsd_main(void *ptr) {
             rrdset_next(st_tcp_connects);
             rrdset_next(st_tcp_connected);
             rrdset_next(st_pcharts);
+            rrdset_next(stcpu_thread);
+            for(i = 0; i < statsd.threads ;i++)
+                rrdset_next(statsd.collection_threads_status[i].st_cpu);
         }
 
         rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)statsd.gauges.metrics);
@@ -2347,6 +2411,7 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_metrics, rd_metrics_meter,        (collected_number)statsd.meters.metrics);
         rrddim_set_by_pointer(st_metrics, rd_metrics_histogram,    (collected_number)statsd.histograms.metrics);
         rrddim_set_by_pointer(st_metrics, rd_metrics_set,          (collected_number)statsd.sets.metrics);
+        rrdset_done(st_metrics);
 
         rrddim_set_by_pointer(st_events,  rd_events_gauge,         (collected_number)statsd.gauges.events);
         rrddim_set_by_pointer(st_events,  rd_events_counter,       (collected_number)statsd.counters.events);
@@ -2356,31 +2421,39 @@ void *statsd_main(void *ptr) {
         rrddim_set_by_pointer(st_events,  rd_events_set,           (collected_number)statsd.sets.events);
         rrddim_set_by_pointer(st_events,  rd_events_unknown,       (collected_number)statsd.unknown_types);
         rrddim_set_by_pointer(st_events,  rd_events_errors,        (collected_number)statsd.socket_errors);
+        rrdset_done(st_events);
 
         rrddim_set_by_pointer(st_reads,   rd_reads_tcp,            (collected_number)statsd.tcp_socket_reads);
         rrddim_set_by_pointer(st_reads,   rd_reads_udp,            (collected_number)statsd.udp_socket_reads);
+        rrdset_done(st_reads);
 
         rrddim_set_by_pointer(st_bytes,   rd_bytes_tcp,            (collected_number)statsd.tcp_bytes_read);
         rrddim_set_by_pointer(st_bytes,   rd_bytes_udp,            (collected_number)statsd.udp_bytes_read);
+        rrdset_done(st_bytes);
 
         rrddim_set_by_pointer(st_packets, rd_packets_tcp,          (collected_number)statsd.tcp_packets_received);
         rrddim_set_by_pointer(st_packets, rd_packets_udp,          (collected_number)statsd.udp_packets_received);
+        rrdset_done(st_packets);
 
         rrddim_set_by_pointer(st_tcp_connects, rd_tcp_connects,    (collected_number)statsd.tcp_socket_connects);
         rrddim_set_by_pointer(st_tcp_connects, rd_tcp_disconnects, (collected_number)statsd.tcp_socket_disconnects);
+        rrdset_done(st_tcp_connects);
 
         rrddim_set_by_pointer(st_tcp_connected, rd_tcp_connected,  (collected_number)statsd.tcp_socket_connected);
+        rrdset_done(st_tcp_connected);
 
         rrddim_set_by_pointer(st_pcharts, rd_pcharts,              (collected_number)statsd.private_charts);
-
-        rrdset_done(st_metrics);
-        rrdset_done(st_events);
-        rrdset_done(st_reads);
-        rrdset_done(st_bytes);
-        rrdset_done(st_packets);
-        rrdset_done(st_tcp_connects);
-        rrdset_done(st_tcp_connected);
         rrdset_done(st_pcharts);
+
+        rrddim_set_by_pointer(stcpu_thread, rd_user, thread.ru_utime.tv_sec * 1000000ULL + thread.ru_utime.tv_usec);
+        rrddim_set_by_pointer(stcpu_thread, rd_system, thread.ru_stime.tv_sec * 1000000ULL + thread.ru_stime.tv_usec);
+        rrdset_done(stcpu_thread);
+
+        for(i = 0; i < statsd.threads ;i++) {
+            rrddim_set_by_pointer(statsd.collection_threads_status[i].st_cpu, statsd.collection_threads_status[i].rd_user, statsd.collection_threads_status[i].rusage.ru_utime.tv_sec * 1000000ULL + statsd.collection_threads_status[i].rusage.ru_utime.tv_usec);
+            rrddim_set_by_pointer(statsd.collection_threads_status[i].st_cpu, statsd.collection_threads_status[i].rd_system, statsd.collection_threads_status[i].rusage.ru_stime.tv_sec * 1000000ULL + statsd.collection_threads_status[i].rusage.ru_stime.tv_usec);
+            rrdset_done(statsd.collection_threads_status[i].st_cpu);
+        }
     }
 
 cleanup:
