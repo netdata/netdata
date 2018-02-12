@@ -893,6 +893,7 @@ void *socket_listen_main_single_threaded(void *ptr) {
 struct web_server_static_threaded_worker {
     netdata_thread_t thread;
 
+    int id;
     int running;
 
     volatile size_t connected;
@@ -1106,6 +1107,46 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
     return web_server_check_client_status(w);
 }
 
+static void web_server_tmr_callback(void *timer_data) {
+    worker_private = (struct web_server_static_threaded_worker *)timer_data;
+
+    static __thread RRDSET *st = NULL;
+    static __thread RRDDIM *rd_user = NULL, *rd_system = NULL;
+
+    if(unlikely(!st)) {
+        char id[100 + 1];
+        char title[100 + 1];
+
+        snprintfz(id, 100, "web_thread%d_cpu", worker_private->id + 1);
+        snprintfz(title, 100, "NetData web server thread No %d CPU usage", worker_private->id + 1);
+
+        st = rrdset_create_localhost(
+                "netdata"
+                , id
+                , NULL
+                , "web"
+                , "netdata.web_cpu"
+                , title
+                , "milliseconds/s"
+                , "web"
+                , "stats"
+                , 132000 + worker_private->id
+                , default_rrd_update_every
+                , RRDSET_TYPE_STACKED
+        );
+
+        rd_user   = rrddim_add(st, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        rd_system = rrddim_add(st, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+    }
+    else
+        rrdset_next(st);
+
+    struct rusage rusage;
+    getrusage(RUSAGE_THREAD, &rusage);
+    rrddim_set_by_pointer(st, rd_user, rusage.ru_utime.tv_sec * 1000000ULL + rusage.ru_utime.tv_usec);
+    rrddim_set_by_pointer(st, rd_system, rusage.ru_stime.tv_sec * 1000000ULL + rusage.ru_stime.tv_usec);
+    rrdset_done(st);
+}
 
 // ----------------------------------------------------------------------------
 // web server worker thread
@@ -1138,10 +1179,13 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                         , web_server_del_callback
                         , web_server_rcv_callback
                         , web_server_snd_callback
+                        , web_server_tmr_callback
                         , web_allow_connections_from
                         , NULL
                         , web_client_first_request_timeout
                         , web_client_timeout
+                        , default_rrd_update_every * 1000 // timer_milliseconds
+                        , ptr // timer_data
             );
 
     netdata_thread_cleanup_pop(1);
@@ -1213,6 +1257,8 @@ void *socket_listen_main_static_threaded(void *ptr) {
 
             int i;
             for(i = 1; i < static_threaded_workers_count; i++) {
+                static_workers_private_data[i].id = i;
+
                 char tag[50 + 1];
                 snprintfz(tag, 50, "WEB_SERVER[static%d]", i+1);
 
