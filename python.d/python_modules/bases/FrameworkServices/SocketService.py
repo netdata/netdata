@@ -14,6 +14,7 @@ class SocketService(SimpleService):
         self.host = 'localhost'
         self.port = None
         self.unix_socket = None
+        self.dgram_socket = False
         self.request = ''
         self.__socket_config = None
         self.__empty_request = "".encode()
@@ -115,7 +116,11 @@ class SocketService(SimpleService):
                 if self.__socket_config is not None:
                     self._connect2socket()
                 else:
-                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                    if self.dgram_socket:
+                        sock_type = socket.SOCK_DGRAM
+                    else:
+                        sock_type = socket.SOCK_STREAM
+                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, sock_type):
                         if self._connect2socket(res):
                             break
 
