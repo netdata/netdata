@@ -196,7 +196,7 @@ class Plugin(object):
         self.runs_counter = 0
         self.config, error = self.loader.load_config_from_file(PLUGIN_CONFIG_DIR + 'python.d.conf')
         if error:
-            run_and_exit(Logger.error)(error)
+            Logger.error('"python.d.conf" configuration file not found. Using defaults.')
 
         if not self.config.get('enabled', True):
             run_and_exit(Logger.info)('DISABLED in configuration file.')
