@@ -195,20 +195,22 @@ class Service(SocketService):
         """
         if peer_ids:
             peer_ids.sort()
-            domain = None
 
-            if self.peer_names:
-                try:
-                    hostname = socket.gethostname()
-                    fqdn = socket.getfqdn()
-                    if fqdn.startswith(hostname):
-                        domain = fqdn[len(hostname):]
-                except socket.error:
-                    self.error('Error getting local domain')
+        domain = None
 
-        # Get peer data
+        # Get the local domain name
+        if self.peer_names:
+            try:
+                hostname = socket.gethostname()
+                fqdn = socket.getfqdn()
+                if fqdn.startswith(hostname):
+                    domain = fqdn[len(hostname):]
+            except socket.error:
+                self.error('Error getting local domain')
+
         peers = list()
 
+        # Get peer data
         for peer_id in peer_ids:
             request = self.get_header(peer_id, 'readvar')
             self.request = request
@@ -232,15 +234,17 @@ class Service(SocketService):
             if domain:
                 try:
                     name = socket.gethostbyaddr(name)[0]
+
+                    match_peer_filter = self.regex_peer_filter.search(name)
+                    if match_peer_filter:
+                        continue
+
                     if len(name) > len(domain) and name.endswith(domain):
                         name = name[:-len(domain)]
                 except (IndexError, socket.error):
                     self.error('Failed to reverse lookup address')
 
             name = name.replace('.', '-')
-            match_peer_filter = self.regex_peer_filter.search(name)
-            if match_peer_filter:
-                continue
 
             peers.append(Peer(peer_id, name, request))
 
