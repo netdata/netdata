@@ -1472,6 +1472,63 @@ Configuration is not needed.
 
 ---
 
+# ntp
+
+Module monitors the system variables of the local `ntpd` daemon, incl. variables of the polled peers using the NTP Control Message Protocol via UDP socket, similar to `ntpq`.
+
+**Requirements:**
+ * Version of `ntpd` must be 2.0+
+ * Local interrogation allowed in `/etc/ntp.conf` (default):
+
+```
+# Local users may interrogate the ntp server more closely.
+restrict 127.0.0.1
+restrict ::1
+```
+
+It produces:
+
+1. system
+ * offset
+ * jitter
+ * frequency
+ * delay
+ * dispersion
+ * stratum
+ * tc
+ * precision
+
+2. peers
+ * offset
+ * delay
+ * dispersion
+ * jitter
+ * rootdelay
+ * rootdispersion
+ * stratum
+ * hmode
+ * pmode
+ * hpoll
+ * ppoll
+ * precision
+
+**configuration**
+
+Sample:
+
+```yaml
+update_every: 10
+
+host: 'localhost'
+port: '123'
+peer_names: yes
+peer_filter: '(127\..*)|(.*\.example\.com)'
+```
+
+If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123`. Peer names are resolved using reverse dns lookup of the source address. Local peers (127.*) are hidden by default, use `peer_filter: '.*'` to show all. To disable reverse lookup and show ip addresses instead, use `peer_names: no`. Any dots `.` are replaced with dashes `-`.
+
+---
+
 # ovpn_status_log
 
 Module monitor openvpn-status log file. 
