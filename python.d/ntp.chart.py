@@ -7,7 +7,7 @@ import struct
 import re
 
 from itertools import cycle
-from base import SocketService
+from bases.FrameworkServices.SocketService import SocketService
 
 # default module values
 update_every = 1
@@ -131,18 +131,17 @@ class Service(SocketService):
         self.regex_data = re.compile(r'([a-z_]+)=([0-9-]+(?:\.[0-9]+)?)(?=,)')
         self.order = None
         self.definitions = None
+        self.peer_names = self.configuration.get('peer_names', True)
+        peer_filter_start = r'^((0\.0\.0\.0)|('
+        peer_filter_end = r'))$'
+        peer_filter_default = r'127\..*'
+        peer_filter_custom = str(self.configuration.get('peer_filter', peer_filter_default))
 
         try:
-            peer_filter = r'^((0\.0\.0\.0)|(' + str(self.configuration['peer_filter']) + r'))$'
-        except (KeyError, TypeError):
-            self.error('error parsing peer_filter')
-            peer_filter = r'^((0\.0\.0\.0)|(127\..*))$'
-        self.regex_peer_filter = re.compile(peer_filter)
-
-        try:
-            self.peer_names = bool((self.configuration['peer_names']))
-        except (KeyError, TypeError):
-            self.peer_names = True
+            self.regex_peer_filter = re.compile(peer_filter_start + peer_filter_custom + peer_filter_end)
+        except re.error as error:
+            self.error('Pattern compile error. Using defaults.')
+            self.regex_peer_filter = re.compile(peer_filter_start + peer_filter_default + peer_filter_end)
 
     def create_charts(self):
         """
@@ -151,12 +150,12 @@ class Service(SocketService):
         Adds all peers whith valid data.
         """
         # Create systemvars charts
-        self.order = ORDER
-        self.definitions = CHARTS
+        self.order = list(ORDER)
+        self.definitions = dict(CHARTS)
 
         # Get peer ids
         self.request = self.get_header(0, 'readstat')
-        peer_ids = self.get_peer_ids(self._get_raw_data_bytes())
+        peer_ids = self.get_peer_ids(self._get_raw_data(raw=True))
 
         # Get peers
         peers = self.get_peers(peer_ids)
@@ -322,58 +321,6 @@ class Service(SocketService):
                 self.create_charts()
                 self.peer_error = 0
                 self.create()
-
-        return data
-
-    def _receive_bytes(self):
-        """
-        Receive data from socket
-        :return: bytestr
-        """
-        data = b""
-        while True:
-            self.debug('receiving response')
-            try:
-                buf = self._sock.recv(4096)
-            except Exception as error:
-                self._socket_error('failed to receive response: {0}'.format(error))
-                self._disconnect()
-                break
-
-            if buf is None or len(buf) == 0:  # handle server disconnect
-                if data == b"":
-                    self._socket_error('unexpectedly disconnected')
-                else:
-                    self.debug('server closed the connection')
-                self._disconnect()
-                break
-
-            self.debug('received data')
-            data += buf
-            if self._check_raw_data(data):
-                break
-
-        self.debug('final response: {0}'.format(data))
-        return data
-
-    def _get_raw_data_bytes(self):
-        """
-        Get raw data with low-level "socket" module.
-        :return: bytestr
-        """
-        if self._sock is None:
-            self._connect()
-            if self._sock is None:
-                return None
-
-        # Send request if it is needed
-        if not self._send():
-            return None
-
-        data = self._receive_bytes()
-
-        if not self._keep_alive:
-            self._disconnect()
 
         return data
 

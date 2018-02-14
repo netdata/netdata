@@ -1525,6 +1525,18 @@ peer_names: yes
 peer_filter: '(127\..*)|(.*\.example\.com)'
 ```
 
+Sample (multiple jobs):
+
+Note: `ntp.conf` on host `otherhost` must be configured to allow queries from our local host by including a line like `restrict <IP> nomodify notrap nopeer`.
+
+```yaml
+local:
+    host: 'localhost'
+
+otherhost:
+    host: 'otherhost'
+```
+
 If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123`. Peer names are resolved using reverse dns lookup of the source address. Local peers (127.*) are hidden by default, use `peer_filter: '.*'` to show all. To disable reverse lookup and show ip addresses instead, use `peer_names: no`. Any dots `.` are replaced with dashes `-`.
 
 ---
