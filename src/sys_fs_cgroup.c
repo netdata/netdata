@@ -156,7 +156,7 @@ void read_cgroup_plugin_configuration() {
 
             // ----------------------------------------------------------------
 
-                    " machine.slice/*.service "            // #3367 systemd-nspawn
+                    " /machine.slice/*.service "           // #3367 systemd-nspawn
 
             // ----------------------------------------------------------------
 
@@ -208,7 +208,7 @@ void read_cgroup_plugin_configuration() {
                     " !*.mount "
                     " !*.socket "
                     " !*.partition "
-                    " machine.slice/*.service "            // #3367 systemd-nspawn
+                    " /machine.slice/*.service "          // #3367 systemd-nspawn
                     " !*.service "
                     " !*.slice "
                     " !*.swap "
