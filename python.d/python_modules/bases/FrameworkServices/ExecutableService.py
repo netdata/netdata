@@ -30,7 +30,10 @@ class ExecutableService(SimpleService):
         data = list()
         std = p.stderr if stderr else p.stdout
         for line in std:
-            data.append(line.decode())
+            try:
+                data.append(line.decode('utf-8'))
+            except TypeError:
+                continue
 
         return data or None
 
