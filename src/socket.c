@@ -1163,6 +1163,10 @@ int poll_default_snd_callback(POLLINFO *pi, short int *events) {
     return 0;
 }
 
+void poll_default_tmr_callback(void *timer_data) {
+    (void)timer_data;
+}
+
 static void poll_events_cleanup(void *data) {
     POLLJOB *p = (POLLJOB *)data;
 
@@ -1336,15 +1340,20 @@ void poll_events(LISTEN_SOCKETS *sockets
         , void  (*del_callback)(POLLINFO *pi)
         , int   (*rcv_callback)(POLLINFO *pi, short int *events)
         , int   (*snd_callback)(POLLINFO *pi, short int *events)
+        , void  (*tmr_callback)(void *timer_data)
         , SIMPLE_PATTERN *access_list
         , void *data
-        , time_t tcp_request_timeout
-        , time_t tcp_idle_timeout
+        , time_t tcp_request_timeout_seconds
+        , time_t tcp_idle_timeout_seconds
+        , time_t timer_milliseconds
+        , void *timer_data
 ) {
     if(!sockets || !sockets->opened) {
         error("POLLFD: internal error: no listening sockets are opened");
         return;
     }
+
+    if(timer_milliseconds <= 0) timer_milliseconds = 0;
 
     int retval;
 
@@ -1356,16 +1365,20 @@ void poll_events(LISTEN_SOCKETS *sockets
             .inf = NULL,
             .first_free = NULL,
 
-            .complete_request_timeout = tcp_request_timeout,
-            .idle_timeout = tcp_idle_timeout,
-            .checks_every = (tcp_idle_timeout / 3) + 1,
+            .complete_request_timeout = tcp_request_timeout_seconds,
+            .idle_timeout = tcp_idle_timeout_seconds,
+            .checks_every = (tcp_idle_timeout_seconds / 3) + 1,
 
             .access_list = access_list,
+
+            .timer_milliseconds = timer_milliseconds,
+            .timer_data = timer_data,
 
             .add_callback = add_callback?add_callback:poll_default_add_callback,
             .del_callback = del_callback?del_callback:poll_default_del_callback,
             .rcv_callback = rcv_callback?rcv_callback:poll_default_rcv_callback,
-            .snd_callback = snd_callback?snd_callback:poll_default_snd_callback
+            .snd_callback = snd_callback?snd_callback:poll_default_snd_callback,
+            .tmr_callback = tmr_callback?tmr_callback:poll_default_tmr_callback
     };
 
     size_t i;
@@ -1391,10 +1404,35 @@ void poll_events(LISTEN_SOCKETS *sockets
     int timeout_ms = 1000; // in milliseconds
     time_t last_check = now_boottime_sec();
 
+    usec_t timer_usec = timer_milliseconds * USEC_PER_MS;
+    usec_t now_usec = 0, next_timer_usec = 0, last_timer_usec = 0;
+    if(unlikely(timer_usec)) {
+        now_usec = now_boottime_usec();
+        next_timer_usec = now_usec - (now_usec % timer_usec) + timer_usec;
+    }
+
     netdata_thread_cleanup_push(poll_events_cleanup, &p);
 
     while(!netdata_exit) {
-        debug(D_POLLFD, "POLLFD: LISTENER: Waiting on %zu sockets...", p.max + 1);
+        if(unlikely(timer_usec)) {
+            now_usec = now_boottime_usec();
+
+            if(unlikely(timer_usec && now_usec >= next_timer_usec)) {
+                debug(D_POLLFD, "Calling timer callback after %zu usec", (size_t)(now_usec - last_timer_usec));
+                last_timer_usec = now_usec;
+                p.tmr_callback(p.timer_data);
+                now_usec = now_boottime_usec();
+                next_timer_usec = now_usec - (now_usec % timer_usec) + timer_usec;
+            }
+
+            usec_t dt_usec = next_timer_usec - now_usec;
+            if(dt_usec > 1000 * USEC_PER_MS)
+                timeout_ms = 1000;
+            else
+                timeout_ms = (int)(dt_usec / USEC_PER_MS);
+        }
+
+        debug(D_POLLFD, "POLLFD: LISTENER: Waiting on %zu sockets for %zu ms...", p.max + 1, (size_t)timeout_ms);
         retval = poll(p.fds, p.max + 1, timeout_ms);
         time_t now = now_boottime_sec();
 
