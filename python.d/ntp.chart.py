@@ -140,7 +140,7 @@ class Service(SocketService):
         try:
             self.regex_peer_filter = re.compile(peer_filter_start + peer_filter_custom + peer_filter_end)
         except re.error as error:
-            self.error('Pattern compile error. Using defaults.')
+            self.error('Pattern compile error: %s, Using defaults.' % str(error))
             self.regex_peer_filter = re.compile(peer_filter_start + peer_filter_default + peer_filter_end)
 
     def create_charts(self):
