@@ -131,17 +131,6 @@ class Service(SocketService):
         self.regex_data = re.compile(r'([a-z_]+)=([0-9-]+(?:\.[0-9]+)?)(?=,)')
         self.order = None
         self.definitions = None
-        self.peer_names = self.configuration.get('peer_names', True)
-        peer_filter_start = r'^((0\.0\.0\.0)|('
-        peer_filter_end = r'))$'
-        peer_filter_default = r'127\..*'
-        peer_filter_custom = str(self.configuration.get('peer_filter', peer_filter_default))
-
-        try:
-            self.regex_peer_filter = re.compile(peer_filter_start + peer_filter_custom + peer_filter_end)
-        except re.error as error:
-            self.error('Pattern compile error: %s, Using defaults.' % str(error))
-            self.regex_peer_filter = re.compile(peer_filter_start + peer_filter_default + peer_filter_end)
 
     def create_charts(self):
         """
@@ -255,6 +244,14 @@ class Service(SocketService):
         If not, returns None to disable module.
         """
         self._parse_config()
+        self.peer_names = self.configuration.get('peer_names', True)
+        peer_filter_custom = self.configuration.get('peer_filter', r'127\..*')
+
+        try:
+            self.regex_peer_filter = re.compile(r'^((0\.0\.0\.0)|({0}))$'.format(peer_filter_custom))
+        except re.error as error:
+            self.error('Pattern compile error: {0}'.format(error))
+            return None
 
         self.request_systemvars = self.get_header(0, 'readvar')
         self.request = self.request_systemvars
