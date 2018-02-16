@@ -109,8 +109,7 @@ class Service(UrlService):
 
         self.data.update(fetch_data_(raw_data=data, metrics=HEALTH_STATS))
 
-        if self.data['total_response_time_sec'] != 0:
-            self.data['average_response_time_per_iteration_sec'] = (data['total_response_time_sec'] * 1000000) / data['total_count']
+        self.data['average_response_time_per_iteration_sec'] = (data['total_response_time_sec'] * 1000000) / data['total_count']
 
         return self.data or None
 
@@ -119,15 +118,15 @@ class Service(UrlService):
         for code, value in raw_data['total_status_code_count'].items():
             code_prefix = code[0]
             if code_prefix == '1' or code_prefix == '2' or code == '304':
-                data['successful_requests'] += raw_data['total_status_code_count'][code]
+                data['successful_requests'] += value
             elif code_prefix == '3':
-                data['redirects'] += raw_data['total_status_code_count'][code]
+                data['redirects'] += value
             elif code_prefix == '4':
-                data['bad_requests'] += raw_data['total_status_code_count'][code]
+                data['bad_requests'] += value
             elif code_prefix == '5':
-                data['server_errors'] += raw_data['total_status_code_count'][code]
+                data['server_errors'] += value
             else:
-                data['other_requests'] += raw_data['total_status_code_count'][code]
+                data['other_requests'] += value
         self.data.update(data)
 
     def get_data_per_code_family(self, raw_data):
@@ -135,17 +134,17 @@ class Service(UrlService):
         for code, value in raw_data['total_status_code_count'].items():
             code_prefix = code[0]
             if code_prefix == '1':
-                data['1xx'] += raw_data['total_status_code_count'][code]
+                data['1xx'] += value
             elif code_prefix == '2':
-                data['2xx'] += raw_data['total_status_code_count'][code]
+                data['2xx'] += value
             elif code_prefix == '3':
-                data['3xx'] += raw_data['total_status_code_count'][code]
+                data['3xx'] += value
             elif code_prefix == '4':
-                data['4xx'] += raw_data['total_status_code_count'][code]
+                data['4xx'] += value
             elif code_prefix == '5':
-                data['5xx'] += raw_data['total_status_code_count'][code]
+                data['5xx'] += value
             else:
-                data['other'] += raw_data['total_status_code_count'][code]
+                data['other'] += value
         self.data.update(data)
 
     def get_data_per_code(self, raw_data):
@@ -154,16 +153,6 @@ class Service(UrlService):
                 if code not in self.data:
                     self.charts['detailed_response_codes'].add_dimension([code, code, 'incremental'])
                 self.data[code] = value
-
-    def get_data_per_code(self, raw_data):
-        for code in raw_data['total_status_code_count']:
-            self.add_chart_dimension(code)
-            self.data[code] = raw_data['total_status_code_count'][code]
-
-    def add_chart_dimension(self, code):
-        if code not in self.data:
-            self.charts['detailed_response_codes'].add_dimension([code, code, 'incremental'])
-            self.data[code] = 0
 
 def fetch_data_(raw_data, metrics):
     data = dict()
