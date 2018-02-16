@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 # Description: ntp netdata python.d module
 # Author: Sven Mäder (rda0)
+# Author: Ilya Mashchenko (l2isbad)
 
-import socket
 import struct
 import re
 
-from itertools import cycle
 from bases.FrameworkServices.SocketService import SocketService
 
 # default module values
@@ -36,292 +35,137 @@ ORDER = [
     'sys_rootdisp',
     'sys_stratum',
     'sys_tc',
-    'sys_precision'
+    'sys_precision',
+    'peer_offset',
+    'peer_delay',
+    'peer_dispersion',
+    'peer_jitter',
+    'peer_xleave',
+    'peer_rootdelay',
+    'peer_rootdisp',
+    'peer_stratum',
+    'peer_hmode',
+    'peer_pmode',
+    'peer_hpoll',
+    'peer_ppoll',
+    'peer_precision'
 ]
 
 CHARTS = {
     'sys_offset': {
-        'options': [None, "Combined offset of server relative to this host", "ms", 'system', 'ntp.sys_offset', 'area'],
+        'options': [None, 'Combined offset of server relative to this host', 'ms', 'system', 'ntp.sys_offset', 'area'],
         'lines': [
             ['offset', 'offset', 'absolute', 1, PRECISION]
         ]},
     'sys_jitter': {
-        'options': [None, "Combined system jitter and clock jitter", "ms", 'system', 'ntp.sys_jitter', 'line'],
+        'options': [None, 'Combined system jitter and clock jitter', 'ms', 'system', 'ntp.sys_jitter', 'line'],
         'lines': [
             ['sys_jitter', 'system', 'absolute', 1, PRECISION],
             ['clk_jitter', 'clock', 'absolute', 1, PRECISION]
         ]},
     'sys_frequency': {
-        'options': [None, "Frequency offset relative to hardware clock", "ppm", 'system', 'ntp.sys_frequency', 'area'],
+        'options': [None, 'Frequency offset relative to hardware clock', 'ppm', 'system', 'ntp.sys_frequency', 'area'],
         'lines': [
             ['frequency', 'frequency', 'absolute', 1, PRECISION]
         ]},
     'sys_wander': {
-        'options': [None, "Clock frequency wander", "ppm", 'system', 'ntp.sys_wander', 'area'],
+        'options': [None, 'Clock frequency wander', 'ppm', 'system', 'ntp.sys_wander', 'area'],
         'lines': [
             ['clk_wander', 'clock', 'absolute', 1, PRECISION]
         ]},
     'sys_rootdelay': {
-        'options': [None, "Total roundtrip delay to the primary reference clock", "ms", 'system', 'ntp.sys_rootdelay', 'area'],
+        'options': [None, 'Total roundtrip delay to the primary reference clock', 'ms', 'system',
+                    'ntp.sys_rootdelay', 'area'],
         'lines': [
             ['rootdelay', 'delay', 'absolute', 1, PRECISION]
         ]},
     'sys_rootdisp': {
-        'options': [None, "Total root dispersion to the primary reference clock", "ms", 'system', 'ntp.sys_rootdisp', 'area'],
+        'options': [None, 'Total root dispersion to the primary reference clock', 'ms', 'system',
+                    'ntp.sys_rootdisp', 'area'],
         'lines': [
             ['rootdisp', 'dispersion', 'absolute', 1, PRECISION]
         ]},
     'sys_stratum': {
-        'options': [None, "Stratum (1-15)", "1", 'system', 'ntp.sys_stratum', 'line'],
+        'options': [None, 'Stratum (1-15)', '1', 'system', 'ntp.sys_stratum', 'line'],
         'lines': [
             ['stratum', 'stratum', 'absolute', 1, PRECISION]
         ]},
     'sys_tc': {
-        'options': [None, "Time constant and poll exponent (3-17)", "log2 s", 'system', 'ntp.sys_tc', 'line'],
+        'options': [None, 'Time constant and poll exponent (3-17)', 'log2 s', 'system', 'ntp.sys_tc', 'line'],
         'lines': [
             ['tc', 'current', 'absolute', 1, PRECISION],
             ['mintc', 'minimum', 'absolute', 1, PRECISION]
         ]},
     'sys_precision': {
-        'options': [None, "Precision", "log2 s", 'system', 'ntp.sys_precision', 'line'],
+        'options': [None, 'Precision', 'log2 s', 'system', 'ntp.sys_precision', 'line'],
         'lines': [
             ['precision', 'precision', 'absolute', 1, PRECISION]
         ]}
 }
 
-# Dynamic charts templates
-PEER_PREFIX = 'peer'
+PEER_CHARTS = {
+    'peer_offset': {
+        'options': [None, 'Filter offset', 'ms', 'peers', 'ntp.peer_offset', 'line'],
+        'lines': [
+        ]},
+    'peer_delay': {
+        'options': [None, 'Filter delay', 'ms', 'peers', 'ntp.peer_delay', 'line'],
+        'lines': [
+        ]},
+    'peer_dispersion': {
+        'options': [None, 'Filter dispersion', 'ms', 'peers', 'ntp.peer_dispersion', 'line'],
+        'lines': [
+        ]},
+    'peer_jitter': {
+        'options': [None, 'Filter jitter', 'ms', 'peers', 'ntp.peer_jitter', 'line'],
+        'lines': [
+        ]},
+    'peer_xleave': {
+        'options': [None, 'Interleave delay', 'ms', 'peers', 'ntp.peer_xleave', 'line'],
+        'lines': [
+        ]},
+    'peer_rootdelay': {
+        'options': [None, 'Total roundtrip delay to the primary reference clock', 'ms', 'peers',
+                    'ntp.peer_rootdelay', 'line'],
+        'lines': [
+        ]},
+    'peer_rootdisp': {
+        'options': [None, 'Total root dispersion to the primary reference clock', 'ms', 'peers',
+                    'ntp.peer_rootdisp', 'line'],
+        'lines': [
+        ]},
+    'peer_stratum': {
+        'options': [None, 'Stratum (1-15)', '1', 'peers', 'ntp.peer_stratum', 'line'],
+        'lines': [
+        ]},
+    'peer_hmode': {
+        'options': [None, 'Host mode (1-6)', '1', 'peers', 'ntp.peer_hmode', 'line'],
+        'lines': [
+        ]},
+    'peer_pmode': {
+        'options': [None, 'Peer mode (1-5)', '1', 'peers', 'ntp.peer_pmode', 'line'],
+        'lines': [
+        ]},
+    'peer_hpoll': {
+        'options': [None, 'Host poll exponent', 'log2 s', 'peers', 'ntp.peer_hpoll', 'line'],
+        'lines': [
+        ]},
+    'peer_ppoll': {
+        'options': [None, 'Peer poll exponent', 'log2 s', 'peers', 'ntp.peer_ppoll', 'line'],
+        'lines': [
+        ]},
+    'peer_precision': {
+        'options': [None, 'Precision', 'log2 s', 'peers', 'ntp.peer_precision', 'line'],
+        'lines': [
+        ]}
+}
 
-PEER_DIMENSIONS = [
-    ['offset', 'Filter offset', 'ms'],
-    ['delay', 'Filter delay', 'ms'],
-    ['dispersion', 'Filter dispersion', 'ms'],
-    ['jitter', 'Filter jitter', 'ms'],
-    ['xleave', 'Interleave delay', 'ms'],
-    ['rootdelay', 'Total roundtrip delay to the primary reference clock', 'ms'],
-    ['rootdisp', 'Total root dispersion to the primary reference clock', 'ms'],
-    ['stratum', 'Stratum (1-15)', '1'],
-    ['hmode', 'Host mode (1-6)', '1'],
-    ['pmode', 'Peer mode (1-5)', '1'],
-    ['hpoll', 'Host poll exponent', 'log2 s'],
-    ['ppoll', 'Peer poll exponent', 'log2 s'],
-    ['precision', 'Precision', 'log2 s']
-]
 
+class Base:
+    regex = re.compile(r'([a-z_]+)=((?:-)?[0-9]+(?:\.[0-9]+)?)')
 
-class Peer(object):
-    """
-    Class to hold peer data required in _get_data
-    """
-    def __init__(self, peer_id, name, request):
-        self.id = peer_id
-        self.name = name
-        self.request = request
-
-
-class Service(SocketService):
-    def __init__(self, configuration=None, name=None):
-        SocketService.__init__(self, configuration=configuration, name=name)
-        self.port = 'ntp'
-        self.dgram_socket = True
-        self.request_systemvars = None
-        self.peers = None
-        self.peer_error = 0
-        self.regex_srcadr = re.compile(r'srcadr=([A-Za-z0-9.-]+)')
-        self.regex_data = re.compile(r'([a-z_]+)=([0-9-]+(?:\.[0-9]+)?)(?=,)')
-        self.order = None
-        self.definitions = None
-
-    def create_charts(self):
-        """
-        Creates the charts dynamically.
-        Checks ntp for available peers.
-        Adds all peers whith valid data.
-        """
-        # Create systemvars charts
-        self.order = list(ORDER)
-        self.definitions = dict(CHARTS)
-
-        # Get peer ids
-        self.request = self.get_header(0, 'readstat')
-        peer_ids = self.get_peer_ids(self._get_raw_data(raw=True))
-
-        # Get peers
-        peers = self.get_peers(peer_ids)
-
-        # Create peer charts
-        if peers:
-            charts = dict()
-
-            for dimension in PEER_DIMENSIONS:
-                chart_id = '_'.join([PEER_PREFIX, dimension[0]])
-                context = '.'.join(['ntp', chart_id])
-                title = dimension[1]
-                units = dimension[2]
-                lines = list()
-
-                for peer in peers:
-                    unique_dimension_id = '_'.join([peer.name, dimension[0]])
-                    line = [unique_dimension_id, peer.name, 'absolute', 1, PRECISION]
-                    lines.append(line)
-                charts[chart_id] = dict()
-                charts[chart_id]['options'] = [None, title, units, 'peers', context, 'line']
-                charts[chart_id]['lines'] = lines
-
-            self.order += ['_'.join([PEER_PREFIX, d[0]]) for d in PEER_DIMENSIONS]
-            self.definitions.update(charts)
-            self.peers = cycle(peers)
-        else:
-            self.peers = None
-
-    def get_peers(self, peer_ids):
-        """
-        Figures out the possible local domain name.
-        Queries each peer once to get data for charts.
-        Replace the peer srcadr with the possible hostname.
-        Returns all peers whith valid data.
-        """
-        if peer_ids:
-            peer_ids.sort()
-
-        domain = None
-
-        # Get the local domain name
-        if self.peer_names:
-            try:
-                hostname = socket.gethostname()
-                fqdn = socket.getfqdn()
-                if fqdn.startswith(hostname):
-                    domain = fqdn[len(hostname):]
-            except socket.error:
-                self.error('Error getting local domain')
-
-        peers = list()
-
-        # Get peer data
-        for peer_id in peer_ids:
-            request = self.get_header(peer_id, 'readvar')
-            self.request = request
-            raw = self._get_raw_data()
-            if not raw:
-                continue
-
-            data = self.get_data_from_raw(raw)
-            if not data:
-                continue
-
-            match_srcadr = self.regex_srcadr.search(raw)
-            if not match_srcadr:
-                continue
-
-            name = match_srcadr.group(1)
-            match_peer_filter = self.regex_peer_filter.search(name)
-            if match_peer_filter:
-                continue
-
-            if domain:
-                try:
-                    name = socket.gethostbyaddr(name)[0]
-
-                    match_peer_filter = self.regex_peer_filter.search(name)
-                    if match_peer_filter:
-                        continue
-
-                    if len(name) > len(domain) and name.endswith(domain):
-                        name = name[:-len(domain)]
-                except (IndexError, socket.error):
-                    self.error('Failed to reverse lookup address')
-
-            name = name.replace('.', '-')
-
-            peers.append(Peer(peer_id, name, request))
-
-        return peers
-
-    def check(self):
-        """
-        Checks if we can get valid systemvars.
-        If not, returns None to disable module.
-        """
-        self._parse_config()
-        self.peer_names = self.configuration.get('peer_names', True)
-        peer_filter_custom = self.configuration.get('peer_filter', r'127\..*')
-
-        try:
-            self.regex_peer_filter = re.compile(r'^((0\.0\.0\.0)|({0}))$'.format(peer_filter_custom))
-        except re.error as error:
-            self.error('Pattern compile error: {0}'.format(error))
-            return None
-
-        self.request_systemvars = self.get_header(0, 'readvar')
-        self.request = self.request_systemvars
-        raw_systemvars = self._get_raw_data()
-
-        if not self.get_data_from_raw(raw_systemvars):
-            return None
-
-        self.create_charts()
-
-        return True
-
-    def _get_data(self):
-        """
-        Gets systemvars data on each update.
-        Gets peervars data for only one peer on each update.
-        Total amount of _get_raw_data invocations per update = 2
-        """
-        data = dict()
-
-        self.request = self.request_systemvars
-        raw_systemvars = self._get_raw_data()
-        data.update(self.get_data_from_raw(raw_systemvars))
-
-        if self.peers:
-            peer = next(self.peers)
-            self.request = peer.request
-            raw_peervars = self._get_raw_data()
-            data.update(self.get_data_from_raw(raw_peervars, peer))
-
-        if not data:
-            self.error("No data received")
-            return None
-
-        return data
-
-    def get_data_from_raw(self, raw, peer=None):
-        """
-        Extracts key=value pairs with float/integer from ntp response packet data.
-        """
-        data = dict()
-        try:
-            data_list = self.regex_data.findall(raw)
-
-            for data_point in data_list:
-                key, value = data_point
-                if peer:
-                    dimension = '_'.join([peer.name, key])
-                else:
-                    dimension = key
-                data[dimension] = int(float(value) * PRECISION)
-        except (ValueError, AttributeError, TypeError):
-            self.error("Invalid data received")
-            return None
-
-        # If peer returns no valid data, probably due to ntpd restart,
-        # then wait 10 seconds and re-initialize the peers and charts
-        if not data and peer:
-            self.error('Peer error: No data received')
-            self.peer_error += 1
-
-            if (self.peer_error * self.update_every) > 10:
-                self.error('Peer error count exceeded, re-creating charts.')
-                self.create_charts()
-                self.peer_error = 0
-                self.create()
-
-        return data
-
-    def get_header(self, associd=0, operation='readvar'):
+    @staticmethod
+    def get_header(associd=0, operation='readvar'):
         """
         Constructs the NTP Control Message header:
          0                   1                   2                   3
@@ -334,23 +178,181 @@ class Service(SocketService):
         |            Offset             |            Count              |
         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
         """
-        try:
-            opcode = OPCODES[operation]
-        except KeyError:
-            self.error('Invalid operation: {0}'.format(operation))
-            return None
         version = 2
         sequence = 1
         status = 0
         offset = 0
         count = 0
+        header = struct.pack(HEADER_FORMAT, (version << 3 | MODE), OPCODES[operation],
+                             sequence, status, associd, offset, count)
+        return header
+
+
+class System(Base):
+    def __init__(self):
+        self.request = self.get_header()
+
+    def get_data(self, raw):
+        """
+        Extracts key=value pairs with float/integer from ntp response packet data.
+        """
+        data = dict()
+        for key, value in self.regex.findall(raw):
+            data[key] = float(value) * PRECISION
+        return data
+
+
+class Peer(Base):
+    def __init__(self, idx, name):
+        self.id = idx
+        self.real_name = name
+        self.name = name.replace('.', '_')
+        self.request = self.get_header(self.id)
+
+    def get_data(self, raw):
+        """
+        Extracts key=value pairs with float/integer from ntp response packet data.
+        """
+        data = dict()
+        for key, value in self.regex.findall(raw):
+            dimension = '_'.join([self.name, key])
+            data[dimension] = float(value) * PRECISION
+        return data
+
+    def rebuild_request(self, new_idx):
+        self.id = new_idx
+        self.request = self.get_header(self.id)
+
+
+class Service(SocketService):
+    def __init__(self, configuration=None, name=None):
+        SocketService.__init__(self, configuration=configuration, name=name)
+        self.order = list(ORDER)
+        self.definitions = dict(CHARTS)
+        self.definitions.update(PEER_CHARTS)
+
+        self.port = 'ntp'
+        self.dgram_socket = True
+        self.system = System()
+        self.peers = dict()
+        self.request = str()
+        self.retries = 0
+
+        peer_filter = self.configuration.get('peer_filter', r'127\..*')
         try:
-            header = struct.pack(HEADER_FORMAT, (version << 3 | MODE), opcode,
-                                 sequence, status, associd, offset, count)
-            return header
-        except struct.error:
-            self.error('error packing header: {0}'.format(struct.error))
+            self.peer_filter = re.compile(r'^((0\.0\.0\.0)|({0}))$'.format(peer_filter))
+        except re.error as error:
+            self.error('Compile pattern error : {0}'.format(error))
+            self.peer_filter = None
+
+    def check(self):
+        """
+        Checks if we can get valid systemvars.
+        If not, returns None to disable module.
+        """
+
+        if not self.peer_filter:
             return None
+
+        self._parse_config()
+
+        self.request = self.system.request
+        raw_systemvars = self._get_raw_data()
+
+        if not self.system.get_data(raw_systemvars):
+            return None
+        return True
+
+    def get_data(self):
+        """
+        Gets systemvars data on each update.
+        Gets peervars data for all peers on each update.
+        """
+        data = dict()
+
+        self.request = self.system.request
+        raw = self._get_raw_data()
+        if not raw:
+            return None
+
+        data.update(self.system.get_data(raw))
+        
+        # TODO: run self.find_new_peers() every N runs?
+        if not self.peers or self.retries > 8:
+            self.find_new_peers()
+        else:
+            for peer in self.peers.values():
+                self.request = peer.request
+                peer_data = peer.get_data(self._get_raw_data())
+                if peer_data:
+                    data.update(peer_data)
+                else:
+                    self.retries += 1
+
+        return data or None
+
+    def find_new_peers(self):
+        new_peers = dict((p.real_name, p) for p in self.get_peers())
+        if new_peers:
+
+            peers_to_remove = set(self.peers) - set(new_peers)
+            peers_to_update = set(self.peers) & set(new_peers)
+            peers_to_add = set(new_peers) - set(self.peers)
+
+            for peer_name in peers_to_remove:
+                self.hide_old_peer_from_charts(self.peers[peer_name])
+                del self.peers[peer_name]
+
+            for peer_name in peers_to_update:
+                if new_peers[peer_name].id != self.peers[peer_name].id:
+                    self.peers[peer_name].rebuild_request(new_peers[peer_name].id)
+
+            for peer_name in peers_to_add:
+                self.add_new_peer_to_charts(new_peers[peer_name])
+
+            self.peers.update(new_peers)
+            self.retries = 0
+
+    def add_new_peer_to_charts(self, peer):
+        for chart_id in set(self.charts.charts) & set(PEER_CHARTS):
+            dim_id = peer.name + chart_id[4:]
+            if dim_id not in self.charts[chart_id]:
+                self.charts[chart_id].add_dimension([dim_id, peer.real_name, 'absolute', 1, PRECISION])
+            else:
+                self.charts[chart_id].hide_dimension(dim_id, reverse=True)
+
+    def hide_old_peer_from_charts(self, peer):
+        for chart_id in set(self.charts.charts) & set(PEER_CHARTS):
+            dim_id = peer.name + chart_id[4:]
+            self.charts[chart_id].hide_dimension(dim_id)
+
+    def get_peers(self):
+        self.request = Base.get_header(operation='readstat')
+
+        raw_data = self._get_raw_data(raw=True)
+        if not raw_data:
+            return list()
+
+        peer_ids = self.get_peer_ids(raw_data)
+        if not peer_ids:
+            return list()
+
+        new_peers = list()
+        for peer_id in peer_ids:
+            self.request = Base.get_header(peer_id)
+            raw_peer_data = self._get_raw_data()
+            if not raw_peer_data:
+                continue
+            srcadr = re.search(r'(srcadr)=([^,]+)', raw_peer_data)
+            if not srcadr:
+                continue
+            srcadr = srcadr.group(2)
+            if self.peer_filter.search(srcadr):
+                continue
+
+            new_peer = Peer(idx=peer_id, name=srcadr)
+            new_peers.append(new_peer)
+        return new_peers
 
     def get_peer_ids(self, res):
         """
@@ -358,21 +360,22 @@ class Service(SocketService):
         Get data length from header
         Get list of association ids returned in the readstat response
         """
+
         try:
             count = struct.unpack(HEADER_FORMAT, res[:HEADER_LEN])[6]
-        except struct.error:
-            self.error('error unpacking header: {0}'.format(struct.error))
-            return list()
+        except struct.error as error:
+            self.error('error unpacking header: {0}'.format(error))
+            return None
         if not count:
-            self.debug('empty data field in NTP control packet')
-            return list()
+            self.error('empty data field in NTP control packet')
+            return None
 
         data_end = HEADER_LEN + count
         data = res[HEADER_LEN:data_end]
         data_format = ''.join(['!', 'H' * int(count / 2)])
-
         try:
-            return list(struct.unpack(data_format, data))[::2]
-        except struct.error:
-            self.error('error unpacking data: {0}'.format(struct.error))
-            return list()
+            peer_ids = list(struct.unpack(data_format, data))[::2]
+        except struct.error as error:
+            self.error('error unpacking data: {0}'.format(error))
+            return None
+        return peer_ids
