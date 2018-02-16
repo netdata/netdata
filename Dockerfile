@@ -1,15 +1,40 @@
-# author  : titpetric
-# original: https://github.com/titpetric/netdata
+FROM alpine:edge as builder
 
-FROM debian:stretch
+# Install prerequisites
+RUN apk --no-cache add alpine-sdk autoconf automake libmnl-dev build-base jq \
+                       lm_sensors nodejs pkgconfig py-mysqldb python libuuid \
+                       py-psycopg2 py-yaml util-linux-dev zlib-dev curl bash \
+                       netcat-openbsd
 
-ADD . /netdata.git
+# Copy source
+COPY . /opt/netdata.git
+WORKDIR /opt/netdata.git
 
-RUN cd ./netdata.git && chmod +x ./docker-build.sh && sync && sleep 1 && ./docker-build.sh
+# Install source
+RUN chmod +x ./netdata-installer.sh && \
+    ./netdata-installer.sh --dont-wait --dont-start-it
 
-WORKDIR /
+################################################################################
+FROM alpine:edge
 
-ENV NETDATA_PORT 19999
-EXPOSE $NETDATA_PORT
+# Reinstall some prerequisites
+RUN apk --no-cache add lm_sensors nodejs libuuid python py-mysqldb \
+                       py-psycopg2 py-yaml netcat-openbsd jq
 
-CMD /usr/sbin/netdata -D -s /host -p ${NETDATA_PORT}
+# Copy files over
+COPY --from=builder /usr/share/netdata   /usr/share/netdata
+COPY --from=builder /usr/libexec/netdata /usr/libexec/netdata
+COPY --from=builder /var/cache/netdata   /var/cache/netdata
+COPY --from=builder /var/lib/netdata     /var/lib/netdata
+COPY --from=builder /usr/sbin/netdata    /usr/sbin/netdata
+COPY --from=builder /etc/netdata         /etc/netdata
+
+# Link log files to stdout
+RUN mkdir -p /var/log/netdata && \
+    ln -sf /dev/stdout /var/log/netdata/access.log && \
+    ln -sf /dev/stdout /var/log/netdata/debug.log && \
+    ln -sf /dev/stderr /var/log/netdata/error.log
+
+EXPOSE 19999
+
+CMD [ "/usr/sbin/netdata" , "-D", "-s", "/host", "-p", "19999"]
