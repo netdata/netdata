@@ -343,8 +343,8 @@ netdataDashboard.menu = {
         info: 'Provides statistics on the <b><a href="http://ceph.com/">ceph</a></b> cluster server, the open-source distributed storage system.'
     },
 
-    'ntp': {
-        title: 'NTP',
+    'ntpd': {
+        title: 'ntpd',
         icon: '<i class="fas fa-clock"></i>',
         info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> including the configured peers.'
     }
@@ -495,12 +495,12 @@ netdataDashboard.submenu = {
         info: 'Detailed information about the status of the Erlang VM that hosts CouchDB. These are intended for advanced users only. High values of the peak message queue (>10e6) generally indicate an overload condition.'
     },
 
-    'ntp.system': {
+    'ntpd.system': {
         title: 'system',
         info: 'Statistics of the internal system variables as shown by <a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a> (standard NTP query program).'
     },
 
-    'ntp.peers': {
+    'ntpd.peers': {
         title: 'peers',
         info: 'Statistics of the peer variables for each peer as shown by <a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a> (standard NTP query program).'
     }

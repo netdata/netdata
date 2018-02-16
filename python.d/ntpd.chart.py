@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Description: ntp netdata python.d module
+# Description: ntpd netdata python.d module
 # Author: Sven Mäder (rda0)
 # Author: Ilya Mashchenko (l2isbad)
 
@@ -53,51 +53,51 @@ ORDER = [
 
 CHARTS = {
     'sys_offset': {
-        'options': [None, 'Combined offset of server relative to this host', 'ms', 'system', 'ntp.sys_offset', 'area'],
+        'options': [None, 'Combined offset of server relative to this host', 'ms', 'system', 'ntpd.sys_offset', 'area'],
         'lines': [
             ['offset', 'offset', 'absolute', 1, PRECISION]
         ]},
     'sys_jitter': {
-        'options': [None, 'Combined system jitter and clock jitter', 'ms', 'system', 'ntp.sys_jitter', 'line'],
+        'options': [None, 'Combined system jitter and clock jitter', 'ms', 'system', 'ntpd.sys_jitter', 'line'],
         'lines': [
             ['sys_jitter', 'system', 'absolute', 1, PRECISION],
             ['clk_jitter', 'clock', 'absolute', 1, PRECISION]
         ]},
     'sys_frequency': {
-        'options': [None, 'Frequency offset relative to hardware clock', 'ppm', 'system', 'ntp.sys_frequency', 'area'],
+        'options': [None, 'Frequency offset relative to hardware clock', 'ppm', 'system', 'ntpd.sys_frequency', 'area'],
         'lines': [
             ['frequency', 'frequency', 'absolute', 1, PRECISION]
         ]},
     'sys_wander': {
-        'options': [None, 'Clock frequency wander', 'ppm', 'system', 'ntp.sys_wander', 'area'],
+        'options': [None, 'Clock frequency wander', 'ppm', 'system', 'ntpd.sys_wander', 'area'],
         'lines': [
             ['clk_wander', 'clock', 'absolute', 1, PRECISION]
         ]},
     'sys_rootdelay': {
         'options': [None, 'Total roundtrip delay to the primary reference clock', 'ms', 'system',
-                    'ntp.sys_rootdelay', 'area'],
+                    'ntpd.sys_rootdelay', 'area'],
         'lines': [
             ['rootdelay', 'delay', 'absolute', 1, PRECISION]
         ]},
     'sys_rootdisp': {
         'options': [None, 'Total root dispersion to the primary reference clock', 'ms', 'system',
-                    'ntp.sys_rootdisp', 'area'],
+                    'ntpd.sys_rootdisp', 'area'],
         'lines': [
             ['rootdisp', 'dispersion', 'absolute', 1, PRECISION]
         ]},
     'sys_stratum': {
-        'options': [None, 'Stratum (1-15)', '1', 'system', 'ntp.sys_stratum', 'line'],
+        'options': [None, 'Stratum (1-15)', '1', 'system', 'ntpd.sys_stratum', 'line'],
         'lines': [
             ['stratum', 'stratum', 'absolute', 1, PRECISION]
         ]},
     'sys_tc': {
-        'options': [None, 'Time constant and poll exponent (3-17)', 'log2 s', 'system', 'ntp.sys_tc', 'line'],
+        'options': [None, 'Time constant and poll exponent (3-17)', 'log2 s', 'system', 'ntpd.sys_tc', 'line'],
         'lines': [
             ['tc', 'current', 'absolute', 1, PRECISION],
             ['mintc', 'minimum', 'absolute', 1, PRECISION]
         ]},
     'sys_precision': {
-        'options': [None, 'Precision', 'log2 s', 'system', 'ntp.sys_precision', 'line'],
+        'options': [None, 'Precision', 'log2 s', 'system', 'ntpd.sys_precision', 'line'],
         'lines': [
             ['precision', 'precision', 'absolute', 1, PRECISION]
         ]}
@@ -105,57 +105,57 @@ CHARTS = {
 
 PEER_CHARTS = {
     'peer_offset': {
-        'options': [None, 'Filter offset', 'ms', 'peers', 'ntp.peer_offset', 'line'],
+        'options': [None, 'Filter offset', 'ms', 'peers', 'ntpd.peer_offset', 'line'],
         'lines': [
         ]},
     'peer_delay': {
-        'options': [None, 'Filter delay', 'ms', 'peers', 'ntp.peer_delay', 'line'],
+        'options': [None, 'Filter delay', 'ms', 'peers', 'ntpd.peer_delay', 'line'],
         'lines': [
         ]},
     'peer_dispersion': {
-        'options': [None, 'Filter dispersion', 'ms', 'peers', 'ntp.peer_dispersion', 'line'],
+        'options': [None, 'Filter dispersion', 'ms', 'peers', 'ntpd.peer_dispersion', 'line'],
         'lines': [
         ]},
     'peer_jitter': {
-        'options': [None, 'Filter jitter', 'ms', 'peers', 'ntp.peer_jitter', 'line'],
+        'options': [None, 'Filter jitter', 'ms', 'peers', 'ntpd.peer_jitter', 'line'],
         'lines': [
         ]},
     'peer_xleave': {
-        'options': [None, 'Interleave delay', 'ms', 'peers', 'ntp.peer_xleave', 'line'],
+        'options': [None, 'Interleave delay', 'ms', 'peers', 'ntpd.peer_xleave', 'line'],
         'lines': [
         ]},
     'peer_rootdelay': {
         'options': [None, 'Total roundtrip delay to the primary reference clock', 'ms', 'peers',
-                    'ntp.peer_rootdelay', 'line'],
+                    'ntpd.peer_rootdelay', 'line'],
         'lines': [
         ]},
     'peer_rootdisp': {
         'options': [None, 'Total root dispersion to the primary reference clock', 'ms', 'peers',
-                    'ntp.peer_rootdisp', 'line'],
+                    'ntpd.peer_rootdisp', 'line'],
         'lines': [
         ]},
     'peer_stratum': {
-        'options': [None, 'Stratum (1-15)', '1', 'peers', 'ntp.peer_stratum', 'line'],
+        'options': [None, 'Stratum (1-15)', '1', 'peers', 'ntpd.peer_stratum', 'line'],
         'lines': [
         ]},
     'peer_hmode': {
-        'options': [None, 'Host mode (1-6)', '1', 'peers', 'ntp.peer_hmode', 'line'],
+        'options': [None, 'Host mode (1-6)', '1', 'peers', 'ntpd.peer_hmode', 'line'],
         'lines': [
         ]},
     'peer_pmode': {
-        'options': [None, 'Peer mode (1-5)', '1', 'peers', 'ntp.peer_pmode', 'line'],
+        'options': [None, 'Peer mode (1-5)', '1', 'peers', 'ntpd.peer_pmode', 'line'],
         'lines': [
         ]},
     'peer_hpoll': {
-        'options': [None, 'Host poll exponent', 'log2 s', 'peers', 'ntp.peer_hpoll', 'line'],
+        'options': [None, 'Host poll exponent', 'log2 s', 'peers', 'ntpd.peer_hpoll', 'line'],
         'lines': [
         ]},
     'peer_ppoll': {
-        'options': [None, 'Peer poll exponent', 'log2 s', 'peers', 'ntp.peer_ppoll', 'line'],
+        'options': [None, 'Peer poll exponent', 'log2 s', 'peers', 'ntpd.peer_ppoll', 'line'],
         'lines': [
         ]},
     'peer_precision': {
-        'options': [None, 'Precision', 'log2 s', 'peers', 'ntp.peer_precision', 'line'],
+        'options': [None, 'Precision', 'log2 s', 'peers', 'ntpd.peer_precision', 'line'],
         'lines': [
         ]}
 }
