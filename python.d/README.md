@@ -1472,9 +1472,9 @@ Configuration is not needed.
 
 ---
 
-# ntp
+# ntpd
 
-Module monitors the system variables of the local `ntpd` daemon, incl. variables of the polled peers using the NTP Control Message Protocol via UDP socket, similar to `ntpq`.
+Module monitors the system variables of the local `ntpd` daemon (optional incl. variables of the polled peers) using the NTP Control Message Protocol via UDP socket, similar to `ntpq`.
 
 **Requirements:**
  * Version of `ntpd` must be 2.0+
@@ -1521,8 +1521,8 @@ update_every: 10
 
 host: 'localhost'
 port: '123'
-peer_names: yes
-peer_filter: '(127\..*)|(.*\.example\.com)'
+all_peers: yes
+peer_filter: '(127\..*)|(192\.168\..*)'
 ```
 
 Sample (multiple jobs):
@@ -1537,7 +1537,7 @@ otherhost:
     host: 'otherhost'
 ```
 
-If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123`. Peer names are resolved using reverse dns lookup of the source address. Local peers (127.*) are hidden by default, use `peer_filter: '.*'` to show all. To disable reverse lookup and show ip addresses instead, use `peer_names: no`. Any dots `.` are replaced with dashes `-`.
+If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123` and show charts for the systemvars. Use `all_peers: yes` to also show the charts for configured peers. Local peers (127.*) are hidden by default, use `peer_filter: ''` to show all.
 
 ---
 
