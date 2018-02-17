@@ -162,13 +162,12 @@ struct target {
     kernel_uint_t num_threads;
     // kernel_uint_t rss;
 
-    kernel_uint_t statm_size;
-    kernel_uint_t statm_resident;
-    kernel_uint_t statm_share;
-    // kernel_uint_t statm_text;
-    // kernel_uint_t statm_lib;
-    // kernel_uint_t statm_data;
-    // kernel_uint_t statm_dirty;
+    kernel_uint_t status_vmsize;
+    kernel_uint_t status_vmrss;
+    kernel_uint_t status_vmshared;
+    kernel_uint_t status_rssfile;
+    kernel_uint_t status_rssshmem;
+    kernel_uint_t status_vmswap;
 
     kernel_uint_t io_logical_bytes_read;
     kernel_uint_t io_logical_bytes_written;
@@ -287,13 +286,13 @@ struct pid_stat {
     uid_t uid;
     gid_t gid;
 
-    kernel_uint_t statm_size;
-    kernel_uint_t statm_resident;
-    kernel_uint_t statm_share;
-    // kernel_uint_t statm_text;
-    // kernel_uint_t statm_lib;
-    // kernel_uint_t statm_data;
-    // kernel_uint_t statm_dirty;
+    kernel_uint_t status_vmsize;
+    kernel_uint_t status_vmrss;
+    kernel_uint_t status_vmshared;
+    kernel_uint_t status_rssfile;
+    kernel_uint_t status_rssshmem;
+    kernel_uint_t status_vmswap;
+    ARL_BASE *status_arl;
 
     kernel_uint_t io_logical_bytes_read_raw;
     kernel_uint_t io_logical_bytes_written_raw;
@@ -337,7 +336,7 @@ struct pid_stat {
     char *fds_dirname;              // the full directory name in /proc/PID/fd
 
     char *stat_filename;
-    char *statm_filename;
+    char *status_filename;
     char *io_filename;
     char *cmdline_filename;
 
@@ -346,10 +345,13 @@ struct pid_stat {
     struct pid_stat *next;
 };
 
+size_t pagesize;
+size_t kb_per_page;
+
 // log each problem once per process
 // log flood protection flags (log_thrown)
 #define PID_LOG_IO      0x00000001
-#define PID_LOG_STATM   0x00000002
+#define PID_LOG_STATUS  0x00000002
 #define PID_LOG_CMDLINE 0x00000004
 #define PID_LOG_FDS     0x00000008
 #define PID_LOG_STAT    0x00000010
@@ -694,7 +696,8 @@ static inline void del_pid_entry(pid_t pid) {
     freez(p->fds);
     freez(p->fds_dirname);
     freez(p->stat_filename);
-    freez(p->statm_filename);
+    freez(p->status_filename);
+    arl_free(p->status_arl);
     freez(p->io_filename);
     freez(p->cmdline_filename);
     freez(p->cmdline);
@@ -722,11 +725,11 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                         #endif
                         break;
 
-                    case PID_LOG_STATM:
+                    case PID_LOG_STATUS:
                         #ifdef __FreeBSD__
-                        error("Cannot fetch process %d memory info (command '%s')", p->pid, p->comm);
+                        error("Cannot fetch process %d status info (command '%s')", p->pid, p->comm);
                         #else
-                        error("Cannot process %s/proc/%d/statm (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
+                        error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
                         #endif
                         break;
 
@@ -848,37 +851,6 @@ cleanup:
     return 0;
 }
 
-static inline int read_proc_pid_ownership(struct pid_stat *p, void *ptr) {
-    (void)ptr;
-#ifdef __FreeBSD__
-    struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
-
-    p->uid = proc_info->ki_uid;
-    p->gid = proc_info->ki_groups[0];
-
-    return 1;
-#else
-    if(unlikely(!p->stat_filename)) {
-        error("pid %d does not have a stat_filename", p->pid);
-        return 0;
-    }
-
-    // ----------------------------------------
-    // read uid and gid
-
-    struct stat st;
-    if(stat(p->stat_filename, &st) != 0) {
-        error("Cannot stat file '%s'", p->stat_filename);
-        return 1;
-    }
-
-    p->uid = st.st_uid;
-    p->gid = st.st_gid;
-
-    return 1;
-#endif
-}
-
 // ----------------------------------------------------------------------------
 // macro to calculate the incremental rate of a value
 // each parameter is accessed only ONCE - so it is safe to pass function calls
@@ -893,6 +865,156 @@ static inline int read_proc_pid_ownership(struct pid_stat *p, void *ptr) {
 // the same macro for struct pid members
 #define pid_incremental_rate(type, var, value) \
     incremental_rate(var, var##_raw, value, p->type##_collected_usec, p->last_##type##_collected_usec)
+
+
+// ----------------------------------------------------------------------------
+
+#ifndef __FreeBSD__
+struct arl_callback_ptr {
+    struct pid_stat *p;
+    procfile *ff;
+    size_t line;
+};
+
+void arl_callback_status_uid(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name; (void)hash; (void)value;
+    struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
+    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 5)) return;
+
+    //const char *real_uid = procfile_lineword(aptr->ff, aptr->line, 1);
+    const char *effective_uid = procfile_lineword(aptr->ff, aptr->line, 2);
+    //const char *saved_uid = procfile_lineword(aptr->ff, aptr->line, 3);
+    //const char *filesystem_uid = procfile_lineword(aptr->ff, aptr->line, 4);
+
+    if(likely(effective_uid && *effective_uid))
+        aptr->p->uid = (uid_t)str2l(effective_uid);
+}
+
+void arl_callback_status_gid(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name; (void)hash; (void)value;
+    struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
+    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 5)) return;
+
+    //const char *real_gid = procfile_lineword(aptr->ff, aptr->line, 1);
+    const char *effective_gid = procfile_lineword(aptr->ff, aptr->line, 2);
+    //const char *saved_gid = procfile_lineword(aptr->ff, aptr->line, 3);
+    //const char *filesystem_gid = procfile_lineword(aptr->ff, aptr->line, 4);
+
+    if(likely(effective_gid && *effective_gid))
+        aptr->p->gid = (uid_t)str2l(effective_gid);
+}
+
+void arl_callback_status_vmsize(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name; (void)hash; (void)value;
+    struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
+    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+
+    aptr->p->status_vmsize = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+}
+
+void arl_callback_status_vmswap(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name; (void)hash; (void)value;
+    struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
+    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+
+    aptr->p->status_vmswap = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+}
+
+void arl_callback_status_vmrss(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name; (void)hash; (void)value;
+    struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
+    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+
+    aptr->p->status_vmrss = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+}
+
+void arl_callback_status_rssfile(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name; (void)hash; (void)value;
+    struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
+    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+
+    aptr->p->status_rssfile = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+}
+
+void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *value, void *dst) {
+    (void)name; (void)hash; (void)value;
+    struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
+    if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
+
+    aptr->p->status_rssshmem = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+}
+#endif // !__FreeBSD__
+
+static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
+    p->status_vmsize           = 0;
+    p->status_vmrss            = 0;
+    p->status_vmshared         = 0;
+    p->status_rssfile          = 0;
+    p->status_rssshmem         = 0;
+    p->status_vmswap           = 0;
+
+#ifdef __FreeBSD__
+    struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
+
+    p->uid                  = proc_info->ki_uid;
+    p->gid                  = proc_info->ki_groups[0];
+    p->status_vmsize        = proc_info->ki_size / pagesize;
+    p->status_vmrss         = proc_info->ki_rssize;
+    // FIXME: what about shared and swap memory on FreeBSD?
+    return 1;
+#else
+    (void)ptr;
+
+    static struct arl_callback_ptr arl_ptr;
+    static procfile *ff = NULL;
+
+    if(unlikely(!p->status_arl)) {
+        p->status_arl = arl_create("/proc/pid/status", NULL, 60);
+        arl_expect_custom(p->status_arl, "Uid", arl_callback_status_uid, &arl_ptr);
+        arl_expect_custom(p->status_arl, "Gid", arl_callback_status_gid, &arl_ptr);
+        arl_expect_custom(p->status_arl, "VmSize", arl_callback_status_vmsize, &arl_ptr);
+        arl_expect_custom(p->status_arl, "VmRSS", arl_callback_status_vmrss, &arl_ptr);
+        arl_expect_custom(p->status_arl, "RssFile", arl_callback_status_rssfile, &arl_ptr);
+        arl_expect_custom(p->status_arl, "RssShmem", arl_callback_status_rssshmem, &arl_ptr);
+        arl_expect_custom(p->status_arl, "VmSwap", arl_callback_status_vmswap, &arl_ptr);
+    }
+
+    if(unlikely(!p->status_filename)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/status", netdata_configured_host_prefix, p->pid);
+        p->status_filename = strdupz(filename);
+    }
+
+    ff = procfile_reopen(ff, p->status_filename, (!ff)?" \t:,-()/":NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    if(unlikely(!ff)) return 0;
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff)) return 0;
+
+    calls_counter++;
+
+    // let ARL use this pid
+    arl_ptr.p = p;
+    arl_ptr.ff = ff;
+
+    size_t lines = procfile_lines(ff), l;
+    arl_begin(p->status_arl);
+
+    for(l = 0; l < lines ;l++) {
+        // fprintf(stderr, "CHECK: line %zu of %zu, key '%s' = '%s'\n", l, lines, procfile_lineword(ff, l, 0), procfile_lineword(ff, l, 1));
+        arl_ptr.line = l;
+        if(unlikely(arl_check(p->status_arl,
+                procfile_lineword(ff, l, 0),
+                procfile_lineword(ff, l, 1)))) break;
+    }
+
+    p->status_vmshared = p->status_rssfile + p->status_rssshmem;
+
+    // fprintf(stderr, "%s uid %d, gid %d, VmSize %zu, VmRSS %zu, RssFile %zu, RssShmem %zu, shared %zu\n", p->comm, (int)p->uid, (int)p->gid, p->status_vmsize, p->status_vmrss, p->status_rssfile, p->status_rssshmem, p->status_vmshared);
+
+    return 1;
+#endif
+}
 
 
 // ----------------------------------------------------------------------------
@@ -1059,57 +1181,6 @@ cleanup:
     p->num_threads      = 0;
     // p->rss              = 0;
     return 0;
-}
-
-static inline int read_proc_pid_statm(struct pid_stat *p, void *ptr) {
-    (void)ptr;
-#ifdef __FreeBSD__
-    struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
-#else
-    static procfile *ff = NULL;
-
-    if(unlikely(!p->statm_filename)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/statm", netdata_configured_host_prefix, p->pid);
-        p->statm_filename = strdupz(filename);
-    }
-
-    ff = procfile_reopen(ff, p->statm_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    if(unlikely(!ff)) goto cleanup;
-
-    ff = procfile_readall(ff);
-    if(unlikely(!ff)) goto cleanup;
-#endif
-
-    calls_counter++;
-
-#ifdef __FreeBSD__
-    p->statm_size           = proc_info->ki_size / sysconf(_SC_PAGESIZE);
-    p->statm_resident       = proc_info->ki_rssize;
-    p->statm_share          = 0; // do we have to use ru_ixrss here?
-#else
-    p->statm_size           = str2kernel_uint_t(procfile_lineword(ff, 0, 0));
-    p->statm_resident       = str2kernel_uint_t(procfile_lineword(ff, 0, 1));
-    p->statm_share          = str2kernel_uint_t(procfile_lineword(ff, 0, 2));
-    // p->statm_text           = str2kernel_uint_t(procfile_lineword(ff, 0, 3));
-    // p->statm_lib            = str2kernel_uint_t(procfile_lineword(ff, 0, 4));
-    // p->statm_data           = str2kernel_uint_t(procfile_lineword(ff, 0, 5));
-    // p->statm_dirty          = str2kernel_uint_t(procfile_lineword(ff, 0, 6));
-#endif
-
-    return 1;
-
-#ifndef __FreeBSD__
-cleanup:
-    p->statm_size           = 0;
-    p->statm_resident       = 0;
-    p->statm_share          = 0;
-    // p->statm_text           = 0;
-    // p->statm_lib            = 0;
-    // p->statm_data           = 0;
-    // p->statm_dirty          = 0;
-    return 0;
-#endif
 }
 
 static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
@@ -1995,7 +2066,7 @@ static inline void link_all_processes_to_their_parents(void) {
 // 1. read all files in /proc
 // 2. for each numeric directory:
 //    i.   read /proc/pid/stat
-//    ii.  read /proc/pid/statm
+//    ii.  read /proc/pid/status
 //    iii. read /proc/pid/io (requires root access)
 //    iii. read the entries in directory /proc/pid/fd (requires root access)
 //         for each entry:
@@ -2040,8 +2111,6 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
         // there is no reason to proceed if we cannot get its status
         return 0;
 
-    read_proc_pid_ownership(p, ptr);
-
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
         error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
@@ -2054,10 +2123,10 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     managed_log(p, PID_LOG_IO, read_proc_pid_io(p, ptr));
 
     // --------------------------------------------------------------------
-    // /proc/<pid>/statm
+    // /proc/<pid>/status
 
-    if(unlikely(!managed_log(p, PID_LOG_STATM, read_proc_pid_statm(p, ptr))))
-        // there is no reason to proceed if we cannot get its memory status
+    if(unlikely(!managed_log(p, PID_LOG_STATUS, read_proc_pid_status(p, ptr))))
+        // there is no reason to proceed if we cannot get its status
         return 0;
 
     // --------------------------------------------------------------------
@@ -2387,13 +2456,12 @@ static size_t zero_all_targets(struct target *root) {
         // w->rss = 0;
         w->processes = 0;
 
-        w->statm_size = 0;
-        w->statm_resident = 0;
-        w->statm_share = 0;
-        // w->statm_text = 0;
-        // w->statm_lib = 0;
-        // w->statm_data = 0;
-        // w->statm_dirty = 0;
+        w->status_vmsize = 0;
+        w->status_vmrss = 0;
+        w->status_vmshared = 0;
+        w->status_rssfile = 0;
+        w->status_rssshmem = 0;
+        w->status_vmswap = 0;
 
         w->io_logical_bytes_read = 0;
         w->io_logical_bytes_written = 0;
@@ -2539,13 +2607,12 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
 
     // w->rss += p->rss;
 
-    w->statm_size += p->statm_size;
-    w->statm_resident += p->statm_resident;
-    w->statm_share += p->statm_share;
-    // w->statm_text += p->statm_text;
-    // w->statm_lib += p->statm_lib;
-    // w->statm_data += p->statm_data;
-    // w->statm_dirty += p->statm_dirty;
+    w->status_vmsize   += p->status_vmsize;
+    w->status_vmrss    += p->status_vmrss;
+    w->status_vmshared += p->status_vmshared;
+    w->status_rssfile  += p->status_rssfile;
+    w->status_rssshmem += p->status_rssshmem;
+    w->status_vmswap   += p->status_vmswap;
 
     w->io_logical_bytes_read    += p->io_logical_bytes_read;
     w->io_logical_bytes_written += p->io_logical_bytes_written;
@@ -2978,14 +3045,21 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_BEGIN(type, "mem", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            send_SET(w->name, (w->statm_resident > w->statm_share)?(w->statm_resident - w->statm_share):0ULL);
+            send_SET(w->name, (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared):0ULL);
     }
     send_END();
 
     send_BEGIN(type, "vmem", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            send_SET(w->name, w->statm_size);
+            send_SET(w->name, w->status_vmsize);
+    }
+    send_END();
+
+    send_BEGIN(type, "swap", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            send_SET(w->name, w->status_vmswap);
     }
     send_END();
 
@@ -3090,22 +3164,22 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
+            fprintf(stdout, "DIMENSION %s '' absolute %zu %ld\n", w->name, pagesize, 1024L*1024L);
     }
 
-    fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MB' mem %s.vmem stacked 20004 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MB' mem %s.vmem stacked 20005 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, sysconf(_SC_PAGESIZE), 1024L*1024L);
+            fprintf(stdout, "DIMENSION %s '' absolute %zu %ld\n", w->name, pagesize, 1024L*1024L);
     }
 
-    fprintf(stdout, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20005 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20006 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    fprintf(stdout, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20004 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.processes '' '%s Processes' 'processes' processes %s.processes stacked 20007 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
@@ -3131,7 +3205,13 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         }
     }
 
-    fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20010 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.swap '' '%s Swap Memory' 'MB' swap %s.swap stacked 20011 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute %zu %ld\n", w->name, pagesize, 1024L*1024L);
+    }
+
+    fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20012 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
@@ -3421,6 +3501,9 @@ static int check_capabilities() {
 
 int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
+
+    pagesize = (size_t)sysconf(_SC_PAGESIZE);
+    kb_per_page = pagesize / 1024;
 
     // set the name for logging
     program_name = "apps.plugin";

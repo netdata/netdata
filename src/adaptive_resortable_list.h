@@ -51,6 +51,9 @@ typedef struct arl_entry {
 
     uint8_t flags;          // ARL_ENTRY_FLAG_*
 
+    // the processor to do the job
+    void (*processor)(const char *name, uint32_t hash, const char *value, void *dst);
+
     // double linked list for fast re-linkings
     struct arl_entry *prev, *next;
 } ARL_ENTRY;
@@ -102,7 +105,8 @@ extern void arl_free(ARL_BASE *arl_base);
 
 // register an expected keyword to the ARL
 // together with its destination ( i.e. the output of the processor() )
-extern ARL_ENTRY *arl_expect(ARL_BASE *base, const char *keyword, void *dst);
+extern ARL_ENTRY *arl_expect_custom(ARL_BASE *base, const char *keyword, void (*processor)(const char *name, uint32_t hash, const char *value, void *dst), void *dst);
+#define arl_expect(base, keyword, dst) arl_expect_custom(base, keyword, NULL, dst)
 
 // an internal call to complete the check() call
 extern int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *value);
@@ -138,7 +142,7 @@ static inline int arl_check(ARL_BASE *base, const char *keyword, const char *val
 
         // execute the processor
         if(unlikely(e->dst)) {
-            base->processor(e->name, e->hash, value, e->dst);
+            e->processor(e->name, e->hash, value, e->dst);
             base->found++;
         }
 
@@ -148,8 +152,10 @@ static inline int arl_check(ARL_BASE *base, const char *keyword, const char *val
             base->next_keyword = base->head;
 
         // stop if we collected all the values for this iteration
-        if(unlikely(base->found == base->wanted))
+        if(unlikely(base->found == base->wanted)) {
+            // fprintf(stderr, "FOUND ALL WANTED 2: found = %zu, wanted = %zu, expected %zu\n", base->found, base->wanted, base->expected);
             return 1;
+        }
 
         return 0;
     }
