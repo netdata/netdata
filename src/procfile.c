@@ -39,7 +39,8 @@ char *procfile_filename(procfile *ff) {
 // ----------------------------------------------------------------------------
 // An array of words
 
-static inline void pfwords_add(procfile *ff, char *str) {
+NOINLINE
+static void pfwords_add(procfile *ff, char *str) {
     // debug(D_PROCFILE, PF_PREFIX ":   adding word No %d: '%s'", fw->len, str);
 
     pfwords *fw = ff->words;
@@ -139,14 +140,6 @@ void procfile_close(procfile *ff) {
     freez(ff);
 }
 
-NOINLINE NEVERNULL
-static char *procfile_parser_add_word(procfile *ff, char *begin, char *end, size_t *line_words) {
-    *end = '\0';
-    pfwords_add(ff, begin);
-    (*line_words)++;
-    return end + 1;
-}
-
 NOINLINE
 static void procfile_parser(procfile *ff) {
     // debug(D_PROCFILE, PF_PREFIX ": Parsing file '%s'", ff->filename);
@@ -171,25 +164,32 @@ static void procfile_parser(procfile *ff) {
             s++;
         }
         else if(likely(ct == PF_CHAR_IS_SEPARATOR)) {
-            if(likely(!quote && !opened)) {
-                if (likely(s != t)) {
-                    // ending separator
-                    s = t = procfile_parser_add_word(ff, t, s, line_words);
+            if(!quote && !opened) {
+                if (s != t) {
+                    // separator, but we have word before it
+                    *s = '\0';
+                    pfwords_add(ff, t);
+                    (*line_words)++;
+                    t = ++s;
                 }
                 else {
-                    // starting separator
+                    // separator at the beginning
                     // skip it
                     t = ++s;
                 }
             }
             else {
-                // we are inside a quote
+                // we are inside a quote or parenthesized string
                 s++;
             }
         }
         else if(likely(ct == PF_CHAR_IS_NEWLINE)) {
             // end of line
-            s = t = procfile_parser_add_word(ff, t, s, line_words);
+
+            *s = '\0';
+            pfwords_add(ff, t);
+            (*line_words)++;
+            t = ++s;
 
             // debug(D_PROCFILE, PF_PREFIX ":   ended line %d with %d words", l, ff->lines->lines[l].words);
 
@@ -205,7 +205,10 @@ static void procfile_parser(procfile *ff) {
                 // quote closed
                 quote = 0;
 
-                s = t = procfile_parser_add_word(ff, t, s, line_words);
+                *s = '\0';
+                pfwords_add(ff, t);
+                (*line_words)++;
+                t = ++s;
             }
             else
                 s++;
@@ -227,7 +230,10 @@ static void procfile_parser(procfile *ff) {
                 opened--;
 
                 if(!opened) {
-                    s = t = procfile_parser_add_word(ff, t, s, line_words);
+                    *s = '\0';
+                    pfwords_add(ff, t);
+                    (*line_words)++;
+                    t = ++s;
                 }
                 else
                     s++;
@@ -246,7 +252,10 @@ static void procfile_parser(procfile *ff) {
             s = &ff->data[ff->size - 1];
         }
 
-        procfile_parser_add_word(ff, t, s, line_words);
+        *s = '\0';
+        pfwords_add(ff, t);
+        (*line_words)++;
+        // t = ++s;
     }
 }
 
