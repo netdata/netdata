@@ -346,7 +346,6 @@ struct pid_stat {
 };
 
 size_t pagesize;
-size_t kb_per_page;
 
 // log each problem once per process
 // log flood protection flags (log_thrown)
@@ -909,7 +908,7 @@ void arl_callback_status_vmsize(const char *name, uint32_t hash, const char *val
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_vmsize = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+    aptr->p->status_vmsize = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
 void arl_callback_status_vmswap(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -917,7 +916,7 @@ void arl_callback_status_vmswap(const char *name, uint32_t hash, const char *val
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_vmswap = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+    aptr->p->status_vmswap = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
 void arl_callback_status_vmrss(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -925,7 +924,7 @@ void arl_callback_status_vmrss(const char *name, uint32_t hash, const char *valu
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_vmrss = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+    aptr->p->status_vmrss = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
 void arl_callback_status_rssfile(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -933,7 +932,7 @@ void arl_callback_status_rssfile(const char *name, uint32_t hash, const char *va
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_rssfile = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+    aptr->p->status_rssfile = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 
 void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -941,7 +940,7 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->status_rssshmem = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) / kb_per_page;
+    aptr->p->status_rssshmem = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1));
 }
 #endif // !__FreeBSD__
 
@@ -958,8 +957,8 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
 
     p->uid                  = proc_info->ki_uid;
     p->gid                  = proc_info->ki_groups[0];
-    p->status_vmsize        = proc_info->ki_size / pagesize;
-    p->status_vmrss         = proc_info->ki_rssize;
+    p->status_vmsize        = proc_info->ki_size / 1024; // in kB
+    p->status_vmrss         = proc_info->ki_rssize * pagesize / 1024; // in kB
     // FIXME: what about shared and swap memory on FreeBSD?
     return 1;
 #else
@@ -3164,13 +3163,13 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute %zu %ld\n", w->name, pagesize, 1024L*1024L);
+            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
 
     fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MB' mem %s.vmem stacked 20005 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute %zu %ld\n", w->name, pagesize, 1024L*1024L);
+            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
 
     fprintf(stdout, "CHART %s.threads '' '%s Threads' 'threads' processes %s.threads stacked 20006 %d\n", type, title, type, update_every);
@@ -3208,7 +3207,7 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     fprintf(stdout, "CHART %s.swap '' '%s Swap Memory' 'MB' swap %s.swap stacked 20011 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute %zu %ld\n", w->name, pagesize, 1024L*1024L);
+            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
 
     fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20012 %d\n", type, title, type, update_every);
@@ -3503,7 +3502,6 @@ int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
-    kb_per_page = pagesize / 1024;
 
     // set the name for logging
     program_name = "apps.plugin";
