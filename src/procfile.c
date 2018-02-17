@@ -139,22 +139,10 @@ void procfile_close(procfile *ff) {
     freez(ff);
 }
 
-__attribute__((noinline))
 static void _procfile_parser_add_word(procfile *ff, size_t line, char *begin, char *end) {
     *end = '\0';
     ff->words = pfwords_add(ff->words, begin);
     ff->lines->lines[line].words++;
-}
-
-__attribute__((noinline))
-static char *_procfile_parser_skip_word(char *begin, char *end, PF_CHAR_TYPE *ct, PF_CHAR_TYPE *separators) {
-    PF_CHAR_TYPE c = PF_CHAR_IS_NEWLINE;
-
-    while(begin < end && (c = separators[(unsigned char)(*begin)]) == PF_CHAR_IS_WORD)
-        begin++;
-
-    *ct = c;
-    return begin;
 }
 
 static void procfile_parser(procfile *ff) {
@@ -174,12 +162,10 @@ static void procfile_parser(procfile *ff) {
         , w = 0                         // counts the number of words we added
         , opened = 0;                   // counts the number of open parenthesis
 
-    PF_CHAR_TYPE ct;
-
     ff->lines = pflines_add(ff->lines, w);
 
-    while((s = _procfile_parser_skip_word(s, e, &ct, separators)) < e) {
-        // we are not at the end
+    while(s < e) {
+        PF_CHAR_TYPE ct = separators[(unsigned char)(*s)];
 
         // this is faster than a switch()
         if(likely(ct == PF_CHAR_IS_WORD)) {
