@@ -248,6 +248,11 @@ if FREEBSD
 apps_plugin_SOURCES += \
 	plugin_freebsd.h \
 	$(NULL)
+else
+apps_plugin_SOURCES += \
+	adaptive_resortable_list.c \
+	adaptive_resortable_list.h \
+	$(NULL)
 endif
 
 apps_plugin_LDADD = \
