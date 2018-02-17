@@ -3055,13 +3055,15 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 
+#ifndef __FreeBSD__
     send_BEGIN(type, "swap", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             send_SET(w->name, w->status_vmswap);
     }
     send_END();
-
+#endif
+    
     send_BEGIN(type, "minor_faults", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
@@ -3204,11 +3206,13 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         }
     }
 
+#ifndef __FreeBSD__
     fprintf(stdout, "CHART %s.swap '' '%s Swap Memory' 'MB' swap %s.swap stacked 20011 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
+#endif
 
     fprintf(stdout, "CHART %s.major_faults '' '%s Major Page Faults (swap read)' 'page faults/s' swap %s.major_faults stacked 20012 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
