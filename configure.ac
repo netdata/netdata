@@ -124,6 +124,7 @@ AC_ARG_ENABLE(
 AX_GCC_FUNC_ATTRIBUTE([returns_nonnull])
 AX_GCC_FUNC_ATTRIBUTE([malloc])
 AX_GCC_FUNC_ATTRIBUTE([noreturn])
+AX_GCC_FUNC_ATTRIBUTE([noinline])
 AX_GCC_FUNC_ATTRIBUTE([format])
 AX_GCC_FUNC_ATTRIBUTE([warn_unused_result])
 
