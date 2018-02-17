@@ -139,7 +139,25 @@ void procfile_close(procfile *ff) {
     freez(ff);
 }
 
-static inline void procfile_parser(procfile *ff) {
+__attribute__((noinline))
+static void _procfile_parser_add_word(procfile *ff, size_t line, char *begin, char *end) {
+    *end = '\0';
+    ff->words = pfwords_add(ff->words, begin);
+    ff->lines->lines[line].words++;
+}
+
+__attribute__((noinline))
+static char *_procfile_parser_skip_word(char *begin, char *end, PF_CHAR_TYPE *ct, PF_CHAR_TYPE *separators) {
+    PF_CHAR_TYPE c = PF_CHAR_IS_NEWLINE;
+
+    while(begin < end && (c = separators[(unsigned char)(*begin)]) == PF_CHAR_IS_WORD)
+        begin++;
+
+    *ct = c;
+    return begin;
+}
+
+static void procfile_parser(procfile *ff) {
     // debug(D_PROCFILE, PF_PREFIX ": Parsing file '%s'", ff->filename);
 
     char  *s = ff->data                 // our current position
@@ -156,52 +174,46 @@ static inline void procfile_parser(procfile *ff) {
         , w = 0                         // counts the number of words we added
         , opened = 0;                   // counts the number of open parenthesis
 
+    PF_CHAR_TYPE ct;
+
     ff->lines = pflines_add(ff->lines, w);
 
-    while(likely(s < e)) {
+    while((s = _procfile_parser_skip_word(s, e, &ct, separators)) < e) {
         // we are not at the end
-        PF_CHAR_TYPE ct = separators[(unsigned char)(*s)];
 
         // this is faster than a switch()
         if(likely(ct == PF_CHAR_IS_WORD)) {
             s++;
         }
         else if(likely(ct == PF_CHAR_IS_SEPARATOR)) {
-            if(unlikely(quote || opened)) {
+            if(likely(!quote && !opened)) {
+                if (likely(s != t)) {
+                    // ending separator
+                    _procfile_parser_add_word(ff, l, t, s);
+                    w++;
+                    t = ++s;
+                }
+                else {
+                    // starting separator
+                    // skip it
+                    t = ++s;
+                }
+            }
+            else {
                 // we are inside a quote
                 s++;
-                continue;
             }
-
-            if(unlikely(s == t)) {
-                // skip all leading white spaces
-                t = ++s;
-                continue;
-            }
-
-            // end of word
-            *s = '\0';
-
-            ff->words = pfwords_add(ff->words, t);
-            ff->lines->lines[l].words++;
-            w++;
-
-            t = ++s;
         }
         else if(likely(ct == PF_CHAR_IS_NEWLINE)) {
             // end of line
-            *s = '\0';
-
-            ff->words = pfwords_add(ff->words, t);
-            ff->lines->lines[l].words++;
+            _procfile_parser_add_word(ff, l, t, s);
             w++;
+            t = ++s;
 
             // debug(D_PROCFILE, PF_PREFIX ":   ended line %d with %d words", l, ff->lines->lines[l].words);
 
             ff->lines = pflines_add(ff->lines, w);
             l++;
-
-            t = ++s;
         }
         else if(likely(ct == PF_CHAR_IS_QUOTE)) {
             if(unlikely(!quote && s == t)) {
@@ -213,11 +225,8 @@ static inline void procfile_parser(procfile *ff) {
                 // quote closed
                 quote = 0;
 
-                *s = '\0';
-                ff->words = pfwords_add(ff->words, t);
-                ff->lines->lines[l].words++;
+                _procfile_parser_add_word(ff, l, t, s);
                 w++;
-
                 t = ++s;
             }
             else
@@ -240,11 +249,8 @@ static inline void procfile_parser(procfile *ff) {
                 opened--;
 
                 if(!opened) {
-                    *s = '\0';
-                    ff->words = pfwords_add(ff->words, t);
-                    ff->lines->lines[l].words++;
+                    _procfile_parser_add_word(ff, l, t, s);
                     w++;
-
                     t = ++s;
                 }
                 else
@@ -259,15 +265,12 @@ static inline void procfile_parser(procfile *ff) {
 
     if(likely(s > t && t < e)) {
         // the last word
-        if(likely(ff->len < ff->size))
-            *s = '\0';
-        else {
+        if(unlikely(ff->len >= ff->size)) {
             // we are going to loose the last byte
-            ff->data[ff->size - 1] = '\0';
+            s = &ff->data[ff->size - 1];
         }
 
-        ff->words = pfwords_add(ff->words, t);
-        ff->lines->lines[l].words++;
+        _procfile_parser_add_word(ff, l, t, s);
     }
 }
 
