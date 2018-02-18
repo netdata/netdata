@@ -1,8 +1,8 @@
 #include "common.h"
 
-static collected_number read_proc_uptime(void) {
-    static procfile *ff = NULL;
+static procfile *ff = NULL;
 
+static collected_number read_proc_uptime(void) {
     if(unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/uptime");
@@ -41,6 +41,7 @@ int do_proc_uptime(int update_every, usec_t dt) {
         if(delta < 0) delta = -delta;
 
         if(delta <= 1000) {
+            procfile_close(ff);
             info("Using now_boottime_usec() for uptime (dt is %lld ms)", delta);
             use_boottime = 1;
         }
