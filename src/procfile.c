@@ -39,8 +39,7 @@ char *procfile_filename(procfile *ff) {
 // ----------------------------------------------------------------------------
 // An array of words
 
-NOINLINE
-static void pfwords_add(procfile *ff, char *str) {
+static inline void pfwords_add(procfile *ff, char *str) {
     // debug(D_PROCFILE, PF_PREFIX ":   adding word No %d: '%s'", fw->len, str);
 
     pfwords *fw = ff->words;
@@ -55,7 +54,7 @@ static void pfwords_add(procfile *ff, char *str) {
 }
 
 NEVERNULL
-static pfwords *pfwords_new(void) {
+static inline pfwords *pfwords_new(void) {
     // debug(D_PROCFILE, PF_PREFIX ":   initializing words");
 
     size_t size = (procfile_adaptive_initial_allocation) ? procfile_max_words : PFWORDS_INCREASE_STEP;
@@ -81,8 +80,8 @@ static inline void pfwords_free(pfwords *fw) {
 // ----------------------------------------------------------------------------
 // An array of lines
 
-NEVERNULL NOINLINE
-static size_t *pflines_add(procfile *ff) {
+NEVERNULL
+static inline size_t *pflines_add(procfile *ff) {
     // debug(D_PROCFILE, PF_PREFIX ":   adding line %d at word %d", fl->len, first_word);
 
     pflines *fl = ff->lines;
@@ -101,7 +100,7 @@ static size_t *pflines_add(procfile *ff) {
 }
 
 NEVERNULL
-static pflines *pflines_new(void) {
+static inline pflines *pflines_new(void) {
     // debug(D_PROCFILE, PF_PREFIX ":   initializing lines");
 
     size_t size = (unlikely(procfile_adaptive_initial_allocation)) ? procfile_max_words : PFLINES_INCREASE_STEP;
