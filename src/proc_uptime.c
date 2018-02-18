@@ -1,13 +1,6 @@
 #include "common.h"
 
-int do_proc_uptime(int update_every, usec_t dt) {
-    (void)dt;
-
-    collected_number uptime = 0;
-
-#ifdef CLOCK_BOOTTIME_IS_AVAILABLE
-    uptime = now_boottime_usec() / 1000;
-#else
+static collected_number read_proc_uptime(void) {
     static procfile *ff = NULL;
 
     if(unlikely(!ff)) {
@@ -32,7 +25,38 @@ int do_proc_uptime(int update_every, usec_t dt) {
         return 1;
     }
 
-    uptime = (collected_number)(strtold(procfile_lineword(ff, 0, 0), NULL) * 1000.0);
+    return (collected_number)(strtold(procfile_lineword(ff, 0, 0), NULL) * 1000.0);
+}
+
+int do_proc_uptime(int update_every, usec_t dt) {
+    (void)dt;
+
+    collected_number uptime;
+
+#ifdef CLOCK_BOOTTIME_IS_AVAILABLE
+    static int use_boottime = -1;
+
+    if(unlikely(use_boottime == -1)) {
+        long long delta = (long long)(now_boottime_usec() / 1000) - (long long)read_proc_uptime();
+        if(delta < 0) delta = -delta;
+
+        if(delta <= 1000) {
+            info("Using now_boottime_usec() for uptime (dt is %lld ms)", delta);
+            use_boottime = 1;
+        }
+        else {
+            info("Using /proc/uptime for uptime (dt is %lld ms)", delta);
+            use_boottime = 0;
+        }
+    }
+
+    if(use_boottime)
+        uptime = now_boottime_usec() / 1000;
+    else
+        uptime = read_proc_uptime();
+
+#else
+    uptime = read_proc_uptime();
 #endif
 
     // --------------------------------------------------------------------
