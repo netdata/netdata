@@ -160,6 +160,7 @@ static void procfile_parser(procfile *ff) {
         PF_CHAR_TYPE ct = separators[(unsigned char)(*s)];
 
         // this is faster than a switch()
+        // read more here: http://lazarenko.me/switch/
         if(likely(ct == PF_CHAR_IS_WORD)) {
             s++;
         }
