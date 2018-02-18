@@ -1,39 +1,72 @@
 #include "common.h"
 
-int do_proc_uptime(int update_every, usec_t dt) {
-    (void)dt;
-
-    collected_number uptime = 0;
-
+static inline collected_number uptime_from_boottime(void) {
 #ifdef CLOCK_BOOTTIME_IS_AVAILABLE
-    uptime = now_boottime_usec() / 1000;
+    return now_boottime_usec() / 1000;
 #else
-    static procfile *ff = NULL;
+    error("uptime cannot be read from CLOCK_BOOTTIME on this system.");
+    return 0;
+#endif
+}
 
-    if(unlikely(!ff)) {
+static procfile *read_proc_uptime_ff = NULL;
+static inline collected_number read_proc_uptime(void) {
+    if(unlikely(!read_proc_uptime_ff)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/uptime");
 
-        ff = procfile_open(config_get("plugin:proc:/proc/uptime", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
-        if(unlikely(!ff))
-            return 1;
+        read_proc_uptime_ff = procfile_open(config_get("plugin:proc:/proc/uptime", "filename to monitor", filename), " \t", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!read_proc_uptime_ff)) return 0;
     }
 
-    ff = procfile_readall(ff);
-    if(unlikely(!ff))
-        return 0; // we return 0, so that we will retry to open it next time
+    read_proc_uptime_ff = procfile_readall(read_proc_uptime_ff);
+    if(unlikely(!read_proc_uptime_ff)) return 0;
 
-    if(unlikely(procfile_lines(ff) < 1)) {
+    if(unlikely(procfile_lines(read_proc_uptime_ff) < 1)) {
         error("/proc/uptime has no lines.");
-        return 1;
+        return 0;
     }
-    if(unlikely(procfile_linewords(ff, 0) < 1)) {
+    if(unlikely(procfile_linewords(read_proc_uptime_ff, 0) < 1)) {
         error("/proc/uptime has less than 1 word in it.");
-        return 1;
+        return 0;
     }
 
-    uptime = (collected_number)(strtold(procfile_lineword(ff, 0, 0), NULL) * 1000.0);
-#endif
+    return (collected_number)(strtold(procfile_lineword(read_proc_uptime_ff, 0, 0), NULL) * 1000.0);
+}
+
+int do_proc_uptime(int update_every, usec_t dt) {
+    (void)dt;
+
+    static int use_boottime = -1;
+
+    if(unlikely(use_boottime == -1)) {
+        collected_number uptime_boottime = uptime_from_boottime();
+        collected_number uptime_proc     = read_proc_uptime();
+
+        long long delta = (long long)uptime_boottime - (long long)uptime_proc;
+        if(delta < 0) delta = -delta;
+
+        if(delta <= 1000 && uptime_boottime != 0) {
+            procfile_close(read_proc_uptime_ff);
+            info("Using now_boottime_usec() for uptime (dt is %lld ms)", delta);
+            use_boottime = 1;
+        }
+        else if(uptime_proc != 0) {
+            info("Using /proc/uptime for uptime (dt is %lld ms)", delta);
+            use_boottime = 0;
+        }
+        else {
+            error("Cannot find any way to read uptime on this system.");
+            return 1;
+        }
+    }
+
+    collected_number uptime;
+    if(use_boottime)
+        uptime = uptime_from_boottime();
+    else
+        uptime = read_proc_uptime();
+
 
     // --------------------------------------------------------------------
 
