@@ -3588,7 +3588,7 @@ int main(int argc, char **argv) {
 #warning "compiling for profiling"
         static int profiling_count=0;
         profiling_count++;
-        if(unlikely(profiling_count > 1000)) exit(0);
+        if(unlikely(profiling_count > 2000)) exit(0);
         usec_t dt = update_every * USEC_PER_SEC;
 #else
         usec_t dt = heartbeat_next(&hb, step);

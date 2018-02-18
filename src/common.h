@@ -159,6 +159,12 @@
 #define NEVERNULL
 #endif
 
+#ifdef HAVE_FUNC_ATTRIBUTE_NOINLINE
+#define NOINLINE __attribute__((noinline))
+#else
+#define NOINLINE
+#endif
+
 #ifdef HAVE_FUNC_ATTRIBUTE_MALLOC
 #define MALLOCLIKE __attribute__((malloc))
 #else
