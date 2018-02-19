@@ -233,7 +233,7 @@ class Service(SocketService):
         self.peers = dict()
         self.request = str()
         self.retries = 0
-        self.all_peers = self.configuration.get('all_peers', False)
+        self.show_peers = self.configuration.get('show_peers', False)
 
         peer_filter = self.configuration.get('peer_filter', r'127\..*')
         try:
@@ -274,7 +274,7 @@ class Service(SocketService):
 
         data.update(self.system.get_data(raw))
 
-        if not self.all_peers:
+        if not self.show_peers:
             return data
 
         # TODO: run self.find_new_peers() every N runs?
