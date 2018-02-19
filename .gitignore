@@ -5,6 +5,9 @@
 config.h.in
 Makefile.in
 *~
+*.old
+*.log
+*.pyc
 
 Makefile
 aclocal.m4
@@ -12,7 +15,6 @@ autom4te.cache
 compile
 config.guess
 config.h
-config.log
 config.status
 config.sub
 configure
@@ -22,45 +24,37 @@ libtool
 ltmain.sh
 missing
 stamp-h1
+netdata.spec
 
+# netdata binaries
 netdata
 apps.plugin
 freeipmi.plugin
-netdata.spec
+cgroup-network
 
+# netdata makeself archives
 *.tar.*
+*.run
 
-cmake-build-debug/
+# netdata makeself downloads
 makeself/tmp/
-sitespeed-result/
+
+# coverity
 cov-int/
 netdata-coverity-analysis.tgz
 .coverity-token
 .coverity-build
 
-.cproject
+.cproject/
 .idea/
 .vscode/
-.project
+.project/
+.settings/
 README
 TODO.md
-asan_symbolize.py
-charts.d/bind.chart.sh
 conf.d/netdata.conf
-conf.d/netdata.conf.old
-isolate-0x1e0e170-v8.log
-lan-hosts.sh
-modp_numtoa.c
-plugins.d/apache_mod_status.plugin
-plugins.d/apps.plugin.old
-src/.cproject
-src/.project
-src/.settings/
 src/TODO.txt
-src/rrddim_file.c
-system/netdata.service
-valgrind.log
-valgrind2.log
+
 web/chart-info/
 web/control.html
 web/datasource.css
@@ -76,43 +70,49 @@ system/netdata-lsb
 system/netdata-openrc
 system/netdata-init-d
 system/netdata.logrotate
-python.d/python-modules-installer.sh
+system/netdata.service
+system/netdata-freebsd
 
-netdata-installer.log
+# installer generated files
 netdata-uninstaller.sh
 netdata-updater.sh
 
-gmon.out
-gmon.txt
-apps.plugin-profiler.sh
-
+# cmake files
+cmake-build-debug/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 
+# jetbrains IDE
 .jetbrains*
 
 .DS_Store
 
 contrib/debian/changelog
-profile/benchmark-dictionary
-profile/benchmark-registry
-profile/test-eval
-profile/benchmark-line-parsing
-profile/statsd-stress
 
-*.pyc
-*.run
-
+# converted diagrams
 diagrams/*.png
 diagrams/*.svg
 diagrams/*.atxt
 diagrams/plantuml.jar
 
-src/cgroup-network
-vgcore.*
-
+# cppcheck
 src/cppcheck-build/
+
+# debugging / profiling
 makeself/debug/
+profile/benchmark-dictionary
+profile/benchmark-registry
+profile/test-eval
+profile/benchmark-line-parsing
+profile/benchmark-procfile-parser
+profile/statsd-stress
+oprofile_data/
+vgcore.*
+callgrind.out.*
+gmon.out
+gmon.txt
+sitespeed-result/
 
-
+# tests and temp files
+python.d/python-modules-installer.sh
