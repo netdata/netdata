@@ -1521,7 +1521,7 @@ update_every: 10
 
 host: 'localhost'
 port: '123'
-all_peers: yes
+show_peers: yes
 peer_filter: '(127\..*)|(192\.168\..*)'
 ```
 
@@ -1537,7 +1537,7 @@ otherhost:
     host: 'otherhost'
 ```
 
-If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123` and show charts for the systemvars. Use `all_peers: yes` to also show the charts for configured peers. Local peers (127.*) are hidden by default, use `peer_filter: ''` to show all.
+If no configuration is given, module will attempt to connect to `ntpd` on `::1:123` or `127.0.0.1:123` and show charts for the systemvars. Use `show_peers: yes` to also show the charts for configured peers. Local peers (127.*) are hidden by default, use `peer_filter: ''` to show all.
 
 ---
 
