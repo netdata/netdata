@@ -234,21 +234,18 @@ class Service(SocketService):
         self.request = str()
         self.retries = 0
         self.show_peers = self.configuration.get('show_peers', False)
-
-        peer_filter = self.configuration.get('peer_filter', r'127\..*')
-        try:
-            self.peer_filter = re.compile(r'^((0\.0\.0\.0)|({0}))$'.format(peer_filter))
-        except re.error as error:
-            self.error('Compile pattern error : {0}'.format(error))
-            self.peer_filter = None
+        self.peer_filter = None
 
     def check(self):
         """
         Checks if we can get valid systemvars.
         If not, returns None to disable module.
         """
-
-        if not self.peer_filter:
+        peer_filter = self.configuration.get('peer_filter', r'127\..*')
+        try:
+            self.peer_filter = re.compile(r'^((0\.0\.0\.0)|({0}))$'.format(peer_filter))
+        except re.error as error:
+            self.error('Compile pattern error : {0}'.format(error))
             return None
 
         self._parse_config()
