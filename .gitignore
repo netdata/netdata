@@ -69,8 +69,8 @@ web/index_new.html
 web/version.txt
 
 # related to karma/javascript/node
-node_modules/
-coverage/
+/node_modules/
+/coverage/
 
 system/netdata-lsb
 system/netdata-openrc
