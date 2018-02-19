@@ -531,6 +531,7 @@ declare -A configs_signatures=(
   ['ddda2bb1c88be03b637d3285406f7910']='health.d/named.conf'
   ['dddc4f93e6187fe4220eb6bf5e20f095']='health.d/ram.conf'
   ['de02f899a61f21b86adb646940f0bcae']='health.d/net.conf'
+  ['de581daa11e267a583776bd8b8179884']='python.d/postgres.conf'
   ['de5fe159e14b481d6bd69856eaddd242']='health_alarm_notify.conf'
   ['def883f35986c9d25de63b1a8e7d0f46']='health.d/entropy.conf'
   ['df381f3a7ca9fb2b4b43ae7cb7a4c492']='python.d/mysql.conf'
