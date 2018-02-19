@@ -219,10 +219,6 @@ class Peer(Base):
             data[dimension] = float(value) * PRECISION
         return data
 
-    def rebuild_request(self, new_idx):
-        self.id = new_idx
-        self.request = self.get_header(self.id)
-
 
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
@@ -300,16 +296,11 @@ class Service(SocketService):
         if new_peers:
 
             peers_to_remove = set(self.peers) - set(new_peers)
-            peers_to_update = set(self.peers) & set(new_peers)
             peers_to_add = set(new_peers) - set(self.peers)
 
             for peer_name in peers_to_remove:
                 self.hide_old_peer_from_charts(self.peers[peer_name])
                 del self.peers[peer_name]
-
-            for peer_name in peers_to_update:
-                if new_peers[peer_name].id != self.peers[peer_name].id:
-                    self.peers[peer_name].rebuild_request(new_peers[peer_name].id)
 
             for peer_name in peers_to_add:
                 self.add_new_peer_to_charts(new_peers[peer_name])
