@@ -43,6 +43,7 @@ dist_python_DATA = \
     nsd.chart.py \
     ovpn_status_log.chart.py \
     phpfpm.chart.py \
+    portcheck.chart.py \
     postfix.chart.py \
     postgres.chart.py \
     powerdns.chart.py \
