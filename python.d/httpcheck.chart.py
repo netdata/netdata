@@ -82,9 +82,10 @@ class Service(UrlService):
         data[HTTP_ERROR] = 0
         url = self.url
         try:
+            retries = 1 if self.follow_redirect else False
             start = time.time()
             response = self._manager.request(
-                method='GET', url=url, timeout=self.request_timeout, retries=1, headers=self._manager.headers,
+                method='GET', url=url, timeout=self.request_timeout, retries=retries, headers=self._manager.headers,
                 redirect=self.follow_redirect
             )
             diff = time.time() - start
@@ -102,12 +103,12 @@ class Service(UrlService):
             else:
                 data[HTTP_ERROR] = STATUS_NOT_ACCEPTED
 
-        except urllib3.exceptions.TimeoutError:
-            self.debug("Connection timed out: {url}".format(url=url))
+        except (urllib3.exceptions.TimeoutError, urllib3.exceptions.PoolError) as error:
+            self.debug("Connection timed out: {url}. Error: {error}".format(url=url, error=error))
             data[HTTP_ERROR] = CONNECTION_TIMED_OUT
 
-        except urllib3.exceptions.HTTPError:
-            self.debug("Connection timed out: {url}".format(url=url))
+        except urllib3.exceptions.HTTPError as error:
+            self.debug("Connection failed: {url}. Error: {error}".format(url=url, error=error))
             data[HTTP_ERROR] = CONNECTION_FAILED
 
         except (TypeError, AttributeError) as error:
