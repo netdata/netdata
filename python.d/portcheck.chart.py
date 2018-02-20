@@ -24,9 +24,9 @@ CHARTS = {
         ]}
 }
 
-SOCKET_FAILED = 1
-CONNECTION_FAILED = 2
-CONNECTION_TIMED_OUT = 3
+CONNECTION_FAILED = 1
+CONNECTION_TIMED_OUT = 2
+SOCKET_FAILED = 3
 
 TCP_DIMENSION_CONNECT_PREFIX = 'tcp_connect_'
 TCP_DIMENSION_ERROR_PREFIX = 'tcp_error_'
@@ -78,14 +78,18 @@ class Service(SimpleService):
 
         for port in self.ports:
             success = False
-            for socket_config in socket.getaddrinfo(self.host, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
-                # use first working socket
-                sock = self._create_socket(socket_config)
-                if sock is not None:
-                    self._connect2socket(data, socket_config, sock)
-                    self._disconnect(sock)
-                    success = True
-                    break
+            try:
+                for socket_config in socket.getaddrinfo(self.host, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                    # use first working socket
+                    sock = self._create_socket(socket_config)
+                    if sock is not None:
+                        self._connect2socket(data, socket_config, sock)
+                        self._disconnect(sock)
+                        success = True
+                        break
+            except socket.gaierror:
+                success = False
+                pass
 
             # We could not connect
             if not success:
