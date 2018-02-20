@@ -44,6 +44,7 @@ dist_pythonconfig_DATA = \
     python.d/go_expvar.conf \
     python.d/haproxy.conf \
     python.d/hddtemp.conf \
+    python.d/httpcheck.conf \
     python.d/ipfs.conf \
     python.d/isc_dhcpd.conf \
     python.d/mdstat.conf \
