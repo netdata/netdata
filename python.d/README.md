@@ -1546,6 +1546,52 @@ Without configuration, module attempts to connect to `http://localhost/status`
 
 ---
 
+# portcheck
+
+Module monitors one or more remote ports per host.
+
+Following charts are drawn per host:
+
+1. **Latency** ms
+ * For each port: TCP socket opening and closing time when connecting.
+   Displays latency in 0.1 ms resolution and 0.1ms will be the minimum.
+   If it is 0.0ms, the connection failed (useful for API)
+
+2. **Error code** int
+ * For each port: One of:
+   -  0: Connection successful
+   - -1: Could not create socket (dns name not resolved?)
+   - -2: Connection refused (port not listening or blocked)
+   - -3: Connection timed out (host unreachable?)
+
+
+### configuration
+
+```yaml
+server:
+  host: 'dns or ip'
+  ports:
+    - 22
+  timeout: 3
+  update_every: 1
+```
+
+`timeout` and `update_every` are optional with default `3` and `netdata-default (=1)`
+ (seconds) respectively.
+
+### notes
+
+ * The error code chart is intended for health check or for access via API.
+ * A system/service/firewall might block netdata's access if a portscan or
+   similar is detected.
+ * Each port check is executed in sequence. E.g. if port 22 times out after 3s and
+   port 80 takes 200ms, the whole check requires 3.2 seconds. You may want
+   to decrease the `timeout` and/or increase `update_every` in order to get
+   regular results (e.g. `'update_every' = 'number-of-ports-to-check' * 'timeout'`
+   will result in regular, though longer intervals.
+
+---
+
 # postfix
 
 Simple module executing `postfix -p` to grab postfix queue.
