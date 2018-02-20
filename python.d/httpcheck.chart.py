@@ -90,7 +90,7 @@ class Service(UrlService):
             )
             diff = time.time() - start
             data[HTTP_RESPONSE_TIME] = max(round(diff * 10000), 1)
-            self.debug('Url: {url}. Host responded with status code {code} in {diff} ms'.format(
+            self.debug('Url: {url}. Host responded with status code {code} in {diff} s'.format(
                 url=url, code=response.status, diff=diff
             ))
 
