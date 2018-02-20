@@ -2175,33 +2175,31 @@ Module uses the `health` API to provide statistics.
 
 It produces:
 
-1. **Uptime**
- * Traefik server uptime
+1. **Responses** by statuses  
+   * success (1xx, 2xx, 304)  
+   * error (5xx)  
+   * redirect (3xx except 304)  
+   * bad (4xx)  
+   * other (all other responses)  
+2. **Responses** by codes  
+   * 2xx (successful)  
+   * 5xx (internal server errors)  
+   * 3xx (redirect)  
+   * 4xx (bad)  
+   * 1xx (informational)  
+   * other (non-standart responses)  
+3. **Detailed Response Codes** requests/s (number of responses for each response code family individually)
 
-2. **Average Response Time**
- * average response time
+4. **Requests**/s   
+ * request statistics  
 
-3. **Total Response Time**
- * sum of all response time
+5. **Total response time**  
+    * sum of all response time  
+6. **Average response time**  
+7. **Average response time per iteration**  
 
-4. **Requests** requests/s
- * request statistics
-
-5. **Response by type** requests/s
-  * success (1xx, 2xx, 304)
-  * error (5xx)
-  * redirect (3xx except 304)
-  * bad (4xx)
-  * other (all other responses)
-
-6. **Response by code family** requests/s
-  * 1xx (informational)
-  * 2xx (successful)
-  * 3xx (redirect)
-  * 4xx (bad)
-  * 5xx (internal server errors)
-  * other (non-standart responses)
-  * unmatched (the lines in the log file that are not matched)
+8. **Uptime**  
+ * Traefik server uptime  
 
 ### configuration
 
