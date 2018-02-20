@@ -91,13 +91,14 @@ class Service(UrlService):
             )
             diff = time.time() - start
             data[HTTP_RESPONSE_TIME] = max(round(diff * 10000), 1)
+            self.debug('Url: {url}. Host responded with status code {code} in {diff} ms'.format(
+                url=url, code=response.status, diff=diff
+            ))
 
-            self.debug('Url: {url}. Http response status code: {code}'.format(url=url, code=response.status))
             if response.status in self.status_codes_accepted:
                 content = response.data
                 self.debug('Content: \n\n{content}\n'.format(content=content))
-                match = self.regex.search(content)
-                if match is None:
+                if self.regex.search(content) is None:
                     self.debug('No match for regex \'{regex}\' found'.format(regex=self.regex.pattern))
                     data[HTTP_ERROR] = CONTENT_MISMATCH
             else:
