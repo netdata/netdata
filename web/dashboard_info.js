@@ -177,6 +177,12 @@ netdataDashboard.menu = {
         info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
     },
 
+    'httpcheck': {
+        title: 'Http Check',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Web Service availability and latency monitoring using HTTP checks. This plugin is a specialized version of the port check plugin.'
+    },
+
     'memcached': {
         title: 'memcached',
         icon: '<i class="fas fa-database"></i>',
@@ -1125,6 +1131,22 @@ netdataDashboard.context = {
         mainheads: [
             netdataDashboard.gaugeChart('Requests', '12%', '', NETDATA.colors[0])
         ]
+    },
+
+    // ------------------------------------------------------------------------
+    // HTTP check
+
+    'httpcheck.latency': {
+        info: 'The <code>Latency</code> describes the time passed between request and response. ' +
+        'A response time of <code>0.0 ms</code> indicates a connection error.'
+    },
+
+    'httpcheck.error': {
+        valueRange: "[0, 3]",
+        info: 'The <code>Error</code> is returned by the plugin when it could not connect to the webserver. It is one of: ' +
+        '<code>0</code> (connection successful), <code>1</code> (unexpected response content), <code>2</code> (unexpected status code), ' +
+        '<code>3</code> (port unreachable), <code>4</code> (host unreachable). ' +
+        'The error code is most useful for 3rd-party apps and alarms.'
     },
 
     // ------------------------------------------------------------------------

@@ -27,7 +27,7 @@ CHARTS = {
     'responsetime': {
         'options': [None, 'HTTP response time', 'ms', 'response time', 'httpcheck.responsetime', 'line'],
         'lines': [
-            [HTTP_RESPONSE_TIME, 'response_time', 'absolute', 100, 1000]
+            [HTTP_RESPONSE_TIME, 'response time', 'absolute', 100, 1000]
         ]},
     'error': {
         'options': [None, 'HTTP check error code', 'code', 'error', 'httpcheck.error', 'line'],
@@ -66,12 +66,10 @@ class Service(UrlService):
         if not self._manager:
             return False
 
-        self.info('Enabled {url} with (redirect={redirect}, status_accepted={accepted}, update_every={update}, '
-                  'timeout={timeout})'
-            .format(
-            url=self.url, redirect=self.follow_redirect, accepted=self.status_codes_accepted,
-            update=self.update_every, timeout=self.request_timeout
-        ))
+        self.info('Enabled {url} with (redirect={redirect}, status={accepted}, interval={update}, timeout={timeout}, '
+                  'regex={regex})'
+                  .format(url=self.url, redirect=self.follow_redirect, accepted=self.status_codes_accepted,
+                          update=self.update_every, timeout=self.request_timeout, regex=self.regex.pattern))
         return True
 
     def _get_data(self):
