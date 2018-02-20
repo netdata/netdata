@@ -881,7 +881,7 @@ server:
   url: 'http://host:port/path'  # required
   status_accepted:              # optional
     - 200
-  request_timeout: 1            # optional
+  timeout: 1                    # optional, supports decimals (e.g. 0.2)
   update_every: 1               # optional
   regex: '.*'                   # optional
   redirect: yes                 # optional
