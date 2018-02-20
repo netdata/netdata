@@ -12,6 +12,7 @@ from bases.FrameworkServices.SocketService import SocketService
 update_every = 1
 priority = 60000
 retries = 60
+peer_rescan = 60
 
 # NTP Control Message Protocol constants
 MODE = 6
@@ -225,7 +226,6 @@ class Service(SocketService):
         SocketService.__init__(self, configuration=configuration, name=name)
         self.order = list(ORDER)
         self.definitions = dict(CHARTS)
-        self.definitions.update(PEER_CHARTS)
 
         self.port = 'ntp'
         self.dgram_socket = True
@@ -234,27 +234,38 @@ class Service(SocketService):
         self.request = str()
         self.retries = 0
         self.show_peers = self.configuration.get('show_peers', False)
-        self.peer_filter = None
 
     def check(self):
         """
         Checks if we can get valid systemvars.
         If not, returns None to disable module.
         """
-        peer_filter = self.configuration.get('peer_filter', r'127\..*')
-        try:
-            self.peer_filter = re.compile(r'^((0\.0\.0\.0)|({0}))$'.format(peer_filter))
-        except re.error as error:
-            self.error('Compile pattern error : {0}'.format(error))
-            return None
-
         self._parse_config()
+
+        if self.show_peers:
+            self.definitions.update(PEER_CHARTS)
+
+            peer_filter = self.configuration.get('peer_filter', r'127\..*')
+            try:
+                self.peer_filter = re.compile(r'^((0\.0\.0\.0)|({0}))$'.format(peer_filter))
+            except re.error as error:
+                self.error('Compile pattern error (peer_filter) : {0}'.format(error))
+                return None
+
+            try:
+                self.peer_rescan = int(self.configuration.get('peer_rescan', peer_rescan))
+                if self.peer_rescan <= 0:
+                    raise ValueError('int > 0 expected: {0}'.format(self.peer_rescan))
+            except ValueError as error:
+                self.error('Value error (peer_rescan) : {0}'.format(error))
+                return None
 
         self.request = self.system.request
         raw_systemvars = self._get_raw_data()
 
         if not self.system.get_data(raw_systemvars):
             return None
+
         return True
 
     def get_data(self):
@@ -274,17 +285,16 @@ class Service(SocketService):
         if not self.show_peers:
             return data
 
-        # TODO: run self.find_new_peers() every N runs?
-        if not self.peers or self.retries > 8:
+        if self.runs_counter == 1 or self.runs_counter % self.peer_rescan or self.retries > 8:
             self.find_new_peers()
-        else:
-            for peer in self.peers.values():
-                self.request = peer.request
-                peer_data = peer.get_data(self._get_raw_data())
-                if peer_data:
-                    data.update(peer_data)
-                else:
-                    self.retries += 1
+
+        for peer in self.peers.values():
+            self.request = peer.request
+            peer_data = peer.get_data(self._get_raw_data())
+            if peer_data:
+                data.update(peer_data)
+            else:
+                self.retries += 1
 
         return data
 
