@@ -14,6 +14,7 @@ class SocketService(SimpleService):
         self.host = 'localhost'
         self.port = None
         self.unix_socket = None
+        self.dgram_socket = False
         self.request = ''
         self.__socket_config = None
         self.__empty_request = "".encode()
@@ -115,7 +116,11 @@ class SocketService(SimpleService):
                 if self.__socket_config is not None:
                     self._connect2socket()
                 else:
-                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+                    if self.dgram_socket:
+                        sock_type = socket.SOCK_DGRAM
+                    else:
+                        sock_type = socket.SOCK_STREAM
+                    for res in socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC, sock_type):
                         if self._connect2socket(res):
                             break
 
@@ -158,12 +163,15 @@ class SocketService(SimpleService):
                 return False
         return True
 
-    def _receive(self):
+    def _receive(self, raw=False):
         """
         Receive data from socket
-        :return: str
+        :param raw: set `True` to return bytes
+        :type raw: bool
+        :return: decoded str or raw bytes
+        :rtype: str/bytes
         """
-        data = ""
+        data = "" if not raw else b""
         while True:
             self.debug('receiving response')
             try:
@@ -174,7 +182,7 @@ class SocketService(SimpleService):
                 break
 
             if buf is None or len(buf) == 0:  # handle server disconnect
-                if data == "":
+                if data == "" or data == b"":
                     self._socket_error('unexpectedly disconnected')
                 else:
                     self.debug('server closed the connection')
@@ -182,17 +190,20 @@ class SocketService(SimpleService):
                 break
 
             self.debug('received data')
-            data += buf.decode('utf-8', 'ignore')
+            data += buf.decode('utf-8', 'ignore') if not raw else buf
             if self._check_raw_data(data):
                 break
 
         self.debug('final response: {0}'.format(data))
         return data
 
-    def _get_raw_data(self):
+    def _get_raw_data(self, raw=False):
         """
         Get raw data with low-level "socket" module.
-        :return: str
+        :param raw: set `True` to return bytes
+        :type raw: bool
+        :return: decoded data (str) or raw data (bytes)
+        :rtype: str/bytes
         """
         if self._sock is None:
             self._connect()
@@ -203,7 +214,7 @@ class SocketService(SimpleService):
         if not self._send():
             return None
 
-        data = self._receive()
+        data = self._receive(raw)
 
         if not self._keep_alive:
             self._disconnect()
