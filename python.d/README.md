@@ -1555,14 +1555,14 @@ Following charts are drawn per host:
 1. **Latency** ms
  * For each port: TCP socket opening and closing time when connecting.
    Displays latency in 0.1 ms resolution and 0.1ms will be the minimum.
-   If it is 0.0ms, the connection failed (useful for API)
+   If it is 0.0ms, the connection failed with error code >0 (useful for API)
 
 2. **Error code** int
  * For each port: One of:
-   -  0: Connection successful
-   - -1: Could not create socket (dns name not resolved?)
-   - -2: Connection refused (port not listening or blocked)
-   - -3: Connection timed out (host unreachable?)
+   - 0: Connection successful
+   - 1: Could not create socket (dns name not resolved?)
+   - 2: Connection refused (port not listening or blocked)
+   - 3: Connection timed out (host unreachable?)
 
 
 ### configuration
