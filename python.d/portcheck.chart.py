@@ -40,7 +40,6 @@ class Service(SimpleService):
         self.chart_name = ""
         self.host = self.configuration.get('host', None)
         self.ports = self.configuration.get('ports', None)
-        self.update_every = self.configuration.get('update every', 1)
         self.timeout = self.configuration.get('timeout', 3)
 
     def check(self):
