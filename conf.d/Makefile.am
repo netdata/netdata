@@ -53,6 +53,7 @@ dist_pythonconfig_DATA = \
     python.d/nginx.conf \
     python.d/nginx_plus.conf \
     python.d/nsd.conf \
+    python.d/ntpd.conf \
     python.d/ovpn_status_log.conf \
     python.d/phpfpm.conf \
     python.d/postfix.conf \
