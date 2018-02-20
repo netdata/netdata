@@ -2194,10 +2194,9 @@ It produces:
  * request statistics  
 
 5. **Total response time**  
-    * sum of all response time  
+ * sum of all response time  
 6. **Average response time**  
 7. **Average response time per iteration**  
-
 8. **Uptime**  
  * Traefik server uptime  
 
