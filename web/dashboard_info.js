@@ -219,6 +219,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>PHP-FPM</b>, an alternative FastCGI implementation for PHP.'
     },
 
+    'portcheck': {
+        title: 'Port Check',
+        icon: '<i class="fas fa-heartbeat"></i>',
+        info: 'Service availability and latency monitoring using port checks.'
+    },
+
     'postfix': {
         title: 'postfix',
         icon: '<i class="fas fa-envelope"></i>',
@@ -1716,6 +1722,21 @@ netdataDashboard.context = {
         commonMin: true,
         commonMax: true,
         valueRange: "[0, null]"
+    },
+
+    // ------------------------------------------------------------------------
+    // Port check
+
+    'portcheck.latency': {
+        info: 'The <code>Latency</code> describes the time spent opening and closing a socket. No data is sent or received. ' +
+        'A response time of <code>0.0 ms</code> indicates a connection error.'
+    },
+
+    'portcheck.error': {
+        valueRange: "[0, 3]",
+        info: 'The <code>Error</code> is returned by the plugin when it could not connect to the host/port. It is one of: ' +
+        '<code>0</code> (connection successful), <code>1</code> (port closed), <code>2</code> (host or port timeout), <code>3</code> (hostname lookup failed). ' +
+        'The error code is most useful for 3rd-party apps and alarms.'
     },
 
     // ------------------------------------------------------------------------
