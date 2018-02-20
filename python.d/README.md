@@ -1569,15 +1569,12 @@ Following charts are drawn per host:
 
 ```yaml
 server:
-  host: 'dns or ip'
-  ports:
+  host: 'dns or ip'     # required
+  ports:                # required
     - 22
-  timeout: 3
-  update_every: 1
+  timeout: 1            # optional
+  update_every: 1       # optional
 ```
-
-`timeout` and `update_every` are optional with default `3` and `netdata-default (=1)`
- (seconds) respectively.
 
 ### notes
 
