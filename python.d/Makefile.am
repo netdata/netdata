@@ -32,6 +32,7 @@ dist_python_DATA = \
     go_expvar.chart.py \
     haproxy.chart.py \
     hddtemp.chart.py \
+    httpcheck.chart.py \
     ipfs.chart.py \
     isc_dhcpd.chart.py \
     mdstat.chart.py \
