@@ -55,22 +55,22 @@ CHARTS = {
     'total_response_time': {
         'options': [None, 'Total response time', 'seconds', 'timings', 'traefik.total_response_time', 'line'],
         'lines': [
-            ['total_response_time_sec', None, 'absolute', 1, 1]
+            ['total_response_time_sec', 'response', 'absolute']
         ]},
     'average_response_time': {
         'options': [None, 'Average response time', 'milliseconds', 'timings', 'traefik.average_response_time', 'line'],
         'lines': [
-            ['average_response_time_sec', None, 'incremental', 1000000, 1000]
+            ['average_response_time_sec', 'response', 'absolute', 1, 1000]
         ]},
     'average_response_time_per_iteration': {
         'options': [None, 'Average response time per iteration', 'milliseconds', 'timings', 'traefik.average_response_time_per_iteration', 'line'],
         'lines': [
-            ['average_response_time_per_iteration_sec', None, 'incremental', 1, 1000]
+            ['average_response_time_per_iteration_sec', 'response', 'incremental', 1, 1000]
         ]},
     'uptime': {
         'options': [None, 'Uptime', 'seconds', 'uptime', 'traefik.uptime', 'line'],
         'lines': [
-            ['uptime_sec', None, 'absolute']
+            ['uptime_sec', 'uptime', 'absolute']
         ]}
     }
 
