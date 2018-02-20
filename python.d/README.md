@@ -853,6 +853,50 @@ If no configuration is given, module will attempt to connect to hddtemp daemon o
 
 ---
 
+# httpcheck
+
+Module monitors remote http server for availability and response time.
+
+Following charts are drawn per job:
+
+1. **Response time** ms
+ * Time in 0.1 ms resolution in which the server responds. When connection is successful,
+   it will be at least 0.1 ms, even if the measured time is lower than 0.1 ms.
+   If it is 0.0 ms, the connection failed with error code >=3 (useful for API)
+
+2. **Error code** int
+ * One of:
+   - 0: Connection successful
+   - 1: Content does not satisfy regex pattern.
+   - 2: HTTP status code not accepted
+   - 3: Connection failed (port not listening or blocked)
+   - 4: Connection timed out (host unreachable?)
+
+### configuration
+
+Sample configuration and their default values.
+
+```yaml
+server:
+  url: 'http://host:port/path'  # required
+  status_accepted:              # optional
+    - 200
+  request_timeout: 1            # optional
+  update_every: 1               # optional
+  regex: '.*'                   # optional
+  redirect: yes                 # optional
+```
+
+### notes
+
+ * The error code chart is intended for health check or for access via API.
+ * A system/service/firewall might block netdata's access if a portscan or
+   similar is detected.
+ * This plugin is meant for simple use cases. For monitoring large networks
+   consider a real service monitoring tool.
+
+---
+
 # IPFS
 
 Module monitors [IPFS](https://ipfs.io) basic information.
