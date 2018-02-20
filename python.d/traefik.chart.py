@@ -110,6 +110,7 @@ class Service(UrlService):
         self.data.update(fetch_data_(raw_data=data, metrics=HEALTH_STATS))
 
         self.data['average_response_time_per_iteration_sec'] = (data['total_response_time_sec'] * 1000000) / data['total_count']
+        self.data['average_response_time_sec'] *= 1000000
 
         return self.data or None
 
