@@ -51,6 +51,7 @@ dist_python_DATA = \
     squid.chart.py \
     smartd_log.chart.py \
     tomcat.chart.py \
+    traefik.chart.py \
     varnish.chart.py \
     web_log.chart.py \
     $(NULL)
@@ -193,4 +194,3 @@ dist_python_urllib3_securetransport_DATA = \
     python_modules/urllib3/contrib/_securetransport/bindings.py \
     python_modules/urllib3/contrib/_securetransport/low_level.py \
     $(NULL)
-
