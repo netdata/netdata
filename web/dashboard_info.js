@@ -358,7 +358,7 @@ netdataDashboard.menu = {
     'ntpd': {
         title: 'ntpd',
         icon: '<i class="fas fa-clock"></i>',
-        info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> including the configured peers.'
+        info: 'Provides statistics for the internal variables of the Network Time Protocol daemon <b><a href="http://www.ntp.org/">ntpd</a></b> and optional including the configured peers (if enabled in the module configuration). The module presents the performance metrics as shown by <b><a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a></b> (the standard NTP query program) using NTP mode 6 UDP packets to communicate with the NTP server.'
     }
 };
 
@@ -513,12 +513,12 @@ netdataDashboard.submenu = {
 
     'ntpd.system': {
         title: 'system',
-        info: 'Statistics of the internal system variables as shown by <a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a> (standard NTP query program).'
+        info: 'Statistics of the system variables as shown by the readlist billboard <code>ntpq -c rl</code>. System variables are assigned an association ID of zero and can also be shown in the readvar billboard <code>ntpq -c "rv 0"</code>. These variables are used in the <a href="http://doc.ntp.org/current-stable/discipline.html">Clock Discipline Algorithm</a>, to calculate the lowest and most stable offset.'
     },
 
     'ntpd.peers': {
         title: 'peers',
-        info: 'Statistics of the peer variables for each peer as shown by <a href="http://doc.ntp.org/current-stable/ntpq.html">ntpq</a> (standard NTP query program).'
+        info: 'Statistics of the peer variables for each peer configured in <code>/etc/ntp.conf</code> as shown by the readvar billboard <code>ntpq -c "rv &lt;association&gt;"</code>, while each peer is assigned a nonzero association ID as shown by <code>ntpq -c "apeers"</code>. The module periodically scans for new/changed peers (default: every 60s). <b>ntpd</b> selects the best possible peer from the available peers to synchronize the clock. A minimum of at least 3 peers is required to properly identify the best possible peer.'
     }
 };
 
@@ -1962,6 +1962,52 @@ netdataDashboard.context = {
     'rabbitmq.disk_space': {
         info: 'Total amount of disk space consumed by the message store(s).  See <code><a href="https://www.rabbitmq.com/production-checklist.html#resource-limits-disk-space" target=_"blank">Disk Space Limits</a></code> for further details.',
         colors: NETDATA.colors[3]
+    },
+
+    // ------------------------------------------------------------------------
+    // ntpd
+
+    'ntpd.sys_offset': {
+        info: 'For hosts without any time critical services an offset of &lt; 100 ms should be acceptable even with high network latencies. For hosts with time critical services an offset of about 0.01 ms or less can be achieved by using peers with low delays and configuring optimal <b>poll exponent</b> values.',
+        colors: NETDATA.colors[4]
+    },
+
+    'ntpd.sys_jitter': {
+        info: 'The jitter statistics are exponentially-weighted RMS averages. The system jitter is defined in the NTPv4 specification; the clock jitter statistic is computed by the clock discipline module.'
+    },
+
+    'ntpd.sys_frequency': {
+        info: 'The frequency offset is shown in ppm (parts per million) relative to the frequency of the system. The frequency correction needed for the clock can vary significantly between boots and also due to external influences like temperature or radiation.',
+        colors: NETDATA.colors[2],
+        height: 0.6
+    },
+
+    'ntpd.sys_wander': {
+        info: 'The wander statistics are exponentially-weighted RMS averages.',
+        colors: NETDATA.colors[3],
+        height: 0.6
+    },
+
+    'ntpd.sys_rootdelay': {
+        info: 'The rootdelay is the roundtrip delay to the primary reference clock, similar to the delay shown by the <code>ping</code> command. A lower delay should result in a (possibly exponentially) lower clock offset.',
+        colors: NETDATA.colors[1]
+    },
+
+    'ntpd.sys_stratum': {
+        info: 'The distance in "hops" to the primary reference clock',
+        colors: NETDATA.colors[5],
+        height: 0.3
+    },
+
+    'ntpd.sys_tc': {
+        info: 'Time constants and poll intervals are expressed as exponents of 2. The default poll exponent of 6 corresponds to a poll interval of 64 s. For typical Internet paths, the optimum poll interval is about 64 s. For fast LANs with modern computers, a poll exponent of 4 (16 s) is appropriate. The <a href="http://doc.ntp.org/current-stable/poll.html">poll process</a> sends NTP packets at intervals determined by the clock discipline algorithm.',
+        height: 0.5
+    },
+
+    'ntpd.sys_precision': {
+        colors: NETDATA.colors[6],
+        height: 0.2
     }
+
     // ------------------------------------------------------------------------
 };
